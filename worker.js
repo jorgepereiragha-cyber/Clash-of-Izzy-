@@ -314,6 +314,15 @@ export default {
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
+  if(url.pathname==="/api/store/catalog"&&request.method==="GET"){
+    try{
+      const [skins,packages]=await Promise.all([
+        env.DB.prepare("SELECT id,name,price_brl FROM skins ORDER BY price_brl,name").all(),
+        env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages ORDER BY price_brl,name").all()
+      ]);
+      return json({skins:skins.results||[],packages:packages.results||[],whatsapp:"+5547996531437"});
+    }catch(e){return json({error:"Catálogo indisponível no momento."},503)}
+  }
   if(url.pathname==="/api/game/start"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"SESSION_SECRET não configurado no Worker."},503);
     try{
