@@ -12,7 +12,7 @@ header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justif
 <body>
 <header><h1>⚔ CLASH OF IZZY · ADMIN</h1><span class="pill">Painel administrativo</span></header>
 <main>
-<div class="notice"><b>Importante:</b> a interface do painel está preparada, mas o servidor administrativo ainda precisa ser configurado no Cloudflare Workers com autenticação, banco de dados e permissões. Não coloque senhas, chaves privadas ou tokens secretos neste arquivo. Até essa configuração, nenhuma alteração de jogador ou compra será aplicada.</div>
+<section class="card"><h2>🛒 Comprar pacotes e skins</h2><p>Fale pelo WhatsApp para consultar e comprar pacotes VIP e skins de castelo.</p><p><b>Preços das skins:</b> de R$ 50,00 até R$ 1.000,00, definidos individualmente no catálogo.</p><a class="toplink" style="display:inline-block;padding:12px 16px;border:1px solid var(--gold);border-radius:8px;background:#293b4d;text-decoration:none;font-weight:700" href="https://wa.me/5547996531437?text=Ol%C3%A1%21%20Quero%20comprar%20um%20pacote%20ou%20skin%20do%20Clash%20of%20Izzy." target="_blank" rel="noopener">Comprar pelo WhatsApp: +55 47 99653-1437</a></section>\n<div class="notice"><b>Importante:</b> a interface do painel está preparada, mas o servidor administrativo ainda precisa ser configurado no Cloudflare Workers com autenticação, banco de dados e permissões. Não coloque senhas, chaves privadas ou tokens secretos neste arquivo. Até essa configuração, nenhuma alteração de jogador ou compra será aplicada.</div>
 <section id="login" class="card">
 <h2>🔐 Acesso do administrador</h2>
 <label for="email">E-mail administrativo</label><input id="email" type="email" autocomplete="username" placeholder="Seu e-mail">
@@ -27,7 +27,7 @@ header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justif
 <div class="card"><h2>🏰 Skins e castelos</h2><label>ID do jogador</label><input id="skinPlayer" placeholder="ID do jogador"><label>Skin / visual</label><input id="skinName" placeholder="Nome da skin"><button data-action="unlock-skin">Desbloquear skin</button><div id="skinStatus" class="status"></div></div>
 <div class="card"><h2>👑 Pacotes VIP</h2><label>Nome do pacote</label><input id="vipName" placeholder="VIP Prata"><label>Preço em R$ (apenas cadastro)</label><input id="vipPrice" type="number" min="0" step="0.01" placeholder="19.90"><label>Gemas incluídas</label><input id="vipGems" type="number" min="0" placeholder="1000"><button data-action="vip">Cadastrar pacote</button><div id="vipStatus" class="status"></div></div>
 </div>
-<div class="card"><h2>🛍 Catálogo de skins</h2><p class="muted">Estrutura preparada para cadastrar até 200 visuais originais. Os preços e desbloqueios reais serão validados pelo servidor.</p><label>Nome da skin</label><input id="catalogSkin" placeholder="Ex.: Guardião das Cinzas"><label>Preço em gemas</label><input id="catalogPrice" type="number" min="0" placeholder="250"><button data-action="catalog">Adicionar skin ao catálogo</button><div id="catalogStatus" class="status"></div></div>
+<div class="card"><h2>🛍 Catálogo de skins</h2><p class="muted">Estrutura preparada para cadastrar até 200 visuais originais. Os preços e desbloqueios reais serão validados pelo servidor.</p><label>Nome da skin</label><input id="catalogSkin" placeholder="Ex.: Guardião das Cinzas"><label>Preço da skin em reais (R$ 50 a R$ 1.000)</label><input id="catalogPrice" type="number" min="50" max="1000" step="1" placeholder="Ex.: 50"><button data-action="catalog">Adicionar skin ao catálogo</button><div id="catalogStatus" class="status"></div></div>
 <button class="secondary" id="logout">Sair do painel</button>
 </section>
 </main>
@@ -57,9 +57,9 @@ document.querySelectorAll('[data-action]').forEach(btn=>btn.onclick=async()=>{
  'gems':['gems',{playerId:$('resourcePlayer').value,amount:Number($('gemsAmount').value)},'resourceStatus'],
  'unlock-skin':['unlock-skin',{playerId:$('skinPlayer').value,skin:$('skinName').value},'skinStatus'],
  'vip':['vip-packages',{name:$('vipName').value,price:Number($('vipPrice').value),gems:Number($('vipGems').value)},'vipStatus'],
- 'catalog':['skins',{name:$('catalogSkin').value,price:Number($('catalogPrice').value)},'catalogStatus']
+ 'catalog':['skins',{name:$('catalogSkin').value,price:Number($('catalogPrice').value),currency:'BRL'},'catalogStatus']
  };
- const [route,payload,target]=map[action];status(target,'Enviando…');
+ const [route,payload,target]=map[action];if(action==='catalog'&&(!payload.name.trim()||!Number.isFinite(payload.price)||payload.price<50||payload.price>1000)){status(target,'Informe o nome e um preço entre R$ 50 e R$ 1.000.');return;}status(target,'Enviando…');
  try{const result=await api('/'+route,payload);status(target,JSON.stringify(result,null,2))}
  catch(e){status(target,e.message)}
 });
