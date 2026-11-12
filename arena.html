@@ -39,11 +39,49 @@ function mesh(geo,material,x,y,z){const o=new THREE.Mesh(geo,material);o.positio
 const ground=mesh(new THREE.PlaneGeometry(110,78),mats.grass,0,-.12,0);ground.rotation.x=-Math.PI/2;
 for(const z of [-20,0,20]){const lane=mesh(new THREE.BoxGeometry(88,.06,7),mats.road,0,-.04,z);lane.receiveShadow=true;for(let x=-42;x<=42;x+=8){mesh(new THREE.BoxGeometry(1,.04,.18),mat(0xc6b99a),x,.005,z)}}
 for(let i=0;i<34;i++){const x=(Math.random()-.5)*100,z=(Math.random()-.5)*70;if(Math.abs(z)<25)continue;mesh(new THREE.CylinderGeometry(.25,.4,2,6),mats.wood,x,1,z);const crown=mesh(new THREE.ConeGeometry(1.8,4,7),mats.leaf,x,3.5,z)}
-function tower(x,z,team){const base=mesh(new THREE.CylinderGeometry(1.25,1.5,3.4,8),team==='blue'?mats.blue:mats.red,x,1.7,z);const top=mesh(new THREE.ConeGeometry(1.6,2,8),mats.gold,x,4.2,z);return {x,z,team,hp:650,max:650,last:0,mesh:base,top}}
+function tower(x,z,team){
+ const color=team==='blue'?0x315f83:0x813d37,glow=team==='blue'?0x55c9ff:0xff7058;
+ const base=mesh(new THREE.CylinderGeometry(1.65,2,1,10),mat(0x555b5d),x,.5,z);
+ const shaft=mesh(new THREE.CylinderGeometry(1.15,1.45,3.5,10),mat(color),x,2.7,z);
+ const band=mesh(new THREE.TorusGeometry(1.25,.16,8,16),mats.gold,x,3.8,z);
+ const roof=mesh(new THREE.ConeGeometry(1.65,1.5,10),mat(0x302d35),x,5.15,z);
+ const crystal=mesh(new THREE.OctahedronGeometry(.55),mat(glow),x,5.7,z);
+ const crenels=[];
+ for(let i=0;i<8;i++){const a=i*Math.PI/4;crenels.push(mesh(new THREE.BoxGeometry(.42,.65,.42),mat(color),x+Math.cos(a)*1.12,4.25,z+Math.sin(a)*1.12))}
+ return {x,z,team,hp:650,max:650,last:0,mesh:shaft,top:roof,parts:[base,band,crystal,...crenels]}
+}
 const towers=[];for(const z of [-20,0,20]){towers.push(tower(-25,z,'blue'),tower(25,z,'red'))}
-function nexus(x,team){const b=mesh(new THREE.DodecahedronGeometry(3,1),team==='blue'?mat(0x4cb7ff):mat(0xff5148),x,3,0);const ring=mesh(new THREE.TorusGeometry(4,.3,8,32),mats.gold,x,.3,0);ring.rotation.x=Math.PI/2;return {x,team,hp:3000,max:3000,mesh:b,ring}}
+function nexus(x,team){
+ const blue=team==='blue',crystalMat=mat(blue?0x42c9ff:0xff5148),stoneMat=mat(0x454b56);
+ const plinth=mesh(new THREE.CylinderGeometry(4.8,5.5,1.2,8),stoneMat,x,.6,0);
+ const ring=mesh(new THREE.TorusGeometry(4.1,.22,10,48),mats.gold,x,1.35,0);ring.rotation.x=Math.PI/2;
+ const crystal=mesh(new THREE.OctahedronGeometry(3.1,1),crystalMat,x,4.2,0);
+ const shards=[];
+ for(let i=0;i<4;i++){const a=i*Math.PI/2;shards.push(mesh(new THREE.OctahedronGeometry(.8),crystalMat,x+Math.cos(a)*3.2,2.4,x+0+Math.sin(a)*3.2))}
+ return {x,team,hp:3000,max:3000,mesh:crystal,ring,plinth,shards}
+}
 const blueNexus=nexus(-45,'blue'),redNexus=nexus(45,'red');
-function makeHero(x,z,team,enemy=false){const group=new THREE.Group();const body=new THREE.Mesh(new THREE.CapsuleGeometry(.65,.9,4,8),team==='blue'?mat(0x285e9d):mat(0x9d302b));body.position.y=1;group.add(body);const head=new THREE.Mesh(new THREE.SphereGeometry(.42,12,10),mat(0xe2b88d));head.position.y=2;group.add(head);const helm=new THREE.Mesh(new THREE.ConeGeometry(.48,.55,6),mats.gold);helm.position.y=2.45;group.add(helm);const blade=new THREE.Mesh(new THREE.BoxGeometry(.16,1.6,.22),mats.gold);blade.position.set(.75,1.25,0);group.add(blade);group.position.set(x,0,z);scene.add(group);return {group,team,enemy,hp:enemy?1000:1200,max:enemy?1000:1200,mana:100,maxMana:100,damage:enemy?45:65,speed:enemy?8:10,range:3.4,cd:0,dead:false}}
+function makeHero(x,z,team,enemy=false){
+ const group=new THREE.Group(),blue=team==='blue';
+ const armor=mat(blue?0x285e9d:0x8e302b),dark=mat(0x252a32),steel=mat(0xb9c5ca),skin=mat(0xd8ad88);
+ const cape=new THREE.Mesh(new THREE.BoxGeometry(.95,1.65,.12),mat(blue?0x173d67:0x5b1d25));cape.position.set(0,1.25,-.48);cape.rotation.x=-.12;group.add(cape);
+ const torso=new THREE.Mesh(new THREE.CylinderGeometry(.48,.62,1.05,8),armor);torso.position.y=1.35;group.add(torso);
+ const chest=new THREE.Mesh(new THREE.BoxGeometry(.72,.55,.16),steel);chest.position.set(0,1.48,.43);group.add(chest);
+ const emblem=new THREE.Mesh(new THREE.OctahedronGeometry(.19),mats.gold);emblem.position.set(0,1.5,.55);group.add(emblem);
+ for(const side of [-1,1]){
+  const shoulder=new THREE.Mesh(new THREE.DodecahedronGeometry(.36),steel);shoulder.position.set(side*.58,1.75,0);group.add(shoulder);
+  const arm=new THREE.Mesh(new THREE.CylinderGeometry(.16,.2,.68,7),armor);arm.position.set(side*.65,1.25,0);group.add(arm);
+  const leg=new THREE.Mesh(new THREE.CylinderGeometry(.19,.23,.72,7),dark);leg.position.set(side*.25,.42,0);group.add(leg);
+  const boot=new THREE.Mesh(new THREE.BoxGeometry(.42,.2,.58),dark);boot.position.set(side*.25,.12,.12);group.add(boot);
+ }
+ const head=new THREE.Mesh(new THREE.SphereGeometry(.34,14,12),skin);head.position.y=2.12;group.add(head);
+ const helm=new THREE.Mesh(new THREE.ConeGeometry(.48,.62,6),mats.gold);helm.position.y=2.58;group.add(helm);
+ const visor=new THREE.Mesh(new THREE.BoxGeometry(.55,.12,.42),dark);visor.position.set(0,2.16,.25);group.add(visor);
+ const blade=new THREE.Mesh(new THREE.BoxGeometry(.13,1.65,.2),steel);blade.position.set(.88,1.35,.08);blade.rotation.z=-.12;group.add(blade);
+ const guard=new THREE.Mesh(new THREE.BoxGeometry(.5,.13,.22),mats.gold);guard.position.set(.88,.72,.08);group.add(guard);
+ group.position.set(x,0,z);scene.add(group);
+ return {group,team,enemy,hp:enemy?1000:1200,max:enemy?1000:1200,mana:100,maxMana:100,damage:enemy?45:65,speed:enemy?8:10,range:3.4,cd:0,dead:false}
+}
 const player=makeHero(-37,0,'blue'),bot=makeHero(36,0,'red',true);
 const minions=[];function spawnWave(){for(const lane of [-20,0,20])for(let i=0;i<3;i++){const x=-39-i*1.2;const g=mesh(new THREE.BoxGeometry(.8,1.1,.8),mats.blue,x,.55,lane+(Math.random()-.5)*1.5);minions.push({mesh:g,team:'blue',hp:140,max:140,damage:16,speed:4.5,lane,cd:0})}for(const lane of [-20,0,20])for(let i=0;i<3;i++){const x=39+i*1.2;const g=mesh(new THREE.BoxGeometry(.8,1.1,.8),mats.red,x,.55,lane+(Math.random()-.5)*1.5);minions.push({mesh:g,team:'red',hp:140,max:140,damage:16,speed:4.5,lane,cd:0})}}
 spawnWave();setInterval(()=>{if(!ended)spawnWave()},18000);
@@ -53,7 +91,7 @@ window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 document.querySelectorAll('[data-move]').forEach(b=>{const k=b.dataset.move;const on=e=>{e.preventDefault();touch[k]=true},off=e=>{e.preventDefault();touch[k]=false};b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointerleave',off);b.addEventListener('pointercancel',off)});
 function nearestEnemy(max=7){let candidates=[bot,...minions.filter(m=>m.team==='red'&&m.hp>0).map(m=>({group:m.mesh,hp:m.hp,mesh:m.mesh,unit:m}))];let best=null,dist=max;for(const c of candidates){if(c.hp<=0)continue;const p=c.group?.position||c.mesh?.position;if(!p)continue;const d=player.group.position.distanceTo(p);if(d<dist){dist=d;best=c}}return best}
 function hurt(target,amount){if(!target)return; if(target.unit){target.unit.hp-=amount;if(target.unit.hp<=0){scene.remove(target.unit.mesh);gold+=18;kills++;}}else{target.hp-=amount;if(target.hp<=0){target.dead=true;target.group.visible=false;gold+=150;kills++;setTimeout(()=>{if(!ended){target.hp=target.max;target.dead=false;target.group.visible=true;target.group.position.set(36,0,0)}},7000)}}updateHud()}
-function attack(){if(ended)return;const t=nearestEnemy(5);if(t)hurt(t,player.damage+damageBonus);else{const t2=towers.find(t=>t.team==='red'&&player.group.position.distanceTo(new THREE.Vector3(t.x,0,t.z))<5&&t.hp>0);if(t2){t2.hp-=player.damage+damageBonus;if(t2.hp<=0){scene.remove(t2.mesh);scene.remove(t2.top);gold+=100;updateHud()}}else if(player.group.position.distanceTo(new THREE.Vector3(redNexus.x,0,0))<7){redNexus.hp-=player.damage+damageBonus;updateHud();if(redNexus.hp<=0)finish(true)}}}
+function attack(){if(ended)return;const t=nearestEnemy(5);if(t)hurt(t,player.damage+damageBonus);else{const t2=towers.find(t=>t.team==='red'&&player.group.position.distanceTo(new THREE.Vector3(t.x,0,t.z))<5&&t.hp>0);if(t2){t2.hp-=player.damage+damageBonus;if(t2.hp<=0){scene.remove(t2.mesh);scene.remove(t2.top);(t2.parts||[]).forEach(p=>scene.remove(p));gold+=100;updateHud()}}else if(player.group.position.distanceTo(new THREE.Vector3(redNexus.x,0,0))<7){redNexus.hp-=player.damage+damageBonus;updateHud();if(redNexus.hp<=0)finish(true)}}}
 function skill(k){if(ended||player.mana<({q:15,w:20,e:25,r:45}[k]))return;player.mana-=({q:15,w:20,e:25,r:45}[k]);const cost={q:15,w:20,e:25,r:45}[k];if(k==='w'){const dir=player.group.position.x<0?1:1;player.group.position.x=Math.min(42,player.group.position.x+9*dir)}else{const radius=k==='r'?15:k==='e'?9:7,damage=k==='r'?390:k==='e'?180:115;for(const target of [bot,...minions.filter(m=>m.team==='red'&&m.hp>0).map(m=>({group:m.mesh,hp:m.hp,unit:m}))]){const p=target.group?.position;if(p&&player.group.position.distanceTo(p)<radius)hurt(target,damage)}}updateHud()}
 function finish(win){ended=true;const m=document.getElementById('message');m.innerHTML=win?'🏆 VITÓRIA!<br><small>O Nexus inimigo caiu.</small>':'💀 DERROTA';m.style.display='block';}
 function updateHud(){document.getElementById('hp').style.width=Math.max(0,player.hp/player.max*100)+'%';document.getElementById('mp').style.width=player.mana+'%';document.getElementById('gold').textContent=gold;document.getElementById('kills').textContent=kills;document.getElementById('nexusHp').textContent=Math.max(0,Math.ceil(redNexus.hp/redNexus.max*100))+'%'}
@@ -81,7 +119,7 @@ function update(dt,time){if(ended)return;const dx=(keys.d||keys.arrowright||touc
 if(!bot.dead){const d=player.group.position.distanceTo(bot.group.position);if(d>3.5){const dir=player.group.position.clone().sub(bot.group.position).normalize();bot.group.position.addScaledVector(dir,bot.speed*dt*.45)}else{bot.cd-=dt;if(bot.cd<=0){player.hp-=35;bot.cd=1.3;if(player.hp<=0)finish(false)}}}
 for(const m of minions){if(m.hp<=0)continue;m.cd-=dt;const dir=m.team==='blue'?1:-1;const enemy=m.team==='blue'?'red':'blue';const target=minions.find(o=>o.hp>0&&o.team===enemy&&Math.abs(o.mesh.position.x-m.mesh.position.x)<2.5&&Math.abs(o.lane-m.lane)<2);if(target){if(m.cd<=0){target.hp-=m.damage;m.cd=1.1;if(target.hp<=0){scene.remove(target.mesh);if(m.team==='blue')gold+=8}}}else{m.mesh.position.x+=dir*m.speed*dt;if(Math.abs(m.mesh.position.x)>43){m.hp=0;scene.remove(m.mesh)}}}
 for(const t of towers){if(t.team!=='red'||t.hp<=0)continue;t.last-=dt;if(t.last<=0){const target=minions.find(m=>m.team==='blue'&&m.hp>0&&Math.hypot(m.mesh.position.x-t.x,m.mesh.position.z-t.z)<10);if(target){target.hp-=80;t.last=1.1;if(target.hp<=0)scene.remove(target.mesh)}}}
-player.mana=Math.min(player.maxMana,player.mana+7*dt);player.hp=Math.min(player.max,player.hp+2*dt);camera.position.set(player.group.position.x-3,34,player.group.position.z+27);camera.lookAt(player.group.position.x,0,player.group.position.z);redNexus.mesh.rotation.y+=dt*.45;blueNexus.mesh.rotation.y-=dt*.4;updateHud()}
+player.mana=Math.min(player.maxMana,player.mana+7*dt);player.hp=Math.min(player.max,player.hp+2*dt);camera.position.set(player.group.position.x-3,34,player.group.position.z+27);camera.lookAt(player.group.position.x,0,player.group.position.z);redNexus.mesh.rotation.y+=dt*.45;blueNexus.mesh.rotation.y-=dt*.4;redNexus.mesh.position.y=4.2+Math.sin(time*.002)*.22;blueNexus.mesh.position.y=4.2+Math.sin(time*.002+1)*.22;redNexus.shards.forEach((s,i)=>s.rotation.y+=dt*(i%2?1.2:-1.2));blueNexus.shards.forEach((s,i)=>s.rotation.y+=dt*(i%2?1.2:-1.2));updateHud()}
 let last=performance.now();function loop(now){requestAnimationFrame(loop);const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);renderer.render(scene,camera)}requestAnimationFrame(loop);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 updateHud();
