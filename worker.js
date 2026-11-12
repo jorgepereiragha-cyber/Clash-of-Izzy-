@@ -156,9 +156,19 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all()
   ]);
-  const alliance=await env.DB.prepare("SELECT a.id,a.name,a.tag,a.description,am.role,(SELECT COUNT(*) FROM alliance_members x WHERE x.alliance_id=a.id) AS members FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=?").bind(kingdom.id).first();
+  const alliance=await env.DB.prepare("SELECT a.id,a.name,a.tag,a.description,a.level,a.xp,a.max_members,a.territory_count,am.role,am.rank,am.contribution,(SELECT COUNT(*) FROM alliance_members x WHERE x.alliance_id=a.id) AS members FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=?").bind(kingdom.id).first();
+  let allianceDetails=null;
+  if(alliance){
+    const [members,chat,invites,wars]=await Promise.all([
+      env.DB.prepare("SELECT am.kingdom_id,am.rank,am.contribution,k.kingdom_name,k.power FROM alliance_members am JOIN kingdoms k ON k.id=am.kingdom_id WHERE am.alliance_id=? ORDER BY CASE am.rank WHEN 'lider' THEN 4 WHEN 'co_lider' THEN 3 WHEN 'oficial' THEN 2 ELSE 1 END DESC,k.power DESC").bind(alliance.id).all(),
+      env.DB.prepare("SELECT c.id,c.message,c.created_at,k.kingdom_name FROM alliance_chat c JOIN kingdoms k ON k.id=c.kingdom_id WHERE c.alliance_id=? ORDER BY c.id DESC LIMIT 50").bind(alliance.id).all(),
+      env.DB.prepare("SELECT i.id,i.created_at,a.name,a.tag FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.target_kingdom_id=? ORDER BY i.id DESC").bind(kingdom.id).all(),
+      env.DB.prepare("SELECT w.id,w.alliance_a_id,w.alliance_b_id,w.starts_at,w.ends_at,w.status,w.score_a,w.score_b,aa.name AS alliance_a_name,aa.tag AS alliance_a_tag,ab.name AS alliance_b_name,ab.tag AS alliance_b_tag FROM alliance_wars w JOIN alliances aa ON aa.id=w.alliance_a_id JOIN alliances ab ON ab.id=w.alliance_b_id WHERE (w.alliance_a_id=? OR w.alliance_b_id=?) ORDER BY w.id DESC LIMIT 10").bind(alliance.id,alliance.id).all()
+    ]);
+    allianceDetails={...alliance,members:members.results||[],chat:(chat.results||[]).reverse(),invites:invites.results||[],wars:wars.results||[]};
+  }
   const totalTroops=(troops.results||[]).reduce((n,u)=>n+u.quantity,0);
-  return {player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:alliance||null,totalTroops};
+  return {player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -177,6 +187,7 @@ async function gameAction(env,playerId,body){
     try{
       const made=await env.DB.prepare("INSERT INTO alliances(name,tag,leader_kingdom_id,description) VALUES(?,?,?,'Aliança de Eldoria')").bind(name,tag,k.id).run();
       await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) VALUES(?,?,'leader')").bind(made.meta.last_row_id,k.id).run();
+      await env.DB.prepare("UPDATE alliance_members SET rank='lider' WHERE alliance_id=? AND kingdom_id=?").bind(made.meta.last_row_id,k.id).run();
     }catch(e){return json({error:"Nome ou sigla já estão em uso."},409)}
   }else if(type==="alliance_join"){
     const tag=String(body.tag||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5);
@@ -186,6 +197,109 @@ async function gameAction(env,playerId,body){
     const alliance=await env.DB.prepare("SELECT id FROM alliances WHERE tag=?").bind(tag).first();
     if(!alliance)return json({error:"Aliança não encontrada."},404);
     await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) VALUES(?,?,'member')").bind(alliance.id,k.id).run();
+  }else if(type==="alliance_invite"){
+    const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não permite convidar jogadores."},403);
+    const targetName=String(body.targetName||"").trim().slice(0,32);
+    const target=await env.DB.prepare("SELECT id FROM kingdoms WHERE kingdom_name=?").bind(targetName).first();
+    if(!target)return json({error:"Reino não encontrado. Confira o nome exato."},404);
+    if(target.id===k.id)return json({error:"Você já está nesta aliança."},409);
+    const already=await env.DB.prepare("SELECT 1 FROM alliance_members WHERE kingdom_id=?").bind(target.id).first();
+    if(already)return json({error:"Este reino já pertence a uma aliança."},409);
+    const count=await env.DB.prepare("SELECT COUNT(*) AS n FROM alliance_members WHERE alliance_id=?").bind(member.alliance_id).first();
+    const cap=await env.DB.prepare("SELECT max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
+    if(count.n>=cap.max_members)return json({error:"Aliança atingiu o limite de membros."},409);
+    await env.DB.prepare("INSERT OR IGNORE INTO alliance_invites(alliance_id,target_kingdom_id,invited_by_kingdom_id) VALUES(?,?,?)").bind(member.alliance_id,target.id,k.id).run();
+  }else if(type==="alliance_accept_invite"){
+    const inviteId=Number(body.inviteId);
+    const invite=await env.DB.prepare("SELECT i.alliance_id,a.max_members FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.id=? AND i.target_kingdom_id=?").bind(inviteId,k.id).first();
+    if(!invite)return json({error:"Convite não encontrado."},404);
+    const current=await env.DB.prepare("SELECT 1 FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    if(current)return json({error:"Seu reino já pertence a uma aliança."},409);
+    const count=await env.DB.prepare("SELECT COUNT(*) AS n FROM alliance_members WHERE alliance_id=?").bind(invite.alliance_id).first();
+    if(count.n>=invite.max_members)return json({error:"A aliança está cheia."},409);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role,rank) VALUES(?,?,'member','membro')").bind(invite.alliance_id,k.id),
+      env.DB.prepare("DELETE FROM alliance_invites WHERE id=?").bind(inviteId)
+    ]);
+  }else if(type==="alliance_promote"){
+    const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    const targetId=Number(body.targetKingdomId),newRank=String(body.rank||"");
+    const ranks={membro:1,oficial:2,co_lider:3,lider:4};
+    if(!member||!ranks[newRank])return json({error:"Cargo ou aliança inválidos."},400);
+    const target=await env.DB.prepare("SELECT rank FROM alliance_members WHERE alliance_id=? AND kingdom_id=?").bind(member.alliance_id,targetId).first();
+    if(!target)return json({error:"Membro não encontrado."},404);
+    if(member.rank!=="lider"&&!(member.rank==="co_lider"&&newRank==="oficial"&&target.rank==="membro"))return json({error:"Somente o líder pode atribuir esse cargo."},403);
+    if(newRank==="lider")return json({error:"Transfira a liderança pelo painel de gestão."},400);
+    if(ranks[newRank]>=ranks[member.rank]||ranks[target.rank]>=ranks[member.rank])return json({error:"Você não pode alterar um cargo igual ou superior ao seu."},403);
+    await env.DB.prepare("UPDATE alliance_members SET rank=?,role=? WHERE alliance_id=? AND kingdom_id=?").bind(newRank,newRank==="lider"?"leader":newRank==="membro"?"member":"officer",member.alliance_id,targetId).run();
+  }else if(type==="alliance_kick"){
+    const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    const targetId=Number(body.targetKingdomId);
+    const target=await env.DB.prepare("SELECT rank FROM alliance_members WHERE alliance_id=? AND kingdom_id=?").bind(member?.alliance_id,targetId).first();
+    if(!member||!target)return json({error:"Membro não encontrado."},404);
+    const ranks={membro:1,oficial:2,co_lider:3,lider:4};
+    if(ranks[member.rank]<=ranks[target.rank]||member.rank==="oficial")return json({error:"Seu cargo não permite expulsar esse membro."},403);
+    await env.DB.prepare("DELETE FROM alliance_members WHERE alliance_id=? AND kingdom_id=?").bind(member.alliance_id,targetId).run();
+  }else if(type==="alliance_donate"){
+    const member=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    const resource=String(body.resource||""),amount=Number(body.amount);
+    const allowed={food:"shared_food",wood:"shared_wood",stone:"shared_stone",iron:"shared_iron",gold:"shared_gold"};
+    if(!member||!allowed[resource]||!Number.isSafeInteger(amount)||amount<100||amount>1000000)return json({error:"Doação inválida. Mínimo de 100 recursos."},400);
+    const debit=await env.DB.prepare("UPDATE kingdoms SET "+resource+"="+resource+"-? WHERE id=? AND "+resource+">=?").bind(amount,k.id,amount).run();
+    if(!debit.meta.changes)return json({error:"Recursos insuficientes."},409);
+    const xp=Math.floor(amount/100);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE alliances SET "+allowed[resource]+"="+allowed[resource]+"+?,xp=xp+? WHERE id=?").bind(amount,xp,member.alliance_id),
+      env.DB.prepare("UPDATE alliance_members SET contribution=contribution+? WHERE alliance_id=? AND kingdom_id=?").bind(xp,member.alliance_id,k.id),
+      env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(k.id,resource,-amount,"doação para aliança")
+    ]);
+    let a=await env.DB.prepare("SELECT level,xp,max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
+    while(a.xp>=a.level*1000){
+      const need=a.level*1000;
+      await env.DB.prepare("UPDATE alliances SET xp=xp-?,level=level+1,max_members=max_members+10 WHERE id=? AND level=?").bind(need,member.alliance_id,a.level).run();
+      a=await env.DB.prepare("SELECT level,xp,max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
+    }
+  }else if(type==="alliance_help"){
+    const member=await env.DB.prepare("SELECT alliance_id,help_count,help_reset_at FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    const targetId=Number(body.targetKingdomId);
+    const target=await env.DB.prepare("SELECT kingdom_name FROM alliance_members am JOIN kingdoms k ON k.id=am.kingdom_id WHERE am.alliance_id=? AND am.kingdom_id=?").bind(member?.alliance_id,targetId).first();
+    if(!member||!target)return json({error:"Membro não encontrado nesta aliança."},404);
+    const today=new Date().toISOString().slice(0,10),used=member.help_reset_at===today?member.help_count:0;
+    const alliance=await env.DB.prepare("SELECT level FROM alliances WHERE id=?").bind(member.alliance_id).first();
+    if(used>=5+alliance.level*2)return json({error:"Você atingiu o limite diário de ajudas."},409);
+    await env.DB.prepare("UPDATE alliance_members SET help_count=?,help_reset_at=? WHERE alliance_id=? AND kingdom_id=?").bind(used+1,today,member.alliance_id,k.id).run();
+    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(targetId,"alliance_help",JSON.stringify({from:k.id,fromName:k.kingdom_name||"Aliado"})).run();
+  }else if(type==="alliance_chat"){
+    const member=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    const message=String(body.message||"").trim().slice(0,300);
+    if(!member)return json({error:"Você não pertence a uma aliança."},409);
+    if(!message)return json({error:"Digite uma mensagem."},400);
+    await env.DB.prepare("INSERT INTO alliance_chat(alliance_id,kingdom_id,message) VALUES(?,?,?)").bind(member.alliance_id,k.id,message).run();
+    await env.DB.prepare("DELETE FROM alliance_chat WHERE alliance_id=? AND id NOT IN (SELECT id FROM alliance_chat WHERE alliance_id=? ORDER BY id DESC LIMIT 50)").bind(member.alliance_id,member.alliance_id).run();
+  }else if(type==="alliance_war_declare"){
+    const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    const targetTag=String(body.targetTag||"").trim().toUpperCase();
+    if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não pode declarar guerra."},403);
+    const enemy=await env.DB.prepare("SELECT id FROM alliances WHERE tag=?").bind(targetTag).first();
+    if(!enemy||enemy.id===member.alliance_id)return json({error:"Aliança adversária inválida."},404);
+    const active=await env.DB.prepare("SELECT id FROM alliance_wars WHERE status='active' AND ends_at>? AND ((alliance_a_id=? AND alliance_b_id=?) OR (alliance_a_id=? AND alliance_b_id=?))").bind(new Date().toISOString(),member.alliance_id,enemy.id,enemy.id,member.alliance_id).first();
+    if(active)return json({error:"Já existe uma guerra ativa entre essas alianças."},409);
+    const start=new Date(),end=new Date(start.getTime()+24*60*60*1000);
+    await env.DB.prepare("INSERT INTO alliance_wars(alliance_a_id,alliance_b_id,starts_at,ends_at) VALUES(?,?,?,?)").bind(member.alliance_id,enemy.id,start.toISOString(),end.toISOString()).run();
+  }else if(type==="alliance_claim_territory"){
+    const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    const territoryId=Number(body.territoryId);
+    if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não pode reivindicar território."},403);
+    const t=await env.DB.prepare("SELECT id,alliance_id,owner_kingdom_id FROM world_territories WHERE id=?").bind(territoryId).first();
+    if(!t)return json({error:"Território não encontrado."},404);
+    if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
+    const cost=await env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000").bind(member.alliance_id).run();
+    if(!cost.meta.changes)return json({error:"A aliança precisa de 1.000 comida e 1.000 madeira no depósito."},409);
+    if(!t.alliance_id){
+      await env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL").bind(member.alliance_id,territoryId).run();
+      await env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=?").bind(member.alliance_id).run();
+    }
   }else if(type==="alliance_leave"){
     const membership=await env.DB.prepare("SELECT alliance_id,role FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(!membership)return json({error:"Seu reino não pertence a uma aliança."},409);
