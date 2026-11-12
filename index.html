@@ -58,7 +58,7 @@ function applyServerState(data){
  if(!data||!data.kingdom)return;const k=data.kingdom;
  for(const key of ['wood','stone','food','iron','gold'])state[key]=Number(k[key]||0);
  state.gems=Number(data.player?.gems||0);state.level=Number(k.castle_level||1);state.soldiers=Number(data.totalTroops||0);
- state.serverKingdomName=k.kingdom_name;state.serverTroops=data.troops||[];state.serverHeroes=data.heroes||[];state.serverDragon=data.dragon;state.serverResearch=data.research||[];state.serverTerritories=data.territories||[];state.serverMarches=data.marches||[];state.serverBattleReports=data.battleReports||[];
+ state.serverKingdomName=k.kingdom_name;state.serverBuildings=data.buildings||[];state.serverTroops=data.troops||[];state.serverHeroes=data.heroes||[];state.serverDragon=data.dragon;state.serverResearch=data.research||[];state.serverTerritories=data.territories||[];state.serverMarches=data.marches||[];state.serverBattleReports=data.battleReports||[];
  state.buildingLevels={Quartel:1,Fazenda:1,'Mina de pedra':1,Mercado:1};
  for(const b of data.buildings||[]){const name=Object.keys(BUILDING_KEYS).find(n=>BUILDING_KEYS[n]===b.building_type);if(name)state.buildingLevels[name]=b.level;}
  state.lastProduction=Date.now();save();if(typeof applyBuildingLevels==='function')applyBuildingLevels();
@@ -112,7 +112,18 @@ const road=box('Estrada',0,.03,14,5,.05,22,mat(0x9b8b70),false);
 const loader=new GLTFLoader();let imported=null;
 function showToast(t){let e=document.getElementById('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2300)}
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();renderer.domElement.addEventListener('click',e=>{mouse.x=e.clientX/innerWidth*2-1;mouse.y=-(e.clientY/innerHeight)*2+1;ray.setFromCamera(mouse,camera);let hits=ray.intersectObjects(buildings);if(hits.length){let n=hits[0].object.userData.name;document.getElementById('selection').textContent=n;state.selectedBuilding=BUILDING_KEYS[n]||'castle';document.getElementById('upgrade').textContent='⬆ Melhorar '+n;showToast(n+' selecionado')}});
-function applyBuildingLevels(){for(const [name,lvl] of Object.entries(state.buildingLevels)){const b=buildingMeshes[name];if(!b)continue;const h=b.userData.baseHeight*(1+(lvl-1)*.18);b.scale.y=h/b.userData.baseHeight;b.position.y=h/2;}}
+function applyBuildingLevels(){
+  const visualNames={castle:'Castelo de Eldoria',barracks:'Quartel',farm:'Fazenda',quarry:'Mina de pedra',market:'Mercado',lumber_mill:'Serraria',iron_mine:'Mina de ferro',academy:'Academia',wall:'Muralha',hospital:'Hospital',watchtower:'Torre de vigia',stable:'Estábulo',archery_range:'Campo de arqueiros',siege_workshop:'Oficina de cerco',embassy:'Embaixada',warehouse:'Armazém'};
+  const palette={lumber_mill:0x76502b,iron_mine:0x555b62,academy:0x53658a,wall:0x88877e,hospital:0xb8b5a4,watchtower:0x777b80,stable:0x795332,archery_range:0x8c7548,siege_workshop:0x55483e,embassy:0x94733f,warehouse:0x8a6744};
+  for(const row of state.serverBuildings||[]){
+    const name=visualNames[row.building_type];if(!name||buildingMeshes[name])continue;
+    const x=Number(row.position_x)||0,z=Number(row.position_z)||0;
+    const base=makeBuilding(name,x,z,4.5,3.2,4.5,mat(palette[row.building_type]||0x777777));
+    const cap=new THREE.Mesh(new THREE.ConeGeometry(3.1,2.1,4),roof);cap.position.set(x,4.2,z);cap.rotation.y=Math.PI/4;scene.add(cap);
+    base.userData.cap=cap;
+  }
+  for(const [name,lvl] of Object.entries(state.buildingLevels)){const b=buildingMeshes[name];if(!b)continue;const h=b.userData.baseHeight*(1+(lvl-1)*.18);b.scale.y=h/b.userData.baseHeight;b.position.y=h/2;if(b.userData.cap)b.userData.cap.position.y=h+1;}
+}
 applyBuildingLevels();
 document.getElementById('upgrade').onclick=async()=>{await serverReady;if(serverOnline){try{await sendGameAction({type:'upgrade',building:state.selectedBuilding||'castle'});keep.scale.y=1+(state.level-1)*.12;keep.position.y=3.5*keep.scale.y;applyBuildingLevels();return showToast('Edifício melhorado e salvo no servidor!')}catch(e){return showToast(e.message)}}const costWood=300*state.level,costStone=150*state.level;if(state.wood<costWood||state.stone<costStone)return showToast('Recursos insuficientes!');state.wood-=costWood;state.stone-=costStone;state.level++;keep.scale.y=1+(state.level-1)*.12;keep.position.y=3.5*keep.scale.y;save();showToast('Castelo evoluiu para nível '+state.level+'!')};
 document.getElementById('train').onclick=async()=>{await serverReady;if(serverOnline){try{await sendGameAction({type:'train',unit:'militia',quantity:10});for(let i=0;i<10;i++)troopGroups.push(makeSoldier(-3+(i%5)*.8,7+Math.floor(i/5)*.8));return showToast('10 milicianos treinados e salvos!')}catch(e){return showToast(e.message)}}if(state.food<100)return showToast('Comida insuficiente!');state.food-=100;state.soldiers+=10;for(let i=0;i<10;i++)troopGroups.push(makeSoldier(-3+(i%5)*.8,7+Math.floor(i/5)*.8));save();showToast('10 soldados recrutados e posicionados no reino!')};
