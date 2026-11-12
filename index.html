@@ -49,6 +49,8 @@ import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.m
 import { OrbitControls } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js';
 import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/loaders/GLTFLoader.js';
 const state=JSON.parse(localStorage.getItem('izzy-save')||'null')||{wood:1200,stone:900,food:1500,gold:650,gems:50,level:1,soldiers:30,skins:['Cavaleiro do Reino'],skin:'Cavaleiro do Reino',quests:0};
+state.buildingLevels=state.buildingLevels||{Quartel:1,Fazenda:1,'Mina de pedra':1,Mercado:1};
+state.lastProduction=state.lastProduction||Date.now();
 const save=()=>{localStorage.setItem('izzy-save',JSON.stringify(state));for(const k of ['wood','stone','food','gold','gems','level'])document.getElementById(k).textContent=state[k]};
 save();
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x9bb5c0);scene.fog=new THREE.Fog(0x9bb5c0,45,100);
@@ -63,6 +65,7 @@ const floor=new THREE.Mesh(new THREE.PlaneGeometry(120,120),grass);floor.rotatio
 const river=new THREE.Mesh(new THREE.PlaneGeometry(11,90),water);river.rotation.x=-Math.PI/2;river.position.set(-28,.02,0);scene.add(river);
 for(let i=0;i<22;i++){let x=(Math.random()-.5)*75,z=(Math.random()-.5)*75;if(Math.abs(x)<17&&Math.abs(z)<17)continue;let trunk=box('Árvore',x,1,z,.45,2,.45,wood,false);let crown=new THREE.Mesh(new THREE.ConeGeometry(1.6,4,7),mat(0x31533a));crown.position.set(x,3.5,z);crown.castShadow=true;scene.add(crown)}
 const buildings=[];
+const buildingMeshes={};
 const troopGroups=[];
 let marching=false;
 function makeSoldier(x,z){
@@ -75,7 +78,7 @@ function makeSoldier(x,z){
 }
 for(let i=0;i<12;i++)troopGroups.push(makeSoldier(-3+(i%4)*.8,7+Math.floor(i/4)*.8));
 function tower(x,z){let b=box('Torre de defesa',x,2,z,3,4,3,stone);let r=new THREE.Mesh(new THREE.ConeGeometry(2.5,2.7,4),roof);r.position.set(x,5.3,z);r.rotation.y=Math.PI/4;scene.add(r);buildings.push(b)}
-function makeBuilding(name,x,z,w,h,d,material){let b=box(name,x,h/2,z,w,h,d,material);buildings.push(b);return b}
+function makeBuilding(name,x,z,w,h,d,material){let b=box(name,x,h/2,z,w,h,d,material);b.userData.baseHeight=h;b.userData.baseWidth=w;b.userData.baseDepth=d;buildingMeshes[name]=b;buildings.push(b);return b}
 const keep=makeBuilding('Castelo de Eldoria',0,0,9,7,8,stone);tower(-5,-5);tower(5,-5);tower(-5,5);tower(5,5);
 let gate=box('Portão real',0,1.5,4.2,3,3,.5,wood);buildings.push(gate);
 let barracks=makeBuilding('Quartel',-11,2,5,3.5,5,wood);let farm=makeBuilding('Fazenda',11,2,5,2.5,5,mat(0x9b874a));let mine=makeBuilding('Mina de pedra',-11,-10,5,3,5,dark);let market=makeBuilding('Mercado',11,-10,5,3,5,mat(0x986c37));
@@ -86,9 +89,11 @@ const road=box('Estrada',0,.03,14,5,.05,22,mat(0x9b8b70),false);
 const loader=new GLTFLoader();let imported=null;
 function showToast(t){let e=document.getElementById('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2300)}
 const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();renderer.domElement.addEventListener('click',e=>{mouse.x=e.clientX/innerWidth*2-1;mouse.y=-(e.clientY/innerHeight)*2+1;ray.setFromCamera(mouse,camera);let hits=ray.intersectObjects(buildings);if(hits.length){let n=hits[0].object.userData.name;document.getElementById('selection').textContent=n;showToast(n+' selecionado')}});
-document.getElementById('upgrade').onclick=()=>{if(state.wood<300||state.stone<150)return showToast('Recursos insuficientes!');state.wood-=300;state.stone-=150;state.level++;save();showToast('Castelo evoluiu para nível '+state.level+'!')};
-document.getElementById('train').onclick=()=>{if(state.food<100)return showToast('Comida insuficiente!');state.food-=100;state.soldiers+=10;save();showToast('10 soldados recrutados!')};
-document.getElementById('collect').onclick=()=>{state.wood+=100;state.stone+=75;state.food+=120;state.gold+=35;save();showToast('Produção recolhida! +recursos')};
+function applyBuildingLevels(){for(const [name,lvl] of Object.entries(state.buildingLevels)){const b=buildingMeshes[name];if(!b)continue;const h=b.userData.baseHeight*(1+(lvl-1)*.18);b.scale.y=h/b.userData.baseHeight;b.position.y=h/2;}}
+applyBuildingLevels();
+document.getElementById('upgrade').onclick=()=>{const costWood=300*state.level,costStone=150*state.level;if(state.wood<costWood||state.stone<costStone)return showToast('Recursos insuficientes!');state.wood-=costWood;state.stone-=costStone;state.level++;keep.scale.y=1+(state.level-1)*.12;keep.position.y=3.5*keep.scale.y;save();showToast('Castelo evoluiu para nível '+state.level+'!')};
+document.getElementById('train').onclick=()=>{if(state.food<100)return showToast('Comida insuficiente!');state.food-=100;state.soldiers+=10;for(let i=0;i<10;i++)troopGroups.push(makeSoldier(-3+(i%5)*.8,7+Math.floor(i/5)*.8));save();showToast('10 soldados recrutados e posicionados no reino!')};
+document.getElementById('collect').onclick=()=>{state.wood+=100*state.buildingLevels.Quartel;state.stone+=75*state.buildingLevels['Mina de pedra'];state.food+=120*state.buildingLevels.Fazenda;state.gold+=35*state.buildingLevels.Mercado;save();showToast('Produção recolhida conforme o nível dos edifícios!')};
 document.getElementById('march').onclick=()=>{marching=!marching;showToast(marching?'Tropas avançando para o portão!':'Tropas retornando ao castelo')};
 function openModal(key){let body=document.getElementById('modalbody');let content={
 heroes:`<h2>👑 Heróis de Eldoria</h2><p><b>Sir Kael, Guardião do Sol</b> — comandante inicial. Bônus de defesa: +5%.</p><p><b>Lyra, Arqueira da Aurora</b> — desbloqueio futuro.</p><p><b>Tharok, Senhor das Montanhas</b> — desbloqueio futuro.</p>`,
@@ -109,5 +114,6 @@ window.createAlliance=()=>{let n=document.getElementById('allianceName').value.t
 window.resetGame=()=>{localStorage.removeItem('izzy-save');location.reload()};
 document.getElementById('modelFile').onchange=e=>{let f=e.target.files[0];if(!f)return;let url=URL.createObjectURL(f);loader.load(url,g=>{if(imported)scene.remove(imported);imported=g.scene;imported.scale.setScalar(3);imported.position.set(0,0,0);scene.add(imported);showToast('Modelo 3D importado!')},undefined,err=>showToast('Não foi possível carregar o modelo'))};
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+setInterval(()=>{const elapsed=Math.min(60,Math.floor((Date.now()-state.lastProduction)/1000));if(elapsed>0){state.wood+=elapsed*0.15*state.buildingLevels.Quartel;state.stone+=elapsed*0.10*state.buildingLevels['Mina de pedra'];state.food+=elapsed*0.18*state.buildingLevels.Fazenda;state.gold+=elapsed*0.05*state.buildingLevels.Mercado;state.lastProduction=Date.now();save();}},1000);
 function animate(){requestAnimationFrame(animate);const now=performance.now()*.001;troopGroups.forEach((g,i)=>{const p=g.userData.phase;if(marching){g.position.z=7+((now*2+i*1.7)%12);g.position.x=-3+(i%4)*.8+Math.sin(now*3+p)*.12;}else{g.position.x=g.userData.startX+Math.sin(now*1.4+p)*.12;g.position.z=g.userData.startZ+Math.cos(now*1.4+p)*.12;}g.rotation.y=marching?Math.PI:Math.sin(now+p)*.08;});renderer.render(scene,camera)}animate();
 </script></body></html>
