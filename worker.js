@@ -177,7 +177,7 @@ async function gameAction(env,playerId,body){
     const defenderPower=80+Number(k.castle_level||1)*95;
     const variance=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const won=attackerPower*variance>=defenderPower;
-    const lossRate=won?.06:.24;
+    const lossRate=won ? 0.06 : 0.24;
     const losses={};
     const statements=(units.results||[]).map(u=>{
       const lost=Math.min(u.quantity,Math.floor(u.quantity*lossRate));
