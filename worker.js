@@ -155,8 +155,9 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all()
   ]);
+  const alliance=await env.DB.prepare("SELECT a.id,a.name,a.tag,a.description,am.role,(SELECT COUNT(*) FROM alliance_members x WHERE x.alliance_id=a.id) AS members FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=?").bind(kingdom.id).first();
   const totalTroops=(troops.results||[]).reduce((n,u)=>n+u.quantity,0);
-  return {player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],totalTroops};
+  return {player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:alliance||null,totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -166,7 +167,33 @@ async function gameAction(env,playerId,body){
   await applyProduction(env,k.id);
   const type=String(body.type||"");
   let battleOutcome=null;
-  if(type==="upgrade"){
+  if(type==="alliance_create"){
+    const name=String(body.name||"").trim().slice(0,32);
+    const tag=String(body.tag||name.replace(/[^a-z0-9]/gi,"").slice(0,4)).toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5);
+    if(name.length<3||tag.length<2)return json({error:"Informe nome com 3 caracteres e sigla com 2 a 5 letras."},400);
+    const existing=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    if(existing)return json({error:"Seu reino já pertence a uma aliança."},409);
+    try{
+      const made=await env.DB.prepare("INSERT INTO alliances(name,tag,leader_kingdom_id,description) VALUES(?,?,?,'Aliança de Eldoria')").bind(name,tag,k.id).run();
+      await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) VALUES(?,?,'leader')").bind(made.meta.last_row_id,k.id).run();
+    }catch(e){return json({error:"Nome ou sigla já estão em uso."},409)}
+  }else if(type==="alliance_join"){
+    const tag=String(body.tag||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5);
+    if(!tag)return json({error:"Informe a sigla da aliança."},400);
+    const existing=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    if(existing)return json({error:"Seu reino já pertence a uma aliança."},409);
+    const alliance=await env.DB.prepare("SELECT id FROM alliances WHERE tag=?").bind(tag).first();
+    if(!alliance)return json({error:"Aliança não encontrada."},404);
+    await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) VALUES(?,?,'member')").bind(alliance.id,k.id).run();
+  }else if(type==="alliance_leave"){
+    const membership=await env.DB.prepare("SELECT alliance_id,role FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
+    if(!membership)return json({error:"Seu reino não pertence a uma aliança."},409);
+    if(membership.role==="leader"){
+      const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM alliance_members WHERE alliance_id=?").bind(membership.alliance_id).first();
+      if(count.total>1)return json({error:"O líder deve transferir a liderança antes de sair."},409);
+      await env.DB.prepare("DELETE FROM alliances WHERE id=?").bind(membership.alliance_id).run();
+    }else await env.DB.prepare("DELETE FROM alliance_members WHERE kingdom_id=?").bind(k.id).run();
+  }else if(type==="upgrade"){
     const key=String(body.building||"");
     if(!BUILDINGS[key])return json({error:"Edifício inválido."},400);
     const b=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type=?").bind(k.id,key).first();
