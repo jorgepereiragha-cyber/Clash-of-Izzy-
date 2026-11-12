@@ -465,6 +465,8 @@ async function gameAction(env,playerId,body){
     if(won)for(const [resource,amount] of Object.entries(rewards))if(amount>0)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(k.id,resource,amount,"recompensa de batalha PvE"));
     await env.DB.batch(statements);
     battleOutcome={won,attackerPower,defenderPower,losses,rewards,message:won?"Vitória! O reino recebeu recursos.":"Derrota! Reorganize o exército e tente novamente."};
+    const activeHero=await env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first();
+    if(activeHero){const cap=HERO_RARITY[activeHero.rarity]?.maxLevel||30;let level=activeHero.level,xp=activeHero.experience+(won?100:40);while(level<cap&&xp>=level*50){xp-=level*50;level++;}await env.DB.prepare("UPDATE hero_inventory SET level=?,experience=? WHERE kingdom_id=? AND hero_key=?").bind(level,xp,k.id,activeHero.hero_key).run();battleOutcome.heroProgress={hero:activeHero.hero_key,level,experience:xp,gained:won?100:40};}
   }else if(type==="rename"){
     const name=String(body.name||"").trim().slice(0,32);if(name.length<3)return json({error:"O nome deve ter de 3 a 32 caracteres."},400);
     await env.DB.prepare("UPDATE kingdoms SET kingdom_name=? WHERE id=?").bind(name,k.id).run();
