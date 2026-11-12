@@ -14,6 +14,7 @@ header{padding:20px 22px;border-bottom:1px solid var(--line);background:#090b10d
 <main>
 <section class="hero"><div class="eyebrow">Erga seu reino · Comande seu destino</div><h2>O reino não se conquista sozinho.</h2><p>Clash of Izzy é um universo medieval de estratégia onde cada jogador desenvolve seu castelo, administra recursos, fortalece seu exército e disputa território. Planeje suas construções, forme alianças e prepare suas tropas para batalhas épicas.</p><div class="features"><div class="feature"><b>🏰 Construa</b><span class="muted">Evolua seu castelo e fortaleça seu reino.</span></div><div class="feature"><b>⚔️ Lute</b><span class="muted">Organize tropas e enfrente seus rivais.</span></div><div class="feature"><b>🤝 Faça alianças</b><span class="muted">Una forças e cresça com outros jogadores.</span></div><div class="feature"><b>💎 Personalize</b><span class="muted">Conheça skins e pacotes especiais.</span></div></div></section>
 <section class="card"><h2>🛒 Comprar pacotes e skins</h2><p>Fale pelo WhatsApp para consultar e comprar pacotes VIP e skins de castelo.</p><p><b>Preços das skins:</b> de R$ 50,00 até R$ 1.000,00, definidos individualmente no catálogo.</p><a class="toplink" style="display:inline-block;padding:12px 16px;border:1px solid var(--gold);border-radius:8px;background:#293b4d;text-decoration:none;font-weight:700" href="https://wa.me/5547996531437?text=Ol%C3%A1%21%20Quero%20comprar%20um%20pacote%20ou%20skin%20do%20Clash%20of%20Izzy." target="_blank" rel="noopener">Comprar pelo WhatsApp: +55 47 99653-1437</a></section>\n<div class="notice"><b>Importante:</b> a interface do painel está preparada, mas o servidor administrativo ainda precisa ser configurado no Cloudflare Workers com autenticação, banco de dados e permissões. Não coloque senhas, chaves privadas ou tokens secretos neste arquivo. Até essa configuração, nenhuma alteração de jogador ou compra será aplicada.</div>
+<section class="card" id="serverHealth"><h2>🔎 Estado do servidor</h2><p id="healthStatus" class="status">Verificando configuração segura…</p></section>
 <section id="login" class="card">
 <h2>🔐 Acesso do administrador</h2>
 <label for="email">E-mail administrativo</label><input id="email" type="email" name="username" autocomplete="username" placeholder="Seu e-mail">
@@ -45,15 +46,25 @@ async function api(path,body){
  if(!res.ok)throw new Error(data.error||'Falha na solicitação ('+res.status+').');
  return data;
 }
+async function checkServerHealth(){
+ try{
+  const r=await fetch(API_BASE+'/health',{cache:'no-store'});const h=await r.json();
+  const missing=[];if(!h.hasDB)missing.push('Banco D1 (DB)');if(!h.hasADMIN_EMAIL)missing.push('ADMIN_EMAIL');if(!h.hasADMIN_PASSWORD)missing.push('ADMIN_PASSWORD');if(!h.hasSESSION_SECRET)missing.push('SESSION_SECRET');
+  if(missing.length){$('healthStatus').textContent='Servidor encontrado, mas falta configurar: '+missing.join(', ')+'. O login ficará indisponível até corrigir esses itens em Workers e Pages > clash-of-izzy > Configurações > Variáveis e segredos.';}
+  else $('healthStatus').textContent='Servidor, banco D1 e três segredos administrativos detectados. Já é possível testar o login.';
+ }catch(e){$('healthStatus').textContent='Não foi possível consultar o Worker. Confira se o endereço do site está apontando para o Worker clash-of-izzy.';}
+}
+checkServerHealth();
 const savedEmail=localStorage.getItem('clash_admin_email');if(savedEmail){$('email').value=savedEmail;$('rememberEmail').checked=true;}
 $('rememberEmail').onchange=()=>{if($('rememberEmail').checked){if($('email').value.trim())localStorage.setItem('clash_admin_email',$('email').value.trim());}else localStorage.removeItem('clash_admin_email');};
 $('email').addEventListener('change',()=>{if($('rememberEmail').checked)localStorage.setItem('clash_admin_email',$('email').value.trim());});
 $('togglePassword').onclick=()=>{const show=$('password').type==='password';$('password').type=show?'text':'password';$('togglePassword').textContent=show?'Ocultar':'Mostrar';};
 $('loginBtn').onclick=async()=>{
  status('loginStatus','Conectando…');
+ if(!$('email').value.trim()||!$('password').value){status('loginStatus','Informe o e-mail e a senha administrativa.');return;}
  try{
   const res=await fetch(API_BASE+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value,password:$('password').value})});
-  const data=await res.json();if(!res.ok||!data.token)throw new Error(data.error||'Servidor de autenticação ainda não configurado.');
+  const data=await res.json();if(!res.ok||!data.token){if(res.status===503)checkServerHealth();throw new Error(data.error||'Servidor de autenticação ainda não configurado.');}
   adminToken=data.token;$('login').classList.add('hidden');$('dashboard').classList.remove('hidden');status('loginStatus','Acesso autorizado.');
  }catch(e){status('loginStatus',e.message)}
 };
