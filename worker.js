@@ -39,6 +39,58 @@ const HERO_RARITY={white:{label:"Branco · Comum",multiplier:1,fragments:5,maxLe
 const HERO_STAR_COST={2:10,3:20,4:40,5:80,6:150,7:300};
 async function ensureHeroTables(env){await env.DB.batch([env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_inventory (kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 1,experience INTEGER NOT NULL DEFAULT 0,stars INTEGER NOT NULL DEFAULT 1,skill_level INTEGER NOT NULL DEFAULT 1,fragments INTEGER NOT NULL DEFAULT 0,acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,hero_key))"),env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_summon_history (id INTEGER PRIMARY KEY AUTOINCREMENT,kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,result_type TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")]);}
 
+
+const COSMETIC_SKINS={
+ c1:{name:"Pedra Antiga",icon:"🏰",rarity:"comum",theme:"Medieval",atk:5,def:5},c2:{name:"Madeira Rústica",icon:"🏚️",rarity:"comum",theme:"Viking",atk:6,def:4},c3:{name:"Aço Forjado",icon:"⚙️",rarity:"comum",theme:"Industrial",atk:7,def:6},c4:{name:"Areia do Deserto",icon:"🏜️",rarity:"comum",theme:"Egípcio",atk:5,def:7},c5:{name:"Gelo Eterno",icon:"❄️",rarity:"comum",theme:"Nórdico",atk:6,def:6},c6:{name:"Floresta Verde",icon:"🌲",rarity:"comum",theme:"Élfico",atk:5,def:8},c7:{name:"Vulcão",icon:"🌋",rarity:"comum",theme:"Vulcânico",atk:8,def:5},c8:{name:"Oceano",icon:"🌊",rarity:"comum",theme:"Marinho",atk:6,def:7},
+ r1:{name:"Ouro Envelhecido",icon:"👑",rarity:"rara",theme:"Real",atk:12,def:10},r2:{name:"Cristal Azul",icon:"💎",rarity:"rara",theme:"Cristalino",atk:10,def:13},r3:{name:"Esmeralda",icon:"💚",rarity:"rara",theme:"Élfico",atk:11,def:12},r4:{name:"Rubi Sangrento",icon:"❤️",rarity:"rara",theme:"Vampírico",atk:14,def:10},r5:{name:"Ametista",icon:"💜",rarity:"rara",theme:"Arcano",atk:12,def:12},
+ e1:{name:"Diamante Eterno",icon:"💠",rarity:"épica",theme:"Supremo",atk:20,def:20},e2:{name:"Fogo Dracônico",icon:"🔥",rarity:"épica",theme:"Dragão",atk:25,def:15},e3:{name:"Trovão Divino",icon:"⚡",rarity:"épica",theme:"Tempestade",atk:22,def:22},e4:{name:"Sombra Demoníaca",icon:"👹",rarity:"épica",theme:"Abissal",atk:28,def:18},
+ l1:{name:"Dragão Primordial",icon:"🐉",rarity:"lendária",theme:"Supremo",atk:45,def:35},l2:{name:"Celestial Divino",icon:"✨",rarity:"lendária",theme:"Celestial",atk:35,def:50},l3:{name:"Caos Primordial",icon:"🌀",rarity:"lendária",theme:"Caos",atk:48,def:48}
+};
+const COSMETIC_COLLECTIONS=[
+ {id:"col_medieval",name:"Coleção Medieval",icon:"🏰",desc:"Complete as skins medievais",skins:["c1","c2","c3"],gems:500,shards:20},
+ {id:"col_elemental",name:"Coleção Elemental",icon:"🌊",desc:"Domine os elementos",skins:["c5","c6","c7","c8"],gems:1000,shards:40},
+ {id:"col_rara",name:"Mestre das Raras",icon:"💎",desc:"Colecione todas as skins raras",skins:["r1","r2","r3","r4","r5"],gems:2000,shards:60},
+ {id:"col_epica",name:"Lenda Épica",icon:"🔥",desc:"Obtenha todas as skins épicas",skins:["e1","e2","e3","e4"],gems:5000,shards:100},
+ {id:"col_lendaria",name:"Panteão Lendário",icon:"👑",desc:"Alcance todas as lendárias",skins:["l1","l2","l3"],gems:15000,shards:300},
+ {id:"col_completa",name:"Colecionador Supremo",icon:"🏆",desc:"Complete todas as coleções",skins:[],special:true,gems:50000,shards:1000}
+];
+const SEASON_END="2026-11-30T23:59:59.000Z";
+const SEASONAL_COSMETICS=[
+ {id:"s1",name:"Abóbora Assombrada",icon:"🎃",theme:"Halloween",atk:30,def:25,special:"+15% dano sombrio · +10% roubo de vida",price:3000},
+ {id:"s2",name:"Castelo dos Mortos",icon:"💀",theme:"Necromante",atk:35,def:30,special:"+20% invocações · +15% defesa contra luz",price:4500},
+ {id:"s3",name:"Fortaleza Vampírica",icon:"🧛",theme:"Vampiro Lorde",atk:40,def:35,special:"+25% roubo de vida · +20% velocidade noturna",price:6000},
+ {id:"s4",name:"Mansão Fantasma",icon:"👻",theme:"Assombração",atk:32,def:38,special:"+30% evasão · +15% imunidade a atordoamento",price:5000},
+ {id:"s5",name:"Teia Demoníaca",icon:"🕷️",theme:"Aracnídeo",atk:38,def:32,special:"+20% imobilização · +25% dano venenoso",price:5500},
+ {id:"s6",name:"Noite Eterna",icon:"🦇",theme:"Lenda Sombria",atk:50,def:45,special:"+40% atributos sombrios · aura assombrada",price:12000,legendary:true}
+];
+const SKIN_FUSIONS=[
+ {inputs:["c1","c2","c3"],output:{id:"f_medieval",name:"Fortaleza Medieval Suprema",icon:"🏰",rarity:"fundida",atk:25,def:25,special:"+15% atributos medievais"}},
+ {inputs:["c5","c6","c7"],output:{id:"f_elemental",name:"Convergência Elemental",icon:"🌪️",rarity:"fundida",atk:28,def:22,special:"+20% dano elemental"}},
+ {inputs:["r1","r2","r3"],output:{id:"f_gemmaster",name:"Mestre das Gemas",icon:"💎",rarity:"fundida",atk:35,def:30,special:"+25% recursos por hora"}},
+ {inputs:["e1","e2","e3"],output:{id:"f_ascendant",name:"Ascensão Divina",icon:"⚡",rarity:"fundida lendária",atk:55,def:50,special:"+40% atributos · aura dourada"}},
+ {inputs:["e2","e4","r4"],output:{id:"f_demonlord",name:"Senhor Demônio",icon:"👹",rarity:"fundida lendária",atk:60,def:40,special:"+50% dano crítico · aura infernal"}},
+ {inputs:["l1","l2","l3"],output:{id:"f_cosmos",name:"Entidade Cósmica",icon:"🌌",rarity:"fundida mítica",atk:80,def:80,special:"+100% atributos · aura cósmica"}}
+];
+async function ensureCosmeticTables(env,kingdomId){
+ await env.DB.batch([
+  env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_cosmetics (kingdom_id INTEGER NOT NULL,item_id TEXT NOT NULL,kind TEXT NOT NULL,acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,item_id))"),
+  env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_cosmetic_wallet (kingdom_id INTEGER PRIMARY KEY,shards INTEGER NOT NULL DEFAULT 150)"),
+  env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_collection_claims (kingdom_id INTEGER NOT NULL,collection_id TEXT NOT NULL,claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,collection_id))"),
+  env.DB.prepare("INSERT OR IGNORE INTO kingdom_cosmetic_wallet(kingdom_id,shards) VALUES(?,150)").bind(kingdomId)
+ ]);
+ const starter=["c1","c2","c3","c4","c5","c6","r1","r2","r3","e1","e2"];
+ await env.DB.batch(starter.map(id=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_cosmetics(kingdom_id,item_id,kind) VALUES(?,?,'standard')").bind(kingdomId,id)));
+}
+async function getCosmeticState(env,kingdomId){
+ await ensureCosmeticTables(env,kingdomId);
+ const [owned,claims,wallet]=await Promise.all([
+  env.DB.prepare("SELECT item_id,kind,acquired_at FROM kingdom_cosmetics WHERE kingdom_id=? ORDER BY acquired_at").bind(kingdomId).all(),
+  env.DB.prepare("SELECT collection_id FROM kingdom_collection_claims WHERE kingdom_id=?").bind(kingdomId).all(),
+  env.DB.prepare("SELECT shards FROM kingdom_cosmetic_wallet WHERE kingdom_id=?").bind(kingdomId).first()
+ ]);
+ return {owned:owned.results||[],claimed:(claims.results||[]).map(x=>x.collection_id),shards:wallet?.shards||0,skins:COSMETIC_SKINS,collections:COSMETIC_COLLECTIONS,seasonal:SEASONAL_COSMETICS,seasonEnd:SEASON_END,seasonActive:Date.now()<Date.parse(SEASON_END),fusions:SKIN_FUSIONS};
+}
+
 const SHOP_ITEMS={
  food_small:{name:"Saco de Comida",icon:"🌾",desc:"+5.000 comida",price:500,currency:"gold",gives:{food:5000},category:"resources"},
  food_medium:{name:"Carroça de Comida",icon:"🌾",desc:"+25.000 comida",price:2000,currency:"gold",gives:{food:25000},category:"resources"},
@@ -246,7 +298,8 @@ async function gameState(env,playerId){
   }
   const totalTroops=(troops.results||[]).reduce((n,u)=>n+u.quantity,0);
   const shop=await getShopState(env,kingdom.id);
-  return {player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  const cosmetics=await getCosmeticState(env,kingdom.id);
+  return {cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -256,7 +309,49 @@ async function gameAction(env,playerId,body){
   await applyProduction(env,k.id);
   const type=String(body.type||"");
   let battleOutcome=null;
-  if(type==="shop_buy"){
+
+  if(type==="cosmetic_claim"){
+    const collectionId=String(body.collection||""),col=COSMETIC_COLLECTIONS.find(x=>x.id===collectionId);
+    if(!col)return json({error:"Coleção inválida."},400);
+    const already=await env.DB.prepare("SELECT 1 FROM kingdom_collection_claims WHERE kingdom_id=? AND collection_id=?").bind(k.id,collectionId).first();
+    if(already)return json({error:"Esta recompensa já foi resgatada."},409);
+    const ownedRows=await env.DB.prepare("SELECT item_id FROM kingdom_cosmetics WHERE kingdom_id=?").bind(k.id).all();
+    const owned=new Set((ownedRows.results||[]).map(x=>x.item_id));
+    const complete=col.special?COSMETIC_COLLECTIONS.filter(x=>!x.special).every(x=>x.skins.every(id=>owned.has(id))):col.skins.every(id=>owned.has(id));
+    if(!complete)return json({error:"Ainda faltam skins para completar esta coleção."},409);
+    const debit=await env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=?").bind(col.gems,p.id).run();
+    await env.DB.batch([
+      env.DB.prepare("UPDATE kingdom_cosmetic_wallet SET shards=shards+? WHERE kingdom_id=?").bind(col.shards,k.id),
+      env.DB.prepare("INSERT INTO kingdom_collection_claims(kingdom_id,collection_id) VALUES(?,?)").bind(k.id,collectionId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"collection_reward",JSON.stringify({collection:collectionId,gems:col.gems,shards:col.shards}))
+    ]);
+  }else if(type==="seasonal_buy"){
+    const id=String(body.skin||""),skin=SEASONAL_COSMETICS.find(x=>x.id===id);
+    if(!skin)return json({error:"Skin sazonal inválida."},400);
+    if(Date.now()>=Date.parse(SEASON_END))return json({error:"O evento sazonal terminou."},409);
+    const exists=await env.DB.prepare("SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?").bind(k.id,id).first();
+    if(exists)return json({error:"Você já possui esta skin."},409);
+    const debit=await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(skin.price,p.id,skin.price).run();
+    if(!debit.meta.changes)return json({error:"Diamantes insuficientes."},409);
+    await env.DB.batch([
+      env.DB.prepare("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) VALUES(?,?,'seasonal')").bind(k.id,id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"seasonal_skin_purchased",JSON.stringify({skin:id,price:skin.price}))
+    ]);
+  }else if(type==="skin_fuse"){
+    const inputs=Array.isArray(body.inputs)?body.inputs.map(String):[];
+    if(inputs.length!==3||new Set(inputs).size!==3)return json({error:"Selecione três skins diferentes."},400);
+    const recipe=SKIN_FUSIONS.find(x=>[...x.inputs].sort().join("|")===[...inputs].sort().join("|"));
+    if(!recipe)return json({error:"Essa combinação não possui uma receita de fusão."},400);
+    const output=recipe.output;
+    const owned=await env.DB.prepare("SELECT item_id FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id IN (?,?,?)").bind(k.id,...inputs).all();
+    if((owned.results||[]).length!==3)return json({error:"Você não possui todas as skins selecionadas."},409);
+    const wallet=await env.DB.prepare("UPDATE kingdom_cosmetic_wallet SET shards=shards-50 WHERE kingdom_id=? AND shards>=50").bind(k.id).run();
+    if(!wallet.meta.changes)return json({error:"São necessários 50 fragmentos de fusão."},409);
+    const statements=inputs.map(id=>env.DB.prepare("DELETE FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?").bind(k.id,id));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) VALUES(?,?,'fused')").bind(k.id,output.id));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"skin_fused",JSON.stringify({inputs,output:output.id,shards:50})));
+    await env.DB.batch(statements);
+  }else if(type==="shop_buy"){
     await ensureShopTables(env);
     const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_ITEMS[itemId];
     if(!item)return json({error:"Produto inválido."},400);
