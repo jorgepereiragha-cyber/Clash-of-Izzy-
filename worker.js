@@ -115,7 +115,8 @@ async function applyProduction(env,kingdomId){
     iron:2*(levels.iron_mine||1),
     gold:1.5*(levels.market||1)
   };
-  const gains=Object.fromEntries(Object.entries(perHour).map(([key,rate])=>[key,Math.floor(rate*elapsed/3600)]));
+  const prestigeBonus=1+Math.max(0,Number(row.prestige||0))*.10;
+  const gains=Object.fromEntries(Object.entries(perHour).map(([key,rate])=>[key,Math.floor(rate*prestigeBonus*elapsed/3600)]));
   await env.DB.batch([
     env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,last_production_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
       .bind(gains.food,gains.wood,gains.stone,gains.iron,gains.gold,new Date(now).toISOString(),kingdomId),
@@ -377,6 +378,18 @@ async function gameAction(env,playerId,body){
     if(!debit.meta.changes)return json({error:"Recursos insuficientes para treinar o herói."},409);
     await env.DB.prepare("UPDATE heroes SET level=level+1,experience=experience+100 WHERE id=?").bind(hero.id).run();
     await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"hero_trained",JSON.stringify({hero:key,level:hero.level+1,cost})).run();
+  }else if(type==="prestige"){
+    const current=Number(k.prestige||0),castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
+    if(!castle||Number(castle.level)<30||Number(k.castle_level)<30)return json({error:"Seu castelo precisa atingir o nível 30."},409);
+    if(current>=7)return json({error:"Prestígio máximo atingido."},409);
+    const costs=[1000,2500,5000,10000,20000,40000,80000],cost=costs[current];
+    const debit=await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(cost,p.id,cost).run();
+    if(!debit.meta.changes)return json({error:"Gemas insuficientes para prestigiar."},409);
+    await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET prestige=prestige+1,castle_level=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(k.id),
+      env.DB.prepare("UPDATE kingdom_buildings SET level=1,upgraded_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND building_type='castle'").bind(k.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"castle_prestige",JSON.stringify({prestige:current+1,cost,resourceBonus:(current+1)*10}))
+    ]);
   }else if(type==="upgrade"){
     const key=String(body.building||"");
     if(!BUILDINGS[key])return json({error:"Edifício inválido."},400);
