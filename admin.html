@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#172333"><title>Administração | Clash of Izzy</title>
+<style>
+:root{color-scheme:dark;--bg:#101923;--panel:#1a2939;--line:#8f7548;--gold:#e7bd62;--ink:#f4ead2;--muted:#b9b1a0}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#26394b,var(--bg) 65%);color:var(--ink);font:15px system-ui,Arial}
+header{padding:18px 22px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}h1{font: bold 22px Georgia;color:var(--gold);margin:0}main{max-width:1100px;margin:24px auto;padding:0 14px}.card{background:#1a2939ee;border:1px solid var(--line);border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 8px 24px #0005}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}h2{font: bold 18px Georgia;color:var(--gold);margin:0 0 14px}label{display:block;color:var(--muted);font-size:13px;margin:10px 0 5px}input,select{width:100%;padding:11px;border:1px solid #776442;border-radius:7px;background:#101923;color:var(--ink);font-size:15px}button{border:1px solid #d5b36b;border-radius:7px;background:linear-gradient(#9b7137,#5e401d);color:#fff1cf;font-weight:700;padding:10px 14px;margin:8px 5px 0 0;cursor:pointer}button.secondary{background:#293b4d;border-color:#60758a}button:disabled{opacity:.5}.notice{padding:12px;border-radius:8px;background:#392e1b;border:1px solid #a8843f;color:#f4dfae;line-height:1.45}.muted{color:var(--muted);font-size:13px}.status{margin-top:12px;min-height:24px;color:#f4dfae;white-space:pre-wrap}.hidden{display:none}.toplink{color:var(--gold)}.pill{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:4px 9px;font-size:12px;color:var(--muted)}table{width:100%;border-collapse:collapse;margin-top:12px}td,th{text-align:left;border-bottom:1px solid #435263;padding:9px;font-size:13px}@media(max-width:600px){header{padding:14px}main{margin:14px auto}.card{padding:14px}h1{font-size:18px}}
+</style>
+</head>
+<body>
+<header><h1>⚔ CLASH OF IZZY · ADMIN</h1><span class="pill">Painel administrativo</span></header>
+<main>
+<div class="notice"><b>Importante:</b> a interface do painel está preparada, mas o servidor administrativo ainda precisa ser configurado no Cloudflare Workers com autenticação, banco de dados e permissões. Não coloque senhas, chaves privadas ou tokens secretos neste arquivo. Até essa configuração, nenhuma alteração de jogador ou compra será aplicada.</div>
+<section id="login" class="card">
+<h2>🔐 Acesso do administrador</h2>
+<label for="email">E-mail administrativo</label><input id="email" type="email" autocomplete="username" placeholder="Seu e-mail">
+<label for="password">Senha</label><input id="password" type="password" autocomplete="current-password" placeholder="Senha">
+<button id="loginBtn">Entrar</button><div id="loginStatus" class="status"></div>
+<p class="muted">O login só funcionará depois que a rota segura /api/admin/login estiver publicada no Worker.</p>
+</section>
+<section id="dashboard" class="hidden">
+<div class="grid">
+<div class="card"><h2>👥 Jogadores</h2><label>ID do jogador</label><input id="playerId" placeholder="Digite o ID"><button data-action="player-search">Buscar jogador</button><div id="playerResult" class="status"></div></div>
+<div class="card"><h2>💎 Recursos</h2><label>ID do jogador</label><input id="resourcePlayer" placeholder="ID do jogador"><label>Quantidade de gemas</label><input id="gemsAmount" type="number" min="0" placeholder="Ex.: 500"><button data-action="gems">Adicionar gemas</button><div id="resourceStatus" class="status"></div></div>
+<div class="card"><h2>🏰 Skins e castelos</h2><label>ID do jogador</label><input id="skinPlayer" placeholder="ID do jogador"><label>Skin / visual</label><input id="skinName" placeholder="Nome da skin"><button data-action="unlock-skin">Desbloquear skin</button><div id="skinStatus" class="status"></div></div>
+<div class="card"><h2>👑 Pacotes VIP</h2><label>Nome do pacote</label><input id="vipName" placeholder="VIP Prata"><label>Preço em R$ (apenas cadastro)</label><input id="vipPrice" type="number" min="0" step="0.01" placeholder="19.90"><label>Gemas incluídas</label><input id="vipGems" type="number" min="0" placeholder="1000"><button data-action="vip">Cadastrar pacote</button><div id="vipStatus" class="status"></div></div>
+</div>
+<div class="card"><h2>🛍 Catálogo de skins</h2><p class="muted">Estrutura preparada para cadastrar até 200 visuais originais. Os preços e desbloqueios reais serão validados pelo servidor.</p><label>Nome da skin</label><input id="catalogSkin" placeholder="Ex.: Guardião das Cinzas"><label>Preço em gemas</label><input id="catalogPrice" type="number" min="0" placeholder="250"><button data-action="catalog">Adicionar skin ao catálogo</button><div id="catalogStatus" class="status"></div></div>
+<button class="secondary" id="logout">Sair do painel</button>
+</section>
+</main>
+<script>
+const API_BASE='/api/admin';
+let adminToken=null;
+const $=id=>document.getElementById(id);
+function status(id,msg){$(id).textContent=msg}
+async function api(path,body){
+ if(!adminToken) throw new Error('Faça login primeiro.');
+ const res=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+adminToken},body:JSON.stringify(body)});
+ let data={};try{data=await res.json()}catch{}
+ if(!res.ok)throw new Error(data.error||'Falha na solicitação ('+res.status+').');
+ return data;
+}
+$('loginBtn').onclick=async()=>{
+ status('loginStatus','Conectando…');
+ try{
+  const res=await fetch(API_BASE+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value,password:$('password').value})});
+  const data=await res.json();if(!res.ok||!data.token)throw new Error(data.error||'Servidor de autenticação ainda não configurado.');
+  adminToken=data.token;$('login').classList.add('hidden');$('dashboard').classList.remove('hidden');status('loginStatus','Acesso autorizado.');
+ }catch(e){status('loginStatus',e.message)}
+};
+document.querySelectorAll('[data-action]').forEach(btn=>btn.onclick=async()=>{
+ const action=btn.dataset.action;const map={
+ 'player-search':['player-search',{playerId:$('playerId').value},'playerResult'],
+ 'gems':['gems',{playerId:$('resourcePlayer').value,amount:Number($('gemsAmount').value)},'resourceStatus'],
+ 'unlock-skin':['unlock-skin',{playerId:$('skinPlayer').value,skin:$('skinName').value},'skinStatus'],
+ 'vip':['vip-packages',{name:$('vipName').value,price:Number($('vipPrice').value),gems:Number($('vipGems').value)},'vipStatus'],
+ 'catalog':['skins',{name:$('catalogSkin').value,price:Number($('catalogPrice').value)},'catalogStatus']
+ };
+ const [route,payload,target]=map[action];status(target,'Enviando…');
+ try{const result=await api('/'+route,payload);status(target,JSON.stringify(result,null,2))}
+ catch(e){status(target,e.message)}
+});
+$('logout').onclick=()=>{adminToken=null;$('dashboard').classList.add('hidden');$('login').classList.remove('hidden');$('password').value='';status('loginStatus','Sessão encerrada.')};
+</script>
+</body></html>
