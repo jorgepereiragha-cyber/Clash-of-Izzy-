@@ -125,7 +125,7 @@ async function gameAction(env,playerId,body){
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
   await applyProduction(env,k.id);
-  const type=String(body.type||"");
+  const type=String(body.type||"");\n  let battleOutcome=null;
   if(type==="upgrade"){
     const key=String(body.building||"");
     if(!BUILDINGS[key])return json({error:"Edifício inválido."},400);
@@ -164,11 +164,37 @@ async function gameAction(env,playerId,body){
       .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron).run();
     if(!debit.meta.changes)return json({error:"Recursos insuficientes para pesquisar."},409);
     await env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level) VALUES(?,?,1) ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=level+1").bind(k.id,key).run();
+  }else if(type==="battle"){
+    const units=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0").bind(k.id).all();
+    const total=(units.results||[]).reduce((n,u)=>n+u.quantity,0);
+    if(total<1)return json({error:"Treine tropas antes de iniciar uma batalha."},409);
+    const hero=await env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first();
+    const dragon=await env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first();
+    const tech=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first();
+    const troopPower=(units.results||[]).reduce((n,u)=>n+u.quantity*(UNITS[u.unit_type]?.power||1)*u.tier,0);
+    const attackerPower=Math.max(1,Math.floor(troopPower+(hero?.level||1)*8+(dragon?.level||1)*10+(tech?.level||0)*12));
+    const defenderPower=80+Number(k.castle_level||1)*95;
+    const variance=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
+    const won=attackerPower*variance>=defenderPower;
+    const lossRate=won?.06:.24;
+    const losses={};
+    const statements=(units.results||[]).map(u=>{
+      const lost=Math.min(u.quantity,Math.floor(u.quantity*lossRate));
+      losses[u.unit_type]=lost;
+      return env.DB.prepare("UPDATE army_units SET quantity=quantity-? WHERE kingdom_id=? AND unit_type=? AND tier=?").bind(lost,k.id,u.unit_type,u.tier);
+    });
+    const rewards=won?{food:500,wood:300,stone:200,gold:100}:{food:0,wood:0,stone:0,gold:0};
+    if(won)statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+500,wood=wood+300,stone=stone+200,gold=gold+100 WHERE id=?").bind(k.id));
+    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) VALUES(?,?,?,?,?,?,?,?)")
+      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:won?"victory":"defeat"},{attackerPower,defenderPower}])));
+    if(won)for(const [resource,amount] of Object.entries(rewards))if(amount>0)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(k.id,resource,amount,"recompensa de batalha PvE"));
+    await env.DB.batch(statements);
+    battleOutcome={won,attackerPower,defenderPower,losses,rewards,message:won?"Vitória! O reino recebeu recursos.":"Derrota! Reorganize o exército e tente novamente."};
   }else if(type==="rename"){
     const name=String(body.name||"").trim().slice(0,32);if(name.length<3)return json({error:"O nome deve ter de 3 a 32 caracteres."},400);
     await env.DB.prepare("UPDATE kingdoms SET kingdom_name=? WHERE id=?").bind(name,k.id).run();
   }else{return json({error:"Ação de jogo desconhecida."},400)}
-  return json({success:true,state:await gameState(env,playerId)});
+  return json({success:true,state:await gameState(env,playerId),...(battleOutcome?{battle:battleOutcome}:{})});
 }
 export default {
  async fetch(request,env){
