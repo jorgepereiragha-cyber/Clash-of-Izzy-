@@ -28,6 +28,7 @@ const UNITS = {
   archer:{label:"Arqueiro",food:20,wood:7,iron:1,power:5},
   cavalry:{label:"Cavalaria",food:35,wood:8,iron:8,power:9},
   knight:{label:"Cavaleiro",food:50,wood:10,iron:15,power:14},
+  mage:{label:"Mago",food:42,wood:18,iron:10,power:12},
   crossbowman:{label:"Besteiro",food:28,wood:9,iron:5,power:7},
   catapult:{label:"Catapulta",food:70,wood:45,iron:20,power:22},
   ram:{label:"Aríete",food:60,wood:55,iron:18,power:20},
@@ -234,6 +235,9 @@ async function gameAction(env,playerId,body){
   }else if(type==="train"){
     const unit=String(body.unit||"militia"),quantity=Math.max(1,Math.min(100,Math.floor(Number(body.quantity)||10)));
     const spec=UNITS[unit];if(!spec)return json({error:"Tipo de tropa inválido."},400);
+    const requiredBuilding={militia:"barracks",swordsman:"barracks",spearman:"barracks",archer:"archery_range",crossbowman:"archery_range",cavalry:"stable",knight:"stable",mage:"academy",catapult:"siege_workshop",ram:"siege_workshop",trebuchet:"siege_workshop"}[unit];
+    const trainingHall=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type=?").bind(k.id,requiredBuilding).first();
+    if(!trainingHall||trainingHall.level<1)return json({error:"Construa o edifício de treinamento exigido."},409);
     const cost={food:spec.food*quantity,wood:spec.wood*quantity,iron:spec.iron*quantity};
     const debit=await env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=?")
       .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron).run();
