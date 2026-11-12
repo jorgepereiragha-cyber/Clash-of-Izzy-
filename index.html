@@ -52,6 +52,29 @@ const state=JSON.parse(localStorage.getItem('izzy-save')||'null')||{wood:1200,st
 state.buildingLevels=state.buildingLevels||{Quartel:1,Fazenda:1,'Mina de pedra':1,Mercado:1};
 state.lastProduction=state.lastProduction||Date.now();
 const save=()=>{localStorage.setItem('izzy-save',JSON.stringify(state));for(const k of ['wood','stone','food','gold','gems','level'])document.getElementById(k).textContent=state[k]};
+let serverToken=localStorage.getItem('izzy-token')||'',serverOnline=false;
+const BUILDING_KEYS={'Castelo de Eldoria':'castle','Quartel':'barracks','Fazenda':'farm','Mina de pedra':'quarry','Mercado':'market'};
+function applyServerState(data){
+ if(!data||!data.kingdom)return;const k=data.kingdom;
+ for(const key of ['wood','stone','food','iron','gold'])state[key]=Number(k[key]||0);
+ state.gems=Number(data.player?.gems||0);state.level=Number(k.castle_level||1);state.soldiers=Number(data.totalTroops||0);
+ state.serverKingdomName=k.kingdom_name;state.serverTroops=data.troops||[];state.serverHeroes=data.heroes||[];state.serverDragon=data.dragon;state.serverResearch=data.research||[];
+ state.buildingLevels={Quartel:1,Fazenda:1,'Mina de pedra':1,Mercado:1};
+ for(const b of data.buildings||[]){const name=Object.keys(BUILDING_KEYS).find(n=>BUILDING_KEYS[n]===b.building_type);if(name)state.buildingLevels[name]=b.level;}
+ state.lastProduction=Date.now();save();if(typeof applyBuildingLevels==='function')applyBuildingLevels();
+}
+async function gameFetch(path,method='GET',body){
+ const response=await fetch('/api/game/'+path,{method,headers:{'Content-Type':'application/json',...(serverToken?{Authorization:'Bearer '+serverToken}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ const result=await response.json();if(!response.ok)throw new Error(result.error||'Falha no servidor');return result;
+}
+async function initializeOnline(){
+ try{if(!serverToken){const started=await gameFetch('start','POST',{});serverToken=started.token;localStorage.setItem('izzy-token',serverToken);applyServerState(started.state);}
+ else{const result=await gameFetch('state');applyServerState(result.state);}
+ serverOnline=true;showToast('Reino sincronizado com o servidor!');return true;
+ }catch(error){serverOnline=false;showToast('Modo local: '+error.message);return false;}
+}
+async function sendGameAction(payload){if(!serverOnline)return false;const result=await gameFetch('action','POST',payload);applyServerState(result.state);return true;}
+
 save();
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x9bb5c0);scene.fog=new THREE.Fog(0x9bb5c0,45,100);
 const camera=new THREE.PerspectiveCamera(55,innerWidth/innerHeight,.1,300);camera.position.set(20,22,27);
@@ -88,12 +111,12 @@ for(let i=-1;i<=1;i++){box('Muralha',i*6,1.5,-8,5,.9,1,stone,false);box('Muralha
 const road=box('Estrada',0,.03,14,5,.05,22,mat(0x9b8b70),false);
 const loader=new GLTFLoader();let imported=null;
 function showToast(t){let e=document.getElementById('toast');e.textContent=t;e.style.display='block';setTimeout(()=>e.style.display='none',2300)}
-const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();renderer.domElement.addEventListener('click',e=>{mouse.x=e.clientX/innerWidth*2-1;mouse.y=-(e.clientY/innerHeight)*2+1;ray.setFromCamera(mouse,camera);let hits=ray.intersectObjects(buildings);if(hits.length){let n=hits[0].object.userData.name;document.getElementById('selection').textContent=n;showToast(n+' selecionado')}});
+const ray=new THREE.Raycaster(),mouse=new THREE.Vector2();renderer.domElement.addEventListener('click',e=>{mouse.x=e.clientX/innerWidth*2-1;mouse.y=-(e.clientY/innerHeight)*2+1;ray.setFromCamera(mouse,camera);let hits=ray.intersectObjects(buildings);if(hits.length){let n=hits[0].object.userData.name;document.getElementById('selection').textContent=n;state.selectedBuilding=BUILDING_KEYS[n]||'castle';showToast(n+' selecionado')}});
 function applyBuildingLevels(){for(const [name,lvl] of Object.entries(state.buildingLevels)){const b=buildingMeshes[name];if(!b)continue;const h=b.userData.baseHeight*(1+(lvl-1)*.18);b.scale.y=h/b.userData.baseHeight;b.position.y=h/2;}}
 applyBuildingLevels();
-document.getElementById('upgrade').onclick=()=>{const costWood=300*state.level,costStone=150*state.level;if(state.wood<costWood||state.stone<costStone)return showToast('Recursos insuficientes!');state.wood-=costWood;state.stone-=costStone;state.level++;keep.scale.y=1+(state.level-1)*.12;keep.position.y=3.5*keep.scale.y;save();showToast('Castelo evoluiu para nível '+state.level+'!')};
-document.getElementById('train').onclick=()=>{if(state.food<100)return showToast('Comida insuficiente!');state.food-=100;state.soldiers+=10;for(let i=0;i<10;i++)troopGroups.push(makeSoldier(-3+(i%5)*.8,7+Math.floor(i/5)*.8));save();showToast('10 soldados recrutados e posicionados no reino!')};
-document.getElementById('collect').onclick=()=>{state.wood+=100*state.buildingLevels.Quartel;state.stone+=75*state.buildingLevels['Mina de pedra'];state.food+=120*state.buildingLevels.Fazenda;state.gold+=35*state.buildingLevels.Mercado;save();showToast('Produção recolhida conforme o nível dos edifícios!')};
+document.getElementById('upgrade').onclick=async()=>{await serverReady;if(serverOnline){try{await sendGameAction({type:'upgrade',building:state.selectedBuilding||'castle'});keep.scale.y=1+(state.level-1)*.12;keep.position.y=3.5*keep.scale.y;applyBuildingLevels();return showToast('Edifício melhorado e salvo no servidor!')}catch(e){return showToast(e.message)}}const costWood=300*state.level,costStone=150*state.level;if(state.wood<costWood||state.stone<costStone)return showToast('Recursos insuficientes!');state.wood-=costWood;state.stone-=costStone;state.level++;keep.scale.y=1+(state.level-1)*.12;keep.position.y=3.5*keep.scale.y;save();showToast('Castelo evoluiu para nível '+state.level+'!')};
+document.getElementById('train').onclick=async()=>{await serverReady;if(serverOnline){try{await sendGameAction({type:'train',unit:'militia',quantity:10});for(let i=0;i<10;i++)troopGroups.push(makeSoldier(-3+(i%5)*.8,7+Math.floor(i/5)*.8));return showToast('10 milicianos treinados e salvos!')}catch(e){return showToast(e.message)}}if(state.food<100)return showToast('Comida insuficiente!');state.food-=100;state.soldiers+=10;for(let i=0;i<10;i++)troopGroups.push(makeSoldier(-3+(i%5)*.8,7+Math.floor(i/5)*.8));save();showToast('10 soldados recrutados e posicionados no reino!')};
+document.getElementById('collect').onclick=async()=>{await serverReady;if(serverOnline){try{const result=await gameFetch('state');applyServerState(result.state);return showToast('Produção do reino atualizada!')}catch(e){return showToast(e.message)}}state.wood+=100*state.buildingLevels.Quartel;state.stone+=75*state.buildingLevels['Mina de pedra'];state.food+=120*state.buildingLevels.Fazenda;state.gold+=35*state.buildingLevels.Mercado;save();showToast('Produção recolhida conforme o nível dos edifícios!')};
 document.getElementById('march').onclick=()=>{marching=!marching;showToast(marching?'Tropas avançando para o portão!':'Tropas retornando ao castelo')};
 function openModal(key){let body=document.getElementById('modalbody');let content={
 heroes:`<h2>👑 Heróis de Eldoria</h2><p><b>Sir Kael, Guardião do Sol</b> — comandante inicial. Bônus de defesa: +5%.</p><p><b>Lyra, Arqueira da Aurora</b> — desbloqueio futuro.</p><p><b>Tharok, Senhor das Montanhas</b> — desbloqueio futuro.</p>`,
@@ -115,5 +138,6 @@ window.resetGame=()=>{localStorage.removeItem('izzy-save');location.reload()};
 document.getElementById('modelFile').onchange=e=>{let f=e.target.files[0];if(!f)return;let url=URL.createObjectURL(f);loader.load(url,g=>{if(imported)scene.remove(imported);imported=g.scene;imported.scale.setScalar(3);imported.position.set(0,0,0);scene.add(imported);showToast('Modelo 3D importado!')},undefined,err=>showToast('Não foi possível carregar o modelo'))};
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 setInterval(()=>{const elapsed=Math.min(60,Math.floor((Date.now()-state.lastProduction)/1000));if(elapsed>0){state.wood+=elapsed*0.15*state.buildingLevels.Quartel;state.stone+=elapsed*0.10*state.buildingLevels['Mina de pedra'];state.food+=elapsed*0.18*state.buildingLevels.Fazenda;state.gold+=elapsed*0.05*state.buildingLevels.Mercado;state.lastProduction=Date.now();save();}},1000);
+const serverReady=initializeOnline();
 function animate(){requestAnimationFrame(animate);const now=performance.now()*.001;troopGroups.forEach((g,i)=>{const p=g.userData.phase;if(marching){g.position.z=7+((now*2+i*1.7)%12);g.position.x=-3+(i%4)*.8+Math.sin(now*3+p)*.12;}else{g.position.x=g.userData.startX+Math.sin(now*1.4+p)*.12;g.position.z=g.userData.startZ+Math.cos(now*1.4+p)*.12;}g.rotation.y=marching?Math.PI:Math.sin(now+p)*.08;});renderer.render(scene,camera)}animate();
 </script></body></html>
