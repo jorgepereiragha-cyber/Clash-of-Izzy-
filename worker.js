@@ -236,8 +236,9 @@ async function gameAction(env,playerId,body){
   }else if(type==="alliance_kick"){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const targetId=Number(body.targetKingdomId);
-    const target=await env.DB.prepare("SELECT rank FROM alliance_members WHERE alliance_id=? AND kingdom_id=?").bind(member?.alliance_id,targetId).first();
-    if(!member||!target)return json({error:"Membro não encontrado."},404);
+    if(!member)return json({error:"Você não pertence a uma aliança."},409);
+    const target=await env.DB.prepare("SELECT rank FROM alliance_members WHERE alliance_id=? AND kingdom_id=?").bind(member.alliance_id,targetId).first();
+    if(!target)return json({error:"Membro não encontrado."},404);
     const ranks={membro:1,oficial:2,co_lider:3,lider:4};
     if(ranks[member.rank]<=ranks[target.rank]||member.rank==="oficial")return json({error:"Seu cargo não permite expulsar esse membro."},403);
     await env.DB.prepare("DELETE FROM alliance_members WHERE alliance_id=? AND kingdom_id=?").bind(member.alliance_id,targetId).run();
