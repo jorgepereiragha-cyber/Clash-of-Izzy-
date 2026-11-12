@@ -49,6 +49,14 @@ export default {
     if (!url.pathname.startsWith("/api/")) {
       return env.ASSETS.fetch(request);
     }
+    if (url.pathname === "/api/admin/health" && request.method === "GET") {
+      return json({
+        hasDB: Boolean(env.DB),
+        hasADMIN_EMAIL: Boolean(env.ADMIN_EMAIL),
+        hasADMIN_PASSWORD: Boolean(env.ADMIN_PASSWORD),
+        hasSESSION_SECRET: Boolean(env.SESSION_SECRET)
+      });
+    }
     if (request.method !== "POST") return json({ error: "Método não permitido." }, 405);
     if (!env.DB) return json({ error: "Banco D1 não vinculado ao Worker." }, 503);
 
