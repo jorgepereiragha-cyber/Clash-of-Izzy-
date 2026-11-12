@@ -75,11 +75,13 @@ async function ensureCosmeticTables(env,kingdomId){
  await env.DB.batch([
   env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_cosmetics (kingdom_id INTEGER NOT NULL,item_id TEXT NOT NULL,kind TEXT NOT NULL,acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,item_id))"),
   env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_cosmetic_wallet (kingdom_id INTEGER PRIMARY KEY,shards INTEGER NOT NULL DEFAULT 150)"),
-  env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_collection_claims (kingdom_id INTEGER NOT NULL,collection_id TEXT NOT NULL,claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,collection_id))"),
-  env.DB.prepare("INSERT OR IGNORE INTO kingdom_cosmetic_wallet(kingdom_id,shards) VALUES(?,150)").bind(kingdomId)
+  env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_collection_claims (kingdom_id INTEGER NOT NULL,collection_id TEXT NOT NULL,claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,collection_id))")
  ]);
- const starter=["c1","c2","c3","c4","c5","c6","r1","r2","r3","e1","e2"];
- await env.DB.batch(starter.map(id=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_cosmetics(kingdom_id,item_id,kind) VALUES(?,?,'standard')").bind(kingdomId,id)));
+ const initialized=await env.DB.prepare("INSERT OR IGNORE INTO kingdom_cosmetic_wallet(kingdom_id,shards) VALUES(?,150)").bind(kingdomId).run();
+ if(initialized.meta.changes){
+  const starter=["c1","c2","c3","c4","c5","c6","r1","r2","r3","e1","e2"];
+  await env.DB.batch(starter.map(id=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_cosmetics(kingdom_id,item_id,kind) VALUES(?,?,'standard')").bind(kingdomId,id)));
+ }
 }
 async function getCosmeticState(env,kingdomId){
  await ensureCosmeticTables(env,kingdomId);
