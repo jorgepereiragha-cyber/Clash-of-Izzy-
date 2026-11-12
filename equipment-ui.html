@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Equipamentos - Clash of Izzy</title>
+    <link rel="stylesheet" href="equipment-styles.css">
+</head>
+<body style="background: #0f0f1e; padding: 10px;">
+
+<div class="mobile-equipment-container">
+    <div class="item-header">
+        <h2 id="item-name">Carregando...</h2>
+        <span class="rarity-badge lendario">Lendário</span>
+        <button class="lock-btn" onclick="toggleLock('coroa_izzy')" id="lock-btn">
+            🔓 Destravado
+        </button>
+    </div>
+
+    <div class="stats-preview">
+        <div class="stat-column current">
+            <h3>Nível <span id="current-level">1</span></h3>
+            <p>🛡️ Defesa: <span id="current-def">10</span></p>
+            <p>💰 Bônus: <span id="current-res">5%</span></p>
+        </div>
+        <div class="stat-arrow">➡️</div>
+        <div class="stat-column next">
+            <h3>Nível <span id="next-level">2</span></h3>
+            <p>🛡️ Defesa: <span id="next-def">15</span></p>
+            <p>💰 Bônus: <span id="next-res">7%</span></p>
+        </div>
+    </div>
+
+    <div class="action-area">
+        <div class="cost-display">
+            Custo: <span id="upgrade-cost">130</span> 🪙 Ouro
+            <small>Seu ouro: <span id="player-gold">5000</span> 🪙</small>
+        </div>
+        <button class="upgrade-btn-mobile" onclick="upgradeEquipment('coroa_izzy')">
+            ⚒️ EVOLUIR EQUIPAMENTO
+        </button>
+    </div>
+</div>
+
+<script src="equipment-system.js"></script>
+</body>
+</html>
