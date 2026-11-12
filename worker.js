@@ -21,6 +21,25 @@ const BUILDINGS = {
   embassy:{label:"Embaixada",wood:220,stone:180,food:0,iron:0},
   warehouse:{label:"Armazém",wood:170,stone:100,food:0,iron:0}
 };
+const HERO_TEMPLATES = {
+soldado_basico:{name:"Soldado Recruta",title:"Recruta do Reino",rarity:"white",type:"infantaria",stats:{hp:500,attack:80,defense:60,speed:30},skill:"Golpe Rápido",skillDesc:"Ataque básico simples",skillPower:1.2},
+arqueiro_comum:{name:"Arqueiro da Floresta",title:"Atirador Comum",rarity:"white",type:"arqueiro",stats:{hp:400,attack:100,defense:40,speed:45},skill:"Flecha Simples",skillDesc:"Disparo básico",skillPower:1.3},
+cavaleiro_iniciante:{name:"Cavaleiro Novato",title:"Montador Iniciante",rarity:"white",type:"cavalaria",stats:{hp:600,attack:90,defense:70,speed:50},skill:"Investida",skillDesc:"Carga básica",skillPower:1.4},
+curandeiro_aldeia:{name:"Curandeiro da Aldeia",title:"Médico Rural",rarity:"white",type:"suporte",stats:{hp:450,attack:50,defense:50,speed:35},skill:"Cura Menor",skillDesc:"Restaura pouca vida",skillPower:1.1},
+capitao_espada:{name:"Capitão da Guarda",title:"Líder Militar",rarity:"blue",type:"infantaria",stats:{hp:1200,attack:180,defense:140,speed:40},skill:"Corte Devastador",skillDesc:"Ataque poderoso em área",skillPower:2},
+mestre_arco:{name:"Mestre Arqueiro",title:"Atirador de Elite",rarity:"blue",type:"arqueiro",stats:{hp:900,attack:220,defense:80,speed:60},skill:"Chuva de Flechas",skillDesc:"Múltiplos disparos",skillPower:2.2},
+cavaleiro_dragao:{name:"Cavaleiro do Dragão",title:"Montador de Dragão",rarity:"blue",type:"cavalaria",stats:{hp:1400,attack:200,defense:160,speed:70},skill:"Sopro de Fogo",skillDesc:"Ataque flamejante",skillPower:2.5},
+sacerdotisa_luar:{name:"Sacerdotisa do Luar",title:"Curandeira Mística",rarity:"blue",type:"suporte",stats:{hp:1000,attack:120,defense:100,speed:50},skill:"Cura Lunar",skillDesc:"Cura poderosa em área",skillPower:1.8},
+rei_artur:{name:"Rei Artur",title:"O Rei Eterno",rarity:"purple",type:"infantaria",stats:{hp:3500,attack:500,defense:400,speed:55},skill:"Excalibur",skillDesc:"Espada sagrada causa dano massivo",skillPower:4.5},
+merlin_arquimago:{name:"Merlin",title:"O Arquimago Supremo",rarity:"purple",type:"suporte",stats:{hp:2800,attack:650,defense:250,speed:65},skill:"Meteoro Ancestral",skillDesc:"Invoca destruição dos céus",skillPower:5},
+joana_darc:{name:"Joana D\u0027Arc",title:"A Donzela de Ferro",rarity:"purple",type:"infantaria",stats:{hp:4000,attack:450,defense:550,speed:60},skill:"Fé Divina",skillDesc:"Proteção sagrada absoluta",skillPower:4},
+genghis_khan:{name:"Genghis Khan",title:"O Flagelo de Deus",rarity:"purple",type:"cavalaria",stats:{hp:3200,attack:600,defense:300,speed:85},skill:"Horda Mongol",skillDesc:"Convoca exército de cavalaria",skillPower:4.8}
+};
+const HERO_RARITY={white:{label:"Branco · Comum",multiplier:1,fragments:5,maxLevel:30,maxStars:5},blue:{label:"Azul · Raro",multiplier:1.8,fragments:15,maxLevel:50,maxStars:6},purple:{label:"Roxo · Lendário",multiplier:3.5,fragments:40,maxLevel:70,maxStars:7}};
+const HERO_STAR_COST={2:10,3:20,4:40,5:80,6:150,7:300};
+async function ensureHeroTables(env){await env.DB.batch([env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_inventory (kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 1,experience INTEGER NOT NULL DEFAULT 0,stars INTEGER NOT NULL DEFAULT 1,skill_level INTEGER NOT NULL DEFAULT 1,fragments INTEGER NOT NULL DEFAULT 0,acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,hero_key))"),env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_summon_history (id INTEGER PRIMARY KEY AUTOINCREMENT,kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,result_type TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")]);}
+function heroView(row){const t=HERO_TEMPLATES[row.hero_key],r=HERO_RARITY[row.rarity];if(!t||!r)return row;const stats=Object.fromEntries(Object.entries(t.stats).map(([key,value])=>[key,Math.floor(value*r.multiplier*(1+(row.level-1)*.03+(row.stars-1)*.15))]));return {...row,name:t.name,title:t.title,type:t.type,rarity_label:r.label,max_level:r.maxLevel,max_stars:r.maxStars,stats,skill:t.skill,skill_description:t.skillDesc,skill_power:t.skillPower,fragments_to_next:HERO_STAR_COST[row.stars+1]||null};}
+function rollHeroRarity(){const n=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;return n<.70?"white":n<.95?"blue":"purple";}
 const UNITS = {
   militia:{label:"Milícia",food:12,wood:2,iron:0,power:2},
   swordsman:{label:"Espadachim",food:22,wood:4,iron:3,power:5},
@@ -138,6 +157,7 @@ async function processMarches(env,kingdomId){
  }
 }
 async function gameState(env,playerId){
+  await ensureHeroTables(env);
   const p=await env.DB.prepare("SELECT id,player_id,name,gems FROM players WHERE player_id=?").bind(playerId).first();
   if(!p)return null;
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
@@ -145,7 +165,7 @@ async function gameState(env,playerId){
   await applyProduction(env,kingdom.id);
   await seedWorld(env);
   await processMarches(env,kingdom.id);
-  const [fresh,buildings,troops,heroes,dragon,research,territories,marches,reports]=await Promise.all([
+  const [fresh,buildings,troops,heroes,dragon,research,territories,marches,reports,heroInventory,heroHistory]=await Promise.all([
     env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdom.id).first(),
     env.DB.prepare("SELECT building_type,level,position_x,position_z FROM kingdom_buildings WHERE kingdom_id=? ORDER BY id").bind(kingdom.id).all(),
     env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? ORDER BY tier,unit_type").bind(kingdom.id).all(),
@@ -154,7 +174,9 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdom.id).all(),
     env.DB.prepare("SELECT id,name,terrain,x,z,resource_type,resource_rate,owner_kingdom_id,alliance_id,level FROM world_territories ORDER BY id").all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all()
+    env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
+    env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,hero_key").bind(kingdom.id).all(),
+    env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all()
   ]);
   const pendingInvites=await env.DB.prepare("SELECT i.id,i.created_at,a.name,a.tag FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.target_kingdom_id=? ORDER BY i.id DESC").bind(kingdom.id).all();
   const alliance=await env.DB.prepare("SELECT a.id,a.name,a.tag,a.description,a.level,a.xp,a.max_members,a.territory_count,am.role,am.rank,am.contribution,(SELECT COUNT(*) FROM alliance_members x WHERE x.alliance_id=a.id) AS member_count FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=?").bind(kingdom.id).first();
@@ -169,7 +191,7 @@ async function gameState(env,playerId){
     allianceDetails={...alliance,members:members.results||[],chat:(chat.results||[]).reverse(),invites:invites.results||[],wars:wars.results||[]};
   }
   const totalTroops=(troops.results||[]).reduce((n,u)=>n+u.quantity,0);
-  return {player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  return {player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -319,6 +341,32 @@ async function gameAction(env,playerId,body){
     if(!debit.meta.changes)return json({error:"Recursos insuficientes para evoluir o dragão."},409);
     await env.DB.prepare("UPDATE dragons SET level=level+1,experience=experience+100,bond=MIN(100,bond+2) WHERE kingdom_id=?").bind(k.id).run();
     await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"dragon_evolved",JSON.stringify({level:level+1,cost})).run();
+  }else if(type==="hero_summon"){
+    await ensureHeroTables(env);
+    const quantity=Number(body.quantity)===10?10:1,cost=quantity===10?900:100;
+    const debit=await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(cost,p.id,cost).run();
+    if(!debit.meta.changes)return json({error:"Gemas insuficientes para invocar."},409);
+    const results=[];
+    for(let i=0;i<quantity;i++){
+      const rarity=rollHeroRarity(),pool=Object.entries(HERO_TEMPLATES).filter(([,hero])=>hero.rarity===rarity);
+      const pick=Math.floor(crypto.getRandomValues(new Uint32Array(1))[0]/4294967296*pool.length),heroKey=pool[pick][0];
+      const existing=await env.DB.prepare("SELECT fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
+      const duplicate=Boolean(existing),fragmentGain=HERO_RARITY[rarity].fragments;
+      if(existing)await env.DB.prepare("UPDATE hero_inventory SET fragments=fragments+? WHERE kingdom_id=? AND hero_key=?").bind(fragmentGain,k.id,heroKey).run();
+      else await env.DB.prepare("INSERT INTO hero_inventory(kingdom_id,hero_key,rarity) VALUES(?,?,?)").bind(k.id,heroKey,rarity).run();
+      await env.DB.prepare("INSERT INTO hero_summon_history(kingdom_id,hero_key,rarity,result_type) VALUES(?,?,?,?)").bind(k.id,heroKey,rarity,duplicate?"duplicate":"new").run();
+      results.push({hero_key:heroKey,name:HERO_TEMPLATES[heroKey].name,rarity,result_type:duplicate?"duplicate":"new",fragments:duplicate?fragmentGain:0});
+    }
+    await env.DB.prepare("DELETE FROM hero_summon_history WHERE kingdom_id=? AND id NOT IN (SELECT id FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 100)").bind(k.id,k.id).run();
+    battleOutcome={summons:results,cost};
+  }else if(type==="hero_evolve"){
+    await ensureHeroTables(env);
+    const heroKey=String(body.hero||""),hero=await env.DB.prepare("SELECT rarity,stars,fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
+    if(!hero||!HERO_TEMPLATES[heroKey])return json({error:"Herói não encontrado na coleção."},404);
+    const rarity=HERO_RARITY[hero.rarity],next=hero.stars+1,needed=HERO_STAR_COST[next];
+    if(hero.stars>=rarity.maxStars||!needed)return json({error:"Herói já atingiu o máximo de estrelas."},409);
+    if(hero.fragments<needed)return json({error:"Fragmentos insuficientes. Necessário: "+needed+"."},409);
+    await env.DB.prepare("UPDATE hero_inventory SET stars=stars+1,fragments=fragments-? WHERE kingdom_id=? AND hero_key=? AND fragments>=?").bind(needed,k.id,heroKey,needed).run();
   }else if(type==="hero_train"){
     const key=String(body.hero||"kael_sunwarden");
     const hero=await env.DB.prepare("SELECT id,level,experience FROM heroes WHERE kingdom_id=? AND hero_key=?").bind(k.id,key).first();
