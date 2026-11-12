@@ -1,85 +1,47 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#090b10"><meta name="description" content="Clash of Izzy: estratégia medieval, castelos, alianças, exércitos e batalhas."><title>Clash of Izzy | Painel do Reino</title>
-<style>
-:root{color-scheme:dark;--bg:#080a0f;--panel:#141821;--line:#665333;--gold:#e8bd68;--ink:#f4eee2;--muted:#aaa5a0}
-*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -15%,#49331c 0,#17130f 28%,#080a0f 72%);color:var(--ink);font:15px system-ui,Arial;min-height:100vh}
-header{padding:20px 22px;border-bottom:1px solid var(--line);background:#090b10dd;display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap}h1{font: bold 22px Georgia;color:var(--gold);margin:0}main{max-width:1100px;margin:24px auto;padding:0 14px}.card{background:linear-gradient(145deg,#191b20f5,#101217f5);border:1px solid #665333;border-radius:12px;padding:18px;margin-bottom:16px;box-shadow:0 12px 34px #0008}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:14px}h2{font: bold 18px Georgia;color:var(--gold);margin:0 0 14px}label{display:block;color:var(--muted);font-size:13px;margin:10px 0 5px}input,select{width:100%;padding:11px;border:1px solid #51452f;border-radius:7px;background:#090c12;color:var(--ink);font-size:15px}button{border:1px solid #d5b36b;border-radius:7px;background:linear-gradient(#9b7137,#5e401d);color:#fff1cf;font-weight:700;padding:10px 14px;margin:8px 5px 0 0;cursor:pointer}button.secondary{background:#252831;border-color:#62543b}button:disabled{opacity:.5}.notice{padding:12px;border-radius:8px;background:#392e1b;border:1px solid #a8843f;color:#f4dfae;line-height:1.45}.muted{color:var(--muted);font-size:13px}.status{margin-top:12px;min-height:24px;color:#f4dfae;white-space:pre-wrap}.hidden{display:none}.toplink{color:var(--gold)}.hero{padding:30px 22px;border:1px solid #665333;border-radius:14px;background:linear-gradient(110deg,#090b10f5,#21170df0);box-shadow:0 18px 50px #0009;margin-bottom:18px}.eyebrow{color:#d7ae61;letter-spacing:3px;text-transform:uppercase;font-size:11px;font-weight:800}.hero h2{font: bold clamp(28px,5vw,44px) Georgia;color:#f1d28f;margin:10px 0}.hero p{max-width:720px;color:#d0c6b5;line-height:1.7}.features{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;margin-top:16px}.feature{border:1px solid #453a2a;background:#0d1016;border-radius:9px;padding:14px}.feature b{display:block;color:#e8bd68;margin-bottom:5px}.pill{display:inline-block;border:1px solid var(--line);border-radius:99px;padding:4px 9px;font-size:12px;color:var(--muted)}table{width:100%;border-collapse:collapse;margin-top:12px}td,th{text-align:left;border-bottom:1px solid #435263;padding:9px;font-size:13px}@media(max-width:600px){header{padding:14px}main{margin:14px auto}.card{padding:14px}h1{font-size:18px}}
-</style>
-</head>
-<body>
-<header><h1>⚔ CLASH OF IZZY</h1><span class="pill">PAINEL DO REINO · ADMIN</span></header>
-<main>
-<section class="hero"><div class="eyebrow">Erga seu reino · Comande seu destino</div><h2>O reino não se conquista sozinho.</h2><p>Clash of Izzy é um universo medieval de estratégia onde cada jogador desenvolve seu castelo, administra recursos, fortalece seu exército e disputa território. Planeje suas construções, forme alianças e prepare suas tropas para batalhas épicas.</p><div class="features"><div class="feature"><b>🏰 Construa</b><span class="muted">Evolua seu castelo e fortaleça seu reino.</span></div><div class="feature"><b>⚔️ Lute</b><span class="muted">Organize tropas e enfrente seus rivais.</span></div><div class="feature"><b>🤝 Faça alianças</b><span class="muted">Una forças e cresça com outros jogadores.</span></div><div class="feature"><b>💎 Personalize</b><span class="muted">Conheça skins e pacotes especiais.</span></div></div></section>
-<section class="card"><h2>🛒 Comprar pacotes e skins</h2><p>Fale pelo WhatsApp para consultar e comprar pacotes VIP e skins de castelo.</p><p><b>Preços das skins:</b> de R$ 50,00 até R$ 1.000,00, definidos individualmente no catálogo.</p><a class="toplink" style="display:inline-block;padding:12px 16px;border:1px solid var(--gold);border-radius:8px;background:#293b4d;text-decoration:none;font-weight:700" href="https://wa.me/5547996531437?text=Ol%C3%A1%21%20Quero%20comprar%20um%20pacote%20ou%20skin%20do%20Clash%20of%20Izzy." target="_blank" rel="noopener">Comprar pelo WhatsApp: +55 47 99653-1437</a></section>\n<div class="notice"><b>Importante:</b> a interface do painel está preparada, mas o servidor administrativo ainda precisa ser configurado no Cloudflare Workers com autenticação, banco de dados e permissões. Não coloque senhas, chaves privadas ou tokens secretos neste arquivo. Até essa configuração, nenhuma alteração de jogador ou compra será aplicada.</div>
-<section class="card" id="serverHealth"><h2>🔎 Estado do servidor</h2><p id="healthStatus" class="status">Verificando configuração segura…</p></section>
-<section id="login" class="card">
-<h2>🔐 Acesso do administrador</h2>
-<label for="email">E-mail administrativo</label><input id="email" type="email" name="username" autocomplete="username" placeholder="Seu e-mail">
-<label for="password">Senha</label><div style="display:flex;gap:8px;align-items:center"><input id="password" name="password" type="password" autocomplete="current-password" placeholder="Senha" style="flex:1;min-width:0"><button type="button" class="secondary" id="togglePassword" aria-label="Mostrar senha">Mostrar</button></div>
-<label style="display:flex;gap:9px;align-items:center;margin-top:12px"><input id="rememberEmail" type="checkbox" style="width:auto"> Lembrar meu e-mail neste aparelho</label><p class="muted">Para salvar a senha com segurança, use o gerenciador de senhas do Android/Google quando o celular oferecer essa opção. Este site não grava sua senha.</p>
-<button id="loginBtn">Entrar</button><div id="loginStatus" class="status"></div>
-<p class="muted">O login só funcionará depois que a rota segura /api/admin/login estiver publicada no Worker.</p>
-</section>
-<section id="dashboard" class="hidden">
-<div class="grid">
-<div class="card"><h2>👥 Jogadores</h2><label>ID do jogador</label><input id="playerId" placeholder="Digite o ID"><button data-action="player-search">Buscar jogador</button><div id="playerResult" class="status"></div></div>
-<div class="card"><h2>💎 Recursos</h2><label>ID do jogador</label><input id="resourcePlayer" placeholder="ID do jogador"><label>Quantidade de gemas</label><input id="gemsAmount" type="number" min="0" placeholder="Ex.: 500"><button data-action="gems">Adicionar gemas</button><div id="resourceStatus" class="status"></div></div>
-<div class="card"><h2>🏰 Skins e castelos</h2><label>ID do jogador</label><input id="skinPlayer" placeholder="ID do jogador"><label>Skin / visual</label><input id="skinName" placeholder="Nome da skin"><button data-action="unlock-skin">Desbloquear skin</button><div id="skinStatus" class="status"></div></div>
-<div class="card"><h2>👑 Pacotes VIP</h2><label>Nome do pacote</label><input id="vipName" placeholder="VIP Prata"><label>Preço em R$ (apenas cadastro)</label><input id="vipPrice" type="number" min="0" step="0.01" placeholder="19.90"><label>Gemas incluídas</label><input id="vipGems" type="number" min="0" placeholder="1000"><button data-action="vip">Cadastrar pacote</button><div id="vipStatus" class="status"></div></div>
-</div>
-<div class="card"><h2>🛍 Catálogo de skins</h2><p class="muted">Estrutura preparada para cadastrar até 200 visuais originais. Os preços e desbloqueios reais serão validados pelo servidor.</p><label>Nome da skin</label><input id="catalogSkin" placeholder="Ex.: Guardião das Cinzas"><label>Preço da skin em reais (R$ 50 a R$ 1.000)</label><input id="catalogPrice" type="number" min="50" max="1000" step="1" placeholder="Ex.: 50"><button data-action="catalog">Adicionar skin ao catálogo</button><div id="catalogStatus" class="status"></div></div>
-<button class="secondary" id="logout">Sair do painel</button>
-</section>
-</main>
-<script>
-const API_BASE='/api/admin';
-let adminToken=null;
-const $=id=>document.getElementById(id);
-function status(id,msg){$(id).textContent=msg}
-async function api(path,body){
- if(!adminToken) throw new Error('Faça login primeiro.');
- const res=await fetch(API_BASE+path,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+adminToken},body:JSON.stringify(body)});
- let data={};try{data=await res.json()}catch{}
- if(!res.ok)throw new Error(data.error||'Falha na solicitação ('+res.status+').');
- return data;
-}
-async function checkServerHealth(){
- try{
-  const r=await fetch(API_BASE+'/health',{cache:'no-store'});const h=await r.json();
-  const missing=[];if(!h.hasDB)missing.push('Banco D1 (DB)');if(!h.hasADMIN_EMAIL)missing.push('ADMIN_EMAIL');if(!h.hasADMIN_PASSWORD)missing.push('ADMIN_PASSWORD');if(!h.hasSESSION_SECRET)missing.push('SESSION_SECRET');
-  if(missing.length){$('healthStatus').textContent='Servidor encontrado, mas falta configurar: '+missing.join(', ')+'. O login ficará indisponível até corrigir esses itens em Workers e Pages > clash-of-izzy > Configurações > Variáveis e segredos.';}
-  else $('healthStatus').textContent='Servidor, banco D1 e três segredos administrativos detectados. Já é possível testar o login.';
- }catch(e){$('healthStatus').textContent='Não foi possível consultar o Worker. Confira se o endereço do site está apontando para o Worker clash-of-izzy.';}
-}
-checkServerHealth();
-const savedEmail=localStorage.getItem('clash_admin_email');if(savedEmail){$('email').value=savedEmail;$('rememberEmail').checked=true;}
-$('rememberEmail').onchange=()=>{if($('rememberEmail').checked){if($('email').value.trim())localStorage.setItem('clash_admin_email',$('email').value.trim());}else localStorage.removeItem('clash_admin_email');};
-$('email').addEventListener('change',()=>{if($('rememberEmail').checked)localStorage.setItem('clash_admin_email',$('email').value.trim());});
-$('togglePassword').onclick=()=>{const show=$('password').type==='password';$('password').type=show?'text':'password';$('togglePassword').textContent=show?'Ocultar':'Mostrar';};
-$('loginBtn').onclick=async()=>{
- status('loginStatus','Conectando…');
- if(!$('email').value.trim()||!$('password').value){status('loginStatus','Informe o e-mail e a senha administrativa.');return;}
- try{
-  const res=await fetch(API_BASE+'/login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({email:$('email').value,password:$('password').value})});
-  const data=await res.json();if(!res.ok||!data.token){if(res.status===503)checkServerHealth();throw new Error(data.error||'Servidor de autenticação ainda não configurado.');}
-  adminToken=data.token;$('login').classList.add('hidden');$('dashboard').classList.remove('hidden');status('loginStatus','Acesso autorizado.');
- }catch(e){status('loginStatus',e.message)}
-};
-document.querySelectorAll('[data-action]').forEach(btn=>btn.onclick=async()=>{
- const action=btn.dataset.action;const map={
- 'player-search':['player-search',{playerId:$('playerId').value},'playerResult'],
- 'gems':['gems',{playerId:$('resourcePlayer').value,amount:Number($('gemsAmount').value)},'resourceStatus'],
- 'unlock-skin':['unlock-skin',{playerId:$('skinPlayer').value,skin:$('skinName').value},'skinStatus'],
- 'vip':['vip-packages',{name:$('vipName').value,price:Number($('vipPrice').value),gems:Number($('vipGems').value)},'vipStatus'],
- 'catalog':['skins',{name:$('catalogSkin').value,price:Number($('catalogPrice').value),currency:'BRL'},'catalogStatus']
- };
- const [route,payload,target]=map[action];if(action==='catalog'&&(!payload.name.trim()||!Number.isFinite(payload.price)||payload.price<50||payload.price>1000)){status(target,'Informe o nome e um preço entre R$ 50 e R$ 1.000.');return;}status(target,'Enviando…');
- try{const result=await api('/'+route,payload);status(target,JSON.stringify(result,null,2))}
- catch(e){status(target,e.message)}
-});
-$('logout').onclick=()=>{adminToken=null;$('dashboard').classList.add('hidden');$('login').classList.remove('hidden');$('password').value='';status('loginStatus','Sessão encerrada.')};
-</script>
-</body></html>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#1a1a2e">
+    <title>Clash of Izzy</title>
+    
+    <!-- PWA Manifest -->
+    <link rel="manifest" href="manifest.json">
+    
+    <!-- Ícones PWA (adicione depois) -->
+    <link rel="icon" type="image/png" href="icon-192.png">
+    <link rel="apple-touch-icon" href="icon-192.png">
+    
+    <!-- Estilos existentes -->
+    <link rel="stylesheet" href="equipment-styles.css">
+    
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', sans-serif; 
+            background: #0f0f1e; 
+            color: #fff;
+            overflow-x: hidden;
+        }
+        .container { max-width: 500px; margin: 0 auto; padding: 20px; }
+        h1 { text-align: center; margin: 20px 0; color: #ffd700; }
+        .nav-tabs { 
+            display: flex; 
+            gap: 10px; 
+            margin-bottom: 20px;
+            overflow-x: auto;
+        }
+        .nav-tab {
+            flex: 1;
+            padding: 12px;
+            background: #1a1a2e;
+            border: 2px solid #333;
+            border-radius: 8px;
+            color: #fff;
+            cursor: pointer;
+            text-align: center;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+        .
