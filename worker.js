@@ -284,7 +284,7 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"shop_purchase",JSON.stringify({item:itemId,source,price,currency:item.currency})));
     await env.DB.batch(statements);
 
-  if(type==="alliance_create"){
+  }else if(type==="alliance_create"){
     const name=String(body.name||"").trim().slice(0,32);
     const tag=String(body.tag||name.replace(/[^a-z0-9]/gi,"").slice(0,4)).toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5);
     if(name.length<3||tag.length<2)return json({error:"Informe nome com 3 caracteres e sigla com 2 a 5 letras."},400);
