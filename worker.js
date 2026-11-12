@@ -66,7 +66,7 @@ export default {
       if (!env.ADMIN_EMAIL || !env.ADMIN_PASSWORD || !env.SESSION_SECRET) {
         return json({ error: "Configure ADMIN_EMAIL, ADMIN_PASSWORD e SESSION_SECRET nos segredos do Worker." }, 503);
       }
-      if (body.email !== env.ADMIN_EMAIL || body.password !== env.ADMIN_PASSWORD) {
+      if (String(body.email || "").trim().toLowerCase() !== String(env.ADMIN_EMAIL || "").trim().toLowerCase() || body.password !== env.ADMIN_PASSWORD) {
         return json({ error: "E-mail ou senha incorretos." }, 401);
       }
       const token = await sign({ sub: "admin", exp: Math.floor(Date.now() / 1000) + 60 * 60 * 8 }, env.SESSION_SECRET);
