@@ -125,7 +125,8 @@ async function gameAction(env,playerId,body){
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
   await applyProduction(env,k.id);
-  const type=String(body.type||"");\n  let battleOutcome=null;
+  const type=String(body.type||"");
+  let battleOutcome=null;
   if(type==="upgrade"){
     const key=String(body.building||"");
     if(!BUILDINGS[key])return json({error:"Edifício inválido."},400);
