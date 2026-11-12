@@ -34,6 +34,42 @@ small{color:#d8c69e}.stat{display:inline-block;margin-right:10px}
       .panel{top:62px;width:175px}.bottom{left:190px;right:8px;bottom:5px}
       .bottom button{flex:1 1 auto}.resources{max-width:none}
     }
+
+/* Interface refinada — legibilidade, hierarquia e conforto em telas pequenas */
+:root{--gold:#e9c477;--panel:rgba(13,24,37,.94);--line:rgba(224,190,119,.48);--ink:#f4f0e7;--muted:#b9c5d0}
+body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(ellipse at 50% 35%,#263d4b 0%,#101923 65%,#090f17 100%);color:var(--ink)}
+.brand,.resources,.panel,.bottom,#hint{backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line);box-shadow:0 14px 38px #0007}
+.brand{font-weight:900;text-shadow:0 2px 14px #e9c47744}
+.panel{background:var(--panel);border-radius:14px}
+.panel h3,.modal h2,.modal h3{color:var(--gold);letter-spacing:.02em}
+.panel p,#hint p,.modal p{color:#d7dfE7;line-height:1.55}
+button{font-family:inherit;font-weight:700;letter-spacing:.01em;border-radius:9px;background:linear-gradient(180deg,#a77a3c,#68451f);border:1px solid #d8b66e;box-shadow:0 3px 10px #0004;transition:transform .16s ease,filter .16s ease,box-shadow .16s ease}
+button:hover{filter:brightness(1.16);transform:translateY(-1px);box-shadow:0 6px 16px #0005}
+button:active{transform:translateY(0) scale(.98)}
+.bottom{background:rgba(10,19,29,.94);border-radius:14px}
+.modal{background:rgba(3,8,14,.78);backdrop-filter:blur(7px);-webkit-backdrop-filter:blur(7px);z-index:20}
+.modal>div{background:linear-gradient(155deg,#203447,#111e2b 70%);border:1px solid #d6b56f;border-radius:16px;max-width:760px;max-height:min(86dvh,900px);overflow:auto;box-shadow:0 24px 80px #000b}
+.modal h2{font-size:1.45rem}
+.modal h3{margin:22px 0 10px}
+.modal .node,.world-nodes .node{background:linear-gradient(145deg,#263b4b,#172635);border:1px solid #ffffff20;border-radius:12px;padding:13px;margin:10px 0;box-shadow:0 5px 18px #0003}
+.modal .node b{color:#f4d38c}
+.modal small,small{color:var(--muted)}
+.modal input,.modal select{background:#0d1925;color:#f5f1e8;border:1px solid #71879a;border-radius:8px;padding:10px;max-width:100%;margin:4px}
+#toast{z-index:40;background:#142536;border:1px solid var(--gold);box-shadow:0 8px 28px #0009;border-radius:12px}
+#hint{background:rgba(13,24,37,.9);border-radius:12px}
+@media(max-width:650px){
+ .brand{font-size:13px}
+ .panel{background:rgba(13,24,37,.95);border-radius:12px}
+ .resources{border-radius:12px}
+ .bottom{border-radius:13px}
+ .bottom button{border-radius:7px}
+ .modal{padding:8px}
+ .modal>div{width:100%;max-height:88dvh;padding:14px}
+ .modal h2{font-size:1.2rem}
+ .modal .node{padding:11px}
+}
+@media(prefers-reduced-motion:reduce){button{transition:none}button:hover{transform:none}}
+
 </style>
 </head>
 <body>
