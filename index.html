@@ -161,7 +161,13 @@ function applyBuildingLevels(){
     const cap=new THREE.Mesh(new THREE.ConeGeometry(3.1,2.1,4),roof);cap.position.set(x,4.2,z);cap.rotation.y=Math.PI/4;scene.add(cap);
     base.userData.cap=cap;
   }
-  for(const [name,lvl] of Object.entries(state.buildingLevels)){const b=buildingMeshes[name];if(!b)continue;const h=b.userData.baseHeight*(1+(lvl-1)*.18);b.scale.y=h/b.userData.baseHeight;b.position.y=h/2;if(b.userData.cap)b.userData.cap.position.y=h+1;}
+  for(const [name,lvl] of Object.entries(state.buildingLevels)){const b=buildingMeshes[name];if(!b)continue;const h=b.userData.baseHeight*(1+(lvl-1)*.18);b.scale.y=h/b.userData.baseHeight;b.position.y=h/2;
+    if(name==='Castelo de Eldoria'){
+      if(!b.userData.tierMaterial){b.material=b.material.clone();b.userData.tierMaterial=true;}
+      const tier=lvl<=5?0x80502f:lvl<=10?0x777d83:lvl<=15?0xa9adb0:lvl<=20?0xe1e2dc:lvl<=25?0xc99a36:0x65358d;
+      b.material.color.setHex(tier);b.material.emissive.setHex(lvl>=26?0x32104b:lvl>=21?0x3a2608:0x000000);b.material.emissiveIntensity=lvl>=26?.55:lvl>=21?.22:0;
+    }
+    if(b.userData.cap)b.userData.cap.position.y=h+1;}
 }
 applyBuildingLevels();
 document.getElementById('upgrade').onclick=async()=>{await serverReady;if(serverOnline){try{await sendGameAction({type:'upgrade',building:state.selectedBuilding||'castle'});keep.scale.y=1+(state.level-1)*.12;keep.position.y=3.5*keep.scale.y;applyBuildingLevels();return showToast('Edifício melhorado e salvo no servidor!')}catch(e){return showToast(e.message)}}const costWood=300*state.level,costStone=150*state.level;if(state.wood<costWood||state.stone<costStone)return showToast('Recursos insuficientes!');state.wood-=costWood;state.stone-=costStone;state.level++;keep.scale.y=1+(state.level-1)*.12;keep.position.y=3.5*keep.scale.y;save();showToast('Castelo evoluiu para nível '+state.level+'!')};
