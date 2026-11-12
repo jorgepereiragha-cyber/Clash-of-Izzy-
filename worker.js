@@ -38,6 +38,58 @@ genghis_khan:{name:"Genghis Khan",title:"O Flagelo de Deus",rarity:"purple",type
 const HERO_RARITY={white:{label:"Branco · Comum",multiplier:1,fragments:5,maxLevel:30,maxStars:5},blue:{label:"Azul · Raro",multiplier:1.8,fragments:15,maxLevel:50,maxStars:6},purple:{label:"Roxo · Lendário",multiplier:3.5,fragments:40,maxLevel:70,maxStars:7}};
 const HERO_STAR_COST={2:10,3:20,4:40,5:80,6:150,7:300};
 async function ensureHeroTables(env){await env.DB.batch([env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_inventory (kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 1,experience INTEGER NOT NULL DEFAULT 0,stars INTEGER NOT NULL DEFAULT 1,skill_level INTEGER NOT NULL DEFAULT 1,fragments INTEGER NOT NULL DEFAULT 0,acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,hero_key))"),env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_summon_history (id INTEGER PRIMARY KEY AUTOINCREMENT,kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,result_type TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")]);}
+
+const SHOP_ITEMS={
+ food_small:{name:"Saco de Comida",icon:"🌾",desc:"+5.000 comida",price:500,currency:"gold",gives:{food:5000},category:"resources"},
+ food_medium:{name:"Carroça de Comida",icon:"🌾",desc:"+25.000 comida",price:2000,currency:"gold",gives:{food:25000},category:"resources"},
+ food_large:{name:"Celeiro Real",icon:"🌾",desc:"+150.000 comida",price:10000,currency:"gold",gives:{food:150000},category:"resources"},
+ wood_small:{name:"Feixe de Madeira",icon:"🪵",desc:"+5.000 madeira",price:500,currency:"gold",gives:{wood:5000},category:"resources"},
+ wood_medium:{name:"Carga de Madeira",icon:"🪵",desc:"+25.000 madeira",price:2000,currency:"gold",gives:{wood:25000},category:"resources"},
+ wood_large:{name:"Estoque Real",icon:"🪵",desc:"+150.000 madeira",price:10000,currency:"gold",gives:{wood:150000},category:"resources"},
+ gold_small:{name:"Bolsa de Ouro",icon:"🪙",desc:"+10.000 ouro",price:100,currency:"gems",gives:{gold:10000},category:"resources"},
+ gold_large:{name:"Baú de Ouro",icon:"🪙",desc:"+100.000 ouro",price:800,currency:"gems",gives:{gold:100000},category:"resources"},
+ acc_5min:{name:"Acelerador 5 min",icon:"⚡",desc:"Item de aceleração de construção",price:20,currency:"gems",gives:{acc_5min:1},category:"accelerators"},
+ acc_1h:{name:"Acelerador 1 hora",icon:"⚡",desc:"Item de aceleração de construção",price:50,currency:"gems",gives:{acc_1h:1},category:"accelerators"},
+ acc_8h:{name:"Acelerador 8 horas",icon:"⚡",desc:"Item de aceleração de construção",price:200,currency:"gems",gives:{acc_8h:1},category:"accelerators"},
+ acc_1d:{name:"Acelerador 1 dia",icon:"⚡",desc:"Item de aceleração de construção",price:400,currency:"gems",gives:{acc_1d:1},category:"accelerators"},
+ train_1h:{name:"Acelerador de Treino 1h",icon:"⚔️",desc:"Item de aceleração de treinamento",price:60,currency:"gems",gives:{train_1h:1},category:"accelerators"},
+ train_8h:{name:"Acelerador de Treino 8h",icon:"⚔️",desc:"Item de aceleração de treinamento",price:250,currency:"gems",gives:{train_8h:1},category:"accelerators"},
+ res_1h:{name:"Acelerador de Pesquisa 1h",icon:"🔬",desc:"Item de aceleração de pesquisa",price:70,currency:"gems",gives:{res_1h:1},category:"accelerators"},
+ res_8h:{name:"Acelerador de Pesquisa 8h",icon:"🔬",desc:"Item de aceleração de pesquisa",price:280,currency:"gems",gives:{res_8h:1},category:"accelerators"},
+ shield_8h:{name:"Escudo 8 horas",icon:"🛡️",desc:"Item de proteção para o reino",price:300,currency:"gems",gives:{shield_8h:1},category:"special"},
+ shield_3d:{name:"Escudo 3 dias",icon:"🛡️",desc:"Item de proteção para o reino",price:1000,currency:"gems",gives:{shield_3d:1},category:"special"},
+ hero_exp:{name:"Livro de EXP",icon:"📖",desc:"+10.000 EXP para herói",price:200,currency:"gems",gives:{hero_exp:1},category:"special"},
+ pack_starter:{name:"Pacote Iniciante",icon:"🎁",desc:"50k comida + 50k madeira + 10 aceleradores de 1h",price:500,currency:"gems",gives:{food:50000,wood:50000,acc_1h:10},category:"packages",originalPrice:800},
+ pack_war:{name:"Pacote Guerra",icon:"⚔️",desc:"100k comida + aceleradores de treino e construção",price:1500,currency:"gems",gives:{food:100000,train_1h:20,acc_1h:10},category:"packages",originalPrice:2500},
+ pack_legend:{name:"Pacote Lendário",icon:"👑",desc:"500k comida + 500k madeira + aceleradores + escudos + livros",price:5000,currency:"gems",gives:{food:500000,wood:500000,acc_1d:20,shield_8h:10,hero_exp:5},category:"packages",originalPrice:9000}
+};
+const MERCHANT_POOL=[
+ {id:"food_large",stock:3,discount:.70},{id:"wood_large",stock:3,discount:.70},
+ {id:"acc_1d",stock:5,discount:.60},{id:"acc_8h",stock:5,discount:.65},
+ {id:"train_8h",stock:5,discount:.65},{id:"res_8h",stock:3,discount:.70},
+ {id:"shield_3d",stock:2,discount:.60},{id:"hero_exp",stock:5,discount:.75},
+ {id:"pack_war",stock:1,discount:.80},{id:"gold_large",stock:2,discount:.50},
+ {id:"pack_starter",stock:2,discount:.70},{id:"food_medium",stock:4,discount:.65}
+];
+const SHOP_CYCLE_MS=8*60*60*1000;
+function merchantCycle(now=Date.now()){return Math.floor(now/SHOP_CYCLE_MS);}
+function merchantOffers(cycle){
+ const pool=[...MERCHANT_POOL],seed=(cycle*2654435761)>>>0;
+ let x=seed||1;const rand=()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967296;};
+ for(let i=pool.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
+ return pool.slice(0,8).map(o=>({id:o.id,stock:o.stock,discount:Math.round((1-o.discount)*100),price:Math.max(1,Math.floor(SHOP_ITEMS[o.id].price*o.discount))}));
+}
+async function ensureShopTables(env){await env.DB.batch([
+ env.DB.prepare("CREATE TABLE IF NOT EXISTS shop_inventory (kingdom_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(kingdom_id,item_id))"),
+ env.DB.prepare("CREATE TABLE IF NOT EXISTS merchant_stock (kingdom_id INTEGER NOT NULL,cycle_id INTEGER NOT NULL,item_id TEXT NOT NULL,stock INTEGER NOT NULL,PRIMARY KEY(kingdom_id,cycle_id,item_id))")
+]);}
+async function getShopState(env,kingdomId){
+ await ensureShopTables(env);const cycle=merchantCycle(),offers=merchantOffers(cycle);
+ const rows=await env.DB.prepare("SELECT item_id,stock FROM merchant_stock WHERE kingdom_id=? AND cycle_id=?").bind(kingdomId,cycle).all();
+ const stock=Object.fromEntries((rows.results||[]).map(r=>[r.item_id,r.stock]));
+ const inventory=await env.DB.prepare("SELECT item_id,quantity FROM shop_inventory WHERE kingdom_id=? AND quantity>0 ORDER BY item_id").bind(kingdomId).all();
+ return {cycle,refreshAt:(cycle+1)*SHOP_CYCLE_MS,offers:offers.map(o=>({...SHOP_ITEMS[o.id],id:o.id,price:o.price,discount:o.discount,stock:stock[o.id]??o.stock,originalPrice:SHOP_ITEMS[o.id].price})),items:SHOP_ITEMS,inventory:inventory.results||[]};
+}
 function heroView(row){const t=HERO_TEMPLATES[row.hero_key],r=HERO_RARITY[row.rarity];if(!t||!r)return row;const stats=Object.fromEntries(Object.entries(t.stats).map(([key,value])=>[key,Math.floor(value*r.multiplier*(1+(row.level-1)*.03+(row.stars-1)*.15))]));return {...row,name:t.name,title:t.title,type:t.type,rarity_label:r.label,max_level:r.maxLevel,max_stars:r.maxStars,stats,skill:t.skill,skill_description:t.skillDesc,skill_power:t.skillPower,fragments_to_next:HERO_STAR_COST[row.stars+1]||null};}
 function rollHeroRarity(){const n=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;return n<.70?"white":n<.95?"blue":"purple";}
 const UNITS = {
@@ -159,6 +211,7 @@ async function processMarches(env,kingdomId){
 }
 async function gameState(env,playerId){
   await ensureHeroTables(env);
+  await ensureShopTables(env);
   const p=await env.DB.prepare("SELECT id,player_id,name,gems FROM players WHERE player_id=?").bind(playerId).first();
   if(!p)return null;
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
@@ -192,7 +245,8 @@ async function gameState(env,playerId){
     allianceDetails={...alliance,members:members.results||[],chat:(chat.results||[]).reverse(),invites:invites.results||[],wars:wars.results||[]};
   }
   const totalTroops=(troops.results||[]).reduce((n,u)=>n+u.quantity,0);
-  return {player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  const shop=await getShopState(env,kingdom.id);
+  return {player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -202,6 +256,34 @@ async function gameAction(env,playerId,body){
   await applyProduction(env,k.id);
   const type=String(body.type||"");
   let battleOutcome=null;
+  if(type==="shop_buy"){
+    await ensureShopTables(env);
+    const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_ITEMS[itemId];
+    if(!item)return json({error:"Produto inválido."},400);
+    let price=item.price,cycle=null,offer=null;
+    if(source==="merchant"){
+      cycle=merchantCycle();offer=merchantOffers(cycle).find(x=>x.id===itemId);
+      if(!offer)return json({error:"Esta oferta não pertence à rotação atual."},409);
+      price=offer.price;
+      await env.DB.prepare("INSERT OR IGNORE INTO merchant_stock(kingdom_id,cycle_id,item_id,stock) VALUES(?,?,?,?)").bind(k.id,cycle,itemId,offer.stock).run();
+      const stock=await env.DB.prepare("UPDATE merchant_stock SET stock=stock-1 WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND stock>0").bind(k.id,cycle,itemId).run();
+      if(!stock.meta.changes)return json({error:"Oferta esgotada. O mercador retorna na próxima rotação."},409);
+    }else if(source!=="shop")return json({error:"Origem da compra inválida."},400);
+    const debit=item.currency==="gems"
+      ?await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(price,p.id,price).run()
+      :await env.DB.prepare("UPDATE kingdoms SET gold=gold-? WHERE id=? AND gold>=?").bind(price,k.id,price).run();
+    if(!debit.meta.changes){
+      if(source==="merchant")await env.DB.prepare("UPDATE merchant_stock SET stock=stock+1 WHERE kingdom_id=? AND cycle_id=? AND item_id=?").bind(k.id,cycle,itemId).run();
+      return json({error:item.currency==="gems"?"Diamantes insuficientes.":"Ouro insuficiente."},409);
+    }
+    const statements=[];
+    for(const [key,amount] of Object.entries(item.gives)){
+      if(["food","wood","stone","iron","gold"].includes(key))statements.push(env.DB.prepare("UPDATE kingdoms SET "+key+"="+key+"+? WHERE id=?").bind(amount,k.id));
+      else statements.push(env.DB.prepare("INSERT INTO shop_inventory(kingdom_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(kingdom_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,key,amount));
+    }
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"shop_purchase",JSON.stringify({item:itemId,source,price,currency:item.currency})));
+    await env.DB.batch(statements);
+
   if(type==="alliance_create"){
     const name=String(body.name||"").trim().slice(0,32);
     const tag=String(body.tag||name.replace(/[^a-z0-9]/gi,"").slice(0,4)).toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5);
