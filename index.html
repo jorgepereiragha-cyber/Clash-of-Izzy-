@@ -73,7 +73,7 @@ async function initializeOnline(){
  serverOnline=true;showToast('Reino sincronizado com o servidor!');return true;
  }catch(error){serverOnline=false;showToast('Modo local: '+error.message);return false;}
 }
-async function sendGameAction(payload){if(!serverOnline)return false;const result=await gameFetch('action','POST',payload);applyServerState(result.state);return true;}
+async function sendGameAction(payload){if(!serverOnline)return false;const result=await gameFetch('action','POST',payload);applyServerState(result.state);return result;}
 
 save();
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x9bb5c0);scene.fog=new THREE.Fog(0x9bb5c0,45,100);
@@ -134,7 +134,7 @@ document.querySelectorAll('[data-open]').forEach(b=>b.onclick=()=>openModal(b.da
 document.getElementById('centerCam').onclick=()=>{controls.target.set(0,2,0);camera.position.set(20,22,27);controls.update();showToast('Câmera centralizada')};
 window.researchKingdom=async(key)=>{try{await serverReady;if(serverOnline){await sendGameAction({type:'research',research:key});showToast('Pesquisa concluída!');openModal('research')}else showToast('Pesquisa exige conexão com o servidor.')}catch(e){showToast(e.message)}};
 window.trainClass=async(unit)=>{try{await serverReady;if(serverOnline){await sendGameAction({type:'train',unit,quantity:10});showToast('Tropas treinadas!');openModal('army')}else showToast('Treinamento online indisponível.')}catch(e){showToast(e.message)}};
-window.mockBattle=()=>{let win=Math.random()>.25;if(win){state.gold+=100;state.food+=100;showToast('Vitória! +100 ouro e +100 comida')}else showToast('Seu exército recuou. Treine mais soldados.');save();closeModal()};
+window.mockBattle=async()=>{try{await serverReady;if(serverOnline){const result=await sendGameAction({type:'battle'});const b=result.battle;showToast(b.message+' Poder '+b.attackerPower+' x '+b.defenderPower);closeModal();return}showToast('Batalha online indisponível.')}catch(e){showToast(e.message)}};
 window.claimQuest=()=>{state.gold+=100;state.quests=Math.min(3,state.quests+1);save();showToast('Recompensa recebida!');openModal('quests')};
 window.buySkin=(name,cost)=>{if(state.gems<cost)return showToast('Gemas insuficientes');state.gems-=cost;state.skin=name;state.skins.push(name);save();showToast('Skin equipada: '+name);openModal('shop')};
 window.createAlliance=()=>{let n=document.getElementById('allianceName').value.trim();document.getElementById('allianceMsg').textContent=n?'Aliança '+n+' criada neste protótipo.':'Digite um nome.'};
