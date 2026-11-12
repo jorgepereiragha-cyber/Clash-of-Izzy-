@@ -193,6 +193,25 @@ async function gameAction(env,playerId,body){
       if(count.total>1)return json({error:"O líder deve transferir a liderança antes de sair."},409);
       await env.DB.prepare("DELETE FROM alliances WHERE id=?").bind(membership.alliance_id).run();
     }else await env.DB.prepare("DELETE FROM alliance_members WHERE kingdom_id=?").bind(k.id).run();
+  }else if(type==="dragon_upgrade"){
+    const dragon=await env.DB.prepare("SELECT level,experience,bond FROM dragons WHERE kingdom_id=?").bind(k.id).first();
+    if(!dragon)return json({error:"Dragão não encontrado."},404);
+    if(dragon.level>=100)return json({error:"Dragão já atingiu o nível máximo."},409);
+    const level=dragon.level,cost={food:250*level,wood:150*level,stone:100*level,iron:25*level};
+    const debit=await env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,stone=stone-?,iron=iron-? WHERE id=? AND food>=? AND wood>=? AND stone>=? AND iron>=?").bind(cost.food,cost.wood,cost.stone,cost.iron,k.id,cost.food,cost.wood,cost.stone,cost.iron).run();
+    if(!debit.meta.changes)return json({error:"Recursos insuficientes para evoluir o dragão."},409);
+    await env.DB.prepare("UPDATE dragons SET level=level+1,experience=experience+100,bond=MIN(100,bond+2) WHERE kingdom_id=?").bind(k.id).run();
+    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"dragon_evolved",JSON.stringify({level:level+1,cost})).run();
+  }else if(type==="hero_train"){
+    const key=String(body.hero||"kael_sunwarden");
+    const hero=await env.DB.prepare("SELECT id,level,experience FROM heroes WHERE kingdom_id=? AND hero_key=?").bind(k.id,key).first();
+    if(!hero)return json({error:"Herói não encontrado."},404);
+    if(hero.level>=100)return json({error:"Herói já atingiu o nível máximo."},409);
+    const cost={food:200*hero.level,wood:100*hero.level,gold:75*hero.level};
+    const debit=await env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,gold=gold-? WHERE id=? AND food>=? AND wood>=? AND gold>=?").bind(cost.food,cost.wood,cost.gold,k.id,cost.food,cost.wood,cost.gold).run();
+    if(!debit.meta.changes)return json({error:"Recursos insuficientes para treinar o herói."},409);
+    await env.DB.prepare("UPDATE heroes SET level=level+1,experience=experience+100 WHERE id=?").bind(hero.id).run();
+    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"hero_trained",JSON.stringify({hero:key,level:hero.level+1,cost})).run();
   }else if(type==="upgrade"){
     const key=String(body.building||"");
     if(!BUILDINGS[key])return json({error:"Edifício inválido."},400);
