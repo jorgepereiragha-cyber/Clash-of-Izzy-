@@ -11,6 +11,6 @@
     "check": "wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist"
   },
   "devDependencies": {
-    "wrangler": "^4.0.0"
+    "wrangler": "4.161.0"
   }
 }
