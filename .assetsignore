@@ -5,3 +5,5 @@ README.md
 .git/**
 .github/**
 migrations/**
+node_modules/**
+dist/**
