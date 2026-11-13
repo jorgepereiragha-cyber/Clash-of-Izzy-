@@ -640,8 +640,8 @@ async function gameAction(env,playerId,body){
     const dragon=await env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first();
     const tech=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first();
     const troopPower=(units.results||[]).reduce((n,u)=>n+u.quantity*(UNITS[u.unit_type]?.power||1)*u.tier,0);
-    const attackerPower=Math.max(1,Math.floor(troopPower+(hero?.level||1)*8+(dragon?.level||1)*10+(tech?.level||0)*12));
-    const defenderPower=80+Number(k.castle_level||1)*95;
+    let attackerPower=Math.max(1,Math.floor(troopPower+(hero?.level||1)*8+(dragon?.level||1)*10+(tech?.level||0)*12));
+    let defenderPower=80+Number(k.castle_level||1)*95;
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const simulation=simulateBattle({
       army:units.results||[],
@@ -652,6 +652,8 @@ async function gameAction(env,playerId,body){
       roll
     });
     const won=simulation.won;
+    attackerPower=simulation.attackerPower;
+    defenderPower=simulation.defenderPower;
     const losses={};
     const remainingLosses={...simulation.losses};
     const statements=(units.results||[]).map(u=>{
