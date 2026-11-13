@@ -698,7 +698,7 @@ export default {
     try{
       const playerId="izzy_"+crypto.randomUUID().replace(/-/g,"");
       await ensureKingdom(env,playerId);
-      const token=await sign({sub:playerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*30},env.SESSION_SECRET);
+      const token=await sign({sub:playerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365},env.SESSION_SECRET);
       return json({token,state:await gameState(env,playerId)},201);
     }catch(e){return json({error:"Não foi possível fundar o reino. Aplique as migrações D1 0001, 0002 e 0003.",detail:String(e?.message||e)},503)}
   }
