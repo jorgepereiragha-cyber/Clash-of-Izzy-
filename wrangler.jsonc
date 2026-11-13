@@ -14,10 +14,10 @@
     {
       "binding": "DB",
       "database_name": "clash-of-izzy-db",
-      "database_id": "7e63af59-d9ff-4159-a9cf-b02e35b92605"
+      "database_id": "7e63af59-d9ff-4159-a9cf-b02e35b92605",
+      "migrations_dir": "migrations"
     }
   ],
-  "migrations_dir": "migrations",
   "compatibility_flags": [
     "nodejs_compat"
   ],
