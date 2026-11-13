@@ -46,20 +46,26 @@ const API_BASE='/api';
 let kingdomSession=null;
 async function connectKingdom(){
  const status=document.getElementById('kingdomStatus');
- const savedToken=sessionStorage.getItem('coi_game_token');
+ const savedToken=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
  try{
   let response;
   if(savedToken){
    response=await fetch(API_BASE+'/game/state',{headers:{Authorization:'Bearer '+savedToken}});
-   if(!response.ok){sessionStorage.removeItem('coi_game_token');}
+   if(!response.ok){
+    localStorage.removeItem('coi_game_token');
+    sessionStorage.removeItem('coi_game_token');
+   }
   }
   if(!response||!response.ok){
    response=await fetch(API_BASE+'/game/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
   }
   if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error||'Servidor indisponível');
   const data=await response.json();
-  if(data.token){sessionStorage.setItem('coi_game_token',data.token);kingdomSession=data.state;}
-  else kingdomSession=data.state;
+  if(data.token){
+   localStorage.setItem('coi_game_token',data.token);
+   sessionStorage.setItem('coi_game_token',data.token);
+   kingdomSession=data.state;
+  }else kingdomSession=data.state;
   if(!kingdomSession)throw new Error('O servidor não retornou os dados do reino.');
   const k=kingdomSession.kingdom||{},p=kingdomSession.player||{};
   status.textContent='🏰 '+(k.kingdom_name||'Reino')+' · 🪙 '+Number(k.gold||0).toLocaleString('pt-BR')+' ouro · 💎 '+Number(p.gems||0).toLocaleString('pt-BR')+' gemas · ⚔ '+Number(kingdomSession.totalTroops||0).toLocaleString('pt-BR')+' tropas';
