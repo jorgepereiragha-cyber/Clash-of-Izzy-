@@ -1,3 +1,4 @@
+import { simulateBattle } from "./game-adapter.js";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -641,19 +642,28 @@ async function gameAction(env,playerId,body){
     const troopPower=(units.results||[]).reduce((n,u)=>n+u.quantity*(UNITS[u.unit_type]?.power||1)*u.tier,0);
     const attackerPower=Math.max(1,Math.floor(troopPower+(hero?.level||1)*8+(dragon?.level||1)*10+(tech?.level||0)*12));
     const defenderPower=80+Number(k.castle_level||1)*95;
-    const variance=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
-    const won=attackerPower*variance>=defenderPower;
-    const lossRate=won ? 0.06 : 0.24;
+    const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
+    const simulation=simulateBattle({
+      army:units.results||[],
+      castleLevel:Number(k.castle_level||1),
+      heroLevel:Number(hero?.level||1),
+      dragonLevel:Number(dragon?.level||1),
+      researchLevel:Number(tech?.level||0),
+      roll
+    });
+    const won=simulation.won;
     const losses={};
+    const remainingLosses={...simulation.losses};
     const statements=(units.results||[]).map(u=>{
-      const lost=Math.min(u.quantity,Math.floor(u.quantity*lossRate));
-      losses[u.unit_type]=lost;
+      const lost=Math.min(u.quantity,Math.max(0,Number(remainingLosses[u.unit_type]||0)));
+      remainingLosses[u.unit_type]=Math.max(0,Number(remainingLosses[u.unit_type]||0)-lost);
+      losses[u.unit_type]=(losses[u.unit_type]||0)+lost;
       return env.DB.prepare("UPDATE army_units SET quantity=quantity-? WHERE kingdom_id=? AND unit_type=? AND tier=?").bind(lost,k.id,u.unit_type,u.tier);
     });
     const rewards=won?{food:500,wood:300,stone:200,gold:100}:{food:0,wood:0,stone:0,gold:0};
     if(won)statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+500,wood=wood+300,stone=stone+200,gold=gold+100 WHERE id=?").bind(k.id));
     statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) VALUES(?,?,?,?,?,?,?,?)")
-      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:won?"victory":"defeat"},{attackerPower,defenderPower}])));
+      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_simulated",rounds:simulation.rounds,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}])));
     if(won)for(const [resource,amount] of Object.entries(rewards))if(amount>0)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(k.id,resource,amount,"recompensa de batalha PvE"));
     await env.DB.batch(statements);
     battleOutcome={won,attackerPower,defenderPower,losses,rewards,message:won?"Vitória! O reino recebeu recursos.":"Derrota! Reorganize o exército e tente novamente."};
