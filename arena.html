@@ -13,12 +13,13 @@
 #message{position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);font-size:30px;font-weight:900;text-shadow:0 3px 8px black;display:none;z-index:5;text-align:center}
 #shop{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:8;padding:16px}#shop .inside{max-width:430px;width:100%;max-height:88vh;overflow:auto;background:#17283c;border:1px solid #e0b75d;border-radius:12px;padding:20px}#catalog{display:grid;gap:7px;margin:10px 0}#catalog button{display:flex;justify-content:space-between;gap:10px;text-align:left;width:100%;margin:0}#shop button{margin:5px;padding:10px;background:#68451f;border:1px solid #e0b75d;color:white;border-radius:7px}
 #help{position:fixed;right:10px;top:86px;z-index:2;max-width:180px;font-size:11px;opacity:.9}
-@media(max-width:650px){#help{display:none}.card{padding:7px;font-size:11px}.stats{gap:6px}.bar{min-width:90px}#skills{bottom:12px;left:auto;right:10px;transform:none;gap:4px}.skill{width:46px;height:50px;font-size:15px}#controls{bottom:15px}.action{padding:8px;font-size:11px}#objective{top:72px;font-size:11px}}
+#kingdomStatus{font-size:11px;max-width:290px;line-height:1.4}@media(max-width:650px){#kingdomStatus{max-width:160px;font-size:9px}}@media(max-width:650px){#help{display:none}.card{padding:7px;font-size:11px}.stats{gap:6px}.bar{min-width:90px}#skills{bottom:12px;left:auto;right:10px;transform:none;gap:4px}.skill{width:46px;height:50px;font-size:15px}#controls{bottom:15px}.action{padding:8px;font-size:11px}#objective{top:72px;font-size:11px}}
 </style></head>
 <body>
 <div id="hud">
  <div class="card"><div class="brand">⚔ CLASH OF IZZY: ARENA</div><div id="heroName">Kael · Guardião do Sol · Nv. 1</div><div class="bar"><div id="hp" class="fill"></div></div><div class="bar"><div id="mp" class="fill mana"></div></div></div>
  <div class="card stats"><span>🪙 Ouro: <b id="gold">500</b></span><span>⚔ Abates: <b id="kills">0</b></span><span>🏰 Inimigo: <b id="nexusHp">100%</b></span></div>
+ <div class="card" id="kingdomStatus" aria-live="polite">🌐 Conectando ao reino…</div>
 </div>
 <div id="objective">Destrua o Nexus vermelho. Proteja sua base!</div>
 <div id="help" class="card">Setas / controles: mover<br>Espaço: ataque básico<br>Q: golpe solar · W: avanço<br>E: explosão · R: ultimate<br>Loja: tecla B</div>
@@ -29,6 +30,35 @@
 <div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Selecione um item para consultar e comprar pelo WhatsApp. Skins de R$ 50 a R$ 1.000.</p><div id="catalog">Carregando catálogo oficial…</div><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+const API_BASE='/api';
+let kingdomSession=null;
+async function connectKingdom(){
+ const status=document.getElementById('kingdomStatus');
+ const savedToken=sessionStorage.getItem('coi_game_token');
+ try{
+  let response;
+  if(savedToken){
+   response=await fetch(API_BASE+'/game/state',{headers:{Authorization:'Bearer '+savedToken}});
+   if(!response.ok){sessionStorage.removeItem('coi_game_token');}
+  }
+  if(!response||!response.ok){
+   response=await fetch(API_BASE+'/game/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
+  }
+  if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error||'Servidor indisponível');
+  const data=await response.json();
+  if(data.token){sessionStorage.setItem('coi_game_token',data.token);kingdomSession=data.state;}
+  else kingdomSession=data.state;
+  if(!kingdomSession)throw new Error('O servidor não retornou os dados do reino.');
+  const k=kingdomSession.kingdom||{},p=kingdomSession.player||{};
+  status.textContent='🏰 '+(k.kingdom_name||'Reino')+' · 🪙 '+Number(k.gold||0).toLocaleString('pt-BR')+' ouro · 💎 '+Number(p.gems||0).toLocaleString('pt-BR')+' gemas · ⚔ '+Number(kingdomSession.totalTroops||0).toLocaleString('pt-BR')+' tropas';
+  document.getElementById('heroName').textContent=(p.name||'Lorde de Eldoria')+' · Reino conectado';
+  document.getElementById('gold').textContent=Number(k.gold||0).toLocaleString('pt-BR');
+ }catch(error){
+  status.textContent='⚠️ Modo demonstração · '+error.message;
+  console.warn('Clash of Izzy: falha ao conectar ao reino:',error);
+ }
+}
+connectKingdom();
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x92a8b4);scene.fog=new THREE.Fog(0x92a8b4,65,125);
 const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,220);
 const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
