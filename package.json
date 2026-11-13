@@ -1,0 +1,16 @@
+{
+  "name": "clash-of-izzy",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "deploy": "wrangler --config wrangler.jsonc deploy",
+    "dev": "wrangler --config wrangler.jsonc dev",
+    "db:migrate:local": "wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local",
+    "db:migrate:remote": "wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --remote",
+    "check": "wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist"
+  },
+  "devDependencies": {
+    "wrangler": "^4.0.0"
+  }
+}
