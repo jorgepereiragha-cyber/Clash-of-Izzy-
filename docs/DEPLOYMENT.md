@@ -5,8 +5,9 @@
 O workflow `.github/workflows/deploy-cloudflare.yml` executa nesta ordem:
 
 1. valida o bundle do Worker com `wrangler deploy --dry-run`;
-2. aplica as migrações pendentes no D1 remoto `clash-of-izzy-db`;
-3. publica o Worker e os arquivos estáticos.
+2. aplica todas as migrações em um D1 local descartável para detectar erros SQL antes de tocar na produção;
+3. aplica as migrações pendentes no D1 remoto `clash-of-izzy-db`;
+4. publica o Worker e os arquivos estáticos.
 
 As migrações ficam em `migrations/`. Não renomeie nem reutilize nomes de migrações já aplicadas.
 
