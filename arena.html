@@ -102,8 +102,10 @@ chatLanguage.addEventListener('change',()=>{translatedCache.clear();chatLastId=0
 
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x92a8b4);scene.fog=new THREE.Fog(0x92a8b4,65,125);
 const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,220);
-const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xdcecff,0x33452e,1.8));const sun=new THREE.DirectionalLight(0xffe4b2,2.6);sun.position.set(-25,45,25);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-60;sun.shadow.camera.right=60;sun.shadow.camera.top=50;sun.shadow.camera.bottom=-50;sun.shadow.bias=-0.00025;scene.add(sun);
+const mobileProfile=matchMedia('(max-width: 800px)').matches||/Android|iPhone|iPad/i.test(navigator.userAgent);
+let adaptivePixelRatio=Math.min(devicePixelRatio,mobileProfile?1.25:1.5);const minPixelRatio=mobileProfile?.78:.9;let perfElapsed=0,perfFrames=0,perfTime=0;
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(adaptivePixelRatio);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xdcecff,0x33452e,1.8));const sun=new THREE.DirectionalLight(0xffe4b2,2.6);sun.position.set(-25,45,25);sun.castShadow=true;sun.shadow.mapSize.set(mobileProfile?512:1024,mobileProfile?512:1024);sun.shadow.camera.left=-60;sun.shadow.camera.right=60;sun.shadow.camera.top=50;sun.shadow.camera.bottom=-50;sun.shadow.bias=-0.00025;scene.add(sun);
 const mat=(c)=>new THREE.MeshStandardMaterial({color:c,roughness:.86});
 function makeTexture(kind){
  const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');
@@ -117,7 +119,7 @@ function makeTexture(kind){
  }else if(kind==='wood'){
   ctx.globalAlpha=.3;ctx.strokeStyle='#24180f';ctx.lineWidth=3;for(let y=12;y<256;y+=28){ctx.beginPath();ctx.moveTo(0,y);ctx.bezierCurveTo(70,y-5,160,y+6,256,y-2);ctx.stroke()}
  }
- ctx.globalAlpha=1;const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());return texture;
+ ctx.globalAlpha=1;const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.anisotropy=Math.min(mobileProfile?2:4,renderer.capabilities.getMaxAnisotropy());return texture;
 }
 const grassTexture=makeTexture('grass');grassTexture.repeat.set(9,7);
 const dirtTexture=makeTexture('dirt');dirtTexture.repeat.set(8,1);
@@ -190,7 +192,33 @@ treeTrunks.count=treeIndex;treeCrowns.count=treeIndex;treeTrunks.instanceMatrix.
 const grassTuftGeometry=new THREE.ConeGeometry(.16,.9,4),grassTufts=new THREE.InstancedMesh(grassTuftGeometry,mats.leaf,84),grassDummy=new THREE.Object3D();
 let tuftIndex=0;
 for(let i=0;i<84;i++){const x=(Math.random()-.5)*104,side=Math.random()<.5?-1:1,z=side*(26+Math.random()*3.8);grassDummy.position.set(x,.34,z);grassDummy.rotation.set((Math.random()-.5)*.18,Math.random()*Math.PI,0);grassDummy.scale.set(.65+Math.random()*.7,.7+Math.random()*.8,.65+Math.random()*.7);grassDummy.updateMatrix();grassTufts.setMatrixAt(tuftIndex++,grassDummy.matrix)}
-grassTufts.count=tuftIndex;grassTufts.instanceMatrix.needsUpdate=true;grassTufts.castShadow=false;grassTufts.receiveShadow=false;scene.add(grassTufts);
+grassTufts.count=tuftIndex;grassTufts.instanceMatrix.needsUpdate=true;
+grassTufts.castShadow=false;grassTufts.receiveShadow=false;scene.add(grassTufts);
+// Setores de cenário: vegetação detalhada perto, silhuetas leves longe e descarte fora do raio ativo.
+const mapChunks=[];
+const chunkTreeTrunk=new THREE.CylinderGeometry(.2,.31,1.65,5),chunkTreeCrown=new THREE.ConeGeometry(1.35,3.1,6),chunkFarTree=new THREE.ConeGeometry(1.45,3.35,5),chunkRockGeometry=new THREE.DodecahedronGeometry(.62,0);
+for(const cx of [-36,0,36])for(const side of [-1,1]){
+ const root=new THREE.Group(),near=new THREE.Group(),far=new THREE.Group();
+ const trunks=new THREE.InstancedMesh(chunkTreeTrunk,mats.wood,7),crowns=new THREE.InstancedMesh(chunkTreeCrown,mats.leaf,7),silhouettes=new THREE.InstancedMesh(chunkFarTree,mats.leaf,7),rocks=new THREE.InstancedMesh(chunkRockGeometry,mats.stone,5);
+ const dummy=new THREE.Object3D();
+ for(let n=0;n<7;n++){
+  const x=(Math.random()-.5)*22,z=side*(Math.random()*3.5);
+  dummy.position.set(x,.82,z);dummy.rotation.y=Math.random()*Math.PI*2;dummy.scale.setScalar(.8+Math.random()*.35);dummy.updateMatrix();trunks.setMatrixAt(n,dummy.matrix);
+  dummy.position.y=2.85;dummy.scale.setScalar(.82+Math.random()*.35);dummy.updateMatrix();crowns.setMatrixAt(n,dummy.matrix);
+  dummy.position.y=1.7;dummy.scale.set(.9+Math.random()*.35,1, .9+Math.random()*.35);dummy.updateMatrix();silhouettes.setMatrixAt(n,dummy.matrix);
+ }
+ for(let n=0;n<5;n++){dummy.position.set((Math.random()-.5)*24,.35,side*(1+Math.random()*5));dummy.rotation.set(Math.random(),Math.random()*Math.PI,Math.random());dummy.scale.setScalar(.55+Math.random()*.8);dummy.updateMatrix();rocks.setMatrixAt(n,dummy.matrix)}
+ for(const instanced of [trunks,crowns,silhouettes,rocks]){instanced.instanceMatrix.needsUpdate=true;instanced.castShadow=false;instanced.receiveShadow=false}
+ near.add(trunks,crowns);far.add(silhouettes);root.position.set(cx,0,side*31);root.add(near,far,rocks);near.visible=false;far.visible=true;scene.add(root);
+ mapChunks.push({root,near,far,x:cx,z:side*31,detail:'far'});
+}
+let mapLodClock=0;
+function updateMapChunks(dt){
+ mapLodClock-=dt;if(mapLodClock>0)return;mapLodClock=.35;
+ const px=player.group.position.x,pz=player.group.position.z;
+ for(const chunk of mapChunks){const distance=Math.hypot(px-chunk.x,pz-chunk.z);chunk.root.visible=distance<82;if(!chunk.root.visible)continue;const detail=distance<42?'near':'far';if(detail!==chunk.detail){chunk.near.visible=detail==='near';chunk.far.visible=detail==='far';chunk.detail=detail}}
+}
+
 function tower(x,z,team){
  const color=team==='blue'?0x315f83:0x813d37,glow=team==='blue'?0x55c9ff:0xff7058;
  const base=mesh(new THREE.CylinderGeometry(1.65,2,1,10),mat(0x555b5d),x,.5,z);
@@ -319,7 +347,17 @@ if(!bot.dead){const d=player.group.position.distanceTo(bot.group.position);if(d>
 for(const m of minions){if(m.hp<=0)continue;m.attackTimer=Math.max(0,m.attackTimer-dt);m.guardTimer=Math.max(0,m.guardTimer-dt);m.hitTimer=Math.max(0,m.hitTimer-dt);const swing=m.attackTimer>0?Math.sin((1-m.attackTimer/.34)*Math.PI):0;m.spear.rotation.z=m.baseSpearZ-swing*.72;m.shield.position.x=m.baseShieldX+(m.guardTimer>0?.13:0);m.shield.rotation.z=m.baseShieldZ-(m.guardTimer>0?.22:0);m.body.rotation.z=m.hitTimer>0?Math.sin((m.hitTimer/.16)*Math.PI)*.07:0;m.cd-=dt;const dir=m.team==='blue'?1:-1;const enemy=m.team==='blue'?'red':'blue';const target=minions.find(o=>o.hp>0&&o.team===enemy&&Math.abs(o.mesh.position.x-m.mesh.position.x)<2.5&&Math.abs(o.lane-m.lane)<2);if(target){if(m.cd<=0){m.attackTimer=.34;target.guardTimer=.22;damageMinion(target,m.damage);m.cd=1.1;if(target.hp<=0&&m.team==='blue')gold+=8}}else{m.mesh.position.x+=dir*m.speed*dt;m.walkPhase+=dt*10;const stride=Math.sin(m.walkPhase)*.42;m.legs[0].rotation.x=stride;m.legs[1].rotation.x=-stride;if(Math.abs(m.mesh.position.x)>43){m.hp=0;scene.remove(m.mesh)}}}
 for(const t of towers){if(t.team!=='red'||t.hp<=0)continue;t.last-=dt;if(t.last<=0){const target=minions.find(m=>m.team==='blue'&&m.hp>0&&Math.hypot(m.mesh.position.x-t.x,m.mesh.position.z-t.z)<10);if(target){damageMinion(target,80);t.last=1.1}}}for(let i=minions.length-1;i>=0;i--){if(minions[i].hp<=0){scene.remove(minions[i].mesh);minions.splice(i,1)}}
 player.mana=Math.min(player.maxMana,player.mana+7*dt);player.hp=Math.min(player.max,player.hp+2*dt);updateSkillHud();camera.position.set(player.group.position.x-3,34,player.group.position.z+27);camera.lookAt(player.group.position.x,0,player.group.position.z);redNexus.mesh.rotation.y+=dt*.45;blueNexus.mesh.rotation.y-=dt*.4;redNexus.mesh.position.y=4.2+Math.sin(time*.002)*.22;blueNexus.mesh.position.y=4.2+Math.sin(time*.002+1)*.22;redNexus.shards.forEach((s,i)=>s.rotation.y+=dt*(i%2?1.2:-1.2));blueNexus.shards.forEach((s,i)=>s.rotation.y+=dt*(i%2?1.2:-1.2));updateHud()}
-let last=performance.now();function loop(now){requestAnimationFrame(loop);const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);renderer.render(scene,camera)}requestAnimationFrame(loop);
+function adaptRenderResolution(dt){
+ perfElapsed+=dt;perfFrames++;if(perfElapsed<2)return;
+ const averageFrame=perfElapsed/Math.max(1,perfFrames);
+ if(averageFrame>.023&&adaptivePixelRatio>minPixelRatio){adaptivePixelRatio=Math.max(minPixelRatio,adaptivePixelRatio-.1)}
+ else if(averageFrame<.0155&&adaptivePixelRatio<Math.min(devicePixelRatio,mobileProfile?1.25:1.5)){adaptivePixelRatio=Math.min(Math.min(devicePixelRatio,mobileProfile?1.25:1.5),adaptivePixelRatio+.05)}
+ if(Math.abs(renderer.getPixelRatio()-adaptivePixelRatio)>.01){renderer.setPixelRatio(adaptivePixelRatio);renderer.setSize(innerWidth,innerHeight,false)}
+ if(window.mapDebugPanel){window.mapDebugPanel.textContent='FPS médio: '+Math.round(1/averageFrame)+' · Draw calls: '+renderer.info.render.calls+' · Triângulos: '+renderer.info.render.triangles.toLocaleString('pt-BR')+' · Resolução: '+adaptivePixelRatio.toFixed(2)+'x'}
+ perfElapsed=0;perfFrames=0;
+}
+if(new URLSearchParams(location.search).get('debug')==='1'){const panel=document.createElement('div');panel.style.cssText='position:fixed;left:8px;top:8px;z-index:20;padding:6px 9px;background:#07111ddd;color:#bdf4c5;border:1px solid #6b9870;border-radius:6px;font:11px monospace;pointer-events:none';panel.textContent='Medição gráfica iniciando…';document.body.append(panel);window.mapDebugPanel=panel}
+let last=performance.now();function loop(now){requestAnimationFrame(loop);const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);updateMapChunks(dt);renderer.render(scene,camera);adaptRenderResolution(dt)}requestAnimationFrame(loop);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 updateHud();
 </script></body></html>
