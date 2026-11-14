@@ -42,7 +42,9 @@ function alive(stack) { return stack.hp > 0 && stack.quantity > 0; }
 
 function applyDamage(target, damage) {
   const before = target.hp;
-  target.hp = Math.max(0, target.hp - Math.max(0, damage));
+  const mitigation = clamp(Number(target.defenseBonusPercent) || 0, 0, 30) / 100;
+  const effectiveDamage = damage > 0 ? Math.max(1, Math.floor(damage * (1 - mitigation))) : 0;
+  target.hp = Math.max(0, target.hp - effectiveDamage);
   target.quantity = Math.ceil(target.hp / target.hpPerUnit);
   return before - target.hp;
 }
@@ -71,10 +73,12 @@ function attackPhase(acting, opposing, round, log, bonus = 0) {
   }
 }
 
-export function simulateBattle({ army, castleLevel = 1, heroLevel = 1, dragonLevel = 1, researchLevel = 0, roll = 1 }) {
+export function simulateBattle({ army, castleLevel = 1, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, roll = 1 }) {
   const attackers = (army || [])
     .filter(row => Number(row.quantity) > 0)
     .map((row, index) => makeStack(row, "attacker", index));
+  const defenseBonus = clamp(Number(defenseBonusPercent) || 0, 0, 30);
+  for (const stack of attackers) stack.defenseBonusPercent = defenseBonus;
   if (!attackers.length) throw new Error("Exército vazio.");
 
   const level = clamp(Math.floor(Number(castleLevel) || 1), 1, 30);
