@@ -212,6 +212,10 @@ for(const cx of [-36,0,36])for(const side of [-1,1]){
  near.add(trunks,crowns);far.add(silhouettes);root.position.set(cx,0,side*31);root.add(near,far,rocks);near.visible=false;far.visible=true;scene.add(root);
  mapChunks.push({root,near,far,x:cx,z:side*31,detail:'far'});
 }
+// Cordilheira distante instanciada: silhueta de fundo com baixo custo e sem sombras.
+const mountainGeometry=new THREE.ConeGeometry(1,1,5,1),mountainMaterial=new THREE.MeshStandardMaterial({color:0xffffff,roughness:1,flatShading:true}),distantMountains=new THREE.InstancedMesh(mountainGeometry,mountainMaterial,14),mountainDummy=new THREE.Object3D();
+for(let i=0;i<14;i++){const side=i<7?-1:1,index=i%7;mountainDummy.position.set(-54+index*18,2.2+(i%3)*.55,side*43);mountainDummy.rotation.y=(i%2)*.35;mountainDummy.scale.set(7+(i%3)*2,7+(i%4)*2,5+(i%2)*2);mountainDummy.updateMatrix();distantMountains.setMatrixAt(i,mountainDummy.matrix);distantMountains.setColorAt(i,new THREE.Color(i%3===0?0x64766b:i%3===1?0x718075:0x596b63))}
+distantMountains.instanceMatrix.needsUpdate=true;distantMountains.castShadow=false;distantMountains.receiveShadow=false;scene.add(distantMountains);
 let mapLodClock=0;
 function updateMapChunks(dt){
  mapLodClock-=dt;if(mapLodClock>0)return;mapLodClock=.35;
