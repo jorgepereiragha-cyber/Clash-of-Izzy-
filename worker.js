@@ -12,7 +12,7 @@ const BUILDINGS = {
   lumber_mill:{label:"Serraria",wood:150,stone:60,food:0,iron:0},
   iron_mine:{label:"Mina de ferro",wood:180,stone:100,food:0,iron:0},
   market:{label:"Mercado",wood:160,stone:80,food:0,iron:0},
-  academy:{label:"Academia",wood:220,stone:160,food:0,iron:0},
+  academy:{label:"Centro de Pesquisa Militar",wood:220,stone:160,food:0,iron:0},
   wall:{label:"Muralha",wood:250,stone:250,food:0,iron:0},
   hospital:{label:"Hospital",wood:200,stone:120,food:0,iron:0},
   watchtower:{label:"Torre de vigia",wood:180,stone:140,food:0,iron:0},
@@ -607,7 +607,14 @@ async function gameAction(env,playerId,body){
     const allowed={economy:{wood:250,stone:120,iron:0},military:{wood:300,stone:180,iron:40},construction:{wood:350,stone:250,iron:0},defense:{wood:220,stone:300,iron:25}};
     if(!allowed[key])return json({error:"Pesquisa inválida."},400);
     const current=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key=?").bind(k.id,key).first();
-    const level=current?.level||0;if(level>=30)return json({error:"Pesquisa no nível máximo."},409);
+    const level=current?.level||0;
+    if(level>=30)return json({error:"Pesquisa no nível máximo."},409);
+    if(key==="defense"){
+      const center=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy'").bind(k.id).first();
+      if(!center||center.level<1)return json({error:"Construa o Centro de Pesquisa Militar primeiro."},409);
+      const maxDefenseLevel=Math.min(30,center.level*3);
+      if(level>=maxDefenseLevel)return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis de defesa."},409);
+    }
     const c=allowed[key],factor=level+1,cost={wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
     const debit=await env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-? WHERE id=? AND wood>=? AND stone>=? AND iron>=?")
       .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron).run();
@@ -640,6 +647,8 @@ async function gameAction(env,playerId,body){
     const hero=await env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first();
     const dragon=await env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first();
     const tech=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first();
+    const defenseTech=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(k.id).first();
+    const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)));
     const troopPower=(units.results||[]).reduce((n,u)=>n+u.quantity*(UNITS[u.unit_type]?.power||1)*u.tier,0);
     let attackerPower=Math.max(1,Math.floor(troopPower+(hero?.level||1)*8+(dragon?.level||1)*10+(tech?.level||0)*12));
     let defenderPower=80+Number(k.castle_level||1)*95;
@@ -650,6 +659,7 @@ async function gameAction(env,playerId,body){
       heroLevel:Number(hero?.level||1),
       dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),
+      defenseBonusPercent,
       roll
     });
     const won=simulation.won;
