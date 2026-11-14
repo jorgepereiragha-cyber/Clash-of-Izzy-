@@ -621,6 +621,7 @@ async function gameAction(env,playerId,body){
     if(!debit.meta.changes)return json({error:"Recursos insuficientes para treinar essas tropas."},409);
     await env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) VALUES(?,?,1,?) ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,unit,quantity).run();
     await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"troops_trained",JSON.stringify({unit,quantity,cost})).run();
+    const trainingMaterial=eventMaterialStatement(env,k.id,"train");if(trainingMaterial)await trainingMaterial.run();
   }else if(type==="research"){
     const key=String(body.research||"economy");
     const allowed={economy:{wood:250,stone:120,iron:0},military:{wood:300,stone:180,iron:40},construction:{wood:350,stone:250,iron:0},defense:{wood:220,stone:300,iron:25}};
@@ -639,6 +640,7 @@ async function gameAction(env,playerId,body){
       .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron).run();
     if(!debit.meta.changes)return json({error:"Recursos insuficientes para pesquisar."},409);
     await env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level) VALUES(?,?,1) ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=level+1").bind(k.id,key).run();
+    const researchMaterial=eventMaterialStatement(env,k.id,"research");if(researchMaterial)await researchMaterial.run();
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     const target=await env.DB.prepare("SELECT id,resource_type FROM world_territories WHERE id=?").bind(targetId).first();
