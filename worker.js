@@ -212,11 +212,12 @@ async function applyProduction(env,kingdomId){
   };
   const prestigeBonus=1+Math.max(0,Number(row.prestige||0))*.10;
   const gains=Object.fromEntries(Object.entries(perHour).map(([key,rate])=>[key,Math.floor(rate*prestigeBonus*elapsed/3600)]));
-  await env.DB.batch([
-    env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,last_production_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-      .bind(gains.food,gains.wood,gains.stone,gains.iron,gains.gold,new Date(now).toISOString(),kingdomId),
-    ...Object.entries(gains).filter(([,amount])=>amount>0).map(([resource,amount])=>env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(kingdomId,resource,amount,"produção automática"))
-  ]);
+  // Compare-and-set: duas requisições simultâneas não podem creditar a mesma janela.
+  const credited=await env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,last_production_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND last_production_at IS ?")
+    .bind(gains.food,gains.wood,gains.stone,gains.iron,gains.gold,new Date(now).toISOString(),kingdomId,row.last_production_at??null).run();
+  if(!credited.meta.changes)return;
+  const ledger=Object.entries(gains).filter(([,amount])=>amount>0).map(([resource,amount])=>env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(kingdomId,resource,amount,"produção automática"));
+  if(ledger.length)await env.DB.batch(ledger);
 }
 async function seedWorld(env){
  const nodes=[
@@ -308,8 +309,10 @@ async function gameAction(env,playerId,body){
     const owned=new Set((ownedRows.results||[]).map(x=>x.item_id));
     const complete=col.special?COSMETIC_COLLECTIONS.filter(x=>!x.special).every(x=>x.skins.every(id=>owned.has(id))):col.skins.every(id=>owned.has(id));
     if(!complete)return json({error:"Ainda faltam skins para completar esta coleção."},409);
-    const debit=await env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=?").bind(col.gems,p.id).run();
+    // Recompensa, fragmentos e marca de resgate são uma única transação.
+    // A chave única da coleção impede créditos duplicados em requisições simultâneas.
     await env.DB.batch([
+      env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=?").bind(col.gems,p.id),
       env.DB.prepare("UPDATE kingdom_cosmetic_wallet SET shards=shards+? WHERE kingdom_id=?").bind(col.shards,k.id),
       env.DB.prepare("INSERT INTO kingdom_collection_claims(kingdom_id,collection_id) VALUES(?,?)").bind(k.id,collectionId),
       env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"collection_reward",JSON.stringify({collection:collectionId,gems:col.gems,shards:col.shards}))
@@ -484,12 +487,14 @@ const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_
     const t=await env.DB.prepare("SELECT id,alliance_id,owner_kingdom_id FROM world_territories WHERE id=?").bind(territoryId).first();
     if(!t)return json({error:"Território não encontrado."},404);
     if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
-    const cost=await env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000").bind(member.alliance_id).run();
-    if(!cost.meta.changes)return json({error:"A aliança precisa de 1.000 comida e 1.000 madeira no depósito."},409);
-    if(!t.alliance_id){
-      await env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL").bind(member.alliance_id,territoryId).run();
-      await env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=?").bind(member.alliance_id).run();
-    }
+    if(t.alliance_id)return json({error:"Este território já foi reivindicado."},409);
+    // O custo só é debitado se o território ainda estiver livre; D1 executa o lote atomicamente.
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000 AND EXISTS(SELECT 1 FROM world_territories WHERE id=? AND alliance_id IS NULL)").bind(member.alliance_id,territoryId),
+      env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL").bind(member.alliance_id,territoryId),
+      env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=? AND EXISTS(SELECT 1 FROM world_territories WHERE id=? AND alliance_id=?)").bind(member.alliance_id,territoryId,member.alliance_id)
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Território ocupado ou recursos insuficientes no depósito da aliança."},409);
   }else if(type==="alliance_leave"){
     const membership=await env.DB.prepare("SELECT alliance_id,role FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(!membership)return json({error:"Seu reino não pertence a uma aliança."},409);
