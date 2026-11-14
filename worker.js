@@ -247,23 +247,68 @@ async function seedWorld(env){
 async function processMarches(env,kingdomId){
  const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=?").bind(kingdomId,new Date().toISOString()).all();
  for(const m of due.results||[]){
+  // Claim atômico: duas chamadas simultâneas não resolvem a mesma marcha duas vezes.
+  const claim=await env.DB.prepare("UPDATE marches SET status='arrived' WHERE id=? AND status='marching'").bind(m.id).run();
+  if(!claim.meta.changes)continue;
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
   const statements=[];
-  const marchMaterial=eventMaterialStatement(env,kingdomId,m.march_type==="gather"?"gather":"scout");if(marchMaterial)statements.push(marchMaterial);
-  for(const [unit,raw] of Object.entries(units)){
-   const qty=Math.max(0,Math.floor(Number(raw)||0));if(!UNITS[unit]||qty<1)continue;
-   statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) VALUES(?,?,1,?) ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,qty));
-  }
-  if(m.march_type==="gather"){
-   const target=await env.DB.prepare("SELECT resource_type,resource_rate FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
-   if(target&&["food","wood","stone","iron"].includes(target.resource_type)){
-    const amount=Math.max(1,Number(target.resource_rate)||90);
-    statements.push(env.DB.prepare("UPDATE kingdoms SET "+target.resource_type+"="+target.resource_type+"+? WHERE id=?").bind(amount,kingdomId));
-    statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(kingdomId,target.resource_type,amount,"coleta por marcha"));
+  if(m.march_type==="attack"){
+   const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+   const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>UNITS[u.unit_type]&&u.quantity>0);
+   let won=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={};
+   if(target&&!target.owner_kingdom_id&&army.length){
+    const [kingdom,hero,dragon,military,defense]=await Promise.all([
+     env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
+     env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(kingdomId).first(),
+     env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
+     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
+     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
+    ]);
+    const castleLevel=Number(kingdom?.castle_level||1);
+    const simulation=simulateBattle({
+     army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
+     heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
+     researchLevel:Number(military?.level||0),
+     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0))),
+     castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
+     roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
+    });
+    won=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
+    losses=simulation.losses||{};battleLog=simulation.log||[];
+    for(const u of army)survivors[u.unit_type]=Math.max(0,u.quantity-Math.max(0,Number(losses[u.unit_type]||0)));
+    if(won){
+     const captured=await env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL").bind(kingdomId,target.id).run();
+     won=Boolean(captured.meta.changes);
+    }
+   }else{
+    // Território já ocupado ou inexistente: não há combate nem captura.
+    for(const u of army)survivors[u.unit_type]=u.quantity;
+    battleLog=[{event:"attack_cancelled",reason:target?"territory_already_owned":"territory_missing"}];
+   }
+   for(const [unit,qty] of Object.entries(survivors)){
+    if(qty>0)statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) VALUES(?,?,1,?) ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,qty));
+   }
+   statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) VALUES(?,?,?,?,?,?,?,?,?)")
+    .bind(kingdomId,won?kingdomId:null,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:won}),JSON.stringify([...battleLog,{event:won?"territory_captured":"territory_defended"}])));
+   statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)")
+    .bind(kingdomId,won?"territory_captured":"territory_attack_resolved",JSON.stringify({territoryId:m.target_territory_id,won,losses})));
+  }else{
+   const marchMaterial=eventMaterialStatement(env,kingdomId,m.march_type==="gather"?"gather":"scout");if(marchMaterial)statements.push(marchMaterial);
+   for(const [unit,raw] of Object.entries(units)){
+    const qty=Math.max(0,Math.floor(Number(raw)||0));if(!UNITS[unit]||qty<1)continue;
+    statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) VALUES(?,?,1,?) ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,qty));
+   }
+   if(m.march_type==="gather"){
+    const target=await env.DB.prepare("SELECT resource_type,resource_rate FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+    if(target&&["food","wood","stone","iron"].includes(target.resource_type)){
+     const amount=Math.max(1,Number(target.resource_rate)||90);
+     statements.push(env.DB.prepare("UPDATE kingdoms SET "+target.resource_type+"="+target.resource_type+"+? WHERE id=?").bind(amount,kingdomId));
+     statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(kingdomId,target.resource_type,amount,"coleta por marcha"));
+    }
    }
   }
-  statements.push(env.DB.prepare("UPDATE marches SET status='completed',resolved_at=CURRENT_TIMESTAMP WHERE id=? AND status='marching'").bind(m.id));
-  await env.DB.batch(statements);
+  statements.push(env.DB.prepare("UPDATE marches SET status='completed',resolved_at=CURRENT_TIMESTAMP WHERE id=? AND status='arrived'").bind(m.id));
+  if(statements.length)await env.DB.batch(statements);
  }
 }
 const CASTLE_MATERIALS={
@@ -643,10 +688,12 @@ async function gameAction(env,playerId,body){
     const researchMaterial=eventMaterialStatement(env,k.id,"research");if(researchMaterial)await researchMaterial.run();
   }else if(type==="march"){
     const targetId=Number(body.targetId);
-    const target=await env.DB.prepare("SELECT id,resource_type FROM world_territories WHERE id=?").bind(targetId).first();
+    const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id FROM world_territories WHERE id=?").bind(targetId).first();
     if(!target)return json({error:"Território não encontrado."},404);
     const marchType=String(body.marchType||"gather");
-    if(marchType!=="gather"&&marchType!=="scout")return json({error:"Tipo de marcha inválido."},400);
+    if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
+    if(marchType==="attack"&&target.owner_kingdom_id)return json({error:"Nesta etapa, só é possível conquistar territórios neutros. Ataques PvP serão habilitados em uma atualização própria."},409);
+    if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
     const requested=body.units&&typeof body.units==="object"?body.units:{militia:5};
     const selected={},statements=[];
     for(const [unit,raw] of Object.entries(requested)){
@@ -658,7 +705,7 @@ async function gameAction(env,playerId,body){
       statements.push(env.DB.prepare("UPDATE army_units SET quantity=quantity-? WHERE kingdom_id=? AND unit_type=? AND tier=1 AND quantity>=?").bind(qty,k.id,unit,qty));
     }
     if(!Object.keys(selected).length)return json({error:"Selecione pelo menos uma tropa."},400);
-    const seconds=marchType==="scout"?15:60;
+    const seconds=marchType==="scout"?15:marchType==="attack"?120:60;
     statements.push(env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at) VALUES(?,?,?,?,?,?)").bind(k.id,target.id,marchType,JSON.stringify(selected),"marching",new Date(Date.now()+seconds*1000).toISOString()));
     await env.DB.batch(statements);
   }else if(type==="battle"){
