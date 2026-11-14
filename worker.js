@@ -189,6 +189,7 @@ async function ensureKingdom(env,playerId){
     await env.DB.batch([
       ...buildingRows,...unitRows,
       env.DB.prepare("INSERT OR IGNORE INTO heroes(kingdom_id,hero_key,hero_name,rarity) VALUES(?,?,?,?)").bind(id,"kael_sunwarden","Kael, Guardião do Sol","rare"),
+      env.DB.prepare("INSERT OR IGNORE INTO hero_inventory(kingdom_id,hero_key,rarity) VALUES(?,?,?)").bind(id,"kael_sunwarden","blue"),
       env.DB.prepare("INSERT OR IGNORE INTO dragons(kingdom_id,dragon_key,dragon_name) VALUES(?,?,?)").bind(id,"ember_wyrm","Brasa")
     ]);
     k={id};
@@ -538,14 +539,17 @@ const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_
     await env.DB.prepare("UPDATE hero_inventory SET stars=stars+1,fragments=fragments-? WHERE kingdom_id=? AND hero_key=? AND fragments>=?").bind(needed,k.id,heroKey,needed).run();
   }else if(type==="hero_train"){
     const key=String(body.hero||"kael_sunwarden");
-    const hero=await env.DB.prepare("SELECT id,level,experience FROM heroes WHERE kingdom_id=? AND hero_key=?").bind(k.id,key).first();
-    if(!hero)return json({error:"Herói não encontrado."},404);
-    if(hero.level>=100)return json({error:"Herói já atingiu o nível máximo."},409);
+    const hero=await env.DB.prepare("SELECT rarity,level,experience FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,key).first();
+    if(!hero)return json({error:"Herói não encontrado na coleção."},404);
+    const maxLevel=HERO_RARITY[hero.rarity]?.maxLevel||100;
+    if(hero.level>=maxLevel)return json({error:"Herói já atingiu o nível máximo."},409);
     const cost={food:200*hero.level,wood:100*hero.level,gold:75*hero.level};
-    const debit=await env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,gold=gold-? WHERE id=? AND food>=? AND wood>=? AND gold>=?").bind(cost.food,cost.wood,cost.gold,k.id,cost.food,cost.wood,cost.gold).run();
-    if(!debit.meta.changes)return json({error:"Recursos insuficientes para treinar o herói."},409);
-    await env.DB.prepare("UPDATE heroes SET level=level+1,experience=experience+100 WHERE id=?").bind(hero.id).run();
-    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"hero_trained",JSON.stringify({hero:key,level:hero.level+1,cost})).run();
+    const updated=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,gold=gold-? WHERE id=? AND food>=? AND wood>=? AND gold>=?").bind(cost.food,cost.wood,cost.gold,k.id,cost.food,cost.wood,cost.gold),
+      env.DB.prepare("UPDATE hero_inventory SET level=level+1,experience=experience+100 WHERE kingdom_id=? AND hero_key=? AND level=? AND level<?").bind(k.id,key,hero.level,maxLevel),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"hero_trained",JSON.stringify({hero:key,level:hero.level+1,cost}))
+    ]);
+    if(!updated[0]?.meta?.changes||!updated[1]?.meta?.changes)return json({error:"Não foi possível treinar: recursos insuficientes ou herói já atualizado."},409);
   }else if(type==="prestige"){
     const current=Number(k.prestige||0),castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
     if(!castle||Number(castle.level)<30||Number(k.castle_level)<30)return json({error:"Seu castelo precisa atingir o nível 30."},409);
@@ -624,7 +628,7 @@ const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_
     const units=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0").bind(k.id).all();
     const total=(units.results||[]).reduce((n,u)=>n+u.quantity,0);
     if(total<1)return json({error:"Treine tropas antes de iniciar uma batalha."},409);
-    const hero=await env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first();
+    const hero=await env.DB.prepare("SELECT level FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first();
     const dragon=await env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first();
     const tech=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first();
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
