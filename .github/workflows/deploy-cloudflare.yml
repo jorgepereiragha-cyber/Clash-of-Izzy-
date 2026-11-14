@@ -35,6 +35,50 @@ jobs:
       - name: Test D1 migrations locally
         run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
 
+      - name: Normalize Cloudflare API token
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          token="$RAW_CLOUDFLARE_API_TOKEN"
+          token="${token//        run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --remote
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy Worker and static assets
+        run: npx wrangler --config wrangler.jsonc deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+\\r'/}"
+          token="${token//        run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --remote
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Deploy Worker and static assets
+        run: npx wrangler --config wrangler.jsonc deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+\\n'/}"
+          token="${token#"${token%%[![:space:]]*}"}"
+          token="${token%"${token##*[![:space:]]}"}"
+          if [[ "$token" == [Bb][Ee][Aa][Rr][Ee][Rr]" "* ]]; then
+            token="${token#* }"
+          fi
+          if [[ "$token" == \\"*\\" && "$token" == *\\" ]]; then
+            token="${token:1:${#token}-2}"
+          elif [[ "$token" == \\'*\\' && "$token" == *\\' ]]; then
+            token="${token:1:${#token}-2}"
+          fi
+          if [[ -z "$token" || "$token" =~ [[:space:]] ]]; then
+            echo "CLOUDFLARE_API_TOKEN está vazio ou contém espaços internos."
+            exit 1
+          fi
+          echo "::add-mask::$token"
+          printf 'CLOUDFLARE_API_TOKEN=%s\\n' "$token" >> "$GITHUB_ENV"
+
       - name: Apply D1 migrations remotely
         run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --remote
         env:
