@@ -112,6 +112,15 @@ const grassTexture=makeTexture('grass');grassTexture.repeat.set(9,7);
 const dirtTexture=makeTexture('dirt');dirtTexture.repeat.set(8,1);
 const stoneTexture=makeTexture('stone');stoneTexture.repeat.set(2,1);
 const woodTexture=makeTexture('wood');woodTexture.repeat.set(2,1);
+// Dois riachos decorativos nas bordas: uma única geometria e textura animada.
+const waterCanvas=document.createElement('canvas');waterCanvas.width=256;waterCanvas.height=64;
+const waterCtx=waterCanvas.getContext('2d');waterCtx.fillStyle='#286f83';waterCtx.fillRect(0,0,256,64);
+for(let i=0;i<90;i++){waterCtx.strokeStyle=i%3===0?'rgba(190,235,230,.38)':'rgba(105,190,200,.22)';waterCtx.lineWidth=1+Math.random()*2;waterCtx.beginPath();const x=Math.random()*256,y=Math.random()*64;waterCtx.moveTo(x,y);waterCtx.quadraticCurveTo(x+12,y-5,x+28,y+Math.random()*8-4);waterCtx.stroke()}
+const waterTexture=new THREE.CanvasTexture(waterCanvas);waterTexture.colorSpace=THREE.SRGBColorSpace;waterTexture.wrapS=waterTexture.wrapT=THREE.RepeatWrapping;waterTexture.repeat.set(5,1);waterTexture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+const waterMaterial=new THREE.MeshStandardMaterial({map:waterTexture,color:0xb1e0e4,roughness:.28,metalness:.08});
+const waterPositions=[],waterIndices=[];
+for(const side of [-1,1]){const start=waterPositions.length/3;for(let i=0;i<=28;i++){const x=-54+i*(108/28),center=side*(34+Math.sin(x*.085)*1.15);waterPositions.push(x,-.025,center-.85,x,-.025,center+.85);if(i<28){const a=start+i*2;waterIndices.push(a,a+1,a+2,a+1,a+3,a+2)}}}
+const waterGeometry=new THREE.BufferGeometry();waterGeometry.setAttribute('position',new THREE.Float32BufferAttribute(waterPositions,3));waterGeometry.setIndex(waterIndices);waterGeometry.computeVertexNormals();const water= new THREE.Mesh(waterGeometry,waterMaterial);water.receiveShadow=true;scene.add(water);
 const mats={grass:new THREE.MeshStandardMaterial({map:grassTexture,color:0xc3d7a8,roughness:1}),road:new THREE.MeshStandardMaterial({map:dirtTexture,color:0xd9c5a0,roughness:1}),blue:mat(0x287ac2),red:mat(0xb94338),gold:mat(0xe5b84f),stone:new THREE.MeshStandardMaterial({map:stoneTexture,color:0xd2d0c7,roughness:.94}),wood:new THREE.MeshStandardMaterial({map:woodTexture,color:0xc9a17a,roughness:.95}),leaf:mat(0x315b3d),hp:mat(0x36c66a)};
 function mesh(geo,material,x,y,z){const o=new THREE.Mesh(geo,material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o}
 const ground=mesh(new THREE.PlaneGeometry(110,78),mats.grass,0,-.12,0);ground.rotation.x=-Math.PI/2;
@@ -242,7 +251,7 @@ async function loadCatalog(){
  }catch(e){box.textContent='Não foi possível carregar o catálogo agora. Fale conosco pelo WhatsApp.'}
 }
 loadCatalog();
-function update(dt,time){
+function update(dt,time){waterTexture.offset.x=(waterTexture.offset.x+dt*.035)%1;
  for(const fire of fireEffects){const pulse=Math.sin(time*.009+fire.phase);fire.flame.scale.set(.88+pulse*.12,1.05+pulse*.2,.88+pulse*.12);fire.flame.rotation.y+=dt*1.8;fire.flame.position.y=fire.baseY+Math.sin(time*.006+fire.phase)*.07}
  for(const puff of smokeEffects){const cycle=((time*.00022+puff.phase) % 1);puff.mesh.position.set(puff.baseX+Math.sin(time*.001+puff.phase)*.12,puff.baseY+cycle*1.35,puff.baseZ);const scale=.55+cycle*1.45;puff.mesh.scale.setScalar(scale)}
  if(ended)return;const dx=(keys.d||keys.arrowright||touch.right?1:0)-(keys.a||keys.arrowleft||touch.left?1:0),dz=(keys.s||keys.arrowdown||touch.down?1:0)-(keys.w||keys.arrowup||touch.up?1:0);const v=new THREE.Vector3(dx,0,dz);if(v.lengthSq())v.normalize();player.group.position.x=Math.max(-48,Math.min(48,player.group.position.x+v.x*(player.speed+speedBonus)*dt));player.group.position.z=Math.max(-30,Math.min(30,player.group.position.z+v.z*(player.speed+speedBonus)*dt));if(v.lengthSq())player.group.rotation.y=Math.atan2(v.x,v.z);
