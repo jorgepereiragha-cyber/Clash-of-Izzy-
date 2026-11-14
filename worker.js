@@ -148,17 +148,17 @@ async function getShopState(env,kingdomId){
 function heroView(row){const t=HERO_TEMPLATES[row.hero_key],r=HERO_RARITY[row.rarity];if(!t||!r)return row;const stats=Object.fromEntries(Object.entries(t.stats).map(([key,value])=>[key,Math.floor(value*r.multiplier*(1+(row.level-1)*.03+(row.stars-1)*.15))]));return {...row,name:t.name,title:t.title,type:t.type,rarity_label:r.label,max_level:r.maxLevel,max_stars:r.maxStars,stats,skill:t.skill,skill_description:t.skillDesc,skill_power:t.skillPower,fragments_to_next:HERO_STAR_COST[row.stars+1]||null};}
 function rollHeroRarity(){const n=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;return n<.70?"white":n<.95?"blue":"purple";}
 const UNITS = {
-  militia:{label:"Milícia",food:12,wood:2,iron:0,power:2},
-  swordsman:{label:"Espadachim",food:22,wood:4,iron:3,power:5},
-  spearman:{label:"Lanceiro",food:18,wood:5,iron:2,power:4},
-  archer:{label:"Arqueiro",food:20,wood:7,iron:1,power:5},
-  cavalry:{label:"Cavalaria",food:35,wood:8,iron:8,power:9},
-  knight:{label:"Cavaleiro",food:50,wood:10,iron:15,power:14},
-  mage:{label:"Mago",food:42,wood:18,iron:10,power:12},
-  crossbowman:{label:"Besteiro",food:28,wood:9,iron:5,power:7},
-  catapult:{label:"Catapulta",food:70,wood:45,iron:20,power:22},
-  ram:{label:"Aríete",food:60,wood:55,iron:18,power:20},
-  trebuchet:{label:"Trabuco",food:90,wood:75,iron:30,power:30}
+  militia:{label:"Milícia",food:12,wood:2,iron:0},
+  swordsman:{label:"Espadachim",food:22,wood:4,iron:3},
+  spearman:{label:"Lanceiro",food:18,wood:5,iron:2},
+  archer:{label:"Arqueiro",food:20,wood:7,iron:1},
+  cavalry:{label:"Cavalaria",food:35,wood:8,iron:8},
+  knight:{label:"Cavaleiro",food:50,wood:10,iron:15},
+  mage:{label:"Mago",food:42,wood:18,iron:10},
+  crossbowman:{label:"Besteiro",food:28,wood:9,iron:5},
+  catapult:{label:"Catapulta",food:70,wood:45,iron:20},
+  ram:{label:"Aríete",food:60,wood:55,iron:18},
+  trebuchet:{label:"Trabuco",food:90,wood:75,iron:30}
 };
 function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8",...cors}})}
 function b64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
@@ -639,9 +639,6 @@ async function gameAction(env,playerId,body){
     const hero=await env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first();
     const dragon=await env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first();
     const tech=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first();
-    const troopPower=(units.results||[]).reduce((n,u)=>n+u.quantity*(UNITS[u.unit_type]?.power||1)*u.tier,0);
-    let attackerPower=Math.max(1,Math.floor(troopPower+(hero?.level||1)*8+(dragon?.level||1)*10+(tech?.level||0)*12));
-    let defenderPower=80+Number(k.castle_level||1)*95;
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const simulation=simulateBattle({
       army:units.results||[],
@@ -652,8 +649,8 @@ async function gameAction(env,playerId,body){
       roll
     });
     const won=simulation.won;
-    attackerPower=simulation.attackerPower;
-    defenderPower=simulation.defenderPower;
+    const attackerPower=simulation.attackerPower;
+    const defenderPower=simulation.defenderPower;
     const losses={};
     const remainingLosses={...simulation.losses};
     const statements=(units.results||[]).map(u=>{
