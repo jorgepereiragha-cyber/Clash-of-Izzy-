@@ -38,9 +38,6 @@ genghis_khan:{name:"Genghis Khan",title:"O Flagelo de Deus",rarity:"purple",type
 };
 const HERO_RARITY={white:{label:"Branco · Comum",multiplier:1,fragments:5,maxLevel:30,maxStars:5},blue:{label:"Azul · Raro",multiplier:1.8,fragments:15,maxLevel:50,maxStars:6},purple:{label:"Roxo · Lendário",multiplier:3.5,fragments:40,maxLevel:70,maxStars:7}};
 const HERO_STAR_COST={2:10,3:20,4:40,5:80,6:150,7:300};
-async function ensureHeroTables(env){await env.DB.batch([env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_inventory (kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 1,experience INTEGER NOT NULL DEFAULT 0,stars INTEGER NOT NULL DEFAULT 1,skill_level INTEGER NOT NULL DEFAULT 1,fragments INTEGER NOT NULL DEFAULT 0,acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,hero_key))"),env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_summon_history (id INTEGER PRIMARY KEY AUTOINCREMENT,kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,result_type TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")]);}
-
-
 const COSMETIC_SKINS={
  c1:{name:"Pedra Antiga",icon:"🏰",rarity:"comum",theme:"Medieval",atk:5,def:5},c2:{name:"Madeira Rústica",icon:"🏚️",rarity:"comum",theme:"Viking",atk:6,def:4},c3:{name:"Aço Forjado",icon:"⚙️",rarity:"comum",theme:"Industrial",atk:7,def:6},c4:{name:"Areia do Deserto",icon:"🏜️",rarity:"comum",theme:"Egípcio",atk:5,def:7},c5:{name:"Gelo Eterno",icon:"❄️",rarity:"comum",theme:"Nórdico",atk:6,def:6},c6:{name:"Floresta Verde",icon:"🌲",rarity:"comum",theme:"Élfico",atk:5,def:8},c7:{name:"Vulcão",icon:"🌋",rarity:"comum",theme:"Vulcânico",atk:8,def:5},c8:{name:"Oceano",icon:"🌊",rarity:"comum",theme:"Marinho",atk:6,def:7},
  r1:{name:"Ouro Envelhecido",icon:"👑",rarity:"rara",theme:"Real",atk:12,def:10},r2:{name:"Cristal Azul",icon:"💎",rarity:"rara",theme:"Cristalino",atk:10,def:13},r3:{name:"Esmeralda",icon:"💚",rarity:"rara",theme:"Élfico",atk:11,def:12},r4:{name:"Rubi Sangrento",icon:"❤️",rarity:"rara",theme:"Vampírico",atk:14,def:10},r5:{name:"Ametista",icon:"💜",rarity:"rara",theme:"Arcano",atk:12,def:12},
@@ -73,11 +70,6 @@ const SKIN_FUSIONS=[
  {inputs:["l1","l2","l3"],output:{id:"f_cosmos",name:"Entidade Cósmica",icon:"🌌",rarity:"fundida mítica",atk:80,def:80,special:"+100% atributos · aura cósmica"}}
 ];
 async function ensureCosmeticTables(env,kingdomId){
- await env.DB.batch([
-  env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_cosmetics (kingdom_id INTEGER NOT NULL,item_id TEXT NOT NULL,kind TEXT NOT NULL,acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,item_id))"),
-  env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_cosmetic_wallet (kingdom_id INTEGER PRIMARY KEY,shards INTEGER NOT NULL DEFAULT 150)"),
-  env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_collection_claims (kingdom_id INTEGER NOT NULL,collection_id TEXT NOT NULL,claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,collection_id))")
- ]);
  const initialized=await env.DB.prepare("INSERT OR IGNORE INTO kingdom_cosmetic_wallet(kingdom_id,shards) VALUES(?,150)").bind(kingdomId).run();
  if(initialized.meta.changes){
   const starter=["c1","c2","c3","c4","c5","c6","r1","r2","r3","e1","e2"];
@@ -134,12 +126,8 @@ function merchantOffers(cycle){
  for(let i=pool.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[pool[i],pool[j]]=[pool[j],pool[i]];}
  return pool.slice(0,8).map(o=>({id:o.id,stock:o.stock,discount:Math.round((1-o.discount)*100),price:Math.max(1,Math.floor(SHOP_ITEMS[o.id].price*o.discount))}));
 }
-async function ensureShopTables(env){await env.DB.batch([
- env.DB.prepare("CREATE TABLE IF NOT EXISTS shop_inventory (kingdom_id INTEGER NOT NULL,item_id TEXT NOT NULL,quantity INTEGER NOT NULL DEFAULT 0,PRIMARY KEY(kingdom_id,item_id))"),
- env.DB.prepare("CREATE TABLE IF NOT EXISTS merchant_stock (kingdom_id INTEGER NOT NULL,cycle_id INTEGER NOT NULL,item_id TEXT NOT NULL,stock INTEGER NOT NULL,PRIMARY KEY(kingdom_id,cycle_id,item_id))")
-]);}
 async function getShopState(env,kingdomId){
- await ensureShopTables(env);const cycle=merchantCycle(),offers=merchantOffers(cycle);
+const cycle=merchantCycle(),offers=merchantOffers(cycle);
  const rows=await env.DB.prepare("SELECT item_id,stock FROM merchant_stock WHERE kingdom_id=? AND cycle_id=?").bind(kingdomId,cycle).all();
  const stock=Object.fromEntries((rows.results||[]).map(r=>[r.item_id,r.stock]));
  const inventory=await env.DB.prepare("SELECT item_id,quantity FROM shop_inventory WHERE kingdom_id=? AND quantity>0 ORDER BY item_id").bind(kingdomId).all();
@@ -265,9 +253,7 @@ async function processMarches(env,kingdomId){
  }
 }
 async function gameState(env,playerId){
-  await ensureHeroTables(env);
-  await ensureShopTables(env);
-  const p=await env.DB.prepare("SELECT id,player_id,name,gems FROM players WHERE player_id=?").bind(playerId).first();
+const p=await env.DB.prepare("SELECT id,player_id,name,gems FROM players WHERE player_id=?").bind(playerId).first();
   if(!p)return null;
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
@@ -355,8 +341,7 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"skin_fused",JSON.stringify({inputs,output:output.id,shards:50})));
     await env.DB.batch(statements);
   }else if(type==="shop_buy"){
-    await ensureShopTables(env);
-    const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_ITEMS[itemId];
+const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_ITEMS[itemId];
     if(!item)return json({error:"Produto inválido."},400);
     let price=item.price,cycle=null,offer=null;
     if(source==="merchant"){
@@ -523,7 +508,7 @@ async function gameAction(env,playerId,body){
     await env.DB.prepare("UPDATE dragons SET level=level+1,experience=experience+100,bond=MIN(100,bond+2) WHERE kingdom_id=?").bind(k.id).run();
     await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"dragon_evolved",JSON.stringify({level:level+1,cost})).run();
   }else if(type==="hero_summon"){
-    await ensureHeroTables(env);
+
     const quantity=Number(body.quantity)===10?10:1,cost=quantity===10?900:100;
     const debit=await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(cost,p.id,cost).run();
     if(!debit.meta.changes)return json({error:"Gemas insuficientes para invocar."},409);
@@ -541,7 +526,7 @@ async function gameAction(env,playerId,body){
     await env.DB.prepare("DELETE FROM hero_summon_history WHERE kingdom_id=? AND id NOT IN (SELECT id FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 100)").bind(k.id,k.id).run();
     battleOutcome={summons:results,cost};
   }else if(type==="hero_evolve"){
-    await ensureHeroTables(env);
+
     const heroKey=String(body.hero||""),hero=await env.DB.prepare("SELECT rarity,stars,fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
     if(!hero||!HERO_TEMPLATES[heroKey])return json({error:"Herói não encontrado na coleção."},404);
     const rarity=HERO_RARITY[hero.rarity],next=hero.stars+1,needed=HERO_STAR_COST[next];
