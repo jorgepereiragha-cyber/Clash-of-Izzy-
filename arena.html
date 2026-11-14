@@ -150,7 +150,13 @@ for(let i=0;i<18;i++){
  }
 }
 
-for(let i=0;i<34;i++){const x=(Math.random()-.5)*100,z=(Math.random()-.5)*70;if(Math.abs(z)<25)continue;mesh(new THREE.CylinderGeometry(.25,.4,2,6),mats.wood,x,1,z);const crown=mesh(new THREE.ConeGeometry(1.8,4,7),mats.leaf,x,3.5,z)}
+// Árvores instanciadas: mesma variedade visual com apenas duas chamadas de desenho.
+const treeCount=34,treeTrunkGeometry=new THREE.CylinderGeometry(.25,.4,2,6),treeCrownGeometry=new THREE.ConeGeometry(1.8,4,7);
+const treeTrunks=new THREE.InstancedMesh(treeTrunkGeometry,mats.wood,treeCount),treeCrowns=new THREE.InstancedMesh(treeCrownGeometry,mats.leaf,treeCount);
+treeTrunks.castShadow=true;treeTrunks.receiveShadow=true;treeCrowns.castShadow=true;treeCrowns.receiveShadow=true;
+const treeDummy=new THREE.Object3D();let treeIndex=0;
+for(let i=0;i<treeCount*3&&treeIndex<treeCount;i++){const x=(Math.random()-.5)*100,z=(Math.random()-.5)*70;if(Math.abs(z)<25)continue;treeDummy.position.set(x,1,z);treeDummy.rotation.set(0,Math.random()*Math.PI*2,0);treeDummy.scale.setScalar(.82+Math.random()*.38);treeDummy.updateMatrix();treeTrunks.setMatrixAt(treeIndex,treeDummy.matrix);treeDummy.position.y=3.5;treeDummy.scale.setScalar(.85+Math.random()*.3);treeDummy.updateMatrix();treeCrowns.setMatrixAt(treeIndex,treeDummy.matrix);treeIndex++}
+treeTrunks.count=treeIndex;treeCrowns.count=treeIndex;treeTrunks.instanceMatrix.needsUpdate=true;treeCrowns.instanceMatrix.needsUpdate=true;scene.add(treeTrunks,treeCrowns);
 function tower(x,z,team){
  const color=team==='blue'?0x315f83:0x813d37,glow=team==='blue'?0x55c9ff:0xff7058;
  const base=mesh(new THREE.CylinderGeometry(1.65,2,1,10),mat(0x555b5d),x,.5,z);
