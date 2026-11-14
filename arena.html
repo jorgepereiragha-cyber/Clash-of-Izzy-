@@ -91,15 +91,33 @@ chatLanguage.addEventListener('change',()=>{translatedCache.clear();chatLastId=0
 
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x92a8b4);scene.fog=new THREE.Fog(0x92a8b4,65,125);
 const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,220);
-const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xdcecff,0x33452e,2));const sun=new THREE.DirectionalLight(0xffe4b2,2.4);sun.position.set(-25,45,25);sun.castShadow=true;scene.add(sun);
-const mat=(c)=>new THREE.MeshStandardMaterial({color:c,roughness:.8});
-const mats={grass:mat(0x4e7147),road:mat(0x9c9279),blue:mat(0x287ac2),red:mat(0xb94338),gold:mat(0xe5b84f),stone:mat(0x777f86),wood:mat(0x62452d),leaf:mat(0x315b3d),hp:mat(0x36c66a)};
+const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.5));renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xdcecff,0x33452e,1.8));const sun=new THREE.DirectionalLight(0xffe4b2,2.6);sun.position.set(-25,45,25);sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);sun.shadow.camera.left=-60;sun.shadow.camera.right=60;sun.shadow.camera.top=50;sun.shadow.camera.bottom=-50;sun.shadow.bias=-0.00025;scene.add(sun);
+const mat=(c)=>new THREE.MeshStandardMaterial({color:c,roughness:.86});
+function makeTexture(kind){
+ const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');
+ const palettes={grass:['#405d35','#557743','#68884a','#344d2e'],dirt:['#796b51','#998466','#62553f','#b09a73'],stone:['#686d70','#85898a','#555b5e','#a0a09a'],wood:['#493322','#68482d','#7c5938','#39271d']};
+ const colors=palettes[kind];ctx.fillStyle=colors[0];ctx.fillRect(0,0,256,256);
+ for(let i=0;i<1900;i++){ctx.globalAlpha=.16+Math.random()*.28;ctx.fillStyle=colors[1+Math.floor(Math.random()*(colors.length-1))];const size=1+Math.random()*(kind==='grass'?4:7);ctx.fillRect(Math.random()*256,Math.random()*256,size,size)}
+ ctx.globalAlpha=1;
+ if(kind==='stone'){
+  for(let y=0;y<256;y+=42){ctx.fillStyle='#353b3d';ctx.fillRect(0,y,256,3);let x=(Math.floor(y/42)%2)*-28;while(x<256){ctx.fillStyle='#454b4d';ctx.fillRect(x,y,3,42);x+=72+Math.random()*12}}
+  ctx.strokeStyle='#a4a49a';ctx.globalAlpha=.16;for(let i=0;i<35;i++){const x=Math.random()*256,y=Math.random()*256;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+8+Math.random()*20,y+Math.random()*8);ctx.stroke()}
+ }else if(kind==='wood'){
+  ctx.globalAlpha=.3;ctx.strokeStyle='#24180f';ctx.lineWidth=3;for(let y=12;y<256;y+=28){ctx.beginPath();ctx.moveTo(0,y);ctx.bezierCurveTo(70,y-5,160,y+6,256,y-2);ctx.stroke()}
+ }
+ ctx.globalAlpha=1;const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());return texture;
+}
+const grassTexture=makeTexture('grass');grassTexture.repeat.set(9,7);
+const dirtTexture=makeTexture('dirt');dirtTexture.repeat.set(8,1);
+const stoneTexture=makeTexture('stone');stoneTexture.repeat.set(2,1);
+const woodTexture=makeTexture('wood');woodTexture.repeat.set(2,1);
+const mats={grass:new THREE.MeshStandardMaterial({map:grassTexture,color:0xc3d7a8,roughness:1}),road:new THREE.MeshStandardMaterial({map:dirtTexture,color:0xd9c5a0,roughness:1}),blue:mat(0x287ac2),red:mat(0xb94338),gold:mat(0xe5b84f),stone:new THREE.MeshStandardMaterial({map:stoneTexture,color:0xd2d0c7,roughness:.94}),wood:new THREE.MeshStandardMaterial({map:woodTexture,color:0xc9a17a,roughness:.95}),leaf:mat(0x315b3d),hp:mat(0x36c66a)};
 function mesh(geo,material,x,y,z){const o=new THREE.Mesh(geo,material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o}
 const ground=mesh(new THREE.PlaneGeometry(110,78),mats.grass,0,-.12,0);ground.rotation.x=-Math.PI/2;
 for(const z of [-20,0,20]){const lane=mesh(new THREE.BoxGeometry(88,.06,7),mats.road,0,-.04,z);lane.receiveShadow=true;for(let x=-42;x<=42;x+=8){mesh(new THREE.BoxGeometry(1,.04,.18),mat(0xc6b99a),x,.005,z)}}
 function wallSegment(x,z,length,axis='x'){
- const stone=mat(0x686c70),cap=mat(0x99958a);
+ const stone=new THREE.MeshStandardMaterial({map:stoneTexture,color:0xc2c1b8,roughness:.96}),cap=new THREE.MeshStandardMaterial({map:stoneTexture,color:0xe0d9c8,roughness:.9});
  const body=mesh(new THREE.BoxGeometry(axis==='x'?length:1.1,1.7,axis==='x'?1.1:length),stone,x,.85,z);
  const crown=mesh(new THREE.BoxGeometry(axis==='x'?length+.2:1.3,.28,axis==='x'?1.3:length+.2),cap,x,1.82,z);
  for(let i=0;i<Math.floor(length/2.3);i++){
