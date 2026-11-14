@@ -487,14 +487,12 @@ const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_
     const t=await env.DB.prepare("SELECT id,alliance_id,owner_kingdom_id FROM world_territories WHERE id=?").bind(territoryId).first();
     if(!t)return json({error:"Território não encontrado."},404);
     if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
-    if(t.alliance_id)return json({error:"Este território já foi reivindicado."},409);
-    // O custo só é debitado se o território ainda estiver livre; D1 executa o lote atomicamente.
-    const result=await env.DB.batch([
-      env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000 AND EXISTS(SELECT 1 FROM world_territories WHERE id=? AND alliance_id IS NULL)").bind(member.alliance_id,territoryId),
-      env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL").bind(member.alliance_id,territoryId),
-      env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=? AND EXISTS(SELECT 1 FROM world_territories WHERE id=? AND alliance_id=?)").bind(member.alliance_id,territoryId,member.alliance_id)
-    ]);
-    if(!result[0]?.meta?.changes)return json({error:"Território ocupado ou recursos insuficientes no depósito da aliança."},409);
+    const cost=await env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000").bind(member.alliance_id).run();
+    if(!cost.meta.changes)return json({error:"A aliança precisa de 1.000 comida e 1.000 madeira no depósito."},409);
+    if(!t.alliance_id){
+      await env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL").bind(member.alliance_id,territoryId).run();
+      await env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=?").bind(member.alliance_id).run();
+    }
   }else if(type==="alliance_leave"){
     const membership=await env.DB.prepare("SELECT alliance_id,role FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(!membership)return json({error:"Seu reino não pertence a uma aliança."},409);
