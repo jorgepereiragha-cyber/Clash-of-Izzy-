@@ -235,6 +235,15 @@ function tower(x,z,team){
  return {x,z,team,hp:650,max:650,last:0,mesh:shaft,top:roof,parts:[base,band,crystal,...crenels]}
 }
 const towers=[];for(const z of [-20,0,20]){towers.push(tower(-25,z,'blue'),tower(25,z,'red'))}
+// Áreas visuais de influência das torres: indicam a região defendida por cada equipe.
+// São apenas marcadores de mapa; a conquista real exige estado autoritativo no servidor.
+const territoryZones=[];
+const territoryGeometry=new THREE.RingGeometry(6.1,7.15,40);
+for(const t of towers){
+ const zoneMaterial=new THREE.MeshBasicMaterial({color:t.team==='blue'?0x42aaff:0xff6258,transparent:true,opacity:.19,side:THREE.DoubleSide,depthWrite:false});
+ const zone=new THREE.Mesh(territoryGeometry,zoneMaterial);zone.rotation.x=-Math.PI/2;zone.position.set(t.x,.025,t.z);zone.renderOrder=2;scene.add(zone);
+ territoryZones.push({mesh:zone,team:t.team,x:t.x,z:t.z});
+}
 function nexus(x,team){
  const blue=team==='blue',crystalMat=mat(blue?0x42c9ff:0xff5148),stoneMat=mat(0x454b56);
  const plinth=mesh(new THREE.CylinderGeometry(4.8,5.5,1.2,8),stoneMat,x,.6,0);
