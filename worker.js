@@ -224,11 +224,12 @@ async function applyProduction(env,kingdomId){
   };
   const prestigeBonus=1+Math.max(0,Number(row.prestige||0))*.10;
   const gains=Object.fromEntries(Object.entries(perHour).map(([key,rate])=>[key,Math.floor(rate*prestigeBonus*elapsed/3600)]));
-  await env.DB.batch([
-    env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,last_production_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=?")
-      .bind(gains.food,gains.wood,gains.stone,gains.iron,gains.gold,new Date(now).toISOString(),kingdomId),
-    ...Object.entries(gains).filter(([,amount])=>amount>0).map(([resource,amount])=>env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(kingdomId,resource,amount,"produção automática"))
-  ]);
+  // Compare-and-set: evita creditar a mesma produção duas vezes em chamadas simultâneas.
+  const productionUpdate=await env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,last_production_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND COALESCE(last_production_at,'')=COALESCE(?, '')")
+    .bind(gains.food,gains.wood,gains.stone,gains.iron,gains.gold,new Date(now).toISOString(),kingdomId,row.last_production_at??"").run();
+  if(!productionUpdate.meta.changes)return;
+  const ledgerStatements=Object.entries(gains).filter(([,amount])=>amount>0).map(([resource,amount])=>env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(kingdomId,resource,amount,"produção automática"));
+  if(ledgerStatements.length)await env.DB.batch(ledgerStatements);
 }
 async function seedWorld(env){
  const nodes=[
