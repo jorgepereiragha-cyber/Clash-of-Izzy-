@@ -547,7 +547,7 @@ const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_
     const updated=await env.DB.batch([
       env.DB.prepare("UPDATE hero_inventory SET level=level+1,experience=experience+100 WHERE kingdom_id=? AND hero_key=? AND level=? AND level<? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND food>=? AND wood>=? AND gold>=?)").bind(k.id,key,hero.level,maxLevel,k.id,cost.food,cost.wood,cost.gold),
       env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,gold=gold-? WHERE id=? AND food>=? AND wood>=? AND gold>=? AND EXISTS(SELECT 1 FROM hero_inventory WHERE kingdom_id=? AND hero_key=? AND level=?)").bind(cost.food,cost.wood,cost.gold,k.id,cost.food,cost.wood,cost.gold,k.id,key,hero.level+1),
-      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM hero_inventory WHERE kingdom_id=? AND hero_key=? AND level=?)").bind(k.id,"hero_trained",JSON.stringify({hero:key,level:hero.level+1,cost}),k.id,key,hero.level+1)
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM hero_inventory WHERE kingdom_id=? AND hero_key=? AND level=?)").bind(k.id,"hero_trained",JSON.stringify({hero:key,level:hero.level+1,cost}),k.id,key,hero.level+1)
     ]);
     if(!updated[0]?.meta?.changes||!updated[1]?.meta?.changes)return json({error:"Não foi possível treinar: recursos insuficientes ou herói já atualizado."},409);
   }else if(type==="prestige"){
