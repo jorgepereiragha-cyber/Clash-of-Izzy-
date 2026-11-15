@@ -1,4 +1,4 @@
-import { simulateBattle } from "./game-adapter.js";
+import { simulateBattle, calculateMarchDuration } from "./game-adapter.js";
 import { EQUIPMENT_CATALOG, EQUIPMENT_RESEARCH, NORSE_SKINS, equipmentBonuses } from "./equipment-engine.js";
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -306,6 +306,7 @@ async function processMarches(env,kingdomId){
      researchLevel:Number(military?.level||0),
      defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0))),
      equipmentAttackPercent:gear.bonuses.attackPercent,equipmentDefensePercent:gear.bonuses.defensePercent,equipmentHealthPercent:gear.bonuses.healthPercent,
+     criticalChancePercent:gear.bonuses.criticalChancePercent,criticalSeed:crypto.getRandomValues(new Uint32Array(1))[0],
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
     });
@@ -847,7 +848,9 @@ async function gameAction(env,playerId,body){
     const unitTypes=Object.keys(selected);
     if(!unitTypes.length)return json({error:"Selecione pelo menos uma tropa válida."},400);
     const unitsJson=JSON.stringify(selected);
-    const seconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    const gear=await getEquipmentState(env,k.id);
+    const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    const seconds=calculateMarchDuration(baseSeconds,gear.bonuses.marchSpeedPercent);
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
@@ -879,6 +882,7 @@ async function gameAction(env,playerId,body){
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
       equipmentAttackPercent:equipmentState.bonuses.attackPercent,equipmentDefensePercent:equipmentState.bonuses.defensePercent,equipmentHealthPercent:equipmentState.bonuses.healthPercent,
+      criticalChancePercent:equipmentState.bonuses.criticalChancePercent,criticalSeed:crypto.getRandomValues(new Uint32Array(1))[0],
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
     });
     const won=simulation.won,attackerPower=simulation.attackerPower,defenderPower=simulation.defenderPower;
