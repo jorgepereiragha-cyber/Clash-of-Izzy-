@@ -162,3 +162,18 @@ test("WebGL fallback explicitly disposes GPU resources and unregisters kingdom l
   assert.match(renderer, /ktx2\?\.dispose\(\)/);
   assert.match(renderer, /if \(disposed\) return/);
 });
+
+
+test("late GLB loads are disposed when WebGL context is lost during async loading", () => {
+  assert.match(renderer, /if \(disposed \|\| !renderer\) return/);
+  assert.match(renderer, /if \(disposed \|\| !renderer\) \{/);
+  assert.match(renderer, /disposeDetachedObject3D\(gltf\.scene\)/);
+  assert.match(renderer, /if \(!disposed && renderer && glbTemplates\.size\) renderBuildings\(latestBuildings\)/);
+  assert.match(renderer, /function disposeDetachedObject3D\(root\)/);
+});
+
+test("GLTF ImageBitmap resources are explicitly closed with GPU textures", () => {
+  assert.match(renderer, /resources\.imageBitmaps\.add\(bitmap\)/);
+  assert.match(renderer, /for \(const bitmap of resources\.imageBitmaps\) bitmap\.close\(\)/);
+  assert.match(renderer, /const resources = \{ geometries: new Set\(\), materials: new Set\(\), textures: new Set\(\), imageBitmaps: new Set\(\) \}/);
+});
