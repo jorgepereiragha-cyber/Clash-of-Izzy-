@@ -8,7 +8,7 @@ on:
 
 concurrency:
   group: clash-of-izzy-ci-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 
 jobs:
   quality:
@@ -22,8 +22,24 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --ignore-scripts
+      - name: Validate PWA installation and offline assets
+        run: node scripts/check-pwa.mjs
       - name: Validate service worker
         run: node --check sw.js
+      - name: Validate kingdom and admin panel scripts
+        run: node --check command-center.js && node --check admin.js
+      - name: Validate LiveOps engine
+        run: node --check liveops-engine.js
+      - name: Validate onboarding and realm policy modules
+        run: node --check onboarding-engine.js && node --check realm-policy.js
+      - name: Test LiveOps engine
+        run: node --test tests/liveops-engine.test.js
+      - name: Test onboarding and realm opening policy
+        run: node --test tests/onboarding-engine.test.js tests/realm-policy.test.js
+      - name: Apply all D1 migrations to an isolated local database
+        run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
+      - name: Test kingdom task timing
+        run: node --test tests/kingdom-tasks.test.js
       - name: Test combat simulator
         run: npm test
       - name: Validate Worker bundle

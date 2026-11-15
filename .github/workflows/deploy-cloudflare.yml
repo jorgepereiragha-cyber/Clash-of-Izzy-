@@ -67,3 +67,13 @@ jobs:
         run: npx wrangler --config wrangler.jsonc deploy
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify public game readiness
+        if: ${{ vars.GAME_PUBLIC_URL != '' }}
+        shell: bash
+        env:
+          GAME_PUBLIC_URL: ${{ vars.GAME_PUBLIC_URL }}
+        run: |
+          URL="${GAME_PUBLIC_URL%/}"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${URL}/command-center.html" | grep -qi "CENTRO DE COMANDO DO REINO"
+          curl --fail --silent --show-error --retry 5 --retry-delay 5 --retry-all-errors "${URL}/api/health"
