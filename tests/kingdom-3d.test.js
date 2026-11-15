@@ -111,6 +111,7 @@ test("quality profiles scale conservatively across low, balanced and high capabi
   assert.equal(low.shadows, false);
   assert.equal(balanced.tier, "balanced");
   assert.equal(balanced.pixelRatioCap, 1.25);
+  assert.equal(balanced.shadows, false);
   assert.equal(high.tier, "high");
   assert.equal(high.pixelRatioCap, 1.5);
   assert.equal(high.shadows, true);
