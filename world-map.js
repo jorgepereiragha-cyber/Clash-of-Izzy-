@@ -105,6 +105,10 @@ function renderTroops() {
   const root = $("troops");
   root.replaceChildren();
   const available = (state.troops || []).filter(unit => Number(unit.tier) === 1 && Number(unit.quantity) > 0);
+  const availableTypes = new Set(available.map(unit => unit.unit_type));
+  for (const unitType of Object.keys(selectedUnits)) {
+    if (!availableTypes.has(unitType)) delete selectedUnits[unitType];
+  }
   if (!available.length) {
     root.append(make("div", "muted", "Você ainda não possui tropas disponíveis para marchar."));
     updateActionButtons();
@@ -120,7 +124,7 @@ function renderTroops() {
     input.step = "1";
     input.inputMode = "numeric";
     input.setAttribute("aria-label", "Quantidade de " + (UNIT_NAMES[unit.unit_type] || unit.unit_type));
-    const defaultValue = unit.unit_type === "militia" ? Math.min(5, Number(unit.quantity)) : 0;
+    const defaultValue = 0;
     input.value = String(selectedUnits[unit.unit_type] ?? defaultValue);
     selectedUnits[unit.unit_type] = clamp(Math.floor(Number(input.value) || 0), 0, Number(unit.quantity));
     input.addEventListener("input", () => {
@@ -210,9 +214,9 @@ async function sendMarch(marchType) {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ type: "march", targetId: territory.id, marchType, units }),
     });
-    $("marchNotice").textContent = result.message || "Marcha registrada pelo servidor.";
     selectedUnits = {};
     await refreshState();
+    $("marchNotice").textContent = result.message || "Marcha registrada pelo servidor.";
     setStatus("● Reino sincronizado");
   } catch (error) {
     $("marchNotice").textContent = error.message;
