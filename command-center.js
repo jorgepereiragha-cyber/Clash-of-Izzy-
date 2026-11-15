@@ -66,6 +66,7 @@ function render(){
  if(!state)return;
  serverNowBase=Date.parse(state.serverTime||new Date().toISOString());performanceBase=performance.now();
  const k=state.kingdom||{},p=state.player||{};
+ if($("playerNickname")&&document.activeElement!==$("playerNickname"))$("playerNickname").value=p.name||"";
  $("resources").innerHTML=[["🌾","Comida",k.food],["🪵","Madeira",k.wood],["🪨","Pedra",k.stone],["⛓","Ferro",k.iron],["🪙","Ouro",k.gold],["💎","Gemas",p.gems]].map(([icon,label,value])=>'<div class="resource"><small>'+icon+" "+label+'</small><strong>'+n(value)+'</strong></div>').join("");
  $("summary").innerHTML=[["🏰 Castelo","Nível "+n(k.castle_level)],["⚔ Tropas",n(state.totalTroops)],["🐉 Dragão","Nível "+n(state.dragon?.level)],["🛡 Aliança",state.alliance?esc(state.alliance.tag):"Sem aliança"]].map(([label,value])=>'<div class="tile"><small>'+label+'</small><strong>'+value+"</strong></div>").join("");
  renderOnboarding();renderTasks();renderBuildings();renderTroops();renderResearch();renderWorld();renderHeroes();renderDragon();renderAlliance();renderBattles();renderDailyEvents();renderVeilArchive();
@@ -177,6 +178,7 @@ $("allianceCreate").addEventListener("submit",async e=>{e.preventDefault();try{a
 $("allianceJoin").addEventListener("submit",async e=>{e.preventDefault();try{await act({type:"alliance_join",tag:$("joinTag").value},"Você entrou na aliança.")}catch{}});
 $("warForm").addEventListener("submit",async e=>{e.preventDefault();if(!confirm("Declarar guerra contra esta aliança?"))return;try{await act({type:"alliance_war_declare",targetTag:$("warTag").value},"Declaração de guerra enviada.")}catch{}});
 $("chatForm").addEventListener("submit",async e=>{e.preventDefault();const message=$("chatText").value.trim();if(!message)return;try{await act({type:"alliance_chat",message},"Mensagem enviada.");$("chatText").value=""}catch{}});
+$("nicknameForm").addEventListener("submit",async e=>{e.preventDefault();const name=$("playerNickname").value.trim();try{await act({type:"set_nickname",name},"Nick salvo. Agora seu reino pode ser encontrado pela busca administrativa.");}catch{}});
 $("refresh").addEventListener("click",refresh);
 setInterval(renderTaskClocks,1000);
 setInterval(()=>{if(!document.hidden)refresh()},30000);
