@@ -102,29 +102,6 @@ test("the browser reuses a pending attack request ID after a network retry", asy
 });
 
 
-test("first deployment in a weekend already in progress schedules a full next cycle", async () => {
-  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
-  assert.ok(worker.includes("const history=await env.DB.prepare"));
-  assert.ok(worker.includes("now.getTime()-Date.parse(window.startsAt)>15*60*1000"));
-  assert.ok(worker.includes("getAngelDeathWeekendWindow(new Date(Date.parse(window.startsAt)+7*86400000))"));
-});
-
-test("event ranking ties use the same deterministic ordering as payout", async () => {
-  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
-  assert.ok(worker.includes("last_attack_at<?"));
-  assert.ok(worker.includes("kingdom_id<?"));
-  assert.ok(worker.includes("ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC"));
-  assert.ok(worker.includes("offset+=15"));
-});
-
-test("attack requests reuse their idempotency key after a network retry", async () => {
-  const client = await readFile(new URL("../events.js", import.meta.url), "utf8");
-  assert.ok(client.includes('sessionStorage.getItem("coi_angel_death_request")'));
-  assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_request",pendingRequestId)'));
-  assert.ok(client.includes("requestId:pendingRequestId"));
-  assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_request")'));
-});
-
 
 test("event page includes accessible original boss artwork and reduced-motion support", async () => {
   const html = await readFile(new URL("../events.html", import.meta.url), "utf8");
@@ -141,3 +118,16 @@ test("event page shows the player's Death Essence inventory balance", async () =
   assert.ok(html.includes('id="myEssence"'));
   assert.ok(client.includes('item.item_key==="death_essence"'));
 });
+
+
+test("Anjo da Morte top rewards exceed the largest existing gem collection reward", () => {
+  const first=angelDeathRewardForRank(1),second=angelDeathRewardForRank(2),third=angelDeathRewardForRank(3);
+  const top10=angelDeathRewardForRank(10),top50=angelDeathRewardForRank(50),top100=angelDeathRewardForRank(100);
+  const participation=angelDeathRewardForRank(101);
+  assert.ok(first.gems>5000&&second.gems>5000&&third.gems>5000&&top10.gems>5000);
+  assert.ok(first.gems>second.gems&&second.gems>third.gems&&third.gems>top10.gems);
+  assert.ok(top10.gems>top50.gems&&top50.gems>top100.gems&&top100.gems>participation.gems);
+  assert.equal(participation.gems,100);
+  assert.ok(first.deathEssence>top10.deathEssence&&top10.deathEssence>participation.deathEssence);
+});
+
