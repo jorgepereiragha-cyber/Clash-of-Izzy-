@@ -68,4 +68,6 @@ test("alliance page handles navigation deep links and renders search results saf
   assert.ok(alliance.includes("button.append(title,detail)"));
   assert.ok(alliance.includes("title.textContent"));
   assert.ok(alliance.includes("detail.textContent"));
+  assert.ok(alliance.includes('if(!token){const loading=$("loading")')||alliance.includes('if(!token){$("worldSearchForm")'));
+  assert.ok(!alliance.includes('request("/game/start"'));
 });
