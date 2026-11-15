@@ -44,3 +44,29 @@ Boas práticas consultadas para jogos persistentes destacam mundo contínuo, map
 
 ## Limites desta rodada
 A interface nova foi conectada ao contrato de API já existente; não foi possível executar npm test / Wrangler neste ambiente GitHub connector. O deploy continua condicionado à credencial Cloudflare válida. A página nova não deve ser anunciada como jogo 3D completo: é uma primeira central de gerenciamento de reino, ainda usando representação visual esquemática.
+
+
+## Revalidação do relatório recebido (15 nov 2026)
+A comparação recebida é útil como roteiro, mas algumas afirmações não correspondem ao código atual e não devem ser tratadas como bugs confirmados:
+
+- **Roteador HTTP:** o suposto bug é falso. `worker.js` exporta `default.fetch(request, env)`, serve assets fora de `/api/` e encaminha rotas de jogo e administração. O estado atual não precisa de um segundo roteador.
+- **Alianças:** não estão ausentes do backend. Há ações para criar/entrar, convidar/aceitar, promover/expulsar, doar, ajudar, conversar, declarar guerra, reivindicar território e sair. O estado também devolve membros, chat, convites e guerras. A lacuna concreta era a interface de jogo.
+- **Central do reino:** não está limitada a placeholders. `kingdom.html` busca o estado autenticado e renderiza recursos, edifícios, tropas, marchas, territórios, aliança e eventos. O visual da cidade, porém, é uma grade CSS esquemática, não um mapa 3D.
+- **Equipamentos:** a crítica de segurança é válida para `equipment-system.js`: evolução e ouro são alterados apenas em objetos JavaScript no cliente. Esse módulo não deve ser considerado autoridade de progressão. A migração para validação no servidor continua pendente.
+- **Compras com dinheiro real:** `packages.js` encaminha o pedido ao WhatsApp e descreve confirmação manual. Isso não é integração automática de pagamento; não há evidência aqui de checkout e webhook de provedor.
+- **Multiplayer:** há estado compartilhado e interação assíncrona via D1, alianças e marchas. Isso não equivale a PvP em tempo real, chat global ou infraestrutura já validada para milhares de jogadores.
+- **Produção concorrente:** existe compare-and-set por `last_production_at` e atualização em lote com ledger. Ainda merece teste de integração sob concorrência; não há evidência suficiente para declarar falha.
+
+## Implementação após a revalidação
+- Criada `alliance.html`, usando a sessão `coi_game_token` e as ações já existentes do Worker para criação/entrada, convites recebidos, chat, doações, guerra e saída.
+- Adicionado acesso **Alianças** à barra de ações de `kingdom.html`.
+- Corrigida a consulta de estado do Worker para incluir os saldos compartilhados do depósito da aliança (`shared_food`, `shared_wood`, `shared_stone`, `shared_iron`, `shared_gold`), necessários para a interface mostrar os valores reais.
+- Adicionados testes de regressão para o contrato da interface e os saldos do depósito.
+
+## Próximas prioridades revisadas
+1. Migrar equipamentos para tabelas e ações server-authoritative, com validação de inventário, custos, nível e efeitos.
+2. Testar fluxos de aliança ponta a ponta (criação, entrada, convite, chat, doação, guerra) com D1 de teste.
+3. Implementar filas persistentes de construção, treinamento e pesquisa, com conclusão calculada pelo servidor.
+4. Criar mapa mundial navegável com terreno, coordenadas, fog of war e territórios; preservar a arena como modo separado.
+5. Implementar PvP assíncrono entre reinos com proteção, reforços, relatório e anti-replay antes de considerar tempo real.
+6. Integrar pagamento real somente com provedor, webhook assinado e entrega idempotente.
