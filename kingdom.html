@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="/styles/coi-theme.css">
+<link rel="stylesheet" href="/styles/navigation.css">
 <meta name="theme-color" content="#142b44"><meta name="description" content="Comande seu reino, evolua construções e prepare seu exército em Clash of Izzy.">
 <link rel="manifest" href="/manifest.json"><link rel="icon" href="/icon-192.svg" type="image/svg+xml">
 <title>Clash of Izzy — Reino</title>
@@ -59,4 +60,5 @@ document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("cli
 async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;busy=false;render();setStatus("Melhoria aplicada");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/arena.html");
 connect();
-</script></body></html>
+</script><script src="/navigation.js" defer></script>
+</body></html>
