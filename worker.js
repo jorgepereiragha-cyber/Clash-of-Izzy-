@@ -1000,10 +1000,10 @@ export default {
         if(rawQuery.length>48)return json({error:"A busca aceita até 48 caracteres.",results:[]},400);
         const kind=String(url.searchParams.get("type")||"all").toLowerCase();
         if(!["all","kingdoms","alliances","territories","skins"].includes(kind))return json({error:"Categoria de busca inválida."},400);
-        const tokens=rawQuery.match(/[\\p{L}\\p{N}_]+/gu)||[];
+        const tokens=rawQuery.match(/[\p{L}\p{N}_]+/gu)||[];
         if(!tokens.length)return json({error:"Digite um nome ou termo válido.",results:[]},400);
         const ftsQuery=tokens.map(token=>'"'+token.replace(/"/g,'""')+'"*').join(" AND ");
-        const escaped=rawQuery.replace(/[\\\\%_]/g,ch=>"\\\\"+ch);
+        const escaped=rawQuery.replace(/[!%_]/g,ch=>"!"+ch);
         const exact=rawQuery.toLocaleLowerCase();
         const pattern="%"+escaped+"%";
         const limit=Math.min(20,Math.max(1,Math.floor(Number(url.searchParams.get("limit"))||10)));
@@ -1028,13 +1028,13 @@ export default {
         if(kind==="all"||kind==="kingdoms"){
           const current=await env.DB.prepare("SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
           const rows=await env.DB.prepare(
-            "SELECT k.id,k.kingdom_name,k.power FROM kingdoms k WHERE k.id<>? AND k.kingdom_name LIKE ? ESCAPE '\\\\' COLLATE NOCASE AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id) ORDER BY CASE WHEN lower(k.kingdom_name)=? THEN 0 WHEN lower(k.kingdom_name) LIKE ? ESCAPE '\\\\' THEN 1 ELSE 2 END,k.power DESC,k.kingdom_name LIMIT ?"
+            "SELECT k.id,k.kingdom_name,k.power FROM kingdoms k WHERE k.id<>? AND k.kingdom_name LIKE ? ESCAPE '!' COLLATE NOCASE AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id) ORDER BY CASE WHEN lower(k.kingdom_name)=? THEN 0 WHEN lower(k.kingdom_name) LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,k.kingdom_name LIMIT ?"
           ).bind(current?.id||-1,pattern,exact,escaped+"%",categoryLimit).all();
           for(const row of rows.results||[])results.push({type:"kingdom",name:row.kingdom_name,power:Number(row.power||0)});
         }
         if(kind==="all"||kind==="alliances"){
           const rows=await env.DB.prepare(
-            "SELECT a.id,a.name,a.tag,a.level,a.territory_count,COUNT(am.kingdom_id) AS member_count FROM alliances a LEFT JOIN alliance_members am ON am.alliance_id=a.id WHERE (a.name LIKE ? ESCAPE '\\\\' COLLATE NOCASE OR a.tag LIKE ? ESCAPE '\\\\' COLLATE NOCASE) GROUP BY a.id ORDER BY CASE WHEN lower(a.tag)=? THEN 0 WHEN lower(a.name)=? THEN 1 WHEN lower(a.tag) LIKE ? ESCAPE '\\\\' THEN 2 ELSE 3 END,a.level DESC,a.name LIMIT ?"
+            "SELECT a.id,a.name,a.tag,a.level,a.territory_count,COUNT(am.kingdom_id) AS member_count FROM alliances a LEFT JOIN alliance_members am ON am.alliance_id=a.id WHERE (a.name LIKE ? ESCAPE '!' COLLATE NOCASE OR a.tag LIKE ? ESCAPE '!' COLLATE NOCASE) GROUP BY a.id ORDER BY CASE WHEN lower(a.tag)=? THEN 0 WHEN lower(a.name)=? THEN 1 WHEN lower(a.tag) LIKE ? ESCAPE '!' THEN 2 ELSE 3 END,a.level DESC,a.name LIMIT ?"
           ).bind(pattern,pattern,exact,exact,escaped+"%",categoryLimit).all();
           for(const row of rows.results||[])results.push({type:"alliance",name:row.name,tag:row.tag,level:Number(row.level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)});
         }
