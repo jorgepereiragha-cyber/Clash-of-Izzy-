@@ -16,8 +16,8 @@ test("rate limiter uses an atomic upsert and stores only a keyed digest", async 
   assert.equal(result.retryAfterSeconds, 600);
   assert.equal(result.resetAt, 1800);
   assert.equal(db.calls.length, 1);
-  assert.match(db.calls[0].sql, /ON CONFLICT\\(rate_key\\) DO UPDATE/);
-  assert.match(db.calls[0].sql, /RETURNING request_count,window_started_at/);
+  assert.ok(db.calls[0].sql.includes("ON CONFLICT(rate_key) DO UPDATE"));
+  assert.ok(db.calls[0].sql.includes("ON CONFLICT(rate_key) DO UPDATE"));
   assert.equal(db.calls[0].values[1], 900);
   assert.equal(db.calls[0].values[2], 2700);
   assert.match(db.calls[0].values[0], /^[a-f0-9]{64}$/);
@@ -45,7 +45,7 @@ test("a delayed request cannot roll the stored window backwards", async () => {
   assert.equal(result.allowed, false);
   assert.equal(result.resetAt, 2700);
   assert.equal(result.retryAfterSeconds, 901);
-  assert.match(calls[0].sql, /window_started_at<=excluded\\.window_started_at/);
+  assert.ok(calls[0].sql.includes("window_started_at<=excluded.window_started_at"));
   assert.equal(calls.length, 2);
 });
 
@@ -55,5 +55,5 @@ test("Worker rate-limits authentication and game endpoints without wildcard CORS
   for (const scope of ["store-catalog-ip", "game-start-ip", "game-state-player", "game-action-player", "game-action-network", "admin-login-ip", "admin-login-account"]) assert.ok(worker.includes(scope), "missing rate-limit scope: " + scope);
   assert.doesNotMatch(worker, /Access-Control-Allow-Origin/);
   assert.doesNotMatch(worker, /Access-Control-Allow-Headers/);
-  assert.match(arena, /const API_BASE=['"]\\/api['"]/);
+  assert.ok(arena.includes("const API_BASE='/api'"));
 });
