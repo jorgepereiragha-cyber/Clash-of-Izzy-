@@ -87,3 +87,13 @@ test("WebGL loss disconnects resize observers and prevents rendering through a d
   assert.match(renderer, /renderer = null/);
   assert.match(renderer, /window\.removeEventListener\("resize", resizeHandler\)/);
 });
+
+
+test("GLB manifest accepts only bounded same-origin assets for known buildings", () => {
+  assert.match(renderer, /manifest\.models\.slice\(0, 32\)/);
+  assert.match(renderer, /Object\.hasOwn\(palettes, asset\.type\)/);
+  assert.match(renderer, /assetUrl\.origin !== window\.location\.origin/);
+  assert.match(renderer, /assetUrl\.pathname\.startsWith\("\/assets\/3d\/"\)/);
+  assert.match(renderer, /pathname\.toLowerCase\(\)\.endsWith\("\.glb"\)/);
+  assert.match(renderer, /GLB \$\{asset\.type\} indisponível; mantendo modelo procedural/);
+});
