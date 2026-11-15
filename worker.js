@@ -958,7 +958,9 @@ async function gameAction(env,playerId,body){
     const unitTypes=Object.keys(selected);
     if(!unitTypes.length)return json({error:"Selecione pelo menos uma tropa válida."},400);
     const unitsJson=JSON.stringify(selected);
-    const seconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    const forgeState=await getForgeEquipmentState(env,k.id);
+    const seconds=calculateMarchDuration(baseSeconds,forgeState.bonuses.marchSpeedPercent);
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
