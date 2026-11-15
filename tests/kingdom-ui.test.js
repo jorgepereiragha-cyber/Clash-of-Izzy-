@@ -35,5 +35,5 @@ test("central do reino mostra filas persistentes, treinamento e pesquisas", asyn
 
 test("PWA cache version is bumped when queue UI is changed", async () => {
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /clash-of-izzy-shell-v10/);
+  assert.match(worker, /clash-of-izzy-shell-v11/);
 });
