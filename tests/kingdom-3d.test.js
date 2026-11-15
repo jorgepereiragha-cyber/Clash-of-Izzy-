@@ -148,3 +148,17 @@ test("pixel budget is reapplied on resize for tall high-density mobile viewports
   assert.ok(390 * 844 * ratio * ratio <= profile.maxPixelCount + 1);
   assert.match(renderer, /const resize = \(\) => \{[\s\S]*?calculateKingdomPixelRatio/);
 });
+
+
+test("WebGL fallback explicitly disposes GPU resources and unregisters kingdom listeners", () => {
+  assert.match(renderer, /function disposeObject3D\(root, resources\)/);
+  assert.match(renderer, /function disposeSceneResources\(\)/);
+  assert.match(renderer, /resources\.geometries\.add\(node\.geometry\)/);
+  assert.match(renderer, /resources\.textures\.add\(value\)/);
+  assert.match(renderer, /for \(const geometry of resources\.geometries\) geometry\.dispose\(\)/);
+  assert.match(renderer, /for \(const texture of resources\.textures\) texture\.dispose\(\)/);
+  assert.match(renderer, /for \(const mat of resources\.materials\) mat\.dispose\(\)/);
+  assert.match(renderer, /window\.removeEventListener\("coi:kingdom-render", kingdomRenderHandler\)/);
+  assert.match(renderer, /ktx2\?\.dispose\(\)/);
+  assert.match(renderer, /if \(disposed\) return/);
+});
