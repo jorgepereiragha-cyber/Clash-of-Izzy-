@@ -1,11 +1,6 @@
 import { simulateBattle, calculateMarchDuration } from "./game-adapter.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { EQUIPMENT_CATALOG, EQUIPMENT_RESEARCH, NORSE_SKINS, equipmentBonuses } from "./equipment-engine.js";
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization"
-};
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -162,7 +157,7 @@ const UNITS = {
   ram:{label:"Aríete",food:60,wood:55,iron:18,power:20},
   trebuchet:{label:"Trabuco",food:90,wood:75,iron:30,power:30}
 };
-function json(data,status=200,extraHeaders={}){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Cache-Control":"no-store",...cors,...extraHeaders}})}
+function json(data,status=200,extraHeaders={}){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Cache-Control":"no-store",...extraHeaders}})}
 function b64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 async function sign(payload,secret){
   const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
@@ -980,7 +975,7 @@ export default {
   }
  },
  async fetch(request,env){
-  if(request.method==="OPTIONS")return new Response(null,{headers:cors});
+  if(request.method==="OPTIONS")return new Response(null,{status:204,headers:{"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
   const url=new URL(request.url);
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
