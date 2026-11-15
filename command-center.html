@@ -52,6 +52,7 @@ footer{text-align:center;color:#8fa1b5;font-size:11px;padding:12px}
  <button data-tab="heroes" aria-selected="false">🐉 Heróis e dragão</button>
  <button data-tab="alliance" aria-selected="false">🛡 Aliança</button>
  <button data-tab="events" aria-selected="false">🎖 Eventos</button>
+ <button data-tab="veil" aria-selected="false">✧ Arquivo Velado</button>
 </nav>
 <div id="notice" class="notice" role="status" aria-live="polite"></div>
 <section class="section active" id="section-kingdom">
@@ -82,6 +83,27 @@ footer{text-align:center;color:#8fa1b5;font-size:11px;padding:12px}
  <form class="controls" id="warForm"><div class="field"><label for="warTag">Sigla da aliança adversária</label><input id="warTag" maxlength="5" placeholder="INIMIGA"></div><button type="submit">Declarar guerra</button></form>
  </div>
  <div class="panel"><h2>💬 Chat da aliança</h2><p class="lead">Mensagens são persistidas no servidor. Atualize para carregar as mais recentes.</p><div id="chatMessages" class="messages"></div><form class="controls" id="chatForm"><div class="field"><label for="chatText">Mensagem</label><input id="chatText" maxlength="300" placeholder="Escreva para sua aliança…"></div><button class="primary" type="submit">Enviar</button></form></div>
+</section>
+<section class="section" id="section-veil">
+ <div class="panel">
+  <div class="row" style="align-items:center;justify-content:flex-start;gap:12px">
+   <svg width="38" height="38" viewBox="0 0 48 48" aria-hidden="true" style="opacity:.72;flex:none">
+    <path d="M7 25Q24 5 41 25Q24 43 7 25Z" fill="none" stroke="#c5a66a" stroke-width="1.5"/>
+    <path d="M14 25Q24 14 34 25Q24 36 14 25Z" fill="none" stroke="#8fa8bd" stroke-width="1.2"/>
+    <circle cx="24" cy="25" r="3.2" fill="#d8bd82"/>
+    <path d="M24 5V11M24 39V44M4 25H9M39 25H44" stroke="#c5a66a" stroke-width="1" opacity=".7"/>
+   </svg>
+   <div><h2>✧ O Arquivo Velado</h2><p class="lead" style="margin:3px 0 0">Há registros que não aparecem nos mapas comuns. Alguns dizem que a antiga Vigília ainda observa os reinos — sem trono, sem bandeira e sem exército.</p></div>
+  </div>
+  <p class="muted">As marcas são quase invisíveis: um arco gravado na pedra, uma estrela fora do lugar, um círculo interrompido. Procure sem pressa.</p>
+  <div id="veilClues" class="grid"></div>
+  <p class="muted" style="margin-top:10px">Arquivo narrativo experimental. As descobertas ficam salvas neste dispositivo e, por enquanto, não concedem recursos nem são sincronizadas com a conta.</p>
+ </div>
+ <div class="panel">
+  <h2>O juramento da Vigília</h2>
+  <p class="lead">“Não governamos os reinos. Guardamos aquilo que os reis esquecem.”</p>
+  <div class="muted">A Vigília do Véu é uma ordem fictícia e antiga do universo de Clash of Izzy. Seus membros aparecem apenas como pistas: um astrônomo sem brasão, uma cartógrafa que apaga rotas e um ferreiro que grava o mesmo pequeno arco em armas destinadas a proteger, nunca a conquistar.</div>
+ </div>
 </section>
 <section class="section" id="section-events">
  <div class="panel"><h2>🎖 Missões diárias</h2><p class="lead">Objetivos renovados à meia-noite UTC. O progresso vem dos registros reais do servidor; cada prêmio só pode ser resgatado uma vez por dia.</p><div id="dailyReset" class="muted" style="margin-bottom:10px"></div><div id="dailyTasks" class="grid"><div class="empty">Carregando missões…</div></div></div>
