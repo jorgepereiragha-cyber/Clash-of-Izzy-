@@ -99,7 +99,8 @@ test("WebGL loss disconnects resize observers and prevents rendering through a d
 
 test("GLB manifest accepts only bounded same-origin assets for known buildings", () => {
   assert.match(renderer, /manifest\.models\.slice\(0, 32\)/);
-  assert.match(renderer, /Object\.hasOwn\(palettes, asset\.type\)/);
+  assert.match(renderer, /Object\.hasOwn\(palettes, type\)/);
+  assert.match(renderer, /neededTypes\.has\(asset\.type\)/);
   assert.match(renderer, /assetUrl\.origin !== window\.location\.origin/);
   assert.match(renderer, /assetUrl\.pathname\.startsWith\("\/assets\/3d\/"\)/);
   assert.match(renderer, /pathname\.toLowerCase\(\)\.endsWith\("\.glb"\)/);
@@ -181,7 +182,7 @@ test("late GLB loads are disposed when WebGL context is lost during async loadin
   assert.match(renderer, /if \(disposed \|\| !renderer\) return/);
   assert.match(renderer, /if \(disposed \|\| !renderer\) \{/);
   assert.match(renderer, /disposeDetachedObject3D\(gltf\.scene\)/);
-  assert.match(renderer, /if \(!disposed && renderer && glbTemplates\.size\) renderBuildings\(latestBuildings\)/);
+  assert.match(renderer, /if \(!disposed && renderer && queue\.length && glbTemplates\.size\) renderBuildings\(latestBuildings\)/);
   assert.match(renderer, /function disposeDetachedObject3D\(root\)/);
 });
 
@@ -198,7 +199,7 @@ test("Data Saver avoids optional 3D downloads while preserving the procedural ki
   assert.equal(profile.shadows, false);
   assert.equal(profile.loadOptionalAssets, false);
   assert.equal(profile.maxBuildings, 8);
-  assert.match(renderer, /if \(!qualityProfile\?\.loadOptionalAssets\) return Promise\.resolve\(\)/);
+  assert.match(renderer, /if \(!qualityProfile\?\.loadOptionalAssets \|\| disposed \|\| !renderer\) return/);
   assert.match(renderer, /dataSaver: !qualityProfile\.loadOptionalAssets/);
 });
 
