@@ -34,7 +34,7 @@ if (host && "WebGLRenderingContext" in window) {
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
   function addTree(x, z, scale = 1) {
-    const group = new THREE.Group(); group.position.set(x, 0, z); group.userData.coIType = type; group.userData.coIProcedural = true; group.scale.setScalar(scale);
+    const group = new THREE.Group(); group.position.set(x, 0, z); group.scale.setScalar(scale);
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.09, .13, .65, 5), mats.wood);
     trunk.position.y = .32; trunk.castShadow = true; group.add(trunk);
     const crown = new THREE.Mesh(new THREE.ConeGeometry(.62, 1.45, 6), mats.leaf);
@@ -43,11 +43,11 @@ if (host && "WebGLRenderingContext" in window) {
     crown2.position.y = 1.72; crown2.castShadow = true; group.add(crown2); scene.add(group);
   }
   function createBuilding(type, level, x, z) {
-    const group = new THREE.Group(); group.position.set(x, 0, z);
+    const group = new THREE.Group(); group.position.set(x, 0, z); group.userData.coIType = type; group.userData.coIProcedural = true;
     const colors = palettes[type] || palettes.warehouse;
     const wall = material(colors[0]), roof = material(colors[1]);
     const height = 1.0 + Math.min(30, Math.max(1, Number(level) || 1)) * .035;
-    const base = box(group, 1.42, height, 1.18, wall, 0, height / 2, 0);
+    box(group, 1.42, height, 1.18, wall, 0, height / 2, 0);
     const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(.98, .88, 4), roof);
     roofMesh.rotation.y = Math.PI / 4; roofMesh.position.y = height + .42; roofMesh.castShadow = true; group.add(roofMesh);
     // Front door and warm windows improve readability at the isometric camera angle.
