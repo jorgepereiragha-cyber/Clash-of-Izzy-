@@ -38,6 +38,26 @@ test("numeric and CJK tokens are not fuzzily rewritten", () => {
   assert.equal(fuzzyTokenDistance(["tokyo", "東京"], ["Tokyo Japan"]), null);
 });
 
+test("CJK queries emit overlapping indexed trigrams without enabling typo substitution", () => {
+  const chinese = buildTrigramSearchQuery(["城堡战争"]);
+  assert.ok(chinese.includes('"城堡战"'));
+  assert.ok(chinese.includes('"堡战争"'));
+
+  const japanese = buildTrigramSearchQuery(["とうきょう"]);
+  assert.ok(japanese.includes('"とうき"'));
+  assert.ok(japanese.includes('"うきょ"'));
+  assert.ok(japanese.includes('"きょう"'));
+
+  const korean = buildTrigramSearchQuery(["서울전투"]);
+  assert.ok(korean.includes('"서울전"'));
+  assert.ok(korean.includes('"울전투"'));
+
+  assert.equal(buildTrigramSearchQuery(["城堡"]), "");
+  assert.equal(typoDistanceForToken("城保战争", "城堡战争"), null);
+  assert.equal(fuzzyTokenDistance(["城堡战争"], ["古代城堡战争"]), 0);
+  assert.equal(fuzzyTokenDistance(["城保战争"], ["古代城堡战争"]), null);
+});
+
 test("trigram candidate queries are bounded to supported alphabetic tokens", () => {
   const query = buildTrigramSearchQuery(["iphone", "2026", "城堡"]);
   assert.ok(query.includes('"iph"'));
