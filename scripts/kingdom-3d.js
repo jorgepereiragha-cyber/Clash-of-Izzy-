@@ -440,10 +440,12 @@ if (host && "WebGLRenderingContext" in window) {
       });
     }
     activeModels = [];
-    const list = (Array.isArray(buildings) ? buildings : []).slice(0, qualityProfile?.maxBuildings || 16);
+    // The HTML interaction layer is a 3x3 grid; keep 3D anchors in the
+    // exact same cells so transparent hit targets sit over the real buildings.
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
     list.forEach((b, i) => {
-      const col = i % 4, row = Math.floor(i / 4);
-      const x = (col - 1.5) * 2.9, z = (row - 1.5) * 2.3;
+      const col = i % 3, row = Math.floor(i / 3);
+      const x = (col - 1) * 4.15, z = (row - 1) * 3.15;
       const template = glbTemplates.get(b.building_type);
       const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
