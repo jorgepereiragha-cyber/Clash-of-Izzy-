@@ -66,7 +66,7 @@ function criticalRoll(seed, round, index, side) {
   return (value >>> 0) / 4294967296;
 }
 
-function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}) {
+function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, metrics = null) {
   for (const unit of acting) {
     if (!alive(unit)) continue;
     const target = selectTarget(opposing, unit);
@@ -79,6 +79,7 @@ function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}) {
     const baseDamage = activeUnits * unit.power * 1.65 + bonus;
     const damage = Math.max(1, Math.floor(baseDamage * (criticalHit ? critical.multiplier : 1)));
     const dealt = applyDamage(target, damage);
+    if (criticalHit && metrics) metrics.criticalHits++;
     if (log.length < 80) log.push({
       round, side: unit.side, unit: unit.key, target: target.key,
       damage: dealt, critical: criticalHit, targetRemaining: target.quantity
@@ -117,11 +118,12 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
     seed: Number(criticalSeed) >>> 0
   };
   const log = [];
+  const metrics = { criticalHits: 0 };
   let rounds = 0;
 
   for (let round = 1; round <= 30; round++) {
     rounds = round;
-    attackPhase(attackers, defenders, round, log, heroBonus + dragonBonus + techBonus, critical);
+    attackPhase(attackers, defenders, round, log, heroBonus + dragonBonus + techBonus, critical, metrics);
     attackPhase(defenders, attackers, round, log, 0);
     if (!attackers.some(alive) || !defenders.some(alive)) break;
   }
@@ -140,7 +142,7 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   }
   return {
     won, rounds, attackerPower: Math.floor(attackerPower * multiplier), defenderPower,
-    losses, log, criticalHits: log.filter(entry => entry.critical).length,
+    losses, log, criticalHits: metrics.criticalHits,
     survivors: attackers.reduce((sum, unit) => sum + unit.quantity, 0)
   };
 }
