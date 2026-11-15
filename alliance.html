@@ -9,9 +9,10 @@
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#395779,#101a2b 60%,#080e18);color:#f5edda;font:14px system-ui,Arial,sans-serif}
 header{padding:14px max(14px,env(safe-area-inset-right)) 14px max(14px,env(safe-area-inset-left));background:#101a2bf2;border-bottom:1px solid var(--line)}.top,main{max-width:980px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{font-weight:950;letter-spacing:.08em;color:var(--gold)}main{padding:20px 12px 48px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.panel{background:linear-gradient(145deg,#1b3049,#101d30);border:1px solid var(--line);border-radius:13px;padding:15px;margin:14px 0}.panel h2{margin:0 0 12px;color:var(--gold);font-size:18px}.muted{color:var(--muted)}button,a.btn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#68451f);color:#fff;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}button.secondary,a.secondary{background:#243a55;border-color:#71839a}button:disabled{opacity:.5;cursor:not-allowed}input,textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #52677d;background:#0e1a2a;color:#fff;font:inherit}label{display:block;color:var(--muted);font-size:12px;margin:8px 0 5px}.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.member,.invite,.message,.war{padding:9px;background:#0e1a2a;border:1px solid #40556b;border-radius:8px;margin:7px 0}.message small,.member small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.chat{max-height:300px;overflow:auto}.status{font-size:12px;color:#d8e2ee}.status.error{color:#ffb4a9}.hidden{display:none!important}.notice{padding:10px;background:#3a2d1c;border:1px solid #927344;border-radius:8px;color:#f4dca8}.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:650px){.section-grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
 </style>
+  <link rel="stylesheet" href="/styles/navigation.css">
 </head>
 <body>
-<header><div class="top"><div class="brand">⚔ CLASH OF IZZY <div class="muted" style="font-size:11px;font-weight:500;letter-spacing:0">Diplomacia · cooperação · guerras</div></div><div class="toolbar"><a class="btn secondary" href="/kingdom.html">← Meu reino</a><button class="secondary" id="refresh">↻ Atualizar</button></div></div></header>
+<header><div class="top"><div class="brand">⚔ CLASH OF IZZY <div class="muted" style="font-size:11px;font-weight:500;letter-spacing:0">Diplomacia · cooperação · guerras</div></div><div class="toolbar"><button class="secondary" id="refresh">↻ Atualizar</button></div></div></header>
 <main>
 <h1 id="title">Alianças do reino</h1><p class="muted" id="subtitle">Conectando ao servidor…</p><div id="status" class="status" role="status"></div>
 <section id="noAlliance" class="panel hidden">
@@ -64,4 +65,5 @@ $("warBtn").addEventListener("click",()=>act({type:"alliance_war_declare",target
 $("leave").addEventListener("click",()=>{if(confirm("Deseja realmente sair da aliança?"))act({type:"alliance_leave"})});
 $("refresh").addEventListener("click",()=>load(false));load();
 </script>
+  <script src="/navigation.js" defer></script>
 </body></html>
