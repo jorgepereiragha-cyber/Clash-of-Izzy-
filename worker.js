@@ -1153,11 +1153,10 @@ export default {
     if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
     const paymentMethod=["pix","bank_transfer","manual"].includes(String(body.paymentMethod||""))?String(body.paymentMethod):"manual";
     const paymentReference=String(body.paymentReference||"").trim().slice(0,120)||null;
-    const [player,kingdom]=await Promise.all([
-      env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first(),
-      env.DB.prepare("SELECT id,kingdom_name FROM kingdoms WHERE player_id=?").bind(playerId).first()
-    ]);
-    if(!player||!kingdom)return json({error:"Reino não encontrado."},404);
+    const player=await env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first();
+    if(!player)return json({error:"Jogador não encontrado."},404);
+    const kingdom=await env.DB.prepare("SELECT id,kingdom_name FROM kingdoms WHERE player_id=?").bind(player.id).first();
+    if(!kingdom)return json({error:"Reino não encontrado."},404);
     const item=kind==="vip_package"
       ?await env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages WHERE id=?").bind(itemId).first()
       :await env.DB.prepare("SELECT id,name,price_brl FROM skins WHERE id=?").bind(itemId).first();
