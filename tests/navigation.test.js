@@ -123,7 +123,8 @@ test("global navigation supports CJK codepoint queries and accent-insensitive lo
 
 test("alliance search inline script parses before deployment", async () => {
   const html = await read("alliance.html");
-  const scripts = [...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
-  assert.ok(scripts.length > 0, "alliance page must contain its application script");
-  for (const match of scripts) new vm.Script(match[1], { filename: "alliance.html:inline-script" });
+  const start = html.indexOf("<script>");
+  const end = html.indexOf("</script>", start);
+  assert.ok(start >= 0 && end > start, "alliance page must contain its application script");
+  new vm.Script(html.slice(start + 8, end), { filename: "alliance.html:inline-script" });
 });
