@@ -1000,6 +1000,9 @@ export default {
   }
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
   if(url.pathname==="/api/store/catalog"&&request.method==="GET"){
+    const ip=request.headers.get("CF-Connecting-IP")||"unknown";
+    const limited=await rateLimitDecision(env,request,"store-catalog-ip",ip,60,60);
+    if(limited)return limited;
     try{
       const [skins,packages]=await Promise.all([
         env.DB.prepare("SELECT id,name,price_brl FROM skins ORDER BY price_brl,name").all(),
@@ -1024,6 +1027,10 @@ export default {
   if(isGamePath){
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
+    if(url.pathname==="/api/game/state"&&request.method==="GET"){
+      const playerLimit=await rateLimitDecision(env,request,"game-state-player",playerId,120,60);
+      if(playerLimit)return playerLimit;
+    }
     if(url.pathname==="/api/game/action"&&request.method==="POST"){
       const playerLimit=await rateLimitDecision(env,request,"game-action-player",playerId,120,60);
       if(playerLimit)return playerLimit;
