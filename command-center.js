@@ -57,7 +57,7 @@ function renderAlliance(){
 }
 function renderDailyEvents(){
  const data=state.dailyEvents||{},tasks=data.tasks||[];
- $("dailyReset").textContent=data.resetsAt?"Reinício: "+new Date(data.resetsAt).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short",timeZone:"UTC"})+" UTC":"";
+ $("dailyReset").textContent=data.resetsAt?"Reinício no seu horário: "+new Date(data.resetsAt).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})+" · UTC: "+new Date(data.resetsAt).toISOString().slice(0,16).replace("T"," ")+"Z":"";
  $("dailyTasks").innerHTML=tasks.map(task=>{
   const reward=Object.entries(task.reward||{}).map(([key,value])=>n(value)+" "+({food:"comida",wood:"madeira",stone:"pedra",iron:"ferro",gold:"ouro"}[key]||key)).join(" · ");
   const ready=task.completed&&!task.claimed;
