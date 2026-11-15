@@ -20,6 +20,7 @@ function runCli(args, timeoutMs = 120_000) {
       cwd: root,
       env: { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false", NO_COLOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
     let output = "";
     const append = chunk => {
@@ -28,7 +29,9 @@ function runCli(args, timeoutMs = 120_000) {
     child.stdout.on("data", append);
     child.stderr.on("data", append);
     const timer = setTimeout(() => {
-      child.kill("SIGKILL");
+      if (process.platform !== "win32" && child.pid) {
+        try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); }
+      } else child.kill("SIGKILL");
       reject(new Error("Wrangler ultrapassou o tempo limite.\n" + output));
     }, timeoutMs);
     child.once("error", error => {
@@ -79,6 +82,8 @@ function makeApi(baseUrl) {
     const headers = { ...(options.headers || {}) };
     if (options.token) headers.Authorization = "Bearer " + options.token;
     if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    const startedAt = Date.now();
+    console.log("[worker-d1] request:start", options.method || "GET", route);
     const response = await fetch(baseUrl + route, {
       method: options.method || "GET",
       headers,
@@ -86,6 +91,7 @@ function makeApi(baseUrl) {
       signal: AbortSignal.timeout(15_000),
     });
     const data = await response.json().catch(() => ({}));
+    console.log("[worker-d1] request:done", route, response.status, Date.now() - startedAt + "ms");
     return { status: response.status, data, headers: response.headers };
   };
 }
@@ -112,34 +118,79 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       "--local", "--persist-to", persistDir,
     ]);
 
-    const port = await freePort();
-    const baseUrl = "http://127.0.0.1:" + port;
-    workerProcess = spawn(process.execPath, [
-      wrangler,
-      "--config", "wrangler.jsonc",
-      "dev",
-      "--local",
-      "--persist-to", persistDir,
-      "--ip", "127.0.0.1",
-      "--port", String(port),
-      "--var",
-      "SESSION_SECRET:" + SESSION_SECRET,
-      "ADMIN_EMAIL:" + ADMIN_EMAIL,
-      "ADMIN_PASSWORD:" + ADMIN_PASSWORD,
-      "--log-level", "error",
-    ], {
-      cwd: root,
-      env: { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false", NO_COLOR: "1" },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    let baseUrl = "";
+    let api = null;
     const append = chunk => {
       workerOutput = (workerOutput + chunk.toString()).slice(-30_000);
     };
-    workerProcess.stdout.on("data", append);
-    workerProcess.stderr.on("data", append);
-
-    await waitForWorker(baseUrl, workerProcess, () => workerOutput);
-    const api = makeApi(baseUrl);
+    const startWorker = async () => {
+      const port = await freePort();
+      baseUrl = "http://127.0.0.1:" + port;
+      workerProcess = spawn(process.execPath, [
+        wrangler,
+        "--config", "wrangler.jsonc",
+        "dev",
+        "--local",
+        "--persist-to", persistDir,
+        "--ip", "127.0.0.1",
+        "--port", String(port),
+        "--var",
+        "SESSION_SECRET:" + SESSION_SECRET,
+        "ADMIN_EMAIL:" + ADMIN_EMAIL,
+        "ADMIN_PASSWORD:" + ADMIN_PASSWORD,
+        "--log-level", "error",
+      ], {
+        cwd: root,
+        env: { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false", NO_COLOR: "1" },
+        stdio: ["ignore", "pipe", "pipe"],
+        detached: process.platform !== "win32",
+      });
+      workerProcess.stdout.on("data", append);
+      workerProcess.stderr.on("data", append);
+      await waitForWorker(baseUrl, workerProcess, () => workerOutput);
+      api = makeApi(baseUrl);
+    };
+    const signalWorkerGroup = signal => {
+      const child = workerProcess;
+      if (!child) return;
+      if (process.platform !== "win32" && child.pid) {
+        try {
+          process.kill(-child.pid, signal);
+          return;
+        } catch (error) {
+          if (error?.code !== "ESRCH") throw error;
+        }
+      }
+      if (child.exitCode === null) child.kill(signal);
+    };
+    const waitForWorkerClose = async (child, timeoutMs) => {
+      if (child.exitCode !== null || child.signalCode !== null) return true;
+      return Promise.race([
+        new Promise(resolve => child.once("close", () => resolve(true))),
+        delay(timeoutMs).then(() => false),
+      ]);
+    };
+    const stopWorker = async () => {
+      const child = workerProcess;
+      if (!child) return;
+      signalWorkerGroup("SIGTERM");
+      if (!await waitForWorkerClose(child, 5000)) {
+        signalWorkerGroup("SIGKILL");
+        await waitForWorkerClose(child, 3000);
+      }
+      workerProcess = null;
+    };
+    const executeLocalD1 = async command => {
+      await stopWorker();
+      await runCli([
+        "--config", "wrangler.jsonc",
+        "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", command,
+      ]);
+      await startWorker();
+    };
+    await startWorker();
 
     const health = await api("/api/health");
     const healthData = expectStatus(health, 200, "health da API");
@@ -314,7 +365,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const executedActions = new Set();
     async function action(token, payload, expected = 200, label = payload.type) {
       executedActions.add(payload.type);
+      const trace = payload.type.startsWith("alliance_") || String(label).includes("PvP");
+      if (trace) console.log("[worker-d1] action:start", label);
       const result = await api("/api/game/action", { method: "POST", token, body: payload });
+      if (trace) console.log("[worker-d1] action:done", label, result.status);
       return expectStatus(result, expected, "ação " + label);
     }
 
@@ -381,7 +435,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "research"));
     });
 
-    await t.test("alianças: criar, convidar, entrar, promover, doar, ajudar, expulsar, guerra e território", async () => {
+    await t.test("alianças: criar, convidar, entrar, promover, doar, ajudar, expulsar, guerra e território", async allianceTest => {
       await action(tokenB, { type: "rename", name: "Reino Beta" }, 200);
       await action(tokenA, { type: "alliance_create", name: "Guardioes Alfa", tag: "ALFA" }, 200);
       await action(tokenA, { type: "alliance_invite", targetName: "Reino Beta" }, 200);
@@ -407,6 +461,56 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
       await action(tokenC, { type: "alliance_join", tag: "ALFA" }, 200);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomC }, 200);
+
+      await allianceTest.test("PvP territorial real: proteção, aliança, guarnição, baixas e relatório bilateral", async () => {
+        console.log("[worker-d1] PvP state:start");
+        stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+        console.log("[worker-d1] PvP state:done");
+        const pvpTarget = stateA.territories.find(item => !item.owner_kingdom_id && !item.alliance_id);
+        assert.ok(pvpTarget?.id, "existe território neutro para preparar o cenário PvP");
+
+        const fixtureStatements = [
+          "UPDATE kingdoms SET battle_token='legacy-attacker-battle-nonce' WHERE id=" + kingdomB,
+          "UPDATE kingdoms SET battle_token='legacy-defender-battle-nonce' WHERE id=" + kingdomA,
+          "DELETE FROM alliance_members WHERE kingdom_id=" + kingdomA,
+          "UPDATE world_territories SET owner_kingdom_id=" + kingdomA +
+            ",alliance_id=(SELECT id FROM alliances WHERE tag='ALFA')," +
+            "shield_until=NULL,combat_lock_token=NULL,combat_lock_expires_at=NULL WHERE id=" + Number(pvpTarget.id),
+          "UPDATE kingdoms SET protection_until='2099-01-01T00:00:00.000Z' WHERE id=" + kingdomA,
+          "DELETE FROM army_units WHERE kingdom_id IN (" + kingdomA + "," + kingdomB + ")",
+          "INSERT INTO army_units(kingdom_id,unit_type,tier,quantity,wounded) VALUES " +
+            "(" + kingdomA + ",'militia',1,120,0)," +
+            "(" + kingdomA + ",'archer',1,80,0)," +
+            "(" + kingdomB + ",'knight',1,500,0)"
+        ];
+        await executeLocalD1(fixtureStatements.join(";\n"));
+
+        await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "ataque contra reino protegido");
+        await executeLocalD1("UPDATE kingdoms SET protection_until=NULL WHERE id=" + kingdomA);
+        await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "território reivindicado por aliança não aceita PvP individual");
+        await action(tokenC, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "ataque contra aliado");
+        await executeLocalD1("UPDATE world_territories SET alliance_id=NULL WHERE id=" + Number(pvpTarget.id));
+        await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 500 } }, 200, "marcha PvP contra reino inimigo sem reivindicação de aliança");
+
+        await executeLocalD1("UPDATE marches SET arrives_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id=" + kingdomB +
+          " AND target_territory_id=" + Number(pvpTarget.id) + " AND march_type='attack' AND status='marching'");
+        const afterAttackB = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "resolver marcha PvP");
+        const resolvedTerritory = afterAttackB.state.territories.find(item => Number(item.id) === Number(pvpTarget.id));
+        assert.equal(Number(resolvedTerritory.owner_kingdom_id), kingdomB, "vencedor captura o território inimigo");
+        const attackerReport = afterAttackB.state.battleReports.find(report =>
+          report.battle_type === "territory_pvp" && Number(report.attacker_kingdom_id) === kingdomB
+          && Number(report.defender_kingdom_id) === kingdomA
+        );
+        assert.ok(attackerReport, "o reino atacante recebe o relatório PvP");
+        assert.ok(attackerReport.losses_json.includes("attacker") && attackerReport.losses_json.includes("defender"));
+
+        const afterAttackA = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "relatório PvP do defensor");
+        const defenderReport = afterAttackA.state.battleReports.find(report => Number(report.id) === Number(attackerReport.id));
+        assert.ok(defenderReport, "o mesmo relatório aparece no reino defensor");
+        assert.ok(afterAttackA.state.recentEvents.some(event => event.event_type === "territory_lost"),
+          "o defensor recebe evento de território perdido");
+      });
+
       await action(tokenC, { type: "alliance_leave" }, 200);
     });
 
@@ -433,14 +537,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         "cada um dos 34 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
   } finally {
-    if (workerProcess && workerProcess.exitCode === null) {
-      workerProcess.kill("SIGTERM");
-      await Promise.race([
-        new Promise(resolve => workerProcess.once("close", resolve)),
-        delay(5000),
-      ]);
-      if (workerProcess.exitCode === null) workerProcess.kill("SIGKILL");
-    }
+    await stopWorker();
     await rm(persistDir, { recursive: true, force: true });
   }
 });

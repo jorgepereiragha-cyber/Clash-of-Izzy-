@@ -59,7 +59,7 @@ test("world map opens a territory selected from global search parameters", () =>
 });
 
 
-test("world map exposes pan and zoom controls without enabling PvP", () => {
+test("world map exposes pan and zoom controls with server-authoritative actions", () => {
   for (const marker of [
     'id="zoomIn"', 'id="zoomOut"', 'id="mapReset"', 'id="mapScale"',
     'id="mapContent"', 'class="map-controls"', 'Arraste para explorar',
@@ -69,7 +69,8 @@ test("world map exposes pan and zoom controls without enabling PvP", () => {
     'setPointerCapture(event.pointerId)', 'pointermove', 'pointerup',
     'addEventListener("wheel"', 'changeMapZoom(0.25)', 'resetMapViewport()',
   ]) assert.ok(script.includes(marker), "missing map navigation behavior: " + marker);
-  assert.ok(script.includes('Boolean(territory.owner_kingdom_id)'));
+  assert.ok(script.includes('const isFriendly = owner === "Seu reino" || owner === "Sua aliança"'));
+  assert.ok(script.includes("territoryCanBeAttacked(territory)"));
   assert.ok(script.includes('request("/game/action"'));
 });
 
@@ -94,4 +95,24 @@ test("map viewport transform is finite and deterministic", () => {
     mapViewportTransform({ zoom: Number.NaN, panX: Number.POSITIVE_INFINITY }),
     "translate3d(0px, 0px, 0) scale(1)"
   );
+});
+
+test("mapa libera PvP somente contra reinos inimigos desprotegidos e confirma baixas permanentes", () => {
+  assert.match(script, /function territoryIsProtected\(territory\)/);
+  assert.match(script, /function territoryCanBeAttacked\(territory\)/);
+  assert.match(script, /owner === "Território neutro"/);
+  assert.match(script, /owner === "Outro reino"/);
+  assert.match(script, /territory\.alliance_id/);
+  assert.match(script, /territory\?\.protection_until/);
+  assert.match(script, /territory\?\.shield_until/);
+  assert.match(script, /Baixas são permanentes para os dois lados/);
+  assert.match(script, /if \(marchType === "attack" && territory\.owner_kingdom_id && !confirm\(/);
+  assert.match(script, /Território de aliança/);
+});
+
+
+test("territórios pertencentes a qualquer aliança não podem ser atacados individualmente", () => {
+  assert.match(script, /if \(territory\.alliance_id\) return false/);
+  assert.match(script, /owner === "Território de aliança"/);
+  assert.match(script, /Território reivindicado por uma aliança/);
 });
