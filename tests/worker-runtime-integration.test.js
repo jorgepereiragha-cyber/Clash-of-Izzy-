@@ -271,7 +271,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         body: {
           kind: "skin", itemId: skin.id,
           requestKey: "integration-skin-request-01",
-          paymentMethod: "manual",
+          paymentMethod: "mercadopago_link",
         },
       }), 201, "pedido de skin de outro jogador");
       expectStatus(await admin("/api/admin/purchase-requests/review", {
