@@ -26,6 +26,10 @@ test("glTF and KTX2/Basis loaders are configured for production assets", () => {
   assert.match(renderer, /GLTFLoader/);
   assert.match(renderer, /KTX2Loader/);
   assert.match(renderer, /setTranscoderPath/);
+  assert.match(renderer, /makeSurfaceTexture/);
+  assert.match(renderer, /applyProceduralSurfaceMaps/);
+  assert.match(renderer, /kind === "stone"/);
+  assert.match(renderer, /kind === "wood"/);
   assert.match(renderer, /setKTX2Loader\(ktx2\)/);
   assert.deepEqual(manifest, { version: 1, models: [] });
 });
