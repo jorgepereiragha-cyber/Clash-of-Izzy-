@@ -27,3 +27,9 @@ test("estado do reino entrega os saldos do depósito da aliança", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   assert.match(worker, /a\.shared_food,a\.shared_wood,a\.shared_stone,a\.shared_iron,a\.shared_gold/);
 });
+
+test("entrada por sigla respeita o limite de membros da aliança", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.match(worker, /SELECT \\?,\\?,'member' WHERE \\(SELECT COUNT\\(\\*\\) FROM alliance_members WHERE alliance_id=\\?\\) < \\?/);
+  assert.match(worker, /A aliança atingiu o limite de membros/);
+});
