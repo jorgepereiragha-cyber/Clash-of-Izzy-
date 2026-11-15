@@ -336,35 +336,27 @@ async function loadKingdomCombatProfile(env, kingdomId) {
 async function acquireKingdomBattleLocks(env, kingdomIds) {
   const locks = [];
   const ids = [...new Set(kingdomIds.map(Number))].sort((a,b)=>a-b);
+  const now = new Date().toISOString();
+  const expiresAt = new Date(Date.now() + 180000).toISOString();
   for (const id of ids) {
-    const current = await env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(id).first();
-    if (!current) {
-      await releaseKingdomBattleLocks(env, locks);
-      return null;
-    }
-    // Never replace an active battle lease. The previous token is only
-    // retained for safe rollback of an empty lock.
-    if (current.battle_token) {
-      await releaseKingdomBattleLocks(env, locks);
-      return null;
-    }
-    const previous = current.battle_token ?? null;
     const token = crypto.randomUUID();
-    const result = await env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')")
-      .bind(token,id,previous ?? "").run();
+    const result = await env.DB.prepare(
+      "UPDATE kingdoms SET battle_lock_token=?,battle_lock_expires_at=? WHERE id=? AND (battle_lock_token IS NULL OR battle_lock_expires_at IS NULL OR battle_lock_expires_at<=?)"
+    ).bind(token,expiresAt,id,now).run();
     if (!result.meta?.changes) {
       await releaseKingdomBattleLocks(env, locks);
       return null;
     }
-    locks.push({id,token,previous});
+    locks.push({id,token});
   }
   return locks;
 }
 
 async function releaseKingdomBattleLocks(env, locks) {
   for (const lock of locks || []) {
-    await env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND battle_token=?")
-      .bind(lock.previous,lock.id,lock.token).run();
+    await env.DB.prepare(
+      "UPDATE kingdoms SET battle_lock_token=NULL,battle_lock_expires_at=NULL WHERE id=? AND battle_lock_token=?"
+    ).bind(lock.id,lock.token).run();
   }
 }
 
@@ -570,7 +562,7 @@ async function processMarches(env,kingdomId){
 
    if(territoryLockToken)statements.push(env.DB.prepare("UPDATE world_territories SET combat_lock_token=NULL,combat_lock_expires_at=NULL WHERE id=? AND combat_lock_token=?").bind(m.target_territory_id,territoryLockToken));
    for(const lock of kingdomBattleLocks){
-    statements.push(env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND battle_token=?").bind(lock.previous,lock.id,lock.token));
+    statements.push(env.DB.prepare("UPDATE kingdoms SET battle_lock_token=NULL,battle_lock_expires_at=NULL WHERE id=? AND battle_lock_token=?").bind(lock.id,lock.token));
    }
    await env.DB.batch(statements);
    batchCommitted=true;
@@ -1190,7 +1182,7 @@ async function gameAction(env,playerId,body){
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
-    if(k.battle_token)return json({error:"Seu exército está resolvendo uma batalha. Aguarde o resultado antes de enviar outra marcha."},409);
+    if(k.battle_lock_token&&Date.parse(k.battle_lock_expires_at||"")>Date.now())return json({error:"Seu exército está resolvendo uma batalha. Aguarde o resultado antes de enviar outra marcha."},409);
     const target=await env.DB.prepare("SELECT t.id,t.resource_type,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(targetId).first();
     if(!target)return json({error:"Território não encontrado."},404);
     const marchType=String(body.marchType||"gather");
@@ -1230,8 +1222,8 @@ async function gameAction(env,playerId,body){
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
-    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND COALESCE(battle_token,'')='')")
-      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length,k.id);
+    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND (battle_lock_token IS NULL OR battle_lock_expires_at IS NULL OR battle_lock_expires_at<=?))")
+      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length,k.id,new Date().toISOString());
     const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at,target_owner_kingdom_id) SELECT ?,?,?,?,?,?,? WHERE changes()=?")
       .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,target.owner_kingdom_id??null,unitTypes.length);
     const result=await env.DB.batch([debit,createMarch]);
@@ -1279,7 +1271,7 @@ async function gameAction(env,playerId,body){
     const snapshotJson=JSON.stringify(snapshot),expectedRows=armyRows.length;
     const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID(),actionId=crypto.randomUUID();
     const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
-    const battleLock=env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,k.id,previousBattleToken);
+    const battleLock=env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '') AND (battle_lock_token IS NULL OR battle_lock_expires_at IS NULL OR battle_lock_expires_at<=?)").bind(battleToken,k.id,previousBattleToken,new Date().toISOString());
     const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity WHERE kingdom_id=? AND quantity>0 AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND (SELECT COUNT(*) FROM army_units WHERE kingdom_id=? AND quantity>0)=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
       .bind(k.id,snapshotJson,k.id,expectedRows,k.id,expectedRows,k.id,battleToken);
     const statements=[battleLock,troopUpdate,
@@ -1363,6 +1355,7 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   if(!player)return json({error:"Jogador não encontrado."},404);
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(player.id).first();
   if(!kingdom)return json({error:"Reino não encontrado."},404);
+  if(kingdom.battle_lock_token&&Date.parse(kingdom.battle_lock_expires_at||"")>now.getTime())return json({error:"Seu exército está em uma batalha territorial. Aguarde a resolução antes de atacar o Anjo da Morte."},409);
   const instant=now.toISOString();
   const event=await env.DB.prepare("SELECT id,boss_hp_remaining,status FROM world_events WHERE event_key=? AND status='active' AND starts_at<=? AND ends_at>? ORDER BY starts_at DESC LIMIT 1")
     .bind(ANGEL_DEATH_EVENT.key,instant,instant).first();
@@ -1411,7 +1404,7 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND EXISTS(SELECT 1 FROM json_each(?) AS selected WHERE selected.key=army_units.unit_type||'_'||army_units.tier) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) AND EXISTS(SELECT 1 FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>?)")
     .bind(snapshotJson,kingdom.id,snapshotJson,snapshotJson,kingdom.id,expectedRows,kingdom.id,battleToken,event.id,instant,instant);
   const statements=[
-    env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,kingdom.id,previousBattleToken),
+    env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '') AND (battle_lock_token IS NULL OR battle_lock_expires_at IS NULL OR battle_lock_expires_at<=?)").bind(battleToken,kingdom.id,previousBattleToken,instant),
     troopUpdate,
     env.DB.prepare("INSERT INTO world_event_attacks(event_id,kingdom_id,request_id,damage,score,troop_losses_json) SELECT ?,?,?,MIN(?,boss_hp_remaining),MIN(?,boss_hp_remaining),? FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>? AND changes()=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
       .bind(event.id,kingdom.id,requestId,simulation.damage,simulation.damage,snapshotJson,event.id,instant,instant,expectedRows,kingdom.id,battleToken),
@@ -1602,6 +1595,7 @@ export default {
     if(!player)return json({error:"Jogador não encontrado."},404);
     const kingdom=await env.DB.prepare("SELECT id,kingdom_name FROM kingdoms WHERE player_id=?").bind(player.id).first();
     if(!kingdom)return json({error:"Reino não encontrado."},404);
+  if(kingdom.battle_lock_token&&Date.parse(kingdom.battle_lock_expires_at||"")>now.getTime())return json({error:"Seu exército está em uma batalha territorial. Aguarde a resolução antes de atacar o Anjo da Morte."},409);
     const item=kind==="vip_package"
       ?await env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages WHERE id=?").bind(itemId).first()
       :await env.DB.prepare("SELECT id,name,price_brl FROM skins WHERE id=?").bind(itemId).first();
