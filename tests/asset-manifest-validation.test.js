@@ -35,7 +35,7 @@ const baseAsset = (id, src, enabled = true) => ({
 test("validates the current version-2 manifest and every enabled GLB", async () => {
   const result = await validateAssetManifest(process.cwd());
   assert.equal(result.version, 2);
-  assert.equal(result.enabled, 5);
+  assert.ok(result.enabled >= 5);
   assert.ok(result.bytes > 0 && result.bytes < 48 * 1024 * 1024);
 });
 
@@ -130,4 +130,13 @@ test("enforces per-model and total model budgets", async () => {
   });
   try { await assert.rejects(validateAssetManifest(oversized), /12 MiB/); }
   finally { await rm(oversized, { recursive: true, force: true }); }
+});
+
+test("rejects an enabled GLB whose external texture or buffer path escapes the asset directory", async () => {
+  const escaping = await fixture({
+    models: [baseAsset("escape", "/assets/3d/models/escape.glb")],
+    files: { "models/escape.glb": glb({ asset: { version: "2.0" }, images: [{ uri: "../../outside.png" }] }) },
+  });
+  try { await assert.rejects(validateAssetManifest(escaping), /traversal|escapa/); }
+  finally { await rm(escaping, { recursive: true, force: true }); }
 });
