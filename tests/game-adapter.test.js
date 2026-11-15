@@ -98,3 +98,28 @@ test("duração de marcha é limitada e nunca fica abaixo de um segundo", () => 
   assert.equal(calculateMarchDuration(0, 20), 1);
   assert.equal(calculateMarchDuration(999999, 0), 86400);
 });
+
+
+test("contador de críticos não depende do limite de 80 entradas do relatório", () => {
+  const result = simulateBattle({
+    army: [
+      { unit_type: "militia", tier: 1, quantity: 100000 },
+      { unit_type: "swordsman", tier: 1, quantity: 100000 },
+      { unit_type: "spearman", tier: 1, quantity: 100000 },
+      { unit_type: "archer", tier: 1, quantity: 100000 },
+      { unit_type: "crossbowman", tier: 1, quantity: 100000 },
+      { unit_type: "cavalry", tier: 1, quantity: 100000 },
+      { unit_type: "knight", tier: 1, quantity: 100000 },
+      { unit_type: "mage", tier: 1, quantity: 100000 },
+      { unit_type: "catapult", tier: 1, quantity: 100000 },
+      { unit_type: "ram", tier: 1, quantity: 100000 },
+      { unit_type: "trebuchet", tier: 1, quantity: 100000 }
+    ],
+    defenderLevel: 30,
+    criticalChancePercent: 15,
+    criticalSeed: 24680,
+    roll: 1
+  });
+  assert.ok(result.log.length <= 80);
+  assert.ok(result.criticalHits >= result.log.filter(entry => entry.critical).length);
+});
