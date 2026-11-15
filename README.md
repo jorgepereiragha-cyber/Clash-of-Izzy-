@@ -49,7 +49,7 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0008`. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE; `0008` registra resgates idempotentes de missões diárias.
+Migrações versionadas até `0010`. A `0009` persiste filas de construção, treino e pesquisa; a `0010` registra capítulos e descobertas narrativas por reino, com chave única e validação no Worker. A `0005` preserva frações da produção passiva; `0006` protege a resolução de marchas; `0007` adiciona token de concorrência das batalhas PvE; `0008` registra resgates idempotentes de missões diárias.
 
 ## Eventos e LiveOps
 
@@ -72,3 +72,4 @@ A interface usa Three.js com instanciamento de objetos repetidos, LOD, redução
 - [Arquivo Velado — lore e pistas secretas](docs/ARQUIVO_VELADO.md)
 - [Árvore tecnológica das sete camadas](docs/ARVORE_TECNOLOGICA_CAMADAS.md)
 - [Codex das Origens, Feras e Véus — Cabala, Caim e Abel, bestiário e motivação](docs/CODEX_ORIGENS_FERAS_E_VEUS.md)
+- [Exploração 3D e pistas do mundo — arquitetura, segurança e desempenho](docs/EXPLORACAO_3D_PISTAS.md)
