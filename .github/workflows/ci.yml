@@ -26,6 +26,7 @@ jobs:
         run: |
           node --check sw.js
           node --check scripts/kingdom-3d.js
+          node --check scripts/kingdom-quality.js
       - name: Test combat simulator
         run: npm test
       - name: Validate D1 migrations locally
