@@ -117,3 +117,11 @@ As alterações foram gravadas na branch principal. O workflow configurado execu
 - A atualização do nível de um item mantém o nível do item equipado sincronizado. Os bônus de combate e produção consultam apenas os itens equipados no herói ativo.
 - A interface de equipamentos agora permite selecionar herói, equipar, desequipar, bloquear e evoluir. O Worker continua autoridade de ouro, níveis e loadouts.
 - Adicionado teste de sintaxe dos módulos de navegador antes da publicação.
+
+
+## Loja oficial e pedidos de compra (15 nov 2026)
+- Criada a migração 0011_purchase_requests.sql com estados restritos, chave idempotente por jogador, índice para impedir mais de um pedido pendente do mesmo produto e referências de pagamento opcionais.
+- A API aceita apenas jogadores autenticados, limita a 5 pedidos por hora por jogador, consulta preço/quantidade no catálogo D1 e nunca aceita o valor de gemas enviado pelo cliente.
+- O painel Master lista pedidos, método/referência e exige decisão explícita. Aprovação de pacotes credita gemas uma única vez; aprovação de skins libera ownership uma única vez; rejeição registra status e data.
+- A loja da arena deixou de abrir WhatsApp automaticamente para os itens oficiais e passou a enviar pedidos auditáveis. O WhatsApp permanece para atendimento de outros pacotes.
+- Importante: esta etapa é aprovação manual; ainda não há integração automática com gateway, QR PIX ou webhook de confirmação.
