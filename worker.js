@@ -238,7 +238,7 @@ async function applyProduction(env,kingdomId){
     gold:1.5*(levels.market||1)
   };
   const equipmentRows=await ensureEquipmentTables(env,kingdomId);
-  const equipmentProductionBonus=equipmentBonuses(equipmentRows).resourcePercent/100;
+  const equipmentProductionBonus=legacyEquipmentBonuses(equipmentRows).resourcePercent/100;
   const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
@@ -296,7 +296,7 @@ async function processMarches(env,kingdomId){
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first(),
      env.DB.prepare("SELECT item_key,level,is_locked FROM kingdom_equipment WHERE kingdom_id=?").bind(kingdomId).all()
     ]);
-    const gear=equipmentBonuses(equipmentRows.results||[]);
+    const gear=legacyEquipmentBonuses(equipmentRows.results||[]);
     const castleLevel=Number(kingdom?.castle_level||1);
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
@@ -360,29 +360,56 @@ function eventMaterialStatement(env,kingdomId,eventKey){
  const key=rewards[eventKey];if(!key)return null;
  return env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) VALUES(?,?,1) ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,key);
 }
-const EQUIPMENT_CATALOG={
+const LEGACY_EQUIPMENT_CATALOG={
  coroa_izzy:{name:"Coroa de Izzy",slot:"helmet",rarity:"lendario",maxLevel:20,base:{defense:10,resourceBonus:5},growth:{defense:5,resourceBonus:2}},
  manto_real:{name:"Manto Real",slot:"armor",rarity:"epico",maxLevel:15,base:{health:50},growth:{health:25}},
  anel_poder:{name:"Anel do Poder",slot:"accessory",rarity:"raro",maxLevel:10,base:{attack:20},growth:{attack:8}},
  espada_guerreiro:{name:"Espada do Guerreiro",slot:"weapon",rarity:"raro",maxLevel:30,base:{attack:50,health:100},growth:{attack:8,health:25}}
 };
 async function ensureEquipmentTables(env,kingdomId){
- await env.DB.batch(Object.keys(EQUIPMENT_CATALOG).map(key=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level,is_locked) VALUES(?,?,1,0)").bind(kingdomId,key)));
+ await env.DB.batch(Object.keys(LEGACY_EQUIPMENT_CATALOG).map(key=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level,is_locked) VALUES(?,?,1,0)").bind(kingdomId,key)));
  return (await env.DB.prepare("SELECT item_key,level,is_locked,updated_at FROM kingdom_equipment WHERE kingdom_id=? ORDER BY item_key").bind(kingdomId).all()).results||[];
 }
-function equipmentBonuses(rows=[]){
+function legacyEquipmentBonuses(rows=[]){
  const totals={attack:0,defense:0,health:0,resourceBonus:0};
  for(const row of rows){const item=equipmentView(row);if(!item)continue;for(const key of Object.keys(totals))totals[key]+=Math.max(0,Number(item.stats?.[key])||0);}
  return {attackPercent:Math.min(30,Math.floor(totals.attack/10)),defensePercent:Math.min(30,Math.floor(totals.defense/10)),healthPercent:Math.min(30,Math.floor(totals.health/25)),resourcePercent:Math.min(50,totals.resourceBonus)};
 }
 
 function equipmentView(row){
- const def=EQUIPMENT_CATALOG[row.item_key];if(!def)return null;
+ const def=LEGACY_EQUIPMENT_CATALOG[row.item_key];if(!def)return null;
  const level=Number(row.level),stats={};
  for(const [key,value] of Object.entries(def.base))stats[key]=value+(def.growth[key]||0)*(level-1);
  const next={};for(const [key,value] of Object.entries(def.base))next[key]=value+(def.growth[key]||0)*level;
  const multiplier=({comum:1,raro:1.1,epico:1.2,lendario:1.5})[def.rarity]||1;
  return {id:row.item_key,name:def.name,slot:def.slot,rarity:def.rarity,level,maxLevel:def.maxLevel,isLocked:Boolean(row.is_locked),stats,nextLevelStats:level<def.maxLevel?next:null,upgradeCost:Math.floor(100*Math.pow(1.3,level)*multiplier)};
+}
+
+async function ensureEquipmentState(env,kingdomId){
+ await env.DB.batch([
+  env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level) VALUES(?,?,1)").bind(kingdomId,"iron_sword"),
+  ...EQUIPMENT_RESEARCH.map(x=>env.DB.prepare("INSERT OR IGNORE INTO research(kingdom_id,research_key,level) VALUES(?,?,0)").bind(kingdomId,x.id))
+ ]);
+}
+async function getEquipmentState(env,kingdomId){
+ await ensureEquipmentState(env,kingdomId);
+ const [owned,equipped,research]=await Promise.all([
+  env.DB.prepare("SELECT item_key,level,acquired_at FROM kingdom_equipment WHERE kingdom_id=? ORDER BY acquired_at,item_key").bind(kingdomId).all(),
+  env.DB.prepare("SELECT slot,item_key,equipped_at FROM equipped_kingdom_equipment WHERE kingdom_id=? ORDER BY slot").bind(kingdomId).all(),
+  env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key LIKE 'gear_%' ORDER BY research_key").bind(kingdomId).all()
+ ]);
+ const ownedRows=owned.results||[],equippedRows=equipped.results||[],researchRows=research.results||[];
+ return {owned:ownedRows,equipped:equippedRows,research:researchRows,bonuses:forgeEquipmentBonuses(ownedRows,equippedRows,researchRows),catalog:FORGE_EQUIPMENT_CATALOG,researchCatalog:EQUIPMENT_RESEARCH};
+}
+function mergeCombatEquipmentBonuses(legacy,forge){
+ return {
+  attackPercent:Math.min(30,(legacy.attackPercent||0)+(forge.attackPercent||0)),
+  defensePercent:Math.min(30,(legacy.defensePercent||0)+(forge.defensePercent||0)),
+  healthPercent:Math.min(25,(legacy.healthPercent||0)+(forge.healthPercent||0)),
+  marchSpeedPercent:Math.min(20,forge.marchSpeedPercent||0),
+  criticalChancePercent:Math.min(15,forge.criticalChancePercent||0),
+  resourcePercent:Math.min(50,legacy.resourcePercent||0)
+ };
 }
 
 async function gameState(env,playerId){
@@ -437,7 +464,7 @@ async function gameAction(env,playerId,body){
   let battleOutcome=null;
 
   if(type==="equipment_upgrade"){
-    const itemKey=String(body.itemId||""),def=EQUIPMENT_CATALOG[itemKey];
+    const itemKey=String(body.itemId||""),def=LEGACY_EQUIPMENT_CATALOG[itemKey];
     if(!def)return json({error:"Equipamento inválido."},400);
     const rows=await ensureEquipmentTables(env,k.id),row=rows.find(x=>x.item_key===itemKey);
     if(!row)return json({error:"Equipamento não encontrado."},404);
@@ -458,7 +485,7 @@ async function gameAction(env,playerId,body){
     if(!result[0]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Ouro insuficiente ou equipamento alterado. Atualize e tente novamente."},409);
   }else if(type==="equipment_lock"){
     const itemKey=String(body.itemId||"");
-    if(!EQUIPMENT_CATALOG[itemKey])return json({error:"Equipamento inválido."},400);
+    if(!LEGACY_EQUIPMENT_CATALOG[itemKey])return json({error:"Equipamento inválido."},400);
     const rows=await ensureEquipmentTables(env,k.id),row=rows.find(x=>x.item_key===itemKey);
     if(!row)return json({error:"Equipamento não encontrado."},404);
     await env.DB.prepare("UPDATE kingdom_equipment SET is_locked=?,updated_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND item_key=?").bind(Number(!Number(row.is_locked)),k.id,itemKey).run();
