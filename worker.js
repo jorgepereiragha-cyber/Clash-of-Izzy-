@@ -1017,7 +1017,7 @@ export default {
     if(!env.SESSION_SECRET)return json({error:"SESSION_SECRET não configurado no Worker."},503);
     try{
       const ip=request.headers.get("CF-Connecting-IP")||"unknown";
-      const limited=await rateLimitDecision(env,request,"game-start-ip",ip,5,3600);
+      const limited=await rateLimitDecision(env,request,"game-start-ip",ip,20,3600);
       if(limited)return limited;
       const playerId="izzy_"+crypto.randomUUID().replace(/-/g,"");
       await ensureKingdom(env,playerId);
@@ -1029,6 +1029,13 @@ export default {
   if(isGamePath){
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
+    if(url.pathname==="/api/game/action"&&request.method==="POST"){
+      const playerLimit=await rateLimitDecision(env,request,"game-action-player",playerId,120,60);
+      if(playerLimit)return playerLimit;
+      const ip=request.headers.get("CF-Connecting-IP")||"unknown";
+      const networkLimit=await rateLimitDecision(env,request,"game-action-network",ip,600,60);
+      if(networkLimit)return networkLimit;
+    }
     try{
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);
