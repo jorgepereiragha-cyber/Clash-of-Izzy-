@@ -15,6 +15,8 @@ test("Royal Forge navigation preserves the existing hero and Asgard equipment sc
   assert.ok(legacyPage.includes('href="/equipment-lab.html"'));
   assert.ok(legacyPage.includes('id="norse-skins"'));
   assert.ok(forgePage.includes('src="/equipment-lab.js"'));
+  assert.ok(forgePage.includes('/navigation.js'));
+  assert.ok(forgePage.includes('navigator.serviceWorker.register("/sw.js")'));
   assert.ok(legacyScript.includes("state.equipment"));
   assert.ok(legacyScript.includes("heroEquipment"));
 });
