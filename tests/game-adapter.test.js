@@ -57,3 +57,45 @@ test("cliente preserva o token e não funda outro reino quando a sessão salva f
   assert.doesNotMatch(connect, /sessionStorage\.removeItem\('coi_game_token'\)/);
   assert.match(connect, /}else\{[\s\S]*?fetch\(API_BASE\+'\/game\/start'/);
 });
+
+
+test("chance crítica aplica dano adicional e registra os acertos", () => {
+  const input = {
+    army: [{ unit_type: "knight", tier: 2, quantity: 30 }],
+    castleLevel: 5,
+    defenderLevel: 3,
+    heroLevel: 1,
+    dragonLevel: 1,
+    criticalChancePercent: 100,
+    criticalDamageMultiplier: 2,
+    criticalSeed: 12345,
+    roll: 1
+  };
+  const result = simulateBattle(input);
+  assert.ok(result.criticalHits > 0);
+  assert.ok(result.log.some(entry => entry.critical === true));
+  assert.ok(result.log.filter(entry => entry.critical).every(entry => entry.damage > 0));
+});
+
+test("chance crítica zero nunca registra acerto crítico", () => {
+  const result = simulateBattle({
+    army: [{ unit_type: "knight", tier: 2, quantity: 30 }],
+    defenderLevel: 3,
+    criticalChancePercent: 0,
+    criticalSeed: 12345,
+    roll: 1
+  });
+  assert.equal(result.criticalHits, 0);
+  assert.ok(result.log.every(entry => entry.critical === false));
+});
+
+test("críticos são reproduzíveis com a mesma semente", () => {
+  const input = {
+    army: [{ unit_type: "archer", tier: 3, quantity: 40 }],
+    defenderLevel: 8,
+    criticalChancePercent: 15,
+    criticalSeed: 987654321,
+    roll: 1
+  };
+  assert.deepEqual(simulateBattle(input), simulateBattle(input));
+});
