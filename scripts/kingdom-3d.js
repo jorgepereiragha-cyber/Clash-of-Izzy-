@@ -28,12 +28,13 @@ if (host && "WebGLRenderingContext" in window) {
     archery_range: ["#a49a6c", "#6b7e49"], siege_workshop: ["#827466", "#625044"],
     embassy: ["#b0a18a", "#526e82"], warehouse: ["#9b886a", "#70543d"]
   };
+  const sharedMaterials = new Set(Object.values(mats));
   function box(parent, w, h, d, mat, x, y, z) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
   function addTree(x, z, scale = 1) {
-    const group = new THREE.Group(); group.position.set(x, 0, z); group.userData.coIType = type; group.scale.setScalar(scale);
+    const group = new THREE.Group(); group.position.set(x, 0, z); group.userData.coIType = type; group.userData.coIProcedural = true; group.scale.setScalar(scale);
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.09, .13, .65, 5), mats.wood);
     trunk.position.y = .32; trunk.castShadow = true; group.add(trunk);
     const crown = new THREE.Mesh(new THREE.ConeGeometry(.62, 1.45, 6), mats.leaf);
@@ -97,10 +98,15 @@ if (host && "WebGLRenderingContext" in window) {
     }
   }
   function renderBuildings(buildings) {
-    for (const item of activeModels) scene.remove(item);
-    activeModels.forEach(item => item.traverse?.(node => {
-      if (node.isMesh && node.geometry && node.geometry.userData?.coiOwned) node.geometry.dispose();
-    }));
+    for (const item of activeModels) {
+      scene.remove(item);
+      if (item.userData.coIProcedural) item.traverse(node => {
+        if (!node.isMesh) return;
+        node.geometry?.dispose();
+        const materials = Array.isArray(node.material) ? node.material : [node.material];
+        materials.forEach(mat => { if (mat && !sharedMaterials.has(mat)) mat.dispose(); });
+      });
+    }
     activeModels = [];
     const list = (Array.isArray(buildings) ? buildings : []).slice(0, 9);
     list.forEach((b, i) => {
@@ -168,6 +174,7 @@ if (host && "WebGLRenderingContext" in window) {
     gltfLoader = new GLTFLoader(); gltfLoader.setKTX2Loader(ktx2);
     host.classList.add("has-3d");
     window.addEventListener("coi:kingdom-render", event => { const list = event.detail?.buildings || []; renderBuildings(list); loadOptionalGlbAssets(list); });
+    if (Array.isArray(window.__coiKingdomBuildings)) { renderBuildings(window.__coiKingdomBuildings); loadOptionalGlbAssets(window.__coiKingdomBuildings); }
     const resize = () => {
       if (!renderer || !host.clientWidth || !host.clientHeight) return;
       const aspect = host.clientWidth / host.clientHeight;
