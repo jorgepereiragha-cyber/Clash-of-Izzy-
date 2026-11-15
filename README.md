@@ -7,6 +7,7 @@ Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e p
 - `/command-center.html`: centro de comando mobile-first para construções, tropas, ciência, mapa, heróis, dragões e alianças.
 - `/arena.html`: arena de batalha 3D.
 - `/admin.html`: painel administrativo com busca de jogadores por nick/reino/ID, ficha completa, gestão de recursos, gemas, skins, pacotes VIP e auditoria.
+- Jogadores definem um nick único no Centro de Comando; a busca administrativa consulta nick, nome do reino ou ID.
 - A entrada principal (`/`) direciona o jogador ao centro de comando e mantém acesso direto à arena.
 - O centro de comando reutiliza a sessão `coi_game_token` e os endpoints existentes, sem criar autenticação ou banco duplicado.
 
