@@ -45,7 +45,7 @@ Permissões mínimas do token para este workflow:
 
 O token precisa pertencer à conta correta e estar dentro do escopo do Worker e do banco utilizados em `wrangler.jsonc`.
 
-## Banco de dados
+## Acesso público, instalação e disponibilidade\n\nO projeto inclui PWA instalável, entrada direta no centro de comando, shell offline, endpoint público de prontidão (`/api/health`) e monitor de uptime a cada 15 minutos. Para configurar o domínio, segredos, variável `GAME_PUBLIC_URL`, instalação no Android e alertas, siga [`docs/PUBLICACAO_E_PWA.md`](docs/PUBLICACAO_E_PWA.md). O link para compartilhar será `https://SEU-DOMINIO/command-center.html` após a publicação e validação do endereço real.\n\n## Banco de dados
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
