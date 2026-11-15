@@ -189,3 +189,9 @@ test("search fallback returns alliance tags for player nicknames without FTS", a
   assert.ok(worker.includes("playerSubstringAvailable=false"));
   assert.ok(worker.includes("!playerSubstringAvailable||needsShortUnicodeFallback"));
 });
+
+test("FTS5 ranks primary titles above secondary descriptions in prefix and substring indexes", async () => {
+  const migration = await read("migrations/0015_search_rank_weights.sql");
+  assert.ok(migration.includes("INSERT INTO game_search_fts(game_search_fts, rank) VALUES('rank', 'bm25(6.0, 1.0)')"));
+  assert.ok(migration.includes("INSERT INTO game_search_substring_fts(game_search_substring_fts, rank) VALUES('rank', 'bm25(6.0, 1.0)')"));
+});
