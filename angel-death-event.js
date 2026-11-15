@@ -109,7 +109,7 @@ export function angelDeathRewardForRank(rank) {
   if (position === 2) return { gems: 9000, food: 4000000, wood: 4000000, stone: 2500000, iron: 800000, gold: 4000000, deathEssence: 350 };
   if (position === 3) return { gems: 7000, food: 3000000, wood: 3000000, stone: 2000000, iron: 600000, gold: 3000000, deathEssence: 250 };
   if (position <= 10) return { gems: 6000, food: 2000000, wood: 2000000, stone: 1500000, iron: 400000, gold: 2000000, deathEssence: 150 };
-  if (position <= 50) return { gems: 4000, food: 1500000, wood: 1500000, stone: 1000000, iron: 300000, gold: 1000000, deathEssence: 100 };
-  if (position <= 100) return { gems: 2500, food: 1000000, wood: 1000000, stone: 750000, iron: 200000, gold: 750000, deathEssence: 60 };
-  return { gems: 1000, food: 500000, wood: 500000, stone: 300000, iron: 100000, gold: 500000, deathEssence: 30 };
+  if (position <= 50) return { gems: 3000, food: 1500000, wood: 1500000, stone: 1000000, iron: 300000, gold: 1000000, deathEssence: 100 };
+  if (position <= 100) return { gems: 1000, food: 1000000, wood: 1000000, stone: 750000, iron: 200000, gold: 750000, deathEssence: 60 };
+  return { gems: 100, food: 500000, wood: 500000, stone: 300000, iron: 100000, gold: 500000, deathEssence: 30 };
 }
