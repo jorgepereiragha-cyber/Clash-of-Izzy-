@@ -36,3 +36,34 @@ test("normal world PvE marches return all troops; permanent losses are reserved 
   assert.ok(worker.includes("SET quantity=quantity-CAST"));
   assert.ok(worker.includes("AS selected WHERE selected.key=army_units.unit_type"));
 });
+
+test("PvP territorial valida o dono na chegada, trava os dois reinos e grava relatório bilateral", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const processMarches = worker.slice(worker.indexOf("async function processMarches"), worker.indexOf("const CASTLE_MATERIALS"));
+  assert.ok(worker.includes("async function loadKingdomCombatProfile(env, kingdomId)"));
+  assert.ok(worker.includes("async function acquireKingdomBattleLocks(env, kingdomIds)"));
+  assert.ok(worker.includes("if (current.battle_token)"));
+  assert.ok(processMarches.includes("target_owner_kingdom_id"));
+  assert.ok(processMarches.includes("territory_owner_changed_or_invalid"));
+  assert.ok(processMarches.includes("pvpDefenderRows"));
+  assert.ok(processMarches.includes("defenderLosses"));
+  assert.ok(processMarches.includes("defender_kingdom_id"));
+  assert.ok(processMarches.includes("territory_lost"));
+  assert.ok(processMarches.includes("territory_defended"));
+  assert.ok(processMarches.includes("combat_lock_token"));
+  assert.ok(processMarches.includes("releaseKingdomBattleLocks"));
+  assert.ok(worker.includes("OR defender_kingdom_id=?"));
+});
+
+test("Worker não aceita PvP contra protegido ou membro da mesma aliança", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const marchStart = worker.indexOf('}else if(type==="march"){');
+  const marchEnd = worker.indexOf('}else if(type==="battle"){', marchStart);
+  const march = worker.slice(marchStart, marchEnd);
+  assert.ok(march.includes("territory.shield_until"));
+  assert.ok(march.includes("k.protection_until"));
+  assert.ok(march.includes("alliance_members"));
+  assert.ok(march.includes("Ataques contra membros da sua própria aliança estão bloqueados"));
+  assert.ok(march.includes("target_owner_kingdom_id"));
+  assert.ok(march.includes("COALESCE(battle_token,'')=''"));
+});
