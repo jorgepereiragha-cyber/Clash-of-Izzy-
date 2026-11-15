@@ -25,10 +25,10 @@
       container.insertBefore(picker,container.firstChild);
       picker.addEventListener("change",()=>{selected=picker.value;render()});
     }
-    if(picker&&state?.equipment){
-      picker.replaceChildren(...state.equipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
+    if(picker&&state?.legacyEquipment){
+      picker.replaceChildren(...state.legacyEquipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
     }
-    const item=(state?.equipment||[]).find(x=>x.id===selected)||(state?.equipment||[])[0];
+    const item=(state?.legacyEquipment||[]).find(x=>x.id===selected)||(state?.legacyEquipment||[])[0];
     if(!item){setStatus("Nenhum equipamento disponível neste reino.",true);return;}
     selected=item.id;
     $("item-name").textContent=item.name;
@@ -55,7 +55,7 @@
   }
   window.upgradeEquipment=async itemId=>{
     if(busy)return;busy=true;render();
-    try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"equipment_upgrade",itemId:itemId||selected})});state=result.state;setStatus("Equipamento evoluído e salvo no servidor.");}
+    try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"legacy_equipment_upgrade",itemId:itemId||selected})});state=result.state;setStatus("Equipamento evoluído e salvo no servidor.");}
     catch(error){setStatus(error.message,true);try{await refresh()}catch{}}
     finally{busy=false;render();}
   };
