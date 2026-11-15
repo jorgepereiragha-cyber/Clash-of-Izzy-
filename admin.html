@@ -28,6 +28,11 @@ footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
 <div id="notice" role="status" aria-live="polite"></div>
 <section id="dashboard">
 <div class="toolbar"><h2>👑 Jogadores do reino</h2><button class="secondary" id="logout" type="button">Sair</button></div>
+<section id="purchaseQueue" style="margin:18px 0;padding:16px;border:1px solid #a98245;border-radius:12px;background:#0b1728">
+ <div class="toolbar"><h2>🔔 Pedidos de compra <span id="pendingCount">0</span></h2><button class="secondary" id="refreshPurchases" type="button">Atualizar</button></div>
+ <p class="sub">Novos pedidos aparecem automaticamente. Confira o recebimento do pagamento fora do jogo antes de aprovar. A aprovação libera as gemas ou a skin no reino.</p>
+ <div id="purchaseRequests" class="results" aria-live="polite">Carregando pedidos…</div>
+</section>
 <p class="sub">Pesquise por nickname ou ID. Selecione um jogador para consultar os dados e, se necessário, creditar gemas.</p>
 <form id="searchForm" class="form"><input id="query" maxlength="64" placeholder="Digite nickname ou ID do jogador" required><button type="submit">Pesquisar</button></form>
 <div id="results" class="results"></div>
@@ -45,6 +50,37 @@ async function api(path,data,auth=true){
 }
 function setLoggedIn(value){$("dashboard").style.display=value?"block":"none";$("loginForm").style.display=value?"none":"block"}
 function showNotice(message){$("notice").textContent=message}
+
+let purchasePoll=null;
+function renderPurchaseRequests(requests){
+ const root=$("purchaseRequests");root.replaceChildren();
+ $("pendingCount").textContent=String(requests.length);
+ if(!requests.length){root.textContent="Nenhum pedido aguardando liberação.";return}
+ for(const request of requests){
+  const card=document.createElement("article");card.className="player";
+  const info=document.createElement("div"),name=document.createElement("strong"),meta=document.createElement("small");
+  name.textContent="#"+request.id+" · "+request.product_name;
+  meta.textContent=(request.player_name||"Jogador")+" · "+(request.kingdom_name||"Reino")+" · ID "+request.player_id+" · R$ "+Number(request.price_brl).toFixed(2).replace(".",",")+(request.product_kind==="vip_package"?" · "+Number(request.gems_amount||0).toLocaleString("pt-BR")+" gemas":" · Skin");
+  info.append(name,meta);
+  const actions=document.createElement("div");actions.className="actions";
+  const approve=document.createElement("button");approve.type="button";approve.textContent="Confirmar pagamento e liberar";
+  approve.addEventListener("click",()=>reviewPurchase(request.id,"approve",approve));
+  const reject=document.createElement("button");reject.type="button";reject.className="secondary";reject.textContent="Recusar";
+  reject.addEventListener("click",()=>reviewPurchase(request.id,"reject",reject));
+  actions.append(approve,reject);card.append(info,actions);root.append(card);
+ }
+}
+async function refreshPurchaseRequests(){
+ const data=await api("/admin/purchase-requests",{});
+ renderPurchaseRequests(data.requests||[]);
+}
+async function reviewPurchase(id,decision,button){
+ if(decision==="approve"&&!confirm("Confirma que o pagamento foi recebido e deseja liberar este pacote agora?"))return;
+ if(decision==="reject"&&!confirm("Deseja recusar este pedido?"))return;
+ button.disabled=true;
+ try{const result=await api("/admin/purchase-requests/review",{requestId:id,decision});showNotice(result.message);await refreshPurchaseRequests()}
+ catch(error){showNotice(error.message);button.disabled=false}
+}
 function renderPlayers(players){
  const root=$("results");root.replaceChildren();
  if(!players.length){root.textContent="Nenhum jogador encontrado.";return}
@@ -61,9 +97,10 @@ function renderPlayers(players){
  }
 }
 async function searchPlayers(query){showNotice("Consultando o reino…");const data=await api("/admin/player-search",{query});renderPlayers(data.players|| (data.player?[data.player]:[]));showNotice((data.players||[]).length+" resultado(s).")}
-$("loginForm").addEventListener("submit",async event=>{event.preventDefault();showNotice("Validando acesso…");try{const data=await api("/admin/login",{email:$("email").value,password:$("password").value},false);token=data.token;sessionStorage.setItem("coi_admin_token",token);$("password").value="";setLoggedIn(true);showNotice("Acesso administrativo liberado.")}catch(e){showNotice(e.message)}});
+$("loginForm").addEventListener("submit",async event=>{event.preventDefault();showNotice("Validando acesso…");try{const data=await api("/admin/login",{email:$("email").value,password:$("password").value},false);token=data.token;sessionStorage.setItem("coi_admin_token",token);$("password").value="";setLoggedIn(true);showNotice("Acesso administrativo liberado.");refreshPurchaseRequests().catch(e=>showNotice(e.message));if(!purchasePoll)purchasePoll=setInterval(()=>{if(!document.hidden&&token)refreshPurchaseRequests().catch(()=>{})},20000)}catch(e){showNotice(e.message)}});
 $("searchForm").addEventListener("submit",async event=>{event.preventDefault();try{await searchPlayers($("query").value.trim())}catch(e){showNotice(e.message);if(/sessão/i.test(e.message)){token="";sessionStorage.removeItem("coi_admin_token");setLoggedIn(false)}}});
 $("logout").addEventListener("click",()=>{token="";sessionStorage.removeItem("coi_admin_token");$("results").replaceChildren();showNotice("Sessão encerrada.");setLoggedIn(false)});
 setLoggedIn(Boolean(token));
-if(token)showNotice("Sessão administrativa recuperada.");
+if(token){showNotice("Sessão administrativa recuperada.");refreshPurchaseRequests().catch(e=>showNotice(e.message));purchasePoll=setInterval(()=>{if(!document.hidden&&token)refreshPurchaseRequests().catch(()=>{})},20000)}
+$("refreshPurchases").addEventListener("click",()=>refreshPurchaseRequests().catch(e=>showNotice(e.message)));
 </script></body></html>
