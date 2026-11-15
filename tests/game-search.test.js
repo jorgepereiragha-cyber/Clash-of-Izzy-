@@ -147,3 +147,11 @@ test("CJK single-codepoint search is allowed while short Latin noise is rejected
   assert.ok(alliance.includes("return length>=(cjk?1:2)"));
   assert.ok(!alliance.includes('id="worldSearchQuery" type="search" minlength="2"'));
 });
+
+
+test("search fallback returns alliance tags for player nicknames without FTS", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag"));
+  assert.ok(worker.includes("playerSubstringAvailable=false"));
+  assert.ok(worker.includes("!playerSubstringAvailable||needsShortUnicodeFallback"));
+});
