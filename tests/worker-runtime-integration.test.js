@@ -179,7 +179,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const playerA = stateA.player.player_id;
 
     await t.test("estado, busca, eventos e sessão autenticada", async () => {
-      const state = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado autenticado");
+      const stateEnvelope = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado autenticado");
+      const state = stateEnvelope.state;
+      assert.ok(state, "o endpoint retorna o estado dentro do envelope state");
       assert.equal(Number(state.kingdom.id), kingdomA);
       assert.ok(state.equipment?.length >= 4, "equipamentos iniciais carregados");
       assert.ok(state.heroInventory?.length >= 1, "herói inicial sincronizado");
