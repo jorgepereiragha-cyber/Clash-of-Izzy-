@@ -35,3 +35,37 @@ test("navigation is a static section search, not an unsafe HTML search result re
   assert.ok(nav.includes("window.__COI_NAV__"));
   assert.ok(!nav.includes("results.innerHTML"));
 });
+
+
+test("shared navigation searches authenticated online game entities safely", async () => {
+  const nav = await read("navigation.js");
+  for (const snippet of [
+    'fetch("/api/game/search?"',
+    'Authorization:"Bearer "+token',
+    'new AbortController()',
+    'new URLSearchParams({q:query,type:"all",limit:"8"})',
+    'coi-nav-online-result',
+    '"/alliance.html?"'
+  ]) assert.ok(nav.includes(snippet), "missing online search behavior: " + snippet);
+  assert.ok(nav.includes("strong.textContent"));
+  assert.ok(nav.includes("small.textContent"));
+  assert.ok(!nav.includes("results.innerHTML"));
+});
+
+test("online search never creates a kingdom just to search", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes("if (!token)"));
+  assert.ok(nav.includes('addEmpty("Entre no reino para pesquisar conteúdo do mundo.")'));
+  assert.ok(!nav.includes("/api/game/start"));
+  assert.ok(nav.includes("setTimeout(() => onlineResults(query,sequence),250)"));
+});
+
+test("alliance page handles navigation deep links and renders search results safely", async () => {
+  const alliance = await read("alliance.html");
+  assert.ok(alliance.includes('id="worldSearchForm"'));
+  assert.ok(alliance.includes('request("/game/search?"+params.toString())'));
+  assert.ok(alliance.includes("new URLSearchParams(location.search)"));
+  assert.ok(alliance.includes("button.append(title,detail)"));
+  assert.ok(alliance.includes("title.textContent"));
+  assert.ok(alliance.includes("detail.textContent"));
+});
