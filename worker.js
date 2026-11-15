@@ -1595,7 +1595,6 @@ export default {
     if(!player)return json({error:"Jogador não encontrado."},404);
     const kingdom=await env.DB.prepare("SELECT id,kingdom_name FROM kingdoms WHERE player_id=?").bind(player.id).first();
     if(!kingdom)return json({error:"Reino não encontrado."},404);
-  if(kingdom.battle_lock_token&&Date.parse(kingdom.battle_lock_expires_at||"")>now.getTime())return json({error:"Seu exército está em uma batalha territorial. Aguarde a resolução antes de atacar o Anjo da Morte."},409);
     const item=kind==="vip_package"
       ?await env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages WHERE id=?").bind(itemId).first()
       :await env.DB.prepare("SELECT id,name,price_brl FROM skins WHERE id=?").bind(itemId).first();
