@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="/styles/coi-theme.css">
+<link rel="stylesheet" href="/styles/navigation.css">
 <meta name="theme-color" content="#142b44"><title>Clash of Izzy — Alianças</title>
 <style>
 :root{color-scheme:dark;--gold:#e7bd68;--panel:#14243a;--line:#80643b;--muted:#b9c5d4}
@@ -64,4 +65,5 @@ $("warBtn").addEventListener("click",()=>act({type:"alliance_war_declare",target
 $("leave").addEventListener("click",()=>{if(confirm("Deseja realmente sair da aliança?"))act({type:"alliance_leave"})});
 $("refresh").addEventListener("click",()=>load(false));load();
 </script>
+<script src="/navigation.js" defer></script>
 </body></html>
