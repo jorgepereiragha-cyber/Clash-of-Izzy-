@@ -81,7 +81,7 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   const castlePowerBonus = clamp(Number(castlePowerBonusPercent ?? castleLevel) || 0, 0, 30) / 100;
   for (const stack of attackers) {
     stack.defenseBonusPercent = defenseBonus;
-    stack.power = Math.floor(stack.power * (1 + castlePowerBonus));
+    stack.power = stack.power * (1 + castlePowerBonus);
     stack.hpPerUnit = Math.floor(stack.hpPerUnit * (1 + castlePowerBonus));
     stack.hp = stack.quantity * stack.hpPerUnit;
   }
