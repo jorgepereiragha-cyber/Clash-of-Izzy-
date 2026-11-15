@@ -29,7 +29,9 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 /* Procedural kingdom art direction: lightweight, original canvas scene for mobile GPUs. */
 .city{position:relative;isolation:isolate;background:linear-gradient(145deg,#718e5a,#355c43 62%,#284636);overflow:hidden}
 .city:before{opacity:.14;background-image:radial-gradient(#e3d5a1 1px,transparent 1px);background-size:17px 17px}
-#kingdomScene{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;transition:opacity .2s ease}\n#kingdom3d{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}\n.city.has-3d #kingdomScene{opacity:0}
+#kingdomScene{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;transition:opacity .2s ease}
+#kingdom3d{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.city.has-3d #kingdomScene{opacity:0}
 .city .building{position:relative;z-index:1;background:linear-gradient(145deg,#263d50d9,#101d30e8);backdrop-filter:blur(2px);border-color:#d9b66f;box-shadow:0 5px 12px #07150e88}
 .city .building.castle{background:linear-gradient(145deg,#8b633ddf,#302a39ed);border-color:#ffe09a;box-shadow:0 0 0 1px #f4d78e66,0 6px 15px #0009}
 @media(prefers-reduced-motion:no-preference){.city .building{transition:transform .18s ease,border-color .18s ease}.city .building:hover{transform:translateY(-3px) scale(1.025)}}
