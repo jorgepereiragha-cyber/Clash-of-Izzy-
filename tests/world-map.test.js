@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "../world-map-viewport.js";
 import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const html = await readFile(new URL("../world.html", import.meta.url), "utf8");
 const script = await readFile(new URL("../world-map.js", import.meta.url), "utf8");
@@ -23,6 +25,14 @@ test("world map presents an isometric 3D strategy view instead of a free-roaming
   for (const marker of ['OrthographicCamera', 'createCastle', 'createTerritoryFeature', 'createMarchFormation', 'updateMarchPositions', 'projectTerritories']) assert.ok(scene.includes(marker), "missing strategic scene feature: " + marker);
   assert.ok(scene.includes('march.status === "marching"'));
   assert.ok(script.includes('window.__coiWorldMap3D.update(visualState)'));
+});
+
+test("strategic 3D world map and territory controls parse before deployment", () => {
+  for (const file of ["../world-map.js", "../world-map-3d.js"]) {
+    const target = fileURLToPath(new URL(file, import.meta.url));
+    const result = spawnSync(process.execPath, ["--check", target], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr || result.stdout || ("Syntax check failed: " + file));
+  }
 });
 
 test("territory actions submit intent and troop quantities to the server API", () => {
