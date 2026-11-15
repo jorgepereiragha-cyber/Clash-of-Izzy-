@@ -18,19 +18,19 @@ if (host && "WebGLRenderingContext" in window) {
     grass: material("#577a49"), grassLight: material("#78945a"),
     road: material("#b8a57d"), roadEdge: material("#76664c"),
     stone: material("#9c9b8b"), darkStone: material("#555d5c"),
-    wood: material("#745039"), roof: material("#8b4636"),
+    wood: material("#745039"), roof: material("#24476B"),
     gold: material("#d5b16b", 0.55), window: new THREE.MeshBasicMaterial({ color: "#f4d68b" }),
     leaf: material("#3d7043"), leafLight: material("#628a4d")
   };
   const palettes = {
-    castle: ["#a69a80", "#a78a54"], barracks: ["#92704f", "#874b3e"],
-    farm: ["#9b9a62", "#9c7542"], quarry: ["#929a9a", "#58636a"],
-    lumber_mill: ["#795a3e", "#744632"], iron_mine: ["#75818a", "#4b5962"],
-    market: ["#a78b61", "#a44f3f"], academy: ["#8c8ba2", "#514c77"],
-    wall: ["#a1a69c", "#6e7774"], hospital: ["#c9c2aa", "#a65a50"],
-    watchtower: ["#9c927b", "#74543d"], stable: ["#98734e", "#76503a"],
-    archery_range: ["#a49a6c", "#6b7e49"], siege_workshop: ["#827466", "#625044"],
-    embassy: ["#b0a18a", "#526e82"], warehouse: ["#9b886a", "#70543d"]
+    castle: ["#a69a80", "#24476B"], barracks: ["#92704f", "#31577D"],
+    farm: ["#9b9a62", "#456B4E"], quarry: ["#929a9a", "#52677D"],
+    lumber_mill: ["#795a3e", "#24476B"], iron_mine: ["#75818a", "#34475B"],
+    market: ["#a78b61", "#31577D"], academy: ["#8c8ba2", "#24476B"],
+    wall: ["#a1a69c", "#52677D"], hospital: ["#c9c2aa", "#31577D"],
+    watchtower: ["#9c927b", "#24476B"], stable: ["#98734e", "#31577D"],
+    archery_range: ["#a49a6c", "#456B4E"], siege_workshop: ["#827466", "#52677D"],
+    embassy: ["#b0a18a", "#31577D"], warehouse: ["#9b886a", "#24476B"]
   };
   const sharedMaterials = new Set(Object.values(mats));
   const surfaceTextureCache = new Map();
@@ -113,7 +113,7 @@ if (host && "WebGLRenderingContext" in window) {
       }
     } else if (kind === "roof") {
       for (let y = 0; y < 128; y += 12) for (let x = 0; x < 128; x += 16) {
-        ctx.fillStyle = rand() > .5 ? "rgba(255,210,170,.12)" : "rgba(35,15,12,.14)";
+        ctx.fillStyle = rand() > .5 ? "rgba(210,225,245,.20)" : "rgba(8,18,34,.22)";
         ctx.fillRect(x + ((y / 12) % 2) * 8, y, 14, 9);
       }
     } else if (kind === "grass") {
@@ -164,7 +164,7 @@ if (host && "WebGLRenderingContext" in window) {
       [mats.stone, "#9c9b8b", "stone", 31],
       [mats.darkStone, "#555d5c", "stone", 37],
       [mats.wood, "#745039", "wood", 41],
-      [mats.roof, "#8b4636", "roof", 47]
+      [mats.roof, "#24476B", "roof", 47]
     ];
     for (const [mat, base, kind, seed] of maps) {
       mat.map = makeSurfaceTexture(base, kind, seed);
@@ -227,6 +227,17 @@ if (host && "WebGLRenderingContext" in window) {
         const turret = new THREE.Mesh(new THREE.ConeGeometry(.25, .5, 4), mats.roof);
         turret.position.set(tx, 1.72, tz); turret.rotation.y = Math.PI / 4; turret.castShadow = true; group.add(turret);
         box(group, .38, .09, .38, mats.gold, tx, 1.47, tz);
+      }
+      // Royal blue roofs and restrained gold standards follow the shared visual bible.
+      for (const tx of [-.56, .56]) {
+        box(group, .045, .52, .045, mats.gold, tx, 1.92, .49);
+        const banner = new THREE.Mesh(
+          new THREE.PlaneGeometry(.34, .42),
+          new THREE.MeshStandardMaterial({ color: "#E7BD68", roughness: .82, side: THREE.DoubleSide })
+        );
+        banner.position.set(tx + .18, 1.86, .515);
+        banner.castShadow = true;
+        group.add(banner);
       }
       // Small gatehouse makes the keep distinct from ordinary buildings.
       box(group, .58, .22, .24, mats.gold, 0, height + .08, .72);
