@@ -66,3 +66,23 @@ test("heróis convocados e herói inicial compartilham uma única identidade de 
   assert.ok(worker.includes("HERO_RARITY[inventoryHero.rarity]?.maxLevel"));
   assert.ok(worker.includes('heroKey!=="kael_sunwarden"'));
 });
+
+
+test("invocações em lote debitam gemas e gravam heróis/histórico atomicamente", async () => {
+  const worker = await read("worker.js");
+  const start = worker.indexOf('type==="hero_summon"');
+  const end = worker.indexOf('type==="hero_evolve"', start);
+  assert.ok(start >= 0 && end > start);
+  const summon = worker.slice(start, end);
+  assert.ok(summon.includes("env.DB.batch(statements)"));
+  assert.ok(summon.includes("__internal_action_guard"));
+  assert.ok(summon.includes("UPDATE players SET gems=gems-?"));
+  assert.ok(summon.includes("INSERT INTO hero_summon_history"));
+  assert.ok(!summon.includes(".run()"));
+});
+
+test("sincronização dos heróis evita atualizações sem mudança", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("WHERE heroes.level<excluded.level OR heroes.experience<excluded.experience"));
+  assert.ok(worker.includes("WHERE kingdom_id=? AND (level<COALESCE"));
+});
