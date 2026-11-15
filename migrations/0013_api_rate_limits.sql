@@ -1,4 +1,4 @@
--- Atomic API rate limits for login and kingdom creation.
+-- Atomic API rate limits for public catalog, game actions and admin login.
 -- Identifiers are HMAC digests; raw IPs and email addresses are never persisted.
 CREATE TABLE IF NOT EXISTS api_rate_limits (
   rate_key TEXT PRIMARY KEY,
