@@ -117,7 +117,7 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   const log = [];
   const metrics = { criticalHits: 0 };
   const critical = {
-    chance: clamp(Number(criticalChancePercent) || 0, 0, 15),
+    chance: clamp(Number(criticalChancePercent) || 0, 0, 100),
     multiplier: clamp(Number(criticalDamageMultiplier) || 1.5, 1.25, 2.5),
     seed: Number(criticalSeed) >>> 0
   };
