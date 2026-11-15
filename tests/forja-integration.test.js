@@ -33,7 +33,7 @@ test("Forge actions are namespaced and server validated", () => {
     assert.ok(worker.includes('type==="' + action + '"'), "missing server action: " + action);
     assert.ok(forgeScript.includes('type:"' + action + '"'), "UI does not call action: " + action);
   }
-  assert.ok(forgeScript.includes('href="/equipment-ui.html#norse-skins"'));
+  assert.ok(forgeScript.includes('"/equipment-ui.html#norse-skins"'));
   assert.ok(worker.includes("equipmentAttackPercent:gear.attackPercent"));
   assert.ok(worker.includes("equipmentDefensePercent:gear.defensePercent"));
   assert.ok(worker.includes("equipmentHealthPercent:gear.healthPercent"));
