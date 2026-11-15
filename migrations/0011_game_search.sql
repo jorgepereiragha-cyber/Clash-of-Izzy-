@@ -58,7 +58,7 @@ CREATE TRIGGER IF NOT EXISTS game_search_alliance_ai AFTER INSERT ON alliances B
 END;
 CREATE TRIGGER IF NOT EXISTS game_search_alliance_au AFTER UPDATE OF name,tag,description,level ON alliances BEGIN
   INSERT INTO game_search_documents(entity_type,entity_key,title,subtitle)
-  VALUES('alliance',CAST(new.id AS TEXT),new.name,new.tag)
+  VALUES('alliance',CAST(new.id AS TEXT),new.name,new.tag||' '||substr(new.description,1,120))
   ON CONFLICT(entity_type,entity_key) DO UPDATE SET title=excluded.title,subtitle=excluded.subtitle;
 END;
 CREATE TRIGGER IF NOT EXISTS game_search_alliance_ad AFTER DELETE ON alliances BEGIN
@@ -72,7 +72,7 @@ CREATE TRIGGER IF NOT EXISTS game_search_territory_ai AFTER INSERT ON world_terr
 END;
 CREATE TRIGGER IF NOT EXISTS game_search_territory_au AFTER UPDATE OF name,terrain,resource_type,level ON world_territories BEGIN
   INSERT INTO game_search_documents(entity_type,entity_key,title,subtitle)
-  VALUES('territory',CAST(new.id AS TEXT),new.name,new.terrain)
+  VALUES('territory',CAST(new.id AS TEXT),new.name,new.terrain||' '||coalesce(new.resource_type,'')||' nível '||new.level)
   ON CONFLICT(entity_type,entity_key) DO UPDATE SET title=excluded.title,subtitle=excluded.subtitle;
 END;
 CREATE TRIGGER IF NOT EXISTS game_search_territory_ad AFTER DELETE ON world_territories BEGIN
