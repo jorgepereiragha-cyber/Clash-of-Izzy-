@@ -242,14 +242,20 @@ if (host && "WebGLRenderingContext" in window) {
         const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
         if (!response.ok) return;
         const manifest = await response.json();
-        for (const asset of (manifest.models || [])) {
-          if (asset.enabled !== true || !asset.type || !asset.src) continue;
-          const gltf = await gltfLoader.loadAsync(asset.src);
-          const template = gltf.scene;
-          template.traverse(node => {
-            if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
-          });
-          glbTemplates.set(asset.type, template);
+        for (const asset of (Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [])) {
+          if (asset.enabled !== true || typeof asset.type !== "string" || !Object.hasOwn(palettes, asset.type) || typeof asset.src !== "string") continue;
+          const assetUrl = new URL(asset.src, window.location.origin);
+          if (assetUrl.origin !== window.location.origin || !assetUrl.pathname.startsWith("/assets/3d/") || !assetUrl.pathname.toLowerCase().endsWith(".glb")) continue;
+          try {
+            const gltf = await gltfLoader.loadAsync(assetUrl.href);
+            const template = gltf.scene;
+            template.traverse(node => {
+              if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+            });
+            glbTemplates.set(asset.type, template);
+          } catch (assetError) {
+            console.info(`Clash of Izzy: GLB ${asset.type} indisponível; mantendo modelo procedural.`, assetError);
+          }
         }
         if (glbTemplates.size) renderBuildings(latestBuildings);
       } catch (error) {
