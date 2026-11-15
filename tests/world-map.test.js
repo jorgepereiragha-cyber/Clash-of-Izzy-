@@ -41,5 +41,7 @@ test("PWA shell includes the world map and increments its cache version", () => 
   assert.match(serviceWorker, /clash-of-izzy-shell-v2/);
   assert.match(serviceWorker, /"\/world\.html"/);
   assert.match(serviceWorker, /"\/world-map\.js"/);
+  assert.match(serviceWorker, /"\\/styles\\/coi-theme\\.css"/);
+  assert.match(serviceWorker, /caches\\.match\\(request\\)\\|\\|await caches\\.match\\("\\/offline\\.html"\\)/);
   assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
 });
