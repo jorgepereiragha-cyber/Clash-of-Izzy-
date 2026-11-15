@@ -9,9 +9,10 @@ const legacyScript = await readFile(new URL("../equipment-system.js", import.met
 const forgePage = await readFile(new URL("../equipment-lab.html", import.meta.url), "utf8");
 const forgeScript = await readFile(new URL("../equipment-lab.js", import.meta.url), "utf8");
 const sw = await readFile(new URL("../sw.js", import.meta.url), "utf8");
+const navigation = await readFile(new URL("../navigation.js", import.meta.url), "utf8");
 
 test("Royal Forge navigation preserves the existing hero and Asgard equipment screen", () => {
-  assert.ok(kingdom.includes('href="/equipment-lab.html"'));
+  assert.ok(navigation.includes('href:"/equipment-lab.html"'));
   assert.ok(legacyPage.includes('href="/equipment-lab.html"'));
   assert.ok(legacyPage.includes('id="norse-skins"'));
   assert.ok(forgePage.includes('src="/equipment-lab.js"'));
