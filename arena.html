@@ -68,7 +68,7 @@
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 const API_BASE='/api';
-let kingdomSession=null;
+let kingdomSession=null,storeSearchQuery="";
 async function connectKingdom(){
  const status=document.getElementById('kingdomStatus');
  const savedToken=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
@@ -474,6 +474,8 @@ function renderKingdomStore(){
  const cosmetics=kingdomSession.cosmetics||{},shop=kingdomSession.shop||{},player=kingdomSession.player||{},kingdom=kingdomSession.kingdom||{};
  status.textContent='💎 '+Number(player.gems||0).toLocaleString('pt-BR')+' gemas · 🪙 '+Number(kingdom.gold||0).toLocaleString('pt-BR')+' ouro · ✨ '+Number(cosmetics.shards||0).toLocaleString('pt-BR')+' fragmentos';
  root.append(status);
+ const search=document.createElement('input');search.type='search';search.id='kingdomStoreSearch';search.placeholder='Buscar skin, recurso, pacote ou coleção…';search.setAttribute('aria-label','Buscar itens na loja');search.value=storeSearchQuery;search.style.cssText='width:100%;padding:10px;margin:8px 0 12px;border-radius:8px;border:1px solid #52677d;background:#0e1a29;color:#fff';root.append(search);
+ const applyStoreSearch=()=>{const query=storeSearchQuery.toLocaleLowerCase('pt-BR');root.querySelectorAll('.storeCard').forEach(card=>{card.hidden=Boolean(query)&&!card.textContent.toLocaleLowerCase('pt-BR').includes(query)})};search.addEventListener('input',()=>{storeSearchQuery=search.value;applyStoreSearch()});
  const owned=new Set((cosmetics.owned||[]).map(x=>x.item_id));
  const collections=cosmetics.collections||[];
  const collectionTitle=document.createElement('h3');collectionTitle.textContent='🎖️ Recompensas de coleção';root.append(collectionTitle);
@@ -496,6 +498,10 @@ function renderKingdomStore(){
  }
  if(!seasonGrid.children.length){const note=document.createElement('p');note.className='storeMuted';note.textContent='Nenhuma skin sazonal disponível.';seasonGrid.append(note)}
  root.append(seasonGrid);
+ const norseTitle=document.createElement('h3');norseTitle.textContent='⚡ Panteão Nórdico · Skins Divinas';root.append(norseTitle);
+ const norseGrid=document.createElement('div');norseGrid.className='storeGrid';
+ for(const skin of kingdomSession.norseSkins||[]){const has=owned.has(skin.id);const description=skin.description+' · '+skin.rarity+' · '+Number(skin.price||0).toLocaleString('pt-BR')+' gemas · cosmética';norseGrid.append(storeCard(skin.icon+' '+skin.name,description,has?'Já adquirida':'Desbloquear skin',()=>runStoreAction({type:'cosmetic_buy',skin:skin.id}),has||Number(player.gems||0)<Number(skin.price||0)));}
+ if(!norseGrid.children.length){const note=document.createElement('p');note.className='storeMuted';note.textContent='As skins divinas serão exibidas quando o catálogo estiver disponível.';norseGrid.append(note)}root.append(norseGrid);
  const fusionTitle=document.createElement('h3');fusionTitle.textContent='⚒️ Forja de skins';root.append(fusionTitle);
  const fusionGrid=document.createElement('div');fusionGrid.className='storeGrid';
  for(const recipe of cosmetics.fusions||[]){
@@ -523,6 +529,7 @@ function renderKingdomStore(){
  }
  const note=document.createElement('p');note.className='storeMuted';note.textContent='As skins ficam registradas na coleção. A opção de equipar e visualizar cada aparência no castelo será integrada ao sistema visual em uma etapa própria; esta tela não promete equipagem ainda.';
  root.append(note);
+ applyStoreSearch();
 }
 async function refreshKingdomStore(){
  try{const data=await chatApi('/game/state');kingdomSession=data.state;renderKingdomStore()}
