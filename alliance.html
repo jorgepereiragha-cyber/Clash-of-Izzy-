@@ -106,8 +106,10 @@ $("worldSearchForm").addEventListener("submit",async event=>{
      $("joinTag").value=item.tag;
      $("joinTag").focus();
      status("Aliança selecionada. Use Solicitar entrada para continuar.");
-    }else{
-     status(item.type==="territory"?"Território encontrado no índice mundial.":"Skin encontrada no catálogo.");
+    }else if(item.type==="territory"){
+     status("Território encontrado no índice mundial.");
+    }else if(item.type==="skin"){
+     status("Skin encontrada no catálogo.");
     }
    });
    list.append(button);
