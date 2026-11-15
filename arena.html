@@ -446,6 +446,15 @@ function renderKingdomStore(){
   collectionGrid.append(storeCard(collection.icon+' '+collection.name,description,buttonLabel,()=>runStoreAction({type:'cosmetic_claim',collection:collection.id}),!complete||claimed));
  }
  root.append(collectionGrid);
+ const officialTitle=document.createElement('h3');officialTitle.textContent='🎨 Skins oficiais liberadas';root.append(officialTitle);
+ const officialGrid=document.createElement('div');officialGrid.className='storeGrid';
+ const purchasedSkins=kingdomSession.purchasedSkins||[];
+ if(purchasedSkins.length){
+  for(const skin of purchasedSkins)officialGrid.append(storeCard('🏰 '+skin.name,'Skin liberada no catálogo oficial · '+String(skin.unlocked_at||'').slice(0,10),'Liberada',null,true));
+ }else{
+  const empty=document.createElement('p');empty.className='storeMuted';empty.textContent='Nenhuma skin oficial liberada para este reino. Após a confirmação do atendimento, as skins desbloqueadas aparecerão aqui.';officialGrid.append(empty);
+ }
+ root.append(officialGrid);
  const seasonTitle=document.createElement('h3');seasonTitle.textContent='🌙 Skins da temporada';root.append(seasonTitle);
  const seasonGrid=document.createElement('div');seasonGrid.className='storeGrid';
  for(const skin of cosmetics.seasonal||[]){
