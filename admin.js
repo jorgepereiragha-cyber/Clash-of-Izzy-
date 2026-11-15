@@ -46,7 +46,8 @@ function renderState(state){
  const sections=[
   ["Edifícios",state.buildings||[],x=>(x.building_type||"")+" · nível "+fmt(x.level)],
   ["Tropas",state.troops||[],x=>(x.unit_type||"")+" · T"+fmt(x.tier)+" · "+fmt(x.quantity)+" · feridos "+fmt(x.wounded)],
-  ["Heróis",state.heroes||[],x=>(x.hero_name||x.hero_key||"Herói")+" · nível "+fmt(x.level)+" · "+(x.rarity||"")],
+  ["Heróis",state.heroInventory?.length?state.heroInventory:(state.heroes||[]),x=>(x.name||x.hero_name||x.hero_key||"Herói")+" · nível "+fmt(x.level)+" · "+(x.rarity_label||x.rarity||"")],
+  ["Dragão",state.dragon?[state.dragon]:[],x=>(x.dragon_name||x.dragon_key||"Dragão")+" · nível "+fmt(x.level)+" · vínculo "+fmt(x.bond)+"/100"],
   ["Pesquisas",state.research||[],x=>(x.research_key||"Pesquisa")+" · nível "+fmt(x.level)],
   ["Marchas",state.marches||[],x=>(x.march_type||"")+" · "+(x.status||"")+" · "+(x.arrives_at||"")],
   ["Relatórios de batalha",state.battleReports||[],x=>(x.battle_type||"Batalha")+" · "+(x.created_at||"")+" · força "+fmt(x.attacker_power)+"/"+fmt(x.defender_power)],
