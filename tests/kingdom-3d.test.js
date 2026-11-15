@@ -14,10 +14,10 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(renderer, /coi:kingdom-render/);
   assert.match(renderer, /slice\(0, 16\)/);
   assert.match(renderer, /const col = i % 4/);
-  assert.match(renderer, /new THREE\\.InstancedMesh/);
+  assert.ok(renderer.includes("new THREE.InstancedMesh"));
   assert.match(renderer, /addForestInstances/);
   assert.match(kingdom, /type="importmap"/);
-  assert.match(kingdom, /"three":"https:\\/\\/cdn\\.jsdelivr\\.net/);
+  assert.ok(kingdom.includes('"three":"https://cdn.jsdelivr.net'));
 });
 
 test("3D scene is mobile-conscious and does not run an unnecessary animation loop", () => {
