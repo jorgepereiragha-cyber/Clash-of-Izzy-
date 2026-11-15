@@ -182,7 +182,6 @@ if (host && "WebGLRenderingContext" in window) {
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
     else window.addEventListener("resize", resize, { passive: true });
     resize();
-    loadOptionalGlbAssets([]);
   } catch (error) {
     console.warn("Clash of Izzy: WebGL indisponível; mantendo arte procedural 2D.", error);
     host.classList.remove("has-3d");
