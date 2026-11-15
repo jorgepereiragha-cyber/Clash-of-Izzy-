@@ -18,7 +18,7 @@ test("shared navigation exposes the real game sections and a responsive search",
 });
 
 test("core management pages load one shared navigation without duplicating their local menu links", async () => {
-  for (const path of ["alliance.html","kingdom.html","world.html","admin.html","equipment-ui.html"]) {
+  for (const path of ["index.html","alliance.html","kingdom.html","world.html","admin.html","equipment-ui.html"]) {
     const html = await read(path);
     assert.ok(html.includes('/styles/navigation.css'), path + " must load shared navigation styles");
     assert.ok(html.includes('/navigation.js'), path + " must load shared navigation script");
