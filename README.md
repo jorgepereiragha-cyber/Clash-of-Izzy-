@@ -115,3 +115,10 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - O servidor mantém o chefe, a vida global, os ataques, as perdas permanentes, a pontuação e o ranking no D1.
 - Somente ataques do Anjo da Morte removem tropas permanentemente; batalhas PvE comuns e ataques de território devolvem todas as tropas, mantendo as baixas simuladas apenas no relatório.
 - A classificação é encerrada automaticamente no fim do evento e as recompensas são creditadas uma única vez por reino, incluindo gemas, recursos e Essência da Morte.
+
+
+## Busca global — revisão de qualidade
+- A busca inclui também reinos que já pertencem a alianças e informa a tag pública, evitando convites inválidos.
+- O ranking normaliza acentos e trata variações comuns de singular/plural em português; a busca usa correspondência por palavra e por substring, com fallback independente por categoria.
+- Jogadores, reinos, alianças, territórios e skins têm destinos de navegação compatíveis. Resultados de jogadores/reinos já vinculados a uma aliança não oferecem convite indevido.
+- A primeira execução do evento não abre uma edição incompleta no meio do fim de semana: se o projeto for publicado depois do início e ainda não houver histórico, a primeira edição começa no próximo ciclo completo.
