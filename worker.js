@@ -1,4 +1,5 @@
 import { simulateBattle } from "./game-adapter.js";
+import { getDailyTasks, claimDailyTask } from "./liveops-engine.js";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -396,8 +397,9 @@ async function gameState(env,playerId){
   }
   const totalTroops=(troops.results||[]).reduce((n,u)=>n+u.quantity,0);
   const shop=await getShopState(env,kingdom.id);
+  const dailyEvents=await getDailyTasks(env,kingdom.id);
   const cosmetics=await getCosmeticState(env,kingdom.id);
-  return {cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  return {cosmetics,dailyEvents,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -408,7 +410,10 @@ async function gameAction(env,playerId,body){
   const type=String(body.type||"");
   let battleOutcome=null;
 
-  if(type==="cosmetic_claim"){
+  if(type==="event_claim"){
+    const result=await claimDailyTask(env,k.id,String(body.taskId||""));
+    if(!result.ok)return json({error:result.error},409);
+  }else if(type==="cosmetic_claim"){
     const collectionId=String(body.collection||""),col=COSMETIC_COLLECTIONS.find(x=>x.id===collectionId);
     if(!col)return json({error:"Coleção inválida."},400);
     const already=await env.DB.prepare("SELECT 1 FROM kingdom_collection_claims WHERE kingdom_id=? AND collection_id=?").bind(k.id,collectionId).first();
