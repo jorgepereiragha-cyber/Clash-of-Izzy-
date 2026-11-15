@@ -8,6 +8,7 @@
     {label:"Início",href:"/index.html",icon:"⌂",keywords:"home início principal"},
     {label:"Meu reino",href:"/kingdom.html",icon:"🏰",keywords:"cidade castelo construções recursos edifícios reino"},
     {label:"Mapa mundial",href:"/world.html",icon:"🌍",keywords:"territórios exploração marchas mapa mundo"},
+    {label:"Eventos",href:"/events.html",icon:"💀",keywords:"anjo da morte ceifador monstros chefes evento mundial fim de semana recompensas ranking"},
     {label:"Forja & skins",href:"/equipment-ui.html",icon:"⚒",keywords:"equipamentos heróis pesquisa evolução loja skins nórdicas odin thor freyja loki tyr heimdall"},
     {label:"Arena 3D",href:"/arena.html",icon:"⚔",keywords:"batalha combate arena treinamento"},
     {label:"Alianças",href:"/alliance.html",icon:"🤝",keywords:"aliança membros chat guerra diplomacia depósito"}
@@ -17,7 +18,7 @@
   const root = document.createElement("nav");
   root.className = "coi-global-nav";
   root.setAttribute("aria-label","Navegação principal");
-  root.innerHTML = '<a class="coi-nav-brand" href="/index.html" aria-label="Clash of Izzy — início"><span aria-hidden="true">⚔</span><b>CLASH OF IZZY</b></a><button class="coi-nav-toggle" type="button" aria-expanded="false" aria-controls="coi-nav-links">☰ <span>Menu</span></button><div class="coi-nav-links" id="coi-nav-links"></div><form class="coi-nav-search" role="search"><label class="coi-sr-only" for="coi-nav-query">Buscar seções e conteúdo do jogo</label><input id="coi-nav-query" type="search" autocomplete="off" placeholder="Buscar reino, aliança, mapa, skin…" aria-controls="coi-nav-results"><button type="submit" aria-label="Buscar no jogo">⌕</button><div class="coi-nav-results" id="coi-nav-results" role="listbox" aria-label="Resultados da busca" hidden></div></form>';
+  root.innerHTML = '<a class="coi-nav-brand" href="/index.html" aria-label="Clash of Izzy — início"><span aria-hidden="true">⚔</span><b>CLASH OF IZZY</b></a><button class="coi-nav-toggle" type="button" aria-expanded="false" aria-controls="coi-nav-links">☰ <span>Menu</span></button><div class="coi-nav-links" id="coi-nav-links"></div><form class="coi-nav-search" role="search"><label class="coi-sr-only" for="coi-nav-query">Buscar seções e conteúdo do jogo</label><input id="coi-nav-query" type="search" autocomplete="off" placeholder="Buscar jogador, reino, aliança, território, skin…" aria-controls="coi-nav-results"><button type="submit" aria-label="Buscar no jogo">⌕</button><div class="coi-nav-results" id="coi-nav-results" role="listbox" aria-label="Resultados da busca" hidden></div></form>';
 
   const linksBox = root.querySelector(".coi-nav-links");
   for (const item of links) {
@@ -90,7 +91,8 @@
   }
 
   function gameResultLink(item, query) {
-    const type = item.type === "kingdom" ? "kingdoms" :
+    const type = item.type === "player" ? "players" :
+      item.type === "kingdom" ? "kingdoms" :
       item.type === "alliance" ? "alliances" :
       item.type === "territory" ? "territories" : "skins";
     const params = new URLSearchParams({search:query,type});
@@ -101,7 +103,8 @@
     const strong = document.createElement("strong");
     strong.textContent = item.type === "alliance" ? item.name+" ["+item.tag+"]" : item.name;
     const small = document.createElement("small");
-    if (item.type === "kingdom") small.textContent = "Reino · poder "+Number(item.power||0).toLocaleString("pt-BR");
+    if (item.type === "player") small.textContent = "Jogador · "+(item.kingdom_name||"Reino")+" · Castelo "+Number(item.castle_level||1)+" · poder "+Number(item.power||0).toLocaleString("pt-BR");
+    else if (item.type === "kingdom") small.textContent = "Reino · poder "+Number(item.power||0).toLocaleString("pt-BR");
     else if (item.type === "alliance") small.textContent = "Aliança · nível "+Number(item.level||1)+" · "+Number(item.members||0)+" membros";
     else if (item.type === "territory") small.textContent = "Território · "+(item.terrain||"terreno");
     else small.textContent = "Skin · catálogo cosmético";
@@ -127,7 +130,9 @@
       const data = await response.json().catch(()=>({}));
       if (sequence !== requestSequence || query !== input.value.trim()) return;
       if (!response.ok) {
-        if (response.status === 401) addEmpty("Entre novamente no reino para pesquisar conteúdo.");
+        if (response.status === 401) addEmpty("Sua sessão expirou. Entre novamente no reino para pesquisar.");
+        else if (response.status === 429) addEmpty("Muitas pesquisas em sequência. Aguarde alguns segundos.");
+        else addEmpty(data.error || "A busca online não respondeu. Tente novamente.");
         return;
       }
       if (data.results?.length) {
@@ -170,9 +175,11 @@
       clearTimeout(searchTimer);
       const sequence = requestSequence;
       await onlineResults(query,sequence);
+      results.hidden = false;
     }
-    const first = results.querySelector(".coi-nav-online-result") || results.querySelector("a");
-    if (first) location.href = first.href;
+  });
+  input.addEventListener("keydown",event=>{
+    if(event.key==="Escape"){results.hidden=true;input.blur();}
   });
   document.addEventListener("click",event => {
     if (!root.contains(event.target)) results.hidden = true;
