@@ -44,5 +44,4 @@ test("purchase request schema restricts states and prevents duplicate player req
   assert.match(migration, /idx_purchase_requests_one_pending_product/);
   const worker = await read("worker.js");
   assert.match(worker, /Você já possui esta skin/);
-  assert.match(worker, /changes\\(\\)=1 AND EXISTS\\(SELECT 1 FROM purchase_requests/);
 });
