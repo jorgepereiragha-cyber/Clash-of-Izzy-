@@ -21,7 +21,13 @@
 
 #openMaterials{position:fixed;right:12px;top:190px;z-index:4;background:#263b55;border:1px solid #e0b75d;color:#fff;border-radius:8px;padding:10px;font-weight:bold}
 #materialsPanel{display:none;position:fixed;inset:50% auto auto 50%;transform:translate(-50%,-50%);width:min(440px,calc(100vw - 24px));max-height:min(75vh,620px);overflow:auto;z-index:9;background:linear-gradient(160deg,#1b2d43,#101a2b);border:2px solid #c59a50;border-radius:14px;box-shadow:0 12px 40px #000c;color:#f5edda;padding:16px}
-#materialsPanel.open{display:block}#materialsHead{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #80663e;padding-bottom:10px;margin-bottom:12px}#materialsHead h2{font-size:18px;margin:0;color:#f1c46a}#materialsClose{background:#68451f;border:1px solid #e0b75d;color:white;border-radius:7px;padding:7px 10px}#materialsList{display:grid;grid-template-columns:1fr 1fr;gap:8px}.materialItem{background:#24364c;border:1px solid #59677a;border-radius:9px;padding:10px;min-width:0}.materialItem strong{display:block;color:#f1c46a;margin-bottom:4px}.materialItem small{color:#cbd5e1;display:block;line-height:1.35}.materialQty{font-size:20px;font-weight:900;margin-top:6px}.materialsNote{font-size:12px;line-height:1.5;color:#cbd5e1;margin:12px 0 0}@media(max-width:420px){#materialsList{grid-template-columns:1fr}}
+#materialsPanel.open{display:block}#openTerritories{position:fixed;right:12px;top:245px;z-index:4;background:#263b55;border:1px solid #e0b75d;color:#fff;border-radius:8px;padding:10px;font-weight:bold}
+#territoryPanel{display:none;position:fixed;inset:50% auto auto 50%;transform:translate(-50%,-50%);width:min(560px,calc(100vw - 20px));max-height:82vh;overflow:auto;z-index:10;background:linear-gradient(160deg,#1b2d43,#101a2b);border:2px solid #c59a50;border-radius:14px;box-shadow:0 12px 40px #000c;color:#f5edda;padding:14px}
+#territoryPanel.open{display:block}#territoryHead{display:flex;justify-content:space-between;align-items:center;gap:8px;position:sticky;top:-14px;background:#1b2d43;padding:4px 0 10px;z-index:1}#territoryHead h2{font-size:17px;color:#f1c46a;margin:0}#territoryHead button,.territoryAction{background:#68451f;border:1px solid #e0b75d;color:white;border-radius:7px;padding:8px;font-weight:bold}
+#territoryHelp{font-size:11px;line-height:1.5;color:#cbd5e1;margin:5px 0 12px}#territoryTroops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px;margin-bottom:12px} .territoryTroop{display:flex;justify-content:space-between;align-items:center;gap:6px;background:#24364c;border:1px solid #526174;border-radius:7px;padding:7px;font-size:11px}.territoryTroop input{width:62px;background:#0d1725;color:white;border:1px solid #65758b;border-radius:5px;padding:6px}
+#territoryList{display:grid;gap:8px}.territoryCard{background:#24364c;border:1px solid #59677a;border-radius:9px;padding:10px}.territoryCardHead{display:flex;justify-content:space-between;gap:8px;align-items:center}.territoryCard strong{color:#f1c46a}.territoryMeta{font-size:10px;color:#cbd5e1;margin:6px 0}.territoryButtons{display:flex;flex-wrap:wrap;gap:6px}.territoryAction{font-size:10px;padding:7px 9px}.territoryAction:disabled{opacity:.45}.territoryNotice{font-size:11px;color:#f5d58e;min-height:18px;margin:8px 0}
+@media(max-width:650px){#openTerritories{top:245px;right:8px;padding:8px;font-size:11px}#territoryTroops{grid-template-columns:1fr 1fr}#territoryPanel{max-height:76vh}}
+#materialsHead{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #80663e;padding-bottom:10px;margin-bottom:12px}#materialsHead h2{font-size:18px;margin:0;color:#f1c46a}#materialsClose{background:#68451f;border:1px solid #e0b75d;color:white;border-radius:7px;padding:7px 10px}#materialsList{display:grid;grid-template-columns:1fr 1fr;gap:8px}.materialItem{background:#24364c;border:1px solid #59677a;border-radius:9px;padding:10px;min-width:0}.materialItem strong{display:block;color:#f1c46a;margin-bottom:4px}.materialItem small{color:#cbd5e1;display:block;line-height:1.35}.materialQty{font-size:20px;font-weight:900;margin-top:6px}.materialsNote{font-size:12px;line-height:1.5;color:#cbd5e1;margin:12px 0 0}@media(max-width:420px){#materialsList{grid-template-columns:1fr}}
 </style></head>
 <body>
 <div id="hud">
@@ -44,6 +50,15 @@
 </section>
 
 <button id="openMaterials" type="button">🎒 MATERIAIS</button>
+<button id="openTerritories" type="button">🌍 TERRITÓRIOS</button>
+<section id="territoryPanel" aria-label="Painel de territórios">
+ <div id="territoryHead"><h2>🌍 Mapa de territórios</h2><div><button id="refreshTerritories" type="button">Atualizar</button> <button id="closeTerritories" type="button">✕</button></div></div>
+ <p id="territoryHelp">Escolha suas tropas e envie uma marcha. Ataques conquistam territórios neutros após a resolução do combate pelo servidor. Tempo de ataque: 2 minutos.</p>
+ <strong style="font-size:12px;color:#f1c46a">⚔ Tropas para enviar (nível 1)</strong>
+ <div id="territoryTroops"><small>Carregando tropas…</small></div>
+ <div id="territoryNotice" class="territoryNotice" aria-live="polite"></div>
+ <div id="territoryList"><div class="territoryCard">Carregando territórios…</div></div>
+</section>
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
 <div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Selecione um item para consultar e comprar pelo WhatsApp. Skins de R$ 50 a R$ 1.000.</p><div id="catalog">Carregando catálogo oficial…</div><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
@@ -88,6 +103,50 @@ const materialsPanel=document.getElementById('materialsPanel');
 const materialCatalog={royal_blueprint:{icon:'📜',fallback:'Projeto Real'},imperial_seal:{icon:'🏅',fallback:'Brasão Imperial'},power_crystal:{icon:'💎',fallback:'Cristal de Poder'},imperial_crest:{icon:'👑',fallback:'Brasão de Prestígio'},svip_medal:{icon:'🎖️',fallback:'Medalha SVIP'}};
 function renderMaterials(){const list=document.getElementById('materialsList');if(!kingdomSession){list.innerHTML='<div class="materialItem">Conecte seu reino para consultar os materiais.</div>';return}const inventory=kingdomSession.inventoryItems||[];const catalog=kingdomSession.castleMaterials||{};list.replaceChildren();for(const [key,meta] of Object.entries(materialCatalog)){const definition=catalog[key]||{};const item=inventory.find(x=>x.item_key===key);const card=document.createElement('article');card.className='materialItem';const title=document.createElement('strong');title.textContent=meta.icon+' '+(definition.name||meta.fallback);const description=document.createElement('small');description.textContent=definition.description||'Material especial para a progressão do reino.';const quantity=document.createElement('div');quantity.className='materialQty';quantity.textContent=' x '+Number(item?.quantity||0).toLocaleString('pt-BR');card.append(title,description,quantity);list.append(card)}const level=Number(kingdomSession.kingdom?.castle_level||1);const requirements=level>=25?{imperial_crest:2,power_crystal:2}:level>=20?{imperial_crest:1,power_crystal:2}:level>=15?{power_crystal:2,imperial_seal:1}:level>=10?{imperial_seal:2,royal_blueprint:1}:level>=5?{royal_blueprint:2}:{};const names=Object.fromEntries(Object.entries(materialCatalog).map(([key,value])=>[key,(catalog[key]?.name||value.fallback)]));const have=Object.fromEntries(inventory.map(item=>[item.item_key,Number(item.quantity||0)]));const req=document.getElementById('castleNextUpgrade');if(level>=30){req.innerHTML='<strong>🏆 Castelo no nível máximo</strong><small>Você alcançou o nível 30.</small>'}else{const rows=Object.entries(requirements);const missing=rows.filter(([key,qty])=>(have[key]||0)<qty);req.replaceChildren();const heading=document.createElement('strong');heading.textContent='🏰 Próxima evolução: Castelo '+(level+1);req.append(heading);const detail=document.createElement('small');detail.textContent=rows.length?rows.map(([key,qty])=>names[key]+': '+(have[key]||0)+'/'+qty).join(' · '):'Sem materiais especiais exigidos nesta faixa.';req.append(detail);const status=document.createElement('small');status.textContent=missing.length?'Faltam materiais especiais para esta evolução.':'Materiais especiais suficientes; confira também madeira, pedra, comida e ferro.';status.style.color=missing.length?'#f3a6a6':'#9ee6b0';req.append(status)}document.getElementById('materialsNote').textContent='Castelo nível '+level+'. Materiais obtidos em batalhas, marchas, melhorias, treinamento e pesquisas. A Medalha SVIP é especial e não bloqueia a progressão normal.'}
 document.getElementById('openMaterials').addEventListener('click',()=>{renderMaterials();materialsPanel.classList.add('open')});document.getElementById('materialsClose').addEventListener('click',()=>materialsPanel.classList.remove('open'));
+
+const territoryPanel=document.getElementById('territoryPanel'),territoryList=document.getElementById('territoryList'),territoryTroops=document.getElementById('territoryTroops'),territoryNotice=document.getElementById('territoryNotice');
+const unitLabels={militia:'Milícia',swordsman:'Espadachim',spearman:'Lanceiro',archer:'Arqueiro',cavalry:'Cavalaria',knight:'Cavaleiro',crossbowman:'Besteiro',catapult:'Catapulta',ram:'Aríete',trebuchet:'Trabuquete'};
+function selectedTerritoryUnits(){const result={};territoryTroops.querySelectorAll('input[data-unit]').forEach(input=>{const qty=Math.max(0,Math.floor(Number(input.value)||0));if(qty>0)result[input.dataset.unit]=qty});return result}
+function renderTerritories(){
+ if(!kingdomSession){territoryList.textContent='Conecte seu reino para consultar o mapa.';return}
+ const troops=kingdomSession.troops||[];territoryTroops.replaceChildren();
+ const available=troops.filter(u=>Number(u.tier)===1&&Number(u.quantity)>0);
+ if(!available.length){const empty=document.createElement('small');empty.textContent='Você não possui tropas de nível 1 disponíveis. Treine tropas antes de marchar.';territoryTroops.append(empty)}
+ for(const unit of available){const label=document.createElement('label');label.className='territoryTroop';const name=document.createElement('span');name.textContent=(unitLabels[unit.unit_type]||unit.unit_type)+' · '+Number(unit.quantity).toLocaleString('pt-BR');const input=document.createElement('input');input.type='number';input.min='0';input.max=String(unit.quantity);input.value='0';input.dataset.unit=unit.unit_type;input.setAttribute('aria-label','Quantidade de '+(unitLabels[unit.unit_type]||unit.unit_type));label.append(name,input);territoryTroops.append(label)}
+ territoryList.replaceChildren();
+ const territories=kingdomSession.territories||[];
+ for(const territory of territories){
+  const card=document.createElement('article');card.className='territoryCard';
+  const head=document.createElement('div');head.className='territoryCardHead';
+  const title=document.createElement('strong');title.textContent=territory.name||'Território';
+  const state=document.createElement('span');state.style.fontSize='10px';state.style.color=territory.owner_kingdom_id?'#a9d5ff':'#9ee6b0';state.textContent=territory.owner_kingdom_id?'Ocupado':'Neutro';
+  head.append(title,state);
+  const meta=document.createElement('div');meta.className='territoryMeta';meta.textContent='Terreno: '+(territory.terrain||'desconhecido')+' · Nível '+Number(territory.level||1)+' · Recurso: '+(territory.resource_type||'nenhum')+' · Taxa: '+Number(territory.resource_rate||0);
+  const buttons=document.createElement('div');buttons.className='territoryButtons';
+  const own=Number(territory.owner_kingdom_id)===Number(kingdomSession.kingdom?.id);
+  const neutral=!territory.owner_kingdom_id;
+  const addAction=(label,type,disabled)=>{const button=document.createElement('button');button.className='territoryAction';button.type='button';button.textContent=label;button.disabled=disabled;button.addEventListener('click',()=>sendTerritoryMarch(territory.id,type,button));buttons.append(button)};
+  addAction('⚔ Atacar', 'attack',!neutral||!available.length);
+  addAction('🌾 Coletar','gather',(!neutral&&!own)||!available.length);
+  addAction('👁 Explorar','scout',(!neutral&&!own)||!available.length);
+  card.append(head,meta,buttons);territoryList.append(card);
+ }
+ if(!territories.length){territoryList.textContent='Nenhum território disponível.'}
+}
+async function sendTerritoryMarch(targetId,marchType,button){
+ const units=selectedTerritoryUnits();if(!Object.keys(units).length){territoryNotice.textContent='Selecione a quantidade de pelo menos uma tropa.';return}
+ button.disabled=true;territoryNotice.textContent='Enviando marcha ao servidor…';
+ try{
+  await chatApi('/game/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'march',targetId,marchType,units})});
+  const data=await chatApi('/game/state');kingdomSession=data.state;renderTerritories();
+  territoryNotice.textContent=marchType==='attack'?'Ataque enviado! A marcha chega em aproximadamente 2 minutos.':'Marcha enviada! Consulte o painel para acompanhar.';
+ }catch(error){territoryNotice.textContent=error.message;button.disabled=false}
+}
+async function refreshTerritoryState(){try{const data=await chatApi('/game/state');kingdomSession=data.state;renderTerritories();territoryNotice.textContent='Mapa atualizado.'}catch(error){territoryNotice.textContent=error.message}}
+document.getElementById('openTerritories').addEventListener('click',()=>{renderTerritories();territoryPanel.classList.add('open');refreshTerritoryState()});
+document.getElementById('closeTerritories').addEventListener('click',()=>territoryPanel.classList.remove('open'));
+document.getElementById('refreshTerritories').addEventListener('click',refreshTerritoryState);
+
 // Chat persistente da aliança + tradução automática das mensagens recebidas.
 const chatPanel=document.getElementById('allianceChat'),chatList=document.getElementById('chatMessages'),chatLanguage=document.getElementById('chatLanguage'),chatAuto=document.getElementById('chatAutoTranslate');
 const translatedCache=new Map();let chatBusy=false,chatLastId=0;
