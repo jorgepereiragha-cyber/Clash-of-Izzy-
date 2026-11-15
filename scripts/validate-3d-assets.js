@@ -1,5 +1,6 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
+import { realpath } from "node:fs/promises";
 import { pathToFileURL } from "node:url";
 const BUILDING_TYPES = new Set(["castle","barracks","farm","quarry","lumber_mill","iron_mine","market","academy","wall","hospital","watchtower","stable","archery_range","siege_workshop","embassy","warehouse"]);
 const MAX_MODELS = 32, MAX_MODEL_BYTES = 12 * 1024 * 1024, MAX_TOTAL_BYTES = 48 * 1024 * 1024;
@@ -27,7 +28,11 @@ export async function validateAssetManifest(root = process.cwd()) {
     const absolutePath = path.resolve(root, "." + model.src);
     const assetsRoot = path.resolve(root, "assets", "3d") + path.sep;
     if (!absolutePath.startsWith(assetsRoot)) fail(label + ".src escapa do diretório de assets.");
-    let bytes; try { bytes = await readFile(absolutePath); } catch { fail("arquivo não encontrado: " + model.src + "."); }
+    let bytes; try {
+      const [realAssetsRoot, realAssetPath] = await Promise.all([realpath(path.resolve(root, "assets", "3d")), realpath(absolutePath)]);
+      if (!realAssetPath.startsWith(realAssetsRoot + path.sep)) fail(label + ".src aponta para fora do diretório de assets.");
+      bytes = await readFile(realAssetPath);
+    } catch (error) { if (error.message.startsWith("Manifesto 3D inválido:")) throw error; fail("arquivo não encontrado ou link inválido: " + model.src + "."); }
     if (bytes.length < 20) fail(model.src + " é menor que o cabeçalho GLB mínimo.");
     if (bytes.length > MAX_MODEL_BYTES) fail(model.src + " excede 12 MiB.");
     if (bytes.toString("ascii", 0, 4) !== "glTF") fail(model.src + " não possui assinatura GLB.");
