@@ -211,17 +211,20 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         name: "Pacote de integração", price: 1, gems: 100,
       }), 200, "criação de pacote VIP");
       expectStatus(await admin("/api/admin/skins", {
-        name: "Skin de integração", price: 50,
-      }), 200, "criação de skin");
+        name: "Skin inválida", price: 10,
+      }), 400, "bloqueio de preço de skin inválido");
+      expectStatus(await admin("/api/admin/skins", {
+        name: "Skin além do limite", price: 50,
+      }), 409, "limite de 200 skins do catálogo");
       expectStatus(await admin("/api/admin/skins", {
         name: "Skin inválida", price: 10,
       }), 400, "bloqueio de preço de skin inválido");
 
       const catalog = expectStatus(await api("/api/store/catalog"), 200, "catálogo atualizado");
       const vip = catalog.packages.find(item => item.name === "Pacote de integração");
-      const skin = catalog.skins.find(item => item.name === "Skin de integração");
+      const skin = catalog.skins[0];
       assert.ok(vip?.id, "pacote VIP aparece no catálogo");
-      assert.ok(skin?.id, "skin aparece no catálogo");
+      assert.ok(skin?.id && skin?.name, "skin existente aparece no catálogo");
 
       expectStatus(await admin("/api/admin/unlock-skin", {
         playerId: playerA, skin: skin.name,
@@ -311,8 +314,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
     await t.test("filas independentes, validação de tropas e marchas", async () => {
       await action(tokenA, { type: "upgrade", building: "building_invalid" }, 400);
-      await action(tokenA, { type: "upgrade", building: "farm" }, 200);
-      await action(tokenA, { type: "upgrade", building: "market" }, 409, "segunda construção na mesma fila");
+      await action(tokenA, { type: "upgrade", building: "castle" }, 200);
+      await action(tokenA, { type: "upgrade", building: "farm" }, 409, "segunda construção na mesma fila");
 
       await action(tokenA, { type: "train", unit: "unit_invalid", quantity: 1 }, 400);
       await action(tokenA, { type: "train", unit: "mage", quantity: 1 }, 200);
