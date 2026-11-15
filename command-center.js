@@ -18,12 +18,28 @@ async function connect(){
   state=data.state;setConnection("🏰 "+(state.kingdom?.kingdom_name||"Reino conectado")+" · Sessão autenticada no servidor.");render();notice("Seu reino está conectado.","ok");
  }catch(error){setConnection("⚠ Não foi possível conectar: "+error.message);notice("Verifique a conexão e a configuração do servidor.","error")}
 }
+function renderTasks(){
+ const rows=state.activeTasks||[];
+ const labels={construction:"Construção",training:"Treinamento",research:"Pesquisa"};
+ $("activeTasks").innerHTML=rows.length?rows.map(task=>{
+  let payload={};try{payload=JSON.parse(task.payload_json||"{}")}catch{}
+  const detail=task.task_type==="construction"?(BUILDINGS[payload.building]||payload.building)+" · nível "+payload.toLevel:task.task_type==="training"?n(payload.quantity)+" × "+(UNITS[payload.unit]||payload.unit): (RESEARCH[payload.research]||payload.research)+" · nível "+payload.toLevel;
+  return '<article class="item"><h3>⏳ '+esc(labels[task.task_type]||task.task_type)+'</h3><div class="muted">'+esc(detail)+'</div><div class="row"><span class="pill" data-task-clock="'+esc(task.id)+'" data-completes="'+esc(task.completes_at)+'">Calculando…</span><span class="muted">Conclusão automática</span></div></article>';
+ }).join(""):'<div class="empty">Nenhuma fila ocupada. O reino está pronto para novas ordens.</div>';
+}
+function renderTaskClocks(){
+ document.querySelectorAll("[data-task-clock]").forEach(el=>{
+  const remaining=Math.max(0,Math.ceil((Date.parse(el.dataset.completes)-Date.now())/1000));
+  const h=Math.floor(remaining/3600),m=Math.floor((remaining%3600)/60),s=remaining%60;
+  el.textContent=remaining===0?"Aguardando confirmação do servidor":(h?String(h).padStart(2,"0")+":":"")+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+" restantes";
+ });
+}
 function render(){
  if(!state)return;
  const k=state.kingdom||{},p=state.player||{};
  $("resources").innerHTML=[["🌾","Comida",k.food],["🪵","Madeira",k.wood],["🪨","Pedra",k.stone],["⛓","Ferro",k.iron],["🪙","Ouro",k.gold],["💎","Gemas",p.gems]].map(([icon,label,value])=>'<div class="resource"><small>'+icon+" "+label+'</small><strong>'+n(value)+'</strong></div>').join("");
  $("summary").innerHTML=[["🏰 Castelo","Nível "+n(k.castle_level)],["⚔ Tropas",n(state.totalTroops)],["🐉 Dragão","Nível "+n(state.dragon?.level)],["🛡 Aliança",state.alliance?esc(state.alliance.tag):"Sem aliança"]].map(([label,value])=>'<div class="tile"><small>'+label+'</small><strong>'+value+"</strong></div>").join("");
- renderBuildings();renderTroops();renderResearch();renderWorld();renderHeroes();renderDragon();renderAlliance();renderBattles();renderDailyEvents();
+ renderTasks();renderBuildings();renderTroops();renderResearch();renderWorld();renderHeroes();renderDragon();renderAlliance();renderBattles();renderDailyEvents();
 }
 function renderBuildings(){
  const rows=state.buildings||[];
@@ -75,12 +91,12 @@ async function act(body,success){
 $("tabs").addEventListener("click",event=>{const button=event.target.closest("[data-tab]");if(!button)return;document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected",String(x===button)));document.querySelectorAll(".section").forEach(x=>x.classList.toggle("active",x.id==="section-"+button.dataset.tab))});
 document.body.addEventListener("click",async event=>{
  const claim=event.target.closest("[data-event-claim]");if(claim){try{await act({type:"event_claim",taskId:claim.dataset.eventClaim},"Recompensa diária resgatada.")}catch{}return}
- const up=event.target.closest("[data-upgrade]");if(up){try{await act({type:"upgrade",building:up.dataset.upgrade},"Estrutura melhorada.")}catch{}return}
- const research=event.target.closest("[data-research]");if(research){try{await act({type:"research",research:research.dataset.research},"Pesquisa concluída.")}catch{}return}
+ const up=event.target.closest("[data-upgrade]");if(up){try{await act({type:"upgrade",building:up.dataset.upgrade},"Melhoria iniciada; o reino continuará construindo offline.")}catch{}return}
+ const research=event.target.closest("[data-research]");if(research){try{await act({type:"research",research:research.dataset.research},"Pesquisa iniciada; o servidor concluirá automaticamente.")}catch{}return}
  const evolve=event.target.closest("[data-evolve]");if(evolve){try{await act({type:"hero_evolve",hero:evolve.dataset.evolve},"Herói evoluído.")}catch{}return}
  const march=event.target.closest("[data-march]");if(march){const unit=$("marchUnit").value,qty=Math.max(1,Math.min(10000,Math.floor(Number($("marchQty").value)||1)));try{await act({type:"march",targetId:Number(march.dataset.target),marchType:march.dataset.march,units:{[unit]:qty}},"Ordem de marcha enviada.")}catch{}return}
 });
-$("trainForm").addEventListener("submit",async e=>{e.preventDefault();try{await act({type:"train",unit:$("unitType").value,quantity:Math.max(1,Math.min(100,Math.floor(Number($("trainQty").value)||1)))},"Treinamento registrado.")}catch{}});
+$("trainForm").addEventListener("submit",async e=>{e.preventDefault();try{await act({type:"train",unit:$("unitType").value,quantity:Math.max(1,Math.min(100,Math.floor(Number($("trainQty").value)||1)))},"Treinamento iniciado; as tropas chegarão automaticamente.")}catch{}});
 $("battle").addEventListener("click",async()=>{try{const data=await act({type:"battle"});if(data?.battle)notice(data.battle.message+(data.battle.won?" Recompensas recebidas.":""),data.battle.won?"ok":"")}catch{}});
 $("summonOne").addEventListener("click",async()=>{if(!confirm("Invocar 1 herói por 100 gemas?"))return;try{await act({type:"hero_summon",quantity:1},"Invocação concluída.")}catch{}});
 $("summonTen").addEventListener("click",async()=>{if(!confirm("Invocar 10 heróis por 900 gemas?"))return;try{await act({type:"hero_summon",quantity:10},"Invocação em lote concluída.")}catch{}});
@@ -90,4 +106,5 @@ $("allianceJoin").addEventListener("submit",async e=>{e.preventDefault();try{awa
 $("warForm").addEventListener("submit",async e=>{e.preventDefault();if(!confirm("Declarar guerra contra esta aliança?"))return;try{await act({type:"alliance_war_declare",targetTag:$("warTag").value},"Declaração de guerra enviada.")}catch{}});
 $("chatForm").addEventListener("submit",async e=>{e.preventDefault();const message=$("chatText").value.trim();if(!message)return;try{await act({type:"alliance_chat",message},"Mensagem enviada.");$("chatText").value=""}catch{}});
 $("refresh").addEventListener("click",refresh);
+setInterval(renderTaskClocks,1000);
 connect();
