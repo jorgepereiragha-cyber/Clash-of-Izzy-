@@ -109,7 +109,13 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   }
 
   function clearGroup(group) {
-    while (group.children.length) group.remove(group.children[group.children.length - 1]);
+    while (group.children.length) {
+      const child = group.children[group.children.length - 1];
+      child.traverse(node => {
+        if (node.geometry) node.geometry.dispose();
+      });
+      group.remove(child);
+    }
   }
 
   function createGround() {
