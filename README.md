@@ -73,3 +73,5 @@ A interface usa Three.js com instanciamento de objetos repetidos, LOD, redução
 - [Árvore tecnológica das sete camadas](docs/ARVORE_TECNOLOGICA_CAMADAS.md)
 - [Codex das Origens, Feras e Véus — Cabala, Caim e Abel, bestiário e motivação](docs/CODEX_ORIGENS_FERAS_E_VEUS.md)
 - [Exploração 3D e pistas do mundo — arquitetura, segurança e desempenho](docs/EXPLORACAO_3D_PISTAS.md)
+
+- [Jornada inicial, retenção e abertura de reinos](docs/RETENCAO_E_ABERTURA_DE_REINOS.md)
