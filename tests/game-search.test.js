@@ -170,6 +170,19 @@ test("global search adds bounded typo matching only from indexed trigram candida
   assert.ok(!worker.includes("SELECT * FROM game_search_documents"));
 });
 
+test("global search retrieves CJK substrings via trigram candidates but verifies the full token", async () => {
+  const worker = await read("worker.js");
+  const ranking = await read("search-ranking.js");
+  assert.ok(worker.includes("const fuzzyQuery=buildTrigramSearchQuery(tokens)"));
+  assert.ok(worker.includes("if(requireFuzzy&&typoCount===null)return"));
+  assert.ok(worker.includes("game_search_substring_fts MATCH ?"));
+  assert.ok(worker.includes("game_player_substring_fts MATCH ?"));
+  assert.ok(ranking.includes("cjkScripts"));
+  assert.ok(ranking.includes("Overlapping code-point trigrams"));
+  assert.ok(ranking.includes("characters.length >= 3"));
+  assert.ok(!ranking.includes("CJK character typo correction"));
+});
+
 test("search fallback returns alliance tags for player nicknames without FTS", async () => {
   const worker = await read("worker.js");
   assert.ok(worker.includes("COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag"));
