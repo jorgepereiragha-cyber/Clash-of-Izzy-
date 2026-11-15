@@ -25,7 +25,9 @@ test("Cloudflare agenda a resolução automática de marchas a cada minuto", asy
 test("normal world PvE marches return all troops; permanent losses are reserved for the weekend boss event", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   const processMarches = worker.slice(worker.indexOf("async function processMarches"), worker.indexOf("const CASTLE_MATERIALS"));
-  assert.ok(processMarches.includes("survivors[u.unit_type]=u.quantity"));
+  assert.ok(processMarches.includes("INSERT INTO army_units"));
+  assert.ok(processMarches.includes("bind(kingdomId,u.unit_type,1,u.quantity"));
+  assert.ok(processMarches.includes("kingdomBattleLocks=await acquireKingdomBattleLocks(env,lockIds)"));
   assert.ok(!processMarches.includes("u.quantity-Math.max(0,Number(losses[u.unit_type]||0))"));
   const battleStart = worker.indexOf('}else if(type==="battle"){');
   const battleEnd = worker.indexOf('}else if(type==="rename"){', battleStart);
