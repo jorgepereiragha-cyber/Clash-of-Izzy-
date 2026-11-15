@@ -76,3 +76,13 @@ test("rate limiter rejects missing storage or signing secret", async () => {
     /requires D1 and SESSION_SECRET/
   );
 });
+
+
+test("game API does not expose wildcard CORS to unrelated origins", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const arena = await readFile(new URL("../arena.html", import.meta.url), "utf8");
+  assert.doesNotMatch(worker, /Access-Control-Allow-Origin/);
+  assert.doesNotMatch(worker, /Access-Control-Allow-Headers/);
+  assert.match(arena, /const API_BASE=['"]\/api['"]/);
+});
