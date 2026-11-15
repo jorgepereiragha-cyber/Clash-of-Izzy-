@@ -4,6 +4,7 @@ CREATE TABLE IF NOT EXISTS liveops_daily_claims (
   cycle_id TEXT NOT NULL,
   task_id TEXT NOT NULL,
   claimed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  credited_at TEXT,
   PRIMARY KEY (kingdom_id, cycle_id, task_id)
 );
 CREATE INDEX IF NOT EXISTS idx_liveops_daily_claims_cycle
