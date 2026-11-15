@@ -32,11 +32,14 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .city .building.castle{background:linear-gradient(145deg,#8b633ddf,#302a39ed);border-color:#ffe09a;box-shadow:0 0 0 1px #f4d78e66,0 6px 15px #0009}
 /* In WebGL mode the buttons are transparent hit targets, not opaque cards:
    the actual Three.js architecture remains visible beneath its own label. */
-.city.has-3d .building{background:linear-gradient(180deg,#0c17250a 42%,#0c1725a8 100%);backdrop-filter:none;border-color:#e7bd6866;box-shadow:0 3px 10px #07150e55;justify-content:end;padding-bottom:10px}
+.city.has-3d{display:block;padding:0}
+.city.has-3d .building{position:absolute;left:50%;top:50%;width:clamp(76px,22%,112px);height:56px;min-height:44px;transform:translate(-50%,-18%);background:linear-gradient(180deg,#0c172500 38%,#0c1725bd 100%);backdrop-filter:none;border-color:#e7bd6866;box-shadow:0 3px 10px #07150e55;justify-content:end;padding:5px 4px 8px;z-index:2}
+.city.has-3d .building:hover{transform:translate(-50%,-18%) translateY(-2px) scale(1.02)}
+.city.has-3d .building[hidden]{display:none!important}
 .city.has-3d .building .emoji{display:none}
 .city.has-3d .building strong{font-size:12px;text-shadow:0 2px 4px #000}
 .city.has-3d .building small{font-size:10px;text-shadow:0 2px 4px #000}
-.city.has-3d .building.castle{background:linear-gradient(180deg,#0c172500 34%,#142b44c9 100%);border:1px solid #ffe09a;box-shadow:inset 0 0 0 1px #f4d78e55,0 4px 12px #0007}
+.city.has-3d .building.castle{background:linear-gradient(180deg,#0c172500 34%,#142b44d9 100%);border:1px solid #ffe09a;box-shadow:inset 0 0 0 1px #f4d78e55,0 4px 12px #0007}
 @media(prefers-reduced-motion:no-preference){.city .building{transition:transform .18s ease,border-color .18s ease}.city .building:hover{transform:translateY(-3px) scale(1.025)}}
 </style>  <link rel="stylesheet" href="/styles/navigation.css">
 </head>
@@ -122,6 +125,25 @@ function watchKingdomScene(){
  if("ResizeObserver" in window){kingdomResizeObserver=new ResizeObserver(()=>drawKingdomScene(state?.buildings||[]));kingdomResizeObserver.observe(host);}
  else{kingdomResizeHandler=()=>drawKingdomScene(state?.buildings||[]);window.addEventListener("resize",kingdomResizeHandler,{passive:true});}
 }
+window.addEventListener("coi:kingdom-projection",event=>{
+ const city=document.getElementById("city");if(!city)return;
+ const positions=Array.isArray(event.detail?.positions)?event.detail.positions:[];
+ city.querySelectorAll("[data-building]").forEach((button,index)=>{
+  const point=positions[index];
+  if(!point||point.visible!==true||!Number.isFinite(point.left)||!Number.isFinite(point.top)){button.hidden=true;return;}
+  button.hidden=false;
+  button.style.left=point.left.toFixed(3)+"%";
+  button.style.top=point.top.toFixed(3)+"%";
+ });
+});
+window.addEventListener("coi:kingdom-2d-fallback",()=>{
+ const city=document.getElementById("city");if(!city)return;
+ city.querySelectorAll("[data-building]").forEach(button=>{
+  button.hidden=false;
+  button.style.left="";
+  button.style.top="";
+ });
+});
 function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";document.getElementById("resources").innerHTML=[["🌾","Comida","food"],["🪵","Madeira","wood"],["🪨","Pedra","stone"],["⛓️","Ferro","iron"],["🪙","Ouro","gold"]].map(([icon,label,key])=>'<div class="resource">'+icon+'<b>'+fmt(k[key])+'</b>'+label+'</div>').join("");
 const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings);if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[]}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
