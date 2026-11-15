@@ -102,3 +102,16 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - Cada jogador pode registrar um nickname público único (3–20 caracteres), normalizado para evitar duplicatas por diferenças de maiúsculas/minúsculas.
 - A busca autenticada usa prefixo de nickname, exclui o próprio jogador e retorna somente nickname, reino, nível do castelo e poder; identificadores internos e dados de conta nunca são expostos.
 - Limites separados por jogador e rede protegem a rota de descoberta. A migração 0013_player_nicknames.sql adiciona a tabela sem alterar os dados existentes.
+
+
+## Busca global — melhoria 0014
+- A pesquisa unifica jogadores por nickname, reinos, alianças, territórios e skins na mesma API autenticada.
+- FTS5 com prefixos continua ativo; índices trigram adicionais cobrem correspondências parciais no meio de nomes e termos, com normalização de acentos.
+- Resultados são deduplicados, priorizam correspondência exata/prefixo e não expõem IDs internos. O fallback SQL continua disponível se um índice FTS estiver indisponível.
+- A navegação mantém os resultados visíveis ao enviar a busca, informa falhas de sessão/limite/conexão e encaminha categorias para a tela de pesquisa compatível.
+
+## Evento mundial Anjo da Morte
+- Evento PvE automático semanal, sexta-feira às 18:00 até segunda-feira às 00:00 no fuso America/Sao_Paulo.
+- O servidor mantém o chefe, a vida global, os ataques, as perdas permanentes, a pontuação e o ranking no D1.
+- Somente ataques do Anjo da Morte removem tropas permanentemente; batalhas PvE comuns e ataques de território devolvem todas as tropas, mantendo as baixas simuladas apenas no relatório.
+- A classificação é encerrada automaticamente no fim do evento e as recompensas são creditadas uma única vez por reino, incluindo gemas, recursos e Essência da Morte.
