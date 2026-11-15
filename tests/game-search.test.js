@@ -93,7 +93,7 @@ test("search merges ranked matches across names, alliance tags, descriptions and
   assert.ok(worker.includes("const exactMatch=searchableFields.some(value=>value===queryKey)"));
   assert.ok(worker.includes("const prefixMatch=searchableFields.some(value=>value.startsWith(queryKey))"));
   assert.ok(worker.includes("const phraseMatch=searchableFields.some(value=>value.includes(queryKey))"));
-  assert.ok(worker.includes("coveredTokens===tokens.length?3:4"));
+  assert.ok(worker.includes("coveredTokens===tokens.length?3:typoCount!==null?4:5"));
   assert.ok(worker.includes('engine:usedFts?"fts5+trigram":"like-fallback"'));
   assert.ok(worker.includes("limit*4"));
   assert.ok(!worker.includes("player_email"));
