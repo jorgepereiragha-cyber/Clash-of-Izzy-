@@ -21,7 +21,7 @@ export function selectKingdomQualityProfile({
   return Object.freeze({
     tier,
     pixelRatioCap: tier === "low" ? 1 : tier === "high" ? 1.5 : 1.25,
-    shadows: tier !== "low" && width > 680,
+    shadows: tier === "high" || (tier === "balanced" && width > 1024),
     shadowMapSize: tier === "high" ? 1536 : tier === "balanced" ? 1024 : 512,
     anisotropy: tier === "high" ? 8 : tier === "balanced" ? 4 : 2,
     maxBuildings: 16,
