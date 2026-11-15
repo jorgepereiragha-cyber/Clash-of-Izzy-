@@ -9,6 +9,7 @@ ON CONFLICT(rate_key) DO UPDATE SET
   END,
   window_started_at=excluded.window_started_at,
   expires_at=excluded.expires_at
+WHERE api_rate_limits.window_started_at<=excluded.window_started_at
 RETURNING request_count,window_started_at
 `;
 
@@ -52,7 +53,24 @@ export async function consumeRateLimit({
   const row = await db.prepare(RATE_LIMIT_SQL)
     .bind(rateKey, windowStartedAt, windowStartedAt + safeWindow * 2)
     .first();
-  if (!row || !Number.isSafeInteger(Number(row.request_count))) {
+  if (!row) {
+    // A delayed request from an older window must not roll the counter backwards.
+    // Treat that stale request as blocked; the next request uses the current window.
+    const current = await db.prepare(
+      "SELECT request_count,window_started_at FROM api_rate_limits WHERE rate_key=?"
+    ).bind(rateKey).first();
+    if (!current || !Number.isSafeInteger(Number(current.request_count))) {
+      throw new Error("Rate limit storage returned an invalid counter.");
+    }
+    const resetAt = Number(current.window_started_at) + safeWindow;
+    return {
+      allowed: false,
+      remaining: 0,
+      retryAfterSeconds: Math.max(1, resetAt - now),
+      resetAt
+    };
+  }
+  if (!Number.isSafeInteger(Number(row.request_count))) {
     throw new Error("Rate limit storage returned an invalid counter.");
   }
   return {
