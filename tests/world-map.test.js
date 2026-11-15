@@ -28,6 +28,8 @@ test("territory actions submit intent and troop quantities to the server API", (
   assert.match(script, /targetId: territory\.id/);
   assert.match(script, /marchType, units/);
   assert.match(script, /tier\) === 1/);
+  assert.match(script, /const defaultValue = 0/);
+  assert.match(script, /availableTypes\.has\(unitType\)/);
 });
 
 test("world map renders untrusted territory labels with DOM text, not HTML injection", () => {
