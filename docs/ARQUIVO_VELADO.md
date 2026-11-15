@@ -40,3 +40,5 @@ A Vigília preserva mapas, registros de guerras, rotas desaparecidas e observaç
 - Game Developer: environmental storytelling pode comunicar história por objetos, arquitetura e pistas ambientais, sem exigir exposição constante. https://www.gamedeveloper.com/design/what-you-give-is-what-you-get-environmental-storytelling-in-games
 - SAGE: itens colecionáveis, descrições e diários podem construir lore opcional. https://journals.sagepub.com/doi/10.1177/2042753019834957
 
+## Protótipo de campanha associado
+O Centro de Comando inclui agora a campanha local **A Primeira Fenda**, desbloqueada visualmente no Castelo nível 3. Ela apresenta três capítulos inspirados com respeito em Gênesis 4, um registro de Basilisco no bestiário e a descoberta narrativa Cartografia das Fundações. O progresso usa `coi_origin_campaign_v1` no armazenamento local do navegador. Não sincroniza com a conta, não concede recursos, não executa combate e não cria uma tecnologia funcional. Para produção, precisa de validação e persistência no servidor.
