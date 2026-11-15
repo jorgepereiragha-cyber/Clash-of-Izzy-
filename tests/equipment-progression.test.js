@@ -52,3 +52,16 @@ test("críticos são determinísticos e a duração da marcha respeita limites",
   assert.equal(calculateMarchDuration(120,50),80);
   assert.equal(calculateMarchDuration(120,100),80);
 });
+
+
+test("heróis convocados e herói inicial compartilham uma única identidade de equipamento", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("async function syncHeroSystems"));
+  assert.ok(worker.includes("INSERT OR IGNORE INTO hero_inventory"));
+  assert.ok(worker.includes("ON CONFLICT(kingdom_id,hero_key) DO UPDATE"));
+  assert.ok(worker.includes("const activeHeroKey=(heroInventory.results||[])[0]?.hero_key"));
+  assert.ok(worker.includes("activeHero?.hero_key?await env.DB.prepare"));
+  assert.ok(worker.includes("UPDATE hero_inventory SET level=level+1,experience=experience+100"));
+  assert.ok(worker.includes("UPDATE heroes SET level=level+1,experience=experience+100"));
+  assert.ok(worker.includes("HERO_RARITY[inventoryHero.rarity]?.maxLevel"));
+});
