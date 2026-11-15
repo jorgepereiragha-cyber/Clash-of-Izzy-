@@ -72,3 +72,18 @@ test("renderer degrades gracefully on low-memory Android and WebGL context loss"
   assert.match(renderer, /host\.classList\.remove\("has-3d"\)/);
   assert.match(renderer, /arte 2D restaurada/);
 });
+
+
+test("GLB clones are attached to the scene and late asset loads use the newest kingdom state", () => {
+  assert.match(renderer, /scene\.add\(group\);\s*activeModels\.push\(group\)/);
+  assert.match(renderer, /let latestBuildings = \[\]/);
+  assert.match(renderer, /latestBuildings = Array\.isArray\(buildings\) \? buildings : \[\]/);
+  assert.match(renderer, /renderBuildings\(latestBuildings\)/);
+});
+
+test("WebGL loss disconnects resize observers and prevents rendering through a disposed renderer", () => {
+  assert.match(renderer, /resizeObserver\?\.disconnect\(\)/);
+  assert.match(renderer, /if \(!renderer \|\| !scene \|\| !camera\) return/);
+  assert.match(renderer, /renderer = null/);
+  assert.match(renderer, /window\.removeEventListener\("resize", resizeHandler\)/);
+});
