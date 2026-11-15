@@ -35,3 +35,19 @@ test("navigation is a static section search, not an unsafe HTML search result re
   assert.ok(nav.includes("window.__COI_NAV__"));
   assert.ok(!nav.includes("results.innerHTML"));
 });
+
+
+test("shared navigation searches authenticated online game entities safely", async () => {
+  const nav = await read("navigation.js");
+  for (const snippet of [
+    'fetch("/api/game/search?"',
+    'Authorization:"Bearer "+token',
+    'new AbortController()',
+    'new URLSearchParams({q:query,type:"all",limit:"8"})',
+    'coi-nav-online-result',
+    '"/alliance.html?"'
+  ]) assert.ok(nav.includes(snippet), "missing online search behavior: " + snippet);
+  assert.ok(nav.includes("strong.textContent"));
+  assert.ok(nav.includes("small.textContent"));
+  assert.ok(!nav.includes("results.innerHTML"));
+});
