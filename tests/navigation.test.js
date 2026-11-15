@@ -96,3 +96,25 @@ test("global navigation supports one-character CJK searches and accent-insensiti
   assert.ok(nav.includes("Script=Han"));
   assert.ok(nav.includes("normalizeSearch(item.label+\" \"+item.keywords).includes(normalized)"));
 });
+
+
+test("player results only offer invitations to kingdoms outside an alliance", async () => {
+  const alliance = await read("alliance.html");
+  const start=alliance.indexOf('if(item.type==="player"||item.type==="kingdom")');
+  const end=alliance.indexOf('}else if(item.type==="alliance"){',start);
+  assert.ok(start>=0&&end>start);
+  const selection=alliance.slice(start,end);
+  assert.ok(selection.includes("item.allianceTag"));
+  assert.ok(selection.includes('$("inviteName").value=item.type==="player"?item.kingdom_name:item.name'));
+  assert.ok(!selection.includes('location.href="/world.html?search="'));
+  assert.ok(alliance.includes('location.href="/world.html?search="+encodeURIComponent(item.name)'));
+  assert.ok(alliance.includes('location.href="/equipment-ui.html?search="+encodeURIComponent(item.name)'));
+});
+
+test("global navigation supports CJK codepoint queries and accent-insensitive local sections", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes("const queryEligible = value"));
+  assert.ok(nav.includes("Array.from(String(value||\"\")).length"));
+  assert.ok(nav.includes("Script=Han"));
+  assert.ok(nav.includes("normalizeSearch(item.label+\" \"+item.keywords).includes(normalized)"));
+});
