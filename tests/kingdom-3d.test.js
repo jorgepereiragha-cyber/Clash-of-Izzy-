@@ -81,6 +81,17 @@ test("rendered scene preserves accessible interactive building controls", () => 
 });
 
 
+test("building hit targets are projected from the isometric camera and refreshed after resize", () => {
+  assert.match(renderer, /function publishBuildingHitTargets\(buildings = latestBuildings\)/);
+  assert.match(renderer, /new THREE\.Vector3\(x, \.18, z\)\.project\(camera\)/);
+  assert.match(renderer, /new CustomEvent\("coi:kingdom-projection"/);
+  assert.match(renderer, /publishBuildingHitTargets\(latestBuildings\)/);
+  assert.match(renderer, /url\.pathname\.startsWith\("\/assets\/3d\/"\)/);
+  assert.match(kingdom, /button\.style\.left=point\.left\.toFixed\(3\)/);
+  assert.match(kingdom, /button\.style\.top=point\.top\.toFixed\(3\)/);
+  assert.match(kingdom, /coi:kingdom-2d-fallback/);
+});
+
 test("state refresh keeps the live WebGL canvas mounted in the kingdom", () => {
   assert.match(kingdom, /const kingdom3d=city\.querySelector\("#kingdom3d"\)/);
   assert.match(kingdom, /if\(kingdom3d\)city\.append\(kingdom3d\)/);

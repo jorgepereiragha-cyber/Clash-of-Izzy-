@@ -34,14 +34,19 @@ test("edifícios 3D possuem silhuetas e marcos próprios por função", async ()
   assert.match(renderer, /new THREE\.TorusGeometry/);
 });
 
-test("grade interativa não encobre os edifícios 3D e mantém âncoras alinhadas", async () => {
+test("alvos dos edifícios seguem a projeção isométrica real, inclusive após resize", async () => {
   const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
   const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
   assert.match(renderer, /const col = i % 3, row = Math\.floor\(i \/ 3\)/);
   assert.match(renderer, /Math\.min\(9, qualityProfile\?\.maxBuildings \|\| 9\)/);
-  assert.match(kingdom, /\.city\.has-3d \.building\{background:linear-gradient/);
+  assert.match(renderer, /function publishBuildingHitTargets\(buildings = latestBuildings\)/);
+  assert.match(renderer, /new THREE\.Vector3\(x, \.18, z\)\.project\(camera\)/);
+  assert.match(renderer, /publishBuildingHitTargets\(latestBuildings\)/);
+  assert.match(kingdom, /\.city\.has-3d\{display:block;padding:0\}/);
   assert.match(kingdom, /\.city\.has-3d \.building \.emoji\{display:none\}/);
-  assert.match(kingdom, /transparent hit targets/);
+  assert.match(kingdom, /window\.addEventListener\("coi:kingdom-projection"/);
+  assert.match(kingdom, /button\.style\.left=point\.left\.toFixed\(3\)/);
+  assert.match(kingdom, /coi:kingdom-2d-fallback/);
 });
 
 test("tema compartilhado define tokens da marca e acessibilidade básica", async () => {

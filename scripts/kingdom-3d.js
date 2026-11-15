@@ -449,6 +449,26 @@ if (host && "WebGLRenderingContext" in window) {
     // Forest is batched into three instanced draw calls instead of one per tree part.
     addForestInstances();
   }
+  function publishBuildingHitTargets(buildings = latestBuildings) {
+    if (!host || !camera || !renderer || disposed) return;
+    camera.updateMatrixWorld(true);
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
+    const positions = list.map((building, index) => {
+      const col = index % 3, row = Math.floor(index / 3);
+      const x = (col - 1) * 4.15, z = (row - 1) * 3.15;
+      const projected = new THREE.Vector3(x, .18, z).project(camera);
+      const visible = projected.z >= -1 && projected.z <= 1
+        && projected.x >= -1 && projected.x <= 1
+        && projected.y >= -1 && projected.y <= 1;
+      return {
+        type: building?.building_type || "",
+        left: (projected.x * .5 + .5) * 100,
+        top: (1 - (projected.y * .5 + .5)) * 100,
+        visible
+      };
+    });
+    window.dispatchEvent(new CustomEvent("coi:kingdom-projection", { detail: { positions } }));
+  }
   function renderBuildings(buildings) {
     latestBuildings = Array.isArray(buildings) ? buildings : [];
     if (!renderer || !scene || !camera) return;
@@ -462,8 +482,8 @@ if (host && "WebGLRenderingContext" in window) {
       });
     }
     activeModels = [];
-    // The HTML interaction layer is a 3x3 grid; keep 3D anchors in the
-    // exact same cells so transparent hit targets sit over the real buildings.
+    // Keep deterministic world-space building anchors. HTML hit targets are
+    // projected into screen coordinates from this same camera below.
     const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
     list.forEach((b, i) => {
       const col = i % 3, row = Math.floor(i / 3);
@@ -476,6 +496,7 @@ if (host && "WebGLRenderingContext" in window) {
       activeModels.push(group);
     });
     renderer.render(scene, camera);
+    publishBuildingHitTargets(list);
   }
   function stopArmyAnimationLoop() {
     if (animationFrame) cancelAnimationFrame(animationFrame);
@@ -742,6 +763,7 @@ if (host && "WebGLRenderingContext" in window) {
       disposed = true;
       stopArmyAnimationLoop();
       host.classList.remove("has-3d");
+      window.dispatchEvent(new CustomEvent("coi:kingdom-2d-fallback"));
       delete host.dataset.qualityTier;
       if (window.__coiKingdomDiagnostics === diagnostics) delete window.__coiKingdomDiagnostics;
       resizeObserver?.disconnect();
@@ -786,6 +808,7 @@ if (host && "WebGLRenderingContext" in window) {
       renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }));
       renderer.setSize(host.clientWidth, host.clientHeight, false);
       renderer.render(scene, camera);
+      publishBuildingHitTargets(latestBuildings);
     };
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
     else { resizeHandler = resize; window.addEventListener("resize", resizeHandler, { passive: true }); }
@@ -807,6 +830,7 @@ if (host && "WebGLRenderingContext" in window) {
     scene = null;
     camera = null;
     host.classList.remove("has-3d");
+      window.dispatchEvent(new CustomEvent("coi:kingdom-2d-fallback"));
     delete host.dataset.qualityTier;
     delete window.__coiKingdomDiagnostics;
     console.warn("Clash of Izzy: WebGL indisponível; mantendo arte procedural 2D.", error);
