@@ -32,6 +32,43 @@ if (host && "WebGLRenderingContext" in window) {
   };
   const sharedMaterials = new Set(Object.values(mats));
   const surfaceTextureCache = new Map();
+  let disposed = false;
+  let kingdomRenderHandler = null;
+
+  // Explicitly release GPU-backed resources on WebGL context loss. Three.js
+  // resources are not reclaimed by the browser's garbage collector.
+  function disposeObject3D(root, resources) {
+    if (!root) return;
+    root.traverse(node => {
+      if (node.geometry) resources.geometries.add(node.geometry);
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      for (const mat of materials) {
+        if (!mat) continue;
+        resources.materials.add(mat);
+        for (const value of Object.values(mat)) {
+          if (value?.isTexture) resources.textures.add(value);
+        }
+      }
+    });
+  }
+  function disposeSceneResources() {
+    const resources = { geometries: new Set(), materials: new Set(), textures: new Set() };
+    disposeObject3D(scene, resources);
+    for (const template of glbTemplates.values()) disposeObject3D(template, resources);
+    for (const texture of surfaceTextureCache.values()) resources.textures.add(texture);
+    for (const mat of Object.values(mats)) {
+      if (!mat) continue;
+      resources.materials.add(mat);
+      if (mat.map) resources.textures.add(mat.map);
+    }
+    for (const geometry of resources.geometries) geometry.dispose();
+    for (const texture of resources.textures) texture.dispose();
+    for (const mat of resources.materials) mat.dispose();
+    scene?.clear();
+    surfaceTextureCache.clear();
+    glbTemplates.clear();
+    activeModels = [];
+  }
   // Small, deterministic, tileable procedural albedo maps add material identity
   // without shipping large image files or creating per-building texture copies.
   function makeSurfaceTexture(base, kind, seed) {
@@ -321,12 +358,17 @@ if (host && "WebGLRenderingContext" in window) {
     };
     window.__coiKingdomDiagnostics = diagnostics;
     const restore2DFallback = () => {
+      if (disposed) return;
+      disposed = true;
       host.classList.remove("has-3d");
       delete host.dataset.qualityTier;
       if (window.__coiKingdomDiagnostics === diagnostics) delete window.__coiKingdomDiagnostics;
       resizeObserver?.disconnect();
       resizeObserver = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+      if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+      disposeSceneResources();
+      ktx2?.dispose();
       renderer?.domElement.remove();
       renderer?.dispose();
       renderer = null;
@@ -336,7 +378,8 @@ if (host && "WebGLRenderingContext" in window) {
       restore2DFallback();
       console.warn("Clash of Izzy: contexto WebGL perdido; arte 2D restaurada.");
     }, { once: true });
-    window.addEventListener("coi:kingdom-render", event => { const list = event.detail?.buildings || []; renderBuildings(list); loadOptionalGlbAssets(list); });
+    kingdomRenderHandler = event => { const list = event.detail?.buildings || []; renderBuildings(list); if (!disposed) loadOptionalGlbAssets(list); };
+    window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
     if (Array.isArray(window.__coiKingdomBuildings)) { renderBuildings(window.__coiKingdomBuildings); loadOptionalGlbAssets(window.__coiKingdomBuildings); }
     const resize = () => {
       if (!renderer || !host.clientWidth || !host.clientHeight) return;
