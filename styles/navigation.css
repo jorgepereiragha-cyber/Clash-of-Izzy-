@@ -14,3 +14,8 @@
 @media(prefers-reduced-motion:reduce){.coi-global-nav *{scroll-behavior:auto!important;transition:none!important}}
 
 .coi-nav-group-label{padding:8px 10px 4px;color:#e7bd68;font-size:11px;font-weight:900;text-transform:uppercase;letter-spacing:.08em}.coi-nav-results a.coi-nav-online-result{border-top:1px solid #344a60}.coi-nav-results a.coi-nav-online-result strong{color:#f7e7c2}.coi-nav-results a.coi-nav-online-result small{color:#b9c5d4}
+
+.coi-nav-install{padding:8px 12px;border:1px solid #e7bd68;border-radius:8px;background:#24476b;color:#f5edda;font:700 12px system-ui,sans-serif;cursor:pointer;white-space:nowrap}
+.coi-nav-install:hover{background:#31577d}
+.coi-nav-install:disabled{opacity:.55;cursor:wait}
+.coi-nav-connection{flex-basis:100%;padding:7px 10px;border:1px solid #a9433b;border-radius:8px;background:#4b2528;color:#ffe0dc;font-size:12px;font-weight:700}
