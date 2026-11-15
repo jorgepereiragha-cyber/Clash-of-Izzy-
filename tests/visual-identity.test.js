@@ -34,6 +34,16 @@ test("edifícios 3D possuem silhuetas e marcos próprios por função", async ()
   assert.match(renderer, /new THREE\.TorusGeometry/);
 });
 
+test("grade interativa não encobre os edifícios 3D e mantém âncoras alinhadas", async () => {
+  const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
+  const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.match(renderer, /const col = i % 3, row = Math\.floor\(i \/ 3\)/);
+  assert.match(renderer, /Math\.min\(9, qualityProfile\?\.maxBuildings \|\| 9\)/);
+  assert.match(kingdom, /\.city\.has-3d \.building\{background:linear-gradient/);
+  assert.match(kingdom, /\.city\.has-3d \.building \.emoji\{display:none\}/);
+  assert.match(kingdom, /transparent hit targets/);
+});
+
 test("tema compartilhado define tokens da marca e acessibilidade básica", async () => {
   const css = await readFile(new URL("../styles/coi-theme.css", import.meta.url), "utf8");
   for (const token of ["--coi-night:", "--coi-blue:", "--coi-gold:", "--coi-parchment:", "--coi-forest:", "--coi-war:"]) {
