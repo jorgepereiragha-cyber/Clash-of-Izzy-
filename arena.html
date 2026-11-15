@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<meta name="theme-color" content="#101a2b"><title>Clash of Izzy: Arena</title>
+<meta name="theme-color" content="#142b44"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icon-192.svg" type="image/svg+xml"><title>Clash of Izzy: Arena</title>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#101a2b;color:#f5edda;font:14px Arial,sans-serif;overflow:hidden}canvas{display:block}
 #hud{position:fixed;inset:10px 10px auto;display:flex;justify-content:space-between;gap:8px;pointer-events:none;z-index:2}.card{background:#101a2be8;border:1px solid #b88b45;border-radius:9px;padding:9px 12px;box-shadow:0 4px 16px #0008}.brand{font-weight:900;color:#f1c46a;letter-spacing:1px}.stats{display:flex;gap:12px;flex-wrap:wrap}.bar{height:8px;background:#3a3030;border-radius:8px;overflow:hidden;margin-top:4px;min-width:120px}.fill{height:100%;width:100%;background:#39bd69;transition:width .12s linear}.mana{background:#4b9ce5}.bar-caption{display:flex;justify-content:space-between;gap:8px;margin-top:3px;font-size:9px;color:#cbd5e1}.bar.critical{outline:1px solid #ff5252;box-shadow:0 0 9px #ff3030;animation:hp-warning .8s ease-in-out infinite alternate}.bar.critical .fill{background:#ed4545}@keyframes hp-warning{from{opacity:.72}to{opacity:1}}
@@ -432,4 +432,4 @@ if(new URLSearchParams(location.search).get('debug')==='1'){const panel=document
 let last=performance.now();function loop(now){requestAnimationFrame(loop);const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);updateMapChunks(dt);renderer.render(scene,camera);adaptRenderResolution(dt)}requestAnimationFrame(loop);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
 updateHud();
-</script></body></html>
+</script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script></body></html>
