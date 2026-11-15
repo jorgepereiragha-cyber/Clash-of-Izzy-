@@ -52,3 +52,18 @@
 - Tier high: até 16 edifícios visíveis, DPR máximo 1.5 e orçamento de 4,2 milhões de pixels.
 - O limite de pixels tem precedência sobre qualquer piso de resolução; em viewports extremos o DPR pode cair abaixo de 0.5 para não exceder o orçamento.
 - A quantidade de edifícios afeta apenas a representação 3D visível; o estado completo continua no servidor e na interface de gestão.
+
+
+## Referências técnicas e decisões de plataforma
+- Three.js WebGLRenderer usa WebGL 2 e precisa de `.dispose()` para liberar recursos GPU: https://threejs.org/docs/pages/WebGLRenderer.html
+- Instâncias devem ser usadas para objetos repetidos e também precisam de descarte explícito: https://threejs.org/docs/pages/InstancedMesh.html
+- glTF 2.0 é o formato runtime de entrega de cenas, meshes, materiais PBR, animações e hierarquias: https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html
+- Khronos mantém registro oficial de especificações e extensões glTF: https://registry.khronos.org/glTF/
+- Android ADPF/ Thermal API pode informar estresse térmico em uma aplicação nativa; a PWA atual não lê diretamente o PowerManager, então não inventa estado térmico via JavaScript: https://developer.android.com/games/optimize/adpf/thermal
+- Para um futuro shell Android nativo, reduzir frame rate, tesselação, sombras e carga de CPU/GPU quando houver estresse térmico, e validar frame pacing em aparelhos reais.
+
+## Gaps reais antes de chamar a cidade de "arte final"
+- O castelo Meshy texturizado ainda não foi baixado nem incorporado; a cena usa o castelo procedural como fallback.
+- O manifesto GLB existe, mas ainda está vazio; nenhum modelo artístico GLB/KTX2 real foi publicado no projeto.
+- O pipeline está preparado para GLB/Draco/KTX2, mas precisa de assets licenciados, validação de tamanho, LOD e testes visuais em Android físico.
+- Não marcar o trabalho como concluído só porque o módulo 3D ou o bundle compila.
