@@ -49,7 +49,11 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0007`. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0008`. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE; `0008` registra resgates idempotentes de missões diárias.
+
+## Eventos e LiveOps
+
+A central de eventos já inclui missões diárias reais no servidor: treinar tropas, melhorar edifícios, concluir pesquisas e participar de batalhas PvE. O progresso é calculado a partir dos registros existentes em `kingdom_events` e `battle_reports`; o cliente não informa pontuação. A migração `0008` garante um único resgate por reino, missão e dia UTC. O calendário sazonal, chefes globais, torneios de aliança e eventos entre reinos permanecem identificados como em desenvolvimento e não concedem recompensas ainda.
 
 ## Segurança e consistência
 
