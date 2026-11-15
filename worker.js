@@ -373,14 +373,14 @@ async function processMarches(env,kingdomId){
   try{
    let target=null;
    if(m.march_type==="attack"){
-    target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(m.target_territory_id).first();
+    target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until,(SELECT alliance_id FROM alliance_members WHERE kingdom_id=t.owner_kingdom_id LIMIT 1) AS owner_alliance_id FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(m.target_territory_id).first();
     if(target){
      territoryLockToken=crypto.randomUUID();
      const lockExpiresAt=new Date(Date.now()+180000).toISOString();
      const lockResult=await env.DB.prepare("UPDATE world_territories SET combat_lock_token=?,combat_lock_expires_at=? WHERE id=? AND (combat_lock_token IS NULL OR combat_lock_expires_at IS NULL OR combat_lock_expires_at<=?)")
        .bind(territoryLockToken,lockExpiresAt,m.target_territory_id,now).run();
      if(!lockResult.meta?.changes)continue;
-     target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=? AND t.combat_lock_token=?").bind(m.target_territory_id,territoryLockToken).first();
+     target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until,(SELECT alliance_id FROM alliance_members WHERE kingdom_id=t.owner_kingdom_id LIMIT 1) AS owner_alliance_id FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=? AND t.combat_lock_token=?").bind(m.target_territory_id,territoryLockToken).first();
     }
    }
 
@@ -393,7 +393,8 @@ async function processMarches(env,kingdomId){
    const isPveAttack=m.march_type==="attack"&&target&&target.owner_kingdom_id==null&&target.alliance_id==null&&m.target_owner_kingdom_id==null;
    const isPvpCandidate=m.march_type==="attack"&&target&&target.owner_kingdom_id!=null
      &&Number(target.owner_kingdom_id)!==Number(kingdomId)
-     &&Number(target.owner_kingdom_id)===Number(m.target_owner_kingdom_id);
+     &&Number(target.owner_kingdom_id)===Number(m.target_owner_kingdom_id)
+     &&!target.alliance_id&&!target.owner_alliance_id;
 
    // Serialize every march resolution with the kingdom garrison. PvP additionally
    // locks the defender so returning gather/scout troops cannot alter a live snapshot.
@@ -480,7 +481,7 @@ async function processMarches(env,kingdomId){
      battleLog.push({event:"attack_cancelled",reason:"attacker_kingdom_unavailable"});
     }
    }else if(m.march_type==="attack"){
-    pvpCancelledReason=target?"territory_owner_changed_or_invalid":"territory_missing";
+    pvpCancelledReason=target?(target.alliance_id||target.owner_alliance_id?"alliance_claimed_territory":"territory_owner_changed_or_invalid"):"territory_missing";
    }
 
    const statements=[
@@ -675,7 +676,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,hero_key,hero_name,level,experience,rarity,assigned_to FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id").bind(kingdom.id).all(),
     env.DB.prepare("SELECT dragon_key,dragon_name,level,experience,bond FROM dragons WHERE kingdom_id=?").bind(kingdom.id).first(),
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT t.id,t.name,t.terrain,t.x,t.z,t.resource_type,t.resource_rate,t.owner_kingdom_id,t.alliance_id,t.level,t.shield_until,k.protection_until,k.kingdom_name AS owner_kingdom_name,a.name AS alliance_name,a.tag AS alliance_tag FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id LEFT JOIN alliances a ON a.id=t.alliance_id ORDER BY t.id").all(),
+    env.DB.prepare("SELECT t.id,t.name,t.terrain,t.x,t.z,t.resource_type,t.resource_rate,t.owner_kingdom_id,COALESCE(t.alliance_id,(SELECT alliance_id FROM alliance_members WHERE kingdom_id=t.owner_kingdom_id LIMIT 1)) AS alliance_id,t.level,t.shield_until,k.protection_until,k.kingdom_name AS owner_kingdom_name,a.name AS alliance_name,a.tag AS alliance_tag FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id LEFT JOIN alliances a ON a.id=t.alliance_id ORDER BY t.id").all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT id,attacker_kingdom_id,defender_kingdom_id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id).all(),
     env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key").bind(kingdom.id).all(),
@@ -1187,12 +1188,12 @@ async function gameAction(env,playerId,body){
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
     if(k.battle_lock_token&&Date.parse(k.battle_lock_expires_at||"")>Date.now())return json({error:"Seu exército está resolvendo uma batalha. Aguarde o resultado antes de enviar outra marcha."},409);
-    const target=await env.DB.prepare("SELECT t.id,t.resource_type,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(targetId).first();
+    const target=await env.DB.prepare("SELECT t.id,t.resource_type,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until,(SELECT alliance_id FROM alliance_members WHERE kingdom_id=t.owner_kingdom_id LIMIT 1) AS owner_alliance_id FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(targetId).first();
     if(!target)return json({error:"Território não encontrado."},404);
     const marchType=String(body.marchType||"gather");
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
     if(marchType==="attack"&&Number(target.owner_kingdom_id)===Number(k.id))return json({error:"Este território já pertence ao seu reino."},409);
-    if(marchType==="attack"&&!target.owner_kingdom_id&&target.alliance_id)return json({error:"Este território está protegido por uma aliança. Ataques a territórios de aliança exigem uma guerra de alianças."},409);
+    if(marchType==="attack"&&(target.alliance_id||target.owner_alliance_id))return json({error:"Este território foi reivindicado por uma aliança. Ataques individuais ficam bloqueados até existir guerra de alianças."},409);
     if(marchType==="attack"&&target.owner_kingdom_id){
       const protectedUntil=[target.shield_until,target.protection_until].some(value=>value&&Date.parse(value)>Date.now());
       if(protectedUntil)return json({error:"Este reino está sob proteção e não pode ser atacado agora."},409);
