@@ -22,6 +22,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --ignore-scripts
+      - name: Validate D1 migrations locally
+        run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
       - name: Validate service worker
         run: node --check sw.js
       - name: Test combat simulator
