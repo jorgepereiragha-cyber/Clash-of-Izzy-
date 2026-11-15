@@ -109,13 +109,22 @@ test("quality profiles scale conservatively across low, balanced and high capabi
   assert.equal(low.tier, "low");
   assert.equal(low.pixelRatioCap, 1);
   assert.equal(low.shadows, false);
+  assert.equal(low.maxBuildings, 8);
   assert.equal(balanced.tier, "balanced");
   assert.equal(balanced.pixelRatioCap, 1.25);
   assert.equal(balanced.shadows, false);
+  assert.equal(balanced.maxBuildings, 12);
   assert.equal(high.tier, "high");
   assert.equal(high.pixelRatioCap, 1.5);
   assert.equal(high.shadows, true);
   assert.equal(high.maxBuildings, 16);
+});
+
+test("pixel budget wins over the old half-resolution floor on extreme mobile viewports", () => {
+  const low = selectKingdomQualityProfile({ deviceMemory: 3, hardwareConcurrency: 4, viewportWidth: 390, maxTextureSize: 4096 });
+  const ratio = calculateKingdomPixelRatio({ width: 2160, height: 3840, devicePixelRatio: 3, profile: low });
+  assert.ok(ratio < 0.5);
+  assert.ok(2160 * 3840 * ratio * ratio <= low.maxPixelCount + 1);
 });
 
 test("renderer diagnostics expose only local rendering counters and are cleaned on fallback", () => {
