@@ -21,14 +21,14 @@ header{padding:14px max(14px,env(safe-area-inset-right)) 14px max(14px,env(safe-
 <p class="muted">Pesquise jogadores, reinos, alianças, territórios e skins em um só lugar.</p>
 <form id="worldSearchForm" class="row">
 <label class="hidden" for="worldSearchQuery">Buscar no mundo</label>
-<input id="worldSearchQuery" type="search" minlength="2" maxlength="48" autocomplete="off" placeholder="Nickname, reino, aliança, território ou skin…" required>
+<input id="worldSearchQuery" type="search" maxlength="48" autocomplete="off" placeholder="Nickname, reino, aliança, território ou skin…" required>
 <label class="hidden" for="worldSearchType">Categoria</label>
 <select id="worldSearchType" aria-label="Categoria da busca" style="max-width:150px;flex:0 0 150px">
 <option value="all">Tudo</option><option value="players">Jogadores</option><option value="kingdoms">Reinos</option><option value="alliances">Alianças</option><option value="territories">Territórios</option><option value="skins">Skins</option>
 </select>
 <button type="submit">Buscar</button>
 </form>
-<div id="worldSearchResults" class="muted" role="status" aria-live="polite">Digite pelo menos 2 caracteres para começar.</div>
+<div id="worldSearchResults" class="muted" role="status" aria-live="polite">Digite 2 caracteres (ou 1 caractere CJK) para começar.</div>
 </section>
 <section id="noAlliance" class="panel hidden">
 <h2>🤝 Faça parte de uma aliança</h2><p class="muted">Crie sua própria aliança ou entre em uma usando a sigla recebida de outro comandante.</p>
@@ -52,6 +52,7 @@ header{padding:14px max(14px,env(safe-area-inset-right)) 14px max(14px,env(safe-
 <script>
 const API="/api";let token=null,state=null,busy=false;
 const $=id=>document.getElementById(id);
+const queryEligible=value=>{const length=Array.from(String(value||"")).length;const cjk=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(String(value||""));return length>=(cjk?1:2);};
 const esc=value=>String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch]));
 function status(message,error=false){$("status").textContent=message;$("status").classList.toggle("error",error)}
 async function request(path,options={}){const res=await fetch(API+path,{...options,headers:{...(options.headers||{}),...(token?{Authorization:"Bearer "+token}:{})}});const data=await res.json().catch(()=>({}));if(!res.ok)throw new Error(data.error||"Falha ao comunicar com o servidor.");return data}
@@ -83,7 +84,7 @@ $("worldSearchForm").addEventListener("submit",async event=>{
  const query=$("worldSearchQuery").value.trim();
  const type=$("worldSearchType").value;
  const output=$("worldSearchResults");
- if(query.length<2){output.textContent="Digite pelo menos 2 caracteres.";return;}
+ if(!queryEligible(query)){output.textContent="Digite 2 caracteres (ou 1 caractere CJK).";return;}
  output.textContent="Pesquisando no mundo…";
  try{
   const params=new URLSearchParams({q:query,type,limit:"10"});
@@ -96,25 +97,22 @@ $("worldSearchForm").addEventListener("submit",async event=>{
    const title=document.createElement("strong");
    title.textContent=item.type==="alliance"?item.name+" ["+item.tag+"]":item.name;
    const detail=document.createElement("small");
-   detail.textContent=item.type==="player"?"Jogador · "+(item.kingdom_name||"Reino")+" · Castelo "+Number(item.castle_level||1)+" · poder "+Number(item.power||0).toLocaleString("pt-BR"):item.type==="alliance"?"Aliança · nível "+item.level+" · "+item.members+" membros":item.type==="kingdom"?"Reino · poder "+Number(item.power||0).toLocaleString("pt-BR"):item.type==="territory"?"Território · "+(item.terrain||"terreno desconhecido"):"Catálogo · "+(item.description||"Skin cosmética");
+   detail.textContent=item.type==="player"?"Jogador · "+(item.kingdom_name||"Reino")+" · Castelo "+Number(item.castle_level||1)+" · poder "+Number(item.power||0).toLocaleString("pt-BR")+(item.allianceTag?" · Aliança ["+item.allianceTag+"]":""):item.type==="kingdom"?"Reino · poder "+Number(item.power||0).toLocaleString("pt-BR")+(item.allianceTag?" · Aliança ["+item.allianceTag+"]":""):item.type==="alliance"?"Aliança · nível "+item.level+" · "+item.members+" membros":item.type==="territory"?"Território · "+(item.terrain||"terreno desconhecido"):"Catálogo · "+(item.description||"Skin cosmética");
    button.append(title,detail);
    button.addEventListener("click",()=>{
-    if(item.type==="player"){
-      $("inviteName").value=item.kingdom_name;
+    if(item.type==="player"||item.type==="kingdom"){
+      if(item.allianceTag){status("Este reino já pertence à aliança ["+item.allianceTag+"].");return;}
+      $("inviteName").value=item.type==="player"?item.kingdom_name:item.name;
       $("inviteName").focus();
-      status("Jogador encontrado. Use Convidar para enviar o convite ao reino.");
-     }else if(item.type==="kingdom"){
-     $("inviteName").value=item.name;
-     $("inviteName").focus();
-     status("Reino selecionado. Use Convidar para enviar o convite.");
-    }else if(item.type==="alliance"){
+      status("Reino selecionado. Use Convidar para enviar o convite.");
+     }else if(item.type==="alliance"){
      $("joinTag").value=item.tag;
      $("joinTag").focus();
      status("Aliança selecionada. Use Solicitar entrada para continuar.");
     }else if(item.type==="territory"){
-     status("Território encontrado no índice mundial.");
-    }else if(item.type==="skin"){
-     status("Skin encontrada no catálogo.");
+      location.href="/world.html?search="+encodeURIComponent(item.name);
+     }else if(item.type==="skin"){
+      location.href="/equipment-ui.html?search="+encodeURIComponent(item.name);
     }
    });
    list.append(button);

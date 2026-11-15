@@ -23,6 +23,9 @@ let state = null;
 let selectedTerritoryId = null;
 let selectedUnits = {};
 let busy = false;
+const requestedTerritorySearch = new URLSearchParams(location.search).get("search") || "";
+let requestedTerritoryApplied = false;
+const normalizeTerritorySearch = value => String(value || "").normalize("NFKD").replace(/[\p{M}]/gu, "").toLocaleLowerCase("pt-BR").trim();
 
 function setStatus(message, error = false) {
   $("status").textContent = message;
@@ -197,6 +200,15 @@ async function refreshState() {
   const response = await request("/game/state");
   state = response.state || response;
   if (!state.kingdom) throw new Error("O servidor não retornou o reino.");
+  if (!requestedTerritoryApplied && requestedTerritorySearch) {
+    const query = normalizeTerritorySearch(requestedTerritorySearch);
+    const territories = state.territories || [];
+    const match = territories.find(item => normalizeTerritorySearch(item.name) === query)
+      || territories.find(item => normalizeTerritorySearch(item.name).startsWith(query))
+      || territories.find(item => normalizeTerritorySearch(item.name).includes(query));
+    if (match) selectedTerritoryId = match.id;
+    requestedTerritoryApplied = true;
+  }
   if (!getSelectedTerritory() && state.territories?.length) selectedTerritoryId = state.territories[0].id;
   render();
 }

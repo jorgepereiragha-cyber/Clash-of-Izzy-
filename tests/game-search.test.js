@@ -9,8 +9,8 @@ test("game search requires a valid player session and rate limits player and net
   assert.ok(worker.includes('url.pathname==="/api/game/search"&&request.method==="GET"'));
   assert.ok(worker.includes('rateLimitDecision(env,"game-search-player",playerId,30,60)'));
   assert.ok(worker.includes('rateLimitDecision(env,"game-search-network"'));
-  assert.ok(worker.includes('rawQuery.length<2'));
-  assert.ok(worker.includes('rawQuery.length>48'));
+  assert.ok(worker.includes('queryLength<(containsCjk?1:2)'));
+  assert.ok(worker.includes('queryLength>48'));
 });
 
 test("search accepts only public categories and builds a parameterized FTS query", async () => {
@@ -93,4 +93,65 @@ test("search merges ranked matches and never exposes internal identifiers", asyn
   assert.ok(worker.includes("limit*4"));
   assert.ok(!worker.includes("player_email"));
   assert.ok(!worker.includes("password_hash"));
+});
+
+
+test("short CJK queries use bounded LIKE fallback even when FTS prefix already returned a result", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("const queryLength=Array.from(rawQuery).length"));
+  assert.ok(worker.includes("queryLength<(containsCjk?1:2)"));
+  assert.ok(worker.includes("if(queryLength>48)"));
+  assert.ok(worker.includes("if(queryLength>=3)"));
+  assert.ok(!worker.includes("rawQuery.length>=3"));
+  assert.ok(worker.includes("needsShortUnicodeFallback=queryLength<3"));
+  assert.ok(worker.includes("Script=Hangul"));
+  assert.ok(worker.includes("queryLength<(containsCjk?1:2)"));
+  assert.ok(worker.includes("Script=Han"));
+  assert.ok(worker.includes("Script=Hiragana"));
+  assert.ok(worker.includes("Script=Katakana"));
+  assert.ok(worker.includes("Script=Hangul"));
+  assert.ok(worker.includes("!entitySubstringAvailable||needsShortUnicodeFallback"));
+  assert.ok(worker.includes("!playerSubstringAvailable||needsShortUnicodeFallback"));
+  assert.ok(worker.includes("if((kind===\"all\"||kind===\"kingdoms\")"));
+  assert.ok(worker.includes("if(!hasPlayers||!playerSubstringAvailable||needsShortUnicodeFallback)"));
+  assert.ok(worker.includes("const pattern=\"%\"+escaped+\"%\""));
+  assert.ok(worker.includes("nickname_key LIKE ? ESCAPE '!'"));
+});
+
+
+test("global search includes allied kingdoms, Portuguese word forms and resilient per-category fallbacks", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("kingdom_alliance_tag"));
+  assert.ok(worker.includes('allianceTag:row.kingdom_alliance_tag||""'));
+  assert.ok(!worker.includes("NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER))"));
+  assert.ok(!worker.includes("NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id)"));
+  assert.ok(worker.includes('normalized.endsWith("oes")'));
+  assert.ok(worker.includes('normalized.endsWith("aes")'));
+  assert.ok(worker.includes('normalized.endsWith("eis")'));
+  assert.ok(worker.includes("tokenVariants(token)"));
+  assert.ok(worker.includes('!hasType("kingdom")'));
+  assert.ok(worker.includes('!hasType("alliance")'));
+  assert.ok(worker.includes('!hasType("territory")'));
+  assert.ok(worker.includes('!hasType("skin")'));
+  assert.ok(worker.includes("entitySubstringAvailable=false"));
+  assert.ok(worker.includes("playerSubstringAvailable=false"));
+});
+
+test("CJK single-codepoint search is allowed while short Latin noise is rejected", async () => {
+  const worker = await read("worker.js");
+  const navigation = await read("navigation.js");
+  const alliance = await read("alliance.html");
+  assert.ok(worker.includes("queryLength<(containsCjk?1:2)"));
+  assert.ok(worker.includes("Script=Hangul"));
+  assert.ok(navigation.includes("return length>=(cjk?1:2)"));
+  assert.ok(alliance.includes("return length>=(cjk?1:2)"));
+  assert.ok(!alliance.includes('id="worldSearchQuery" type="search" minlength="2"'));
+});
+
+
+test("search fallback returns alliance tags for player nicknames without FTS", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag"));
+  assert.ok(worker.includes("playerSubstringAvailable=false"));
+  assert.ok(worker.includes("!playerSubstringAvailable||needsShortUnicodeFallback"));
 });

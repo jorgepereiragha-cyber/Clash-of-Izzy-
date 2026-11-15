@@ -76,3 +76,51 @@ test("permanent troop loss is isolated to Anjo da Morte attacks", async () => {
   assert.ok(normalBattle.includes("SET quantity=quantity"));
   assert.ok(worker.includes("survivors[u.unit_type]=u.quantity"));
 });
+
+
+test("first deployment during an already-started weekend schedules the next complete event", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.ok(worker.includes("const history=await env.DB.prepare"));
+  assert.ok(worker.includes("now.getTime()-Date.parse(window.startsAt)>15*60*1000"));
+  assert.ok(worker.includes("getAngelDeathWeekendWindow(new Date(Date.parse(window.startsAt)+7*86400000))"));
+});
+
+test("leaderboard ties follow the same stable ordering as final reward payout", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.ok(worker.includes("last_attack_at<?"));
+  assert.ok(worker.includes("kingdom_id<?"));
+  assert.ok(worker.includes("ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC"));
+  assert.ok(worker.includes("offset+=15"));
+});
+
+test("the browser reuses a pending attack request ID after a network retry", async () => {
+  const client = await readFile(new URL("../events.js", import.meta.url), "utf8");
+  assert.ok(client.includes('sessionStorage.getItem("coi_angel_death_request")'));
+  assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_request",pendingRequestId)'));
+  assert.ok(client.includes("requestId:pendingRequestId"));
+  assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_request")'));
+});
+
+
+test("first deployment in a weekend already in progress schedules a full next cycle", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.ok(worker.includes("const history=await env.DB.prepare"));
+  assert.ok(worker.includes("now.getTime()-Date.parse(window.startsAt)>15*60*1000"));
+  assert.ok(worker.includes("getAngelDeathWeekendWindow(new Date(Date.parse(window.startsAt)+7*86400000))"));
+});
+
+test("event ranking ties use the same deterministic ordering as payout", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.ok(worker.includes("last_attack_at<?"));
+  assert.ok(worker.includes("kingdom_id<?"));
+  assert.ok(worker.includes("ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC"));
+  assert.ok(worker.includes("offset+=15"));
+});
+
+test("attack requests reuse their idempotency key after a network retry", async () => {
+  const client = await readFile(new URL("../events.js", import.meta.url), "utf8");
+  assert.ok(client.includes('sessionStorage.getItem("coi_angel_death_request")'));
+  assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_request",pendingRequestId)'));
+  assert.ok(client.includes("requestId:pendingRequestId"));
+  assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_request")'));
+});

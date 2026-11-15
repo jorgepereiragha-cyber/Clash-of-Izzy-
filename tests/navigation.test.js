@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
@@ -86,4 +87,53 @@ test("global navigation exposes the Anjo da Morte weekend event", async () => {
   const nav = await read("navigation.js");
   assert.ok(nav.includes('href:"/events.html"'));
   assert.ok(nav.includes("anjo da morte"));
+});
+
+
+test("global navigation supports one-character CJK searches and accent-insensitive local sections", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes("const queryEligible = value"));
+  assert.ok(nav.includes("Array.from(String(value||\"\")).length"));
+  assert.ok(nav.includes("Script=Han"));
+  assert.ok(nav.includes("normalizeSearch(item.label+\" \"+item.keywords).includes(normalized)"));
+});
+
+
+test("player results only offer invitations to kingdoms outside an alliance", async () => {
+  const alliance = await read("alliance.html");
+  const start=alliance.indexOf('if(item.type==="player"||item.type==="kingdom")');
+  const end=alliance.indexOf('}else if(item.type==="alliance"){',start);
+  assert.ok(start>=0&&end>start);
+  const selection=alliance.slice(start,end);
+  assert.ok(selection.includes("item.allianceTag"));
+  assert.ok(selection.includes('$("inviteName").value=item.type==="player"?item.kingdom_name:item.name'));
+  assert.ok(!selection.includes('location.href="/world.html?search="'));
+  assert.ok(alliance.includes('location.href="/world.html?search="+encodeURIComponent(item.name)'));
+  assert.ok(alliance.includes('location.href="/equipment-ui.html?search="+encodeURIComponent(item.name)'));
+});
+
+test("global navigation supports CJK codepoint queries and accent-insensitive local sections", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes("const queryEligible = value"));
+  assert.ok(nav.includes("Array.from(String(value||\"\")).length"));
+  assert.ok(nav.includes("Script=Han"));
+  assert.ok(nav.includes("normalizeSearch(item.label+\" \"+item.keywords).includes(normalized)"));
+});
+
+
+test("alliance search inline script parses before deployment", async () => {
+  const html = await read("alliance.html");
+  const start = html.indexOf("<script>");
+  const end = html.indexOf("</script>", start);
+  assert.ok(start >= 0 && end > start, "alliance page must contain its application script");
+  new vm.Script(html.slice(start + 8, end), { filename: "alliance.html:inline-script" });
+});
+
+
+test("skin results are highlighted in the equipment catalog after navigation", async () => {
+  const equipment = await read("equipment-system.js");
+  assert.ok(equipment.includes("requestedSkinSearch"));
+  assert.ok(equipment.includes("searchFocusApplied"));
+  assert.ok(equipment.includes("matches[0].scrollIntoView"));
+  assert.ok(equipment.includes("normalizeSearch(card.textContent).includes(needle)"));
 });
