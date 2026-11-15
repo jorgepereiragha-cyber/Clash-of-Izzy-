@@ -86,3 +86,33 @@ test("game API does not expose wildcard CORS to unrelated origins", async () => 
   assert.doesNotMatch(worker, /Access-Control-Allow-Headers/);
   assert.match(arena, /const API_BASE=['"]\/api['"]/);
 });
+
+
+test("a delayed request cannot roll the stored window backwards", async () => {
+  const calls = [];
+  const db = {
+    prepare(sql) {
+      return {
+        bind(...values) {
+          return {
+            async first() {
+              calls.push({ sql, values });
+              if (sql.includes("INSERT INTO api_rate_limits")) return null;
+              return { request_count: 2, window_started_at: 1800 };
+            }
+          };
+        }
+      };
+    }
+  };
+  const result = await consumeRateLimit({
+    db, secret: "test-secret", scope: "admin-login-ip",
+    identity: "203.0.113.8", limit: 10,
+    windowSeconds: 900, nowSeconds: 1799
+  });
+  assert.equal(result.allowed, false);
+  assert.equal(result.resetAt, 2700);
+  assert.equal(result.retryAfterSeconds, 901);
+  assert.match(calls[0].sql, /window_started_at<=excluded\.window_started_at/);
+  assert.equal(calls.length, 2);
+});
