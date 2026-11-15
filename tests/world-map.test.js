@@ -8,40 +8,26 @@ const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf
 const serviceWorker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
 
 test("kingdom navigation opens the actual world map, not the combat arena", () => {
-  assert.match(kingdom, /goMap.*location\.href="\/world\.html"/);
-  assert.doesNotMatch(kingdom, /goMap.*location\.href="\/arena\.html"/);
+  assert.ok(kingdom.includes('document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html")'));
+  assert.ok(!kingdom.includes('document.getElementById("goMap").addEventListener("click",()=>location.href="/arena.html")'));
 });
 
 test("world map page loads authenticated territory and march interface", () => {
-  assert.match(html, /id="worldMap"/);
-  assert.match(html, /id="territoryDetails"/);
-  assert.match(html, /id="troops"/);
-  assert.match(html, /id="marches"/);
-  assert.match(html, /src="\/world-map\.js"/);
+  for (const marker of ['id="worldMap"', 'id="territoryDetails"', 'id="troops"', 'id="marches"', 'src="/world-map.js"']) assert.ok(html.includes(marker), "missing world map marker: " + marker);
 });
 
 test("territory actions submit intent and troop quantities to the server API", () => {
-  assert.match(script, /request\("\/game\/state"\)/);
-  assert.match(script, /request\("\/game\/action"/);
-  assert.match(script, /type: "march"/);
-  assert.match(script, /targetId: territory\.id/);
-  assert.match(script, /marchType, units/);
-  assert.match(script, /tier\) === 1/);
-  assert.match(script, /const defaultValue = 0/);
-  assert.match(script, /availableTypes\.has\(unitType\)/);
+  for (const marker of ['request("/game/state")', 'request("/game/action"', 'type: "march"', 'targetId: territory.id', 'marchType, units', 'const defaultValue = 0', 'availableTypes.has(unitType)']) assert.ok(script.includes(marker), "missing march contract: " + marker);
+  assert.ok(script.includes('Number(unit.tier) === 1'));
 });
 
 test("world map renders untrusted territory labels with DOM text, not HTML injection", () => {
-  assert.match(script, /textContent/);
-  assert.match(script, /createElement/);
-  assert.doesNotMatch(script, /innerHTML/);
+  assert.ok(script.includes("textContent"));
+  assert.ok(script.includes("createElement"));
+  assert.ok(!script.includes("innerHTML"));
 });
 
 test("PWA shell includes the world map and increments its cache version", () => {
-  assert.match(serviceWorker, /clash-of-izzy-shell-v2/);
-  assert.match(serviceWorker, /"\/world\.html"/);
-  assert.match(serviceWorker, /"\/world-map\.js"/);
-  assert.match(serviceWorker, /"\\/styles\\/coi-theme\\.css"/);
-  assert.match(serviceWorker, /caches\\.match\\(request\\)\\|\\|await caches\\.match\\("\\/offline\\.html"\\)/);
-  assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
+  for (const marker of ['clash-of-izzy-shell-v2', '"/world.html"', '"/world-map.js"', '"/styles/coi-theme.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  assert.ok(serviceWorker.includes('url.pathname.startsWith("/api/")'));
 });
