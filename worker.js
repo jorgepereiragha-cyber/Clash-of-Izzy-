@@ -1,4 +1,5 @@
-import { simulateBattle } from "./game-adapter.js";
+import { simulateBattle, calculateMarchDuration } from "./game-adapter.js";
+import { EQUIPMENT_CATALOG as FORGE_EQUIPMENT_CATALOG, EQUIPMENT_RESEARCH, NORSE_SKINS, equipmentBonuses as forgeEquipmentBonuses } from "./equipment-engine.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
@@ -36,10 +37,10 @@ const HERO_RARITY={white:{label:"Branco · Comum",multiplier:1,fragments:5,maxLe
 const HERO_STAR_COST={2:10,3:20,4:40,5:80,6:150,7:300};
 
 const COSMETIC_SKINS={
- c1:{name:"Pedra Antiga",icon:"🏰",rarity:"comum",theme:"Medieval",atk:5,def:5},c2:{name:"Madeira Rústica",icon:"🏚️",rarity:"comum",theme:"Viking",atk:6,def:4},c3:{name:"Aço Forjado",icon:"⚙️",rarity:"comum",theme:"Industrial",atk:7,def:6},c4:{name:"Areia do Deserto",icon:"🏜️",rarity:"comum",theme:"Egípcio",atk:5,def:7},c5:{name:"Gelo Eterno",icon:"❄️",rarity:"comum",theme:"Nórdico",atk:6,def:6},c6:{name:"Floresta Verde",icon:"🌲",rarity:"comum",theme:"Élfico",atk:5,def:8},c7:{name:"Vulcão",icon:"🌋",rarity:"comum",theme:"Vulcânico",atk:8,def:5},c8:{name:"Oceano",icon:"🌊",rarity:"comum",theme:"Marinho",atk:6,def:7},
- r1:{name:"Ouro Envelhecido",icon:"👑",rarity:"rara",theme:"Real",atk:12,def:10},r2:{name:"Cristal Azul",icon:"💎",rarity:"rara",theme:"Cristalino",atk:10,def:13},r3:{name:"Esmeralda",icon:"💚",rarity:"rara",theme:"Élfico",atk:11,def:12},r4:{name:"Rubi Sangrento",icon:"❤️",rarity:"rara",theme:"Vampírico",atk:14,def:10},r5:{name:"Ametista",icon:"💜",rarity:"rara",theme:"Arcano",atk:12,def:12},
- e1:{name:"Diamante Eterno",icon:"💠",rarity:"épica",theme:"Supremo",atk:20,def:20},e2:{name:"Fogo Dracônico",icon:"🔥",rarity:"épica",theme:"Dragão",atk:25,def:15},e3:{name:"Trovão Divino",icon:"⚡",rarity:"épica",theme:"Tempestade",atk:22,def:22},e4:{name:"Sombra Demoníaca",icon:"👹",rarity:"épica",theme:"Abissal",atk:28,def:18},
- l1:{name:"Dragão Primordial",icon:"🐉",rarity:"lendária",theme:"Supremo",atk:45,def:35},l2:{name:"Celestial Divino",icon:"✨",rarity:"lendária",theme:"Celestial",atk:35,def:50},l3:{name:"Caos Primordial",icon:"🌀",rarity:"lendária",theme:"Caos",atk:48,def:48}
+ c1:{name:"Pedra Antiga",icon:"🏰",rarity:"comum",theme:"Medieval"},c2:{name:"Madeira Rústica",icon:"🏚️",rarity:"comum",theme:"Viking"},c3:{name:"Aço Forjado",icon:"⚙️",rarity:"comum",theme:"Industrial"},c4:{name:"Areia do Deserto",icon:"🏜️",rarity:"comum",theme:"Egípcio"},c5:{name:"Gelo Eterno",icon:"❄️",rarity:"comum",theme:"Nórdico"},c6:{name:"Floresta Verde",icon:"🌲",rarity:"comum",theme:"Élfico"},c7:{name:"Vulcão",icon:"🌋",rarity:"comum",theme:"Vulcânico"},c8:{name:"Oceano",icon:"🌊",rarity:"comum",theme:"Marinho"},
+ r1:{name:"Ouro Envelhecido",icon:"👑",rarity:"rara",theme:"Real"},r2:{name:"Cristal Azul",icon:"💎",rarity:"rara",theme:"Cristalino"},r3:{name:"Esmeralda",icon:"💚",rarity:"rara",theme:"Élfico"},r4:{name:"Rubi Sangrento",icon:"❤️",rarity:"rara",theme:"Vampírico"},r5:{name:"Ametista",icon:"💜",rarity:"rara",theme:"Arcano"},
+ e1:{name:"Diamante Eterno",icon:"💠",rarity:"épica",theme:"Supremo"},e2:{name:"Fogo Dracônico",icon:"🔥",rarity:"épica",theme:"Dragão"},e3:{name:"Trovão Divino",icon:"⚡",rarity:"épica",theme:"Tempestade"},e4:{name:"Sombra Demoníaca",icon:"👹",rarity:"épica",theme:"Abissal"},
+ l1:{name:"Dragão Primordial",icon:"🐉",rarity:"lendária",theme:"Supremo"},l2:{name:"Celestial Divino",icon:"✨",rarity:"lendária",theme:"Celestial"},l3:{name:"Caos Primordial",icon:"🌀",rarity:"lendária",theme:"Caos"}
 };
 const COSMETIC_COLLECTIONS=[
  {id:"col_medieval",name:"Coleção Medieval",icon:"🏰",desc:"Complete as skins medievais",skins:["c1","c2","c3"],gems:500,shards:20},
@@ -51,20 +52,20 @@ const COSMETIC_COLLECTIONS=[
 ];
 const SEASON_END="2026-11-30T23:59:59.000Z";
 const SEASONAL_COSMETICS=[
- {id:"s1",name:"Abóbora Assombrada",icon:"🎃",theme:"Halloween",atk:30,def:25,special:"+15% dano sombrio · +10% roubo de vida",price:3000},
- {id:"s2",name:"Castelo dos Mortos",icon:"💀",theme:"Necromante",atk:35,def:30,special:"+20% invocações · +15% defesa contra luz",price:4500},
- {id:"s3",name:"Fortaleza Vampírica",icon:"🧛",theme:"Vampiro Lorde",atk:40,def:35,special:"+25% roubo de vida · +20% velocidade noturna",price:6000},
- {id:"s4",name:"Mansão Fantasma",icon:"👻",theme:"Assombração",atk:32,def:38,special:"+30% evasão · +15% imunidade a atordoamento",price:5000},
- {id:"s5",name:"Teia Demoníaca",icon:"🕷️",theme:"Aracnídeo",atk:38,def:32,special:"+20% imobilização · +25% dano venenoso",price:5500},
- {id:"s6",name:"Noite Eterna",icon:"🦇",theme:"Lenda Sombria",atk:50,def:45,special:"+40% atributos sombrios · aura assombrada",price:12000,legendary:true}
+ {id:"s1",name:"Abóbora Assombrada",icon:"🎃",theme:"Halloween",visualEffect:"Brilho âmbar e partículas de folhas",price:3000},
+ {id:"s2",name:"Castelo dos Mortos",icon:"💀",theme:"Necromante",visualEffect:"Pedra espectral e névoa verde",price:4500},
+ {id:"s3",name:"Fortaleza Vampírica",icon:"🧛",theme:"Vampiro Lorde",visualEffect:"Vitral rubro e aura visual carmesim",price:6000},
+ {id:"s4",name:"Mansão Fantasma",icon:"👻",theme:"Assombração",visualEffect:"Transparência fantasmagórica e névoa",price:5000},
+ {id:"s5",name:"Teia Demoníaca",icon:"🕷️",theme:"Aracnídeo",visualEffect:"Ornamentos de teia e partículas",price:5500},
+ {id:"s6",name:"Noite Eterna",icon:"🦇",theme:"Lenda Sombria",visualEffect:"Aura noturna e brilho lunar",price:12000,legendary:true}
 ];
 const SKIN_FUSIONS=[
- {inputs:["c1","c2","c3"],output:{id:"f_medieval",name:"Fortaleza Medieval Suprema",icon:"🏰",rarity:"fundida",atk:25,def:25,special:"+15% atributos medievais"}},
- {inputs:["c5","c6","c7"],output:{id:"f_elemental",name:"Convergência Elemental",icon:"🌪️",rarity:"fundida",atk:28,def:22,special:"+20% dano elemental"}},
- {inputs:["r1","r2","r3"],output:{id:"f_gemmaster",name:"Mestre das Gemas",icon:"💎",rarity:"fundida",atk:35,def:30,special:"+25% recursos por hora"}},
- {inputs:["e1","e2","e3"],output:{id:"f_ascendant",name:"Ascensão Divina",icon:"⚡",rarity:"fundida lendária",atk:55,def:50,special:"+40% atributos · aura dourada"}},
- {inputs:["e2","e4","r4"],output:{id:"f_demonlord",name:"Senhor Demônio",icon:"👹",rarity:"fundida lendária",atk:60,def:40,special:"+50% dano crítico · aura infernal"}},
- {inputs:["l1","l2","l3"],output:{id:"f_cosmos",name:"Entidade Cósmica",icon:"🌌",rarity:"fundida mítica",atk:80,def:80,special:"+100% atributos · aura cósmica"}}
+ {inputs:["c1","c2","c3"],output:{id:"f_medieval",name:"Fortaleza Medieval Suprema",icon:"🏰",rarity:"fundida",visualEffect:"Brasões medievais e acabamento de pedra"}},
+ {inputs:["c5","c6","c7"],output:{id:"f_elemental",name:"Convergência Elemental",icon:"🌪️",rarity:"fundida",visualEffect:"Partículas visuais dos elementos"}},
+ {inputs:["r1","r2","r3"],output:{id:"f_gemmaster",name:"Mestre das Gemas",icon:"💎",rarity:"fundida",visualEffect:"Reflexos de gemas e ornamentos"}},
+ {inputs:["e1","e2","e3"],output:{id:"f_ascendant",name:"Ascensão Divina",icon:"⚡",rarity:"fundida lendária",visualEffect:"Aura dourada puramente visual"}},
+ {inputs:["e2","e4","r4"],output:{id:"f_demonlord",name:"Senhor Demônio",icon:"👹",rarity:"fundida lendária",visualEffect:"Aura infernal puramente visual"}},
+ {inputs:["l1","l2","l3"],output:{id:"f_cosmos",name:"Entidade Cósmica",icon:"🌌",rarity:"fundida mítica",visualEffect:"Aura cósmica puramente visual"}}
 ];
 async function ensureCosmeticDefaults(env,kingdomId){
  const initialized=await env.DB.prepare("INSERT OR IGNORE INTO kingdom_cosmetic_wallet(kingdom_id,shards) VALUES(?,150)").bind(kingdomId).run();
@@ -239,7 +240,7 @@ async function applyProduction(env,kingdomId){
   };
   await ensureEquipmentTables(env,kingdomId);
   const activeHero=await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first();
-  const equippedRows=activeHero?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,activeHero.id,kingdomId).all():{results:[]};
+  const equippedRows=activeHero?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(kingdomId,activeHero.id,kingdomId).all():{results:[]};
   const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[]).resourcePercent/100;
   const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
   let previousRemainders={};
@@ -290,23 +291,27 @@ async function processMarches(env,kingdomId){
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={};
    if(target&&!target.owner_kingdom_id&&army.length){
-    const [kingdom,hero,dragon,military,defense]=await Promise.all([
+    const [kingdom,hero,dragon,military,defense,forgeState]=await Promise.all([
      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT id,level FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
-     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
+     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first(),
+     getForgeEquipmentState(env,kingdomId)
     ]);
-    const equipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id,kingdomId).all():{results:[]};
-    const gear=equipmentBonuses(equipmentRows.results||[]);
+    const equipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id).all():{results:[]};
+    const gear=mergeForgeBonuses(equipmentBonuses(equipmentRows.results||[]),forgeState.bonuses);
     const castleLevel=Number(kingdom?.castle_level||1);
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      researchLevel:Number(military?.level||0),
-     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
-     equipmentAttackBonusPercent:gear.attackPercent,
-     equipmentHealthBonusPercent:gear.healthPercent,
+     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0))),
+     equipmentAttackPercent:gear.attackPercent,
+     equipmentDefensePercent:gear.defensePercent,
+     equipmentHealthPercent:gear.healthPercent,
+     criticalChancePercent:gear.criticalChancePercent,
+     criticalSeed:Number(m.id)+Number(kingdomId)*31,
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
     });
@@ -387,6 +392,33 @@ function equipmentView(row){
  return {id:row.item_key,name:def.name,slot:def.slot,rarity:def.rarity,level,maxLevel:def.maxLevel,isLocked:Boolean(row.is_locked),stats,nextLevelStats:level<def.maxLevel?next:null,upgradeCost:Math.floor(100*Math.pow(1.3,level)*multiplier)};
 }
 
+async function ensureForgeEquipmentState(env,kingdomId){
+ await env.DB.batch([
+  env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level) VALUES(?,?,1)").bind(kingdomId,"iron_sword"),
+  ...EQUIPMENT_RESEARCH.map(x=>env.DB.prepare("INSERT OR IGNORE INTO research(kingdom_id,research_key,level) VALUES(?,?,0)").bind(kingdomId,x.id))
+ ]);
+}
+async function getForgeEquipmentState(env,kingdomId){
+ await ensureForgeEquipmentState(env,kingdomId);
+ const [owned,equipped,research]=await Promise.all([
+  env.DB.prepare("SELECT item_key,level,acquired_at FROM kingdom_equipment WHERE kingdom_id=? ORDER BY acquired_at,item_key").bind(kingdomId).all(),
+  env.DB.prepare("SELECT slot,item_key,equipped_at FROM equipped_kingdom_equipment WHERE kingdom_id=? ORDER BY slot").bind(kingdomId).all(),
+  env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key LIKE 'gear_%' ORDER BY research_key").bind(kingdomId).all()
+ ]);
+ const ownedRows=owned.results||[],equippedRows=equipped.results||[],researchRows=research.results||[];
+ return {owned:ownedRows,equipped:equippedRows,research:researchRows,bonuses:forgeEquipmentBonuses(ownedRows,equippedRows,researchRows),catalog:FORGE_EQUIPMENT_CATALOG,researchCatalog:EQUIPMENT_RESEARCH};
+}
+function mergeForgeBonuses(heroGear,forge){
+ return {
+  attackPercent:Math.min(30,(heroGear.attackPercent||0)+(forge.attackPercent||0)),
+  defensePercent:Math.min(30,(heroGear.defensePercent||0)+(forge.defensePercent||0)),
+  healthPercent:Math.min(25,(heroGear.healthPercent||0)+(forge.healthPercent||0)),
+  marchSpeedPercent:Math.min(20,forge.marchSpeedPercent||0),
+  criticalChancePercent:Math.min(15,forge.criticalChancePercent||0),
+  resourcePercent:Math.min(50,heroGear.resourcePercent||0)
+ };
+}
+
 async function gameState(env,playerId){
 
   const p=await env.DB.prepare("SELECT id,player_id,name,gems FROM players WHERE player_id=?").bind(playerId).first();
@@ -427,10 +459,11 @@ async function gameState(env,playerId){
   const shop=await getShopState(env,kingdom.id);
   const cosmetics=await getCosmeticState(env,kingdom.id);
   const equipmentRows=await ensureEquipmentTables(env,kingdom.id);
+  const forgeEquipment=await getForgeEquipmentState(env,kingdom.id);
   const heroEquipment=(await env.DB.prepare("SELECT he.hero_id,h.hero_name,he.slot,he.item_key,he.level FROM hero_equipment he JOIN heroes h ON h.id=he.hero_id WHERE h.kingdom_id=? ORDER BY h.level DESC,h.id,he.slot").bind(kingdom.id).all()).results||[];
   const equippedByItem=new Map(heroEquipment.map(item=>[item.item_key,Number(item.hero_id)]));
   const equipment=equipmentRows.map(row=>({...equipmentView(row),equippedHeroId:equippedByItem.get(row.item_key)||null})).filter(Boolean);
-  return {equipment,heroEquipment,cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  return {equipment,heroEquipment,forgeEquipment,cosmetics,norseSkins:NORSE_SKINS,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -439,9 +472,68 @@ async function gameAction(env,playerId,body){
   if(!k)return json({error:"Reino não encontrado."},404);
   await applyProduction(env,k.id);
   const type=String(body.type||"");
+  if(type.startsWith("forge_equipment_"))await ensureForgeEquipmentState(env,k.id);
   let battleOutcome=null;
 
-  if(type==="equipment_upgrade"){
+  if(type==="forge_equipment_craft"){
+    const itemKey=String(body.item||""),item=FORGE_EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
+    if(!item)return json({error:"Equipamento não encontrado."},404);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,iron=iron-? WHERE id=? AND gold>=? AND iron>=? AND NOT EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?)")
+        .bind(item.craft.gold,item.craft.iron,k.id,item.craft.gold,item.craft.iron,k.id,itemKey),
+      env.DB.prepare("INSERT INTO kingdom_equipment(kingdom_id,item_key,level) SELECT ?,?,1 WHERE changes()>0")
+        .bind(k.id,itemKey),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"equipment_forged",JSON.stringify({item:itemKey,gold:item.craft.gold,iron:item.craft.iron}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Ouro ou ferro insuficiente, ou equipamento já adquirido."},409);
+  }else if(type==="forge_equipment_upgrade"){
+    const itemKey=String(body.item||""),expected=Number(body.level),item=FORGE_EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
+    if(!item||!Number.isInteger(expected)||expected<1||expected>=20)return json({error:"Equipamento ou nível inválido."},400);
+    const costGold=Math.floor(350*Math.pow(1.42,expected-1)),costIron=20+8*expected;
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdom_equipment SET level=level+1 WHERE kingdom_id=? AND item_key=? AND level=? AND level<20 AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND gold>=? AND iron>=?)")
+        .bind(k.id,itemKey,expected,k.id,costGold,costIron),
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,iron=iron-? WHERE id=? AND changes()>0")
+        .bind(costGold,costIron,k.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"equipment_upgraded",JSON.stringify({item:itemKey,from:expected,to:expected+1,gold:costGold,iron:costIron}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Evolução indisponível: confira o nível, ouro e ferro."},409);
+  }else if(type==="forge_equipment_equip"){
+    const itemKey=String(body.item||""),item=FORGE_EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
+    if(!item)return json({error:"Equipamento inválido."},400);
+    const result=await env.DB.prepare("INSERT INTO equipped_kingdom_equipment(kingdom_id,slot,item_key) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?) ON CONFLICT(kingdom_id,slot) DO UPDATE SET item_key=excluded.item_key,equipped_at=CURRENT_TIMESTAMP")
+      .bind(k.id,item.slot,itemKey,k.id,itemKey).run();
+    if(!result.meta.changes)return json({error:"Forje o equipamento antes de equipá-lo."},409);
+    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"equipment_equipped",JSON.stringify({item:itemKey,slot:item.slot})).run();
+  }else if(type==="forge_equipment_research"){
+    const researchKey=String(body.research||""),tech=EQUIPMENT_RESEARCH.find(x=>x.id===researchKey),expected=Number(body.level);
+    if(!tech||!Number.isInteger(expected)||expected<0||expected>=tech.max)return json({error:"Pesquisa ou nível inválido."},400);
+    const costGold=Math.floor(tech.base.gold*Math.pow(1.48,expected)),costStone=Math.floor(tech.base.stone*Math.pow(1.4,expected)),academyRequired=1+Math.floor(expected/3);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE research SET level=level+1,completed_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND research_key=? AND level=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND gold>=? AND stone>=?) AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)")
+        .bind(k.id,researchKey,expected,k.id,costGold,costStone,k.id,academyRequired),
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,stone=stone-? WHERE id=? AND changes()>0")
+        .bind(costGold,costStone,k.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"equipment_research_completed",JSON.stringify({research:researchKey,level:expected+1,gold:costGold,stone:costStone}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Pesquisa indisponível: confira nível atual, Academia, ouro e pedra."},409);
+  }else if(type==="forge_cosmetic_buy"){
+    await ensureCosmeticDefaults(env,k.id);
+    const skinId=String(body.skin||""),skin=NORSE_SKINS.find(x=>x.id===skinId);
+    if(!skin)return json({error:"Skin divina não encontrada."},404);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=? AND NOT EXISTS(SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?)")
+        .bind(skin.price,p.id,skin.price,k.id,skinId),
+      env.DB.prepare("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) SELECT ?,?,'norse' WHERE changes()>0")
+        .bind(k.id,skinId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"norse_skin_unlocked",JSON.stringify({skin:skinId,price:skin.price}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Gemas insuficientes ou skin já adquirida."},409);
+  }else if(type==="equipment_upgrade"){
     const itemKey=String(body.itemId||""),def=EQUIPMENT_CATALOG[itemKey];
     if(!def)return json({error:"Equipamento inválido."},400);
     const rows=await ensureEquipmentTables(env,k.id),row=rows.find(x=>x.item_key===itemKey);
@@ -842,7 +934,9 @@ async function gameAction(env,playerId,body){
     const unitTypes=Object.keys(selected);
     if(!unitTypes.length)return json({error:"Selecione pelo menos uma tropa válida."},400);
     const unitsJson=JSON.stringify(selected);
-    const seconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    const forgeState=await getForgeEquipmentState(env,k.id);
+    const seconds=calculateMarchDuration(baseSeconds,forgeState.bonuses.marchSpeedPercent);
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
@@ -857,20 +951,28 @@ async function gameAction(env,playerId,body){
     const armyRows=units.results||[];
     const total=armyRows.reduce((n,u)=>n+u.quantity,0);
     if(total<1)return json({error:"Treine tropas antes de iniciar uma batalha."},409);
-    const [hero,dragon,tech,defenseTech,battleState,activeHero]=await Promise.all([
-      env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first(),
+    const [hero,dragon,tech,defenseTech,battleState,activeHero,forgeState]=await Promise.all([
+      env.DB.prepare("SELECT id,level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(k.id).first(),
       env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(k.id).first(),
-      env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first()
+      env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first(),
+      getForgeEquipmentState(env,k.id)
     ]);
+    const heroEquipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,hero.id).all():{results:[]};
+    const gear=mergeForgeBonuses(equipmentBonuses(heroEquipmentRows.results||[]),forgeState.bonuses);
     const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)));
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const simulation=simulateBattle({
       army:armyRows,castleLevel:Number(k.castle_level||1),
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
+      equipmentAttackPercent:gear.attackPercent,
+      equipmentDefensePercent:gear.defensePercent,
+      equipmentHealthPercent:gear.healthPercent,
+      criticalChancePercent:gear.criticalChancePercent,
+      criticalSeed:Number(k.id)*31+Math.floor(Date.now()/1000),
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
     });
     const won=simulation.won,attackerPower=simulation.attackerPower,defenderPower=simulation.defenderPower;
