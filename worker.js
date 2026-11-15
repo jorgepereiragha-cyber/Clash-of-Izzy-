@@ -240,7 +240,7 @@ async function applyProduction(env,kingdomId){
   };
   await ensureEquipmentTables(env,kingdomId);
   const activeHero=await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first();
-  const equippedRows=activeHero?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,activeHero.id,kingdomId).all():{results:[]};
+  const equippedRows=activeHero?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(kingdomId,activeHero.id,kingdomId).all():{results:[]};
   const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[]).resourcePercent/100;
   const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
   let previousRemainders={};
@@ -299,7 +299,7 @@ async function processMarches(env,kingdomId){
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first(),
      getForgeEquipmentState(env,kingdomId)
     ]);
-    const equipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id,kingdomId).all():{results:[]};
+    const equipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id).all():{results:[]};
     const gear=mergeForgeBonuses(equipmentBonuses(equipmentRows.results||[]),forgeState.bonuses);
     const castleLevel=Number(kingdom?.castle_level||1);
     const simulation=simulateBattle({
