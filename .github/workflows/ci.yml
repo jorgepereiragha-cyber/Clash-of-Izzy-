@@ -24,6 +24,8 @@ jobs:
         run: npm install --ignore-scripts
       - name: Validate service worker
         run: node --check sw.js
+      - name: Validate kingdom command center script
+        run: node --check command-center.js
       - name: Test combat simulator
         run: npm test
       - name: Validate Worker bundle
