@@ -282,7 +282,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const executedActions = new Set();
     async function action(token, payload, expected = 200, label = payload.type) {
       executedActions.add(payload.type);
+      const trace = payload.type.startsWith("alliance_") || String(label).includes("PvP");
+      if (trace) console.log("[worker-d1] action:start", label);
       const result = await api("/api/game/action", { method: "POST", token, body: payload });
+      if (trace) console.log("[worker-d1] action:done", label, result.status);
       return expectStatus(result, expected, "ação " + label);
     }
 
@@ -377,7 +380,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomC }, 200);
 
       await t.test("PvP territorial real: proteção, aliança, guarnição, baixas e relatório bilateral", async () => {
+        console.log("[worker-d1] PvP state:start");
         stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+        console.log("[worker-d1] PvP state:done");
         const pvpTarget = stateA.territories.find(item => !item.owner_kingdom_id && !item.alliance_id);
         assert.ok(pvpTarget?.id, "existe território neutro para preparar o cenário PvP");
 
