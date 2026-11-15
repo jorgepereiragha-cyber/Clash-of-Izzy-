@@ -1,4 +1,4 @@
-const CACHE_NAME = "clash-of-izzy-shell-v3";
+const CACHE_NAME = "clash-of-izzy-shell-v4";
 const CORE_ASSETS = [
   "/",
   "/index.html",
