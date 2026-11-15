@@ -894,9 +894,11 @@ export default {
   if(!payload||payload.scope!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
   try{
     if(url.pathname==="/api/admin/player-search"){
-      const id=String(body.playerId||"").trim();if(!id)return json({error:"Informe o ID do jogador."},400);
-      const player=await env.DB.prepare("SELECT id,player_id,name,gems,created_at FROM players WHERE player_id=?").bind(id).first();
-      return player?json({player}):json({error:"Jogador não encontrado no banco."},404);
+      const query=String(body.query||body.playerId||"").trim().slice(0,64);
+      if(!query)return json({error:"Informe o nickname ou ID do jogador."},400);
+      const exact=await env.DB.prepare("SELECT id,player_id,name,gems,created_at FROM players WHERE player_id=? COLLATE NOCASE").bind(query).first();
+      const players=exact?[exact]:(await env.DB.prepare("SELECT id,player_id,name,gems,created_at FROM players WHERE name LIKE ? COLLATE NOCASE OR player_id LIKE ? COLLATE NOCASE ORDER BY created_at DESC LIMIT 20").bind("%"+query+"%","%"+query+"%").all()).results||[];
+      return json({players,player:players[0]||null});
     }
     if(url.pathname==="/api/admin/gems"){
       const id=String(body.playerId||"").trim(),amount=Number(body.amount);
