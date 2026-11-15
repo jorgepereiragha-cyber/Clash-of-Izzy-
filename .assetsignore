@@ -31,3 +31,8 @@ tests/
 api-rate-limit.js
 *.pem
 *.key
+# Server-only game rules (not imported by browser entry points).
+liveops-engine.js
+task-engine.js
+story-engine.js
+realm-policy.js
