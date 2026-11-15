@@ -35,3 +35,32 @@ test("entrada por sigla respeita o limite de membros da aliança", async () => {
   assert.ok(worker.includes("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT ?,?,'member' WHERE (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=?) < ?"));
   assert.ok(worker.includes("A aliança atingiu o limite de membros."));
 });
+
+
+test("busca mundial autentica, limita consultas e retorna somente dados públicos", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  for (const snippet of [
+    'url.pathname==="/api/game/search"&&request.method==="GET"',
+    '"game-search-player",playerId,30,60',
+    '"game-search-network"',
+    'rawQuery.length<2',
+    'rawQuery.length>48',
+    '["all","kingdoms","alliances"]',
+    'NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id)',
+    'JOIN players p ON p.id=k.player_id WHERE p.player_id=?',
+    'COUNT(am.kingdom_id) AS member_count'
+  ]) assert.ok(worker.includes(snippet), `busca mundial deve conter: ${snippet}`);
+});
+
+test("central de alianças oferece busca acessível de reinos e alianças", async () => {
+  const html = await readFile(new URL("../alliance.html", import.meta.url), "utf8");
+  for (const snippet of [
+    'id="worldSearchForm"',
+    'id="worldSearchQuery"',
+    'id="worldSearchType"',
+    'aria-live="polite"',
+    'request("/game/search?"',
+    'item.type==="kingdom"',
+    'item.type==="alliance"'
+  ]) assert.ok(html.includes(snippet), `interface de busca deve conter: ${snippet}`);
+});
