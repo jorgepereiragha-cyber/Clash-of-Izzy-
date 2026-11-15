@@ -26,5 +26,7 @@ jobs:
         run: node --check sw.js
       - name: Test combat simulator
         run: npm test
+      - name: Validate D1 migrations locally
+        run: npm run db:migrate:local
       - name: Validate Worker bundle
         run: npm run check
