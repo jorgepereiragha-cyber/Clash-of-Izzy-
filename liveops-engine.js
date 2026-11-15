@@ -12,7 +12,7 @@ function utcDay(now = new Date()) {
 async function taskProgress(env, kingdomId, task, day) {
   if (task.kind === "battle") {
     const row = await env.DB.prepare(
-      "SELECT COUNT(*) AS value FROM battle_reports WHERE attacker_kingdom_id=? AND date(created_at)=?"
+      "SELECT COUNT(*) AS value FROM battle_reports WHERE attacker_kingdom_id=? AND battle_type='pve' AND date(created_at)=?"
     ).bind(kingdomId, day).first();
     return Number(row?.value || 0);
   }
