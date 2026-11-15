@@ -1024,6 +1024,36 @@ export default {
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
   const isGamePath=url.pathname.startsWith("/api/game/");
+  if(url.pathname==="/api/store/purchase-request"&&request.method==="POST"){
+    if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
+    const playerId=await gameIdentity(request,env);
+    if(!playerId)return json({error:"Sessão do jogador inválida."},401);
+    const limited=await rateLimitDecision(env,request,"purchase-request-player",playerId,5,3600);
+    if(limited)return limited;
+    const body=await readBody(request,8192);
+    if(body.__bodyError)return json({error:"Solicitação inválida."},400);
+    const kind=String(body.kind||""),itemId=Number(body.itemId),requestKey=String(body.requestKey||"").slice(0,64);
+    if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
+    const [player,kingdom]=await Promise.all([
+      env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first(),
+      env.DB.prepare("SELECT id,kingdom_name FROM kingdoms WHERE player_id=?").bind(playerId).first()
+    ]);
+    if(!player||!kingdom)return json({error:"Reino não encontrado."},404);
+    const item=kind==="vip_package"
+      ?await env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages WHERE id=?").bind(itemId).first()
+      :await env.DB.prepare("SELECT id,name,price_brl FROM skins WHERE id=?").bind(itemId).first();
+    if(!item)return json({error:"Produto não encontrado no catálogo."},404);
+    try{
+      await env.DB.prepare("INSERT INTO purchase_requests(player_id,kingdom_id,product_kind,product_id,product_name,price_brl,gems_amount,request_key) VALUES(?,?,?,?,?,?,?,?)")
+        .bind(player.id,kingdom.id,kind,item.id,item.name,item.price_brl,kind==="vip_package"?Number(item.gems||0):0,requestKey).run();
+    }catch(error){
+      const existing=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
+      if(existing)return json({success:true,request:existing,reused:true},200);
+      throw error;
+    }
+    const created=await env.DB.prepare("SELECT id,status,product_name,price_brl,created_at FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
+    return json({success:true,request:created,message:"Pedido enviado ao painel Master. A liberação acontece após a confirmação do pagamento."},201);
+  }
   if(isGamePath){
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
@@ -1063,6 +1093,34 @@ export default {
   const payload=env.SESSION_SECRET?await verify(token,env.SESSION_SECRET):false;
   if(!payload||payload.scope!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
   try{
+    if(url.pathname==="/api/admin/purchase-requests"){
+      const rows=await env.DB.prepare("SELECT r.id,r.product_kind,r.product_name,r.price_brl,r.gems_amount,r.status,r.created_at,p.player_id,p.name AS player_name,k.kingdom_name FROM purchase_requests r JOIN players p ON p.id=r.player_id JOIN kingdoms k ON k.id=r.kingdom_id WHERE r.status='pending' ORDER BY r.created_at ASC LIMIT 100").all();
+      return json({requests:rows.results||[]});
+    }
+    if(url.pathname==="/api/admin/purchase-requests/review"){
+      const id=Number(body.requestId),decision=String(body.decision||"");
+      if(!Number.isSafeInteger(id)||id<1||!["approve","reject"].includes(decision))return json({error:"Pedido ou decisão inválidos."},400);
+      const pending=await env.DB.prepare("SELECT id,product_kind,product_id,player_id,gems_amount FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
+      if(!pending)return json({error:"Pedido já processado ou não encontrado."},409);
+      let result;
+      if(decision==="reject"){
+        result=await env.DB.prepare("UPDATE purchase_requests SET status='rejected',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending'").bind(id).run();
+      }else if(pending.product_kind==="vip_package"){
+        result=await env.DB.batch([
+          env.DB.prepare("UPDATE purchase_requests SET status='approved',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending' AND product_kind='vip_package'").bind(id),
+          env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.gems_amount,pending.player_id,id)
+        ]);
+        if(!result[0]?.meta?.changes)return json({error:"Pedido já processado."},409);
+      }else{
+        result=await env.DB.batch([
+          env.DB.prepare("UPDATE purchase_requests SET status='approved',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending' AND product_kind='skin'").bind(id),
+          env.DB.prepare("INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT player_id,product_id FROM purchase_requests WHERE id=? AND status='approved'").bind(id)
+        ]);
+        if(!result[0]?.meta?.changes)return json({error:"Pedido já processado."},409);
+      }
+      if(decision==="reject"&&!result.meta?.changes)return json({error:"Pedido já processado."},409);
+      return json({success:true,message:decision==="approve"?"Pedido aprovado e pacote liberado.":"Pedido recusado."});
+    }
     if(url.pathname==="/api/admin/player-search"){
       const query=String(body.query||body.playerId||"").trim().slice(0,64);
       if(!query)return json({error:"Informe o nickname ou ID do jogador."},400);
