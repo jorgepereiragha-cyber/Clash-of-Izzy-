@@ -1,6 +1,7 @@
 import { simulateBattle } from "./game-adapter.js";
 import { getDailyTasks, claimDailyTask } from "./liveops-engine.js";
 import { taskDurationSeconds } from "./task-engine.js";
+import { validateStoryStep } from "./story-engine.js";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -436,8 +437,9 @@ async function gameState(env,playerId){
   const shop=await getShopState(env,kingdom.id);
   const dailyEvents=await getDailyTasks(env,kingdom.id);
   const activeTasks=await env.DB.prepare("SELECT id,task_type,slot_key,payload_json,started_at,completes_at FROM kingdom_tasks WHERE kingdom_id=? AND status='running' ORDER BY completes_at,id").bind(kingdom.id).all();
+  const storyProgress=await env.DB.prepare("SELECT campaign_key,step_key,completed_at FROM kingdom_story_progress WHERE kingdom_id=? ORDER BY campaign_key,completed_at,step_key").bind(kingdom.id).all();
   const cosmetics=await getCosmeticState(env,kingdom.id);
-  return {cosmetics,dailyEvents,activeTasks:activeTasks.results||[],serverTime:new Date().toISOString(),player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  return {cosmetics,dailyEvents,activeTasks:activeTasks.results||[],storyProgress:storyProgress.results||[],serverTime:new Date().toISOString(),player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -449,7 +451,21 @@ async function gameAction(env,playerId,body){
   const type=String(body.type||"");
   let battleOutcome=null;
 
-  if(type==="event_claim"){
+  if(type==="story_step"){
+    const campaign=String(body.campaign||"").slice(0,32);
+    const step=String(body.step||"").slice(0,48);
+    const completedRows=await env.DB.prepare("SELECT step_key FROM kingdom_story_progress WHERE kingdom_id=? AND campaign_key=?").bind(k.id,campaign).all();
+    const completed=new Set((completedRows.results||[]).map(row=>row.step_key));
+    const validation=validateStoryStep({campaign,step,castleLevel:Number(k.castle_level||1),completed});
+    if(!validation.ok)return json({error:validation.error},409);
+    // A chave primária torna a descoberta idempotente; o lote grava o evento somente
+    // quando a primeira inserção realmente cria o progresso.
+    await env.DB.batch([
+      env.DB.prepare("INSERT OR IGNORE INTO kingdom_story_progress(kingdom_id,campaign_key,step_key) VALUES(?,?,?)").bind(k.id,campaign,step),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"story_step_completed",JSON.stringify({campaign,step}))
+    ]);
+  }else if(type==="event_claim"){
     const result=await claimDailyTask(env,k.id,String(body.taskId||""));
     if(!result.ok)return json({error:result.error},409);
   }else if(type==="cosmetic_claim"){
