@@ -148,7 +148,7 @@ export function simulateBattle({
   const defenderCastlePower = clamp(Number(defenderCastlePowerBonusPercent) || 0, 0, 30) / 100;
   for (const stack of defenders) {
     stack.defenseBonusPercent = defenderDefense;
-    stack.power *= 1 + defenderCastlePower + defenderAttackGear;
+    stack.power *= (1 + defenderCastlePower) * (1 + defenderAttackGear);
     stack.hpPerUnit = Math.max(1, Math.floor(stack.hpPerUnit * (1 + defenderCastlePower) * (1 + defenderHealthGear)));
     stack.hp = stack.quantity * stack.hpPerUnit;
   }
