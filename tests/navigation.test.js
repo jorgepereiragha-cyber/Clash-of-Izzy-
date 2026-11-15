@@ -71,3 +71,15 @@ test("alliance page handles navigation deep links and renders search results saf
   assert.ok(alliance.includes('if(!token){const loading=$("loading")')||alliance.includes('if(!token){$("worldSearchForm")'));
   assert.ok(!alliance.includes('request("/game/start"'));
 });
+
+
+test("global search includes public nickname discovery and deep-links to the kingdom hub", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes('fetch("/api/game/players/search?"'));
+  assert.ok(nav.includes('new URLSearchParams({playerSearch:player.nickname})'));
+  assert.ok(nav.includes('player.nickname+" · "+player.kingdom_name'));
+  assert.ok(nav.includes("const canSearchPlayers = /^[\\p{L}\\p{N}_-]{3,20}$/u.test(nicknameQuery)"));
+  const kingdom = await read("kingdom.html");
+  assert.ok(kingdom.includes('new URLSearchParams(location.search).get("playerSearch")'));
+  assert.ok(kingdom.includes('document.getElementById("playerSearchForm").requestSubmit()'));
+});
