@@ -100,3 +100,11 @@ As alterações foram gravadas na branch principal. O workflow configurado execu
 - Os cálculos continuam no Worker; o cliente não escolhe nem calcula os bônus aplicados.
 - A migração 0008 já existe e o deploy dessa migração foi confirmado no workflow 43739543760.
 - Próxima validação necessária: testes de integração D1 para provar que cada atributo afeta somente o sistema correto, incluindo bloqueio, concorrência e limites máximos.
+
+
+## Segurança da API e publicação de assets (15 nov 2026)
+- Integrei rate limiting atômico com D1 para catálogo público (60/min por IP), criação de reino (20/h por IP), leitura de estado (120/min por jogador), ações (120/min por jogador e 600/min por IP) e login Master (10/15 min por IP e 5/15 min por conta).
+- Os identificadores de limite são HMAC-SHA-256 com SESSION_SECRET; o banco não armazena IPs nem e-mails em texto aberto. A tabela expira e é limpa pelo cron.
+- Removido CORS universal. As páginas oficiais consomem a API no mesmo domínio; OPTIONS retorna 204 sem abrir acesso cross-origin.
+- A migração 0010_api_rate_limits.sql foi aplicada no D1 remoto e o Worker foi publicado. CI, testes e bundle passaram.
+- .assetsignore agora exclui .wrangler/, tests/, arquivos SQLite, logs, mapas e arquivos de ambiente para evitar publicação de artefatos locais.
