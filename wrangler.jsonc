@@ -27,5 +27,10 @@
   "vars": {
     "ENVIRONMENT": "production"
   },
-  "workers_dev": true
+  "workers_dev": true,
+  "triggers": {
+    "crons": [
+      "* * * * *"
+    ]
+  }
 }
