@@ -1,6 +1,6 @@
 # Progressão persistente e mundo ativo — Clash of Izzy
 
-Status: primeira implementação de runtime concluída na branch; revisão e CI pendentes. Não publicada em produção.
+Status: primeira implementação de runtime concluída; CI aprovado (GitHub Actions run 68). PR #9 pronta para revisão. Não publicada em produção.
 Branch: feature/offline-kingdom-progression
 
 ## Objetivo de produto
