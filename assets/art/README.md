@@ -16,11 +16,17 @@
 7. Versionar assets e nunca sobrescrever um GLB em uso sem atualizar seu manifesto/cache.
 
 ## Cena atual
-A cidade em `kingdom.html` usa arte procedural 2D em Canvas: terreno, trilhas, vegetação, sombras e volumes estilizados dos edifícios. Isso é um marco visual leve, não substitui os modelos GLB finais nem deve ser descrito como cidade 3D real.
+- `kingdom.html` mantém a arte procedural 2D em Canvas como fallback para WebGL indisponível.
+- `scripts/kingdom-3d.js` adiciona uma cena isométrica Three.js com terreno, estrada, árvores, iluminação e edifícios 3D procedurais.
+- `assets/3d/manifest.json` é o catálogo versionado para substituição explícita por modelos GLB reais (`enabled: true`). O manifesto começa vazio: ainda não há modelos GLB artísticos finais no repositório.
+- O carregador usa `GLTFLoader` e `KTX2Loader`/Basis Universal. Texturas KTX2 só serão usadas quando um GLB real com `KHR_texture_basisu` for adicionado e testado.
+- A cena 3D é renderizada sob demanda, sem loop contínuo; não há animação de câmera ou ciclo de jogo nesta tela ainda.
 
 ## Regras de desempenho
-- DPR limitado a 1.5 na camada de arte da cidade.
-- Redesenhar em mudança de tamanho, sem loop de animação permanente.
+- Canvas 2D fallback limita DPR a 1.5; Three.js limita DPR a 1.25 para controlar custo de GPU.
+- Redimensionar via `ResizeObserver` e renderizar quando os dados/tamanho mudarem, sem loop de animação permanente.
+- Sombras 3D ficam desativadas em áreas estreitas (abaixo de 680 px) para reduzir custo em dispositivos móveis.
+- Manter modelos procedurais como fallback até cada GLB real estar validado e habilitado no manifesto.
 - Canvas decorativo não intercepta toques; controles HTML permanecem acessíveis.
 - Respeitar `prefers-reduced-motion`.
 - Testar em Android real antes de elevar resolução, sombras ou efeitos.
