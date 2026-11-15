@@ -121,7 +121,7 @@ test("GLB manifest accepts only bounded same-origin assets for known buildings",
   assert.match(renderer, /Object\.hasOwn\(palettes, type\)/);
   assert.match(renderer, /neededTypes\.has\(asset\.type\)/);
   assert.match(renderer, /url\.origin !== window\.location\.origin/);
-  assert.match(renderer, /assetUrl\.pathname\.startsWith\("\/assets\/3d\/"\)/);
+  assert.match(renderer, /url\.pathname\.startsWith\("\/assets\/3d\/"\)/);
   assert.match(renderer, /pathname\.toLowerCase\(\)\.endsWith\("\.glb"\)/);
   assert.match(renderer, /indisponível; mantendo o fallback procedural/);
 });
@@ -261,7 +261,7 @@ test("optional GLB assets load only for present building types with bounded conc
 });
 
 test("failed optional GLB downloads preserve procedural models and allow later retries", () => {
-  assert.ok(renderer.includes("GLB asset not ready; procedural 3D models remain active"));
+  assert.ok(renderer.includes("GLB assets not ready; procedural models remain active"));
   assert.ok(renderer.includes("glbLoadPromises.delete(key)"));
   assert.ok(renderer.includes("manifestLoad = null"));
 });
