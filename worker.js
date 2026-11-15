@@ -1,4 +1,5 @@
-import { simulateBattle } from "./game-adapter.js";
+import { simulateBattle, calculateMarchDuration } from "./game-adapter.js";
+import { EQUIPMENT_CATALOG as FORGE_EQUIPMENT_CATALOG, EQUIPMENT_RESEARCH, NORSE_SKINS, equipmentBonuses as forgeEquipmentBonuses } from "./equipment-engine.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
