@@ -26,3 +26,6 @@ coverage/
 
 # Art pipeline documentation is kept in Git, not served as a game asset.
 assets/art/README.md
+
+# Model documentation is not a public game asset.
+assets/models/README.md
