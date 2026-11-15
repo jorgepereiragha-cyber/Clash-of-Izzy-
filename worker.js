@@ -342,6 +342,12 @@ async function acquireKingdomBattleLocks(env, kingdomIds) {
       await releaseKingdomBattleLocks(env, locks);
       return null;
     }
+    // Never replace an active battle lease. The previous token is only
+    // retained for safe rollback of an empty lock.
+    if (current.battle_token) {
+      await releaseKingdomBattleLocks(env, locks);
+      return null;
+    }
     const previous = current.battle_token ?? null;
     const token = crypto.randomUUID();
     const result = await env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')")
@@ -1198,6 +1204,10 @@ async function gameAction(env,playerId,body){
       if(allied)return json({error:"Ataques contra membros da sua própria aliança estão bloqueados."},409);
     }
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
+    if(marchType!=="attack"&&target.alliance_id){
+      const member=await env.DB.prepare("SELECT 1 AS member FROM alliance_members WHERE alliance_id=? AND kingdom_id=? LIMIT 1").bind(target.alliance_id,k.id).first();
+      if(!member)return json({error:"Este território pertence a uma aliança. Somente membros podem enviar coleta ou exploração."},409);
+    }
     const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
     const selected={};
     for(const [unit,raw] of Object.entries(requested)){
