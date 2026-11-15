@@ -1,9 +1,5 @@
 import { simulateBattle } from "./game-adapter.js";
-const cors = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Content-Type, Authorization"
-};
+import { consumeRateLimit } from "./api-rate-limit.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -149,7 +145,7 @@ const UNITS = {
   ram:{label:"Aríete",food:60,wood:55,iron:18,power:20},
   trebuchet:{label:"Trabuco",food:90,wood:75,iron:30,power:30}
 };
-function json(data,status=200){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Cache-Control":"no-store",...cors}})}
+function json(data,status=200,extraHeaders={}){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Cache-Control":"no-store",...extraHeaders}})}
 function b64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 async function sign(payload,secret){
   const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
@@ -166,6 +162,17 @@ async function verify(token,secret){
     const payload=JSON.parse(atob(body.replace(/-/g,"+").replace(/_/g,"/")));
     return payload.exp>Math.floor(Date.now()/1000)?payload:false;
   }catch{return false}
+}
+async function rateLimitDecision(env,scope,identity,limit,windowSeconds){
+  if(!env.DB||!env.SESSION_SECRET)return json({error:"Proteção temporariamente indisponível."},503);
+  try{
+    const result=await consumeRateLimit({db:env.DB,secret:env.SESSION_SECRET,scope,identity,limit,windowSeconds});
+    if(result.allowed)return null;
+    return json({error:"Muitas tentativas. Aguarde antes de tentar novamente."},429,{"Retry-After":String(result.retryAfterSeconds)});
+  }catch(error){
+    console.error("rate_limit_unavailable",String(error?.message||error));
+    return json({error:"Proteção temporariamente indisponível."},503);
+  }
 }
 async function readBody(request,maxBytes=32768){
  const declaredLength=Number(request.headers.get("content-length")||0);
@@ -912,15 +919,17 @@ async function processDueMarches(env){
 export default {
  async scheduled(controller,env){
   await processDueMarches(env);
+  try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();}
+  catch(error){console.error("scheduled_rate_limit_cleanup_failed",String(error?.message||error));}
  },
  async fetch(request,env){
-  if(request.method==="OPTIONS")return new Response(null,{headers:cors});
+  if(request.method==="OPTIONS")return new Response(null,{status:204});
   const url=new URL(request.url);
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -940,6 +949,9 @@ export default {
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
   if(url.pathname==="/api/store/catalog"&&request.method==="GET"){
     try{
+      const ip=request.headers.get("CF-Connecting-IP")||"unknown";
+      const limited=await rateLimitDecision(env,"store-catalog-ip",ip,60,60);
+      if(limited)return limited;
       const [skins,packages]=await Promise.all([
         env.DB.prepare("SELECT id,name,price_brl FROM skins ORDER BY price_brl,name").all(),
         env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages ORDER BY price_brl,name").all()
@@ -950,6 +962,9 @@ export default {
   if(url.pathname==="/api/game/start"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"SESSION_SECRET não configurado no Worker."},503);
     try{
+      const ip=request.headers.get("CF-Connecting-IP")||"unknown";
+      const limited=await rateLimitDecision(env,"game-start-ip",ip,20,3600);
+      if(limited)return limited;
       const playerId="izzy_"+crypto.randomUUID().replace(/-/g,"");
       await ensureKingdom(env,playerId);
       const token=await sign({sub:playerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365},env.SESSION_SECRET);
@@ -962,6 +977,17 @@ export default {
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     try{
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
+        const limited=await rateLimitDecision(env,"game-state-player",playerId,120,60);
+        if(limited)return limited;
+      }
+      if(url.pathname==="/api/game/action"&&request.method==="POST"){
+        const playerLimit=await rateLimitDecision(env,"game-action-player",playerId,120,60);
+        if(playerLimit)return playerLimit;
+        const ip=request.headers.get("CF-Connecting-IP")||"unknown";
+        const networkLimit=await rateLimitDecision(env,"game-action-network",ip,600,60);
+        if(networkLimit)return networkLimit;
+      }
+      if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);
       }
       if(url.pathname==="/api/game/action"&&request.method==="POST"){const body=await readBody(request);if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);return await gameAction(env,playerId,body);}
@@ -972,7 +998,13 @@ export default {
   const body=await readBody(request);if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);
   if(url.pathname==="/api/admin/login"){
     if(!env.ADMIN_EMAIL||!env.ADMIN_PASSWORD||!env.SESSION_SECRET)return json({error:"Configure ADMIN_EMAIL, ADMIN_PASSWORD e SESSION_SECRET nos segredos do Worker."},503);
-    if(String(body.email||"").trim().toLowerCase()!==String(env.ADMIN_EMAIL).trim().toLowerCase()||body.password!==env.ADMIN_PASSWORD)return json({error:"E-mail ou senha incorretos."},401);
+    const ip=request.headers.get("CF-Connecting-IP")||"unknown";
+    const email=String(body.email||"").trim().toLowerCase().slice(0,254)||"empty";
+    const ipLimit=await rateLimitDecision(env,"admin-login-ip",ip,10,900);
+    if(ipLimit)return ipLimit;
+    const accountLimit=await rateLimitDecision(env,"admin-login-account",email,5,900);
+    if(accountLimit)return accountLimit;
+    if(email!==String(env.ADMIN_EMAIL).trim().toLowerCase()||body.password!==env.ADMIN_PASSWORD)return json({error:"E-mail ou senha incorretos."},401);
     const token=await sign({sub:"admin",scope:"admin",exp:Math.floor(Date.now()/1000)+28800},env.SESSION_SECRET);return json({token,expiresIn:28800});
   }
   const auth=request.headers.get("Authorization")||"",token=auth.startsWith("Bearer ")?auth.slice(7):"";
