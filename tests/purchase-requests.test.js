@@ -18,6 +18,7 @@ test("Master approval queue is protected by admin session and grants packages on
   assert.match(worker, /\/api\/admin\/purchase-requests/);
   assert.match(worker, /status='pending'/);
   assert.match(worker, /status='approved'/);
+  assert.match(worker, /reviewed_at=CURRENT_TIMESTAMP/);
   assert.match(worker, /UPDATE players SET gems=gems\+\?/);
   assert.match(worker, /changes\(\)=1 AND EXISTS\(SELECT 1 FROM purchase_requests/);
   assert.match(worker, /INSERT OR IGNORE INTO player_skins/);
