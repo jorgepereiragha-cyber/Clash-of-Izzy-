@@ -97,3 +97,14 @@ test("velocidade de marcha reduz duração sem ultrapassar os limites", () => {
   assert.equal(calculateMarchDuration(100,100),67);
   assert.equal(calculateMarchDuration(1,50),5);
 });
+
+
+test("bônus de defesa da Forja soma à pesquisa e respeita o teto global", () => {
+  const army = [{ unit_type: "knight", tier: 2, quantity: 30 }];
+  const base = simulateBattle({ army, defenderLevel: 8, roll: 1 });
+  const geared = simulateBattle({ army, defenderLevel: 8, equipmentDefensePercent: 25, roll: 1 });
+  assert.ok(geared.survivors >= base.survivors);
+  const over = simulateBattle({ army, defenderLevel: 8, defenseBonusPercent: 30, equipmentDefensePercent: 300, roll: 1 });
+  const capped = simulateBattle({ army, defenderLevel: 8, defenseBonusPercent: 30, equipmentDefensePercent: 20, roll: 1 });
+  assert.deepEqual(over, capped);
+});
