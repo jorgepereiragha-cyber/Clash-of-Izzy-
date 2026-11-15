@@ -410,8 +410,15 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           "--local", "--persist-to", persistDir,
           "--command", "UPDATE kingdoms SET protection_until=NULL WHERE id=" + kingdomA
         ]);
+        await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "território reivindicado por aliança não aceita PvP individual");
         await action(tokenC, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "ataque contra aliado");
-        await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 500 } }, 200, "marcha PvP contra inimigo");
+        await runCli([
+          "--config", "wrangler.jsonc",
+          "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE world_territories SET alliance_id=NULL WHERE id=" + Number(pvpTarget.id)
+        ]);
+        await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 500 } }, 200, "marcha PvP contra reino inimigo sem reivindicação de aliança");
 
         await runCli([
           "--config", "wrangler.jsonc",
