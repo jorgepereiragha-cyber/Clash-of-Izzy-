@@ -237,8 +237,10 @@ async function applyProduction(env,kingdomId){
     iron:2*(levels.iron_mine||1),
     gold:1.5*(levels.market||1)
   };
-  const equipmentRows=await ensureEquipmentTables(env,kingdomId);
-  const equipmentProductionBonus=equipmentBonuses(equipmentRows).resourcePercent/100;
+  await ensureEquipmentTables(env,kingdomId);
+  const activeHero=await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first();
+  const equippedRows=activeHero?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,activeHero.id,kingdomId).all():{results:[]};
+  const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[]).resourcePercent/100;
   const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
@@ -288,14 +290,14 @@ async function processMarches(env,kingdomId){
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={};
    if(target&&!target.owner_kingdom_id&&army.length){
-    const [kingdom,hero,dragon,military,defense,equipmentRows]=await Promise.all([
+    const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
-     env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(kingdomId).first(),
+     env.DB.prepare("SELECT id,level FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
-     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first(),
-     env.DB.prepare("SELECT item_key,level,is_locked FROM kingdom_equipment WHERE kingdom_id=?").bind(kingdomId).all()
+     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
     ]);
+    const equipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id,kingdomId).all():{results:[]};
     const gear=equipmentBonuses(equipmentRows.results||[]);
     const castleLevel=Number(kingdom?.castle_level||1);
     const simulation=simulateBattle({
@@ -398,7 +400,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdom.id).first(),
     env.DB.prepare("SELECT building_type,level,position_x,position_z FROM kingdom_buildings WHERE kingdom_id=? ORDER BY id").bind(kingdom.id).all(),
     env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? ORDER BY tier,unit_type").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT hero_key,hero_name,level,experience,rarity,assigned_to FROM heroes WHERE kingdom_id=?").bind(kingdom.id).all(),
+    env.DB.prepare("SELECT id,hero_key,hero_name,level,experience,rarity,assigned_to FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id").bind(kingdom.id).all(),
     env.DB.prepare("SELECT dragon_key,dragon_name,level,experience,bond FROM dragons WHERE kingdom_id=?").bind(kingdom.id).first(),
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdom.id).all(),
     env.DB.prepare("SELECT id,name,terrain,x,z,resource_type,resource_rate,owner_kingdom_id,alliance_id,level FROM world_territories ORDER BY id").all(),
@@ -424,8 +426,11 @@ async function gameState(env,playerId){
   const totalTroops=(troops.results||[]).reduce((n,u)=>n+u.quantity,0);
   const shop=await getShopState(env,kingdom.id);
   const cosmetics=await getCosmeticState(env,kingdom.id);
-  const equipment=(await ensureEquipmentTables(env,kingdom.id)).map(equipmentView).filter(Boolean);
-  return {equipment,cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  const equipmentRows=await ensureEquipmentTables(env,kingdom.id);
+  const heroEquipment=(await env.DB.prepare("SELECT he.hero_id,h.hero_name,he.slot,he.item_key,he.level FROM hero_equipment he JOIN heroes h ON h.id=he.hero_id WHERE h.kingdom_id=? ORDER BY h.level DESC,h.id,he.slot").bind(kingdom.id).all()).results||[];
+  const equippedByItem=new Map(heroEquipment.map(item=>[item.item_key,Number(item.hero_id)]));
+  const equipment=equipmentRows.map(row=>({...equipmentView(row),equippedHeroId:equippedByItem.get(row.item_key)||null})).filter(Boolean);
+  return {equipment,heroEquipment,cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -451,11 +456,30 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("UPDATE kingdoms SET gold=gold-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND gold>=? AND EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=? AND level=? AND is_locked=0)").bind(cost,k.id,cost,k.id,itemKey,level),
       env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId),
       env.DB.prepare("UPDATE kingdom_equipment SET level=level+1,updated_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND item_key=? AND level=? AND is_locked=0 AND "+guard+"").bind(k.id,itemKey,level,k.id,actionId),
+      env.DB.prepare("UPDATE hero_equipment SET level=level+1 WHERE item_key=? AND hero_id IN (SELECT id FROM heroes WHERE kingdom_id=?) AND EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=? AND level=?)").bind(itemKey,k.id,k.id,itemKey,level+1),
       env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard+"").bind(k.id,"equipment_upgraded",JSON.stringify({item:itemKey,from:level,to:level+1,cost}),k.id,actionId),
       env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId)
     ];
     const result=await env.DB.batch(statements);
     if(!result[0]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Ouro insuficiente ou equipamento alterado. Atualize e tente novamente."},409);
+  }else if(type==="equipment_equip"){
+    const itemKey=String(body.itemId||""),heroId=Number(body.heroId),def=EQUIPMENT_CATALOG[itemKey];
+    if(!def||!Number.isSafeInteger(heroId)||heroId<1)return json({error:"Equipamento ou herói inválido."},400);
+    const rows=await ensureEquipmentTables(env,k.id),row=rows.find(x=>x.item_key===itemKey);
+    if(!row)return json({error:"Equipamento não encontrado no inventário."},404);
+    const hero=await env.DB.prepare("SELECT id FROM heroes WHERE id=? AND kingdom_id=?").bind(heroId,k.id).first();
+    if(!hero)return json({error:"Herói não pertence a este reino."},404);
+    await env.DB.batch([
+      env.DB.prepare("DELETE FROM hero_equipment WHERE item_key=? AND hero_id IN (SELECT id FROM heroes WHERE kingdom_id=?)").bind(itemKey,k.id),
+      env.DB.prepare("INSERT INTO hero_equipment(hero_id,slot,item_key,level) VALUES(?,?,?,?) ON CONFLICT(hero_id,slot) DO UPDATE SET item_key=excluded.item_key,level=excluded.level").bind(heroId,def.slot,itemKey,row.level)
+    ]);
+  }else if(type==="equipment_unequip"){
+    const itemKey=String(body.itemId||""),heroId=Number(body.heroId);
+    if(!EQUIPMENT_CATALOG[itemKey]||!Number.isSafeInteger(heroId)||heroId<1)return json({error:"Equipamento ou herói inválido."},400);
+    const hero=await env.DB.prepare("SELECT id FROM heroes WHERE id=? AND kingdom_id=?").bind(heroId,k.id).first();
+    if(!hero)return json({error:"Herói não pertence a este reino."},404);
+    const result=await env.DB.prepare("DELETE FROM hero_equipment WHERE hero_id=? AND item_key=?").bind(heroId,itemKey).run();
+    if(!result.meta.changes)return json({error:"Este equipamento não está equipado nesse herói."},409);
   }else if(type==="equipment_lock"){
     const itemKey=String(body.itemId||"");
     if(!EQUIPMENT_CATALOG[itemKey])return json({error:"Equipamento inválido."},400);
