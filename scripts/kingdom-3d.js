@@ -29,6 +29,82 @@ if (host && "WebGLRenderingContext" in window) {
     embassy: ["#b0a18a", "#526e82"], warehouse: ["#9b886a", "#70543d"]
   };
   const sharedMaterials = new Set(Object.values(mats));
+  // Small, deterministic, tileable procedural albedo maps add material identity
+  // without shipping large image files or creating per-building texture copies.
+  function makeSurfaceTexture(base, kind, seed) {
+    const canvas = document.createElement("canvas");
+    canvas.width = canvas.height = 128;
+    const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.fillStyle = base;
+    ctx.fillRect(0, 0, 128, 128);
+    let value = seed >>> 0;
+    const rand = () => { value = (value * 1664525 + 1013904223) >>> 0; return value / 4294967296; };
+    if (kind === "wood") {
+      for (let i = 0; i < 34; i++) {
+        const y = rand() * 128;
+        ctx.strokeStyle = rand() > .5 ? "rgba(35,20,12,.20)" : "rgba(238,190,125,.13)";
+        ctx.lineWidth = 1 + rand() * 3;
+        ctx.beginPath(); ctx.moveTo(0, y);
+        ctx.bezierCurveTo(36, y - 5 + rand() * 10, 86, y - 5 + rand() * 10, 128, y);
+        ctx.stroke();
+      }
+    } else if (kind === "stone") {
+      for (let y = 0; y < 128; y += 22) {
+        const offset = (Math.floor(y / 22) % 2) * 16;
+        for (let x = -16; x < 144; x += 32) {
+          ctx.strokeStyle = "rgba(35,39,37,.22)";
+          ctx.lineWidth = 1.5;
+          ctx.strokeRect(x + offset + 1, y + 1, 30, 20);
+        }
+      }
+    } else if (kind === "roof") {
+      for (let y = 0; y < 128; y += 12) for (let x = 0; x < 128; x += 16) {
+        ctx.fillStyle = rand() > .5 ? "rgba(255,210,170,.12)" : "rgba(35,15,12,.14)";
+        ctx.fillRect(x + ((y / 12) % 2) * 8, y, 14, 9);
+      }
+    } else if (kind === "grass") {
+      for (let i = 0; i < 700; i++) {
+        ctx.strokeStyle = rand() > .5 ? "rgba(25,65,28,.20)" : "rgba(210,220,135,.16)";
+        ctx.lineWidth = 1;
+        const x = rand() * 128, y = rand() * 128;
+        ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + rand() * 3, y - 2 - rand() * 5); ctx.stroke();
+      }
+    } else if (kind === "road") {
+      for (let i = 0; i < 90; i++) {
+        const x = rand() * 128, y = rand() * 128;
+        ctx.fillStyle = rand() > .5 ? "rgba(45,39,29,.15)" : "rgba(255,245,215,.18)";
+        ctx.fillRect(x, y, 2 + rand() * 8, 2 + rand() * 5);
+      }
+    }
+    for (let i = 0; i < 1200; i++) {
+      const alpha = .025 + rand() * .07;
+      ctx.fillStyle = rand() > .5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
+      ctx.fillRect(rand() * 128, rand() * 128, 1 + rand() * 2, 1 + rand() * 2);
+    }
+    const texture = new THREE.CanvasTexture(canvas);
+    texture.colorSpace = THREE.SRGBColorSpace;
+    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+    texture.repeat.set(kind === "grass" ? 9 : 3, kind === "grass" ? 7 : 3);
+    texture.anisotropy = Math.min(4, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+    texture.needsUpdate = true;
+    return texture;
+  }
+  function applyProceduralSurfaceMaps() {
+    const maps = [
+      [mats.grass, "#577a49", "grass", 11],
+      [mats.road, "#b8a57d", "road", 17],
+      [mats.roadEdge, "#76664c", "stone", 23],
+      [mats.stone, "#9c9b8b", "stone", 31],
+      [mats.darkStone, "#555d5c", "stone", 37],
+      [mats.wood, "#745039", "wood", 41],
+      [mats.roof, "#8b4636", "roof", 47]
+    ];
+    for (const [mat, base, kind, seed] of maps) {
+      mat.map = makeSurfaceTexture(base, kind, seed);
+      mat.color.set("#ffffff");
+      mat.needsUpdate = true;
+    }
+  }
   function box(parent, w, h, d, mat, x, y, z) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
@@ -167,6 +243,7 @@ if (host && "WebGLRenderingContext" in window) {
     sun.position.set(-5, 10, 6); sun.castShadow = renderer.shadowMap.enabled;
     sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -9; sun.shadow.camera.right = 9;
     sun.shadow.camera.top = 9; sun.shadow.camera.bottom = -9; scene.add(sun);
+    applyProceduralSurfaceMaps();
     buildGround();
     ktx2 = new KTX2Loader();
     ktx2.setTranscoderPath("https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/basis/");
