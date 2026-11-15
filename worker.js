@@ -530,6 +530,11 @@ async function gameAction(env,playerId,body){
       .bind(k.id,item.slot,itemKey,k.id,itemKey).run();
     if(!result.meta.changes)return json({error:"Forje o equipamento antes de equipá-lo."},409);
     await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"equipment_equipped",JSON.stringify({item:itemKey,slot:item.slot})).run();
+  }else if(type==="forge_equipment_unequip"){
+    const slot=String(body.slot||"");
+    if(!FORGE_EQUIPMENT_CATALOG.some(x=>x.slot===slot))return json({error:"Slot de equipamento inválido."},400);
+    const result=await env.DB.prepare("DELETE FROM equipped_kingdom_equipment WHERE kingdom_id=? AND slot=?").bind(k.id,slot).run();
+    if(!result.meta.changes)return json({error:"Não existe equipamento equipado nesse slot."},409);
   }else if(type==="forge_equipment_research"){
     const researchKey=String(body.research||""),tech=EQUIPMENT_RESEARCH.find(x=>x.id===researchKey),expected=Number(body.level);
     if(!tech||!Number.isInteger(expected)||expected<0||expected>=tech.max)return json({error:"Pesquisa ou nível inválido."},400);
