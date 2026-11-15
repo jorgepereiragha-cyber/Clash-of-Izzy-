@@ -113,7 +113,7 @@ $("worldSearchForm").addEventListener("submit",async event=>{
       location.href="/world.html?search="+encodeURIComponent(item.name);
      }else if(item.type==="skin"){
       location.href="/equipment-ui.html?search="+encodeURIComponent(item.name);
-     
+    }
    });
    list.append(button);
   }
