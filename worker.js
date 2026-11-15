@@ -1199,6 +1199,7 @@ export default {
         if(rawQuery.length>48)return json({error:"A busca aceita até 48 caracteres.",results:[]},400);
         const kind=String(url.searchParams.get("type")||"all").toLowerCase();
         if(!["all","kingdoms","alliances","territories","skins"].includes(kind))return json({error:"Categoria de busca inválida."},400);
+        const entityType=({kingdoms:"kingdom",alliances:"alliance",territories:"territory",skins:"skin"})[kind]||"";
         const tokens=rawQuery.match(/[\p{L}\p{N}_]+/gu)||[];
         if(!tokens.length)return json({error:"Digite um nome ou termo válido.",results:[]},400);
         const ftsQuery=tokens.map(token=>'"'+token.replace(/"/g,'""')+'"*').join(" AND ");
@@ -1209,7 +1210,7 @@ export default {
         try{
           const indexed=await env.DB.prepare(
             "SELECT d.entity_type,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count FROM game_search_fts f JOIN game_search_documents d ON d.id=f.rowid WHERE game_search_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1) AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)))) ORDER BY f.rank LIMIT ?"
-          ).bind(ftsQuery,kind,kind,playerId,limit).all();
+          ).bind(ftsQuery,kind,entityType,playerId,limit).all();
           if((indexed.results||[]).length){
             const results=indexed.results.map(row=>{
               if(row.entity_type==="kingdom")return {type:"kingdom",name:row.title,power:Number(row.power||0)};
