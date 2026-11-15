@@ -723,74 +723,75 @@ async function gameAction(env,playerId,body){
       const castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
       if(!castle||b.level>=castle.level)return json({error:"O nível do edifício não pode superar o castelo."},409);
     }
-    const factor=b.level;
-    const base=BUILDINGS[key];
+    const active=await env.DB.prepare("SELECT id FROM kingdom_tasks WHERE kingdom_id=? AND task_type='construction' AND status='running'").bind(k.id).first();
+    if(active)return json({error:"A fila de construção já está ocupada."},409);
+    const factor=b.level,base=BUILDINGS[key];
     const materialNeeds=key==="castle"?(b.level>=25?{imperial_crest:2,power_crystal:2}:b.level>=20?{imperial_crest:1,power_crystal:2}:b.level>=15?{power_crystal:2,imperial_seal:1}:b.level>=10?{imperial_seal:2,royal_blueprint:1}:b.level>=5?{royal_blueprint:2}:{}):{};
-    for(const [item,quantity] of Object.entries(materialNeeds)){const owned=await env.DB.prepare("SELECT quantity FROM inventory_items WHERE kingdom_id=? AND item_key=?").bind(k.id,item).first();if(!owned||owned.quantity<quantity)return json({error:"Materiais insuficientes: "+CASTLE_MATERIALS[item].name+" ("+quantity+" necessários)."},409);}
-    const cost={wood:Math.ceil(base.wood*factor),stone:Math.ceil(base.stone*factor),food:Math.ceil(base.food*factor),iron:Math.ceil(base.iron*factor)};
-    const castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
-    if(!castle)return json({error:"Castelo não encontrado."},409);
-    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
-    const materialChecks=Object.entries(materialNeeds).map(()=> " AND EXISTS(SELECT 1 FROM inventory_items WHERE kingdom_id=? AND item_key=? AND quantity>=?)").join("");
-    const materialBindings=Object.entries(materialNeeds).flatMap(([item,quantity])=>[k.id,item,quantity]);
-    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,food=food-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND food>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level=?) AND (?='castle' OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle' AND level>?))"+materialChecks)
-      .bind(cost.wood,cost.stone,cost.food,cost.iron,k.id,cost.wood,cost.stone,cost.food,cost.iron,k.id,key,b.level,key,k.id,b.level,...materialBindings);
-    const statements=[debit,
-      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)
-    ];
     for(const [item,quantity] of Object.entries(materialNeeds)){
-      statements.push(env.DB.prepare("UPDATE inventory_items SET quantity=quantity-? WHERE kingdom_id=? AND item_key=? AND "+guard).bind(quantity,k.id,item,k.id,actionId));
+      const owned=await env.DB.prepare("SELECT quantity FROM inventory_items WHERE kingdom_id=? AND item_key=?").bind(k.id,item).first();
+      if(!owned||owned.quantity<quantity)return json({error:"Materiais insuficientes: "+CASTLE_MATERIALS[item].name+" ("+quantity+" necessários)."},409);
     }
-    statements.push(env.DB.prepare("UPDATE kingdom_buildings SET level=level+1,upgraded_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND building_type=? AND level=? AND "+guard).bind(k.id,key,b.level,k.id,actionId));
-    if(key==="castle")statements.push(env.DB.prepare("UPDATE kingdoms SET castle_level=castle_level+1 WHERE id=? AND "+guard).bind(k.id,k.id,actionId));
-    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"imperial_seal",k.id,actionId));
-    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"building_upgraded",JSON.stringify({building:key,level:b.level+1,cost}),k.id,actionId));
+    const cost={wood:Math.ceil(base.wood*factor),stone:Math.ceil(base.stone*factor),food:Math.ceil(base.food*factor),iron:Math.ceil(base.iron*factor)};
+    const actionId=crypto.randomUUID(),started=new Date(),seconds=taskDurationSeconds("construction",b.level),completes=new Date(started.getTime()+seconds*1000);
+    const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const checks=Object.entries(materialNeeds).map(()=> " AND EXISTS(SELECT 1 FROM inventory_items WHERE kingdom_id=? AND item_key=? AND quantity>=?)").join("");
+    const bindings=Object.entries(materialNeeds).flatMap(([item,qty])=>[k.id,item,qty]);
+    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,food=food-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND food>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level=?) AND (?='castle' OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle' AND level>?))"+checks)
+      .bind(cost.wood,cost.stone,cost.food,cost.iron,k.id,cost.wood,cost.stone,cost.food,cost.iron,k.id,key,b.level,key,k.id,b.level,...bindings);
+    const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
+    for(const [item,qty] of Object.entries(materialNeeds))statements.push(env.DB.prepare("UPDATE inventory_items SET quantity=quantity-? WHERE kingdom_id=? AND item_key=? AND "+guard).bind(qty,k.id,item,k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'construction','main',?,?,?,?,? WHERE "+guard)
+      .bind(k.id,JSON.stringify({building:key,fromLevel:b.level,toLevel:b.level+1,cost,materials:materialNeeds,durationSeconds:seconds}),started.toISOString(),completes.toISOString(),crypto.randomUUID(),k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"construction_started",JSON.stringify({building:key,fromLevel:b.level,toLevel:b.level+1,completesAt:completes.toISOString()}),k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
-    const result=await env.DB.batch(statements);
-    if(!result[1]?.meta?.changes)return json({error:"Recursos ou materiais insuficientes, ou edifício alterado. Atualize e tente novamente."},409);
+    try{const result=await env.DB.batch(statements);if(!result[1]?.meta?.changes||!result[3]?.meta?.changes)return json({error:"Recursos insuficientes ou fila ocupada. Atualize e tente novamente."},409);}
+    catch(error){if(String(error?.message||error).includes("idx_kingdom_tasks_active_slot"))return json({error:"A fila de construção já está ocupada."},409);throw error;}
+
   }else if(type==="train"){
     const unit=String(body.unit||"militia"),quantity=Math.max(1,Math.min(100,Math.floor(Number(body.quantity)||10)));
-    const spec=Object.hasOwn(UNITS,unit)?UNITS[unit]:null;if(!spec)return json({error:"Tipo de tropa inválido."},400);
+    const spec=Object.hasOwn(UNITS,unit);if(!spec)return json({error:"Tipo de tropa inválido."},400);
     const requiredBuilding={militia:"barracks",swordsman:"barracks",spearman:"barracks",archer:"archery_range",crossbowman:"archery_range",cavalry:"stable",knight:"stable",mage:"academy",catapult:"siege_workshop",ram:"siege_workshop",trebuchet:"siege_workshop"}[unit];
-    const trainingHall=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type=?").bind(k.id,requiredBuilding).first();
-    if(!trainingHall||trainingHall.level<1)return json({error:"Construa o edifício de treinamento exigido."},409);
-    const cost={food:spec.food*quantity,wood:spec.wood*quantity,iron:spec.iron*quantity};
-    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const hall=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type=?").bind(k.id,requiredBuilding).first();
+    if(!hall||hall.level<1)return json({error:"Construa o edifício de treinamento exigido."},409);
+    const cost={food:UNITS[unit].food*quantity,wood:UNITS[unit].wood*quantity,iron:UNITS[unit].iron*quantity};
+    const started=new Date(),seconds=taskDurationSeconds("training",hall.level,quantity,unit),completes=new Date(started.getTime()+seconds*1000),actionId=crypto.randomUUID();
+    const active=await env.DB.prepare("SELECT id FROM kingdom_tasks WHERE kingdom_id=? AND task_type='training' AND slot_key=? AND status='running'").bind(k.id,requiredBuilding).first();
+    if(active)return json({error:"A fila deste edifício já está ocupada."},409);
+    const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const debit=env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level>=1)")
       .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron,k.id,requiredBuilding);
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
-    statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,unit,quantity,k.id,actionId));
-    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"troops_trained",JSON.stringify({unit,quantity,cost}),k.id,actionId));
-    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"royal_blueprint",k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'training',?,?,?,?,? WHERE "+guard)
+      .bind(k.id,requiredBuilding,JSON.stringify({unit,quantity,cost,durationSeconds:seconds}),started.toISOString(),completes.toISOString(),crypto.randomUUID(),k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"training_started",JSON.stringify({unit,quantity,building:requiredBuilding,completesAt:completes.toISOString()}),k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
-    const result=await env.DB.batch(statements);
-    if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes. Atualize o reino e tente novamente."},409);
+    try{const result=await env.DB.batch(statements);if(!result[1]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Recursos insuficientes ou fila ocupada. Atualize e tente novamente."},409);}
+    catch(error){if(String(error?.message||error).includes("idx_kingdom_tasks_active_slot"))return json({error:"A fila deste edifício já está ocupada."},409);throw error;}
+
   }else if(type==="research"){
     const key=String(body.research||"economy");
     const allowed={economy:{wood:250,stone:120,iron:0},military:{wood:300,stone:180,iron:40},construction:{wood:350,stone:250,iron:0},defense:{wood:220,stone:300,iron:25}};
     if(!Object.hasOwn(allowed,key))return json({error:"Pesquisa inválida."},400);
     const current=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key=?").bind(k.id,key).first();
-    const level=current?.level||0;
-    if(level>=30)return json({error:"Pesquisa no nível máximo."},409);
-    let centerLevel=0;
-    if(key==="defense"){
-      const center=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy'").bind(k.id).first();
-      if(!center||center.level<1)return json({error:"Construa o Centro de Pesquisa Militar primeiro."},409);
-      centerLevel=Number(center.level);
-      if(level>=Math.min(30,centerLevel*3))return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis de defesa."},409);
-    }
+    const level=current?.level||0;if(level>=30)return json({error:"Pesquisa no nível máximo."},409);
+    const center=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy'").bind(k.id).first();
+    if(!center||center.level<1)return json({error:"Construa o Centro de Pesquisa Militar primeiro."},409);
+    if(key==="defense"&&level>=Math.min(30,Number(center.level)*3))return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis de defesa."},409);
+    const active=await env.DB.prepare("SELECT id FROM kingdom_tasks WHERE kingdom_id=? AND task_type='research' AND status='running'").bind(k.id).first();
+    if(active)return json({error:"A fila de pesquisa já está ocupada."},409);
     const c=allowed[key],factor=level+1,cost={wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
-    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
-    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND (?<>'defense' OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?))")
-      .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,key,k.id,Math.ceil((level+1)/3));
+    const started=new Date(),seconds=taskDurationSeconds("research",level+1),completes=new Date(started.getTime()+seconds*1000),actionId=crypto.randomUUID();
+    const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)")
+      .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,k.id,Math.ceil((level+1)/3));
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
-    statements.push(env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=level+1 WHERE level=?").bind(k.id,key,k.id,actionId,level));
-    const researchMaterialKey=key==="defense"?"imperial_crest":"imperial_crest";
-    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,researchMaterialKey,k.id,actionId));
-    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"research_upgraded",JSON.stringify({research:key,level:level+1,cost}),k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'research','main',?,?,?,?,? WHERE "+guard)
+      .bind(k.id,JSON.stringify({research:key,fromLevel:level,toLevel:level+1,cost,durationSeconds:seconds}),started.toISOString(),completes.toISOString(),crypto.randomUUID(),k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"research_started",JSON.stringify({research:key,toLevel:level+1,completesAt:completes.toISOString()}),k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
-    const result=await env.DB.batch(statements);
-    if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes ou pesquisa alterada por outra ação. Atualize e tente novamente."},409);
+    try{const result=await env.DB.batch(statements);if(!result[1]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Recursos insuficientes ou fila ocupada. Atualize e tente novamente."},409);}
+    catch(error){if(String(error?.message||error).includes("idx_kingdom_tasks_active_slot"))return json({error:"A fila de pesquisa já está ocupada."},409);throw error;}
+
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
