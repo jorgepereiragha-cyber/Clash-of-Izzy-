@@ -30,6 +30,9 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 .world-map{position:relative;isolation:isolate;overflow:hidden;min-height:430px;aspect-ratio:1.2;border:1px solid #71865b;border-radius:12px;background:radial-gradient(ellipse at 50% 50%,#78945a,#476b4b 58%,#243f3b);background-image:linear-gradient(35deg,transparent 48%,#d7c28b20 49%,#d7c28b20 51%,transparent 52%),linear-gradient(-28deg,transparent 48%,#d7c28b18 49%,#d7c28b18 51%,transparent 52%),radial-gradient(ellipse at 50% 50%,#78945a,#476b4b 58%,#243f3b);touch-action:none;cursor:grab}
 .world-map.is-dragging{cursor:grabbing}
 .map-content{position:absolute;inset:0;z-index:2;transform-origin:50% 50%;transition:transform .12s ease;will-change:transform;touch-action:none}
+#world3d{position:absolute;inset:0;width:100%;height:100%;z-index:0;display:block;pointer-events:none}
+.map-content .territory-pin{z-index:3}
+.world-map.map-3d-fallback #world3d{display:none}
 .world-map.is-dragging .map-content{transition:none}
 .map-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
 .map-controls button{min-width:42px;padding:8px 11px}
@@ -65,7 +68,7 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 <body>
 <header>
  <div class="top">
-  <div class="brand">⚔ CLASH OF IZZY <small>Mapa de territórios · Reino persistente</small></div>
+  <div class="brand">⚔ CLASH OF IZZY <small>Mundo estratégico 3D · Territórios e marchas</small></div>
   
   <div id="status" role="status">Sincronizando mapa…</div>
  </div>
@@ -74,21 +77,21 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 <main>
  <div class="layout">
   <section class="panel">
-   <h1>🌍 Fronteiras de Eldoria</h1>
-   <p class="muted">Selecione um território para explorar, coletar recursos ou tentar conquistá-lo. As marchas e os resultados são confirmados pelo servidor.</p>
+   <h1>🌍 Mapa estratégico 3D de Eldoria</h1>
+   <p class="muted">Veja o reino em perspectiva isométrica, selecione recursos e territórios, e acompanhe as formações militares avançando pelas rotas. Propriedade, tropas e resultados continuam validados pelo servidor.</p>
    <div class="map-controls" role="group" aria-label="Controles do mapa">
     <button id="zoomOut" type="button" aria-label="Diminuir zoom" title="Diminuir zoom">−</button>
     <output id="mapScale" class="map-scale" aria-live="polite">100%</output>
     <button id="zoomIn" type="button" aria-label="Aumentar zoom" title="Aumentar zoom">+</button>
     <button id="mapReset" type="button" class="secondary">Centralizar</button>
    </div>
-   <div id="worldMap" class="world-map" role="group" aria-label="Mapa interativo. Arraste para navegar e use os controles ou a roda do mouse para ampliar.">
+   <div id="worldMap" class="world-map" role="group" aria-label="Mapa estratégico 3D isométrico. Arraste para navegar, use os controles de zoom e toque em um território para selecioná-lo.">
     <span class="map-label north">Norte</span><span class="map-label south">Sul</span>
     <div id="mapContent" class="map-content">
-     <div class="map-center" aria-hidden="true">🏰<small>Seu reino</small></div>
+     <canvas id="world3d" aria-hidden="true"></canvas>
     </div>
    </div>
-   <p class="map-hint">Arraste para explorar · use + e − para aproximar · toque em um território para selecioná-lo.</p>
+   <p class="map-hint">Arraste para explorar · use + e − para aproximar · tropas em marcha seguem a rota até o território selecionado.</p>
    <div class="legend"><span><i class="dot"></i> Neutro</span><span><i class="dot owned"></i> Seu território</span><span><i class="dot enemy"></i> Outro reino</span></div>
   </section>
   <aside class="stack">
@@ -111,6 +114,7 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
  </div>
 </main>
 <script type="module" src="/world-map.js"></script>
+<script type="module" src="/world-map-3d.js"></script>
   <script src="/navigation.js" defer></script>
 </body>
 </html>

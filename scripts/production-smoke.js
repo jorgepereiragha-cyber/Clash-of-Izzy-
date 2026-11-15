@@ -101,6 +101,12 @@ export async function runProductionSmokeTests({
   assert(mapHelper.includes("clampMapViewport") && mapHelper.includes("mapViewportTransform"),
     "Módulo de navegação do mapa está incompleto.");
 
+  const map3dResponse = await get("/world-map-3d.js");
+  assert(map3dResponse.status === 200, "Módulo de renderização do mapa 3D indisponível.");
+  const map3d = await map3dResponse.text();
+  assert(map3d.includes("OrthographicCamera") && map3d.includes("createMarchFormation"),
+    "Mapa 3D não contém a cena estratégica e as formações de marcha.");
+
   const manifestResponse = await get("/manifest.json");
   assert(manifestResponse.status === 200, "Manifest da PWA indisponível.");
   const manifest = await readJson(manifestResponse, "Manifest da PWA");
@@ -109,8 +115,9 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v11"), "Service worker não contém o cache esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v12"), "Service worker não contém o cache esperado.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
+  assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
 
   return {
     baseUrl: base.origin,
@@ -126,6 +133,7 @@ export async function runProductionSmokeTests({
       pwaManifest: true,
       serviceWorker: true,
       worldMapNavigation: true,
+      worldMap3D: true,
     },
   };
 }

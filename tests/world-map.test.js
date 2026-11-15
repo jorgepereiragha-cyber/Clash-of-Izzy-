@@ -2,6 +2,8 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "../world-map-viewport.js";
 import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
+import { fileURLToPath } from "node:url";
 
 const html = await readFile(new URL("../world.html", import.meta.url), "utf8");
 const script = await readFile(new URL("../world-map.js", import.meta.url), "utf8");
@@ -17,6 +19,22 @@ test("world map page loads authenticated territory and march interface", () => {
   for (const marker of ['id="worldMap"', 'id="territoryDetails"', 'id="troops"', 'id="marches"', 'src="/world-map.js"']) assert.ok(html.includes(marker), "missing world map marker: " + marker);
 });
 
+test("world map presents an isometric 3D strategy view instead of a free-roaming arena hero", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  for (const marker of ['id="world3d"', 'Mapa estratégico 3D', 'world-map-3d.js']) assert.ok(html.includes(marker), "missing 3D map presentation: " + marker);
+  for (const marker of ['OrthographicCamera', 'createCastle', 'createTerritoryFeature', 'createMarchFormation', 'updateMarchPositions', 'projectTerritories']) assert.ok(scene.includes(marker), "missing strategic scene feature: " + marker);
+  assert.ok(scene.includes('march.status === "marching"'));
+  assert.ok(script.includes('window.__coiWorldMap3D.update(visualState)'));
+});
+
+test("strategic 3D world map and territory controls parse before deployment", () => {
+  for (const file of ["../world-map.js", "../world-map-3d.js"]) {
+    const target = fileURLToPath(new URL(file, import.meta.url));
+    const result = spawnSync(process.execPath, ["--check", target], { encoding: "utf8" });
+    assert.equal(result.status, 0, result.stderr || result.stdout || ("Syntax check failed: " + file));
+  }
+});
+
 test("territory actions submit intent and troop quantities to the server API", () => {
   for (const marker of ['request("/game/state")', 'request("/game/action"', 'type: "march"', 'targetId: territory.id', 'marchType, units', 'const defaultValue = 0', 'availableTypes.has(unitType)']) assert.ok(script.includes(marker), "missing march contract: " + marker);
   assert.ok(script.includes('Number(unit.tier) === 1'));
@@ -29,7 +47,7 @@ test("world map renders untrusted territory labels with DOM text, not HTML injec
 });
 
 test("PWA shell includes the world map and increments its cache version", () => {
-  for (const marker of ['clash-of-izzy-shell-v11', '"/world.html"', '"/world-map.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  for (const marker of ['clash-of-izzy-shell-v12', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
   assert.ok(serviceWorker.includes('url.pathname.startsWith("/api/")'));
 });
 
