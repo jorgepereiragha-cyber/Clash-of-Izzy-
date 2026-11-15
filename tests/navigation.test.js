@@ -7,7 +7,7 @@ const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 test("shared navigation exposes the real game sections and a responsive search", async () => {
   const nav = await read("navigation.js");
   const css = await read("styles/navigation.css");
-  for (const route of ["/index.html","/kingdom.html","/world.html","/equipment-ui.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
+  for (const route of ["/index.html","/kingdom.html","/world.html","/equipment-ui.html","/equipment-lab.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
   assert.ok(nav.includes('setAttribute("aria-label","Navegação principal")'));
   assert.ok(nav.includes("toLocaleLowerCase"));
   assert.ok(nav.includes("strong.textContent"));
@@ -18,7 +18,7 @@ test("shared navigation exposes the real game sections and a responsive search",
 });
 
 test("core management pages load one shared navigation without duplicating their local menu links", async () => {
-  for (const path of ["alliance.html","kingdom.html","world.html","admin.html","equipment-ui.html"]) {
+  for (const path of ["alliance.html","kingdom.html","world.html","admin.html","equipment-ui.html","equipment-lab.html"]) {
     const html = await read(path);
     assert.ok(html.includes('/styles/navigation.css'), path + " must load shared navigation styles");
     assert.ok(html.includes('/navigation.js'), path + " must load shared navigation script");
