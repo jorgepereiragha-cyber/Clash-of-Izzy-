@@ -90,3 +90,10 @@ test("mapa libera PvP somente contra reinos inimigos desprotegidos e confirma ba
   assert.match(script, /if \(marchType === "attack" && territory\.owner_kingdom_id && !confirm\(/);
   assert.match(script, /Território de aliança/);
 });
+
+
+test("territórios pertencentes a qualquer aliança não podem ser atacados individualmente", () => {
+  assert.match(script, /if \(territory\.alliance_id\) return false/);
+  assert.match(script, /owner === "Território de aliança"/);
+  assert.match(script, /Território reivindicado por uma aliança/);
+});
