@@ -18,7 +18,7 @@ test("shared navigation exposes the real game sections and a responsive search",
 });
 
 test("core management pages load one shared navigation without duplicating their local menu links", async () => {
-  for (const path of ["alliance.html","kingdom.html","world.html","admin.html","equipment-ui.html"]) {
+  for (const path of ["index.html","alliance.html","kingdom.html","world.html","admin.html","equipment-ui.html"]) {
     const html = await read(path);
     assert.ok(html.includes('/styles/navigation.css'), path + " must load shared navigation styles");
     assert.ok(html.includes('/navigation.js'), path + " must load shared navigation script");
@@ -34,4 +34,21 @@ test("navigation is a static section search, not an unsafe HTML search result re
   assert.ok(nav.includes("results.replaceChildren()"));
   assert.ok(nav.includes("window.__COI_NAV__"));
   assert.ok(!nav.includes("results.innerHTML"));
+});
+
+
+test("shared navigation searches online game entities using the saved session", async () => {
+  const nav = await read("navigation.js");
+  for (const snippet of [
+    'fetch("/api/game/search?"',
+    'Authorization:"Bearer "+token',
+    'new AbortController()',
+    'new URLSearchParams({q:query,type:"all",limit:"8"})',
+    'coi-nav-online-result',
+    '"/alliance.html?"'
+  ]) assert.ok(nav.includes(snippet), "busca online da navegação deve conter: " + snippet);
+  assert.ok(nav.includes("strong.textContent"));
+  assert.ok(nav.includes("small.textContent"));
+  assert.ok(!nav.includes("results.innerHTML"));
+  assert.ok(!nav.includes("/api/game/start"));
 });
