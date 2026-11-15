@@ -40,7 +40,28 @@
       <button id="unequip-btn" type="button" class="secondary">DESEQUIPAR</button>
       <button id="upgrade-btn" type="button" class="upgrade-btn-mobile">⚒️ EVOLUIR EQUIPAMENTO</button>
     </div>
-  </main>
+      <section class="norse-skins" aria-labelledby="norse-title">
+      <header class="norse-skins-header">
+        <div><h2 id="norse-title">Panteão de Asgard</h2><p>Skins visuais de Odin, Thor, Freyja, Loki, Týr e Heimdall. Nenhuma skin altera ataque ou defesa.</p></div>
+        <div class="skin-wallet"><span id="skin-gems">Gemas: —</span><span id="skin-shards">Fragmentos: —</span></div>
+      </header>
+      <div id="norse-skin-list" class="norse-skin-grid"></div>
+      <button id="claim-norse-collection" type="button" class="upgrade-btn-mobile" disabled>COLEÇÃO 0/6</button>
+    </section>
+    <style>
+      .norse-skins{margin:22px 0;padding:16px;border:1px solid #8b6b39;border-radius:14px;background:linear-gradient(145deg,#182a3d,#101b2a)}
+      .norse-skins-header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+      .norse-skins-header h2{margin:0;color:#ffe0a0}.norse-skins-header p{margin:6px 0;color:#c9d2dc;max-width:520px}
+      .skin-wallet{display:grid;gap:5px;color:#f6d58d;font-weight:700;text-align:right}
+      .norse-skin-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:12px;margin:14px 0}
+      .norse-skin-card{padding:12px;border:1px solid #53667a;border-radius:10px;background:linear-gradient(145deg,#263b51,#172638);display:flex;flex-direction:column;gap:7px}
+      .norse-skin-card h3{font-size:15px;margin:0;color:#fff}.skin-rarity{font-size:12px;text-transform:capitalize;color:#f1ca78}
+      .norse-skin-card p{font-size:13px;color:#cbd5df;min-height:54px;margin:0}
+      .skin-buy-btn{margin-top:auto;border:1px solid #d6ad63;border-radius:8px;padding:10px;background:#70502b;color:#fff2ce;font-weight:800}
+      .skin-buy-btn:disabled{opacity:.6}
+      #claim-norse-collection{width:100%;margin-top:6px}
+    </style>
+</main>
   <script src="/equipment-system.js"></script>
 </body>
 </html>
