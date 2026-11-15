@@ -261,7 +261,7 @@ async function applyProduction(env,kingdomId){
     gold:1.5*(levels.market||1)
   };
   await ensureEquipmentTables(env,kingdomId);
-  const activeHero=await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first();
+  const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first();
   const [equippedRows,gearResearchRows]=await Promise.all([
     activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,activeHero.id,kingdomId).all():Promise.resolve({results:[]}),
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
@@ -318,7 +318,7 @@ async function processMarches(env,kingdomId){
    if(target&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
-     env.DB.prepare("SELECT id,level FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first(),
+     env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
@@ -447,12 +447,27 @@ function equipmentView(row){
  return {id:row.item_key,name:def.name,slot:def.slot,rarity:def.rarity,icon:def.icon||"⚔️",description:def.description||"",craft:def.craft||null,requiredResearch:def.requiredResearch||{},level,maxLevel:def.maxLevel,isLocked:Boolean(row.is_locked),stats,nextLevelStats:level<def.maxLevel?next:null,upgradeCost:Math.floor(100*Math.pow(1.3,level)*multiplier)};
 }
 
+async function syncHeroSystems(env,kingdomId){
+  // hero_inventory is canonical for collection progression; heroes is the equipment binding.
+  await env.DB.prepare("INSERT OR IGNORE INTO hero_inventory(kingdom_id,hero_key,rarity,level,experience) SELECT kingdom_id,hero_key,CASE rarity WHEN 'common' THEN 'white' WHEN 'rare' THEN 'blue' WHEN 'epic' THEN 'purple' WHEN 'legendary' THEN 'purple' WHEN 'mythic' THEN 'purple' ELSE 'white' END,level,experience FROM heroes WHERE kingdom_id=?").bind(kingdomId).run();
+  const inventory=await env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY hero_key").bind(kingdomId).all();
+  const statements=(inventory.results||[]).map(hero=>{
+    const rarity=hero.rarity==="white"?"common":hero.rarity==="blue"?"rare":"legendary";
+    const name=HERO_TEMPLATES[hero.hero_key]?.name||hero.hero_key;
+    return env.DB.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) VALUES(?,?,?,?,?,?) ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET level=MAX(heroes.level,excluded.level),experience=MAX(heroes.experience,excluded.experience),rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END")
+      .bind(kingdomId,hero.hero_key,name,Math.max(1,Number(hero.level)||1),Math.max(0,Number(hero.experience)||0),rarity);
+  });
+  if(statements.length)await env.DB.batch(statements);
+  await env.DB.prepare("UPDATE hero_inventory SET level=MAX(level,COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level)),experience=MAX(experience,COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience)) WHERE kingdom_id=?").bind(kingdomId).run();
+}
+
 async function gameState(env,playerId){
 
   const p=await env.DB.prepare("SELECT id,player_id,name,gems FROM players WHERE player_id=?").bind(playerId).first();
   if(!p)return null;
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
+  await syncHeroSystems(env,kingdom.id);
   await applyProduction(env,kingdom.id);
   await seedWorld(env);
   await processMarches(env,kingdom.id);
@@ -466,7 +481,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,name,terrain,x,z,resource_type,resource_rate,owner_kingdom_id,alliance_id,level FROM world_territories ORDER BY id").all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,hero_key").bind(kingdom.id).all(),
+    env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key").bind(kingdom.id).all(),
     env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id).all()
     ,env.DB.prepare("SELECT id,event_type,payload_json FROM kingdom_events WHERE kingdom_id=? AND event_type!='__internal_action_guard' ORDER BY id DESC LIMIT 15").bind(kingdom.id).all()
@@ -494,7 +509,8 @@ async function gameState(env,playerId){
   const equipmentCatalog=Object.entries(EQUIPMENT_CATALOG).map(([id,def])=>({...def,id,owned:ownedEquipmentKeys.has(id)}));
   const researchLevels=new Map((research.results||[]).map(row=>[row.research_key,Number(row.level)||0]));
   const equipmentResearch=Object.entries(EQUIPMENT_RESEARCH).map(([id,def])=>{const level=researchLevels.get(id)||0;return {...def,id,level,nextCost:Object.fromEntries(Object.entries(def.cost).map(([resource,amount])=>[resource,amount*(level+1)]))};});
-  const activeHeroId=Number((heroes.results||[])[0]?.id||0);
+  const activeHeroKey=(heroInventory.results||[])[0]?.hero_key||(heroes.results||[])[0]?.hero_key;
+  const activeHeroId=Number((heroes.results||[]).find(hero=>hero.hero_key===activeHeroKey)?.id||0);
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
   return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
@@ -504,6 +520,7 @@ async function gameAction(env,playerId,body){
   if(!p)return json({error:"Jogador não encontrado."},404);
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
+  await syncHeroSystems(env,k.id);
   await applyProduction(env,k.id);
   const type=String(body.type||"");
   let battleOutcome=null;
@@ -825,14 +842,24 @@ async function gameAction(env,playerId,body){
     await env.DB.prepare("UPDATE hero_inventory SET stars=stars+1,fragments=fragments-? WHERE kingdom_id=? AND hero_key=? AND fragments>=?").bind(needed,k.id,heroKey,needed).run();
   }else if(type==="hero_train"){
     const key=String(body.hero||"kael_sunwarden");
-    const hero=await env.DB.prepare("SELECT id,level,experience FROM heroes WHERE kingdom_id=? AND hero_key=?").bind(k.id,key).first();
-    if(!hero)return json({error:"Herói não encontrado."},404);
-    if(hero.level>=100)return json({error:"Herói já atingiu o nível máximo."},409);
-    const cost={food:200*hero.level,wood:100*hero.level,gold:75*hero.level};
-    const debit=await env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,gold=gold-? WHERE id=? AND food>=? AND wood>=? AND gold>=?").bind(cost.food,cost.wood,cost.gold,k.id,cost.food,cost.wood,cost.gold).run();
-    if(!debit.meta.changes)return json({error:"Recursos insuficientes para treinar o herói."},409);
-    await env.DB.prepare("UPDATE heroes SET level=level+1,experience=experience+100 WHERE id=?").bind(hero.id).run();
-    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"hero_trained",JSON.stringify({hero:key,level:hero.level+1,cost})).run();
+    const [hero,inventoryHero]=await Promise.all([
+      env.DB.prepare("SELECT id,level,experience FROM heroes WHERE kingdom_id=? AND hero_key=?").bind(k.id,key).first(),
+      env.DB.prepare("SELECT level,experience,rarity FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,key).first()
+    ]);
+    if(!hero||!inventoryHero)return json({error:"Herói não encontrado na coleção."},404);
+    const maxLevel=HERO_RARITY[inventoryHero.rarity]?.maxLevel||100,level=Math.max(Number(hero.level)||1,Number(inventoryHero.level)||1);
+    if(level>=maxLevel)return json({error:"Herói já atingiu o nível máximo da raridade."},409);
+    const cost={food:200*level,wood:100*level,gold:75*level},actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,gold=gold-? WHERE id=? AND food>=? AND wood>=? AND gold>=? AND EXISTS(SELECT 1 FROM heroes WHERE id=? AND level=?) AND EXISTS(SELECT 1 FROM hero_inventory WHERE kingdom_id=? AND hero_key=? AND level=?)").bind(cost.food,cost.wood,cost.gold,k.id,cost.food,cost.wood,cost.gold,hero.id,level,k.id,key,level),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId),
+      env.DB.prepare("UPDATE hero_inventory SET level=level+1,experience=experience+100 WHERE kingdom_id=? AND hero_key=? AND level=? AND "+guard).bind(k.id,key,level,k.id,actionId),
+      env.DB.prepare("UPDATE heroes SET level=level+1,experience=experience+100 WHERE id=? AND level=? AND "+guard+" AND changes()>0").bind(hero.id,level,k.id,actionId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard+" AND changes()>0").bind(k.id,"hero_trained",JSON.stringify({hero:key,level:level+1,cost}),k.id,actionId),
+      env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId)
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Recursos insuficientes ou herói alterado por outra ação."},409);
+    if(!result[2]?.meta?.changes||!result[3]?.meta?.changes)return json({error:"Não foi possível sincronizar o treinamento do herói."},409);
   }else if(type==="prestige"){
     const current=Number(k.prestige||0),castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
     if(!castle||Number(castle.level)<30||Number(k.castle_level)<30)return json({error:"Seu castelo precisa atingir o nível 30."},409);
@@ -944,7 +971,7 @@ async function gameAction(env,playerId,body){
     const unitsJson=JSON.stringify(selected);
     const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
     await ensureEquipmentTables(env,k.id);
-    const activeHero=await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(k.id).first();
+    const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(k.id).first();
     const [equippedRows,gearResearchRows]=await Promise.all([
       activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,activeHero.id).all():Promise.resolve({results:[]}),
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
@@ -972,8 +999,8 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(k.id).first(),
       env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(k.id).first(),
       env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first(),
-      env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(k.id).first()
     ]);
+    const gearHero=activeHero?.hero_key?await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? AND hero_key=?").bind(k.id,activeHero.hero_key).first():null;
     await ensureEquipmentTables(env,k.id);
     const [equippedRows,gearResearchRows]=await Promise.all([
       gearHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,gearHero.id).all():Promise.resolve({results:[]}),
