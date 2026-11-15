@@ -1,9 +1,11 @@
-const CACHE_NAME = "clash-of-izzy-shell-v5";
+const CACHE_NAME = "clash-of-izzy-shell-v6";
 const CORE_ASSETS = [
   "/",
   "/index.html",
   "/command-center.html",
   "/command-center.js",
+  "/admin.html",
+  "/admin.js",
   "/arena.html",
   "/manifest.json",
   "/icon-192.svg",
