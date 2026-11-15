@@ -67,8 +67,8 @@ test("Worker não aceita PvP contra protegido ou membro da mesma aliança", asyn
   const marchStart = worker.indexOf('}else if(type==="march"){');
   const marchEnd = worker.indexOf('}else if(type==="battle"){', marchStart);
   const march = worker.slice(marchStart, marchEnd);
-  assert.ok(march.includes("territory.shield_until"));
-  assert.ok(march.includes("k.protection_until"));
+  assert.ok(march.includes("target.shield_until"));
+  assert.ok(march.includes("target.protection_until"));
   assert.ok(march.includes("alliance_members"));
   assert.ok(march.includes("Ataques contra membros da sua própria aliança estão bloqueados"));
   assert.ok(march.includes("target_owner_kingdom_id"));
