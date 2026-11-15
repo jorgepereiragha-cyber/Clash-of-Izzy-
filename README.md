@@ -15,7 +15,7 @@ npm run dev
 Comandos úteis:
 
 - `npm test`: testes de regras, contratos e integração Worker+D1 local.
-- `node scripts/production-smoke-test.js`: smoke test de produção (requer `WORKER_BASE_URL`).
+- `node scripts/production-smoke.js`: smoke test de produção (requer `WORKER_BASE_URL`).
 - `npm run check`: valida o bundle do Worker sem publicar.
 - `npm run db:migrate:local`: aplica as migrações no D1 local.
 - `npm run db:migrate:remote`: aplica as migrações no D1 remoto.
