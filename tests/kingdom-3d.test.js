@@ -21,6 +21,10 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.ok(kingdom.includes('"three":"https://cdn.jsdelivr.net'));
 });
 
+test("quality profile uses the real viewport while the kingdom panel is initially hidden", () => {
+  assert.match(renderer, /viewportWidth: host\.clientWidth \|\| window\.innerWidth/);
+});
+
 test("3D scene is mobile-conscious and does not run an unnecessary animation loop", () => {
   assert.match(renderer, /powerPreference: "low-power"/);
   assert.match(renderer, /calculateKingdomPixelRatio\(\{ width: host\.clientWidth, height: host\.clientHeight, devicePixelRatio: window\.devicePixelRatio \|\| 1, profile: qualityProfile \}\)/);
