@@ -229,3 +229,19 @@ test("GLB assets are normalized to a mobile building footprint and grounded at y
   assert.ok(renderer.includes("-sourceBounds.min.y * uniformScale"));
   assert.ok(renderer.includes("template.add(normalizedModel)"));
 });
+
+
+test("optional GLB assets load only for present building types with bounded concurrency", () => {
+  assert.ok(renderer.includes("const neededTypes = new Set"));
+  assert.ok(renderer.includes("glbLoadPromises.has(asset.type)"));
+  assert.ok(renderer.includes("Math.min(3, queue.length)"));
+  assert.ok(renderer.includes("loadOptionalGlbAssets(list)"));
+  assert.ok(renderer.includes("loadOptionalGlbAssets(window.__coiKingdomBuildings)"));
+  assert.ok(renderer.includes("manifestLoad = null"));
+});
+
+test("failed optional GLB downloads preserve procedural models and allow later retries", () => {
+  assert.ok(renderer.includes("GLB asset not ready; procedural 3D models remain active"));
+  assert.ok(renderer.includes("glbLoadPromises.delete(asset.type)"));
+  assert.ok(renderer.includes("manifestLoad = null"));
+});
