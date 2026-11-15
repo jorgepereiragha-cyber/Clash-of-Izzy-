@@ -124,3 +124,12 @@ test("attack requests reuse their idempotency key after a network retry", async 
   assert.ok(client.includes("requestId:pendingRequestId"));
   assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_request")'));
 });
+
+
+test("event page includes accessible original boss artwork and reduced-motion support", async () => {
+  const html = await readFile(new URL("../events.html", import.meta.url), "utf8");
+  assert.ok(html.includes('role="img" aria-label="Anjo da Morte'));
+  assert.ok(html.includes("death-wing"));
+  assert.ok(html.includes("death-cloak"));
+  assert.ok(html.includes("prefers-reduced-motion:reduce"));
+});
