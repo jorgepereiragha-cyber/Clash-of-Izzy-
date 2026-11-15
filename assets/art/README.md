@@ -27,7 +27,7 @@
 - A cena 3D é renderizada sob demanda, sem loop contínuo; não há animação de câmera ou ciclo de jogo nesta tela ainda.
 
 ## Regras de desempenho
-- Canvas 2D fallback limita DPR a 1.5; Three.js limita DPR a 1.25 para controlar custo de GPU.
+- Canvas 2D fallback limita DPR a 1.5; Three.js limita DPR a 1.25 e reduz para 1.0 em dispositivos que reportam até 4 GB de memória.
 - Redimensionar via `ResizeObserver` e renderizar quando os dados/tamanho mudarem, sem loop de animação permanente.
 - Sombras 3D ficam desativadas em áreas estreitas (abaixo de 680 px) para reduzir custo em dispositivos móveis.
 - Manter modelos procedurais como fallback até cada GLB real estar validado e habilitado no manifesto.
