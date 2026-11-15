@@ -241,7 +241,9 @@ async function applyProduction(env,kingdomId){
     iron:2*(levels.iron_mine||1),
     gold:1.5*(levels.market||1)
   };
-  const prestigeBonus=1+Math.max(0,Number(row.prestige||0))*.10;
+  const equipmentRows=await env.DB.prepare("SELECT item_key,level,is_locked FROM kingdom_equipment WHERE kingdom_id=?").bind(kingdomId).all().catch(()=>({results:[]}));
+  const equipmentProductionBonus=equipmentBonuses(equipmentRows.results||[]).resourcePercent/100;
+  const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
   const gains={},nextRemainders={};
@@ -290,19 +292,23 @@ async function processMarches(env,kingdomId){
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={};
    if(target&&!target.owner_kingdom_id&&army.length){
-    const [kingdom,hero,dragon,military,defense]=await Promise.all([
+    const [kingdom,hero,dragon,military,defense,equipmentRows]=await Promise.all([
      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
-     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
+     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first(),
+     env.DB.prepare("SELECT item_key,level,is_locked FROM kingdom_equipment WHERE kingdom_id=?").bind(kingdomId).all()
     ]);
+    const gear=equipmentBonuses(equipmentRows.results||[]);
     const castleLevel=Number(kingdom?.castle_level||1);
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      researchLevel:Number(military?.level||0),
-     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0))),
+     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
+     equipmentAttackBonusPercent:gear.attackPercent,
+     equipmentHealthBonusPercent:gear.healthPercent,
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
     });
@@ -368,6 +374,12 @@ async function ensureEquipmentTables(env,kingdomId){
  await env.DB.batch(Object.keys(EQUIPMENT_CATALOG).map(key=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level,is_locked) VALUES(?,?,1,0)").bind(kingdomId,key)));
  return (await env.DB.prepare("SELECT item_key,level,is_locked,updated_at FROM kingdom_equipment WHERE kingdom_id=? ORDER BY item_key").bind(kingdomId).all()).results||[];
 }
+function equipmentBonuses(rows=[]){
+ const totals={attack:0,defense:0,health:0,resourceBonus:0};
+ for(const row of rows){const item=equipmentView(row);if(!item)continue;for(const key of Object.keys(totals))totals[key]+=Math.max(0,Number(item.stats?.[key])||0);}
+ return {attackPercent:Math.min(30,Math.floor(totals.attack/10)),defensePercent:Math.min(30,Math.floor(totals.defense/10)),healthPercent:Math.min(30,Math.floor(totals.health/25)),resourcePercent:Math.min(50,totals.resourceBonus)};
+}
+
 function equipmentView(row){
  const def=EQUIPMENT_CATALOG[row.item_key];if(!def)return null;
  const level=Number(row.level),stats={};
