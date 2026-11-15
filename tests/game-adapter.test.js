@@ -57,3 +57,15 @@ test("cliente preserva o token e não funda outro reino quando a sessão salva f
   assert.doesNotMatch(connect, /sessionStorage\.removeItem\('coi_game_token'\)/);
   assert.match(connect, /}else\{[\s\S]*?fetch\(API_BASE\+'\/game\/start'/);
 });
+
+
+test("bônus de equipamentos fortalecem ataque e sobrevivência sem ultrapassar o limite", () => {
+  const army = [{ unit_type: "knight", tier: 2, quantity: 20 }];
+  const base = simulateBattle({ army, castleLevel: 1, defenderLevel: 8, roll: 1 });
+  const geared = simulateBattle({ army, castleLevel: 1, defenderLevel: 8, equipmentAttackBonusPercent: 30, equipmentHealthBonusPercent: 30, roll: 1 });
+  assert.ok(geared.attackerPower > base.attackerPower);
+  assert.ok(geared.survivors >= base.survivors);
+  const capped = simulateBattle({ army, castleLevel: 1, defenderLevel: 8, equipmentAttackBonusPercent: 300, equipmentHealthBonusPercent: 300, roll: 1 });
+  const maxed = simulateBattle({ army, castleLevel: 1, defenderLevel: 8, equipmentAttackBonusPercent: 30, equipmentHealthBonusPercent: 30, roll: 1 });
+  assert.deepEqual(capped, maxed);
+});
