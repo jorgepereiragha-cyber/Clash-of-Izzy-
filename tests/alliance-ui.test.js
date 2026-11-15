@@ -64,6 +64,8 @@ test("índice FTS5 mantém catálogo público sincronizado sem indexar dados pri
     "game_search_alliance_ai",
     "game_search_territory_ai",
     "game_search_skin_ai",
+    "substr(description,1,120)",
+    "coalesce(resource_type,'')",
     "INSERT OR IGNORE INTO game_search_documents"
   ]) assert.ok(migration.includes(snippet), `índice de busca deve conter: ${snippet}`);
   assert.doesNotMatch(migration, /inventory_items|resource_ledger|hero_inventory|player_skins/);
