@@ -395,6 +395,12 @@ async function processMarches(env,kingdomId){
      &&Number(target.owner_kingdom_id)!==Number(kingdomId)
      &&Number(target.owner_kingdom_id)===Number(m.target_owner_kingdom_id);
 
+   // Serialize every march resolution with the kingdom garrison. PvP additionally
+   // locks the defender so returning gather/scout troops cannot alter a live snapshot.
+   const lockIds=isPvpCandidate?[kingdomId,Number(target.owner_kingdom_id)]:[kingdomId];
+   kingdomBattleLocks=await acquireKingdomBattleLocks(env,lockIds);
+   if(!kingdomBattleLocks)continue;
+
    if(isPvpCandidate){
     pvpDefenderId=Number(target.owner_kingdom_id);
     const nowMs=Date.now();
@@ -408,8 +414,6 @@ async function processMarches(env,kingdomId){
      if(sameAlliance){
       pvpCancelledReason="friendly_territory";
      }else{
-      kingdomBattleLocks=await acquireKingdomBattleLocks(env,[kingdomId,pvpDefenderId]);
-      if(!kingdomBattleLocks)continue;
       const defenderRows=await env.DB.prepare("SELECT id,unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY tier DESC,unit_type").bind(pvpDefenderId).all();
       pvpDefenderRows=defenderRows.results||[];
       const [attackerProfile,defenderProfile]=await Promise.all([
