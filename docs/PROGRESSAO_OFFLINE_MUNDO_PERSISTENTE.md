@@ -1,6 +1,6 @@
 # Progressão persistente e mundo ativo — Clash of Izzy
 
-Status: especificação técnica auditada; implementação de filas e scheduler ainda pendente.
+Status: primeira implementação de runtime concluída na branch; revisão e CI pendentes. Não publicada em produção.
 Branch: feature/offline-kingdom-progression
 
 ## Objetivo de produto
@@ -131,3 +131,25 @@ Fontes consultadas:
 6. Executar testes de concorrência, repetição, relógio manipulado, app fechado, telefone desligado e offline prolongado.
 
 Esta atualização é pesquisa e especificação. Não declara filas, scheduler, push ou multiplayer como implementados; nenhuma migração ou publicação de produção foi executada.
+
+
+## Implementação de runtime adicionada nesta branch
+
+- Migração aditiva `0009_kingdom_tasks.sql`: tabela de tarefas, slots ativos únicos por reino/tipo/slot, chave idempotente e índices de vencimento.
+- `upgrade`, `train` e `research` agora debitam recursos no início e criam tarefas persistidas; o nível/tropas só são aplicados ao concluir.
+- Filas: uma fila global inicial de construção, uma de pesquisa e uma por edifício militar de treinamento (quartel, estábulo, arqueiros, academia e oficina de cerco).
+- `processDueKingdomTasks` reivindica conclusão com token único e aplica efeitos/recompensas no mesmo lote D1 transacional.
+- `scheduled()` e Cron Trigger de um minuto processam tarefas vencidas e marchas mesmo sem jogadores conectados. O estado do reino também reconcilia tarefas vencidas quando o jogador retorna.
+- API do estado inclui `activeTasks` e `serverTime`; o Centro de Comando mostra filas e contagens regressivas. A contagem local é apenas visual.
+- Custos de construção, treinamento e pesquisa são registrados no `resource_ledger`.
+- `task-engine.js` contém regras de duração e testes unitários; CI aplica todas as migrações apenas em D1 local e testa os tempos.
+- A produção passiva existente e o limite de sete dias foram preservados.
+
+### Limitações que continuam pendentes
+
+- O Cron roda em intervalo de um minuto; a conclusão pode aparecer com atraso de até um ciclo, mas o prazo real permanece no timestamp persistido.
+- A fila de construção e pesquisa tem um slot cada; ainda não há aceleradores/cancelamento/segunda fila VIP.
+- Marchas continuam usando a lógica atual de resolução, agora também chamada pelo scheduler global. PvP global, rally, combate entre reinos, coleta por tempo no nó e notificações push ainda não estão prontos.
+- Cura hospitalar, escudos com expiração automatizada, calendário global de eventos, WebSockets/chat instantâneo e push notifications ficam em etapas posteriores.
+- As novas filas dependem da migração 0009. Até o deploy e aplicação dessa migração, a versão em produção não recebe esse comportamento.
+- Nenhuma migração remota, merge ou deploy foi executado nesta etapa.
