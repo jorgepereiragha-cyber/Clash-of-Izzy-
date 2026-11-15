@@ -18,7 +18,8 @@ test("equipamentos usam estado persistente e validação no servidor", async () 
   assert.match(worker, /type==="equipment_equip"/);
   assert.match(worker, /type==="equipment_unequip"/);
   assert.match(worker, /JOIN hero_equipment he ON he.item_key=ke.item_key/);
-  assert.match(worker, /heroEquipment,cosmetics/);
+  assert.match(worker, /heroEquipment/);
+  assert.match(worker, /cosmetics/);
   assert.match(coreMigration, /CREATE TABLE IF NOT EXISTS hero_equipment/);
   assert.match(coreMigration, /UNIQUE \(hero_id, slot\)/);
   assert.match(page, /id="hero-select"/);
