@@ -9,7 +9,7 @@
     const number=Number(value)||0;
     if(key==="attack"||key==="defense")return (number/10).toFixed(1)+"%";
     if(key==="health")return (number/25).toFixed(1)+"%";
-    return number.toFixed(2).replace(/\\.?0+$/,"")+"%";
+    return number.toFixed(2).replace(/\.?0+$/,"")+"%";
   }
   const slotLabels={weapon:"Arma",helmet:"Capacete",armor:"Armadura",boots:"Botas",accessory:"Acessório"};
   const rarityLabels={comum:"Comum",raro:"Raro",epico:"Épico",lendario:"Lendário"};
