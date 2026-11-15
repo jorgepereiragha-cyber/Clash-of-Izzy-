@@ -8,6 +8,7 @@ test("purchase requests require a valid player session and a stable idempotency 
   const worker = await read("worker.js");
   assert.ok(worker.includes('/api/store/purchase-request'));
   assert.ok(worker.includes("gameIdentity(request,env)"));
+  assert.ok(worker.includes('SELECT id,kingdom_name FROM kingdoms WHERE player_id=?").bind(player.id)'));
   assert.ok(worker.includes("purchase-request-player"));
   assert.ok(worker.includes("requestKey"));
   assert.ok(worker.includes("payment_method,payment_reference,request_key"));
