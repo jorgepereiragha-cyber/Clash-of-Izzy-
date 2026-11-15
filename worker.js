@@ -279,11 +279,11 @@ async function processMarches(env,kingdomId){
  const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
  for(const m of due.results||[]){
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
-  const resolvedAt=new Date().toISOString();
-  const guard="EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolved_at=?)";
+  const resolvedAt=new Date().toISOString(),resolutionToken=crypto.randomUUID();
+  const guard="EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)";
   const statements=[
    // A resolução inteira é uma transação D1. Se qualquer escrita falhar, o status e todas as recompensas voltam juntos.
-   env.DB.prepare("UPDATE marches SET status='completed',resolved_at=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,m.id,kingdomId,now)
+   env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
   ];
   if(m.march_type==="attack"){
    const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
@@ -314,29 +314,29 @@ async function processMarches(env,kingdomId){
     battleLog=[{event:"attack_cancelled",reason:target?"territory_already_owned":"territory_missing"}];
    }
    // A captura é condicional e imediatamente seguida pelo relatório, que lê changes() da captura.
-   statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolvedAt));
+   statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,? WHERE "+guard)
-    .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true}),JSON.stringify({territoryCaptured:false}),JSON.stringify(battleLog),m.id,kingdomId,resolvedAt));
+    .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true}),JSON.stringify({territoryCaptured:false}),JSON.stringify(battleLog),m.id,kingdomId,resolutionToken));
    for(const [unit,qty] of Object.entries(survivors)){
-    if(qty>0)statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,1,qty,m.id,kingdomId,resolvedAt));
+    if(qty>0)statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,1,qty,m.id,kingdomId,resolutionToken));
    }
    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,CASE WHEN json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured')=1 THEN 'territory_captured' ELSE 'territory_attack_resolved' END,json_object('territoryId',?,'won',json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured'),'losses',json(?)) WHERE "+guard)
-    .bind(kingdomId,kingdomId,m.target_territory_id,m.target_territory_id,kingdomId,m.target_territory_id,JSON.stringify(losses),m.id,kingdomId,resolvedAt));
+    .bind(kingdomId,kingdomId,m.target_territory_id,m.target_territory_id,kingdomId,m.target_territory_id,JSON.stringify(losses),m.id,kingdomId,resolutionToken));
   }else{
    const marchMaterial=eventMaterialStatement(env,kingdomId,m.march_type==="gather"?"gather":"scout");
    if(marchMaterial){
-    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,m.march_type==="gather"?"power_crystal":"svip_medal",m.id,kingdomId,resolvedAt));
+    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,m.march_type==="gather"?"power_crystal":"svip_medal",m.id,kingdomId,resolutionToken));
    }
    for(const [unit,raw] of Object.entries(units)){
     const qty=Math.max(0,Math.floor(Number(raw)||0));if(!Object.hasOwn(UNITS,unit)||qty<1)continue;
-    statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,1,qty,m.id,kingdomId,resolvedAt));
+    statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,1,qty,m.id,kingdomId,resolutionToken));
    }
    if(m.march_type==="gather"){
     const target=await env.DB.prepare("SELECT resource_type,resource_rate FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
     if(target&&["food","wood","stone","iron"].includes(target.resource_type)){
      const amount=Math.max(1,Number(target.resource_rate)||90);
-     statements.push(env.DB.prepare("UPDATE kingdoms SET "+target.resource_type+"="+target.resource_type+"+? WHERE id=? AND "+guard).bind(amount,kingdomId,m.id,kingdomId,resolvedAt));
-     statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE "+guard).bind(kingdomId,target.resource_type,amount,"coleta por marcha",m.id,kingdomId,resolvedAt));
+     statements.push(env.DB.prepare("UPDATE kingdoms SET "+target.resource_type+"="+target.resource_type+"+? WHERE id=? AND "+guard).bind(amount,kingdomId,m.id,kingdomId,resolutionToken));
+     statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE "+guard).bind(kingdomId,target.resource_type,amount,"coleta por marcha",m.id,kingdomId,resolutionToken));
     }
    }
   }
