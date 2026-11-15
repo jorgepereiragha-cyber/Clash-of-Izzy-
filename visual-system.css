@@ -55,3 +55,9 @@ body:has(> main) a{background:linear-gradient(180deg,var(--izzy-gold-bright),var
  #skills .skill{min-width:44px}#allianceChat{max-height:calc(100dvh - 110px)}
  #materialsPanel,#territoryPanel{max-height:calc(100dvh - 32px)}
 }
+/* Official Clash of Izzy crest: reuse the existing PWA artwork, never a substitute icon. */
+.coi-brand{display:flex;align-items:center;justify-content:center;gap:10px;margin:4px auto 14px;color:var(--izzy-gold-bright);font-weight:900;letter-spacing:.12em;text-align:center}
+.coi-brand img{display:block;width:48px;height:48px;object-fit:contain;filter:drop-shadow(0 4px 10px rgba(0,0,0,.38))}
+.brand{display:flex;align-items:center;gap:8px}
+.brand::before{content:"";display:inline-block;flex:0 0 30px;width:30px;height:30px;background:url("/icon-192.svg") center/contain no-repeat;filter:drop-shadow(0 2px 5px rgba(0,0,0,.35))}
+@media(max-width:650px){.coi-brand{font-size:13px}.coi-brand img{width:42px;height:42px}}
