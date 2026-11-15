@@ -17,6 +17,17 @@
     return data;
   }
   function render(){
+    const container=document.querySelector(".mobile-equipment-container");
+    let picker=$("equipment-select");
+    if(!picker&&container){
+      picker=document.createElement("select");picker.id="equipment-select";picker.setAttribute("aria-label","Selecionar equipamento");
+      picker.style.cssText="width:100%;padding:10px;margin:8px 0 14px;border-radius:8px;background:#17283c;color:#fff;border:1px solid #b88b45";
+      container.insertBefore(picker,container.firstChild);
+      picker.addEventListener("change",()=>{selected=picker.value;render()});
+    }
+    if(picker&&state?.equipment){
+      picker.replaceChildren(...state.equipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
+    }
     const item=(state?.equipment||[]).find(x=>x.id===selected)||(state?.equipment||[])[0];
     if(!item){setStatus("Nenhum equipamento disponível neste reino.",true);return;}
     selected=item.id;
