@@ -31,7 +31,7 @@ if (host && "WebGLRenderingContext" in window) {
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
   function addTree(x, z, scale = 1) {
-    const group = new THREE.Group(); group.position.set(x, 0, z); group.scale.setScalar(scale);
+    const group = new THREE.Group(); group.position.set(x, 0, z); group.userData.coIType = type; group.scale.setScalar(scale);
     const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.09, .13, .65, 5), mats.wood);
     trunk.position.y = .32; trunk.castShadow = true; group.add(trunk);
     const crown = new THREE.Mesh(new THREE.ConeGeometry(.62, 1.45, 6), mats.leaf);
@@ -109,28 +109,37 @@ if (host && "WebGLRenderingContext" in window) {
     });
     renderer.render(scene, camera);
   }
-  async function loadOptionalGlbAssets() {
+  async function loadOptionalGlbAssets(buildings = []) {
     try {
       const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
       if (!response.ok) return;
       const manifest = await response.json();
       for (const asset of (manifest.models || [])) {
-        if (!asset.type || !asset.src) continue;
+        if (asset.enabled !== true || !asset.type || !asset.src) continue;
         const gltf = await gltfLoader.loadAsync(asset.src);
         const template = gltf.scene;
         template.traverse(node => {
           if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
         });
-        template.userData.coIAssetType = asset.type;
-        // The manifest is a verified future replacement path; fallback primitives stay visible
-        // until an asset is explicitly marked enabled and has a real GLB file.
-        if (asset.enabled === true) {
-          const target = activeModels.find(model => model.userData.coIType === asset.type);
-          if (target) { scene.remove(target); activeModels = activeModels.filter(model => model !== target); }
-        }
+        const data = (Array.isArray(buildings) ? buildings : []).find(item => item.building_type === asset.type);
+        const target = activeModels.find(model => model.userData.coIType === asset.type);
+        if (!target) continue;
+        const position = target.position.clone();
+        scene.remove(target);
+        const model = template.clone(true);
+        model.position.copy(position);
+        const scale = Number(asset.scale) > 0 ? Number(asset.scale) : 1;
+        model.scale.setScalar(scale);
+        model.userData.coIType = asset.type;
+        model.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
+        scene.add(model);
+        activeModels = activeModels.filter(item => item !== target);
+        activeModels.push(model);
+        if (data?.level) model.userData.coILevel = Number(data.level);
       }
+      renderer.render(scene, camera);
     } catch (error) {
-      console.info("Clash of Izzy: GLB manifest unavailable; using procedural 3D buildings.", error);
+      console.info("Clash of Izzy: GLB asset not ready; procedural 3D models remain active.", error);
     }
   }
   try {
@@ -163,7 +172,7 @@ if (host && "WebGLRenderingContext" in window) {
     ktx2.detectSupport(renderer);
     gltfLoader = new GLTFLoader(); gltfLoader.setKTX2Loader(ktx2);
     host.classList.add("has-3d");
-    window.addEventListener("coi:kingdom-render", event => renderBuildings(event.detail?.buildings || []));
+    window.addEventListener("coi:kingdom-render", event => { const list = event.detail?.buildings || []; renderBuildings(list); loadOptionalGlbAssets(list); });
     const resize = () => {
       if (!renderer || !host.clientWidth || !host.clientHeight) return;
       const aspect = host.clientWidth / host.clientHeight;
