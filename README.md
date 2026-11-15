@@ -44,7 +44,14 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0015`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0016`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+
+## Filas estratégicas persistentes
+
+- Construção, treinamento e pesquisa possuem filas independentes por reino e uma ordem ativa por tipo.
+- Os recursos e materiais são debitados ao iniciar; edifícios, tropas e níveis de pesquisa só são entregues ao concluir a fila no Worker.
+- O cron do Worker processa ordens vencidas; a leitura autenticada do reino também faz a recuperação de filas vencidas para evitar dependência exclusiva de uma visita do jogador.
+- A migração `0016_strategy_queues_and_mage.sql` cria as filas e corrige o catálogo SQL de tropas para aceitar `mage`, já existente no catálogo do Worker.
 
 ## Segurança e consistência
 

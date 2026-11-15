@@ -20,6 +20,16 @@ main{max-width:1120px;margin:18px auto;padding:0 12px 40px}.hero{display:flex;al
 .building:disabled{opacity:.55;cursor:not-allowed}
 .grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.stat{background:#0e1a2a;border:1px solid #40556b;border-radius:8px;padding:10px}.stat span{display:block;color:var(--muted);font-size:11px}.stat b{font-size:17px;color:#fff}
 button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#68451f);color:#fff;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;gap:6px}button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#243a55;border-color:#71839a}.building-list{display:grid;gap:8px}.building-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0e1a2a;border:1px solid #40556b;border-radius:9px;padding:9px}.building-row .info{min-width:0}.building-row strong{display:block}.building-row small{color:var(--muted)}.building-row button{font-size:11px;padding:7px 9px;white-space:nowrap}
+.panel select,.panel input[type="number"]{min-width:0;padding:10px;border:1px solid #71839a;border-radius:8px;background:#0e1a2a;color:#fff;font:inherit}
+.queue-card{display:grid;gap:5px;background:#0e1a2a;border:1px solid #52677d;border-radius:9px;padding:10px}
+.queue-card strong{color:#f5edda}.queue-card small{color:var(--muted)}
+.queue-progress{height:7px;overflow:hidden;border-radius:999px;background:#26394d}
+.queue-progress span{display:block;height:100%;background:linear-gradient(90deg,#9a682d,#e7bd68);width:35%;animation:queue-pulse 1.7s ease-in-out infinite alternate}
+.queue-remaining{color:#f1c46a;font-weight:800;font-variant-numeric:tabular-nums}
+.queue-form{display:grid;gap:8px;margin-top:10px}
+.queue-form label{font-size:12px;color:var(--muted)}
+.queue-form button{width:100%}
+@keyframes queue-pulse{from{opacity:.55}to{opacity:1}}
 .stack{display:grid;gap:14px}.notice{padding:10px;border-radius:8px;background:#3a2d1c;border:1px solid #927344;color:#f4dca8;line-height:1.5}.events{display:grid;gap:7px}.event{background:#0e1a2a;padding:8px;border-radius:7px;color:#dbe3ec;font-size:12px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 #status{font-size:12px;color:#d8e2ee}#status.error{color:#ffb4a9}#loading{padding:25px;text-align:center;color:var(--muted)}
 @media(max-width:760px){.layout{grid-template-columns:1fr}.city{min-height:320px;grid-template-rows:repeat(3,minmax(78px,1fr));padding:10px;gap:7px}.resources{grid-template-columns:repeat(5,minmax(0,1fr))}.resource{font-size:10px;padding:6px 2px}.resource b{font-size:12px}.hero{align-items:start;flex-direction:column}}
@@ -53,6 +63,36 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <section class="panel"><h2>🏰 Sua cidade</h2><div class="city" id="city"></div><div class="grid2" id="summary"></div></section>
 <div class="stack">
 <section class="panel"><h2>🏗️ Edifícios e melhorias</h2><div class="building-list" id="buildings"></div></section>
+<section class="panel"><h2>⏳ Centro de operações</h2><div id="queues" class="events"><div class="muted">Carregando filas do reino…</div></div></section>
+<section class="panel"><h2>⚔️ Recrutamento de tropas</h2>
+<form id="trainingForm" class="queue-form">
+<label for="unitType">Unidade militar</label>
+<select id="unitType" required>
+<option value="militia">Milícia</option><option value="swordsman">Espadachim</option><option value="spearman">Lanceiro</option>
+<option value="archer">Arqueiro</option><option value="crossbowman">Besteiro</option><option value="cavalry">Cavalaria</option>
+<option value="knight">Cavaleiro</option><option value="mage">Mago</option><option value="catapult">Catapulta</option>
+<option value="ram">Aríete</option><option value="trebuchet">Trabuquete</option>
+</select>
+<label for="unitQuantity">Quantidade (1–100)</label>
+<input id="unitQuantity" type="number" min="1" max="100" value="10" step="1" inputmode="numeric" required>
+<button id="trainButton" type="submit">Iniciar treinamento</button>
+<p class="muted">Os recursos são cobrados ao iniciar. As tropas entram no exército quando o cronômetro terminar.</p>
+</form>
+</section>
+<section class="panel"><h2>🔬 Academia e pesquisas</h2>
+<div id="researchLevels" class="events"></div>
+<form id="researchForm" class="queue-form">
+<label for="researchKey">Tecnologia</label>
+<select id="researchKey" required>
+<option value="economy">Economia</option><option value="military">Doutrina militar</option>
+<option value="construction">Engenharia de construção</option><option value="defense">Defesa</option>
+<option value="gear_forging">Metalurgia rúnica</option><option value="gear_ward">Runas de proteção</option>
+<option value="gear_vitality">Forja vital</option><option value="gear_logistics">Logística rúnica</option>
+</select>
+<button id="researchButton" type="submit">Iniciar pesquisa</button>
+<p class="muted">Uma pesquisa por vez. O nível só aumenta depois da conclusão confirmada pelo servidor.</p>
+</form>
+</section>
 <section class="panel"><h2>🛡️ Poder do reino</h2><div class="grid2" id="army"></div><div class="toolbar"><button class="secondary" id="goMap">🌍 Explorar territórios</button></div></section>
 <section class="panel"><h2>📜 Crônicas do reino</h2><div class="events" id="events"></div></section>
 </div></div>
@@ -147,13 +187,62 @@ window.addEventListener("coi:kingdom-2d-fallback",()=>{
 function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";document.getElementById("resources").innerHTML=[["🌾","Comida","food"],["🪵","Madeira","wood"],["🪨","Pedra","stone"],["⛓️","Ferro","iron"],["🪙","Ouro","gold"]].map(([icon,label,key])=>'<div class="resource">'+icon+'<b>'+fmt(k[key])+'</b>'+label+'</div>').join("");
 const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings);if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[]}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
-document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const blocked=b.level>=30;return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked||busy?"disabled":"")+'> '+(blocked?"MÁXIMO":"Evoluir")+' </button></div>'}).join("");
+const constructionRunning=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running");
+document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const blocked=maxed||constructionRunning||busy;const label=maxed?"MÁXIMO":constructionRunning?"FILA OCUPADA":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
+renderQueues();
+document.getElementById("researchLevels").innerHTML=(state.research||[]).map(r=>'<div class="event">'+esc(String(r.research_key).replaceAll("_"," "))+' · nível '+fmt(r.level)+'</div>').join("")||'<div class="muted">Nenhuma pesquisa concluída ainda.</div>';
+document.getElementById("trainButton").disabled=busy||(state.queues||[]).some(q=>q.queue_type==="training"&&q.status==="running");
+document.getElementById("researchButton").disabled=busy||(state.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running");
 const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Tropas",fmt(total)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).map(e=>'<div class="event">'+esc(String(e.event_type||"Atividade").replaceAll("_"," "))+'</div>').join("")||'<div class="muted">Seu reino está começando sua história.</div>';
 city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
 document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
 }
-async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;busy=false;render();setStatus("Melhoria aplicada");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
+function formatDuration(seconds){
+ const safe=Math.max(0,Math.floor(Number(seconds)||0));
+ const hours=Math.floor(safe/3600),minutes=Math.floor((safe%3600)/60),rest=safe%60;
+ if(hours)return hours+"h "+String(minutes).padStart(2,"0")+"m";
+ if(minutes)return minutes+"m "+String(rest).padStart(2,"0")+"s";
+ return rest+"s";
+}
+function renderQueues(){
+ const root=document.getElementById("queues");
+ const active=(state?.queues||[]).filter(q=>q.status==="running");
+ const labels={construction:"Construção",training:"Treinamento",research:"Pesquisa"};
+ const targets={castle:"Castelo",barracks:"Quartel",farm:"Fazenda",quarry:"Pedreira",lumber_mill:"Serraria",iron_mine:"Mina de ferro",academy:"Academia",militia:"Milícia",swordsman:"Espadachim",spearman:"Lanceiro",archer:"Arqueiro",crossbowman:"Besteiro",cavalry:"Cavalaria",knight:"Cavaleiro",mage:"Mago",catapult:"Catapulta",ram:"Aríete",trebuchet:"Trabuquete",economy:"Economia",military:"Doutrina militar",construction:"Engenharia",defense:"Defesa",gear_forging:"Metalurgia rúnica",gear_ward:"Runas de proteção",gear_vitality:"Forja vital",gear_logistics:"Logística rúnica"};
+ if(!active.length){root.innerHTML='<div class="muted">Nenhuma ordem em andamento. Construção, treinamento e pesquisa podem funcionar em paralelo.</div>';return;}
+ root.innerHTML=active.map(q=>{
+   const remaining=Math.max(0,Math.ceil((Date.parse(q.completes_at)-Date.now())/1000));
+   const target=targets[q.target_key]||q.target_key;
+   const detail=q.queue_type==="construction"?"Nível "+q.to_level:q.queue_type==="training"?"Quantidade: "+fmt(q.quantity):"Nível "+q.to_level;
+   return '<div class="queue-card"><strong>'+esc(labels[q.queue_type]||q.queue_type)+' · '+esc(target)+'</strong><small>'+esc(detail)+' · termina em '+new Date(q.completes_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+'</small><span class="queue-remaining" data-completes="'+esc(q.completes_at)+'">'+formatDuration(remaining)+'</span><div class="queue-progress" aria-hidden="true"><span></span></div></div>';
+ }).join("");
+}
+async function refreshQueueState(){
+ if(busy||document.hidden||!token)return;
+ try{const fresh=await request("/game/state");state=fresh.state;render();}
+ catch(error){setStatus(error.message,true);}
+}
+async function submitQueue(type,payload,message){
+ if(busy)return;
+ busy=true;setStatus("Enviando ordem ao servidor…");
+ try{
+   await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type,...payload})});
+   const fresh=await request("/game/state");state=fresh.state;render();setStatus(message);
+ }catch(error){setStatus(error.message,true);}
+ finally{busy=false;render();}
+}
+async function startTraining(event){
+ event.preventDefault();
+ const quantity=Math.max(1,Math.min(100,Math.floor(Number(document.getElementById("unitQuantity").value)||1)));
+ document.getElementById("unitQuantity").value=String(quantity);
+ await submitQueue("train",{unit:document.getElementById("unitType").value,quantity},"Treinamento iniciado. As tropas serão liberadas ao concluir.");
+}
+async function startResearch(event){
+ event.preventDefault();
+ await submitQueue("research",{research:document.getElementById("researchKey").value},"Pesquisa iniciada. O bônus será ativado ao concluir.");
+}
+async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;busy=false;render();setStatus("Construção iniciada. O nível será atualizado ao concluir.");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
 async function setNickname(event){
  event.preventDefault();
  const input=document.getElementById("nicknameInput"),status=document.getElementById("nicknameStatus");
@@ -182,6 +271,11 @@ async function searchPlayers(event){
  }catch(error){results.replaceChildren();const message=document.createElement("div");message.className="event";message.textContent=error.message;results.append(message);}
 }
 document.getElementById("nicknameForm").addEventListener("submit",setNickname);
+document.getElementById("trainingForm").addEventListener("submit",startTraining);
+document.getElementById("researchForm").addEventListener("submit",startResearch);
+window.setInterval(()=>{document.querySelectorAll("[data-completes]").forEach(el=>{const remaining=Math.max(0,Math.ceil((Date.parse(el.dataset.completes)-Date.now())/1000));el.textContent=formatDuration(remaining);});},1000);
+window.setInterval(refreshQueueState,30000);
+document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshQueueState();});
 document.getElementById("playerSearchForm").addEventListener("submit",searchPlayers);
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
