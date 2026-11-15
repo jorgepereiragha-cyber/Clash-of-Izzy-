@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
@@ -117,4 +118,12 @@ test("global navigation supports CJK codepoint queries and accent-insensitive lo
   assert.ok(nav.includes("Array.from(String(value||\"\")).length"));
   assert.ok(nav.includes("Script=Han"));
   assert.ok(nav.includes("normalizeSearch(item.label+\" \"+item.keywords).includes(normalized)"));
+});
+
+
+test("alliance search inline script parses before deployment", async () => {
+  const html = await read("alliance.html");
+  const scripts = [...html.matchAll(/<script>([\\s\\S]*?)<\\/script>/g)];
+  assert.ok(scripts.length > 0, "alliance page must contain its application script");
+  for (const match of scripts) new vm.Script(match[1], { filename: "alliance.html:inline-script" });
 });
