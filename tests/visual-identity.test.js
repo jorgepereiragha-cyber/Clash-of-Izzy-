@@ -11,6 +11,16 @@ test("todas as telas principais carregam a identidade visual compartilhada", asy
   }
 });
 
+test("cidade 3D segue a bíblia visual com telhados azul-real e detalhes dourados", async () => {
+  const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
+  const bible = await readFile(new URL("../docs/biblia-visual-clash-of-izzy.md", import.meta.url), "utf8");
+  assert.match(bible, /telhados azul-real e detalhes dourados/i);
+  assert.match(renderer, /roof: material\("#24476B"\)/);
+  assert.match(renderer, /\[mats\.roof, "#24476B", "roof"/);
+  assert.match(renderer, /color: "#E7BD68"/);
+  assert.match(renderer, /Royal blue roofs and restrained gold standards/);
+});
+
 test("tema compartilhado define tokens da marca e acessibilidade básica", async () => {
   const css = await readFile(new URL("../styles/coi-theme.css", import.meta.url), "utf8");
   for (const token of ["--coi-night:", "--coi-blue:", "--coi-gold:", "--coi-parchment:", "--coi-forest:", "--coi-war:"]) {
