@@ -26,7 +26,7 @@
 - A PWA usa `manifest.json`, ícones, service worker versionado e fallback offline. O cache não intercepta nem armazena respostas de `/api/*`; dados do jogador continuam vindo do servidor.
 
 ## Monitoramento
-- `GET /api/health` responde 200 apenas quando D1 responde e `SESSION_SECRET` está configurado.
+- `GET /api/health` responde 200 apenas quando D1 responde, a tabela `kingdoms` existe e `SESSION_SECRET` está configurado.\n- O monitor também confirma que `/command-center.html` entrega a interface pública.
 - A rota não revela tokens, nomes de usuário ou configuração administrativa.
 - O monitor do GitHub Actions roda a cada 15 minutos quando `GAME_PUBLIC_URL` existe. Uma falha aparece como execução vermelha no separador Actions do GitHub.
 - Ative notificações de falha de workflow nas configurações de notificações do GitHub para receber alertas.
