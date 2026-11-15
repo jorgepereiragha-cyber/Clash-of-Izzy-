@@ -82,32 +82,30 @@ const ORIGIN_STEPS=[
  {id:"field",title:"II — O campo silencioso",place:"Campos além das muralhas",text:"O campo está vazio. Há marcas de passos, uma ferramenta caída e dois testemunhos que não concordam. A investigação não apaga a violência: procura compreender suas consequências.",hint:"A segunda página só pode ser lida depois da primeira.",action:"Investigar o campo"},
  {id:"mark",title:"III — A marca e o exílio",place:"Marco de pedra na estrada antiga",text:"A última página descreve a marca como sinal narrativo de proteção e memória, não como troféu. Caim parte, e o reino precisa decidir se lembrará apenas do crime ou também da responsabilidade de impedir novos ciclos de violência.",hint:"O caminho termina fora do campo, junto a uma pedra sem brasão.",action:"Examinar o marco"}
 ];
-function readOriginProgress(){
- try{return JSON.parse(localStorage.getItem("coi_origin_campaign_v1")||'{"steps":[],"basilisk":false,"technology":false}')}
- catch{return {steps:[],basilisk:false,technology:false}}
+function storyProgressSet(campaign){
+ return new Set((state?.storyProgress||[]).filter(row=>row.campaign_key===campaign).map(row=>row.step_key));
 }
-function saveOriginProgress(progress){localStorage.setItem("coi_origin_campaign_v1",JSON.stringify(progress))}
 function renderOriginCampaign(){
  const host=$("originCampaign");if(!host)return;
- const castleLevel=Number(state?.kingdom?.castle_level||1),progress=readOriginProgress(),done=new Set(progress.steps||[]);
+ const castleLevel=Number(state?.kingdom?.castle_level||1),done=storyProgressSet("first_rift");
  if(castleLevel<3){
   host.innerHTML='<article class="item"><h3>🔒 A Primeira Fenda</h3><p class="muted">Esta campanha começa no Castelo nível 3. Continue desenvolvendo seu reino; a crônica ficará guardada.</p><span class="pill">Requisito: Castelo 3</span></article>';
   return;
  }
  const cards=ORIGIN_STEPS.map((step,index)=>{
   const unlocked=index===0||done.has(ORIGIN_STEPS[index-1].id),complete=done.has(step.id);
-  return '<article class="item"><h3>'+esc(step.title)+'</h3><div class="muted">'+esc(step.place)+'</div><p class="muted">'+(complete?esc(step.text):esc(step.hint))+'</p><div class="row"><span class="pill">'+(complete?"Capítulo registrado":unlocked?"Disponível":"Ainda selado")+'</span><button type="button" data-origin-step="'+esc(step.id)+'" '+(!unlocked||complete?"disabled":"")+'>'+(complete?"Concluído":esc(step.action))+'</button></div></article>';
+  return '<article class="item"><h3>'+esc(step.title)+'</h3><div class="muted">'+esc(step.place)+'</div><p class="muted">'+(complete?esc(step.text):esc(step.hint))+'</p><div class="row"><span class="pill">'+(complete?"Capítulo registrado":unlocked?"Disponível":"Ainda selado")+'</span><button type="button" data-story-campaign="first_rift" data-story-step="'+esc(step.id)+'" '+(!unlocked||complete?"disabled":"")+'>'+(complete?"Concluído":esc(step.action))+'</button></div></article>';
  }).join("");
- const chaptersComplete=ORIGIN_STEPS.every(step=>done.has(step.id));
- const beast=chaptersComplete?'<article class="item"><h3>🐍 Bestiário — Basilisco das galerias</h3><p class="muted">'+(progress.basilisk?"Registro: uma criatura lendária descrita em bestiários medievais. No mundo do jogo, seus olhos petrificantes são fantasia e não zoologia.":"Um mineiro encontrou escamas vitrificadas sob a torre. Examine o vestígio para abrir a primeira página do bestiário.")+'</p><div class="row"><span class="pill">'+(progress.basilisk?"Fera catalogada":"Vestígio encontrado")+'</span><button type="button" data-origin-beast="basilisk" '+(progress.basilisk?"disabled":"")+'>'+(progress.basilisk?"Catalogado":"Catalogar vestígio")+'</button></div></article>':"";
- const technology=progress.basilisk?'<article class="item"><h3>✧ Tecnologia descoberta — Cartografia das Fundações</h3><p class="muted">'+(progress.technology?"Registro arquivado: mapas antigos ajudam a localizar ruínas e passagens no universo do jogo.":"Um desenho escondido sob a escama mostra fundações esquecidas. Arquive o conhecimento para concluir esta primeira descoberta.")+'</p><div class="row"><span class="pill">'+(progress.technology?"Descoberta arquivada":"Conhecimento revelado")+'</span><button type="button" data-origin-tech="foundations" '+(progress.technology?"disabled":"")+'>'+(progress.technology?"Arquivado":"Arquivar descoberta")+'</button></div></article>':"";
- host.innerHTML='<div class="muted" style="margin-bottom:9px">Campanha introdutória · requisito Castelo 3 · '+done.size+'/3 capítulos</div><div class="grid">'+cards+beast+technology+'</div><p class="muted" style="margin-top:10px">Protótipo narrativo local: progresso salvo neste dispositivo. Ainda não concede bônus, não altera pesquisas reais e não sincroniza com a conta. A narrativa é uma adaptação ficcional respeitosa de Gênesis 4, não uma interpretação religiosa oficial.</p>';
+ const chaptersComplete=ORIGIN_STEPS.every(step=>done.has(step.id)),basilisk=done.has("basilisk"),technology=done.has("foundations");
+ const beast=chaptersComplete?'<article class="item"><h3>🐍 Bestiário — Basilisco das galerias</h3><p class="muted">'+(basilisk?"Registro: uma criatura lendária descrita em bestiários medievais. No mundo do jogo, seus olhos petrificantes são fantasia e não zoologia.":"Um mineiro encontrou escamas vitrificadas sob a torre. Examine o vestígio para abrir a primeira página do bestiário.")+'</p><div class="row"><span class="pill">'+(basilisk?"Fera catalogada":"Vestígio encontrado")+'</span><button type="button" data-story-campaign="first_rift" data-story-step="basilisk" '+(basilisk?"disabled":"")+'>'+(basilisk?"Catalogado":"Catalogar vestígio")+'</button></div></article>':"";
+ const technologyCard=basilisk?'<article class="item"><h3>✧ Tecnologia descoberta — Cartografia das Fundações</h3><p class="muted">'+(technology?"Registro arquivado: mapas antigos ajudam a localizar ruínas e passagens no universo do jogo.":"Um desenho escondido sob a escama mostra fundações esquecidas. Arquive o conhecimento para concluir esta primeira descoberta.")+'</p><div class="row"><span class="pill">'+(technology?"Descoberta arquivada":"Conhecimento revelado")+'</span><button type="button" data-story-campaign="first_rift" data-story-step="foundations" '+(technology?"disabled":"")+'>'+(technology?"Arquivado":"Arquivar descoberta")+'</button></div></article>':"";
+ host.innerHTML='<div class="muted" style="margin-bottom:9px">Campanha introdutória · requisito Castelo 3 · '+done.size+'/5 registros</div><div class="grid">'+cards+beast+technologyCard+'</div><p class="muted" style="margin-top:10px">Progresso validado e salvo no servidor, associado ao reino. A campanha não concede bônus nem altera pesquisas reais nesta versão. A narrativa é uma adaptação ficcional respeitosa de Gênesis 4, não uma interpretação religiosa oficial.</p>';
 }
 function renderVeilArchive(){
- const found=new Set(JSON.parse(localStorage.getItem("coi_veil_clues")||"[]"));
+ const found=storyProgressSet("veil_archive");
  $("veilClues").innerHTML=VEIL_CLUES.map(clue=>{
   const unlocked=found.has(clue.id);
-  return '<article class="item"><h3>'+ (unlocked?"✧ ":"") +esc(clue.title)+'</h3><div class="muted">'+esc(clue.place)+'</div><p class="muted">'+(unlocked?esc(clue.text):esc(clue.hint))+'</p><div class="row"><span class="pill">'+(unlocked?"Fragmento arquivado":"Registro selado")+'</span><button type="button" data-veil-clue="'+esc(clue.id)+'" '+(unlocked?"disabled":"")+'>'+(unlocked?"Descoberto":"Examinar pista")+'</button></div></article>';
+  return '<article class="item"><h3>'+ (unlocked?"✧ ":"") +esc(clue.title)+'</h3><div class="muted">'+esc(clue.place)+'</div><p class="muted">'+(unlocked?esc(clue.text):esc(clue.hint))+'</p><div class="row"><span class="pill">'+(unlocked?"Fragmento arquivado":"Registro selado")+'</span><button type="button" data-story-campaign="veil_archive" data-story-step="'+esc(clue.id)+'" '+(unlocked?"disabled":"")+'>'+(unlocked?"Descoberto":"Examinar pista")+'</button></div></article>';
  }).join("");
  renderOriginCampaign();
 }
@@ -130,26 +128,11 @@ async function act(body,success){
 }
 $("tabs").addEventListener("click",event=>{const button=event.target.closest("[data-tab]");if(!button)return;document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected",String(x===button)));document.querySelectorAll(".section").forEach(x=>x.classList.toggle("active",x.id==="section-"+button.dataset.tab))});
 document.body.addEventListener("click",async event=>{
- const veil=event.target.closest("[data-veil-clue]");
- if(veil){
-  const found=new Set(JSON.parse(localStorage.getItem("coi_veil_clues")||"[]"));
-  found.add(veil.dataset.veilClue);
-  localStorage.setItem("coi_veil_clues",JSON.stringify([...found]));
-  renderVeilArchive();
-  notice("Fragmento encontrado. A Vigília deixou mais um sinal.", "ok");
+ const story=event.target.closest("[data-story-step]");
+ if(story){
+  try{await act({type:"story_step",campaign:story.dataset.storyCampaign,step:story.dataset.storyStep},"Descoberta registrada no servidor e vinculada ao seu reino.")}catch{}
   return;
  }
- const originStep=event.target.closest("[data-origin-step]");
- if(originStep){
-  const step=ORIGIN_STEPS.find(item=>item.id===originStep.dataset.originStep),progress=readOriginProgress(),index=ORIGIN_STEPS.findIndex(item=>item.id===step?.id);
-  if(step&&index>=0&&(index===0||(progress.steps||[]).includes(ORIGIN_STEPS[index-1].id))){
-   progress.steps=[...new Set([...(progress.steps||[]),step.id])];saveOriginProgress(progress);renderOriginCampaign();notice("Capítulo registrado no Arquivo das Origens.","ok");
-  }return;
- }
- const originBeast=event.target.closest("[data-origin-beast]");
- if(originBeast){const progress=readOriginProgress();if(ORIGIN_STEPS.every(step=>(progress.steps||[]).includes(step.id))){progress.basilisk=true;saveOriginProgress(progress);renderOriginCampaign();notice("Primeira fera catalogada no bestiário.","ok")}return}
- const originTech=event.target.closest("[data-origin-tech]");
- if(originTech){const progress=readOriginProgress();if(progress.basilisk){progress.technology=true;saveOriginProgress(progress);renderOriginCampaign();notice("Cartografia das Fundações arquivada. Sem efeito de jogo nesta versão.","ok")}return}
  const claim=event.target.closest("[data-event-claim]");if(claim){try{await act({type:"event_claim",taskId:claim.dataset.eventClaim},"Recompensa diária resgatada.")}catch{}return}
  const up=event.target.closest("[data-upgrade]");if(up){try{await act({type:"upgrade",building:up.dataset.upgrade},"Melhoria iniciada; o reino continuará construindo offline.")}catch{}return}
  const research=event.target.closest("[data-research]");if(research){try{await act({type:"research",research:research.dataset.research},"Pesquisa iniciada; o servidor concluirá automaticamente.")}catch{}return}
