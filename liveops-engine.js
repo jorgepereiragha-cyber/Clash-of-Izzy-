@@ -58,7 +58,15 @@ export async function claimDailyTask(env, kingdomId, taskId, now = new Date()) {
   const update = env.DB.prepare(
     "UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()>0"
   ).bind(reward.food || 0, reward.wood || 0, reward.stone || 0, reward.iron || 0, reward.gold || 0, kingdomId);
-  const result = await env.DB.batch([insert, update]);
+  const markCredited = env.DB.prepare(
+    "UPDATE liveops_daily_claims SET credited_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND cycle_id=? AND task_id=? AND credited_at IS NULL AND changes()>0"
+  ).bind(kingdomId, day, task.id);
+  const ledger = Object.entries(reward).filter(([, amount]) => Number(amount) > 0).map(([resource, amount]) =>
+    env.DB.prepare(
+      "INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE EXISTS (SELECT 1 FROM liveops_daily_claims WHERE kingdom_id=? AND cycle_id=? AND task_id=? AND credited_at IS NOT NULL) AND NOT EXISTS (SELECT 1 FROM resource_ledger WHERE kingdom_id=? AND resource=? AND reason=?)"
+    ).bind(kingdomId, resource, amount, "daily_task:" + task.id + ":" + day, kingdomId, day, task.id, kingdomId, resource, "daily_task:" + task.id + ":" + day)
+  );
+  const result = await env.DB.batch([insert, update, markCredited, ...ledger]);
   if (!result[0]?.meta?.changes) return { ok: false, error: "Esta recompensa já foi resgatada hoje." };
   return { ok: true, taskId: task.id, reward, cycleId: day };
 }
