@@ -7,6 +7,7 @@ import {
   equipmentItemStats,
   equipmentBonuses
 } from "../equipment-engine.js";
+import { simulateBattle } from "../game-adapter.js";
 
 test("equipment catalog has unique ids and valid five-slot coverage",()=>{
   const ids=EQUIPMENT_CATALOG.map(x=>x.id);
@@ -47,4 +48,11 @@ test("equipment research has bounded progression and explicit academy costs",()=
     assert.equal(tech.max,10);
     assert.ok(tech.base.gold>0&&tech.base.stone>0);
   }
+});
+
+test("equipment attack bonus is applied by the authoritative battle simulator",()=>{
+  const army=[{unit_type:"knight",tier:2,quantity:30}];
+  const base=simulateBattle({army,castleLevel:5,heroLevel:5,dragonLevel:3,roll:1});
+  const geared=simulateBattle({army,castleLevel:5,heroLevel:5,dragonLevel:3,equipmentAttackPercent:10,roll:1});
+  assert.ok(geared.attackerPower>base.attackerPower);
 });
