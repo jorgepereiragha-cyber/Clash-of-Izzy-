@@ -491,9 +491,55 @@ async function gameAction(env,playerId,body){
   if(!k)return json({error:"Reino não encontrado."},404);
   await applyProduction(env,k.id);
   const type=String(body.type||"");
+  if(type.startsWith("forge_equipment_"))await ensureForgeEquipmentState(env,k.id);
   let battleOutcome=null;
 
-  if(type==="equipment_upgrade"){
+  if(type==="forge_equipment_craft"){
+    const itemKey=String(body.item||""),item=FORGE_EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
+    if(!item)return json({error:"Equipamento não encontrado."},404);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,iron=iron-? WHERE id=? AND gold>=? AND iron>=? AND NOT EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?)")
+        .bind(item.craft.gold,item.craft.iron,k.id,item.craft.gold,item.craft.iron,k.id,itemKey),
+      env.DB.prepare("INSERT INTO kingdom_equipment(kingdom_id,item_key,level) SELECT ?,?,1 WHERE changes()>0")
+        .bind(k.id,itemKey),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"equipment_forged",JSON.stringify({item:itemKey,gold:item.craft.gold,iron:item.craft.iron}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Ouro ou ferro insuficiente, ou equipamento já adquirido."},409);
+  }else if(type==="forge_equipment_upgrade"){
+    const itemKey=String(body.item||""),expected=Number(body.level),item=FORGE_EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
+    if(!item||!Number.isInteger(expected)||expected<1||expected>=20)return json({error:"Equipamento ou nível inválido."},400);
+    const costGold=Math.floor(350*Math.pow(1.42,expected-1)),costIron=20+8*expected;
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdom_equipment SET level=level+1 WHERE kingdom_id=? AND item_key=? AND level=? AND level<20 AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND gold>=? AND iron>=?)")
+        .bind(k.id,itemKey,expected,k.id,costGold,costIron),
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,iron=iron-? WHERE id=? AND changes()>0")
+        .bind(costGold,costIron,k.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"equipment_upgraded",JSON.stringify({item:itemKey,from:expected,to:expected+1,gold:costGold,iron:costIron}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Evolução indisponível: confira o nível, ouro e ferro."},409);
+  }else if(type==="forge_equipment_equip"){
+    const itemKey=String(body.item||""),item=FORGE_EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
+    if(!item)return json({error:"Equipamento inválido."},400);
+    const result=await env.DB.prepare("INSERT INTO equipped_kingdom_equipment(kingdom_id,slot,item_key) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?) ON CONFLICT(kingdom_id,slot) DO UPDATE SET item_key=excluded.item_key,equipped_at=CURRENT_TIMESTAMP")
+      .bind(k.id,item.slot,itemKey,k.id,itemKey).run();
+    if(!result.meta.changes)return json({error:"Forje o equipamento antes de equipá-lo."},409);
+    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"equipment_equipped",JSON.stringify({item:itemKey,slot:item.slot})).run();
+  }else if(type==="forge_equipment_research"){
+    const researchKey=String(body.research||""),tech=EQUIPMENT_RESEARCH.find(x=>x.id===researchKey),expected=Number(body.level);
+    if(!tech||!Number.isInteger(expected)||expected<0||expected>=tech.max)return json({error:"Pesquisa ou nível inválido."},400);
+    const costGold=Math.floor(tech.base.gold*Math.pow(1.48,expected)),costStone=Math.floor(tech.base.stone*Math.pow(1.4,expected)),academyRequired=1+Math.floor(expected/3);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE research SET level=level+1,completed_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND research_key=? AND level=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND gold>=? AND stone>=?) AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)")
+        .bind(k.id,researchKey,expected,k.id,costGold,costStone,k.id,academyRequired),
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,stone=stone-? WHERE id=? AND changes()>0")
+        .bind(costGold,costStone,k.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"equipment_research_completed",JSON.stringify({research:researchKey,level:expected+1,gold:costGold,stone:costStone}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Pesquisa indisponível: confira nível atual, Academia, ouro e pedra."},409);
+  }else if(type==="equipment_upgrade"){
     const itemKey=String(body.itemId||""),def=EQUIPMENT_CATALOG[itemKey];
     if(!def)return json({error:"Equipamento inválido."},400);
     const rows=await ensureEquipmentTables(env,k.id),row=rows.find(x=>x.item_key===itemKey);
