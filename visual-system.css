@@ -1,0 +1,57 @@
+/* Clash of Izzy — shared visual system
+   One visual language for the game shell, arena and equipment.
+   Gameplay logic and existing component structure remain untouched. */
+:root{
+  color-scheme:dark;
+  --izzy-night:#0b1422;--izzy-ink:#111f32;--izzy-panel:#172a40;
+  --izzy-panel-raised:#203850;--izzy-stone:#34495d;--izzy-gold:#e5b85e;
+  --izzy-gold-bright:#ffda83;--izzy-bronze:#8c5c2b;--izzy-parchment:#f4ead4;
+  --izzy-muted:#b7c5d4;--izzy-success:#63c98b;--izzy-danger:#f07878;
+  --izzy-info:#78b8ed;--izzy-radius-sm:9px;--izzy-radius-md:14px;
+  --izzy-radius-lg:20px;--izzy-line:rgba(229,184,94,.42);
+  --izzy-shadow:0 12px 32px rgba(0,0,0,.38);--izzy-focus:0 0 0 3px rgba(120,184,237,.42);
+}
+html{background:var(--izzy-night);-webkit-tap-highlight-color:transparent}
+body{font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
+button,a,input,select,textarea{font:inherit}
+button,a{touch-action:manipulation}
+button{cursor:pointer}
+button:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:0;box-shadow:var(--izzy-focus)}
+:where(button,[role=button],a).is-primary,a[href].primary{background:linear-gradient(180deg,var(--izzy-gold-bright),var(--izzy-gold) 58%,#b77d37)!important;color:#21180d!important;border:1px solid #f5d58d!important;font-weight:800}
+:where(button,[role=button]):disabled{cursor:not-allowed;filter:saturate(.55);opacity:.58}
+::selection{background:rgba(229,184,94,.35);color:#fff}
+@media(prefers-reduced-motion:no-preference){button,a{transition:filter .16s ease,transform .16s ease,box-shadow .16s ease}button:not(:disabled):active{transform:translateY(1px)}}
+@media(max-width:650px){button{min-height:42px}input,select,textarea{font-size:16px}}
+/* Main entry */
+body:has(> main){background:radial-gradient(ellipse at 50% 0%,#294765 0%,#14263b 42%,var(--izzy-night) 100%)}
+body:has(> main) main{background:linear-gradient(155deg,rgba(32,56,80,.97),rgba(13,25,41,.98));border:1px solid var(--izzy-line);border-radius:var(--izzy-radius-lg);box-shadow:var(--izzy-shadow),inset 0 1px rgba(255,255,255,.06)}
+body:has(> main) h1{color:var(--izzy-gold-bright);text-shadow:0 2px 18px rgba(229,184,94,.16)}
+body:has(> main) a{background:linear-gradient(180deg,var(--izzy-gold-bright),var(--izzy-gold) 60%,#a96d30);box-shadow:0 4px 0 #68451f,0 10px 24px rgba(0,0,0,.28)}
+/* Arena */
+#hud .card,.card{background:linear-gradient(145deg,rgba(28,48,70,.96),rgba(12,25,42,.96));border:1px solid var(--izzy-line);border-radius:var(--izzy-radius-md);box-shadow:0 8px 22px rgba(0,0,0,.32),inset 0 1px rgba(255,255,255,.05);backdrop-filter:blur(8px)}
+.brand,#kingdomStore h3,#territoryHead h2,#materialsHead h2{color:var(--izzy-gold-bright)}
+#objective{background:rgba(17,31,50,.94);border:1px solid var(--izzy-line);border-radius:999px;box-shadow:var(--izzy-shadow);backdrop-filter:blur(8px)}
+.skill,.move,#openChat,#openMaterials,#openTerritories,.action,#chatHead button,#chatTools button,#chatSend,#territoryHead button,.territoryAction,#shop button,#materialsClose{background:linear-gradient(180deg,#36516d,#1a3048);border:1px solid var(--izzy-line);border-radius:var(--izzy-radius-sm);box-shadow:0 3px 0 rgba(0,0,0,.28);color:var(--izzy-parchment)}
+.skill{border:1px solid rgba(255,218,131,.76);background:linear-gradient(155deg,#3a5877,#172a42);box-shadow:0 4px 14px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.12)}
+.action,#shop button{background:linear-gradient(180deg,#b77d3d,#74471f);border-color:#e9bd6a}
+#shop .inside,#allianceChat,#materialsPanel,#territoryPanel{background:linear-gradient(155deg,#203850,#101e30);border:1px solid var(--izzy-line);border-radius:var(--izzy-radius-lg);box-shadow:var(--izzy-shadow)}
+#chatHead{background:linear-gradient(90deg,#294765,#1a3048);border-bottom:1px solid var(--izzy-line)}
+#kingdomStore .storeCard,.territoryCard,.territoryTroop,.materialItem,.chatMsg{background:rgba(11,23,38,.72);border:1px solid rgba(145,169,190,.25);border-radius:var(--izzy-radius-sm)}
+#kingdomStore .storeCard strong,.territoryCard strong,.materialItem strong{color:var(--izzy-gold-bright)}
+#kingdomStore .storeCard small,.territoryMeta,.territoryHelp,.materialsNote{color:var(--izzy-muted)}
+.bar{background:#26384b}.bar-caption{color:#d1dce7}
+#message{text-shadow:0 3px 12px #000,0 0 24px rgba(229,184,94,.25)}
+/* Equipment */
+.mobile-equipment-container{font-family:inherit;background:linear-gradient(155deg,#203850,#101e30);border:1px solid var(--izzy-line);border-radius:var(--izzy-radius-lg);box-shadow:var(--izzy-shadow);color:var(--izzy-parchment)}
+.item-header h2{color:var(--izzy-gold-bright)}
+.stats-preview,.action-area{background:rgba(9,20,34,.58);border:1px solid rgba(145,169,190,.25);border-radius:var(--izzy-radius-md)}
+.stat-column h3{color:var(--izzy-muted)}
+.stat-column.next h3,.stat-column.next p{color:var(--izzy-success)}
+.cost-display{color:var(--izzy-gold-bright)}
+.upgrade-btn-mobile{background:linear-gradient(180deg,#80d9a0,#42ad70);box-shadow:0 4px 0 #267448;color:#07180e}
+.lock-btn{border-color:var(--izzy-line);color:var(--izzy-parchment)}
+@media(max-width:650px){
+ #hud{gap:6px}#objective{max-width:calc(100vw - 24px);overflow:hidden;text-overflow:ellipsis}
+ #skills .skill{min-width:44px}#allianceChat{max-height:calc(100dvh - 110px)}
+ #materialsPanel,#territoryPanel{max-height:calc(100dvh - 32px)}
+}
