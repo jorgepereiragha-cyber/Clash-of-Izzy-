@@ -7,7 +7,7 @@ const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 test("shared navigation exposes the real game sections and a responsive search", async () => {
   const nav = await read("navigation.js");
   const css = await read("styles/navigation.css");
-  for (const route of ["/index.html","/kingdom.html","/world.html","/equipment-ui.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
+  for (const route of ["/index.html","/kingdom.html","/world.html","/events.html","/equipment-ui.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
   assert.ok(nav.includes('setAttribute("aria-label","Navegação principal")'));
   assert.ok(nav.includes("toLocaleLowerCase"));
   assert.ok(nav.includes("strong.textContent"));
@@ -70,4 +70,20 @@ test("alliance page handles navigation deep links and renders search results saf
   assert.ok(alliance.includes("detail.textContent"));
   assert.ok(alliance.includes('if(!token){const loading=$("loading")')||alliance.includes('if(!token){$("worldSearchForm")'));
   assert.ok(!alliance.includes('request("/game/start"'));
+});
+
+
+test("global navigation keeps search results visible on submit and includes player destinations", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes('item.type === "player" ? "players"'));
+  assert.ok(nav.includes('item.kingdom_name||"Reino"'));
+  assert.ok(nav.includes('results.hidden = false'));
+  assert.ok(!nav.includes("location.href = first.href"));
+  assert.ok(nav.includes('event.key==="Escape"'));
+});
+
+test("global navigation exposes the Anjo da Morte weekend event", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes('href:"/events.html"'));
+  assert.ok(nav.includes("anjo da morte"));
 });
