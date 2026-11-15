@@ -912,6 +912,10 @@ async function gameAction(env,playerId,body){
   }else{return json({error:"Ação de jogo desconhecida."},400)}
   return json({success:true,state:await gameState(env,playerId),...(battleOutcome?{battle:battleOutcome}:{})});
 }
+async function recordAdminAction(env,actor,action,targetPlayerId=null,details={}){
+  await env.DB.prepare("INSERT INTO admin_audit_log(actor,action,target_player_id,details_json) VALUES(?,?,?,?)").bind(String(actor||"admin"),action,targetPlayerId,JSON.stringify(details)).run();
+}
+
 export default {
  async scheduled(controller,env,ctx){
   try{await processDueKingdomTasks(env,25);await processAllDueMarches(env,20);}
@@ -969,33 +973,81 @@ export default {
   const payload=env.SESSION_SECRET?await verify(token,env.SESSION_SECRET):false;
   if(!payload||payload.scope!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
   try{
+    if(url.pathname==="/api/admin/overview"){
+      const [players,kingdoms,alliances,marches,events,audit]=await Promise.all([
+        env.DB.prepare("SELECT COUNT(*) AS total FROM players").first(),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM kingdoms").first(),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM alliances").first(),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM marches WHERE status IN ('marching','returning')").first(),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM kingdom_events WHERE created_at>=datetime('now','-1 day')").first(),
+        env.DB.prepare("SELECT id,actor,action,target_player_id,details_json,created_at FROM admin_audit_log ORDER BY id DESC LIMIT 20").all()
+      ]);
+      return json({overview:{players:players?.total||0,kingdoms:kingdoms?.total||0,alliances:alliances?.total||0,activeMarches:marches?.total||0,events24h:events?.total||0},audit:audit.results||[]});
+    }
     if(url.pathname==="/api/admin/player-search"){
-      const id=String(body.playerId||"").trim();if(!id)return json({error:"Informe o ID do jogador."},400);
-      const player=await env.DB.prepare("SELECT id,player_id,name,gems,created_at FROM players WHERE player_id=?").bind(id).first();
-      return player?json({player}):json({error:"Jogador não encontrado no banco."},404);
+      const query=String(body.query||body.playerId||"").trim().slice(0,64);
+      if(query.length<2)return json({error:"Digite pelo menos 2 caracteres do nick, nome do reino ou ID."},400);
+      const results=await env.DB.prepare("SELECT p.player_id,p.name,p.gems,p.created_at,k.kingdom_name,k.castle_level,k.power FROM players p LEFT JOIN kingdoms k ON k.player_id=p.id WHERE instr(lower(p.name),lower(?))>0 OR instr(lower(COALESCE(k.kingdom_name,'')),lower(?))>0 OR instr(lower(p.player_id),lower(?))>0 ORDER BY CASE WHEN lower(p.name)=lower(?) OR lower(COALESCE(k.kingdom_name,''))=lower(?) OR lower(p.player_id)=lower(?) THEN 0 ELSE 1 END,p.created_at DESC LIMIT 25").bind(query,query,query,query,query,query).all();
+      return json({players:results.results||[]});
+    }
+    if(url.pathname==="/api/admin/player-detail"){
+      const id=String(body.playerId||"").trim();if(!id)return json({error:"Selecione um jogador."},400);
+      const player=await env.DB.prepare("SELECT p.player_id,p.name,p.gems,p.created_at,k.kingdom_name,k.castle_level,k.power FROM players p LEFT JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?").bind(id).first();
+      if(!player)return json({error:"Jogador não encontrado."},404);
+      const state=await gameState(env,id);return json({player,state});
+    }
+    if(url.pathname==="/api/admin/audit"){
+      const rows=await env.DB.prepare("SELECT id,actor,action,target_player_id,details_json,created_at FROM admin_audit_log ORDER BY id DESC LIMIT 100").all();
+      return json({audit:rows.results||[]});
     }
     if(url.pathname==="/api/admin/gems"){
       const id=String(body.playerId||"").trim(),amount=Number(body.amount);
       if(!id||!Number.isSafeInteger(amount)||amount<=0||amount>100000000)return json({error:"ID ou quantidade de gemas inválida."},400);
       const result=await env.DB.prepare("UPDATE players SET gems=gems+? WHERE player_id=?").bind(amount,id).run();
       if(!result.meta.changes)return json({error:"Jogador não encontrado."},404);
-      const player=await env.DB.prepare("SELECT player_id,gems FROM players WHERE player_id=?").bind(id).first();return json({success:true,player});
+      const player=await env.DB.prepare("SELECT player_id,gems FROM players WHERE player_id=?").bind(id).first();
+      await recordAdminAction(env,payload.sub,"player.gems_granted",id,{amount});return json({success:true,player});
+    }
+    if(url.pathname==="/api/admin/resource-adjust"){
+      const id=String(body.playerId||"").trim(),resource=String(body.resource||""),amount=Number(body.amount);
+      const columns={food:"food",wood:"wood",stone:"stone",iron:"iron",gold:"gold",gems:"gems"};
+      if(!id||!Object.hasOwn(columns,resource)||!Number.isSafeInteger(amount)||amount===0||Math.abs(amount)>1000000000)return json({error:"Jogador, recurso ou quantidade inválida."},400);
+      const player=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(id).first();if(!player)return json({error:"Jogador não encontrado."},404);
+      const column=columns[resource];
+      const update=resource==="gems"
+        ?await env.DB.prepare("UPDATE players SET gems=gems+? WHERE player_id=? AND gems+?>=0").bind(amount,id,amount).run()
+        :await env.DB.prepare("UPDATE kingdoms SET "+column+"="+column+"+?,updated_at=CURRENT_TIMESTAMP WHERE player_id=? AND "+column+"+?>=0").bind(amount,player.id,amount).run();
+      if(!update.meta.changes)return json({error:"Saldo insuficiente ou reino não encontrado."},409);
+      const kingdom=await env.DB.prepare("SELECT id FROM kingdoms WHERE player_id=?").bind(player.id).first();
+      if(kingdom)await env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,'admin_adjustment')").bind(kingdom.id,resource,amount).run();
+      await recordAdminAction(env,payload.sub,"player.resource_adjusted",id,{resource,amount});
+      return json({success:true,message:"Saldo atualizado.",state:await gameState(env,id)});
+    }
+    if(url.pathname==="/api/admin/rename-kingdom"){
+      const id=String(body.playerId||"").trim(),name=String(body.name||"").trim();
+      if(!id||name.length<3||name.length>32)return json({error:"Informe um nome de reino entre 3 e 32 caracteres."},400);
+      const result=await env.DB.prepare("UPDATE kingdoms SET kingdom_name=?,updated_at=CURRENT_TIMESTAMP WHERE player_id=(SELECT id FROM players WHERE player_id=?)").bind(name,id).run();
+      if(!result.meta.changes)return json({error:"Reino não encontrado."},404);
+      await recordAdminAction(env,payload.sub,"player.kingdom_renamed",id,{name});return json({success:true,message:"Nome do reino atualizado."});
     }
     if(url.pathname==="/api/admin/unlock-skin"){
       const id=String(body.playerId||"").trim(),name=String(body.skin||"").trim();if(!id||!name)return json({error:"Informe o ID do jogador e a skin."},400);
       const player=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(id).first();if(!player)return json({error:"Jogador não encontrado."},404);
       const skin=await env.DB.prepare("SELECT id FROM skins WHERE name=?").bind(name).first();if(!skin)return json({error:"Skin não cadastrada no catálogo."},404);
-      await env.DB.prepare("INSERT OR IGNORE INTO player_skins(player_id,skin_id) VALUES(?,?)").bind(player.id,skin.id).run();return json({success:true,message:"Skin liberada para o jogador."});
+      await env.DB.prepare("INSERT OR IGNORE INTO player_skins(player_id,skin_id) VALUES(?,?)").bind(player.id,skin.id).run();
+      await recordAdminAction(env,payload.sub,"player.skin_unlocked",id,{skin:name});return json({success:true,message:"Skin liberada para o jogador."});
     }
     if(url.pathname==="/api/admin/vip-packages"){
       const name=String(body.name||"").trim(),price=Number(body.price),gems=Number(body.gems);
       if(!name||!Number.isFinite(price)||price<=0||!Number.isSafeInteger(gems)||gems<0)return json({error:"Dados do pacote VIP inválidos."},400);
-      await env.DB.prepare("INSERT INTO vip_packages(name,price_brl,gems) VALUES(?,?,?)").bind(name,price,gems).run();return json({success:true,message:"Pacote VIP cadastrado."});
+      await env.DB.prepare("INSERT INTO vip_packages(name,price_brl,gems) VALUES(?,?,?)").bind(name,price,gems).run();
+      await recordAdminAction(env,payload.sub,"catalog.vip_package_created",null,{name,price,gems});return json({success:true,message:"Pacote VIP cadastrado."});
     }
     if(url.pathname==="/api/admin/skins"){
       const name=String(body.name||"").trim(),price=Number(body.price);if(!name||!Number.isFinite(price)||price<50||price>1000)return json({error:"Informe nome e preço entre R$ 50 e R$ 1.000."},400);
       const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM skins").first();if(count.total>=200)return json({error:"Limite de 200 skins atingido."},409);
-      await env.DB.prepare("INSERT INTO skins(name,price_brl) VALUES(?,?)").bind(name,price).run();return json({success:true,message:"Skin cadastrada no catálogo."});
+      await env.DB.prepare("INSERT INTO skins(name,price_brl) VALUES(?,?)").bind(name,price).run();
+      await recordAdminAction(env,payload.sub,"catalog.skin_created",null,{name,price});return json({success:true,message:"Skin cadastrada no catálogo."});
     }
     return json({error:"Rota administrativa não encontrada."},404);
   }catch(e){console.error("admin_request_failed",String(e?.message||e));return json({error:"Erro interno ao processar a solicitação."},500)}
