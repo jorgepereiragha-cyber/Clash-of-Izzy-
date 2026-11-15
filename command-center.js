@@ -15,6 +15,9 @@ async function migrateLegacyStoryProgress(){
  let origin={steps:[],basilisk:false,technology:false},veil=[];
  try{if(originRaw)origin=JSON.parse(originRaw)||origin}catch{}
  try{if(veilRaw)veil=JSON.parse(veilRaw)||[]}catch{}
+ if(!origin||typeof origin!=="object"||Array.isArray(origin))origin={steps:[],basilisk:false,technology:false};
+ if(!Array.isArray(origin.steps))origin.steps=[];
+ if(!Array.isArray(veil))veil=[];
  const requested=[];
  for(const step of ORIGIN_STEPS)if((origin.steps||[]).includes(step.id))requested.push({campaign:"first_rift",step:step.id});
  if(origin.basilisk)requested.push({campaign:"first_rift",step:"basilisk"});
