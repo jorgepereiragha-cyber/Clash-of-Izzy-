@@ -69,7 +69,7 @@
 <script type="module">
 import * as THREE from 'three';
 import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } from './engine/asset-loader.js';
-import { loadTexture, preloadTextures, getTexture, disposeTextures } from './engine/texture-manager.js';
+import { initTextureManager, loadTexture, preloadTextures, getTexture, disposeTextures } from './engine/texture-manager.js';
 const API_BASE='/api';
 let kingdomSession=null;
 async function connectKingdom(){
@@ -211,6 +211,7 @@ const renderer=new THREE.WebGLRenderer({antialias:!mobileProfile,powerPreference
 
 // Pipeline de assets acoplado ao renderer existente: nenhum canvas/cena paralelos.
 initAssetLoader(renderer);
+initTextureManager(renderer);
 window.COI_ASSETS={
  addModel:(name,url,options={})=>addModel(scene,name,url,options),
  loadTexture,preloadTextures,getTexture,
