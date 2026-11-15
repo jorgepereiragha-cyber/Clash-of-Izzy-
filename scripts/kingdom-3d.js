@@ -29,6 +29,7 @@ if (host && "WebGLRenderingContext" in window) {
     embassy: ["#b0a18a", "#526e82"], warehouse: ["#9b886a", "#70543d"]
   };
   const sharedMaterials = new Set(Object.values(mats));
+  const surfaceTextureCache = new Map();
   // Small, deterministic, tileable procedural albedo maps add material identity
   // without shipping large image files or creating per-building texture copies.
   function makeSurfaceTexture(base, kind, seed) {
@@ -89,6 +90,19 @@ if (host && "WebGLRenderingContext" in window) {
     texture.needsUpdate = true;
     return texture;
   }
+  function getSurfaceTexture(base, kind, seed) {
+    const key = `${base}:${kind}:${seed}`;
+    if (!surfaceTextureCache.has(key)) surfaceTextureCache.set(key, makeSurfaceTexture(base, kind, seed));
+    return surfaceTextureCache.get(key);
+  }
+  function surfaceMaterial(base, kind, seed) {
+    return new THREE.MeshStandardMaterial({
+      color: "#ffffff",
+      map: getSurfaceTexture(base, kind, seed),
+      roughness: kind === "roof" ? .86 : .96,
+      metalness: 0.01
+    });
+  }
   function applyProceduralSurfaceMaps() {
     const maps = [
       [mats.grass, "#577a49", "grass", 11],
@@ -121,7 +135,9 @@ if (host && "WebGLRenderingContext" in window) {
   function createBuilding(type, level, x, z) {
     const group = new THREE.Group(); group.position.set(x, 0, z); group.userData.coIType = type; group.userData.coIProcedural = true;
     const colors = palettes[type] || palettes.warehouse;
-    const wall = material(colors[0]), roof = material(colors[1]);
+    const seed = [...String(type)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
+    const wall = surfaceMaterial(colors[0], "stone", seed);
+    const roof = surfaceMaterial(colors[1], "roof", seed + 101);
     const height = 1.0 + Math.min(30, Math.max(1, Number(level) || 1)) * .035;
     box(group, 1.42, height, 1.18, wall, 0, height / 2, 0);
     const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(.98, .88, 4), roof);
