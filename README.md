@@ -68,3 +68,5 @@ O catálogo completo de eventos, cadência, critérios de justiça, métricas e 
 ## Aplicativo e desempenho
 
 A interface usa Three.js com instanciamento de objetos repetidos, LOD, redução de resolução adaptativa e perfil móvel. O manifesto e o service worker permitem instalar o shell do jogo e mostrar uma página própria quando não há conexão. Batalhas e sincronização do reino continuam exigindo Internet.
+
+- [Arquivo Velado — lore e pistas secretas](docs/ARQUIVO_VELADO.md)
