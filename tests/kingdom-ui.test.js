@@ -17,5 +17,9 @@ test("central do reino consome estado e melhorias pela API autenticada", async (
   assert.match(html, /state\.recentEvents/);
   assert.match(html, /state\.territories/);
   assert.match(html, /state\.alliance/);
+  assert.match(html, /const esc=value=>String\(value\?\?""\)\.replace/);
+  assert.match(html, /esc\(a\).*esc\(b\)/);
+  assert.match(html, /esc\(emoji\).*esc\(name\)/);
+  assert.match(html, /esc\(String\(e\.event_type/);
   assert.doesNotMatch(html, /localStorage\.removeItem\("coi_game_token"\)/);
 });
