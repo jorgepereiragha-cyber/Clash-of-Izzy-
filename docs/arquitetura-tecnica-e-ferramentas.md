@@ -94,3 +94,23 @@ Nenhuma engine é universalmente melhor. A decisão deve ser baseada em protóti
 - A mesma identidade visual é usada na cidade, mapa, inventário e alianças.
 - Cidade 3D mantém desempenho aceitável no Android de referência e degrada qualidade de forma controlada.
 - CI executa testes e dry-run antes de qualquer deploy.
+
+## Licenciamento, proveniência e ferramentas gratuitas
+
+Ferramenta gratuita ou open-source **não torna automaticamente livre para uso comercial** todo modelo, textura, fonte, áudio, plugin ou arquivo encontrado nela. Cada asset tem licença própria e precisa ser analisado separadamente.
+
+Para cada arquivo incorporado ao jogo, registrar no manifesto ou no registro de proveniência: caminho do arquivo, autor, URL de origem, licença exata, data de obtenção, atribuição exigida e modificações realizadas. Priorizar arte original, CC0 e licenças comerciais claras. Não publicar assets com cláusula NonCommercial (NC), licença desconhecida ou condições incompatíveis com redistribuição.
+
+Referências de ferramentas gratuitas/open-source para a equipe:
+- [Blender](https://www.blender.org/): modelagem, rigging, animação e exportação GLB. A licença do programa não substitui a licença de assets incorporados.
+- [Krita](https://krita.org/) e [GIMP](https://www.gimp.org/): pintura, concept art, composição e edição de texturas; verificar a origem de imagens usadas como referência.
+- [Khronos glTF Validator](https://github.com/KhronosGroup/glTF-Validator): validação de conformidade do GLB; conferir a licença da distribuição fixada.
+- [meshoptimizer / gltfpack](https://meshoptimizer.org/) e [glTF Transform](https://gltf-transform.dev/): otimização e transformação de modelos; fixar versões e revisar as licenças das dependências.
+- [KTX-Software / Basis Universal](https://github.com/KhronosGroup/KTX-Software): compressão de texturas KTX2/Basis, somente depois de testar compatibilidade e qualidade no Android.
+- [Godot](https://godotengine.org/): alternativa para protótipos isolados; não adicionar uma segunda engine ao runtime Web sem comparação mensurável.
+
+O verificador local do manifesto é uma primeira barreira de integridade, não um substituto para o Khronos Validator, inspeção visual ou teste em dispositivo real.
+
+## Métricas antes de otimizar ou prometer desempenho
+
+Comparar a mesma cena antes e depois em um aparelho Android de referência: tamanho do download, tempo de carregamento, memória, triângulos, draw calls, frame time, estabilidade, aquecimento e bateria. Registrar aparelho, versão do sistema, perfil gráfico e condições de teste. Não declarar FPS, compatibilidade universal ou desempenho global sem medições reproduzíveis. Preservar o fallback 2D e os perfis gráficos de menor capacidade.
