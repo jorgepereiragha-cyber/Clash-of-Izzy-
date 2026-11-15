@@ -10,3 +10,22 @@ dist/**
 game-adapter.js
 package.json
 docs/**
+
+# Build/runtime artifacts must never be published as public game assets.
+.wrangler/
+tests/
+coverage/
+.gitignore
+.dev.vars*
+.env*
+*.sqlite
+*.sqlite-*
+*.db
+*.log
+*.map
+# Server-only modules must not be served as browser assets.
+api-rate-limit.js
+liveops-engine.js
+task-engine.js
+story-engine.js
+realm-policy.js
