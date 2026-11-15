@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/styles/coi-theme.css">
+<link rel="stylesheet" href="/styles/navigation.css">
 <meta name="theme-color" content="#101a2b"><title>Clash of Izzy · Administração</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,Segoe UI,sans-serif;background:#0b1422;color:#f5edda}
@@ -66,4 +67,5 @@ $("searchForm").addEventListener("submit",async event=>{event.preventDefault();t
 $("logout").addEventListener("click",()=>{token="";sessionStorage.removeItem("coi_admin_token");$("results").replaceChildren();showNotice("Sessão encerrada.");setLoggedIn(false)});
 setLoggedIn(Boolean(token));
 if(token)showNotice("Sessão administrativa recuperada.");
-</script></body></html>
+</script><script src="/navigation.js" defer></script>
+</body></html>
