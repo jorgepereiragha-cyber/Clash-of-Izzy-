@@ -128,16 +128,27 @@ export function fuzzyTokenDistance(queryTokens, fields) {
   return totalTypos;
 }
 
-// FTS5 trigram OR-query: returns a bounded candidate pool without scanning source
-// tables. The final edit-distance check is always performed in JavaScript.
+const cjkScripts = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u;
+
+// FTS5 trigram OR-query: Latin typo candidates and CJK substring candidates are
+// selected from the indexed corpus. The final verifier still requires every
+// original token to be present or a Latin token to pass bounded edit distance.
 export function buildTrigramSearchQuery(tokens) {
   const grams = new Set();
   for (const rawToken of Array.isArray(tokens) ? tokens : []) {
     const token = normalizeSearchText(rawToken);
-    if (!isTypoEligibleToken(token)) continue;
     const characters = Array.from(token);
-    for (let index = 0; index <= characters.length - 3; index += 1) {
-      grams.add(characters.slice(index, index + 3).join(""));
+    if (isTypoEligibleToken(token)) {
+      for (let index = 0; index <= characters.length - 3; index += 1) {
+        grams.add(characters.slice(index, index + 3).join(""));
+      }
+    } else if (cjkScripts.test(token) && characters.length >= 3) {
+      // Overlapping code-point trigrams work for Chinese/Japanese/Korean text
+      // that has no whitespace word boundaries. One/two-character searches
+      // continue to use the existing exact/LIKE fallback.
+      for (let index = 0; index <= characters.length - 3; index += 1) {
+        grams.add(characters.slice(index, index + 3).join(""));
+      }
     }
   }
   if (!grams.size) return "";
