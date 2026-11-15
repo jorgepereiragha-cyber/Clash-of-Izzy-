@@ -1,3 +1,5 @@
+import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
+
 const API = "/api";
 const $ = id => document.getElementById(id);
 const token = localStorage.getItem("coi_game_token") || sessionStorage.getItem("coi_game_token");
@@ -23,6 +25,8 @@ let state = null;
 let selectedTerritoryId = null;
 let selectedUnits = {};
 let busy = false;
+let mapViewport = { zoom: 1, panX: 0, panY: 0 };
+let mapPointer = null;
 const requestedTerritorySearch = new URLSearchParams(location.search).get("search") || "";
 let requestedTerritoryApplied = false;
 const normalizeTerritorySearch = value => String(value || "").normalize("NFKD").replace(/[\p{M}]/gu, "").toLocaleLowerCase("pt-BR").trim();
@@ -74,8 +78,28 @@ function renderResources() {
     root.append(item);
   }
 }
+function applyMapViewport(patch = {}) {
+  const map = $("worldMap");
+  const content = $("mapContent");
+  if (!map || !content) return;
+  mapViewport = clampMapViewport({
+    ...mapViewport,
+    ...patch,
+    width: map.clientWidth,
+    height: map.clientHeight,
+  });
+  content.style.transform = mapViewportTransform(mapViewport);
+  $("mapScale").textContent = Math.round(mapViewport.zoom * 100) + "%";
+}
+function changeMapZoom(delta) {
+  applyMapViewport({ zoom: nextMapZoom(mapViewport.zoom, delta) });
+}
+function resetMapViewport() {
+  mapViewport = { zoom: 1, panX: 0, panY: 0 };
+  applyMapViewport();
+}
 function renderMap() {
-  const root = $("worldMap");
+  const root = $("mapContent");
   root.querySelectorAll(".territory-pin").forEach(pin => pin.remove());
   for (const territory of state.territories || []) {
     const resource = RESOURCE[territory.resource_type] || { icon: "📍", label: "Território" };
@@ -98,6 +122,7 @@ function renderMap() {
     });
     root.append(button);
   }
+  applyMapViewport();
 }
 function addStat(root, label, value) {
   const stat = make("div", "stat");
@@ -241,6 +266,53 @@ async function sendMarch(marchType) {
 $("gather").addEventListener("click", () => sendMarch("gather"));
 $("scout").addEventListener("click", () => sendMarch("scout"));
 $("attack").addEventListener("click", () => sendMarch("attack"));
+$("zoomIn").addEventListener("click", () => changeMapZoom(0.25));
+$("zoomOut").addEventListener("click", () => changeMapZoom(-0.25));
+$("mapReset").addEventListener("click", resetMapViewport);
+
+$("worldMap").addEventListener("pointerdown", event => {
+  if (event.button !== 0 || event.target.closest(".territory-pin")) return;
+  mapPointer = {
+    pointerId: event.pointerId,
+    startX: event.clientX,
+    startY: event.clientY,
+    panX: mapViewport.panX,
+    panY: mapViewport.panY,
+  };
+  $("worldMap").classList.add("is-dragging");
+  try {
+    $("worldMap").setPointerCapture(event.pointerId);
+  } catch {
+    mapPointer = null;
+    $("worldMap").classList.remove("is-dragging");
+  }
+});
+$("worldMap").addEventListener("pointermove", event => {
+  if (!mapPointer || event.pointerId !== mapPointer.pointerId) return;
+  const dx = event.clientX - mapPointer.startX;
+  const dy = event.clientY - mapPointer.startY;
+  if (Math.abs(dx) + Math.abs(dy) < 2) return;
+  applyMapViewport({ panX: mapPointer.panX + dx, panY: mapPointer.panY + dy });
+});
+function endMapPan(event) {
+  if (!mapPointer || (event && event.pointerId !== mapPointer.pointerId)) return;
+  const pointerId = mapPointer.pointerId;
+  mapPointer = null;
+  $("worldMap").classList.remove("is-dragging");
+  try {
+    if ($("worldMap").hasPointerCapture(pointerId)) $("worldMap").releasePointerCapture(pointerId);
+  } catch {
+    // Pointer capture may already have been released by the browser.
+  }
+}
+$("worldMap").addEventListener("pointerup", endMapPan);
+$("worldMap").addEventListener("pointercancel", endMapPan);
+$("worldMap").addEventListener("lostpointercapture", endMapPan);
+$("worldMap").addEventListener("wheel", event => {
+  event.preventDefault();
+  changeMapZoom(event.deltaY < 0 ? 0.1 : -0.1);
+}, { passive: false });
+window.addEventListener("resize", () => applyMapViewport());
 
 async function connect() {
   if (!token) {
