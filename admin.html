@@ -6,7 +6,7 @@
 <meta name="theme-color" content="#101a2b"><title>Clash of Izzy · Administração</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,Segoe UI,sans-serif;background:#0b1422;color:#f5edda}
-*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#263d5b,#0b1422 65%);padding:24px}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#263d5b,#0b1422 65%);padding:0}
 main{width:min(100%,850px);margin:30px auto}.panel{background:#101d30;border:1px solid #a98245;border-radius:16px;padding:22px;box-shadow:0 16px 45px #0007}
 h1,h2{color:#f1c46a;margin-top:0}.sub{color:#b8c5d5;line-height:1.5}.form{display:flex;gap:9px;flex-wrap:wrap;margin:14px 0}.form input{flex:1;min-width:180px}
 input{background:#0b1422;border:1px solid #566a83;border-radius:8px;padding:12px;color:#fff;font:inherit}
@@ -18,6 +18,7 @@ button.secondary{background:#263b55;color:#fff;border:1px solid #8c744b}
 footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
 @media(max-width:560px){body{padding:12px}.panel{padding:16px}.player{grid-template-columns:1fr}.actions input{flex:1}}
 </style>
+  <link rel="stylesheet" href="/styles/navigation.css">
 </head>
 <body><main>
 <section class="panel">
@@ -103,4 +104,5 @@ $("logout").addEventListener("click",()=>{token="";sessionStorage.removeItem("co
 setLoggedIn(Boolean(token));
 if(token){showNotice("Sessão administrativa recuperada.");refreshPurchaseRequests().catch(e=>showNotice(e.message));purchasePoll=setInterval(()=>{if(!document.hidden&&token)refreshPurchaseRequests().catch(()=>{})},20000)}
 $("refreshPurchases").addEventListener("click",()=>refreshPurchaseRequests().catch(e=>showNotice(e.message)));
-</script></body></html>
+</script>  <script src="/navigation.js" defer></script>
+</body></html>
