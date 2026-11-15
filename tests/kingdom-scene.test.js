@@ -23,5 +23,5 @@ test("procedural art keeps existing accessible building buttons and kingdom acti
   assert.match(kingdom, /data-building=/);
   assert.match(kingdom, /data-upgrade=/);
   assert.match(kingdom, /function upgrade\(building\)/);
-  assert.match(kingdom, /aria-hidden="true"/);
+  assert.match(kingdom, /setAttribute\("aria-hidden","true"\)/);
 });
