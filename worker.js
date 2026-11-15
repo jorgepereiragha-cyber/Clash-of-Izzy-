@@ -454,11 +454,11 @@ async function syncHeroSystems(env,kingdomId){
   const statements=(inventory.results||[]).map(hero=>{
     const rarity=hero.rarity==="white"?"common":hero.rarity==="blue"?"rare":"legendary";
     const name=HERO_TEMPLATES[hero.hero_key]?.name||hero.hero_key;
-    return env.DB.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) VALUES(?,?,?,?,?,?) ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET level=MAX(heroes.level,excluded.level),experience=MAX(heroes.experience,excluded.experience),rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END")
+    return env.DB.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) VALUES(?,?,?,?,?,?) ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET level=MAX(heroes.level,excluded.level),experience=MAX(heroes.experience,excluded.experience),rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END WHERE heroes.level<excluded.level OR heroes.experience<excluded.experience OR heroes.rarity<>excluded.rarity OR heroes.hero_name IS NULL OR heroes.hero_name=''")
       .bind(kingdomId,hero.hero_key,name,Math.max(1,Number(hero.level)||1),Math.max(0,Number(hero.experience)||0),rarity);
   });
   if(statements.length)await env.DB.batch(statements);
-  await env.DB.prepare("UPDATE hero_inventory SET level=MAX(level,COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level)),experience=MAX(experience,COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience)) WHERE kingdom_id=?").bind(kingdomId).run();
+  await env.DB.prepare("UPDATE hero_inventory SET level=MAX(level,COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level)),experience=MAX(experience,COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience)) WHERE kingdom_id=? AND (level<COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level) OR experience<COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience))").bind(kingdomId).run();
 }
 
 async function gameState(env,playerId){
@@ -818,20 +818,32 @@ async function gameAction(env,playerId,body){
     await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"dragon_evolved",JSON.stringify({level:level+1,cost})).run();
   }else if(type==="hero_summon"){
     const quantity=Number(body.quantity)===10?10:1,cost=quantity===10?900:100;
-    const debit=await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(cost,p.id,cost).run();
-    if(!debit.meta.changes)return json({error:"Gemas insuficientes para invocar."},409);
-    const results=[];
+    const ownedRows=await env.DB.prepare("SELECT hero_key FROM hero_inventory WHERE kingdom_id=?").bind(k.id).all();
+    const owned=new Set((ownedRows.results||[]).map(row=>row.hero_key));
+    const results=[],statements=[],actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    statements.push(env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(cost,p.id,cost));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId));
     for(let i=0;i<quantity;i++){
       const rarity=rollHeroRarity(),pool=Object.entries(HERO_TEMPLATES).filter(([,hero])=>hero.rarity===rarity);
+      if(!pool.length)throw new Error("Nenhum herói disponível para a raridade sorteada.");
       const pick=Math.floor(crypto.getRandomValues(new Uint32Array(1))[0]/4294967296*pool.length),heroKey=pool[pick][0];
-      const existing=await env.DB.prepare("SELECT fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
-      const duplicate=Boolean(existing),fragmentGain=HERO_RARITY[rarity].fragments;
-      if(existing)await env.DB.prepare("UPDATE hero_inventory SET fragments=fragments+? WHERE kingdom_id=? AND hero_key=?").bind(fragmentGain,k.id,heroKey).run();
-      else await env.DB.prepare("INSERT INTO hero_inventory(kingdom_id,hero_key,rarity) VALUES(?,?,?)").bind(k.id,heroKey,rarity).run();
-      await env.DB.prepare("INSERT INTO hero_summon_history(kingdom_id,hero_key,rarity,result_type) VALUES(?,?,?,?)").bind(k.id,heroKey,rarity,duplicate?"duplicate":"new").run();
+      const duplicate=owned.has(heroKey),fragmentGain=HERO_RARITY[rarity].fragments;
+      if(duplicate){
+        statements.push(env.DB.prepare("UPDATE hero_inventory SET fragments=fragments+? WHERE kingdom_id=? AND hero_key=? AND "+guard).bind(fragmentGain,k.id,heroKey,k.id,actionId));
+      }else{
+        statements.push(env.DB.prepare("INSERT INTO hero_inventory(kingdom_id,hero_key,rarity,level,experience,stars,skill_level,fragments) SELECT ?,?,?,1,0,1,1,0 WHERE "+guard+" ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET fragments=hero_inventory.fragments+?").bind(k.id,heroKey,rarity,k.id,actionId,fragmentGain));
+        owned.add(heroKey);
+      }
+      const tableRarity=rarity==="white"?"common":rarity==="blue"?"rare":"legendary";
+      statements.push(env.DB.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) SELECT ?,?,?,1,0,? WHERE "+guard+" ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END").bind(k.id,heroKey,HERO_TEMPLATES[heroKey].name,tableRarity,k.id,actionId));
+      statements.push(env.DB.prepare("INSERT INTO hero_summon_history(kingdom_id,hero_key,rarity,result_type) SELECT ?,?,?,? WHERE "+guard).bind(k.id,heroKey,rarity,duplicate?"duplicate":"new",k.id,actionId));
       results.push({hero_key:heroKey,name:HERO_TEMPLATES[heroKey].name,rarity,result_type:duplicate?"duplicate":"new",fragments:duplicate?fragmentGain:0});
     }
-    await env.DB.prepare("DELETE FROM hero_summon_history WHERE kingdom_id=? AND id NOT IN (SELECT id FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 100)").bind(k.id,k.id).run();
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"hero_summoned",JSON.stringify({quantity,cost,summons:results}),k.id,actionId));
+    statements.push(env.DB.prepare("DELETE FROM hero_summon_history WHERE kingdom_id=? AND id NOT IN (SELECT id FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 100) AND "+guard).bind(k.id,k.id,k.id,actionId));
+    statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
+    const batch=await env.DB.batch(statements);
+    if(!batch[0]?.meta?.changes)return json({error:"Gemas insuficientes para invocar."},409);
     battleOutcome={summons:results,cost};
   }else if(type==="hero_evolve"){
     const heroKey=String(body.hero||""),hero=await env.DB.prepare("SELECT rarity,stars,fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
