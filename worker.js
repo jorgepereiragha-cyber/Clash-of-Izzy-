@@ -329,6 +329,7 @@ async function processMarches(env,kingdomId){
     ]);
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
     const castleLevel=Number(kingdom?.castle_level||1);
+    const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
@@ -338,12 +339,12 @@ async function processMarches(env,kingdomId){
      equipmentHealthBonusPercent:gear.healthPercent,
      criticalChancePercent:gear.criticalChancePercent,
      criticalDamageMultiplier:1.5,
-     criticalSeed:crypto.getRandomValues(new Uint32Array(1))[0],
+     criticalSeed,
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
     });
     simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
-    losses=simulation.losses||{};battleLog=simulation.log||[];
+    losses=simulation.losses||{};battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
     for(const u of army)survivors[u.unit_type]=Math.max(0,u.quantity-Math.max(0,Number(losses[u.unit_type]||0)));
    }else{
     for(const u of army)survivors[u.unit_type]=u.quantity;
@@ -428,9 +429,9 @@ function equipmentBonuses(rows=[],researchRows=[]){
  const vitality=Math.min(10,levels.gear_vitality||0)*0.5;
  const logistics=Math.min(10,levels.gear_logistics||0)*0.5;
  return {
-  attackPercent:Math.min(30,Math.floor(totals.attack/10)+forging),
-  defensePercent:Math.min(30,Math.floor(totals.defense/10)+ward),
-  healthPercent:Math.min(30,Math.floor(totals.health/25)+vitality),
+  attackPercent:Math.min(30,Number((totals.attack/10+forging).toFixed(2))),
+  defensePercent:Math.min(30,Number((totals.defense/10+ward).toFixed(2))),
+  healthPercent:Math.min(30,Number((totals.health/25+vitality).toFixed(2))),
   resourcePercent:Math.min(50,totals.resourceBonus),
   criticalChancePercent:Math.min(15,totals.critical),
   marchSpeedPercent:Math.min(25,totals.march+logistics)
@@ -981,13 +982,14 @@ async function gameAction(env,playerId,body){
     const gear=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]);
     const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)+gear.defensePercent));
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
+    const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
     const simulation=simulateBattle({
       army:armyRows,castleLevel:Number(k.castle_level||1),
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
       equipmentAttackBonusPercent:gear.attackPercent,equipmentHealthBonusPercent:gear.healthPercent,
       criticalChancePercent:gear.criticalChancePercent,criticalDamageMultiplier:1.5,
-      criticalSeed:crypto.getRandomValues(new Uint32Array(1))[0],
+      criticalSeed,
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
     });
     const won=simulation.won,attackerPower=simulation.attackerPower,defenderPower=simulation.defenderPower;
@@ -1014,7 +1016,7 @@ async function gameAction(env,playerId,body){
       statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"royal_blueprint",k.id,actionId));
     }
     statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,?,?,?,?,?,?,? WHERE "+guard)
-      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_simulated",rounds:simulation.rounds,criticalHits:simulation.criticalHits||0,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}]),k.id,actionId));
+      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent},{event:"combat_simulated",rounds:simulation.rounds,criticalHits:simulation.criticalHits||0,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}]),k.id,actionId));
     if(won){
       const ledgerRows=Object.entries(rewards).filter(([,amount])=>amount>0);
       if(ledgerRows.length)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+ledgerRows.map(()=> "SELECT ?,?,?,? WHERE "+guard).join(" UNION ALL "))
