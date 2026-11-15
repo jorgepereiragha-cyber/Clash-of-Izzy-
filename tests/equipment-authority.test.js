@@ -24,7 +24,7 @@ test("equipamentos usam estado persistente e validação no servidor", async () 
   assert.match(page, /id="hero-select"/);
   assert.match(page, /id="equip-btn"/);
   assert.match(page, /id="unequip-btn"/);
-  assert.match(worker, /equipment,cosmetics,player/);
+  assert.match(worker, /equipment,heroEquipment,cosmetics,player/);
   assert.match(worker, /function equipmentBonuses/);
   assert.match(worker, /equipmentProductionBonus/);
   assert.match(worker, /equipmentAttackBonusPercent:gear\.attackPercent/);
