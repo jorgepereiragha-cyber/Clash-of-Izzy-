@@ -1,0 +1,23 @@
+/* Clash of Izzy — design tokens compartilhados. Telas podem manter estilos locais, mas não redefinir a identidade. */
+:root{
+  color-scheme:dark;
+  --coi-night:#101A2B;
+  --coi-night-deep:#080E18;
+  --coi-blue:#24476B;
+  --coi-steel:#52677D;
+  --coi-gold:#E7BD68;
+  --coi-gold-dark:#9A682D;
+  --coi-parchment:#F5EDDA;
+  --coi-muted:#B9C5D4;
+  --coi-forest:#456B4E;
+  --coi-war:#A9433B;
+  --coi-panel:linear-gradient(145deg,#1B3049,#101D30);
+  --coi-border:rgba(231,189,104,.58);
+  --coi-radius:13px;
+  --coi-shadow:0 8px 25px rgba(0,0,0,.32);
+}
+:focus-visible{outline:2px solid var(--coi-gold);outline-offset:3px}
+::selection{background:rgba(231,189,104,.32);color:var(--coi-parchment)}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}
+}
