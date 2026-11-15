@@ -1,47 +1,90 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="theme-color" content="#1a1a2e">
-    <title>Clash of Izzy</title>
-    
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="manifest.json">
-    
-    <!-- Ícones PWA (adicione depois) -->
-    <link rel="icon" type="image/svg+xml" href="/icon-192.svg">
-    <link rel="apple-touch-icon" href="/icon-192.svg">
-    
-    <!-- Estilos existentes -->
-    <link rel="stylesheet" href="equipment-styles.css">
-    
-    <style>
-        * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { 
-            font-family: 'Segoe UI', sans-serif; 
-            background: #0f0f1e; 
-            color: #fff;
-            overflow-x: hidden;
-        }
-        .container { max-width: 500px; margin: 0 auto; padding: 20px; }
-        h1 { text-align: center; margin: 20px 0; color: #ffd700; }
-        .nav-tabs { 
-            display: flex; 
-            gap: 10px; 
-            margin-bottom: 20px;
-            overflow-x: auto;
-        }
-        .nav-tab {
-            flex: 1;
-            padding: 12px;
-            background: #1a1a2e;
-            border: 2px solid #333;
-            border-radius: 8px;
-            color: #fff;
-            cursor: pointer;
-            text-align: center;
-            font-weight: bold;
-            white-space: nowrap;
-        }
-        .
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101a2b">
+<meta name="description" content="Painel administrativo do Clash of Izzy.">
+<link rel="icon" href="/icon-192.svg" type="image/svg+xml">
+<title>Painel do Soberano · Clash of Izzy</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1422;--panel:#172a40;--gold:#e5b85e;--line:#536981;--muted:#b7c5d4}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#294765 0,#14263b 42%,var(--bg) 100%);color:#f4ead4;font:14px Inter,system-ui,sans-serif}
+.shell{max-width:1180px;margin:auto;padding:calc(16px + env(safe-area-inset-top)) 12px calc(28px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.brand{display:flex;align-items:center;gap:12px}.brand img{width:48px;height:48px}h1{font-size:clamp(20px,4vw,28px);margin:0;color:#ffda83;letter-spacing:.05em}.muted,small{color:var(--muted)}
+button,a.btn{border:1px solid #b38b4c;border-radius:9px;padding:10px 13px;background:linear-gradient(145deg,#29435e,#172a40);color:#f4ead4;text-decoration:none;font-weight:700;cursor:pointer;min-height:42px}
+button.primary{background:linear-gradient(180deg,#ffda83,#e5b85e 60%,#a96d30);color:#21180d}
+input,select{width:100%;min-height:42px;padding:9px;border-radius:8px;border:1px solid #65758b;background:#0d1725;color:#fff}
+label{display:grid;gap:5px;color:var(--muted);font-size:12px}
+.panel,.stat,.item{background:linear-gradient(145deg,rgba(32,56,80,.97),rgba(13,25,41,.98));border:1px solid rgba(229,184,94,.35);border-radius:13px;padding:14px;box-shadow:0 8px 22px #0003}
+.panel{margin-bottom:12px}.panel h2{font-size:17px;color:#ffda83;margin:0 0 10px}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}.stats{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin-bottom:12px}.stat small{display:block}.stat strong{font-size:21px;display:block;margin-top:5px}
+form{display:flex;gap:9px;align-items:end;flex-wrap:wrap}.field{flex:1;min-width:140px}
+nav{display:flex;gap:7px;overflow:auto;margin:12px 0}nav button{white-space:nowrap}nav button[aria-selected=true]{background:linear-gradient(180deg,#ffda83,#e5b85e);color:#21180d}
+.section{display:none}.section.active{display:block}
+#login{max-width:430px;margin:8vh auto}.results{display:grid;gap:7px;margin-top:10px}.player-result{display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;width:100%}
+.player-result span{display:block}.columns{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(260px,.8fr);gap:12px}
+.kv{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.kv div{background:#0d1a2a;padding:9px;border-radius:8px;min-width:0}.kv small{display:block}.kv strong{overflow-wrap:anywhere}
+.list{display:grid;gap:6px;max-height:300px;overflow:auto}.row{display:flex;justify-content:space-between;gap:8px;align-items:center;flex-wrap:wrap;padding:7px 0;border-bottom:1px solid #344b62}
+.notice{min-height:22px;color:#ffda83;margin:8px 0}.notice.error{color:#ff9999}.notice.ok{color:#83dda7}
+pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#0b1422;padding:10px;border-radius:8px;color:#d8e4f0;font-size:11px;max-height:300px;overflow:auto}
+.hidden{display:none!important}
+@media(max-width:760px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.grid,.columns{grid-template-columns:1fr}.shell{padding-left:9px;padding-right:9px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header>
+ <div class="brand"><img src="/icon-192.svg" alt=""><div><h1>CLASH OF IZZY</h1><div class="muted">PAINEL DO SOBERANO · ADMINISTRAÇÃO DO JOGO</div></div></div>
+ <div id="toolbar" class="hidden"><a class="btn" href="/command-center.html">Abrir jogo</a> <button id="refresh" type="button">Atualizar</button> <button id="logout" type="button">Sair</button></div>
+</header>
+<div id="notice" class="notice" role="status" aria-live="polite"></div>
+<section id="login" class="panel">
+ <h2>🔐 Acesso administrativo</h2>
+ <p class="muted">Entre com o e-mail e a senha configurados nos segredos do Worker.</p>
+ <form id="loginForm"><label class="field">E-mail administrativo<input id="email" type="email" autocomplete="username" required></label><label class="field">Senha<input id="password" type="password" autocomplete="current-password" required></label><button class="primary" type="submit">Entrar no painel</button></form>
+ <p class="muted">Se o acesso ainda não estiver configurado, defina ADMIN_EMAIL, ADMIN_PASSWORD e SESSION_SECRET no Worker Cloudflare. Não coloque essas credenciais no código.</p>
+</section>
+<main id="app" class="hidden">
+ <section class="stats" id="overview"></section>
+ <nav aria-label="Administração">
+  <button data-tab="players" aria-selected="true">👥 Jogadores</button>
+  <button data-tab="catalog" aria-selected="false">🎨 Loja e pacotes</button>
+  <button data-tab="audit" aria-selected="false">📜 Auditoria</button>
+ </nav>
+ <section id="section-players" class="section active">
+  <div class="panel">
+   <h2>Encontrar jogador</h2>
+   <p class="muted">Pesquise por nick, nome do reino ou ID. Selecione um resultado para abrir o perfil completo.</p>
+   <form id="searchForm"><label class="field">Nick / reino / ID<input id="searchQuery" maxlength="64" placeholder="Ex.: Rei de Eldoria" autocomplete="off" required></label><button class="primary" type="submit">Buscar jogador</button></form>
+   <div id="results" class="results"></div>
+  </div>
+  <div id="playerPanel" class="hidden">
+   <div class="panel"><h2>Ficha do jogador</h2><div id="playerSummary"></div></div>
+   <div class="columns">
+    <div>
+     <div class="panel"><h2>Estado completo do reino</h2><div id="playerState"></div></div>
+    </div>
+    <div>
+     <div class="panel"><h2>Editar recursos</h2><form id="resourceForm"><label class="field">Recurso<select id="resource"><option value="food">Comida</option><option value="wood">Madeira</option><option value="stone">Pedra</option><option value="iron">Ferro</option><option value="gold">Ouro</option><option value="gems">Gemas</option></select></label><label class="field">Quantidade (+ ou −)<input id="resourceAmount" type="number" step="1" required placeholder="1000"></label><button type="submit">Aplicar</button></form></div>
+     <div class="panel"><h2>Renomear reino</h2><form id="renameForm"><label class="field">Novo nome<input id="kingdomName" maxlength="32" minlength="3" required></label><button type="submit">Salvar nome</button></form></div>
+     <div class="panel"><h2>Liberar skin</h2><form id="skinUnlockForm"><label class="field">Skin<select id="skinChoice"></select></label><button type="submit">Liberar skin</button></form></div>
+     <div class="panel"><h2>Adicionar gemas</h2><form id="gemsForm"><label class="field">Quantidade<input id="gemsAmount" type="number" min="1" max="100000000" step="1" required></label><button type="submit">Creditar gemas</button></form></div>
+    </div>
+   </div>
+  </div>
+ </section>
+ <section id="section-catalog" class="section">
+  <div class="grid">
+   <div class="panel"><h2>Adicionar skin à loja</h2><form id="newSkinForm"><label class="field">Nome<input id="newSkinName" maxlength="80" required></label><label class="field">Preço em R$<input id="newSkinPrice" type="number" min="50" max="1000" step="0.01" required></label><button type="submit">Cadastrar skin</button></form></div>
+   <div class="panel"><h2>Criar pacote VIP</h2><form id="vipForm"><label class="field">Nome<input id="vipName" maxlength="80" required></label><label class="field">Preço em R$<input id="vipPrice" type="number" min="0.01" step="0.01" required></label><label class="field">Gemas<input id="vipGems" type="number" min="0" step="1" required></label><button type="submit">Cadastrar pacote</button></form></div>
+  </div>
+  <div class="panel"><h2>Catálogo atual</h2><div id="catalogView" class="grid"></div></div>
+ </section>
+ <section id="section-audit" class="section"><div class="panel"><h2>Últimas ações administrativas</h2><div id="auditList" class="list"></div></div></section>
+</main>
+</div>
+<script type="module" src="/admin.js"></script>
+</body>
+</html>
