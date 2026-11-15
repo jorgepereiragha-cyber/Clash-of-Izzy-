@@ -22,3 +22,8 @@ test("central do reino oferece acesso à gestão de alianças", async () => {
   const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
   assert.match(html, /href="/alliance.html">🤝 Alianças/);
 });
+
+test("estado do reino entrega os saldos do depósito da aliança", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.match(worker, /a\.shared_food,a\.shared_wood,a\.shared_stone,a\.shared_iron,a\.shared_gold/);
+});
