@@ -108,6 +108,10 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     return group;
   }
 
+  function clearGroup(group) {
+    while (group.children.length) group.remove(group.children[group.children.length - 1]);
+  }
+
   function createGround() {
     const geometry = new THREE.PlaneGeometry(112, 92, 56, 46);
     const positions = geometry.attributes.position;
@@ -247,19 +251,13 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   }
 
   function rebuildTerritories() {
-    while (territoryRoot.children.length) {
-      const child = territoryRoot.children.pop();
-      territoryRoot.remove(child);
-    }
+    clearGroup(territoryRoot);
     const rows = Array.isArray(worldState?.territories) ? worldState.territories : [];
     for (const territory of rows) createTerritoryFeature(territoryRoot, territory);
   }
 
   function rebuildRoads() {
-    while (routeRoot.children.length) {
-      const child = routeRoot.children.pop();
-      routeRoot.remove(child);
-    }
+    clearGroup(routeRoot);
     const territories = Array.isArray(worldState?.territories) ? worldState.territories : [];
     for (const territory of territories) {
       const x = Number(territory.x) || 0;
@@ -310,14 +308,12 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   }
 
   function rebuildMarches() {
-    while (armyRoot.children.length) {
-      const child = armyRoot.children.pop();
-      armyRoot.remove(child);
-    }
+    clearGroup(armyRoot);
     activeMarches = [];
     const rows = (Array.isArray(worldState?.marches) ? worldState.marches : [])
       .filter(march => march.status === "marching" && Number.isFinite(Date.parse(march.arrives_at || "")));
     for (const march of rows.slice(0, 8)) activeMarches.push(createMarchFormation(march));
+    updateMarchPositions(Date.now());
     animateMarches();
   }
 
