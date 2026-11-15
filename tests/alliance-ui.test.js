@@ -52,6 +52,8 @@ test("busca mundial autentica, limita consultas e retorna somente dados público
   ]) assert.ok(worker.includes(snippet), `busca mundial deve conter: ${snippet}`);
   assert.ok(!worker.includes('results.push({type:"kingdom",id:row.id'));
   assert.ok(!worker.includes('results.push({type:"alliance",id:row.id'));
+  assert.ok(worker.includes("CAST(d.entity_key AS INTEGER)<>COALESCE("));
+  assert.ok(worker.includes("NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER))"));
 });
 
 test("central de alianças oferece busca acessível de reinos e alianças", async () => {
