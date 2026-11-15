@@ -122,6 +122,6 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Smoke test production Worker
-        run: node scripts/production-smoke-test.js
+        run: node scripts/production-smoke.js
         env:
           WORKER_BASE_URL: ${{ env.WORKER_BASE_URL }}
