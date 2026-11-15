@@ -411,7 +411,7 @@ async function gameAction(env,playerId,body){
 
   if(type==="set_nickname"){
     const nickname=String(body.nickname||"").normalize("NFC").trim();
-    if(!/^[\\p{L}\\p{N}_-]{3,20}$/u.test(nickname))return json({error:"Use um nickname de 3 a 20 caracteres: letras, números, _ ou -."},400);
+    if(!/^[\p{L}\p{N}_-]{3,20}$/u.test(nickname))return json({error:"Use um nickname de 3 a 20 caracteres: letras, números, _ ou -."},400);
     const nicknameKey=nickname.toLocaleLowerCase("pt-BR");
     try{
       await env.DB.prepare("INSERT INTO player_nicknames(player_id,nickname,nickname_key) VALUES(?,?,?) ON CONFLICT(player_id) DO UPDATE SET nickname=excluded.nickname,nickname_key=excluded.nickname_key").bind(p.id,nickname,nicknameKey).run();
@@ -885,7 +885,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars"];
+    const requiredTables=["players","player_nicknames","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -928,7 +928,7 @@ export default {
     try{
       if(url.pathname==="/api/game/players/search"&&request.method==="GET"){
         const query=String(url.searchParams.get("q")||"").normalize("NFC").trim();
-        if(!/^[\\p{L}\\p{N}_-]{3,20}$/u.test(query))return json({error:"Digite ao menos 3 caracteres válidos para pesquisar."},400);
+        if(!/^[\p{L}\p{N}_-]{3,20}$/u.test(query))return json({error:"Digite ao menos 3 caracteres válidos para pesquisar."},400);
         const key=query.toLocaleLowerCase("pt-BR");
         const matches=await env.DB.prepare("SELECT p.player_id,n.nickname,k.kingdom_name,k.castle_level,k.power FROM player_nicknames n JOIN players p ON p.id=n.player_id JOIN kingdoms k ON k.player_id=p.id WHERE n.nickname_key LIKE ? ORDER BY k.power DESC LIMIT 20").bind("%"+key+"%").all();
         return json({players:matches.results||[]});
