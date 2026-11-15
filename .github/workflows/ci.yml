@@ -22,8 +22,10 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --ignore-scripts
-      - name: Validate service worker
-        run: node --check sw.js
+      - name: Validate service worker and 3D client module
+        run: |
+          node --check sw.js
+          node --check scripts/kingdom-3d.js
       - name: Test combat simulator
         run: npm test
       - name: Validate D1 migrations locally
