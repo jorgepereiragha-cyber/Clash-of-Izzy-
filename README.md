@@ -2,6 +2,13 @@
 
 Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e persistência em Cloudflare D1.
 
+## Interface do jogo
+
+- `/command-center.html`: centro de comando do reino para construções, tropas, ciência, mapa, heróis, dragões e alianças.
+- `/arena.html`: arena de batalha 3D.
+- A entrada principal (`/`) direciona o jogador ao centro de comando e mantém acesso direto à arena.
+- O centro de comando reutiliza a sessão `coi_game_token` e os endpoints existentes; não cria uma segunda autenticação nem um segundo modelo de dados.
+
 ## Desenvolvimento local
 
 Requisitos: Node.js 22 ou superior.
