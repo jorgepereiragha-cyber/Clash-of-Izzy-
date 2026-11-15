@@ -94,3 +94,21 @@ test("search merges ranked matches and never exposes internal identifiers", asyn
   assert.ok(!worker.includes("player_email"));
   assert.ok(!worker.includes("password_hash"));
 });
+
+
+test("search returns kingdoms already in alliances and exposes only their public alliance tag", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("kingdom_alliance_tag"));
+  assert.ok(worker.includes('allianceTag:row.kingdom_alliance_tag||""'));
+  assert.ok(!worker.includes("NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER))"));
+  assert.ok(!worker.includes("NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id)"));
+});
+
+test("Portuguese search expands common plural forms without interpolating raw query operators", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes('normalized.endsWith("ões")'));
+  assert.ok(worker.includes('normalized.endsWith("ais")'));
+  assert.ok(worker.includes('normalized.endsWith("ao")'));
+  assert.ok(worker.includes("tokenVariants(token)"));
+  assert.ok(worker.includes("playerFtsQuery=tokens.map"));
+});
