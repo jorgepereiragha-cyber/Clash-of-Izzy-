@@ -458,7 +458,7 @@ async function gameAction(env,playerId,body){
   }else if(type==="equipment_equip"){
     const itemKey=String(body.item||""),item=EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
     if(!item)return json({error:"Equipamento inválido."},400);
-    const result=await env.DB.prepare("INSERT INTO equipped_kingdom_equipment(kingdom_id,slot,item_key) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?) ON CONFLICT(kingdom_id,slot) DO UPDATE SET item_key=excluded.item_key,equipped_at=CURRENT_TIMESTAMP")
+    const result=await env.DB.prepare("INSERT INTO equipped_kingdom_equipment(kingdom_id,slot,item_key) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?) ON CONFLICT(kingdom_id,slot) DO UPDATE SET item_key=excluded.item_key,equipped_at=CURRENT_TIMESTAMP")
       .bind(k.id,item.slot,itemKey,k.id,itemKey).run();
     if(!result.meta.changes)return json({error:"Forje o equipamento antes de equipá-lo."},409);
     await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"equipment_equipped",JSON.stringify({item:itemKey,slot:item.slot})).run();
