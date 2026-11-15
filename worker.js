@@ -653,13 +653,13 @@ async function gameAction(env,playerId,body){
     ]);
   }else if(type==="upgrade"){
     const key=String(body.building||"");
-    if(!BUILDINGS[key])return json({error:"Edifício inválido."},400);
+    if(!Object.hasOwn(BUILDINGS,key))return json({error:"Edifício inválido."},400);
     const b=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type=?").bind(k.id,key).first();
     if(!b)return json({error:"Edifício não encontrado."},404);
     if(b.level>=30)return json({error:"Edifício já está no nível máximo."},409);
     if(key!=="castle"){
       const castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
-      if(b.level>=castle.level)return json({error:"O nível do edifício não pode superar o castelo."},409);
+      if(!castle||b.level>=castle.level)return json({error:"O nível do edifício não pode superar o castelo."},409);
     }
     const factor=b.level;
     const base=BUILDINGS[key];
@@ -698,7 +698,7 @@ async function gameAction(env,playerId,body){
       .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron,k.id,requiredBuilding);
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
     statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,unit,quantity,k.id,actionId));
-    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,?,? WHERE "+guard).bind(k.id,"troops_trained",JSON.stringify({unit,quantity,cost}),k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"troops_trained",JSON.stringify({unit,quantity,cost}),k.id,actionId));
     statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"royal_blueprint",k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const result=await env.DB.batch(statements);
