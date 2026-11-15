@@ -45,7 +45,7 @@ test("busca mundial autentica, limita consultas e retorna somente dados público
     '"game-search-network"',
     'rawQuery.length<2',
     'rawQuery.length>48',
-    '["all","kingdoms","alliances"]',
+    '["all","kingdoms","alliances","territories","skins"]',
     'NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id)',
     'JOIN players p ON p.id=k.player_id WHERE p.player_id=?',
     'COUNT(am.kingdom_id) AS member_count'
@@ -65,4 +65,46 @@ test("central de alianças oferece busca acessível de reinos e alianças", asyn
     'item.type==="kingdom"',
     'item.type==="alliance"'
   ]) assert.ok(html.includes(snippet), `interface de busca deve conter: ${snippet}`);
+});
+
+
+test("índice FTS5 mantém catálogo público sincronizado sem indexar dados privados", async () => {
+  const migration = await readFile(new URL("../migrations/0011_game_search.sql", import.meta.url), "utf8");
+  for (const snippet of [
+    "CREATE VIRTUAL TABLE IF NOT EXISTS game_search_fts USING fts5",
+    "unicode61 remove_diacritics 2",
+    "content='game_search_documents'",
+    "game_search_kingdom_ai",
+    "game_search_alliance_ai",
+    "game_search_territory_ai",
+    "game_search_skin_ai",
+    "INSERT OR IGNORE INTO game_search_documents"
+  ]) assert.ok(migration.includes(snippet), `índice de busca deve conter: ${snippet}`);
+  assert.doesNotMatch(migration, /inventory_items|resource_ledger|hero_inventory|player_skins/);
+});
+
+test("busca unificada usa FTS5 com ranking e fallback compatível", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  for (const snippet of [
+    'game_search_fts MATCH ?',
+    "ORDER BY f.rank LIMIT ?",
+    'engine:"fts5"',
+    'engine:"like-fallback"',
+    'd.entity_type=?)',
+    '["all","kingdoms","alliances","territories","skins"]',
+    'world_territories WHERE name LIKE',
+    'FROM skins WHERE name LIKE'
+  ]) assert.ok(worker.includes(snippet), `busca unificada deve conter: ${snippet}`);
+});
+
+test("central de alianças apresenta filtros para todas as categorias públicas", async () => {
+  const html = await readFile(new URL("../alliance.html", import.meta.url), "utf8");
+  for (const snippet of [
+    '<option value="territories">Territórios</option>',
+    '<option value="skins">Skins</option>',
+    'item.type==="territory"',
+    'item.type==="skin"'
+  ]) assert.ok(html.includes(snippet), `filtro de busca deve conter: ${snippet}`);
+  const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.ok(kingdom.includes('href="/alliance.html#globalSearchTitle">🔎 Busca mundial'));
 });
