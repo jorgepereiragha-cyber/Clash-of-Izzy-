@@ -146,6 +146,7 @@
   function search() {
     const query = input.value.trim();
     results.replaceChildren();
+    results.removeAttribute("aria-busy");
     results.hidden = !query;
     requestSequence += 1;
     const sequence = requestSequence;
