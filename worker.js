@@ -463,7 +463,7 @@ async function syncHeroSystems(env,kingdomId){
 
 async function gameState(env,playerId){
 
-  const p=await env.DB.prepare("SELECT id,player_id,name,gems FROM players WHERE player_id=?").bind(playerId).first();
+  const p=await env.DB.prepare("SELECT p.id,p.player_id,p.name,p.gems,n.nickname FROM players p LEFT JOIN player_nicknames n ON n.player_id=p.id WHERE p.player_id=?").bind(playerId).first();
   if(!p)return null;
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
@@ -513,7 +513,7 @@ async function gameState(env,playerId){
   const activeHeroId=Number((heroes.results||[]).find(hero=>hero.hero_key===activeHeroKey)?.id||0);
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
-  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -525,7 +525,19 @@ async function gameAction(env,playerId,body){
   const type=String(body.type||"");
   let battleOutcome=null;
 
-  if(type==="equipment_craft"){
+  if(type==="set_nickname"){
+    const nickname=String(body.nickname||"").normalize("NFKC").trim();
+    if(!/^[\p{L}\p{N}_-]{3,20}$/u.test(nickname))return json({error:"Use um nickname de 3 a 20 caracteres: letras, números, _ ou -."},400);
+    const nicknameKey=nickname.toLocaleLowerCase("en-US");
+    try{
+      await env.DB.prepare("INSERT INTO player_nicknames(player_id,nickname,nickname_key) VALUES(?,?,?) ON CONFLICT(player_id) DO UPDATE SET nickname=excluded.nickname,nickname_key=excluded.nickname_key")
+        .bind(p.id,nickname,nicknameKey).run();
+    }catch(error){
+      const conflict=await env.DB.prepare("SELECT player_id FROM player_nicknames WHERE nickname_key=?").bind(nicknameKey).first();
+      if(conflict&&Number(conflict.player_id)!==Number(p.id))return json({error:"Este nickname já está em uso. Escolha outro."},409);
+      throw error;
+    }
+  }else if(type==="equipment_craft"){
     const itemKey=String(body.itemId||""),def=EQUIPMENT_CATALOG[itemKey];
     if(!def||!def.craft)return json({error:"Projeto de forja inválido."},400);
     const owned=await ensureEquipmentTables(env,k.id);
@@ -1111,7 +1123,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","player_nicknames"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1200,6 +1212,22 @@ export default {
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"game-state-player",playerId,120,60);
         if(limited)return limited;
+      }
+      if(url.pathname==="/api/game/players/search"&&request.method==="GET"){
+        const limited=await rateLimitDecision(env,"player-search-player",playerId,20,60);
+        if(limited)return limited;
+        const networkLimit=await rateLimitDecision(env,"player-search-network",request.headers.get("CF-Connecting-IP")||"unknown",120,60);
+        if(networkLimit)return networkLimit;
+        const rawQuery=String(url.searchParams.get("q")||"").normalize("NFKC").trim();
+        if(!/^[\p{L}\p{N}_-]{3,20}$/u.test(rawQuery))return json({error:"Digite ao menos 3 caracteres válidos para pesquisar jogadores.",players:[]},400);
+        const queryKey=rawQuery.toLocaleLowerCase("en-US");
+        const escaped=queryKey.replace(/[!%_]/g,ch=>"!"+ch);
+        const limit=Math.min(10,Math.max(1,Math.floor(Number(url.searchParams.get("limit"))||8)));
+        const rows=await env.DB.prepare(
+          "SELECT n.nickname,k.kingdom_name,k.castle_level,k.power FROM player_nicknames n JOIN kingdoms k ON k.player_id=n.player_id WHERE n.player_id<>(SELECT id FROM players WHERE player_id=?) AND n.nickname_key LIKE ? ESCAPE '!' ORDER BY CASE WHEN n.nickname_key=? THEN 0 ELSE 1 END,k.power DESC,n.nickname_key LIMIT ?"
+        ).bind(playerId,escaped+"%",queryKey,limit).all();
+        const players=(rows.results||[]).map(row=>({nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0)}));
+        return json({query:rawQuery,players,count:players.length});
       }
       if(url.pathname==="/api/game/search"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"game-search-player",playerId,30,60);
