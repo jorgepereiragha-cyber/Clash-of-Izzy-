@@ -21,8 +21,8 @@ test("interface de alianças usa sessão persistida e estado real do Worker", as
 });
 
 test("central do reino oferece acesso à gestão de alianças", async () => {
-  const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
-  assert.ok(html.includes('href="/alliance.html">🤝 Alianças'));
+  const nav = await readFile(new URL("../navigation.js", import.meta.url), "utf8");
+  assert.ok(nav.includes('href:"/alliance.html"'));
 });
 
 test("estado do reino entrega os saldos do depósito da aliança", async () => {
