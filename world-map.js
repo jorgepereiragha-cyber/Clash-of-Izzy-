@@ -60,15 +60,15 @@ async function request(path, options = {}) {
   return data;
 }
 function territoryOwner(territory) {
-  if (territory.owner_kingdom_id) {
-    return Number(territory.owner_kingdom_id) === Number(state?.kingdom?.id)
-      ? "Seu reino"
-      : "Outro reino";
-  }
   if (territory.alliance_id) {
     return Number(territory.alliance_id) === Number(state?.alliance?.id)
       ? "Sua aliança"
       : "Território de aliança";
+  }
+  if (territory.owner_kingdom_id) {
+    return Number(territory.owner_kingdom_id) === Number(state?.kingdom?.id)
+      ? "Seu reino"
+      : "Outro reino";
   }
   return "Território neutro";
 }
@@ -79,11 +79,11 @@ function territoryIsProtected(territory) {
 }
 function territoryCanBeAttacked(territory) {
   if (!territory) return false;
+  if (territory.alliance_id) return false;
   const ownerId = Number(territory.owner_kingdom_id || 0);
   const ownId = Number(state?.kingdom?.id || 0);
-  if (!ownerId) return !territory.alliance_id;
+  if (!ownerId) return true;
   if (ownerId === ownId || territoryIsProtected(territory)) return false;
-  if (territory.alliance_id && Number(territory.alliance_id) === Number(state?.alliance?.id || 0)) return false;
   return true;
 }
 function getSelectedTerritory() {
@@ -227,11 +227,13 @@ function renderDetails() {
   if (territory.alliance_tag) addStat(grid, "Aliança", "[" + territory.alliance_tag + "]");
   if (territoryIsProtected(territory)) addStat(grid, "Proteção", "Ativa");
   root.append(grid);
-  if (owner === "Outro reino") {
+  if (owner === "Território de aliança") {
+    $("marchNotice").textContent = "Território reivindicado por uma aliança. É necessária uma guerra de alianças; ataques individuais não são permitidos.";
+  } else if (owner === "Outro reino") {
     $("marchNotice").textContent = territoryIsProtected(territory)
       ? "Este reino está protegido. O ataque ficará disponível quando a proteção terminar."
       : "PvP habilitado: o exército defensor lutará com as tropas, herói, dragão, pesquisas e equipamentos reais. Baixas são permanentes para os dois lados. Uma confirmação será solicitada antes de partir.";
-  } else if (owner === "Território de aliança") {
+  } else if (owner === "Sua aliança") {
     $("marchNotice").textContent = "Território reivindicado por uma aliança. É necessária uma guerra de alianças; ataques individuais não são permitidos.";
   } else if (owner === "Sua aliança") {
     $("marchNotice").textContent = "Território aliado: membros podem enviar coleta e exploração. Ataques contra aliados são bloqueados.";
