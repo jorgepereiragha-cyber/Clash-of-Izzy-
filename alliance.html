@@ -7,13 +7,27 @@
 <style>
 :root{color-scheme:dark;--gold:#e7bd68;--panel:#14243a;--line:#80643b;--muted:#b9c5d4}
 *{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#395779,#101a2b 60%,#080e18);color:#f5edda;font:14px system-ui,Arial,sans-serif}
-header{padding:14px max(14px,env(safe-area-inset-right)) 14px max(14px,env(safe-area-inset-left));background:#101a2bf2;border-bottom:1px solid var(--line)}.top,main{max-width:980px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{font-weight:950;letter-spacing:.08em;color:var(--gold)}main{padding:20px 12px 48px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.panel{background:linear-gradient(145deg,#1b3049,#101d30);border:1px solid var(--line);border-radius:13px;padding:15px;margin:14px 0}.panel h2{margin:0 0 12px;color:var(--gold);font-size:18px}.muted{color:var(--muted)}button,a.btn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#68451f);color:#fff;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}button.secondary,a.secondary{background:#243a55;border-color:#71839a}button:disabled{opacity:.5;cursor:not-allowed}input,textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #52677d;background:#0e1a2a;color:#fff;font:inherit}label{display:block;color:var(--muted);font-size:12px;margin:8px 0 5px}.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.member,.invite,.message,.war{padding:9px;background:#0e1a2a;border:1px solid #40556b;border-radius:8px;margin:7px 0}.message small,.member small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.chat{max-height:300px;overflow:auto}.status{font-size:12px;color:#d8e2ee}.status.error{color:#ffb4a9}.hidden{display:none!important}.notice{padding:10px;background:#3a2d1c;border:1px solid #927344;border-radius:8px;color:#f4dca8}.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:650px){.section-grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+header{padding:14px max(14px,env(safe-area-inset-right)) 14px max(14px,env(safe-area-inset-left));background:#101a2bf2;border-bottom:1px solid var(--line)}.top,main{max-width:980px;margin:auto}.top{display:flex;justify-content:space-between;align-items:center;gap:12px}.brand{font-weight:950;letter-spacing:.08em;color:var(--gold)}main{padding:20px 12px 48px}.toolbar{display:flex;gap:8px;flex-wrap:wrap}.panel{background:linear-gradient(145deg,#1b3049,#101d30);border:1px solid var(--line);border-radius:13px;padding:15px;margin:14px 0}.panel h2{margin:0 0 12px;color:var(--gold);font-size:18px}.muted{color:var(--muted)}button,a.btn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#68451f);color:#fff;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}button.secondary,a.secondary{background:#243a55;border-color:#71839a}button:disabled{opacity:.5;cursor:not-allowed}input,textarea,select{width:100%;padding:10px;border-radius:8px;border:1px solid #52677d;background:#0e1a2a;color:#fff;font:inherit}label{display:block;color:var(--muted);font-size:12px;margin:8px 0 5px}.fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:9px}.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.row>*{flex:1}.member,.invite,.message,.war{padding:9px;background:#0e1a2a;border:1px solid #40556b;border-radius:8px;margin:7px 0}.message small,.member small{display:block;color:var(--muted);font-size:11px;margin-top:3px}.chat{max-height:300px;overflow:auto}.status{font-size:12px;color:#d8e2ee}.status.error{color:#ffb4a9}.search-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:8px;margin-top:10px}.search-result{display:grid;justify-items:start;text-align:left;gap:4px;min-width:0}.search-result strong,.search-result small{overflow-wrap:anywhere}.search-result small{color:#d3dce7;font-weight:500}.hidden{display:none!important}.notice{padding:10px;background:#3a2d1c;border:1px solid #927344;border-radius:8px;color:#f4dca8}.section-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}@media(max-width:650px){.section-grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
 </style>
 </head>
 <body>
 <header><div class="top"><div class="brand">⚔ CLASH OF IZZY <div class="muted" style="font-size:11px;font-weight:500;letter-spacing:0">Diplomacia · cooperação · guerras</div></div><div class="toolbar"><a class="btn secondary" href="/kingdom.html">← Meu reino</a><button class="secondary" id="refresh">↻ Atualizar</button></div></div></header>
 <main>
 <h1 id="title">Alianças do reino</h1><p class="muted" id="subtitle">Conectando ao servidor…</p><div id="status" class="status" role="status"></div>
+<section class="panel" aria-labelledby="globalSearchTitle">
+<h2 id="globalSearchTitle">🔎 Busca do mundo</h2>
+<p class="muted">Encontre reinos disponíveis para convite e alianças por nome ou sigla.</p>
+<form id="worldSearchForm" class="row">
+<label class="hidden" for="worldSearchQuery">Buscar no mundo</label>
+<input id="worldSearchQuery" type="search" minlength="2" maxlength="48" autocomplete="off" placeholder="Nome do reino, aliança ou sigla…" required>
+<label class="hidden" for="worldSearchType">Categoria</label>
+<select id="worldSearchType" aria-label="Categoria da busca" style="max-width:150px;flex:0 0 150px">
+<option value="all">Tudo</option><option value="kingdoms">Reinos</option><option value="alliances">Alianças</option>
+</select>
+<button type="submit">Buscar</button>
+</form>
+<div id="worldSearchResults" class="muted" role="status" aria-live="polite">Digite pelo menos 2 caracteres para começar.</div>
+</section>
 <section id="noAlliance" class="panel hidden">
 <h2>🤝 Faça parte de uma aliança</h2><p class="muted">Crie sua própria aliança ou entre em uma usando a sigla recebida de outro comandante.</p>
 <div class="section-grid">
@@ -62,6 +76,44 @@ $("donateBtn").addEventListener("click",()=>act({type:"alliance_donate",resource
 $("inviteBtn").addEventListener("click",()=>act({type:"alliance_invite",targetName:$("inviteName").value}));
 $("warBtn").addEventListener("click",()=>act({type:"alliance_war_declare",targetTag:$("enemyTag").value}));
 $("leave").addEventListener("click",()=>{if(confirm("Deseja realmente sair da aliança?"))act({type:"alliance_leave"})});
+
+$("worldSearchForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const query=$("worldSearchQuery").value.trim();
+ const type=$("worldSearchType").value;
+ const output=$("worldSearchResults");
+ if(query.length<2){output.textContent="Digite pelo menos 2 caracteres.";return;}
+ output.textContent="Pesquisando no mundo…";
+ try{
+  const params=new URLSearchParams({q:query,type,limit:"10"});
+  const data=await request("/game/search?"+params.toString());
+  output.replaceChildren();
+  if(!data.results?.length){output.textContent="Nenhum resultado. Tente outro nome ou selecione outra categoria.";return;}
+  const list=document.createElement("div");list.className="search-results";
+  for(const item of data.results){
+   const button=document.createElement("button");button.type="button";button.className="secondary search-result";
+   const title=document.createElement("strong");
+   title.textContent=item.type==="alliance"?item.name+" ["+item.tag+"]":item.name;
+   const detail=document.createElement("small");
+   detail.textContent=item.type==="alliance"?"Aliança · nível "+item.level+" · "+item.members+" membros":"Reino · poder "+Number(item.power||0).toLocaleString("pt-BR");
+   button.append(title,detail);
+   button.addEventListener("click",()=>{
+    if(item.type==="kingdom"){
+     $("inviteName").value=item.name;
+     $("inviteName").focus();
+     status("Reino selecionado. Use Convidar para enviar o convite.");
+    }else{
+     $("joinTag").value=item.tag;
+     $("joinTag").focus();
+     status("Aliança selecionada. Use Solicitar entrada para continuar.");
+    }
+   });
+   list.append(button);
+  }
+  output.append(list);
+  if(type==="all")status(data.count+" resultado(s) encontrados.");
+ }catch(error){output.textContent=error.message;status(error.message,true);}
+});
 $("refresh").addEventListener("click",()=>load(false));load();
 </script>
 </body></html>
