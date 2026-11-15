@@ -10,21 +10,23 @@ function utcDay(now = new Date()) {
 }
 
 async function taskProgress(env, kingdomId, task, day) {
+  const start = day + " 00:00:00";
+  const end = new Date(Date.parse(day + "T00:00:00.000Z") + 86400000).toISOString().slice(0, 10) + " 00:00:00";
   if (task.kind === "battle") {
     const row = await env.DB.prepare(
-      "SELECT COUNT(*) AS value FROM battle_reports WHERE attacker_kingdom_id=? AND battle_type='pve' AND date(created_at)=?"
-    ).bind(kingdomId, day).first();
+      "SELECT COUNT(*) AS value FROM battle_reports WHERE attacker_kingdom_id=? AND battle_type='pve' AND created_at>=? AND created_at<?"
+    ).bind(kingdomId, start, end).first();
     return Number(row?.value || 0);
   }
   if (task.kind === "sum") {
     const row = await env.DB.prepare(
-      "SELECT COALESCE(SUM(CAST(json_extract(payload_json,'$.quantity') AS INTEGER)),0) AS value FROM kingdom_events WHERE kingdom_id=? AND event_type=? AND date(created_at)=?"
-    ).bind(kingdomId, task.source, day).first();
+      "SELECT COALESCE(SUM(CAST(json_extract(payload_json,'$.quantity') AS INTEGER)),0) AS value FROM kingdom_events WHERE kingdom_id=? AND event_type=? AND created_at>=? AND created_at<?"
+    ).bind(kingdomId, task.source, start, end).first();
     return Number(row?.value || 0);
   }
   const row = await env.DB.prepare(
-    "SELECT COUNT(*) AS value FROM kingdom_events WHERE kingdom_id=? AND event_type=? AND date(created_at)=?"
-  ).bind(kingdomId, task.source, day).first();
+    "SELECT COUNT(*) AS value FROM kingdom_events WHERE kingdom_id=? AND event_type=? AND created_at>=? AND created_at<?"
+  ).bind(kingdomId, task.source, start, end).first();
   return Number(row?.value || 0);
 }
 
