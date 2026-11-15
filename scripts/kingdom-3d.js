@@ -5,7 +5,8 @@ import { KTX2Loader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
-  let renderer, scene, camera, resizeObserver, ktx2, gltfLoader;
+  let renderer, scene, camera, resizeObserver, ktx2, gltfLoader, resizeHandler;
+  let latestBuildings = [];
   let activeModels = [];
   const glbTemplates = new Map();
   let manifestLoad = null;
@@ -187,7 +188,7 @@ if (host && "WebGLRenderingContext" in window) {
         row.rotation.y = .08;
       }
     }
-    scene.add(group); return group;
+    return group;
   }
   function buildGround() {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(14, 11), mats.grass);
@@ -209,6 +210,8 @@ if (host && "WebGLRenderingContext" in window) {
     addForestInstances();
   }
   function renderBuildings(buildings) {
+    latestBuildings = Array.isArray(buildings) ? buildings : [];
+    if (!renderer || !scene || !camera) return;
     for (const item of activeModels) {
       scene.remove(item);
       if (item.userData.coIProcedural) item.traverse(node => {
@@ -227,6 +230,7 @@ if (host && "WebGLRenderingContext" in window) {
       const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
+      scene.add(group);
       activeModels.push(group);
     });
     renderer.render(scene, camera);
@@ -247,7 +251,7 @@ if (host && "WebGLRenderingContext" in window) {
           });
           glbTemplates.set(asset.type, template);
         }
-        if (glbTemplates.size) renderBuildings(buildings);
+        if (glbTemplates.size) renderBuildings(latestBuildings);
       } catch (error) {
         console.info("Clash of Izzy: GLB asset not ready; procedural 3D models remain active.", error);
       }
@@ -287,11 +291,18 @@ if (host && "WebGLRenderingContext" in window) {
     ktx2.detectSupport(renderer);
     gltfLoader = new GLTFLoader(); gltfLoader.setKTX2Loader(ktx2);
     host.classList.add("has-3d");
+    const restore2DFallback = () => {
+      host.classList.remove("has-3d");
+      resizeObserver?.disconnect();
+      resizeObserver = null;
+      if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+      renderer?.domElement.remove();
+      renderer?.dispose();
+      renderer = null;
+    };
     renderer.domElement.addEventListener("webglcontextlost", event => {
       event.preventDefault();
-      host.classList.remove("has-3d");
-      renderer.domElement.remove();
-      renderer.dispose();
+      restore2DFallback();
       console.warn("Clash of Izzy: contexto WebGL perdido; arte 2D restaurada.");
     }, { once: true });
     window.addEventListener("coi:kingdom-render", event => { const list = event.detail?.buildings || []; renderBuildings(list); loadOptionalGlbAssets(list); });
@@ -308,7 +319,7 @@ if (host && "WebGLRenderingContext" in window) {
       renderer.render(scene, camera);
     };
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
-    else window.addEventListener("resize", resize, { passive: true });
+    else { resizeHandler = resize; window.addEventListener("resize", resizeHandler, { passive: true }); }
     resize();
   } catch (error) {
     console.warn("Clash of Izzy: WebGL indisponível; mantendo arte procedural 2D.", error);
