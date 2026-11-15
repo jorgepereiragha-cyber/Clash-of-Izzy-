@@ -1033,13 +1033,13 @@ export default {
         const limit=Math.min(20,Math.max(1,Math.floor(Number(url.searchParams.get("limit"))||10)));
         try{
           const indexed=await env.DB.prepare(
-            "SELECT d.entity_type,d.title,d.subtitle,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count FROM game_search_fts f JOIN game_search_documents d ON d.id=f.rowid WHERE game_search_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1) AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)))) ORDER BY f.rank LIMIT ?"
+            "SELECT d.entity_type,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count FROM game_search_fts f JOIN game_search_documents d ON d.id=f.rowid WHERE game_search_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1) AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)))) ORDER BY f.rank LIMIT ?"
           ).bind(ftsQuery,kind,kind,playerId,limit).all();
           if((indexed.results||[]).length){
             const results=indexed.results.map(row=>{
               if(row.entity_type==="kingdom")return {type:"kingdom",name:row.title,power:Number(row.power||0)};
-              if(row.entity_type==="alliance")return {type:"alliance",name:row.title,tag:row.subtitle,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)};
-              if(row.entity_type==="territory")return {type:"territory",name:row.title,terrain:row.subtitle};
+              if(row.entity_type==="alliance")return {type:"alliance",name:row.title,tag:row.alliance_tag,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)};
+              if(row.entity_type==="territory")return {type:"territory",name:row.title,terrain:row.territory_terrain};
               return {type:"skin",name:row.title,description:row.subtitle};
             });
             return json({query:rawQuery,results,count:results.length,engine:"fts5"});
