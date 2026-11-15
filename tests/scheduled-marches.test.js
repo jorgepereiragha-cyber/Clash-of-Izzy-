@@ -42,7 +42,12 @@ test("PvP territorial valida o dono na chegada, trava os dois reinos e grava rel
   const processMarches = worker.slice(worker.indexOf("async function processMarches"), worker.indexOf("const CASTLE_MATERIALS"));
   assert.ok(worker.includes("async function loadKingdomCombatProfile(env, kingdomId)"));
   assert.ok(worker.includes("async function acquireKingdomBattleLocks(env, kingdomIds)"));
-  assert.ok(worker.includes("if (current.battle_token)"));
+  assert.ok(worker.includes("battle_lock_token") && worker.includes("battle_lock_expires_at"));
+  const lockStart = worker.indexOf("async function acquireKingdomBattleLocks");
+  const lockEnd = worker.indexOf("async function processMarches", lockStart);
+  const lockCode = worker.slice(lockStart, lockEnd);
+  assert.doesNotMatch(lockCode, /battle_token/);
+  assert.ok(lockCode.includes("battle_lock_expires_at<=?"));
   assert.ok(processMarches.includes("target_owner_kingdom_id"));
   assert.ok(processMarches.includes("territory_owner_changed_or_invalid"));
   assert.ok(processMarches.includes("pvpDefenderRows"));
@@ -65,5 +70,27 @@ test("Worker não aceita PvP contra protegido ou membro da mesma aliança", asyn
   assert.ok(march.includes("alliance_members"));
   assert.ok(march.includes("Ataques contra membros da sua própria aliança estão bloqueados"));
   assert.ok(march.includes("target_owner_kingdom_id"));
-  assert.ok(march.includes("COALESCE(battle_token,'')=''"));
+  assert.ok(march.includes("battle_lock_token") && march.includes("battle_lock_expires_at"));
+  assert.ok(!march.includes("COALESCE(battle_token"));
+});
+
+
+test("battle_token remains a nonce while separate expiring locks serialize combat", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const battleStart = worker.indexOf('}else if(type==="battle"){');
+  const battleEnd = worker.indexOf('}else if(type==="rename"){', battleStart);
+  const battle = worker.slice(battleStart, battleEnd);
+  assert.ok(battle.includes("battle_lock_token IS NULL OR battle_lock_expires_at IS NULL OR battle_lock_expires_at<=?"));
+  const eventStart = worker.indexOf("async function angelDeathEventAttack");
+  const eventEnd = worker.indexOf("async function distributeAngelDeathRewards", eventStart);
+  const eventAttack = worker.slice(eventStart, eventEnd);
+  assert.ok(eventAttack.includes("battle_lock_token IS NULL OR battle_lock_expires_at IS NULL OR battle_lock_expires_at<=?"));
+  assert.ok(eventAttack.includes("kingdom.battle_lock_token"));
+});
+
+test("migration creates independent expiring kingdom battle locks", async () => {
+  const migration = await readFile(new URL("../migrations/0017_territory_pvp_battles.sql", import.meta.url), "utf8");
+  assert.ok(migration.includes("ADD COLUMN battle_lock_token TEXT"));
+  assert.ok(migration.includes("ADD COLUMN battle_lock_expires_at TEXT"));
+  assert.ok(migration.includes("idx_kingdom_battle_lock"));
 });
