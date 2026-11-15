@@ -360,9 +360,11 @@ function eventMaterialStatement(env,kingdomId,eventKey){
  const key=rewards[eventKey];if(!key)return null;
  return env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) VALUES(?,?,1) ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,key);
 }
-async function processDueKingdomTasks(env,limit=100){
+async function processDueKingdomTasks(env,limit=100,kingdomId=null){
  const now=new Date().toISOString();
- const due=await env.DB.prepare("SELECT id,kingdom_id,task_type,payload_json FROM kingdom_tasks WHERE status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT ?").bind(now,limit).all();
+ const due=kingdomId
+  ?await env.DB.prepare("SELECT id,kingdom_id,task_type,payload_json FROM kingdom_tasks WHERE kingdom_id=? AND status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT ?").bind(kingdomId,now,limit).all()
+  :await env.DB.prepare("SELECT id,kingdom_id,task_type,payload_json FROM kingdom_tasks WHERE status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT ?").bind(now,limit).all();
  let processed=0;
  for(const task of due.results||[]){
   let p={};try{p=JSON.parse(task.payload_json||'{}')}catch{}
@@ -401,7 +403,7 @@ async function gameState(env,playerId){
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
   await applyProduction(env,kingdom.id);
-  await processDueKingdomTasks(env,10);
+  await processDueKingdomTasks(env,10,kingdom.id);
   await seedWorld(env);
   await processMarches(env,kingdom.id);
   const [fresh,buildings,troops,heroes,dragon,research,territories,marches,reports,heroInventory,heroHistory,inventoryItems]=await Promise.all([
@@ -443,7 +445,7 @@ async function gameAction(env,playerId,body){
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
   await applyProduction(env,k.id);
-  await processDueKingdomTasks(env,10);
+  await processDueKingdomTasks(env,10,k.id);
   const type=String(body.type||"");
   let battleOutcome=null;
 
