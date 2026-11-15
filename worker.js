@@ -448,8 +448,8 @@ async function gameAction(env,playerId,body){
     await env.DB.batch(statements);
   }else if(type==="shop_buy"){
     await ensureShopTables(env);
-    const itemId=String(body.item||""),source=String(body.source||"shop"),item=SHOP_ITEMS[itemId];
-    if(!item)return json({error:"Produto inválido."},400);
+    const itemId=String(body.item||""),source=String(body.source||"shop"),item=Object.hasOwn(SHOP_ITEMS,itemId)?SHOP_ITEMS[itemId]:null;
+    if(!item||!["shop","merchant"].includes(source))return json({error:"Produto ou origem inválidos."},400);
     let price=item.price,cycle=null,offer=null;
     if(source==="merchant"){
       cycle=merchantCycle();offer=merchantOffers(cycle).find(x=>x.id===itemId);
@@ -522,7 +522,7 @@ async function gameAction(env,playerId,body){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const targetId=Number(body.targetKingdomId),newRank=String(body.rank||"");
     const ranks={membro:1,oficial:2,co_lider:3,lider:4};
-    if(!member||!ranks[newRank])return json({error:"Cargo ou aliança inválidos."},400);
+    if(!member||!Object.hasOwn(ranks,newRank))return json({error:"Cargo ou aliança inválidos."},400);
     const target=await env.DB.prepare("SELECT rank FROM alliance_members WHERE alliance_id=? AND kingdom_id=?").bind(member.alliance_id,targetId).first();
     if(!target)return json({error:"Membro não encontrado."},404);
     if(member.rank!=="lider"&&!(member.rank==="co_lider"&&newRank==="oficial"&&target.rank==="membro"))return json({error:"Somente o líder pode atribuir esse cargo."},403);
@@ -542,7 +542,7 @@ async function gameAction(env,playerId,body){
     const member=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const resource=String(body.resource||""),amount=Number(body.amount);
     const allowed={food:"shared_food",wood:"shared_wood",stone:"shared_stone",iron:"shared_iron",gold:"shared_gold"};
-    if(!member||!allowed[resource]||!Number.isSafeInteger(amount)||amount<100||amount>1000000)return json({error:"Doação inválida. Mínimo de 100 recursos."},400);
+    if(!member||!Object.hasOwn(allowed,resource)||!Number.isSafeInteger(amount)||amount<100||amount>1000000)return json({error:"Doação inválida. Mínimo de 100 recursos."},400);
     const debit=await env.DB.prepare("UPDATE kingdoms SET "+resource+"="+resource+"-? WHERE id=? AND "+resource+">=?").bind(amount,k.id,amount).run();
     if(!debit.meta.changes)return json({error:"Recursos insuficientes."},409);
     const xp=Math.floor(amount/100);
@@ -742,6 +742,7 @@ async function gameAction(env,playerId,body){
     if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes ou pesquisa alterada por outra ação. Atualize e tente novamente."},409);
   }else if(type==="march"){
     const targetId=Number(body.targetId);
+    if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
     const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id FROM world_territories WHERE id=?").bind(targetId).first();
     if(!target)return json({error:"Território não encontrado."},404);
     const marchType=String(body.marchType||"gather");
