@@ -22,7 +22,7 @@ console.log("PWA validation passed: manifest, start URL, icons, offline page and
 
 for (const file of ["index.html", "command-center.html"]) {
   const html = fs.readFileSync(file, "utf8");
-  const inlineScripts = [...html.matchAll(/<script(?:\\s[^>]*)?>([\\s\\S]*?)<\\/script>/g)];
+  const inlineScripts = [...html.matchAll(/<script(?:\s[^>]*)?>([\s\S]*?)<\/script>/g)];
   for (const [index, match] of inlineScripts.entries()) {
     if (match[1].trim()) new vm.Script(match[1], { filename: file + "#inline-" + index });
   }
