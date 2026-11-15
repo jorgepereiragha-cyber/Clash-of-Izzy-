@@ -195,13 +195,20 @@ Não aplicar migrações remotas, fazer merge ou publicar sem validação e auto
 ---
 **Este documento é direção de design, não confirmação de funcionalidades implementadas.**
 
-## 12. Protótipo implementado: primeira fatia narrativa
+## 12. Primeira fatia narrativa — estado atualizado
 
-Na branch feature/offline-kingdom-progression foi acrescentada ao Centro de Comando a campanha local **A Primeira Fenda**:
-- bloqueio visual até o Castelo nível 3;
-- três capítulos em sequência: Duas ofertas, O campo silencioso e A marca e o exílio;
-- ao concluir os capítulos, abre-se o vestígio do Basilisco para catalogação no bestiário;
-- depois, o jogador arquiva a descoberta fictícia Cartografia das Fundações;
-- progresso gravado localmente na chave `coi_origin_campaign_v1`.
+A campanha A Primeira Fenda contém três capítulos (ofertas, campo silencioso e marca/exílio), seguida do registro do Basilisco e da Cartografia das Fundações. O conteúdo não concede bônus, recursos ou vantagem competitiva.
 
-**Limitações explícitas:** é um protótipo narrativo no navegador. Não há validação do progresso no servidor, sincronização entre dispositivos, combate contra o Basilisco, bônus, efeito real de tecnologia ou recompensa econômica. O desbloqueio por nível é apenas interface e não é proteção contra manipulação. A campanha não é conteúdo religioso oficial. Antes de transformar em sistema definitivo, migrar progresso para o servidor, criar endpoints autenticados e resgates idempotentes, testes de autorização e integração com o catálogo de pesquisa existente.
+## 13. Persistência narrativa implementada na branch
+
+- Migração aditiva `0010_kingdom_story_progress.sql` cria progresso por reino, campanha e etapa, com chave primária única.
+- `story-engine.js` centraliza o catálogo permitido e os requisitos; os testes cobrem Castelo nível 3, sequência dos capítulos, Basilisco, tecnologia e pistas do Arquivo Velado.
+- `worker.js` valida sessão, campanha, etapa, nível do Castelo e pré-requisito. A escrita idempotente e o evento são executados no mesmo lote D1.
+- `gameState()` retorna `storyProgress`; o Centro de Comando renderiza o progresso vindo do servidor.
+- Progresso antigo local é importado por ações validadas pelo servidor, quando possível. O navegador não é mais fonte de verdade.
+
+**Limites atuais:** nenhuma recompensa, efeito de tecnologia ou combate de Basilisco está ativo. A migração ainda não foi aplicada remotamente e não houve deploy. O CI do novo head precisa concluir antes de considerar a alteração validada.
+
+## 14. Próxima etapa: pistas físicas no mapa
+
+A auditoria do repositório não encontrou uma cena de mapa mundial Three.js conectada ao Centro de Comando; o mundo atual é apresentado em cartões, e a arena 3D é separada. A arquitetura para a Cripta das Fundações, raycasting, carregamento glTF, desempenho Android, fallback acessível e validação pelo servidor está em `docs/EXPLORACAO_3D_PISTAS.md`. Não declarar mapa 3D de exploração pronto até essa cena ser implementada e testada.
