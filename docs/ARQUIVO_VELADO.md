@@ -42,3 +42,8 @@ A Vigília preserva mapas, registros de guerras, rotas desaparecidas e observaç
 
 ## Protótipo de campanha associado
 O Centro de Comando inclui agora a campanha local **A Primeira Fenda**, desbloqueada visualmente no Castelo nível 3. Ela apresenta três capítulos inspirados com respeito em Gênesis 4, um registro de Basilisco no bestiário e a descoberta narrativa Cartografia das Fundações. O progresso usa `coi_origin_campaign_v1` no armazenamento local do navegador. Não sincroniza com a conta, não concede recursos, não executa combate e não cria uma tecnologia funcional. Para produção, precisa de validação e persistência no servidor.
+
+
+## Atualização técnica — progresso sincronizado
+
+As pistas do Arquivo Velado agora usam a migração `0010_kingdom_story_progress`. A API valida as três etapas em sequência e devolve `storyProgress` para o Centro de Comando. As descobertas passam a acompanhar o reino no servidor; os valores antigos do navegador são apenas importados como pedidos e revalidados. A migração ainda aguarda CI e publicação autorizada. Não há ainda posições físicas ou interação 3D no mapa mundial; consulte `docs/EXPLORACAO_3D_PISTAS.md`.
