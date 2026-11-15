@@ -2,16 +2,27 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
 import { KTX2Loader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/KTX2Loader.js";
+import { clone as cloneSkinned } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "./kingdom-quality.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
   let renderer, scene, camera, resizeObserver, ktx2, gltfLoader, resizeHandler, qualityProfile;
   let latestBuildings = [];
+  let latestTroops = [];
   let activeModels = [];
+  let activeProps = [];
+  let activeTroops = [];
+  let armyMixers = [];
+  let animationFrame = 0;
+  let lastAnimationTime = 0;
   const glbTemplates = new Map();
+  const glbPropTemplates = new Map();
+  const glbUnitTemplates = new Map();
   const glbLoadPromises = new Map();
   let manifestAssets = [];
+  let manifestProps = [];
+  let manifestUnits = [];
   let manifestLoad = null;
   const material = (color, roughness = 0.92) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.02 });
   const mats = {
@@ -71,6 +82,8 @@ if (host && "WebGLRenderingContext" in window) {
     const resources = { geometries: new Set(), materials: new Set(), textures: new Set(), imageBitmaps: new Set() };
     disposeObject3D(scene, resources);
     for (const template of glbTemplates.values()) disposeObject3D(template, resources);
+    for (const template of glbPropTemplates.values()) disposeObject3D(template, resources);
+    for (const entry of glbUnitTemplates.values()) disposeObject3D(entry.template, resources);
     for (const texture of surfaceTextureCache.values()) resources.textures.add(texture);
     for (const mat of Object.values(mats)) {
       if (!mat) continue;
@@ -81,7 +94,16 @@ if (host && "WebGLRenderingContext" in window) {
     scene?.clear();
     surfaceTextureCache.clear();
     glbTemplates.clear();
+    glbPropTemplates.clear();
+    glbUnitTemplates.clear();
     activeModels = [];
+    activeProps = [];
+    activeTroops = [];
+    armyMixers = [];
+    manifestAssets = [];
+    manifestProps = [];
+    manifestUnits = [];
+    stopArmyAnimationLoop();
   }
   // Small, deterministic, tileable procedural albedo maps add material identity
   // without shipping large image files or creating per-building texture copies.
@@ -455,10 +477,201 @@ if (host && "WebGLRenderingContext" in window) {
     });
     renderer.render(scene, camera);
   }
-  async function loadOptionalGlbAssets(buildings = []) {
-    // Data Saver keeps the procedural scene available but skips optional GLB downloads.
+  function stopArmyAnimationLoop() {
+    if (animationFrame) cancelAnimationFrame(animationFrame);
+    animationFrame = 0;
+    lastAnimationTime = 0;
+  }
+  function renderArmyFrame(timestamp) {
+    if (disposed || !renderer || !scene || !camera || !armyMixers.length) {
+      animationFrame = 0;
+      return;
+    }
+    const delta = lastAnimationTime ? Math.min(.05, Math.max(0, (timestamp - lastAnimationTime) / 1000)) : 0;
+    lastAnimationTime = timestamp;
+    for (const mixer of armyMixers) mixer.update(delta);
+    renderer.render(scene, camera);
+    animationFrame = requestAnimationFrame(renderArmyFrame);
+  }
+  function startArmyAnimationLoop() {
+    if (animationFrame || !armyMixers.length || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
+    lastAnimationTime = 0;
+    animationFrame = requestAnimationFrame(renderArmyFrame);
+  }
+  function normalizeGlbTemplate(gltf, asset) {
+    const sourceBounds = new THREE.Box3().setFromObject(gltf.scene);
+    const sourceSize = sourceBounds.getSize(new THREE.Vector3());
+    const sourceCenter = sourceBounds.getCenter(new THREE.Vector3());
+    const footprint = Math.max(sourceSize.x, sourceSize.z, .001);
+    const height = Math.max(sourceSize.y, .001);
+    const targetFootprint = Math.max(.25, Math.min(3.5, Number(asset.targetFootprint) || 2.05));
+    const targetHeight = Math.max(.25, Math.min(4.5, Number(asset.targetHeight) || 2.4));
+    const uniformScale = Math.min(targetFootprint / footprint, targetHeight / height);
+    const template = new THREE.Group();
+    const normalizedModel = new THREE.Group();
+    normalizedModel.add(gltf.scene);
+    normalizedModel.scale.setScalar(uniformScale);
+    normalizedModel.position.set(
+      -sourceCenter.x * uniformScale,
+      -sourceBounds.min.y * uniformScale,
+      -sourceCenter.z * uniformScale
+    );
+    template.add(normalizedModel);
+    template.traverse(node => {
+      if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+    });
+    return template;
+  }
+  function safeAssetUrl(asset) {
+    const url = new URL(asset.src, window.location.origin);
+    if (url.origin !== window.location.origin || !url.pathname.startsWith("/assets/3d/") || !url.pathname.toLowerCase().endsWith(".glb")) {
+      throw new TypeError("Asset GLB fora da pasta local aprovada.");
+    }
+    return url.href;
+  }
+  async function loadManifestAsset(entry) {
+    const { asset, kind, key } = entry;
+    try {
+      const assetUrl = safeAssetUrl(asset);
+      const loadPromise = gltfLoader.loadAsync(assetUrl);
+      glbLoadPromises.set(key, loadPromise);
+      const gltf = await loadPromise;
+      if (disposed || !renderer) {
+        disposeDetachedObject3D(gltf.scene);
+        return;
+      }
+      const template = normalizeGlbTemplate(gltf, asset);
+      if (kind === "building") glbTemplates.set(asset.type, template);
+      else if (kind === "prop") glbPropTemplates.set(asset.id, template);
+      else if (kind === "unit") glbUnitTemplates.set(asset.unit_type, {
+        template,
+        animations: Array.isArray(gltf.animations) ? gltf.animations : [],
+        animation: asset.animation || "idle",
+        maxInstances: Math.max(1, Math.min(8, Number(asset.maxInstances) || 4))
+      });
+    } catch (assetError) {
+      console.info(`Clash of Izzy: GLB ${asset.id || asset.type || asset.unit_type} indisponível; mantendo o fallback procedural.`, assetError);
+    } finally {
+      glbLoadPromises.delete(key);
+    }
+  }
+  function renderManifestProps() {
+    for (const prop of activeProps) scene.remove(prop);
+    activeProps = [];
+    for (const asset of manifestProps) {
+      const template = glbPropTemplates.get(asset.id);
+      if (!template) continue;
+      const positions = Array.isArray(asset.positions) && asset.positions.length ? asset.positions : [asset.position || [0, 0, 0]];
+      for (let index = 0; index < positions.length; index += 1) {
+        const position = positions[index];
+        if (!Array.isArray(position) || position.length !== 3 || position.some(value => !Number.isFinite(Number(value)))) continue;
+        const instance = template.clone(true);
+        instance.position.fromArray(position.map(Number));
+        if (Array.isArray(asset.rotation) && asset.rotation.length === 3) instance.rotation.set(...asset.rotation.map(Number));
+        if (Number.isFinite(Number(asset.instanceScale))) instance.scale.multiplyScalar(Number(asset.instanceScale));
+        instance.userData.coIAssetId = asset.id;
+        scene.add(instance);
+        activeProps.push(instance);
+      }
+    }
+  }
+  function renderKingdomTroops(troops = []) {
+    stopArmyAnimationLoop();
+    for (const instance of activeTroops) {
+      instance.mixer.stopAllAction();
+      instance.mixer.uncacheRoot(instance.root);
+      scene.remove(instance.root);
+    }
+    activeTroops = [];
+    armyMixers = [];
+    const archerCount = (Array.isArray(troops) ? troops : [])
+      .filter(unit => unit?.unit_type === "archer")
+      .reduce((sum, unit) => sum + Math.max(0, Number(unit.quantity) || 0), 0);
+    const asset = glbUnitTemplates.get("archer");
+    if (!asset || archerCount <= 0) {
+      renderer?.render(scene, camera);
+      return;
+    }
+    const tierLimit = qualityProfile?.tier === "low" ? 2 : qualityProfile?.tier === "high" ? 5 : 3;
+    const count = Math.min(tierLimit, asset.maxInstances, Math.max(1, Math.ceil(Math.log2(archerCount + 1))));
+    const spacing = .72;
+    for (let index = 0; index < count; index += 1) {
+      const root = cloneSkinned(asset.template);
+      root.position.set((index - (count - 1) / 2) * spacing, 0, 4.25 + (index % 2) * .22);
+      root.rotation.y = Math.PI;
+      root.userData.coIUnitType = "archer";
+      scene.add(root);
+      const mixer = new THREE.AnimationMixer(root);
+      const clip = asset.animations.find(animation => animation.name.toLowerCase() === asset.animation.toLowerCase())
+        || asset.animations.find(animation => animation.name.toLowerCase() === "static")
+        || asset.animations[0];
+      if (clip) mixer.clipAction(clip).play();
+      activeTroops.push({ root, mixer });
+      armyMixers.push(mixer);
+      if (qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) mixer.update(0);
+    }
+    startArmyAnimationLoop();
+    if (!animationFrame) renderer?.render(scene, camera);
+  }
+  async function loadOptionalGlbAssets(buildings = [], troops = []) {
+    // Optional art is skipped in Data Saver mode; procedural models remain available.
     if (!qualityProfile?.loadOptionalAssets || disposed || !renderer) return Promise.resolve();
     try {
+      if (!manifestLoad) {
+        manifestLoad = (async () => {
+          const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
+          if (disposed || !renderer) return;
+          if (!response.ok) throw new Error("Manifesto 3D indisponível.");
+          const manifest = await response.json();
+          if (disposed || !renderer) return;
+          manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [];
+          manifestProps = Array.isArray(manifest.props) ? manifest.props.slice(0, 16) : [];
+          manifestUnits = Array.isArray(manifest.units) ? manifest.units.slice(0, 8) : [];
+        })().catch(error => {
+          manifestLoad = null;
+          throw error;
+        });
+      }
+      await manifestLoad;
+      if (disposed || !renderer) return;
+
+      const neededTypes = new Set(
+        (Array.isArray(buildings) ? buildings : [])
+          .map(item => item?.building_type)
+          .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
+      );
+      const presentUnits = new Set(
+        (Array.isArray(troops) ? troops : [])
+          .filter(unit => Number(unit?.quantity) > 0)
+          .map(unit => unit?.unit_type)
+          .filter(type => typeof type === "string")
+      );
+      const queue = [
+        ...manifestAssets
+          .filter(asset => asset?.enabled === true && neededTypes.has(asset.type) && !glbTemplates.has(asset.type))
+          .map(asset => ({ asset, kind: "building", key: `building:${asset.type}` })),
+        ...manifestProps
+          .filter(asset => asset?.enabled === true && typeof asset.id === "string" && !glbPropTemplates.has(asset.id))
+          .map(asset => ({ asset, kind: "prop", key: `prop:${asset.id}` })),
+        ...manifestUnits
+          .filter(asset => asset?.enabled === true && presentUnits.has(asset.unit_type) && !glbUnitTemplates.has(asset.unit_type))
+          .map(asset => ({ asset, kind: "unit", key: `unit:${asset.unit_type}` }))
+      ].filter(entry => !glbLoadPromises.has(entry.key));
+      let cursor = 0;
+      const worker = async () => {
+        while (!disposed && cursor < queue.length) await loadManifestAsset(queue[cursor++]);
+      };
+      await Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => worker()));
+      if (!disposed && renderer) {
+        renderBuildings(latestBuildings);
+        renderManifestProps();
+        renderKingdomTroops(latestTroops);
+      }
+    } catch (error) {
+      console.info("Clash of Izzy: GLB assets not ready; procedural models remain active.", error);
+    }
+  }
+  try {
       if (!manifestLoad) {
         manifestLoad = (async () => {
           const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
@@ -611,6 +824,7 @@ if (host && "WebGLRenderingContext" in window) {
     const restore2DFallback = () => {
       if (disposed) return;
       disposed = true;
+      stopArmyAnimationLoop();
       host.classList.remove("has-3d");
       delete host.dataset.qualityTier;
       if (window.__coiKingdomDiagnostics === diagnostics) delete window.__coiKingdomDiagnostics;
@@ -629,9 +843,23 @@ if (host && "WebGLRenderingContext" in window) {
       restore2DFallback();
       console.warn("Clash of Izzy: contexto WebGL perdido; arte 2D restaurada.");
     }, { once: true });
-    kingdomRenderHandler = event => { const list = event.detail?.buildings || []; renderBuildings(list); if (!disposed) loadOptionalGlbAssets(list); };
+    kingdomRenderHandler = event => {
+      const detail = event.detail || {};
+      const list = detail.buildings || [];
+      latestTroops = Array.isArray(detail.troops) ? detail.troops : [];
+      renderBuildings(list);
+      renderManifestProps();
+      renderKingdomTroops(latestTroops);
+      if (!disposed) loadOptionalGlbAssets(list, latestTroops);
+    };
     window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
-    if (Array.isArray(window.__coiKingdomBuildings)) { renderBuildings(window.__coiKingdomBuildings); loadOptionalGlbAssets(window.__coiKingdomBuildings); }
+    if (Array.isArray(window.__coiKingdomBuildings)) {
+      latestTroops = Array.isArray(window.__coiKingdomTroops) ? window.__coiKingdomTroops : [];
+      renderBuildings(window.__coiKingdomBuildings);
+      renderManifestProps();
+      renderKingdomTroops(latestTroops);
+      loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops);
+    }
     const resize = () => {
       if (!renderer || !host.clientWidth || !host.clientHeight) return;
       const aspect = host.clientWidth / host.clientHeight;
@@ -650,6 +878,7 @@ if (host && "WebGLRenderingContext" in window) {
     // Initialization can fail after GPU resources or listeners were already created.
     // Run the same deterministic teardown used by the context-loss fallback.
     disposed = true;
+    stopArmyAnimationLoop();
     resizeObserver?.disconnect();
     resizeObserver = null;
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
