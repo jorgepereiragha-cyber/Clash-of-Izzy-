@@ -41,7 +41,7 @@ test("world map opens a territory selected from global search parameters", () =>
 });
 
 
-test("world map exposes pan and zoom controls without enabling PvP", () => {
+test("world map exposes pan and zoom controls with server-authoritative actions", () => {
   for (const marker of [
     'id="zoomIn"', 'id="zoomOut"', 'id="mapReset"', 'id="mapScale"',
     'id="mapContent"', 'class="map-controls"', 'Arraste para explorar',
@@ -51,7 +51,8 @@ test("world map exposes pan and zoom controls without enabling PvP", () => {
     'setPointerCapture(event.pointerId)', 'pointermove', 'pointerup',
     'addEventListener("wheel"', 'changeMapZoom(0.25)', 'resetMapViewport()',
   ]) assert.ok(script.includes(marker), "missing map navigation behavior: " + marker);
-  assert.ok(script.includes('Boolean(territory.owner_kingdom_id)'));
+  assert.ok(script.includes('const isFriendly = owner === "Seu reino" || owner === "Sua aliança"'));
+  assert.ok(script.includes("territoryCanBeAttacked(territory)"));
   assert.ok(script.includes('request("/game/action"'));
 });
 
