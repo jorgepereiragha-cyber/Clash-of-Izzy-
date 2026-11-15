@@ -454,9 +454,12 @@ async function gameAction(env,playerId,body){
   if(type==="story_step"){
     const campaign=String(body.campaign||"").slice(0,32);
     const step=String(body.step||"").slice(0,48);
-    const completedRows=await env.DB.prepare("SELECT step_key FROM kingdom_story_progress WHERE kingdom_id=? AND campaign_key=?").bind(k.id,campaign).all();
+    const [completedRows,currentCastle]=await Promise.all([
+      env.DB.prepare("SELECT step_key FROM kingdom_story_progress WHERE kingdom_id=? AND campaign_key=?").bind(k.id,campaign).all(),
+      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(k.id).first()
+    ]);
     const completed=new Set((completedRows.results||[]).map(row=>row.step_key));
-    const validation=validateStoryStep({campaign,step,castleLevel:Number(k.castle_level||1),completed});
+    const validation=validateStoryStep({campaign,step,castleLevel:Number(currentCastle?.castle_level||1),completed});
     if(!validation.ok)return json({error:validation.error},409);
     // A chave primária torna a descoberta idempotente; o lote grava o evento somente
     // quando a primeira inserção realmente cria o progresso.
