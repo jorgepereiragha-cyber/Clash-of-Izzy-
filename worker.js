@@ -38,11 +38,12 @@ const HERO_STAR_COST={2:10,3:20,4:40,5:80,6:150,7:300};
 async function ensureHeroTables(env){await env.DB.batch([env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_inventory (kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 1,experience INTEGER NOT NULL DEFAULT 0,stars INTEGER NOT NULL DEFAULT 1,skill_level INTEGER NOT NULL DEFAULT 1,fragments INTEGER NOT NULL DEFAULT 0,acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,hero_key))"),env.DB.prepare("CREATE TABLE IF NOT EXISTS hero_summon_history (id INTEGER PRIMARY KEY AUTOINCREMENT,kingdom_id INTEGER NOT NULL,hero_key TEXT NOT NULL,rarity TEXT NOT NULL,result_type TEXT NOT NULL,created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP)")]);}
 
 
+// Legacy collection skins are appearance-only. Combat progression belongs to equipment/research.
 const COSMETIC_SKINS={
- c1:{name:"Pedra Antiga",icon:"🏰",rarity:"comum",theme:"Medieval",atk:5,def:5},c2:{name:"Madeira Rústica",icon:"🏚️",rarity:"comum",theme:"Viking",atk:6,def:4},c3:{name:"Aço Forjado",icon:"⚙️",rarity:"comum",theme:"Industrial",atk:7,def:6},c4:{name:"Areia do Deserto",icon:"🏜️",rarity:"comum",theme:"Egípcio",atk:5,def:7},c5:{name:"Gelo Eterno",icon:"❄️",rarity:"comum",theme:"Nórdico",atk:6,def:6},c6:{name:"Floresta Verde",icon:"🌲",rarity:"comum",theme:"Élfico",atk:5,def:8},c7:{name:"Vulcão",icon:"🌋",rarity:"comum",theme:"Vulcânico",atk:8,def:5},c8:{name:"Oceano",icon:"🌊",rarity:"comum",theme:"Marinho",atk:6,def:7},
- r1:{name:"Ouro Envelhecido",icon:"👑",rarity:"rara",theme:"Real",atk:12,def:10},r2:{name:"Cristal Azul",icon:"💎",rarity:"rara",theme:"Cristalino",atk:10,def:13},r3:{name:"Esmeralda",icon:"💚",rarity:"rara",theme:"Élfico",atk:11,def:12},r4:{name:"Rubi Sangrento",icon:"❤️",rarity:"rara",theme:"Vampírico",atk:14,def:10},r5:{name:"Ametista",icon:"💜",rarity:"rara",theme:"Arcano",atk:12,def:12},
- e1:{name:"Diamante Eterno",icon:"💠",rarity:"épica",theme:"Supremo",atk:20,def:20},e2:{name:"Fogo Dracônico",icon:"🔥",rarity:"épica",theme:"Dragão",atk:25,def:15},e3:{name:"Trovão Divino",icon:"⚡",rarity:"épica",theme:"Tempestade",atk:22,def:22},e4:{name:"Sombra Demoníaca",icon:"👹",rarity:"épica",theme:"Abissal",atk:28,def:18},
- l1:{name:"Dragão Primordial",icon:"🐉",rarity:"lendária",theme:"Supremo",atk:45,def:35},l2:{name:"Celestial Divino",icon:"✨",rarity:"lendária",theme:"Celestial",atk:35,def:50},l3:{name:"Caos Primordial",icon:"🌀",rarity:"lendária",theme:"Caos",atk:48,def:48}
+ c1:{name:"Pedra Antiga",icon:"🏰",rarity:"comum",theme:"Medieval"},c2:{name:"Madeira Rústica",icon:"🏚️",rarity:"comum",theme:"Viking"},c3:{name:"Aço Forjado",icon:"⚙️",rarity:"comum",theme:"Industrial"},c4:{name:"Areia do Deserto",icon:"🏜️",rarity:"comum",theme:"Egípcio"},c5:{name:"Gelo Eterno",icon:"❄️",rarity:"comum",theme:"Nórdico"},c6:{name:"Floresta Verde",icon:"🌲",rarity:"comum",theme:"Élfico"},c7:{name:"Vulcão",icon:"🌋",rarity:"comum",theme:"Vulcânico"},c8:{name:"Oceano",icon:"🌊",rarity:"comum",theme:"Marinho"},
+ r1:{name:"Ouro Envelhecido",icon:"👑",rarity:"rara",theme:"Real"},r2:{name:"Cristal Azul",icon:"💎",rarity:"rara",theme:"Cristalino"},r3:{name:"Esmeralda",icon:"💚",rarity:"rara",theme:"Élfico"},r4:{name:"Rubi Sangrento",icon:"❤️",rarity:"rara",theme:"Vampírico"},r5:{name:"Ametista",icon:"💜",rarity:"rara",theme:"Arcano"},
+ e1:{name:"Diamante Eterno",icon:"💠",rarity:"épica",theme:"Supremo"},e2:{name:"Fogo Dracônico",icon:"🔥",rarity:"épica",theme:"Dragão"},e3:{name:"Trovão Divino",icon:"⚡",rarity:"épica",theme:"Tempestade"},e4:{name:"Sombra Demoníaca",icon:"👹",rarity:"épica",theme:"Abissal"},
+ l1:{name:"Dragão Primordial",icon:"🐉",rarity:"lendária",theme:"Supremo"},l2:{name:"Celestial Divino",icon:"✨",rarity:"lendária",theme:"Celestial"},l3:{name:"Caos Primordial",icon:"🌀",rarity:"lendária",theme:"Caos"}
 };
 const COSMETIC_COLLECTIONS=[
  {id:"col_medieval",name:"Coleção Medieval",icon:"🏰",desc:"Complete as skins medievais",skins:["c1","c2","c3"],gems:500,shards:20},
@@ -54,20 +55,20 @@ const COSMETIC_COLLECTIONS=[
 ];
 const SEASON_END="2026-11-30T23:59:59.000Z";
 const SEASONAL_COSMETICS=[
- {id:"s1",name:"Abóbora Assombrada",icon:"🎃",theme:"Halloween",atk:30,def:25,special:"+15% dano sombrio · +10% roubo de vida",price:3000},
- {id:"s2",name:"Castelo dos Mortos",icon:"💀",theme:"Necromante",atk:35,def:30,special:"+20% invocações · +15% defesa contra luz",price:4500},
- {id:"s3",name:"Fortaleza Vampírica",icon:"🧛",theme:"Vampiro Lorde",atk:40,def:35,special:"+25% roubo de vida · +20% velocidade noturna",price:6000},
- {id:"s4",name:"Mansão Fantasma",icon:"👻",theme:"Assombração",atk:32,def:38,special:"+30% evasão · +15% imunidade a atordoamento",price:5000},
- {id:"s5",name:"Teia Demoníaca",icon:"🕷️",theme:"Aracnídeo",atk:38,def:32,special:"+20% imobilização · +25% dano venenoso",price:5500},
- {id:"s6",name:"Noite Eterna",icon:"🦇",theme:"Lenda Sombria",atk:50,def:45,special:"+40% atributos sombrios · aura assombrada",price:12000,legendary:true}
+ {id:"s1",name:"Abóbora Assombrada",icon:"🎃",theme:"Halloween",visualEffect:"Brilho âmbar e partículas de folhas",price:3000},
+ {id:"s2",name:"Castelo dos Mortos",icon:"💀",theme:"Necromante",visualEffect:"Pedra espectral e névoa verde",price:4500},
+ {id:"s3",name:"Fortaleza Vampírica",icon:"🧛",theme:"Vampiro Lorde",visualEffect:"Vitral rubro e aura visual carmesim",price:6000},
+ {id:"s4",name:"Mansão Fantasma",icon:"👻",theme:"Assombração",visualEffect:"Transparência fantasmagórica e névoa",price:5000},
+ {id:"s5",name:"Teia Demoníaca",icon:"🕷️",theme:"Aracnídeo",visualEffect:"Ornamentos de teia e partículas",price:5500},
+ {id:"s6",name:"Noite Eterna",icon:"🦇",theme:"Lenda Sombria",visualEffect:"Aura noturna e brilho lunar",price:12000,legendary:true}
 ];
 const SKIN_FUSIONS=[
- {inputs:["c1","c2","c3"],output:{id:"f_medieval",name:"Fortaleza Medieval Suprema",icon:"🏰",rarity:"fundida",atk:25,def:25,special:"+15% atributos medievais"}},
- {inputs:["c5","c6","c7"],output:{id:"f_elemental",name:"Convergência Elemental",icon:"🌪️",rarity:"fundida",atk:28,def:22,special:"+20% dano elemental"}},
- {inputs:["r1","r2","r3"],output:{id:"f_gemmaster",name:"Mestre das Gemas",icon:"💎",rarity:"fundida",atk:35,def:30,special:"+25% recursos por hora"}},
- {inputs:["e1","e2","e3"],output:{id:"f_ascendant",name:"Ascensão Divina",icon:"⚡",rarity:"fundida lendária",atk:55,def:50,special:"+40% atributos · aura dourada"}},
- {inputs:["e2","e4","r4"],output:{id:"f_demonlord",name:"Senhor Demônio",icon:"👹",rarity:"fundida lendária",atk:60,def:40,special:"+50% dano crítico · aura infernal"}},
- {inputs:["l1","l2","l3"],output:{id:"f_cosmos",name:"Entidade Cósmica",icon:"🌌",rarity:"fundida mítica",atk:80,def:80,special:"+100% atributos · aura cósmica"}}
+ {inputs:["c1","c2","c3"],output:{id:"f_medieval",name:"Fortaleza Medieval Suprema",icon:"🏰",rarity:"fundida",visualEffect:"Brasões medievais e acabamento de pedra"}},
+ {inputs:["c5","c6","c7"],output:{id:"f_elemental",name:"Convergência Elemental",icon:"🌪️",rarity:"fundida",visualEffect:"Partículas visuais dos elementos"}},
+ {inputs:["r1","r2","r3"],output:{id:"f_gemmaster",name:"Mestre das Gemas",icon:"💎",rarity:"fundida",visualEffect:"Reflexos de gemas e ornamentos"}},
+ {inputs:["e1","e2","e3"],output:{id:"f_ascendant",name:"Ascensão Divina",icon:"⚡",rarity:"fundida lendária",visualEffect:"Aura dourada puramente visual"}},
+ {inputs:["e2","e4","r4"],output:{id:"f_demonlord",name:"Senhor Demônio",icon:"👹",rarity:"fundida lendária",visualEffect:"Aura infernal puramente visual"}},
+ {inputs:["l1","l2","l3"],output:{id:"f_cosmos",name:"Entidade Cósmica",icon:"🌌",rarity:"fundida mítica",visualEffect:"Aura cósmica puramente visual"}}
 ];
 async function ensureCosmeticTables(env,kingdomId){
  await env.DB.batch([
