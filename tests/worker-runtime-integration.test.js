@@ -140,20 +140,49 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         cwd: root,
         env: { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false", NO_COLOR: "1" },
         stdio: ["ignore", "pipe", "pipe"],
+        detached: process.platform !== "win32",
       });
       workerProcess.stdout.on("data", append);
       workerProcess.stderr.on("data", append);
       await waitForWorker(baseUrl, workerProcess, () => workerOutput);
       api = makeApi(baseUrl);
     };
+    const signalWorkerGroup = signal => {
+      const child = workerProcess;
+      if (!child) return;
+      if (process.platform !== "win32" && child.pid) {
+        try {
+          process.kill(-child.pid, signal);
+          return;
+        } catch (error) {
+          if (error?.code !== "ESRCH") throw error;
+        }
+      }
+      if (child.exitCode === null) child.kill(signal);
+    };
+    const waitForWorkerGroupExit = async timeoutMs => {
+      const child = workerProcess;
+      if (!child) return true;
+      const deadline = Date.now() + timeoutMs;
+      while (Date.now() < deadline) {
+        let groupAlive = false;
+        if (process.platform !== "win32" && child.pid) {
+          try { process.kill(-child.pid, 0); groupAlive = true; }
+          catch (error) { if (error?.code !== "ESRCH") groupAlive = true; }
+        } else {
+          groupAlive = child.exitCode === null && child.signalCode === null;
+        }
+        if (!groupAlive) return true;
+        await delay(100);
+      }
+      return false;
+    };
     const stopWorker = async () => {
-      if (workerProcess && workerProcess.exitCode === null) {
-        workerProcess.kill("SIGTERM");
-        await Promise.race([
-          new Promise(resolve => workerProcess.once("close", resolve)),
-          delay(5000),
-        ]);
-        if (workerProcess.exitCode === null) workerProcess.kill("SIGKILL");
+      if (!workerProcess) return;
+      signalWorkerGroup("SIGTERM");
+      if (!await waitForWorkerGroupExit(5000)) {
+        signalWorkerGroup("SIGKILL");
+        await waitForWorkerGroupExit(5000);
       }
       workerProcess = null;
     };
