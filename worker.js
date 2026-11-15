@@ -1400,11 +1400,11 @@ export default {
           const normalized=token.normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR");
           const variants=new Set([normalized]);
           if(normalized.length>4){
-            if(normalized.endsWith("ões"))variants.add(normalized.slice(0,-3)+"ao");
-            else if(normalized.endsWith("ães"))variants.add(normalized.slice(0,-3)+"ao");
+            if(normalized.endsWith("oes"))variants.add(normalized.slice(0,-3)+"ao");
+            else if(normalized.endsWith("aes"))variants.add(normalized.slice(0,-3)+"ao");
             else if(normalized.endsWith("ais"))variants.add(normalized.slice(0,-3)+"al");
-            else if(normalized.endsWith("éis"))variants.add(normalized.slice(0,-3)+"el");
-            else if(normalized.endsWith("ao"))variants.add(normalized.slice(0,-2)+"oes");
+            else if(normalized.endsWith("eis"))variants.add(normalized.slice(0,-3)+"el");
+            else if(normalized.endsWith("ao")){variants.add(normalized.slice(0,-2)+"oes");variants.add(normalized.slice(0,-2)+"aes");}
             else if(normalized.endsWith("al"))variants.add(normalized.slice(0,-2)+"ais");
             else if(normalized.endsWith("el"))variants.add(normalized.slice(0,-2)+"eis");
             else if(normalized.endsWith("il"))variants.add(normalized.slice(0,-2)+"is");
@@ -1462,27 +1462,25 @@ export default {
               }
             }catch(error){console.warn("game_search_substring_unavailable",String(error?.message||error));}
           }
-          const hasEntity=[...resultMap.values()].some(item=>item.type!=="player");
-          if(!hasEntity){
-            const categoryLimit=kind==="all"?Math.max(1,Math.ceil(limit/4)):limit;
-            if(kind==="all"||kind==="kingdoms"){
+          const hasType=type=>[...resultMap.values()].some(item=>item.type===type);
+          const categoryLimit=kind==="all"?Math.max(1,Math.ceil(limit/5)):limit;
+          if((kind==="all"||kind==="kingdoms")&&!hasType("kingdom")){
               const current=await env.DB.prepare("SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
               const rows=await env.DB.prepare("SELECT k.kingdom_name,k.power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag FROM kingdoms k WHERE k.id<>? AND k.kingdom_name LIKE ? ESCAPE '!' COLLATE NOCASE ORDER BY CASE WHEN lower(k.kingdom_name)=? THEN 0 WHEN lower(k.kingdom_name) LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,k.kingdom_name LIMIT ?").bind(current?.id||-1,pattern,queryKey,prefixPattern,categoryLimit).all();
               for(const row of rows.results||[])addResult({type:"kingdom",name:row.kingdom_name,power:Number(row.power||0),allianceTag:row.alliance_tag||""});
             }
-            if(kind==="all"||kind==="alliances"){
+          if((kind==="all"||kind==="alliances")&&!hasType("alliance")){
               const rows=await env.DB.prepare("SELECT a.name,a.tag,a.level,a.territory_count,COUNT(am.kingdom_id) AS member_count FROM alliances a LEFT JOIN alliance_members am ON am.alliance_id=a.id WHERE (a.name LIKE ? ESCAPE '!' COLLATE NOCASE OR a.tag LIKE ? ESCAPE '!' COLLATE NOCASE) GROUP BY a.id ORDER BY CASE WHEN lower(a.tag)=? THEN 0 WHEN lower(a.name)=? THEN 1 WHEN lower(a.tag) LIKE ? ESCAPE '!' THEN 2 ELSE 3 END,a.level DESC,a.name LIMIT ?").bind(pattern,pattern,queryKey,queryKey,prefixPattern,categoryLimit).all();
               for(const row of rows.results||[])addResult({type:"alliance",name:row.name,tag:row.tag,level:Number(row.level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)});
             }
-            if(kind==="all"||kind==="territories"){
+          if((kind==="all"||kind==="territories")&&!hasType("territory")){
               const rows=await env.DB.prepare("SELECT name,terrain FROM world_territories WHERE (name LIKE ? ESCAPE '!' COLLATE NOCASE OR terrain LIKE ? ESCAPE '!' COLLATE NOCASE) ORDER BY level DESC,name LIMIT ?").bind(pattern,pattern,categoryLimit).all();
               for(const row of rows.results||[])addResult({type:"territory",name:row.name,terrain:row.terrain});
             }
-            if(kind==="all"||kind==="skins"){
+          if((kind==="all"||kind==="skins")&&!hasType("skin")){
               const rows=await env.DB.prepare("SELECT name FROM skins WHERE name LIKE ? ESCAPE '!' COLLATE NOCASE ORDER BY name LIMIT ?").bind(pattern,categoryLimit).all();
               for(const row of rows.results||[])addResult({type:"skin",name:row.name,description:"Skin cosmética"});
             }
-          }
         }
         if(wantsPlayers){
           try{
@@ -1503,7 +1501,7 @@ export default {
           }
           const hasPlayers=[...resultMap.values()].some(item=>item.type==="player");
           if(!hasPlayers){
-            const players=await env.DB.prepare("SELECT n.nickname,k.kingdom_name,k.castle_level,k.power FROM player_nicknames n JOIN kingdoms k ON k.player_id=n.player_id WHERE n.player_id<>(SELECT id FROM players WHERE player_id=?) AND n.nickname_key LIKE ? ESCAPE '!' ORDER BY CASE WHEN n.nickname_key=? THEN 0 WHEN n.nickname_key LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,n.nickname_key LIMIT ?").bind(playerId,pattern,queryKey,prefixPattern,limit).all();
+            const players=await env.DB.prepare("SELECT n.nickname,k.kingdom_name,k.castle_level,k.power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag FROM player_nicknames n JOIN kingdoms k ON k.player_id=n.player_id WHERE n.player_id<>(SELECT id FROM players WHERE player_id=?) AND n.nickname_key LIKE ? ESCAPE '!' ORDER BY CASE WHEN n.nickname_key=? THEN 0 WHEN n.nickname_key LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,n.nickname_key LIMIT ?").bind(playerId,pattern,queryKey,prefixPattern,limit).all();
             for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0),allianceTag:row.alliance_tag||""});
           }
         }
