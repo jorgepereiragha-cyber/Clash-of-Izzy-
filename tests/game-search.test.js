@@ -20,16 +20,16 @@ test("search accepts only public categories and builds a parameterized FTS query
   assert.ok(worker.includes("\\p{L}"));
   assert.ok(worker.includes('game_search_fts MATCH ?'));
   assert.ok(worker.includes('entityType=({kingdoms:"kingdom",alliances:"alliance",territories:"territory",skins:"skin"})[kind]||""'));
-  assert.ok(worker.includes('.bind(ftsQuery,kind,entityType,playerId,limit)'));
+  assert.ok(worker.includes('.bind(ftsQuery,kind,entityType,playerId,limit*4)'));
   assert.ok(worker.includes('Math.min(20,Math.max(1,Math.floor(Number(url.searchParams.get("limit"))||10)))'));
 });
 
 test("LIKE fallback escapes wildcard characters and returns only public result fields", async () => {
   const worker = await read("worker.js");
-  assert.ok(worker.includes('rawQuery.replace(/[!%_]/g,ch=>"!"+ch)'));
+  assert.ok(worker.includes('toLocaleLowerCase("en-US").replace(/[!%_]/g,ch=>"!"+ch)'));
   assert.ok(worker.includes("ESCAPE '!' COLLATE NOCASE"));
-  assert.ok(worker.includes('engine:"like-fallback"'));
-  assert.ok(worker.includes('engine:"fts5"'));
+  assert.ok(worker.includes('engine:usedFts?"fts5+trigram":"like-fallback"'));
+  assert.ok(worker.includes('game_search_fts MATCH ?'));
   assert.ok(!worker.includes("player_email"));
   assert.ok(!worker.includes("password_hash"));
 });
