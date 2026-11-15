@@ -725,7 +725,7 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=level+1 WHERE level=?").bind(k.id,key,k.id,actionId,level));
     const researchMaterialKey=key==="defense"?"imperial_crest":"imperial_crest";
     statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,researchMaterialKey,k.id,actionId));
-    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,?,? WHERE "+guard).bind(k.id,"research_upgraded",JSON.stringify({research:key,level:level+1,cost}),k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"research_upgraded",JSON.stringify({research:key,level:level+1,cost}),k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const result=await env.DB.batch(statements);
     if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes ou pesquisa alterada por outra ação. Atualize e tente novamente."},409);
@@ -883,6 +883,6 @@ export default {
       await env.DB.prepare("INSERT INTO skins(name,price_brl) VALUES(?,?)").bind(name,price).run();return json({success:true,message:"Skin cadastrada no catálogo."});
     }
     return json({error:"Rota administrativa não encontrada."},404);
-  }catch(e){return json({error:"Erro interno ao processar a solicitação.",detail:String(e?.message||e)},500)}
+  }catch(e){console.error("admin_request_failed",String(e?.message||e));return json({error:"Erro interno ao processar a solicitação."},500)}
  }
 };
