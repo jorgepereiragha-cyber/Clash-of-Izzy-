@@ -90,7 +90,7 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 ## Loja oficial e aprovação Master
 - Pedidos de pacotes VIP e skins pagos usam `purchase_requests`, com chave de idempotência, produto/preço capturados do catálogo, método e referência de pagamento.
 - O jogador envia um pedido autenticado; o painel Master lista pedidos pendentes e só libera gemas/skin após aprovação manual.
-- O sistema ainda não processa PIX/cartão automaticamente nem confirma pagamento por webhook. O administrador deve conferir o recebimento fora do jogo antes de aprovar.
+- Novos pedidos usam exclusivamente o link de checkout do Mercado Pago. PIX direto, transferência e pagamento manual foram desativados para novas compras. As opções antigas permanecem apenas no schema para preservar o histórico de pedidos; o administrador deve conferir o recebimento no Mercado Pago antes de aprovar. O link compartilhado não cria cobrança dinâmica por produto e ainda não há confirmação automática por webhook.
 
 
 ## Forja, ciência e progressão de heróis
