@@ -61,6 +61,42 @@ jobs:
               env_file.write("CLOUDFLARE_API_TOKEN=" + token + "\n")
           PY
 
+      - name: Verify Cloudflare API token
+        shell: bash
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN }}
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
+          if not token:
+              raise SystemExit("Token Cloudflare ausente. Configure CLOUDFLARE_API_TOKEN nos GitHub Actions secrets.")
+
+          request = urllib.request.Request(
+              "https://api.cloudflare.com/client/v4/user/tokens/verify",
+              headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+              method="GET",
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  payload = json.loads(response.read().decode("utf-8"))
+          except urllib.error.HTTPError as error:
+              raise SystemExit(
+                  f"Cloudflare rejeitou o token (HTTP {error.code}). Gere um API Token novo e atualize CLOUDFLARE_API_TOKEN."
+              )
+          except Exception as error:
+              raise SystemExit(f"Não foi possível validar o token Cloudflare: {type(error).__name__}")
+
+          result = payload.get("result") or {}
+          if not payload.get("success") or result.get("status") != "active":
+              raise SystemExit("O token Cloudflare não está ativo. Gere um token novo e atualize CLOUDFLARE_API_TOKEN.")
+          print("Token Cloudflare válido e ativo.")
+          PY
+
       - name: Apply D1 migrations remotely
         run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --remote
         env:
