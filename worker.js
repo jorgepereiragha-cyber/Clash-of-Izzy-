@@ -401,7 +401,7 @@ async function gameState(env,playerId){
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
   await applyProduction(env,kingdom.id);
-  await processDueKingdomTasks(env,100);
+  await processDueKingdomTasks(env,10);
   await seedWorld(env);
   await processMarches(env,kingdom.id);
   const [fresh,buildings,troops,heroes,dragon,research,territories,marches,reports,heroInventory,heroHistory,inventoryItems]=await Promise.all([
@@ -443,7 +443,7 @@ async function gameAction(env,playerId,body){
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
   await applyProduction(env,k.id);
-  await processDueKingdomTasks(env,100);
+  await processDueKingdomTasks(env,10);
   const type=String(body.type||"");
   let battleOutcome=null;
 
@@ -734,6 +734,7 @@ async function gameAction(env,playerId,body){
       .bind(cost.wood,cost.stone,cost.food,cost.iron,k.id,cost.wood,cost.stone,cost.food,cost.iron,k.id,key,b.level,key,k.id,b.level,...bindings);
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
     for(const [item,qty] of Object.entries(materialNeeds))statements.push(env.DB.prepare("UPDATE inventory_items SET quantity=quantity-? WHERE kingdom_id=? AND item_key=? AND "+guard).bind(qty,k.id,item,k.id,actionId));
+    const spent=Object.entries(cost).filter(([,amount])=>amount>0);if(spent.length)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+spent.map(()=> "SELECT ?,?,?,? WHERE "+guard).join(" UNION ALL ")).bind(...spent.flatMap(([resource,amount])=>[k.id,resource,-amount,"início de construção",k.id,actionId])));
     statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'construction','main',?,?,?,? WHERE "+guard)
       .bind(k.id,JSON.stringify({building:key,fromLevel:b.level,toLevel:b.level+1,cost,materials:materialNeeds,durationSeconds:seconds}),started.toISOString(),completes.toISOString(),crypto.randomUUID(),k.id,actionId));
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"construction_started",JSON.stringify({building:key,fromLevel:b.level,toLevel:b.level+1,completesAt:completes.toISOString()}),k.id,actionId));
@@ -755,6 +756,7 @@ async function gameAction(env,playerId,body){
     const debit=env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level>=1)")
       .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron,k.id,requiredBuilding);
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
+    const spent=Object.entries(cost).filter(([,amount])=>amount>0);if(spent.length)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+spent.map(()=> "SELECT ?,?,?,? WHERE "+guard).join(" UNION ALL ")).bind(...spent.flatMap(([resource,amount])=>[k.id,resource,-amount,"início de treinamento",k.id,actionId])));
     statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'training',?,?,?,?,? WHERE "+guard)
       .bind(k.id,requiredBuilding,JSON.stringify({unit,quantity,cost,durationSeconds:seconds}),started.toISOString(),completes.toISOString(),crypto.randomUUID(),k.id,actionId));
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"training_started",JSON.stringify({unit,quantity,building:requiredBuilding,completesAt:completes.toISOString()}),k.id,actionId));
@@ -779,6 +781,7 @@ async function gameAction(env,playerId,body){
     const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)")
       .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,k.id,Math.ceil((level+1)/3));
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
+    const spent=Object.entries(cost).filter(([,amount])=>amount>0);if(spent.length)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+spent.map(()=> "SELECT ?,?,?,? WHERE "+guard).join(" UNION ALL ")).bind(...spent.flatMap(([resource,amount])=>[k.id,resource,-amount,"início de pesquisa",k.id,actionId])));
     statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'research','main',?,?,?,? WHERE "+guard)
       .bind(k.id,JSON.stringify({research:key,fromLevel:level,toLevel:level+1,cost,durationSeconds:seconds}),started.toISOString(),completes.toISOString(),crypto.randomUUID(),k.id,actionId));
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"research_started",JSON.stringify({research:key,toLevel:level+1,completesAt:completes.toISOString()}),k.id,actionId));
@@ -890,7 +893,7 @@ async function gameAction(env,playerId,body){
 }
 export default {
  async scheduled(controller,env,ctx){
-  try{await processDueKingdomTasks(env,250);await processAllDueMarches(env,250);}
+  try{await processDueKingdomTasks(env,25);await processAllDueMarches(env,20);}
   catch(error){console.error('scheduled_world_tick_failed',String(error&&error.message||error));throw error;}
  },
  async fetch(request,env){
