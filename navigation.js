@@ -32,6 +32,67 @@
     a.append(icon,document.createTextNode(" "+item.label));
     linksBox.append(a);
   }
+  const installButton = document.createElement("button");
+  installButton.type = "button";
+  installButton.className = "coi-nav-install";
+  installButton.textContent = "＋ Instalar app";
+  installButton.setAttribute("aria-label", "Instalar Clash of Izzy");
+  installButton.hidden = true;
+  root.append(installButton);
+
+  const connectionStatus = document.createElement("span");
+  connectionStatus.className = "coi-nav-connection";
+  connectionStatus.setAttribute("role", "status");
+  connectionStatus.setAttribute("aria-live", "polite");
+  connectionStatus.hidden = true;
+  root.append(connectionStatus);
+
+  let deferredInstallPrompt = null;
+  window.addEventListener("beforeinstallprompt", event => {
+    event.preventDefault();
+    deferredInstallPrompt = event;
+    installButton.hidden = false;
+  });
+  installButton.addEventListener("click", async () => {
+    if (!deferredInstallPrompt) return;
+    installButton.disabled = true;
+    try {
+      const promptEvent = deferredInstallPrompt;
+      deferredInstallPrompt = null;
+      await promptEvent.prompt();
+      await promptEvent.userChoice;
+    } catch (error) {
+      console.info("Clash of Izzy: prompt de instalação indisponível neste navegador.", error);
+    } finally {
+      installButton.disabled = false;
+      installButton.hidden = true;
+    }
+  });
+  window.addEventListener("appinstalled", () => {
+    deferredInstallPrompt = null;
+    installButton.hidden = true;
+  });
+
+  const updateConnectionStatus = () => {
+    const offline = navigator.onLine === false;
+    connectionStatus.hidden = !offline;
+    connectionStatus.textContent = offline
+      ? "Sem rede — ações do reino exigem conexão"
+      : "";
+  };
+  window.addEventListener("offline", updateConnectionStatus);
+  window.addEventListener("online", updateConnectionStatus);
+  updateConnectionStatus();
+
+  if ("serviceWorker" in navigator) {
+    const registerServiceWorker = () => {
+      navigator.serviceWorker.register("/sw.js", { scope: "/" })
+        .catch(error => console.info("Clash of Izzy: service worker indisponível.", error));
+    };
+    if (document.readyState === "complete") registerServiceWorker();
+    else window.addEventListener("load", registerServiceWorker, { once: true });
+  }
+
   document.body.prepend(root);
 
   const toggle = root.querySelector(".coi-nav-toggle");
