@@ -11,7 +11,8 @@
 ## Sistemas observados em jogos de referência
 - **Clash of Kings:** tarefas por etapas, eventos de pontuação e ranking, chefes de aliança, caça a monstros, temporadas e competições entre reinos; alterações oficiais também mostram a importância de remover ou ajustar eventos que deixam de funcionar.
 - **Rise of Kingdoms:** calendário de eventos, eventos de aniversário em série, quiz de aliança, treinamento progressivo, expedições, escolta de caravanas e competições por temporada.
-- **Whiteout Survival:** disputas entre alianças, rotas de comércio/escolta, tarefas coletivas e comunicação de aliança.
+- **Whiteout Survival:** disputas entre alianças, rotas de comércio/escolta, tarefas coletivas e comunicação de aliança. Atualizações oficiais de 2026 destacam ainda janelas de sessão, tentativas por evento, lista de participantes, canais de liderança, avisos fixados, lembretes, tutoriais de primeira participação e exibição de horários UTC/local.
+- **Rise of Kingdoms:** eventos e recompensas podem variar pela idade/temporada do reino; algumas atividades só liberam após o reino atingir uma idade mínima. A pontuação e o matchmaking devem usar regras explícitas e limites para evitar que uma conta isolada distorça a classificação.
 - **Cloudflare:** Workers para API stateless; D1 para estado persistente; Durable Objects particionados por sala/aliança para coordenação em tempo real; Cron para calendário global e alarmes para tarefas específicas. Não concentrar todo o jogo em um único Durable Object.
 
 ## Catálogo original de eventos
@@ -29,6 +30,13 @@
 | Guerra dos Reinos | Sazonal | Preparação, disputa e recuperação; matchmaking por faixa | Recompensas por participação e desempenho |
 | Festival do Reino | Sazonal | Minijogos leves, coleção e loja temporária | Skins, decoração e itens não exclusivos de poder |
 | Retorno do Comandante | Após inatividade | Trilha curta de reentrada e objetivos de recuperação | Recursos de retomada sem ultrapassar novatos ativos |
+
+## Requisitos de produto extraídos da pesquisa recente
+- Todo evento deve exibir: estado (preparação/inscrição/ativo/encerrado), horário UTC e local, duração, elegibilidade, limite de tentativas, participantes e regras de pontuação.
+- Tutoriais curtos na primeira participação e filtros de participantes ajudam jogadores a entender a atividade sem depender de guias externos.
+- Avisos fixados e canal de liderança reduzem perda de informação durante guerras e eventos cooperativos.
+- Desbloqueio por idade do reino/temporada deve ser configurável no servidor; não codificar um limite universal de 21 dias para todos os modos.
+- Pontuação diária agregada deve considerar o melhor resultado diário quando a regra do evento pedir isso, e não somar tentativas ilimitadas.
 
 ## Regras de justiça e segurança
 - Não pontuar ações compradas diretamente com dinheiro; quando houver aceleração paga, pontuar apenas resultado de jogo válido e limitar a contribuição por categoria.
@@ -48,7 +56,7 @@
 - Máximo recomendado de dois eventos de alta exigência simultâneos.
 
 ## Roadmap de implementação
-- **P0 — entregue nesta branch:** quatro missões diárias calculadas no servidor, resgate único por dia UTC e painel com progresso.
+- **P0 — entregue nesta branch:** quatro missões diárias calculadas no servidor, resgate único por dia UTC, crédito auditável em `resource_ledger`, índices compostos para consultas de progresso e painel com horário local + UTC.
 - **P1 — próxima:** calendário persistente, sequência de login, metas semanais e desafio de aliança com ranking e recompensas idempotentes.
 - **P2:** chefe ancestral com fases, expedição cooperativa e caravana PvE.
 - **P3:** torneio de alianças e guerra entre reinos com matchmaking, registro, fases e temporada.
@@ -63,11 +71,12 @@
 - Diferença de participação entre jogadores gratuitos, pagantes e retornantes.
 
 ## Estado técnico atual
-As missões diárias iniciais foram ligadas aos registros existentes de construção, treinamento, pesquisa e batalhas PvE. A migração `0008_liveops_daily_claims.sql` persiste o resgate único. Os demais modos deste catálogo são especificação de produto, não devem aparecer como eventos ativos nem conceder recompensas até terem backend, testes e interface próprios.
+As missões diárias iniciais foram ligadas aos registros existentes de construção, treinamento, pesquisa e batalhas PvE. A migração `0008_liveops_daily_claims.sql` persiste o resgate único, registra o crédito confirmado e cria índices para consultas por reino/tipo/data. Os créditos também são lançados em `resource_ledger` na mesma operação D1. Os demais modos deste catálogo são especificação de produto, não devem aparecer como eventos ativos nem conceder recompensas até terem backend, testes e interface próprios.
 
 ## Referências
 - Clash of Kings — histórico oficial de atualizações e eventos: https://apps.apple.com/us/app/clash-of-kings-cok/id945274928
 - Rise of Kingdoms — eventos de aniversário, quiz, treinamento e expedições: https://apps.apple.com/ca/app/rise-of-kingdoms/id1354260888
 - Whiteout Survival — Alliance Showdown e Tundra Trade Route: https://apps.apple.com/gb/app/whiteout-survival/id6443575749
+- Whiteout Survival — atualizações oficiais de 2026, Winter Siege, participantes, canais de liderança, lembretes e horários: https://www.centurygames.com/whiteout-survival-wos-update/ e https://www.centurygames.com/whiteout-survival-new-content-update/
 - Cloudflare Durable Objects — coordenação persistente: https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/
 - Cloudflare Workers — filas, tarefas em segundo plano e WebSockets: https://developers.cloudflare.com/workers/best-practices/workers-best-practices/
