@@ -163,7 +163,7 @@ chatLanguage.addEventListener('change',()=>{translatedCache.clear();chatLastId=0
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x92a8b4);scene.fog=new THREE.Fog(0x92a8b4,65,125);
 const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,220);
 const mobileProfile=matchMedia('(max-width: 800px)').matches||/Android|iPhone|iPad/i.test(navigator.userAgent);
-const lowPowerProfile=mobileProfile&&((navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||4)<=4);
+const lowPowerProfile=mobileProfile&&((navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||8)<=4);
 const maxPixelRatio=mobileProfile?(lowPowerProfile?1:1.2):1.5;
 let adaptivePixelRatio=Math.min(window.devicePixelRatio||1,maxPixelRatio);const minPixelRatio=lowPowerProfile?.65:mobileProfile?.78:.9;let perfElapsed=0,perfFrames=0;
 const renderer=new THREE.WebGLRenderer({antialias:!mobileProfile,powerPreference:mobileProfile?'low-power':'high-performance',stencil:false,preserveDrawingBuffer:false});renderer.setPixelRatio(adaptivePixelRatio);renderer.setSize(innerWidth,innerHeight,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=!lowPowerProfile;renderer.shadowMap.type=THREE.PCFShadowMap;document.body.appendChild(renderer.domElement);
