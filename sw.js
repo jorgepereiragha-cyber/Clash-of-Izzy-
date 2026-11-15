@@ -1,5 +1,5 @@
-const CACHE_NAME="clash-of-izzy-shell-v1";
-const CORE_ASSETS=["/","/index.html","/arena.html","/manifest.json","/icon-192.svg","/icon-512.svg","/offline.html"];
+const CACHE_NAME="clash-of-izzy-shell-v2";
+const CORE_ASSETS=["/","/index.html","/arena.html","/kingdom.html","/world.html","/world-map.js","/styles/coi-theme.css","/manifest.json","/icon-192.svg","/icon-512.svg","/offline.html"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(CORE_ASSETS)).then(()=>self.skipWaiting()));
 });
@@ -15,7 +15,7 @@ self.addEventListener("fetch",event=>{
   event.respondWith(fetch(request).then(async response=>{
    if(response.ok){const cache=await caches.open(CACHE_NAME);await cache.put(request,response.clone());}
    return response;
-  }).catch(async()=>await caches.match("/offline.html")));
+  }).catch(async()=>await caches.match(request)||await caches.match("/offline.html")));
   return;
  }
  event.respondWith(caches.match(request).then(cached=>{
