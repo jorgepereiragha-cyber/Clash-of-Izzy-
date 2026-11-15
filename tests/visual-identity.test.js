@@ -18,7 +18,30 @@ test("cidade 3D segue a bíblia visual com telhados azul-real e detalhes dourado
   assert.match(renderer, /roof: material\("#24476B"\)/);
   assert.match(renderer, /\[mats\.roof, "#24476B", "roof"/);
   assert.match(renderer, /color: "#E7BD68"/);
-  assert.match(renderer, /Royal blue roofs and restrained gold standards/);
+  assert.match(renderer, /heraldic seal/);
+});
+
+test("edifícios 3D possuem silhuetas e marcos próprios por função", async () => {
+  const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
+  for (const feature of [
+    'type === "market"', 'type === "barracks"', 'type === "quarry"',
+    'type === "lumber_mill"', 'type === "academy"', 'type === "hospital"',
+    'type === "archery_range"', 'type === "siege_workshop"',
+    'type === "embassy"', 'type === "warehouse"', 'type === "stable"'
+  ]) assert.ok(renderer.includes(feature), "marco arquitetônico ausente: " + feature);
+  assert.match(renderer, /emissiveIntensity: 0\.28/);
+  assert.match(renderer, /new THREE\.DodecahedronGeometry/);
+  assert.match(renderer, /new THREE\.TorusGeometry/);
+});
+
+test("grade interativa não encobre os edifícios 3D e mantém âncoras alinhadas", async () => {
+  const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
+  const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.match(renderer, /const col = i % 3, row = Math\.floor\(i \/ 3\)/);
+  assert.match(renderer, /Math\.min\(9, qualityProfile\?\.maxBuildings \|\| 9\)/);
+  assert.match(kingdom, /\.city\.has-3d \.building\{background:linear-gradient/);
+  assert.match(kingdom, /\.city\.has-3d \.building \.emoji\{display:none\}/);
+  assert.match(kingdom, /transparent hit targets/);
 });
 
 test("tema compartilhado define tokens da marca e acessibilidade básica", async () => {
