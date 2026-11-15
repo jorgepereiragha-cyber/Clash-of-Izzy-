@@ -39,7 +39,7 @@ test("world map renders untrusted territory labels with DOM text, not HTML injec
 });
 
 test("PWA shell includes the world map and increments its cache version", () => {
-  assert.match(serviceWorker, /clash-of-izzy-shell-v3/);
+  assert.match(serviceWorker, /clash-of-izzy-shell-v2/);
   assert.match(serviceWorker, /"\/world\.html"/);
   assert.match(serviceWorker, /"\/world-map\.js"/);
   assert.match(serviceWorker, /url\.pathname\.startsWith\("\/api\/"\)/);
