@@ -89,3 +89,45 @@ Fase posterior: notificações push para construção concluída, treino, pesqui
 ## Infraestrutura e publicação
 
 Antes de ativar Cron Trigger, confirmar a configuração Cloudflare e o comportamento de deploy. O workflow de produção atual pode aplicar migrações remotas; portanto, nenhuma migração deve ser executada no banco de produção sem revisão, testes locais/D1 de desenvolvimento e confirmação explícita do plano de deploy. O shell PWA offline não substitui a execução autoritativa no servidor.
+
+
+## Pesquisa externa e decisões de arquitetura (14/11/2026)
+
+Fontes consultadas:
+- Rise of Kingdoms: filas de treinamento independentes por edifício militar e gestão de construção/pesquisa: https://rokhub.app/vi/faq/troops e https://paamu.com/en/games/rise-of-kingdoms/guides/gathering-research/
+- Arquitetura de jogos idle cooperativos: calcular ganhos por tempo decorrido, com relógio do servidor, em vez de simular cada segundo: https://teemo.dev/game-design/coop-idle/systems/systems-and-architecture-how-to-actually/
+- Cloudflare Durable Objects: coordenação stateful, consistência forte, multiplayer, conexões persistentes e trabalho agendado por entidade: https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/
+- Cloudflare Alarms: execução pelo menos uma vez e possibilidade de retries; os efeitos precisam ser idempotentes: https://developers.cloudflare.com/durable-objects/api/alarms/
+- Ciclo de vida e escolha entre alarms por entidade e Cron Triggers globais: https://architectingoncloudflare.com/chapter-07/
+
+### Decisão para a infraestrutura atual
+
+1. Manter D1 como persistência canônica inicial; não adicionar banco ou serviço pago sem necessidade comprovada.
+2. Usar timestamps UTC absolutos (started_at, completes_at, completed_at) e incluir server_time na API. O cliente só desenha a contagem regressiva.
+3. Reconciliar tarefas vencidas antes de qualquer leitura/ação que dependa de saldo, nível, tropas ou território.
+4. Usar Cron Trigger global para marchas, batalhas, expiração de escudos e eventos que precisam produzir efeitos sem login.
+5. Reservar Durable Objects para coordenação por reino/sessão, WebSockets, chat ou combate multiplayer em tempo real. Não criar um objeto por jogador apenas para contar cronômetros.
+6. Tratar Cron/Alarm como entrega pelo menos uma vez: claim condicional, lease recuperável, chave idempotente única e efeito/recompensa no mesmo lote transacional D1.
+7. Processar lotes limitados com índices por status/prazo, cursor e métricas. Atraso do scheduler não pode alterar duração nem duplicar recompensas.
+8. A consulta de estado também reconcilia vencimentos, para recuperar o estado correto mesmo após atraso/falha do agendamento.
+
+### Regras de implementação adicionais
+
+- Antes de criar a próxima migração, enumerar e auditar todos os arquivos de migrations existentes e confirmar o último número realmente usado.
+- A tabela de tarefas deve ter slots ativos únicos por reino/tipo/slot, prazo indexado, estado explícito, payload validado no servidor, chave idempotente única, tentativas e lease de processamento.
+- Débito inicial, inserção da tarefa e registro no ledger devem ser atômicos.
+- Conclusão deve mudar o estado condicionalmente e creditar o efeito no mesmo lote transacional; uma segunda execução deve ser inofensiva.
+- Cron é para varredura global; não usar setTimeout dentro do Worker como mecanismo de persistência.
+- Não tratar o instante de execução do scheduler como deadline exato. O prazo oficial é completes_at e tarefas atrasadas são reconciliadas pela mesma lógica.
+- A produção offline atual e o limite de sete dias devem ser preservados até simulação econômica; qualquer mudança deve ser configurável e visível ao jogador.
+
+### Sequência e limite desta etapa
+
+1. Revalidar migrações, tabelas e modelos de edifícios/tropas/pesquisas.
+2. Criar migração aditiva e testes de invariantes do motor de tarefas.
+3. Integrar construção, treinamento e pesquisa com filas reais e contagens regressivas.
+4. Integrar scheduler global e resolução atômica de marchas.
+5. Implementar cura, aceleradores, capacidade de armazém e notificações.
+6. Executar testes de concorrência, repetição, relógio manipulado, app fechado, telefone desligado e offline prolongado.
+
+Esta atualização é pesquisa e especificação. Não declara filas, scheduler, push ou multiplayer como implementados; nenhuma migração ou publicação de produção foi executada.
