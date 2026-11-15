@@ -1,4 +1,5 @@
 import { simulateBattle } from "./game-adapter.js";
+import { EQUIPMENT_CATALOG, EQUIPMENT_RESEARCH, NORSE_SKINS, equipmentBonuses } from "./equipment-engine.js";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -358,6 +359,23 @@ function eventMaterialStatement(env,kingdomId,eventKey){
  const key=rewards[eventKey];if(!key)return null;
  return env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) VALUES(?,?,1) ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,key);
 }
+
+async function ensureEquipmentState(env,kingdomId){
+  await env.DB.batch([
+    env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level) VALUES(?,? ,1)").bind(kingdomId,"iron_sword"),
+    ...EQUIPMENT_RESEARCH.map(x=>env.DB.prepare("INSERT OR IGNORE INTO research(kingdom_id,research_key,level) VALUES(?,?,0)").bind(kingdomId,x.id))
+  ]);
+}
+async function getEquipmentState(env,kingdomId){
+  await ensureEquipmentState(env,kingdomId);
+  const [owned,equipped,research]=await Promise.all([
+    env.DB.prepare("SELECT item_key,level,acquired_at FROM kingdom_equipment WHERE kingdom_id=? ORDER BY acquired_at,item_key").bind(kingdomId).all(),
+    env.DB.prepare("SELECT slot,item_key,equipped_at FROM equipped_kingdom_equipment WHERE kingdom_id=? ORDER BY slot").bind(kingdomId).all(),
+    env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key LIKE 'gear_%' ORDER BY research_key").bind(kingdomId).all()
+  ]);
+  const ownedRows=owned.results||[],equippedRows=equipped.results||[],researchRows=research.results||[];
+  return {owned:ownedRows,equipped:equippedRows,research:researchRows,bonuses:equipmentBonuses(ownedRows,equippedRows,researchRows),catalog:EQUIPMENT_CATALOG,researchCatalog:EQUIPMENT_RESEARCH};
+}
 async function gameState(env,playerId){
   await ensureHeroTables(env);
   await ensureShopTables(env);
@@ -366,6 +384,7 @@ async function gameState(env,playerId){
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
   await applyProduction(env,kingdom.id);
+  const equipment=await getEquipmentState(env,kingdom.id);
   await seedWorld(env);
   await processMarches(env,kingdom.id);
   const [fresh,buildings,troops,heroes,dragon,research,territories,marches,reports,heroInventory,heroHistory,inventoryItems,recentEvents]=await Promise.all([
@@ -398,7 +417,7 @@ async function gameState(env,playerId){
   const totalTroops=(troops.results||[]).reduce((n,u)=>n+u.quantity,0);
   const shop=await getShopState(env,kingdom.id);
   const cosmetics=await getCosmeticState(env,kingdom.id);
-  return {cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  return {cosmetics,norseSkins:NORSE_SKINS,equipment,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -406,9 +425,69 @@ async function gameAction(env,playerId,body){
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
   await applyProduction(env,k.id);
+  const equipmentState=await getEquipmentState(env,k.id);
   const type=String(body.type||"");
   let battleOutcome=null;
 
+
+  if(type==="equipment_craft"){
+    const itemKey=String(body.item||""),item=EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
+    if(!item)return json({error:"Equipamento não encontrado."},404);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,iron=iron-? WHERE id=? AND gold>=? AND iron>=? AND NOT EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?)")
+        .bind(item.craft.gold,item.craft.iron,k.id,item.craft.gold,item.craft.iron,k.id,itemKey),
+      env.DB.prepare("INSERT INTO kingdom_equipment(kingdom_id,item_key,level) SELECT ?,?,1 WHERE changes()>0")
+        .bind(k.id,itemKey),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"equipment_forged",JSON.stringify({item:itemKey,gold:item.craft.gold,iron:item.craft.iron}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Ouro ou ferro insuficiente, ou equipamento já adquirido."},409);
+  }else if(type==="equipment_upgrade"){
+    const itemKey=String(body.item||""),expected=Number(body.level),item=EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
+    if(!item||!Number.isInteger(expected)||expected<1||expected>=20)return json({error:"Equipamento ou nível inválido."},400);
+    const costGold=Math.floor(350*Math.pow(1.42,expected-1)),costIron=20+8*expected;
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdom_equipment SET level=level+1 WHERE kingdom_id=? AND item_key=? AND level=? AND level<20 AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND gold>=? AND iron>=?)")
+        .bind(k.id,itemKey,expected,k.id,costGold,costIron),
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,iron=iron-? WHERE id=? AND changes()>0")
+        .bind(costGold,costIron,k.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"equipment_upgraded",JSON.stringify({item:itemKey,from:expected,to:expected+1,gold:costGold,iron:costIron}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Evolução indisponível: confira o nível, ouro e ferro."},409);
+  }else if(type==="equipment_equip"){
+    const itemKey=String(body.item||""),item=EQUIPMENT_CATALOG.find(x=>x.id===itemKey);
+    if(!item)return json({error:"Equipamento inválido."},400);
+    const result=await env.DB.prepare("INSERT INTO equipped_kingdom_equipment(kingdom_id,slot,item_key) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?) ON CONFLICT(kingdom_id,slot) DO UPDATE SET item_key=excluded.item_key,equipped_at=CURRENT_TIMESTAMP")
+      .bind(k.id,item.slot,itemKey,k.id,itemKey).run();
+    if(!result.meta.changes)return json({error:"Forje o equipamento antes de equipá-lo."},409);
+    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"equipment_equipped",JSON.stringify({item:itemKey,slot:item.slot})).run();
+  }else if(type==="equipment_research"){
+    const researchKey=String(body.research||""),tech=EQUIPMENT_RESEARCH.find(x=>x.id===researchKey),expected=Number(body.level);
+    if(!tech||!Number.isInteger(expected)||expected<0||expected>=tech.max)return json({error:"Pesquisa ou nível inválido."},400);
+    const costGold=Math.floor(tech.base.gold*Math.pow(1.48,expected)),costStone=Math.floor(tech.base.stone*Math.pow(1.4,expected)),academyRequired=1+Math.floor(expected/3);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE research SET level=level+1,completed_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND research_key=? AND level=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND gold>=? AND stone>=?) AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)")
+        .bind(k.id,researchKey,expected,k.id,costGold,costStone,k.id,academyRequired),
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,stone=stone-? WHERE id=? AND changes()>0")
+        .bind(costGold,costStone,k.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"equipment_research_completed",JSON.stringify({research:researchKey,level:expected+1,gold:costGold,stone:costStone}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Pesquisa indisponível: confira nível atual, Academia, ouro e pedra."},409);
+  }else if(type==="cosmetic_buy"){
+    await ensureCosmeticTables(env,k.id);
+    const skinId=String(body.skin||""),skin=NORSE_SKINS.find(x=>x.id===skinId);
+    if(!skin)return json({error:"Skin divina não encontrada."},404);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=? AND NOT EXISTS(SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?)")
+        .bind(skin.price,p.id,skin.price,k.id,skinId),
+      env.DB.prepare("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) SELECT ?,?,'norse' WHERE changes()>0")
+        .bind(k.id,skinId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0")
+        .bind(k.id,"norse_skin_unlocked",JSON.stringify({skin:skinId,price:skin.price}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Gemas insuficientes ou skin já adquirida."},409);
   if(type==="cosmetic_claim"){
     await ensureCosmeticTables(env,k.id);
     const collectionId=String(body.collection||""),col=COSMETIC_COLLECTIONS.find(x=>x.id===collectionId);
@@ -797,6 +876,7 @@ async function gameAction(env,playerId,body){
       army:armyRows,castleLevel:Number(k.castle_level||1),
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
+      equipmentAttackPercent:equipmentState.bonuses.attackPercent,equipmentDefensePercent:equipmentState.bonuses.defensePercent,
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
     });
     const won=simulation.won,attackerPower=simulation.attackerPower,defenderPower=simulation.defenderPower;
