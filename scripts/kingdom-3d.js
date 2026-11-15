@@ -763,6 +763,7 @@ if (host && "WebGLRenderingContext" in window) {
       disposed = true;
       stopArmyAnimationLoop();
       host.classList.remove("has-3d");
+      window.dispatchEvent(new CustomEvent("coi:kingdom-2d-fallback"));
       delete host.dataset.qualityTier;
       if (window.__coiKingdomDiagnostics === diagnostics) delete window.__coiKingdomDiagnostics;
       resizeObserver?.disconnect();
@@ -829,6 +830,7 @@ if (host && "WebGLRenderingContext" in window) {
     scene = null;
     camera = null;
     host.classList.remove("has-3d");
+      window.dispatchEvent(new CustomEvent("coi:kingdom-2d-fallback"));
     delete host.dataset.qualityTier;
     delete window.__coiKingdomDiagnostics;
     console.warn("Clash of Izzy: WebGL indisponível; mantendo arte procedural 2D.", error);
