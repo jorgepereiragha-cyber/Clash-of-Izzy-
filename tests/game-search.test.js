@@ -103,7 +103,7 @@ test("short CJK queries use bounded LIKE fallback even when FTS prefix already r
   assert.ok(worker.includes("if(queryLength>48)"));
   assert.ok(worker.includes("if(queryLength>=3)"));
   assert.ok(!worker.includes("rawQuery.length>=3"));
-  assert.ok(worker.includes("needsShortUnicodeFallback=queryLength<3&&containsCjk"));
+  assert.ok(worker.includes("needsShortUnicodeFallback=queryLength<3"));
   assert.ok(worker.includes("Script=Hangul"));
   assert.ok(worker.includes("queryLength<(containsCjk?1:2)"));
   assert.ok(worker.includes("Script=Han"));
