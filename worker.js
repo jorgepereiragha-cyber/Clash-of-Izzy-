@@ -1390,6 +1390,7 @@ export default {
         if(networkLimit)return networkLimit;
         const rawQuery=String(url.searchParams.get("q")||"").normalize("NFKC").trim();
         const queryLength=Array.from(rawQuery).length;
+        const needsShortUnicodeFallback=queryLength<3&&/[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}]/u.test(rawQuery);
         if(queryLength<2)return json({error:"Digite pelo menos 2 caracteres.",results:[]},400);
         if(queryLength>48)return json({error:"A busca aceita até 48 caracteres.",results:[]},400);
         const kind=String(url.searchParams.get("type")||"all").toLowerCase();
@@ -1446,7 +1447,7 @@ export default {
             }catch(error){console.warn("game_search_substring_unavailable",String(error?.message||error));}
           }
           const hasEntity=[...resultMap.values()].some(item=>item.type!=="player");
-          if(!hasEntity||queryLength<3){
+          if(!hasEntity||needsShortUnicodeFallback){
             const categoryLimit=kind==="all"?Math.max(1,Math.ceil(limit/4)):limit;
             if(kind==="all"||kind==="kingdoms"){
               const current=await env.DB.prepare("SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
@@ -1485,7 +1486,7 @@ export default {
             }catch(error){console.warn("game_player_substring_unavailable",String(error?.message||error));}
           }
           const hasPlayers=[...resultMap.values()].some(item=>item.type==="player");
-          if(!hasPlayers||queryLength<3){
+          if(!hasPlayers||needsShortUnicodeFallback){
             const players=await env.DB.prepare("SELECT n.nickname,k.kingdom_name,k.castle_level,k.power FROM player_nicknames n JOIN kingdoms k ON k.player_id=n.player_id WHERE n.player_id<>(SELECT id FROM players WHERE player_id=?) AND n.nickname_key LIKE ? ESCAPE '!' ORDER BY CASE WHEN n.nickname_key=? THEN 0 WHEN n.nickname_key LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,n.nickname_key LIMIT ?").bind(playerId,pattern,queryKey,prefixPattern,limit).all();
             for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0)});
           }
