@@ -66,7 +66,7 @@ async function refreshSelected(){if(selectedPlayerId)await openPlayer(selectedPl
 async function mutate(path,payload,message){
  await api(path,payload);notice(message,"ok");await refreshSelected();
 }
-$("loginForm").addEventListener("submit",async e=>{e.preventDefault();try{await login($("email").value.trim(),$("password").value);$("password").value="";}catch(error){notice(error.message,"error");}});
+$("loginForm").addEventListener("submit",async e=>{e.preventDefault();try{await login($("email").value.trim(),$("password").value);$("password").value="";}catch(error){adminToken="";sessionStorage.removeItem("coi_admin_token");showLogin();notice(error.message,"error");}});
 $("logout").addEventListener("click",()=>{adminToken="";selectedPlayerId=null;sessionStorage.removeItem("coi_admin_token");$("playerPanel").classList.add("hidden");showLogin();notice("Sessão administrativa encerrada.");});
 $("refresh").addEventListener("click",async()=>{try{await loadDashboard();if(selectedPlayerId)await openPlayer(selectedPlayerId);}catch(error){notice(error.message,"error");}});
 $("searchForm").addEventListener("submit",async e=>{e.preventDefault();try{await searchPlayers($("searchQuery").value.trim());}catch(error){notice(error.message,"error");}});
