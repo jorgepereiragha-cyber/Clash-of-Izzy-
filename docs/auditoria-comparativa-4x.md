@@ -72,3 +72,23 @@ A comparação recebida é útil como roteiro, mas algumas afirmações não cor
 6. Integrar pagamento real somente com provedor, webhook assinado e entrega idempotente.
 
 - Reforçada a entrada por sigla: `alliance_join` agora verifica a capacidade máxima antes de inserir o membro; foi adicionado teste de regressão para esse limite.
+
+
+## Evolução técnica — equipamentos (15 nov 2026)
+- A evolução anterior em `equipment-system.js` alterava ouro e nível somente em objetos JavaScript do navegador. Esse fluxo foi substituído por ações autenticadas `equipment_upgrade` e `equipment_lock` no Worker.
+- Criada a tabela `kingdom_equipment` na migração `0008_kingdom_equipment.sql`, com chave única por reino/equipamento, nível limitado e estado de bloqueio.
+- O estado do reino agora inclui equipamentos persistentes. O servidor calcula custos e atributos; o navegador não pode definir preço, ouro, nível ou atributos.
+- A evolução debita ouro e altera o nível em um único lote D1, com guarda de concorrência e evento de auditoria.
+- A tela ganhou seleção dos quatro equipamentos iniciais e foi ligada à central do reino.
+- Criado `tests/equipment-authority.test.js` para impedir regressão ao modelo puramente local.
+
+## Próximos passos técnicos prioritários
+1. Executar a suíte `npm test`, validar o bundle Wrangler e confirmar a aplicação remota da migração 0008 pelo GitHub Actions.
+2. Criar testes de integração D1 para upgrade concorrente, ouro insuficiente, item bloqueado, nível máximo e repetição de requisições.
+3. Migrar atributos de equipamentos para o cálculo efetivo de combate e produção; hoje os níveis e os atributos exibidos já persistem, mas a aplicação dos bônus no simulador ainda precisa ser conectada e balanceada.
+4. Evoluir `kingdom.html` para mapa isométrico/3D com posicionamento híbrido: edifícios principais em áreas definidas e decorações com posicionamento livre.
+5. Criar atlas de texturas PBR/estilizadas, materiais por bioma, iluminação e animações com fallback gráfico para celulares modestos.
+6. Substituir itens temporários da loja por catálogo de temporadas com regras de raridade, coleção, prévia visual e confirmação de compra segura.
+
+## Estado de validação
+As alterações foram gravadas na branch principal. O workflow configurado executa testes, valida o bundle, aplica migrações locais e remotas e publica Worker/assets. A execução e o resultado do pipeline precisam ser confirmados antes de declarar a versão publicada e pronta.
