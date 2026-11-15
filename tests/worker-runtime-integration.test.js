@@ -115,34 +115,59 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       "--local", "--persist-to", persistDir,
     ]);
 
-    const port = await freePort();
-    const baseUrl = "http://127.0.0.1:" + port;
-    workerProcess = spawn(process.execPath, [
-      wrangler,
-      "--config", "wrangler.jsonc",
-      "dev",
-      "--local",
-      "--persist-to", persistDir,
-      "--ip", "127.0.0.1",
-      "--port", String(port),
-      "--var",
-      "SESSION_SECRET:" + SESSION_SECRET,
-      "ADMIN_EMAIL:" + ADMIN_EMAIL,
-      "ADMIN_PASSWORD:" + ADMIN_PASSWORD,
-      "--log-level", "error",
-    ], {
-      cwd: root,
-      env: { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false", NO_COLOR: "1" },
-      stdio: ["ignore", "pipe", "pipe"],
-    });
+    let baseUrl = "";
+    let api = null;
     const append = chunk => {
       workerOutput = (workerOutput + chunk.toString()).slice(-30_000);
     };
-    workerProcess.stdout.on("data", append);
-    workerProcess.stderr.on("data", append);
-
-    await waitForWorker(baseUrl, workerProcess, () => workerOutput);
-    const api = makeApi(baseUrl);
+    const startWorker = async () => {
+      const port = await freePort();
+      baseUrl = "http://127.0.0.1:" + port;
+      workerProcess = spawn(process.execPath, [
+        wrangler,
+        "--config", "wrangler.jsonc",
+        "dev",
+        "--local",
+        "--persist-to", persistDir,
+        "--ip", "127.0.0.1",
+        "--port", String(port),
+        "--var",
+        "SESSION_SECRET:" + SESSION_SECRET,
+        "ADMIN_EMAIL:" + ADMIN_EMAIL,
+        "ADMIN_PASSWORD:" + ADMIN_PASSWORD,
+        "--log-level", "error",
+      ], {
+        cwd: root,
+        env: { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false", NO_COLOR: "1" },
+        stdio: ["ignore", "pipe", "pipe"],
+      });
+      workerProcess.stdout.on("data", append);
+      workerProcess.stderr.on("data", append);
+      await waitForWorker(baseUrl, workerProcess, () => workerOutput);
+      api = makeApi(baseUrl);
+    };
+    const stopWorker = async () => {
+      if (workerProcess && workerProcess.exitCode === null) {
+        workerProcess.kill("SIGTERM");
+        await Promise.race([
+          new Promise(resolve => workerProcess.once("close", resolve)),
+          delay(5000),
+        ]);
+        if (workerProcess.exitCode === null) workerProcess.kill("SIGKILL");
+      }
+      workerProcess = null;
+    };
+    const executeLocalD1 = async command => {
+      await stopWorker();
+      await runCli([
+        "--config", "wrangler.jsonc",
+        "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", command,
+      ]);
+      await startWorker();
+    };
+    await startWorker();
 
     const health = await api("/api/health");
     const healthData = expectStatus(health, 200, "health da API");
@@ -403,39 +428,17 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
             "(" + kingdomA + ",'archer',1,80,0)," +
             "(" + kingdomB + ",'knight',1,500,0)"
         ];
-        for (const sql of fixtureStatements) {
-          await runCli([
-            "--config", "wrangler.jsonc",
-            "d1", "execute", "clash-of-izzy-db",
-            "--local", "--persist-to", persistDir,
-            "--command", sql
-          ]);
-        }
+        await executeLocalD1(fixtureStatements.join(";\n"));
 
         await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "ataque contra reino protegido");
-        await runCli([
-          "--config", "wrangler.jsonc",
-          "d1", "execute", "clash-of-izzy-db",
-          "--local", "--persist-to", persistDir,
-          "--command", "UPDATE kingdoms SET protection_until=NULL WHERE id=" + kingdomA
-        ]);
+        await executeLocalD1("UPDATE kingdoms SET protection_until=NULL WHERE id=" + kingdomA);
         await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "território reivindicado por aliança não aceita PvP individual");
         await action(tokenC, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "ataque contra aliado");
-        await runCli([
-          "--config", "wrangler.jsonc",
-          "d1", "execute", "clash-of-izzy-db",
-          "--local", "--persist-to", persistDir,
-          "--command", "UPDATE world_territories SET alliance_id=NULL WHERE id=" + Number(pvpTarget.id)
-        ]);
+        await executeLocalD1("UPDATE world_territories SET alliance_id=NULL WHERE id=" + Number(pvpTarget.id));
         await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 500 } }, 200, "marcha PvP contra reino inimigo sem reivindicação de aliança");
 
-        await runCli([
-          "--config", "wrangler.jsonc",
-          "d1", "execute", "clash-of-izzy-db",
-          "--local", "--persist-to", persistDir,
-          "--command", "UPDATE marches SET arrives_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id=" + kingdomB +
-            " AND target_territory_id=" + Number(pvpTarget.id) + " AND march_type='attack' AND status='marching'"
-        ]);
+        await executeLocalD1("UPDATE marches SET arrives_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id=" + kingdomB +
+          " AND target_territory_id=" + Number(pvpTarget.id) + " AND march_type='attack' AND status='marching'");
         const afterAttackB = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "resolver marcha PvP");
         const resolvedTerritory = afterAttackB.state.territories.find(item => Number(item.id) === Number(pvpTarget.id));
         assert.equal(Number(resolvedTerritory.owner_kingdom_id), kingdomB, "vencedor captura o território inimigo");
@@ -479,14 +482,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         "cada um dos 34 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
   } finally {
-    if (workerProcess && workerProcess.exitCode === null) {
-      workerProcess.kill("SIGTERM");
-      await Promise.race([
-        new Promise(resolve => workerProcess.once("close", resolve)),
-        delay(5000),
-      ]);
-      if (workerProcess.exitCode === null) workerProcess.kill("SIGKILL");
-    }
+    await stopWorker();
     await rm(persistDir, { recursive: true, force: true });
   }
 });
