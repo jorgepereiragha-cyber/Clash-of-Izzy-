@@ -4,6 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="/styles/coi-theme.css">
 <meta name="theme-color" content="#142b44"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icon-192.svg" type="image/svg+xml"><title>Clash of Izzy: Arena</title>
+<script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js","three/addons/":"https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/"}}</script>
 <style>
 *{box-sizing:border-box}body{margin:0;background:#101a2b;color:#f5edda;font:14px Arial,sans-serif;overflow:hidden}canvas{display:block}
 #hud{position:fixed;inset:calc(10px + env(safe-area-inset-top)) 10px auto;display:flex;justify-content:space-between;gap:8px;pointer-events:none;z-index:2}.card{background:#101a2be8;border:1px solid #b88b45;border-radius:9px;padding:9px 12px;box-shadow:0 4px 16px #0008}.brand{font-weight:900;color:#f1c46a;letter-spacing:1px}.stats{display:flex;gap:12px;flex-wrap:wrap}.bar{height:8px;background:#3a3030;border-radius:8px;overflow:hidden;margin-top:4px;min-width:120px}.fill{height:100%;width:100%;background:#39bd69;transition:width .12s linear}.mana{background:#4b9ce5}.bar-caption{display:flex;justify-content:space-between;gap:8px;margin-top:3px;font-size:9px;color:#cbd5e1}.bar.critical{outline:1px solid #ff5252;box-shadow:0 0 9px #ff3030;animation:hp-warning .8s ease-in-out infinite alternate}.bar.critical .fill{background:#ed4545}@keyframes hp-warning{from{opacity:.72}to{opacity:1}}
@@ -66,7 +67,9 @@
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
 <div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Selecione um item para consultar e comprar pelo WhatsApp. Skins de R$ 50 a R$ 1.000.</p><div id="catalog">Carregando catálogo oficial…</div><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
-import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
+import * as THREE from 'three';
+import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } from './engine/asset-loader.js';
+import { initTextureManager, loadTexture, preloadTextures, getTexture, disposeTextures } from './engine/texture-manager.js';
 const API_BASE='/api';
 let kingdomSession=null;
 async function connectKingdom(){
@@ -205,10 +208,23 @@ const lowPowerProfile=mobileProfile&&((navigator.hardwareConcurrency||8)<=4||(na
 const maxPixelRatio=mobileProfile?(lowPowerProfile?1:1.2):1.5;
 let adaptivePixelRatio=Math.min(window.devicePixelRatio||1,maxPixelRatio);const minPixelRatio=lowPowerProfile?.65:mobileProfile?.78:.9;let perfElapsed=0,perfFrames=0;
 const renderer=new THREE.WebGLRenderer({antialias:!mobileProfile,powerPreference:mobileProfile?'low-power':'high-performance',stencil:false,preserveDrawingBuffer:false});renderer.setPixelRatio(adaptivePixelRatio);renderer.setSize(innerWidth,innerHeight,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=!lowPowerProfile;renderer.shadowMap.type=THREE.PCFShadowMap;document.body.appendChild(renderer.domElement);
+
+// Pipeline de assets acoplado ao renderer existente: nenhum canvas/cena paralelos.
+initAssetLoader(renderer);
+initTextureManager(renderer);
+window.COI_ASSETS={
+ addModel:(name,url,options={})=>addModel(scene,name,url,options),
+ loadTexture,preloadTextures,getTexture,
+ update:updateAssetAnimations,
+ dispose(){disposeAssetLoader();disposeTextures()}
+};
+window.addEventListener('pagehide',event=>{if(!event.persisted)window.COI_ASSETS.dispose()},{once:true});
 scene.add(new THREE.HemisphereLight(0xdcecff,0x33452e,1.8));const sun=new THREE.DirectionalLight(0xffe4b2,2.6);sun.position.set(-25,45,25);sun.castShadow=!lowPowerProfile;sun.shadow.mapSize.set(mobileProfile?512:1024,mobileProfile?512:1024);sun.shadow.camera.left=-60;sun.shadow.camera.right=60;sun.shadow.camera.top=50;sun.shadow.camera.bottom=-50;sun.shadow.bias=-0.00025;scene.add(sun);
 const contextNotice=document.createElement('div');contextNotice.textContent='Reconectando os gráficos…';contextNotice.style.cssText='display:none;position:fixed;inset:0;z-index:30;align-items:center;justify-content:center;background:#101a2b;color:#f5edda;font: bold 16px Arial';renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();contextNotice.style.display='flex'});renderer.domElement.addEventListener('webglcontextrestored',()=>{contextNotice.style.display='none';renderer.setPixelRatio(adaptivePixelRatio);renderer.setSize(innerWidth,innerHeight,false)});document.body.appendChild(contextNotice);
 const mat=(c)=>new THREE.MeshStandardMaterial({color:c,roughness:.86});
+const generatedTextureCache=new Map();
 function makeTexture(kind){
+ if(generatedTextureCache.has(kind))return generatedTextureCache.get(kind);
  const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');
  const palettes={grass:['#405d35','#557743','#68884a','#344d2e'],dirt:['#796b51','#998466','#62553f','#b09a73'],stone:['#686d70','#85898a','#555b5e','#a0a09a'],wood:['#493322','#68482d','#7c5938','#39271d']};
  const colors=palettes[kind];ctx.fillStyle=colors[0];ctx.fillRect(0,0,256,256);
@@ -220,7 +236,7 @@ function makeTexture(kind){
  }else if(kind==='wood'){
   ctx.globalAlpha=.3;ctx.strokeStyle='#24180f';ctx.lineWidth=3;for(let y=12;y<256;y+=28){ctx.beginPath();ctx.moveTo(0,y);ctx.bezierCurveTo(70,y-5,160,y+6,256,y-2);ctx.stroke()}
  }
- ctx.globalAlpha=1;const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.anisotropy=Math.min(mobileProfile?2:4,renderer.capabilities.getMaxAnisotropy());return texture;
+ ctx.globalAlpha=1;const texture=new THREE.CanvasTexture(canvas);texture.colorSpace=THREE.SRGBColorSpace;texture.wrapS=texture.wrapT=THREE.RepeatWrapping;texture.anisotropy=Math.min(mobileProfile?2:4,renderer.capabilities.getMaxAnisotropy());generatedTextureCache.set(kind,texture);return texture;
 }
 const grassTexture=makeTexture('grass');grassTexture.repeat.set(9,7);
 const dirtTexture=makeTexture('dirt');dirtTexture.repeat.set(8,1);
@@ -239,13 +255,14 @@ const mats={grass:new THREE.MeshStandardMaterial({map:grassTexture,color:0xc3d7a
 function mesh(geo,material,x,y,z){const o=new THREE.Mesh(geo,material);o.position.set(x,y,z);o.castShadow=true;o.receiveShadow=true;scene.add(o);return o}
 const ground=mesh(new THREE.PlaneGeometry(110,78),mats.grass,0,-.12,0);ground.rotation.x=-Math.PI/2;
 for(const z of [-20,0,20]){const lane=mesh(new THREE.BoxGeometry(88,.06,7),mats.road,0,-.04,z);lane.receiveShadow=true;for(let x=-42;x<=42;x+=8){mesh(new THREE.BoxGeometry(1,.04,.18),mat(0xc6b99a),x,.005,z)}}
+const wallStoneMaterial=new THREE.MeshStandardMaterial({map:stoneTexture,color:0xc2c1b8,roughness:.96});
+const wallCapMaterial=new THREE.MeshStandardMaterial({map:stoneTexture,color:0xe0d9c8,roughness:.9});
 function wallSegment(x,z,length,axis='x'){
- const stone=new THREE.MeshStandardMaterial({map:stoneTexture,color:0xc2c1b8,roughness:.96}),cap=new THREE.MeshStandardMaterial({map:stoneTexture,color:0xe0d9c8,roughness:.9});
- const body=mesh(new THREE.BoxGeometry(axis==='x'?length:1.1,1.7,axis==='x'?1.1:length),stone,x,.85,z);
- const crown=mesh(new THREE.BoxGeometry(axis==='x'?length+.2:1.3,.28,axis==='x'?1.3:length+.2),cap,x,1.82,z);
+ const body=mesh(new THREE.BoxGeometry(axis==='x'?length:1.1,1.7,axis==='x'?1.1:length),wallStoneMaterial,x,.85,z);
+ const crown=mesh(new THREE.BoxGeometry(axis==='x'?length+.2:1.3,.28,axis==='x'?1.3:length+.2),wallCapMaterial,x,1.82,z);
  for(let i=0;i<Math.floor(length/2.3);i++){
   const offset=-length/2+1.2+i*2.3;
-  mesh(new THREE.BoxGeometry(.55,.55,.55),cap,x+(axis==='x'?offset:0),2.18,z+(axis==='z'?offset:0));
+  mesh(new THREE.BoxGeometry(.55,.55,.55),wallCapMaterial,x+(axis==='x'?offset:0),2.18,z+(axis==='z'?offset:0));
  }
  return body;
 }
@@ -568,7 +585,7 @@ function adaptRenderResolution(dt){
  perfElapsed=0;perfFrames=0;
 }
 if(new URLSearchParams(location.search).get('debug')==='1'){const panel=document.createElement('div');panel.style.cssText='position:fixed;left:8px;top:8px;z-index:20;padding:6px 9px;background:#07111ddd;color:#bdf4c5;border:1px solid #6b9870;border-radius:6px;font:11px monospace;pointer-events:none';panel.textContent='Medição gráfica iniciando…';document.body.append(panel);window.mapDebugPanel=panel}
-let last=performance.now();function loop(now){if(document.hidden){last=now;return}const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);updateMapChunks(dt);renderer.render(scene,camera);adaptRenderResolution(dt)}renderer.setAnimationLoop(loop);
+let last=performance.now();function loop(now){if(document.hidden){last=now;return}const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);updateMapChunks(dt);updateAssetAnimations(dt);renderer.render(scene,camera);adaptRenderResolution(dt)}renderer.setAnimationLoop(loop);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false)});
 updateHud();
 </script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script></body></html>
