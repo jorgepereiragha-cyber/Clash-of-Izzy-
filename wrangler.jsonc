@@ -26,5 +26,6 @@
   },
   "vars": {
     "ENVIRONMENT": "production"
-  }
+  },
+  "workers_dev": true
 }
