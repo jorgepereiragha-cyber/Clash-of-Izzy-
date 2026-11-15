@@ -2,7 +2,7 @@ const API="/api";
 const BUILDINGS={castle:"Castelo",barracks:"Quartel",farm:"Fazenda",quarry:"Pedreira",lumber_mill:"Serraria",iron_mine:"Mina de ferro",market:"Mercado",academy:"Academia",wall:"Muralha",hospital:"Hospital",watchtower:"Torre de vigia",stable:"Estábulo",archery_range:"Campo de arqueiros",siege_workshop:"Oficina de cerco",embassy:"Embaixada",warehouse:"Armazém"};
 const UNITS={militia:"Milícia",swordsman:"Espadachim",spearman:"Lanceiro",archer:"Arqueiro",crossbowman:"Besteiro",cavalry:"Cavalaria",knight:"Cavaleiro",mage:"Mago",catapult:"Catapulta",ram:"Aríete",trebuchet:"Trabuquete"};
 const RESEARCH={economy:"Economia",military:"Doutrina militar",construction:"Construção",defense:"Defesa"};
-let state=null,token=null,busy=false;
+let state=null,token=null,busy=false,serverNowBase=0,performanceBase=0;
 const $=id=>document.getElementById(id);
 const esc=value=>String(value??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const n=value=>Number(value||0).toLocaleString("pt-BR");
@@ -29,13 +29,14 @@ function renderTasks(){
 }
 function renderTaskClocks(){
  document.querySelectorAll("[data-task-clock]").forEach(el=>{
-  const remaining=Math.max(0,Math.ceil((Date.parse(el.dataset.completes)-Date.now())/1000));
+  const remaining=Math.max(0,Math.ceil((Date.parse(el.dataset.completes)-(serverNowBase+(performance.now()-performanceBase)))/1000));
   const h=Math.floor(remaining/3600),m=Math.floor((remaining%3600)/60),s=remaining%60;
   el.textContent=remaining===0?"Aguardando confirmação do servidor":(h?String(h).padStart(2,"0")+":":"")+String(m).padStart(2,"0")+":"+String(s).padStart(2,"0")+" restantes";
  });
 }
 function render(){
  if(!state)return;
+ serverNowBase=Date.parse(state.serverTime||new Date().toISOString());performanceBase=performance.now();
  const k=state.kingdom||{},p=state.player||{};
  $("resources").innerHTML=[["🌾","Comida",k.food],["🪵","Madeira",k.wood],["🪨","Pedra",k.stone],["⛓","Ferro",k.iron],["🪙","Ouro",k.gold],["💎","Gemas",p.gems]].map(([icon,label,value])=>'<div class="resource"><small>'+icon+" "+label+'</small><strong>'+n(value)+'</strong></div>').join("");
  $("summary").innerHTML=[["🏰 Castelo","Nível "+n(k.castle_level)],["⚔ Tropas",n(state.totalTroops)],["🐉 Dragão","Nível "+n(state.dragon?.level)],["🛡 Aliança",state.alliance?esc(state.alliance.tag):"Sem aliança"]].map(([label,value])=>'<div class="tile"><small>'+label+'</small><strong>'+value+"</strong></div>").join("");
@@ -107,4 +108,5 @@ $("warForm").addEventListener("submit",async e=>{e.preventDefault();if(!confirm(
 $("chatForm").addEventListener("submit",async e=>{e.preventDefault();const message=$("chatText").value.trim();if(!message)return;try{await act({type:"alliance_chat",message},"Mensagem enviada.");$("chatText").value=""}catch{}});
 $("refresh").addEventListener("click",refresh);
 setInterval(renderTaskClocks,1000);
+setInterval(()=>{if(!document.hidden)refresh()},30000);
 connect();
