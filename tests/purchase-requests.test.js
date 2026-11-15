@@ -43,7 +43,7 @@ test("official store submits an auditable payment request instead of opening Wha
 });
 
 test("purchase schema restricts products, states, payment methods and duplicate requests", async () => {
-  const migration = await read("migrations/0011_purchase_requests.sql");
+  const migration = await read("migrations/0012_mercadopago_payment_link.sql");
   assert.ok(migration.includes("CHECK (product_kind IN ('vip_package','skin'))"));
   assert.ok(migration.includes("CHECK (status IN ('pending','approved','rejected'))"));
   assert.ok(migration.includes("CHECK (payment_method IN ('mercadopago_link','pix','bank_transfer','manual'))"));
