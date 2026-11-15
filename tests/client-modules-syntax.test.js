@@ -7,7 +7,10 @@ const files = [
   "../world-map.js",
   "../equipment-system.js",
   "../scripts/kingdom-3d.js",
-  "../scripts/kingdom-quality.js"
+  "../scripts/kingdom-quality.js",
+  "../engine/asset-loader.js",
+  "../engine/resource-disposal.js",
+  "../engine/texture-manager.js"
 ];
 
 test("browser game modules parse before deployment", () => {
