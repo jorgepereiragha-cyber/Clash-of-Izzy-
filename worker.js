@@ -984,7 +984,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first(),
       getForgeEquipmentState(env,k.id)
     ]);
-    const heroEquipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,hero.id).all():{results:[]};
+    const heroEquipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(k.id,hero.id,k.id).all():{results:[]};
     const gear=mergeForgeBonuses(equipmentBonuses(heroEquipmentRows.results||[]),forgeState.bonuses);
     const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)));
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
