@@ -21,8 +21,8 @@ test("interface de alianças usa sessão persistida e estado real do Worker", as
 });
 
 test("central do reino oferece acesso à gestão de alianças", async () => {
-  const nav = await readFile(new URL("../navigation.js", import.meta.url), "utf8");
-  assert.ok(nav.includes('href:"/alliance.html"'));
+  const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.ok(html.includes('href="/alliance.html">🤝 Alianças'));
 });
 
 test("estado do reino entrega os saldos do depósito da aliança", async () => {
@@ -34,4 +34,12 @@ test("entrada por sigla respeita o limite de membros da aliança", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   assert.ok(worker.includes("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT ?,?,'member' WHERE (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=?) < ?"));
   assert.ok(worker.includes("A aliança atingiu o limite de membros."));
+});
+
+
+test("central de alianças aceita deep links da busca global", async () => {
+  const html = await readFile(new URL("../alliance.html", import.meta.url), "utf8");
+  assert.ok(html.includes("new URLSearchParams(location.search)"));
+  assert.ok(html.includes('initialSearch.get("search")'));
+  assert.ok(html.includes('$("worldSearchForm").requestSubmit()'));
 });
