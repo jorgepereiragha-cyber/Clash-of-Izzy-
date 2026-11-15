@@ -76,3 +76,19 @@ test("permanent troop loss is isolated to Anjo da Morte attacks", async () => {
   assert.ok(normalBattle.includes("SET quantity=quantity"));
   assert.ok(worker.includes("survivors[u.unit_type]=u.quantity"));
 });
+
+
+test("first deployment during an already-started weekend schedules a complete first event", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.ok(worker.includes("const history=await env.DB.prepare"));
+  assert.ok(worker.includes("now.getTime()-Date.parse(window.startsAt)>15*60*1000"));
+  assert.ok(worker.includes("const nextStart=new Date(Date.parse(window.startsAt)+7*86400000)"));
+});
+
+test("leaderboard ties use the same stable ordering as final reward distribution", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.ok(worker.includes("last_attack_at<?"));
+  assert.ok(worker.includes("kingdom_id<?"));
+  assert.ok(worker.includes("ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC"));
+  assert.ok(worker.includes("offset+=15"));
+});
