@@ -857,7 +857,7 @@ export default {
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
   if(url.pathname==="/api/health"&&request.method==="GET"){
     if(!env.DB||!env.SESSION_SECRET)return json({ok:false,status:"not_ready"},503);
-    try{await env.DB.prepare("SELECT 1 AS ready").first();return json({ok:true,status:"ready"});}
+    try{await env.DB.prepare("SELECT 1 FROM kingdoms LIMIT 1").first();return json({ok:true,status:"ready"});}
     catch(e){console.error("health_check_failed",String(e?.message||e));return json({ok:false,status:"database_unavailable"},503);}
   }
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
