@@ -31,6 +31,8 @@
 - Redimensionar via `ResizeObserver` e renderizar quando os dados/tamanho mudarem, sem loop de animação permanente.
 - Sombras 3D ficam desativadas em áreas estreitas (abaixo de 680 px) para reduzir custo em dispositivos móveis.
 - Manter modelos procedurais como fallback até cada GLB real estar validado e habilitado no manifesto.
+- GLB clones são anexados explicitamente à cena; carregamentos assíncronos reaplicam o estado mais recente do reino para evitar modelos obsoletos após atualização rápida.
+- Se o contexto WebGL for perdido, desconectar observadores de tamanho, descartar o renderer e impedir novas chamadas de renderização; o Canvas 2D assume a exibição.
 - Canvas decorativo não intercepta toques; controles HTML permanecem acessíveis.
 - Respeitar `prefers-reduced-motion`.
 - Testar em Android real antes de elevar resolução, sombras ou efeitos.
