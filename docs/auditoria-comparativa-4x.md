@@ -134,3 +134,11 @@ As alterações foram gravadas na branch principal. O workflow configurado execu
 - O simulador usa semente crítica persistida nos relatórios; os testes cobrem repetibilidade, chance zero, chance garantida e limites de duração da marcha.
 - Foi encontrada duplicidade de modelo entre `hero_inventory` (convocações/estrelas/fragmentos) e `heroes` (equipamentos/treino). Criado sincronizador por `hero_key`, mapeando raridades e preservando o maior nível/experiência existentes. Treinamento passa a atualizar as duas representações de forma condicionada e atômica.
 - Pendência para próxima auditoria: transformar a invocação de heróis em um lote D1 único, pois o fluxo de sorteio ainda realiza gravações sequenciais após o débito de gemas.
+
+
+## Busca global FTS5 (15 nov 2026)
+- Migração 0012 cria `game_search_documents` e `game_search_fts` com tokenizer Unicode sem diacríticos, prefixos e triggers de sincronização para reinos, alianças, territórios e skins.
+- O endpoint GET `/api/game/search` exige sessão válida, aceita consulta de 2 a 48 caracteres, limita resultados a 20 e aplica rate limit por jogador e por IP.
+- A consulta FTS5 usa parâmetros vinculados e tokens separados por AND; se FTS5 estiver indisponível, o Worker usa fallback `LIKE` com escape de `%`, `_` e `!`.
+- A navegação combina resultados locais de seções com resultados online; usa debounce, AbortController, sequência de requisição e `textContent` para evitar XSS e respostas fora de ordem.
+- A página de alianças recebe links profundos de busca e permite selecionar reinos para convite e alianças para solicitação de entrada. Não há exposição de IDs ou dados pessoais no payload público.
