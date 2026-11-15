@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { simulateBattle } from "../game-adapter.js";
+import { simulateBattle, calculateMarchDuration } from "../game-adapter.js";
 
 test("rejeita exército vazio", () => {
   assert.throws(() => simulateBattle({ army: [] }), /Exército vazio/);
@@ -56,4 +56,45 @@ test("cliente preserva o token e não funda outro reino quando a sessão salva f
   assert.doesNotMatch(connect, /localStorage\.removeItem\('coi_game_token'\)/);
   assert.doesNotMatch(connect, /sessionStorage\.removeItem\('coi_game_token'\)/);
   assert.match(connect, /}else\{[\s\S]*?fetch\(API_BASE\+'\/game\/start'/);
+});
+
+
+test("chance crítica aplica dano adicional e registra acertos", () => {
+  const result = simulateBattle({
+    army: [{ unit_type: "knight", tier: 2, quantity: 30 }],
+    castleLevel: 5, defenderLevel: 3, heroLevel: 1, dragonLevel: 1,
+    criticalChancePercent: 15, criticalDamageMultiplier: 2,
+    criticalSeed: 12345, roll: 1
+  });
+  assert.ok(result.criticalHits > 0);
+  assert.ok(result.log.some(entry => entry.critical === true));
+});
+
+test("chance crítica zero mantém todos os ataques sem crítico", () => {
+  const result = simulateBattle({
+    army: [{ unit_type: "knight", tier: 2, quantity: 30 }],
+    defenderLevel: 3, criticalChancePercent: 0, criticalSeed: 12345, roll: 1
+  });
+  assert.equal(result.criticalHits, 0);
+  assert.ok(result.log.every(entry => entry.critical === false));
+});
+
+test("críticos são reproduzíveis com a mesma semente", () => {
+  const input = {
+    army: [{ unit_type: "archer", tier: 3, quantity: 40 }],
+    defenderLevel: 8, criticalChancePercent: 15, criticalSeed: 987654321, roll: 1
+  };
+  assert.deepEqual(simulateBattle(input), simulateBattle(input));
+});
+
+test("bônus de marcha reduz o tempo calculado no servidor até o limite de 20%", () => {
+  assert.equal(calculateMarchDuration(120, 0), 120);
+  assert.equal(calculateMarchDuration(120, 10), 110);
+  assert.equal(calculateMarchDuration(120, 20), 100);
+  assert.equal(calculateMarchDuration(120, 90), 100);
+});
+
+test("duração de marcha é limitada e nunca fica abaixo de um segundo", () => {
+  assert.equal(calculateMarchDuration(0, 20), 1);
+  assert.equal(calculateMarchDuration(999999, 0), 86400);
 });
