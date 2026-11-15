@@ -103,8 +103,8 @@
     const strong = document.createElement("strong");
     strong.textContent = item.type === "alliance" ? item.name+" ["+item.tag+"]" : item.name;
     const small = document.createElement("small");
-    if (item.type === "player") small.textContent = "Jogador · "+(item.kingdom_name||"Reino")+" · Castelo "+Number(item.castle_level||1)+" · poder "+Number(item.power||0).toLocaleString("pt-BR");
-    else if (item.type === "kingdom") small.textContent = "Reino · poder "+Number(item.power||0).toLocaleString("pt-BR");
+    if (item.type === "player") small.textContent = "Jogador · "+(item.kingdom_name||"Reino")+" · Castelo "+Number(item.castle_level||1)+" · poder "+Number(item.power||0).toLocaleString("pt-BR")+(item.allianceTag?" · Aliança ["+item.allianceTag+"]":"");
+    else if (item.type === "kingdom") small.textContent = "Reino · poder "+Number(item.power||0).toLocaleString("pt-BR")+(item.allianceTag?" · Aliança ["+item.allianceTag+"]":"");
     else if (item.type === "alliance") small.textContent = "Aliança · nível "+Number(item.level||1)+" · "+Number(item.members||0)+" membros";
     else if (item.type === "territory") small.textContent = "Território · "+(item.terrain||"terreno");
     else small.textContent = "Skin · catálogo cosmético";
