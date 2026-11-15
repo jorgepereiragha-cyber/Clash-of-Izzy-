@@ -286,6 +286,8 @@ if (host && "WebGLRenderingContext" in window) {
     renderer.render(scene, camera);
   }
   async function loadOptionalGlbAssets(buildings = []) {
+    // Data Saver keeps the procedural scene available but skips optional GLB downloads.
+    if (!qualityProfile?.loadOptionalAssets) return Promise.resolve();
     if (manifestLoad) return manifestLoad;
     manifestLoad = (async () => {
       try {
@@ -326,11 +328,20 @@ if (host && "WebGLRenderingContext" in window) {
       alpha: true, antialias: false, powerPreference: "low-power",
       depth: true, stencil: false, preserveDrawingBuffer: false
     });
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
     qualityProfile = selectKingdomQualityProfile({
       deviceMemory,
       hardwareConcurrency: navigator.hardwareConcurrency,
       viewportWidth: host.clientWidth || window.innerWidth,
-      maxTextureSize: renderer.capabilities.maxTextureSize
+      maxTextureSize: renderer.capabilities.maxTextureSize,
+      saveData: connection?.saveData === true,
+      prefersReducedMotion
+    });
+    window.__coiKingdomQuality = Object.freeze({
+      tier: qualityProfile.tier,
+      dataSaver: !qualityProfile.loadOptionalAssets,
+      prefersReducedMotion: qualityProfile.prefersReducedMotion
     });
     renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
