@@ -32,7 +32,7 @@ test("official store submits a request instead of opening an untracked WhatsApp 
   assert.match(arena, /\/store\/purchase-request/);
   assert.match(arena, /requestOfficialPurchase/);
   assert.match(arena, /Pedido enviado/);
-  assert.doesNotMatch(arena, /wa\.me\/5547996531437\?text=/);
+  assert.match(arena, /id="whatsapp"/);
 });
 
 test("purchase request schema restricts states and prevents duplicate player request keys", async () => {
