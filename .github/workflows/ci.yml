@@ -26,7 +26,7 @@ jobs:
         run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
       - name: Validate service worker
         run: node --check sw.js
-      - name: Test combat simulator
+      - name: Test gameplay rules and Worker-D1 integration
         run: npm test
       - name: Validate Worker bundle
         run: npm run check
