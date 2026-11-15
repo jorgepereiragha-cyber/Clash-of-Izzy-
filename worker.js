@@ -1,4 +1,5 @@
 import { simulateBattle, calculateMarchDuration } from "./game-adapter.js";
+import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
@@ -1094,6 +1095,136 @@ async function gameAction(env,playerId,body){
   }else{return json({error:"Ação de jogo desconhecida."},400)}
   return json({success:true,state:await gameState(env,playerId),...(battleOutcome?{battle:battleOutcome}:{})});
 }
+
+async function ensureAngelDeathWeekend(env,now=new Date()){
+  const window=getAngelDeathWeekendWindow(now),instant=now.toISOString();
+  await env.DB.prepare("INSERT OR IGNORE INTO world_events(event_key,starts_at,ends_at,status,boss_hp_total,boss_hp_remaining) VALUES(?,?,?,?,?,?)")
+    .bind(ANGEL_DEATH_EVENT.key,window.startsAt,window.endsAt,Date.parse(window.startsAt)<=now.getTime()?"active":"scheduled",ANGEL_DEATH_EVENT.bossHp,ANGEL_DEATH_EVENT.bossHp).run();
+  await env.DB.prepare("UPDATE world_events SET status='active' WHERE event_key=? AND starts_at<=? AND ends_at>? AND status='scheduled'")
+    .bind(ANGEL_DEATH_EVENT.key,instant,instant).run();
+  return window;
+}
+
+async function angelDeathEventState(env,playerId){
+  const now=new Date();
+  await ensureAngelDeathWeekend(env,now);
+  const event=await env.DB.prepare("SELECT id,event_key,starts_at,ends_at,status,boss_hp_total,boss_hp_remaining,boss_defeated_at,rewards_distributed_at FROM world_events WHERE event_key=? AND ends_at>? ORDER BY starts_at LIMIT 1")
+    .bind(ANGEL_DEATH_EVENT.key,now.toISOString()).first();
+  if(!event)return {event:null,participant:null,leaderboard:[]};
+  const player=await env.DB.prepare("SELECT k.id FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?").bind(playerId).first();
+  let participant=null;
+  if(player){
+    participant=await env.DB.prepare("SELECT score,damage,attacks,troops_lost,last_attack_at FROM world_event_participants WHERE event_id=? AND kingdom_id=?").bind(event.id,player.id).first();
+    if(participant){
+      const rank=await env.DB.prepare("SELECT COUNT(*)+1 AS rank FROM world_event_participants WHERE event_id=? AND (score>? OR (score=? AND damage>?))")
+        .bind(event.id,participant.score,participant.score,participant.damage).first();
+      participant={...participant,rank:Number(rank?.rank||1)};
+    }else participant={score:0,damage:0,attacks:0,troops_lost:0,rank:null,last_attack_at:null};
+  }
+  const rows=await env.DB.prepare("SELECT COALESCE(n.nickname,p.name,k.kingdom_name) AS display_name,k.kingdom_name,ep.score,ep.damage,ep.attacks,ep.troops_lost FROM world_event_participants ep JOIN kingdoms k ON k.id=ep.kingdom_id JOIN players p ON p.id=k.player_id LEFT JOIN player_nicknames n ON n.player_id=p.id WHERE ep.event_id=? AND ep.score>0 ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC LIMIT 10")
+    .bind(event.id).all();
+  return {event:{...event,boss_name:ANGEL_DEATH_EVENT.name,boss_epithet:ANGEL_DEATH_EVENT.epithet,boss_level:ANGEL_DEATH_EVENT.level,timezone:ANGEL_DEATH_EVENT.timezone,schedule:ANGEL_DEATH_EVENT.schedule},participant,leaderboard:rows.results||[]};
+}
+
+async function angelDeathEventAttack(env,playerId,body,now=new Date()){
+  const requestId=String(body.requestId||"").trim();
+  if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId))return json({error:"Identificador de ataque inválido. Atualize a página e tente novamente."},400);
+  const player=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
+  if(!player)return json({error:"Jogador não encontrado."},404);
+  const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(player.id).first();
+  if(!kingdom)return json({error:"Reino não encontrado."},404);
+  const instant=now.toISOString();
+  const event=await env.DB.prepare("SELECT id,boss_hp_remaining,status FROM world_events WHERE event_key=? AND status='active' AND starts_at<=? AND ends_at>? ORDER BY starts_at DESC LIMIT 1")
+    .bind(ANGEL_DEATH_EVENT.key,instant,instant).first();
+  if(!event)return json({error:"O Anjo da Morte não está ativo. O evento acontece automaticamente no fim de semana."},409);
+  const duplicate=await env.DB.prepare("SELECT damage,score,troop_losses_json FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?")
+    .bind(event.id,kingdom.id,requestId).first();
+  if(duplicate)return json({success:true,duplicate:true,damage:Number(duplicate.damage||0),score:Number(duplicate.score||0),losses:JSON.parse(duplicate.troop_losses_json||"{}")});
+  if(Number(event.boss_hp_remaining)<=0)return json({error:"O Anjo da Morte já foi derrotado. A classificação será fechada no fim de semana."},409);
+  const requested=body.units;
+  if(!requested||typeof requested!=="object"||Array.isArray(requested))return json({error:"Selecione as tropas que participarão do ataque."},400);
+  const availableRows=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY unit_type,tier").bind(kingdom.id).all();
+  const available=new Map((availableRows.results||[]).map(row=>[row.unit_type+"_"+row.tier,row]));
+  const selected=[];
+  let total=0;
+  for(const [key,raw] of Object.entries(requested)){
+    if(!/^(militia|swordsman|spearman|archer|crossbowman|cavalry|knight|catapult|ram|trebuchet)_(?:[1-9]|10)$/.test(key))return json({error:"Tipo de tropa inválido."},400);
+    const quantity=Number(raw);
+    if(!Number.isSafeInteger(quantity)||quantity<0||quantity>50000)return json({error:"Quantidade de tropas inválida."},400);
+    if(quantity===0)continue;
+    const row=available.get(key);
+    if(!row||quantity>Number(row.quantity))return json({error:"Seu exército mudou. Atualize a página antes de atacar."},409);
+    selected.push({...row,quantity});
+    total+=quantity;
+  }
+  if(!selected.length)return json({error:"Selecione pelo menos uma tropa."},400);
+  if(total>50000)return json({error:"O limite por ataque é de 50.000 tropas."},400);
+  const [hero,dragon,tech,battleState]=await Promise.all([
+    env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(kingdom.id).first(),
+    env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdom.id).first(),
+    env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdom.id).first(),
+    env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(kingdom.id).first()
+  ]);
+  const seed=crypto.getRandomValues(new Uint32Array(1))[0];
+  const simulation=simulateAngelDeathAttack({army:selected,castleLevel:kingdom.castle_level,heroLevel:hero?.level||1,dragonLevel:dragon?.level||1,militaryLevel:tech?.level||0,seed});
+  const snapshot={};
+  for(const row of selected){
+    const key=row.unit_type+"_"+row.tier;
+    snapshot[key]={quantity:row.quantity,loss:Number(simulation.losses[key]||0)};
+  }
+  const snapshotJson=JSON.stringify(snapshot),expectedRows=selected.length;
+  const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID();
+  const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) AND EXISTS(SELECT 1 FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>?)")
+    .bind(snapshotJson,kingdom.id,snapshotJson,kingdom.id,expectedRows,kingdom.id,battleToken,event.id,instant,instant);
+  const statements=[
+    env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,kingdom.id,previousBattleToken),
+    troopUpdate,
+    env.DB.prepare("INSERT INTO world_event_attacks(event_id,kingdom_id,request_id,damage,score,troop_losses_json) SELECT ?,?,?,MIN(?,boss_hp_remaining),MIN(?,boss_hp_remaining),? FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>? AND changes()=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
+      .bind(event.id,kingdom.id,requestId,simulation.damage,simulation.damage,snapshotJson,event.id,instant,instant,expectedRows,kingdom.id,battleToken),
+    env.DB.prepare("UPDATE world_events SET boss_hp_remaining=MAX(0,boss_hp_remaining-(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)),boss_defeated_at=CASE WHEN boss_hp_remaining<=(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?) THEN COALESCE(boss_defeated_at,?) ELSE boss_defeated_at END WHERE id=? AND EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
+      .bind(event.id,kingdom.id,requestId,event.id,kingdom.id,requestId,instant,event.id,event.id,kingdom.id,requestId),
+    env.DB.prepare("INSERT OR IGNORE INTO world_event_participants(event_id,kingdom_id,first_attack_at,last_attack_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
+      .bind(event.id,kingdom.id,instant,instant,event.id,kingdom.id,requestId),
+    env.DB.prepare("UPDATE world_event_participants SET score=score+(SELECT score FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),damage=damage+(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),attacks=attacks+1,troops_lost=troops_lost+?,last_attack_at=? WHERE event_id=? AND kingdom_id=? AND EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
+      .bind(event.id,kingdom.id,requestId,event.id,kingdom.id,requestId,simulation.troopsLost,instant,event.id,kingdom.id,event.id,kingdom.id,requestId)
+  ];
+  const result=await env.DB.batch(statements);
+  if(!result[2]?.meta?.changes)return json({error:"O exército mudou, o chefe foi derrotado ou outro ataque foi processado. Atualize e tente novamente."},409);
+  const updated=await env.DB.prepare("SELECT boss_hp_remaining FROM world_events WHERE id=?").bind(event.id).first();
+  return json({success:true,damage:Number(result[2]?.meta?.changes?simulation.damage:0),score:simulation.damage,losses:simulation.losses,troopsLost:simulation.troopsLost,lossRatePercent:Math.round(simulation.lossRate*100),bossHpRemaining:Number(updated?.boss_hp_remaining||0),message:"Ataque registrado. As baixas foram aplicadas permanentemente ao exército deste evento."});
+}
+
+async function distributeAngelDeathRewards(env,eventId,now=new Date()){
+  const participants=await env.DB.prepare("SELECT ep.kingdom_id,k.player_id,ep.score FROM world_event_participants ep JOIN kingdoms k ON k.id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0 ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC")
+    .bind(eventId).all();
+  const rows=participants.results||[];
+  for(let offset=0;offset<rows.length;offset+=40){
+    const statements=[];
+    for(let index=offset;index<Math.min(rows.length,offset+40);index++){
+      const participant=rows[index],rank=index+1,reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO world_event_rewards(event_id,kingdom_id,rank,score,reward_json) VALUES(?,?,?,?,?)").bind(eventId,participant.kingdom_id,rank,participant.score,rewardJson));
+      statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()>0").bind(reward.food,reward.wood,reward.stone,reward.iron,reward.gold,participant.kingdom_id));
+      statements.push(env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()>0").bind(reward.gems,participant.player_id));
+      statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?, 'death_essence', ? WHERE changes()>0 ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+excluded.quantity").bind(participant.kingdom_id,reward.deathEssence));
+      statements.push(env.DB.prepare("UPDATE world_event_rewards SET paid_at=? WHERE event_id=? AND kingdom_id=? AND paid_at IS NULL AND changes()>0").bind(now.toISOString(),eventId,participant.kingdom_id));
+    }
+    await env.DB.batch(statements);
+  }
+  await env.DB.prepare("UPDATE world_events SET status='completed',rewards_distributed_at=? WHERE id=? AND ends_at<=? AND NOT EXISTS(SELECT 1 FROM world_event_participants ep LEFT JOIN world_event_rewards wr ON wr.event_id=ep.event_id AND wr.kingdom_id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0 AND (wr.id IS NULL OR wr.paid_at IS NULL))")
+    .bind(now.toISOString(),eventId,now.toISOString(),eventId).run();
+}
+
+async function processAngelDeathEventLifecycle(env,now=new Date()){
+  if(!env.DB)return;
+  await ensureAngelDeathWeekend(env,now);
+  const due=await env.DB.prepare("SELECT id FROM world_events WHERE event_key=? AND status IN ('scheduled','active') AND ends_at<=? ORDER BY ends_at LIMIT 10")
+    .bind(ANGEL_DEATH_EVENT.key,now.toISOString()).all();
+  for(const row of due.results||[]){
+    try{await distributeAngelDeathRewards(env,row.id,now);}
+    catch(error){console.error("angel_death_reward_distribution_failed",row.id,String(error?.message||error));}
+  }
+}
+
 async function processDueMarches(env){
   if(!env.DB)return;
   const now=new Date().toISOString();
@@ -1113,6 +1244,8 @@ async function processDueMarches(env){
 export default {
  async scheduled(controller,env){
   await processDueMarches(env);
+  try{await processAngelDeathEventLifecycle(env);}
+  catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
   try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_rate_limit_cleanup_failed",String(error?.message||error));}
  },
@@ -1123,7 +1256,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","player_nicknames"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1213,6 +1346,20 @@ export default {
         const limited=await rateLimitDecision(env,"game-state-player",playerId,120,60);
         if(limited)return limited;
       }
+      if(url.pathname==="/api/game/event"&&request.method==="GET"){
+        const limited=await rateLimitDecision(env,"angel-death-state-player",playerId,30,60);
+        if(limited)return limited;
+        return json(await angelDeathEventState(env,playerId));
+      }
+      if(url.pathname==="/api/game/event/attack"&&request.method==="POST"){
+        const limited=await rateLimitDecision(env,"angel-death-attack-player",playerId,6,60);
+        if(limited)return limited;
+        const networkLimit=await rateLimitDecision(env,"angel-death-attack-network",request.headers.get("CF-Connecting-IP")||"unknown",60,60);
+        if(networkLimit)return networkLimit;
+        const body=await readBody(request,8192);
+        if(body.__bodyError)return json({error:"Solicitação de ataque inválida."},body.__bodyError==="payload_too_large"?413:400);
+        return await angelDeathEventAttack(env,playerId,body);
+      }
       if(url.pathname==="/api/game/players/search"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"player-search-player",playerId,20,60);
         if(limited)return limited;
@@ -1238,54 +1385,105 @@ export default {
         if(rawQuery.length<2)return json({error:"Digite pelo menos 2 caracteres.",results:[]},400);
         if(rawQuery.length>48)return json({error:"A busca aceita até 48 caracteres.",results:[]},400);
         const kind=String(url.searchParams.get("type")||"all").toLowerCase();
-        if(!["all","kingdoms","alliances","territories","skins"].includes(kind))return json({error:"Categoria de busca inválida."},400);
+        if(!["all","players","kingdoms","alliances","territories","skins"].includes(kind))return json({error:"Categoria de busca inválida.",results:[]},400);
         const entityType=({kingdoms:"kingdom",alliances:"alliance",territories:"territory",skins:"skin"})[kind]||"";
-        const tokens=rawQuery.match(/[\p{L}\p{N}_]+/gu)||[];
+        const tokens=(rawQuery.match(/[\p{L}\p{N}_]+/gu)||[]).slice(0,8);
         if(!tokens.length)return json({error:"Digite um nome ou termo válido.",results:[]},400);
         const ftsQuery=tokens.map(token=>'"'+token.replace(/"/g,'""')+'"*').join(" AND ");
-        const escaped=rawQuery.replace(/[!%_]/g,ch=>"!"+ch);
-        const exact=rawQuery.toLocaleLowerCase();
+        const substringQuery='"'+rawQuery.replace(/"/g,'""')+'"';
+        const escaped=rawQuery.toLocaleLowerCase("en-US").replace(/[!%_]/g,ch=>"!"+ch);
         const pattern="%"+escaped+"%";
+        const prefixPattern=escaped+"%";
         const limit=Math.min(20,Math.max(1,Math.floor(Number(url.searchParams.get("limit"))||10)));
-        try{
-          const indexed=await env.DB.prepare(
-            "SELECT d.entity_type,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count FROM game_search_fts f JOIN game_search_documents d ON d.id=f.rowid WHERE game_search_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1) AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)))) ORDER BY f.rank LIMIT ?"
-          ).bind(ftsQuery,kind,entityType,playerId,limit).all();
-          if((indexed.results||[]).length){
-            const results=indexed.results.map(row=>{
-              if(row.entity_type==="kingdom")return {type:"kingdom",name:row.title,power:Number(row.power||0)};
-              if(row.entity_type==="alliance")return {type:"alliance",name:row.title,tag:row.alliance_tag,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)};
-              if(row.entity_type==="territory")return {type:"territory",name:row.title,terrain:row.territory_terrain};
-              return {type:"skin",name:row.title,description:row.subtitle};
-            });
-            return json({query:rawQuery,results,count:results.length,engine:"fts5"});
+        const normalized=value=>String(value||"").normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR").trim();
+        const queryKey=normalized(rawQuery);
+        const resultMap=new Map();
+        let usedFts=false;
+        const addResult=(item,rank=0)=>{
+          const name=item.nickname||item.name||"";
+          const candidate=normalized(name);
+          const priority=candidate===queryKey?0:candidate.startsWith(queryKey)?1:candidate.includes(queryKey)?2:3;
+          const key=item.type+"|"+candidate;
+          const existing=resultMap.get(key);
+          if(!existing||priority<existing._priority||(priority===existing._priority&&Number(rank)<existing._rank))
+            resultMap.set(key,{...item,_priority:priority,_rank:Number(rank)||0});
+        };
+        const wantsEntities=kind!=="players";
+        const wantsPlayers=kind==="all"||kind==="players";
+        if(wantsEntities){
+          try{
+            const indexed=await env.DB.prepare(
+              "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,f.rank AS search_rank FROM game_search_fts f JOIN game_search_documents d ON d.id=f.rowid WHERE game_search_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1) AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)))) ORDER BY f.rank LIMIT ?"
+            ).bind(ftsQuery,kind,entityType,playerId,limit*4).all();
+            if((indexed.results||[]).length)usedFts=true;
+            for(const row of indexed.results||[]){
+              if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0)},row.search_rank);
+              else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
+              else if(row.entity_type==="territory")addResult({type:"territory",name:row.title,terrain:row.territory_terrain},row.search_rank);
+              else if(row.entity_type==="skin")addResult({type:"skin",name:row.title,description:row.subtitle},row.search_rank);
+            }
+          }catch(error){console.warn("game_search_fts_unavailable",String(error?.message||error));}
+          if(rawQuery.length>=3){
+            try{
+              const partial=await env.DB.prepare(
+                "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,s.rank AS search_rank FROM game_search_substring_fts s JOIN game_search_documents d ON d.id=s.rowid WHERE game_search_substring_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1) AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)))) ORDER BY s.rank LIMIT ?"
+              ).bind(substringQuery,kind,entityType,playerId,limit*4).all();
+              if((partial.results||[]).length)usedFts=true;
+              for(const row of partial.results||[]){
+                if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0)},row.search_rank);
+                else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
+                else if(row.entity_type==="territory")addResult({type:"territory",name:row.title,terrain:row.territory_terrain},row.search_rank);
+                else if(row.entity_type==="skin")addResult({type:"skin",name:row.title,description:row.subtitle},row.search_rank);
+              }
+            }catch(error){console.warn("game_search_substring_unavailable",String(error?.message||error));}
           }
-        }catch{ /* FTS5 migration pending: use the compatible SQL fallback. */
+          const hasEntity=[...resultMap.values()].some(item=>item.type!=="player");
+          if(!hasEntity){
+            const categoryLimit=kind==="all"?Math.max(1,Math.ceil(limit/4)):limit;
+            if(kind==="all"||kind==="kingdoms"){
+              const current=await env.DB.prepare("SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
+              const rows=await env.DB.prepare("SELECT k.kingdom_name,k.power FROM kingdoms k WHERE k.id<>? AND k.kingdom_name LIKE ? ESCAPE '!' COLLATE NOCASE AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id) ORDER BY CASE WHEN lower(k.kingdom_name)=? THEN 0 WHEN lower(k.kingdom_name) LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,k.kingdom_name LIMIT ?").bind(current?.id||-1,pattern,queryKey,prefixPattern,categoryLimit).all();
+              for(const row of rows.results||[])addResult({type:"kingdom",name:row.kingdom_name,power:Number(row.power||0)});
+            }
+            if(kind==="all"||kind==="alliances"){
+              const rows=await env.DB.prepare("SELECT a.name,a.tag,a.level,a.territory_count,COUNT(am.kingdom_id) AS member_count FROM alliances a LEFT JOIN alliance_members am ON am.alliance_id=a.id WHERE (a.name LIKE ? ESCAPE '!' COLLATE NOCASE OR a.tag LIKE ? ESCAPE '!' COLLATE NOCASE) GROUP BY a.id ORDER BY CASE WHEN lower(a.tag)=? THEN 0 WHEN lower(a.name)=? THEN 1 WHEN lower(a.tag) LIKE ? ESCAPE '!' THEN 2 ELSE 3 END,a.level DESC,a.name LIMIT ?").bind(pattern,pattern,queryKey,queryKey,prefixPattern,categoryLimit).all();
+              for(const row of rows.results||[])addResult({type:"alliance",name:row.name,tag:row.tag,level:Number(row.level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)});
+            }
+            if(kind==="all"||kind==="territories"){
+              const rows=await env.DB.prepare("SELECT name,terrain FROM world_territories WHERE (name LIKE ? ESCAPE '!' COLLATE NOCASE OR terrain LIKE ? ESCAPE '!' COLLATE NOCASE) ORDER BY level DESC,name LIMIT ?").bind(pattern,pattern,categoryLimit).all();
+              for(const row of rows.results||[])addResult({type:"territory",name:row.name,terrain:row.terrain});
+            }
+            if(kind==="all"||kind==="skins"){
+              const rows=await env.DB.prepare("SELECT name FROM skins WHERE name LIKE ? ESCAPE '!' COLLATE NOCASE ORDER BY name LIMIT ?").bind(pattern,categoryLimit).all();
+              for(const row of rows.results||[])addResult({type:"skin",name:row.name,description:"Skin cosmética"});
+            }
+          }
         }
-        const categoryLimit=kind==="all"?Math.max(1,Math.ceil(limit/4)):limit;
-        const results=[];
-        if(kind==="all"||kind==="kingdoms"){
-          const current=await env.DB.prepare("SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
-          const rows=await env.DB.prepare(
-            "SELECT k.id,k.kingdom_name,k.power FROM kingdoms k WHERE k.id<>? AND k.kingdom_name LIKE ? ESCAPE '!' COLLATE NOCASE AND NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id) ORDER BY CASE WHEN lower(k.kingdom_name)=? THEN 0 WHEN lower(k.kingdom_name) LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,k.kingdom_name LIMIT ?"
-          ).bind(current?.id||-1,pattern,exact,escaped+"%",categoryLimit).all();
-          for(const row of rows.results||[])results.push({type:"kingdom",name:row.kingdom_name,power:Number(row.power||0)});
+        if(wantsPlayers){
+          try{
+            const players=await env.DB.prepare(
+              "SELECT n.nickname,k.kingdom_name,k.castle_level,k.power,f.rank AS search_rank FROM game_player_search_fts f JOIN player_nicknames n ON n.player_id=f.rowid JOIN kingdoms k ON k.player_id=n.player_id WHERE game_player_search_fts MATCH ? AND n.player_id<>(SELECT id FROM players WHERE player_id=?) ORDER BY f.rank LIMIT ?"
+            ).bind(ftsQuery,playerId,limit*2).all();
+            if((players.results||[]).length)usedFts=true;
+            for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0)},row.search_rank);
+          }catch(error){console.warn("game_player_search_fts_unavailable",String(error?.message||error));}
+          if(rawQuery.length>=3){
+            try{
+              const players=await env.DB.prepare(
+                "SELECT n.nickname,k.kingdom_name,k.castle_level,k.power,f.rank AS search_rank FROM game_player_substring_fts f JOIN player_nicknames n ON n.player_id=f.rowid JOIN kingdoms k ON k.player_id=n.player_id WHERE game_player_substring_fts MATCH ? AND n.player_id<>(SELECT id FROM players WHERE player_id=?) ORDER BY f.rank LIMIT ?"
+              ).bind(substringQuery,playerId,limit*2).all();
+              if((players.results||[]).length)usedFts=true;
+              for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0)},row.search_rank);
+            }catch(error){console.warn("game_player_substring_unavailable",String(error?.message||error));}
+          }
+          const hasPlayers=[...resultMap.values()].some(item=>item.type==="player");
+          if(!hasPlayers){
+            const players=await env.DB.prepare("SELECT n.nickname,k.kingdom_name,k.castle_level,k.power FROM player_nicknames n JOIN kingdoms k ON k.player_id=n.player_id WHERE n.player_id<>(SELECT id FROM players WHERE player_id=?) AND n.nickname_key LIKE ? ESCAPE '!' ORDER BY CASE WHEN n.nickname_key=? THEN 0 WHEN n.nickname_key LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,n.nickname_key LIMIT ?").bind(playerId,pattern,queryKey,prefixPattern,limit).all();
+            for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0)});
+          }
         }
-        if(kind==="all"||kind==="alliances"){
-          const rows=await env.DB.prepare(
-            "SELECT a.id,a.name,a.tag,a.level,a.territory_count,COUNT(am.kingdom_id) AS member_count FROM alliances a LEFT JOIN alliance_members am ON am.alliance_id=a.id WHERE (a.name LIKE ? ESCAPE '!' COLLATE NOCASE OR a.tag LIKE ? ESCAPE '!' COLLATE NOCASE) GROUP BY a.id ORDER BY CASE WHEN lower(a.tag)=? THEN 0 WHEN lower(a.name)=? THEN 1 WHEN lower(a.tag) LIKE ? ESCAPE '!' THEN 2 ELSE 3 END,a.level DESC,a.name LIMIT ?"
-          ).bind(pattern,pattern,exact,exact,escaped+"%",categoryLimit).all();
-          for(const row of rows.results||[])results.push({type:"alliance",name:row.name,tag:row.tag,level:Number(row.level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)});
-        }
-        if(kind==="all"||kind==="territories"){
-          const rows=await env.DB.prepare("SELECT name,terrain FROM world_territories WHERE (name LIKE ? ESCAPE '!' COLLATE NOCASE OR terrain LIKE ? ESCAPE '!' COLLATE NOCASE) ORDER BY level DESC,name LIMIT ?").bind(pattern,pattern,categoryLimit).all();
-          for(const row of rows.results||[])results.push({type:"territory",name:row.name,terrain:row.terrain});
-        }
-        if(kind==="all"||kind==="skins"){
-          const rows=await env.DB.prepare("SELECT name FROM skins WHERE name LIKE ? ESCAPE '!' COLLATE NOCASE ORDER BY name LIMIT ?").bind(pattern,categoryLimit).all();
-          for(const row of rows.results||[])results.push({type:"skin",name:row.name,description:"Skin cosmética"});
-        }
-        return json({query:rawQuery,results:results.slice(0,limit),count:Math.min(results.length,limit),engine:"like-fallback"});
+        const results=[...resultMap.values()].sort((a,b)=>a._priority-b._priority||a._rank-b._rank||Number(b.power||0)-Number(a.power||0)||String(a.name).localeCompare(String(b.name),"pt-BR")).slice(0,limit).map(({_priority,_rank,...item})=>item);
+        return json({query:rawQuery,results,count:results.length,engine:usedFts?"fts5+trigram":"like-fallback"});
       }
       if(url.pathname==="/api/game/action"&&request.method==="POST"){
         const playerLimit=await rateLimitDecision(env,"game-action-player",playerId,120,60);
