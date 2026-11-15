@@ -96,18 +96,15 @@ $("worldSearchForm").addEventListener("submit",async event=>{
    const title=document.createElement("strong");
    title.textContent=item.type==="alliance"?item.name+" ["+item.tag+"]":item.name;
    const detail=document.createElement("small");
-   detail.textContent=item.type==="player"?"Jogador · "+(item.kingdom_name||"Reino")+" · Castelo "+Number(item.castle_level||1)+" · poder "+Number(item.power||0).toLocaleString("pt-BR"):item.type==="alliance"?"Aliança · nível "+item.level+" · "+item.members+" membros":item.type==="kingdom"?"Reino · poder "+Number(item.power||0).toLocaleString("pt-BR"):item.type==="territory"?"Território · "+(item.terrain||"terreno desconhecido"):"Catálogo · "+(item.description||"Skin cosmética");
+   detail.textContent=item.type==="player"?"Jogador · "+(item.kingdom_name||"Reino")+" · Castelo "+Number(item.castle_level||1)+" · poder "+Number(item.power||0).toLocaleString("pt-BR")+(item.allianceTag?" · Aliança ["+item.allianceTag+"]":""):item.type==="alliance"?"Aliança · nível "+item.level+" · "+item.members+" membros":item.type==="kingdom"?"Reino · poder "+Number(item.power||0).toLocaleString("pt-BR"):item.type==="territory"?"Território · "+(item.terrain||"terreno desconhecido"):"Catálogo · "+(item.description||"Skin cosmética");
    button.append(title,detail);
    button.addEventListener("click",()=>{
-    if(item.type==="player"){
-      $("inviteName").value=item.kingdom_name;
+    if(item.type==="player"||item.type==="kingdom"){
+      if(item.allianceTag){status("Este reino já pertence à aliança ["+item.allianceTag+"].");return;}
+      $("inviteName").value=item.type==="player"?item.kingdom_name:item.name;
       $("inviteName").focus();
-      status("Jogador encontrado. Use Convidar para enviar o convite ao reino.");
-     }else if(item.type==="kingdom"){
-     $("inviteName").value=item.name;
-     $("inviteName").focus();
-     status("Reino selecionado. Use Convidar para enviar o convite.");
-    }else if(item.type==="alliance"){
+      status("Reino selecionado. Use Convidar para enviar o convite.");
+     }else if(item.type==="alliance"){
      $("joinTag").value=item.tag;
      $("joinTag").focus();
      status("Aliança selecionada. Use Solicitar entrada para continuar.");
