@@ -81,10 +81,12 @@ export function typoDistanceForToken(queryToken, candidateToken) {
   const query = normalizeSearchText(queryToken);
   const candidate = normalizeSearchText(candidateToken);
   if (!query || !candidate || query === candidate) return 0;
-  if (!isTypoEligibleToken(query) || !isTypoEligibleToken(candidate)) return null;
+  if (!isTypoEligibleToken(query) || !supportedFuzzyToken.test(candidate)) return null;
 
   const queryLength = Array.from(query).length;
+  const candidateLength = Array.from(candidate).length;
   const maximum = queryLength >= 9 ? 2 : 1;
+  if (candidateLength < queryLength - maximum || candidateLength > queryLength + maximum) return null;
   const baseDistance = damerauLevenshteinDistance(query, candidate, maximum);
   if (baseDistance === null) return null;
 
