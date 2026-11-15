@@ -18,7 +18,6 @@ export function initAssetLoader(renderer, options = {}) {
 
   dracoLoader = new DRACOLoader();
   dracoLoader.setDecoderPath(options.dracoPath || `${THREE_CDN}draco/gltf/`);
-  dracoLoader.setDecoderConfig({ type: 'js' });
 
   ktx2Loader = new KTX2Loader();
   ktx2Loader.setTranscoderPath(options.basisPath || `${THREE_CDN}basis/`);
