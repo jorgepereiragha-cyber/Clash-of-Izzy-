@@ -740,7 +740,7 @@ async function gameAction(env,playerId,body){
       .bind(cost.wood,cost.stone,cost.food,cost.iron,k.id,cost.wood,cost.stone,cost.food,cost.iron,k.id,key,b.level,key,k.id,b.level,...bindings);
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
     for(const [item,qty] of Object.entries(materialNeeds))statements.push(env.DB.prepare("UPDATE inventory_items SET quantity=quantity-? WHERE kingdom_id=? AND item_key=? AND "+guard).bind(qty,k.id,item,k.id,actionId));
-    statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'construction','main',?,?,?,?,? WHERE "+guard)
+    statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'construction','main',?,?,?,? WHERE "+guard)
       .bind(k.id,JSON.stringify({building:key,fromLevel:b.level,toLevel:b.level+1,cost,materials:materialNeeds,durationSeconds:seconds}),started.toISOString(),completes.toISOString(),crypto.randomUUID(),k.id,actionId));
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"construction_started",JSON.stringify({building:key,fromLevel:b.level,toLevel:b.level+1,completesAt:completes.toISOString()}),k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
@@ -785,7 +785,7 @@ async function gameAction(env,playerId,body){
     const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)")
       .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,k.id,Math.ceil((level+1)/3));
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
-    statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'research','main',?,?,?,?,? WHERE "+guard)
+    statements.push(env.DB.prepare("INSERT INTO kingdom_tasks(kingdom_id,task_type,slot_key,payload_json,started_at,completes_at,idempotency_key) SELECT ?,'research','main',?,?,?,? WHERE "+guard)
       .bind(k.id,JSON.stringify({research:key,fromLevel:level,toLevel:level+1,cost,durationSeconds:seconds}),started.toISOString(),completes.toISOString(),crypto.randomUUID(),k.id,actionId));
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"research_started",JSON.stringify({research:key,toLevel:level+1,completesAt:completes.toISOString()}),k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
