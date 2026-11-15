@@ -452,8 +452,8 @@ async function gameAction(env,playerId,body){
   let battleOutcome=null;
 
   if(type==="set_nickname"){
-    const name=String(body.name||"").trim().replace(/\\s+/g," ");
-    if(!/^[\\p{L}\\p{N} _.-]{3,20}$/u.test(name))return json({error:"O nick deve ter de 3 a 20 caracteres: letras, números, espaço, ponto, hífen ou sublinhado."},400);
+    const name=String(body.name||"").trim().replace(/\s+/g," ");
+    if(!/^[\p{L}\p{N} _.-]{3,20}$/u.test(name))return json({error:"O nick deve ter de 3 a 20 caracteres: letras, números, espaço, ponto, hífen ou sublinhado."},400);
     const duplicate=await env.DB.prepare("SELECT id FROM players WHERE lower(name)=lower(?) AND id<>?").bind(name,p.id).first();
     if(duplicate)return json({error:"Este nick já está sendo usado. Escolha outro."},409);
     await env.DB.prepare("UPDATE players SET name=? WHERE id=?").bind(name,p.id).run();
