@@ -120,22 +120,50 @@
     results.setAttribute("aria-busy","true");
     try {
       const params = new URLSearchParams({q:query,type:"all",limit:"8"});
-      const response = await fetch("/api/game/search?"+params.toString(),{
-        headers:{Authorization:"Bearer "+token},
-        signal:requestController.signal
-      });
-      const data = await response.json().catch(()=>({}));
+      const headers = {Authorization:"Bearer "+token};
+      const requests = [
+        fetch("/api/game/search?"+params.toString(),{headers,signal:requestController.signal})
+      ];
+      const nicknameQuery = query.normalize("NFKC").trim();
+      const canSearchPlayers = /^[\p{L}\p{N}_-]{3,20}$/u.test(nicknameQuery);
+      if (canSearchPlayers) {
+        const playerParams = new URLSearchParams({q:nicknameQuery,limit:"6"});
+        requests.push(fetch("/api/game/players/search?"+playerParams.toString(),{headers,signal:requestController.signal}));
+      }
+      const responses = await Promise.all(requests);
+      const data = await responses[0].json().catch(()=>({}));
+      const playerData = responses[1] ? await responses[1].json().catch(()=>({})) : {};
       if (sequence !== requestSequence || query !== input.value.trim()) return;
-      if (!response.ok) {
-        if (response.status === 401) addEmpty("Entre novamente no reino para pesquisar conteúdo.");
+      if (!responses[0].ok) {
+        if (responses[0].status === 401) addEmpty("Entre novamente no reino para pesquisar conteúdo.");
         return;
       }
+      let resultCount = 0;
       if (data.results?.length) {
         addGroupLabel("Conteúdo do mundo");
-        for (const item of data.results) results.append(gameResultLink(item,query));
-      } else if (!results.querySelector("a")) {
-        addEmpty("Nenhuma seção ou conteúdo encontrado.");
+        for (const item of data.results) {
+          results.append(gameResultLink(item,query));
+          resultCount += 1;
+        }
       }
+      if (responses[1]?.ok && playerData.players?.length) {
+        addGroupLabel("Jogadores");
+        for (const player of playerData.players) {
+          const a = document.createElement("a");
+          const playerParams = new URLSearchParams({playerSearch:player.nickname});
+          a.href = "/kingdom.html?"+playerParams.toString();
+          a.className = "coi-nav-online-result";
+          a.setAttribute("role","option");
+          const strong = document.createElement("strong");
+          strong.textContent = player.nickname+" · "+player.kingdom_name;
+          const small = document.createElement("small");
+          small.textContent = "Jogador · Castelo nível "+Number(player.castle_level||1)+" · Poder "+Number(player.power||0).toLocaleString("pt-BR");
+          a.append(strong,small);
+          results.append(a);
+          resultCount += 1;
+        }
+      }
+      if (!resultCount && !results.querySelector("a")) addEmpty("Nenhuma seção ou conteúdo encontrado.");
     } catch (error) {
       if (error?.name !== "AbortError" && sequence === requestSequence) addEmpty("Busca online indisponível. Tente novamente.");
     } finally {
@@ -158,7 +186,7 @@
       if (!localCount) addEmpty("Digite pelo menos 2 caracteres.");
       return;
     }
-    searchTimer = setTimeout(() => onlineResults(query,sequence),250);
+    searchTimer = setTimeout(() => onlineResults(query,sequence),400);
   }
 
   input.addEventListener("input",search);
