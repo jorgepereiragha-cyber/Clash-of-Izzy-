@@ -482,8 +482,8 @@ if (host && "WebGLRenderingContext" in window) {
       });
     }
     activeModels = [];
-    // The HTML interaction layer is a 3x3 grid; keep 3D anchors in the
-    // exact same cells so transparent hit targets sit over the real buildings.
+    // Keep deterministic world-space building anchors. HTML hit targets are
+    // projected into screen coordinates from this same camera below.
     const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
     list.forEach((b, i) => {
       const col = i % 3, row = Math.floor(i / 3);
