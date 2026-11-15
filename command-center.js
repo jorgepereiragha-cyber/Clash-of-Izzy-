@@ -72,8 +72,8 @@ document.body.addEventListener("click",async event=>{
 });
 $("trainForm").addEventListener("submit",async e=>{e.preventDefault();try{await act({type:"train",unit:$("unitType").value,quantity:Math.max(1,Math.min(100,Math.floor(Number($("trainQty").value)||1)))},"Treinamento registrado.")}catch{}});
 $("battle").addEventListener("click",async()=>{try{const data=await act({type:"battle"});if(data?.battle)notice(data.battle.message+(data.battle.won?" Recompensas recebidas.":""),data.battle.won?"ok":"")}catch{}});
-$("summonOne").addEventListener("click",async()=>{try{await act({type:"hero_summon",quantity:1},"Invocação concluída.")}catch{}});
-$("summonTen").addEventListener("click",async()=>{try{await act({type:"hero_summon",quantity:10},"Invocação em lote concluída.")}catch{}});
+$("summonOne").addEventListener("click",async()=>{if(!confirm("Invocar 1 herói por 100 gemas?"))return;try{await act({type:"hero_summon",quantity:1},"Invocação concluída.")}catch{}});
+$("summonTen").addEventListener("click",async()=>{if(!confirm("Invocar 10 heróis por 900 gemas?"))return;try{await act({type:"hero_summon",quantity:10},"Invocação em lote concluída.")}catch{}});
 $("dragonUpgrade").addEventListener("click",async()=>{try{await act({type:"dragon_upgrade"},"Dragão evoluído.")}catch{}});
 $("allianceCreate").addEventListener("submit",async e=>{e.preventDefault();try{await act({type:"alliance_create",name:$("allianceName").value,tag:$("allianceTag").value},"Aliança criada.")}catch{}});
 $("allianceJoin").addEventListener("submit",async e=>{e.preventDefault();try{await act({type:"alliance_join",tag:$("joinTag").value},"Você entrou na aliança.")}catch{}});
