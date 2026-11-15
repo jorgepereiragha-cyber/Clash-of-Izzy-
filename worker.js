@@ -910,7 +910,9 @@ async function gameAction(env,playerId,body){
     const unitTypes=Object.keys(selected);
     if(!unitTypes.length)return json({error:"Selecione pelo menos uma tropa válida."},400);
     const unitsJson=JSON.stringify(selected);
-    const seconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    const forgeState=await getEquipmentState(env,k.id);
+    const seconds=calculateMarchDuration(baseSeconds,forgeState.bonuses.marchSpeedPercent);
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
@@ -925,20 +927,28 @@ async function gameAction(env,playerId,body){
     const armyRows=units.results||[];
     const total=armyRows.reduce((n,u)=>n+u.quantity,0);
     if(total<1)return json({error:"Treine tropas antes de iniciar uma batalha."},409);
-    const [hero,dragon,tech,defenseTech,battleState,activeHero]=await Promise.all([
+    const [hero,dragon,tech,defenseTech,battleState,activeHero,equipmentRows,forgeState]=await Promise.all([
       env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(k.id).first(),
       env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(k.id).first(),
-      env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first()
+      env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first(),
+      env.DB.prepare("SELECT item_key,level,is_locked FROM kingdom_equipment WHERE kingdom_id=?").bind(k.id).all(),
+      getEquipmentState(env,k.id)
     ]);
+    const gear=mergeCombatEquipmentBonuses(legacyEquipmentBonuses(equipmentRows.results||[]),forgeState.bonuses);
     const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)));
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const simulation=simulateBattle({
       army:armyRows,castleLevel:Number(k.castle_level||1),
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
+      equipmentAttackPercent:gear.attackPercent,
+      equipmentDefensePercent:gear.defensePercent,
+      equipmentHealthPercent:gear.healthPercent,
+      criticalChancePercent:gear.criticalChancePercent,
+      criticalSeed:Number(k.id)*31+Math.floor(Date.now()/1000),
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
     });
     const won=simulation.won,attackerPower=simulation.attackerPower,defenderPower=simulation.defenderPower;
