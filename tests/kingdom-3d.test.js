@@ -21,6 +21,18 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.ok(kingdom.includes('"three":"https://cdn.jsdelivr.net'));
 });
 
+test("bundled CC0 models can render props and only display units present in the army", () => {
+  assert.match(renderer, /manifestProps = Array\.isArray\(manifest\.props\)/);
+  assert.match(renderer, /manifestUnits = Array\.isArray\(manifest\.units\)/);
+  assert.match(renderer, /function renderManifestProps\(\)/);
+  assert.match(renderer, /function renderKingdomTroops\(troops = \[\]\)/);
+  assert.match(renderer, /unit\?\.unit_type === "archer"/);
+  assert.match(renderer, /cloneSkinned\(asset\.template\)/);
+  assert.match(renderer, /new THREE\.AnimationMixer\(root\)/);
+  assert.match(kingdom, /window\.__coiKingdomTroops=state\.troops\|\|\[\]/);
+  assert.match(kingdom, /detail:\{buildings,troops:state\.troops\|\|\[\]\}/);
+});
+
 test("quality profile uses the real viewport while the kingdom panel is initially hidden", () => {
   assert.match(renderer, /viewportWidth: host\.clientWidth \|\| window\.innerWidth/);
 });
@@ -30,7 +42,9 @@ test("3D scene is mobile-conscious and does not run an unnecessary animation loo
   assert.match(renderer, /calculateKingdomPixelRatio\(\{ width: host\.clientWidth, height: host\.clientHeight, devicePixelRatio: window\.devicePixelRatio \|\| 1, profile: qualityProfile \}\)/);
   assert.match(renderer, /renderer\.shadowMap\.enabled = qualityProfile\.shadows/);
   assert.match(renderer, /ResizeObserver/);
-  assert.doesNotMatch(renderer, /requestAnimationFrame/);
+  assert.match(renderer, /requestAnimationFrame\(renderArmyFrame\)/);
+  assert.match(renderer, /qualityProfile\?\.tier === "low"/);
+  assert.match(renderer, /qualityProfile\?\.prefersReducedMotion/);
 });
 
 test("glTF and KTX2/Basis loaders are configured for production assets", () => {
@@ -45,11 +59,15 @@ test("glTF and KTX2/Basis loaders are configured for production assets", () => {
   assert.match(renderer, /kind === "stone"/);
   assert.match(renderer, /kind === "wood"/);
   assert.match(renderer, /setKTX2Loader\(ktx2\)/);
-  assert.deepEqual(manifest, { version: 1, models: [] });
+  assert.equal(manifest.version, 2);
+  assert.ok(manifest.models.some(asset => asset.type === "watchtower"));
+  assert.ok(manifest.models.some(asset => asset.type === "wall"));
+  assert.ok(manifest.props.length >= 2);
+  assert.ok(manifest.units.some(asset => asset.unit_type === "archer"));
 });
 
 test("procedural buildings are replaceable by explicitly enabled GLB assets", () => {
-  assert.match(renderer, /asset\.enabled !== true/);
+  assert.match(renderer, /asset\?\.enabled === true/);
   assert.match(renderer, /glbTemplates\.set\(asset\.type, template\)/);
   assert.match(renderer, /glbTemplates\.get\(b\.building_type\)/);
   assert.match(renderer, /coIType/);
@@ -102,10 +120,10 @@ test("GLB manifest accepts only bounded same-origin assets for known buildings",
   assert.match(renderer, /const neededTypes = new Set/);
   assert.match(renderer, /Object\.hasOwn\(palettes, type\)/);
   assert.match(renderer, /neededTypes\.has\(asset\.type\)/);
-  assert.match(renderer, /assetUrl\.origin !== window\.location\.origin/);
+  assert.match(renderer, /url\.origin !== window\.location\.origin/);
   assert.match(renderer, /assetUrl\.pathname\.startsWith\("\/assets\/3d\/"\)/);
   assert.match(renderer, /pathname\.toLowerCase\(\)\.endsWith\("\.glb"\)/);
-  assert.match(renderer, /GLB \$\{asset\.type\} indisponível; mantendo modelo procedural/);
+  assert.match(renderer, /indisponível; mantendo o fallback procedural/);
 });
 
 test("quality profiles scale conservatively across low, balanced and high capability devices", () => {
@@ -183,7 +201,7 @@ test("late GLB loads are disposed when WebGL context is lost during async loadin
   assert.match(renderer, /if \(disposed \|\| !renderer\) return/);
   assert.match(renderer, /if \(disposed \|\| !renderer\) \{/);
   assert.match(renderer, /disposeDetachedObject3D\(gltf\.scene\)/);
-  assert.match(renderer, /if \(!disposed && renderer && queue\.length && glbTemplates\.size\) renderBuildings\(latestBuildings\)/);
+  assert.match(renderer, /renderBuildings\(latestBuildings\);\s*renderManifestProps\(\);\s*renderKingdomTroops\(latestTroops\)/);
   assert.match(renderer, /function disposeDetachedObject3D\(root\)/);
 });
 
@@ -225,8 +243,8 @@ test("partial WebGL initialization failure runs the complete GPU and listener te
 
 
 test("GLB assets are normalized to a mobile building footprint and grounded at y=0", () => {
-  assert.ok(renderer.includes("targetFootprint = Math.max(0.8, Math.min(2.5"));
-  assert.ok(renderer.includes("targetHeight = Math.max(0.8, Math.min(3.2"));
+  assert.ok(renderer.includes("targetFootprint = Math.max(.25, Math.min(3.5"));
+  assert.ok(renderer.includes("targetHeight = Math.max(.25, Math.min(4.5"));
   assert.ok(renderer.includes("normalizedModel.scale.setScalar(uniformScale)"));
   assert.ok(renderer.includes("-sourceBounds.min.y * uniformScale"));
   assert.ok(renderer.includes("template.add(normalizedModel)"));
@@ -235,15 +253,15 @@ test("GLB assets are normalized to a mobile building footprint and grounded at y
 
 test("optional GLB assets load only for present building types with bounded concurrency", () => {
   assert.ok(renderer.includes("const neededTypes = new Set"));
-  assert.ok(renderer.includes("glbLoadPromises.has(asset.type)"));
+  assert.ok(renderer.includes("glbLoadPromises.has(entry.key)"));
   assert.ok(renderer.includes("Math.min(3, queue.length)"));
-  assert.ok(renderer.includes("loadOptionalGlbAssets(list)"));
-  assert.ok(renderer.includes("loadOptionalGlbAssets(window.__coiKingdomBuildings)"));
+  assert.ok(renderer.includes("loadOptionalGlbAssets(list, latestTroops)"));
+  assert.ok(renderer.includes("loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops)"));
   assert.ok(renderer.includes("manifestLoad = null"));
 });
 
 test("failed optional GLB downloads preserve procedural models and allow later retries", () => {
   assert.ok(renderer.includes("GLB asset not ready; procedural 3D models remain active"));
-  assert.ok(renderer.includes("glbLoadPromises.delete(asset.type)"));
+  assert.ok(renderer.includes("glbLoadPromises.delete(key)"));
   assert.ok(renderer.includes("manifestLoad = null"));
 });
