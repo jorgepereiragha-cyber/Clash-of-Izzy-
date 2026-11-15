@@ -1020,9 +1020,7 @@ export default {
             });
             return json({query:rawQuery,results,count:results.length,engine:"fts5"});
           }
-        }catch(error){
         }catch{ /* FTS5 migration pending: use the compatible SQL fallback. */
-        }
         const categoryLimit=kind==="all"?Math.max(1,Math.ceil(limit/4)):limit;
         const results=[];
         if(kind==="all"||kind==="kingdoms"){
