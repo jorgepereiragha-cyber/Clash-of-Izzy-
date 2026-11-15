@@ -1397,7 +1397,7 @@ export default {
         const rawQuery=String(url.searchParams.get("q")||"").normalize("NFKC").trim();
         const queryLength=Array.from(rawQuery).length;
         const containsCjk=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(rawQuery);
-        const needsShortUnicodeFallback=queryLength<3&&containsCjk;
+        const needsShortUnicodeFallback=queryLength<3;
         if(queryLength<(containsCjk?1:2))return json({error:"Digite pelo menos 2 caracteres (ou 1 caractere CJK).",results:[]},400);
         if(queryLength>48)return json({error:"A busca aceita até 48 caracteres.",results:[]},400);
         const kind=String(url.searchParams.get("type")||"all").toLowerCase();
