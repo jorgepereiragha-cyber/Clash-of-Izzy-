@@ -169,7 +169,7 @@ if (host && "WebGLRenderingContext" in window) {
     // Rock clusters and forest border, deterministic and inexpensive.
     for (let i = 0; i < 18; i++) {
       const x = ((i * 37) % 125) / 10 - 6.2, z = ((i * 23) % 95) / 10 - 4.7;
-      if (Math.abs(x) < 2.2 && Math.abs(z) < 1.8) continue;
+      if (Math.abs(x) < 5 && Math.abs(z) < 4) continue;
       addTree(x, z, .72 + (i % 4) * .12);
     }
   }
@@ -184,10 +184,10 @@ if (host && "WebGLRenderingContext" in window) {
       });
     }
     activeModels = [];
-    const list = (Array.isArray(buildings) ? buildings : []).slice(0, 9);
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, 16);
     list.forEach((b, i) => {
-      const col = i % 3, row = Math.floor(i / 3);
-      const x = (col - 1) * 3.7, z = (row - 1) * 2.85;
+      const col = i % 4, row = Math.floor(i / 4);
+      const x = (col - 1.5) * 2.9, z = (row - 1.5) * 2.3;
       const template = glbTemplates.get(b.building_type);
       const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
