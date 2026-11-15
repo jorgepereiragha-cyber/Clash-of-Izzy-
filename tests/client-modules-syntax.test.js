@@ -5,6 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const files = [
   "../navigation.js",
+  "../events.js",
   "../world-map.js",
   "../equipment-system.js",
   "../scripts/kingdom-3d.js",
