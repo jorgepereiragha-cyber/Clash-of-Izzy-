@@ -666,15 +666,26 @@ async function gameAction(env,playerId,body){
     const materialNeeds=key==="castle"?(b.level>=25?{imperial_crest:2,power_crystal:2}:b.level>=20?{imperial_crest:1,power_crystal:2}:b.level>=15?{power_crystal:2,imperial_seal:1}:b.level>=10?{imperial_seal:2,royal_blueprint:1}:b.level>=5?{royal_blueprint:2}:{ });
     for(const [item,quantity] of Object.entries(materialNeeds)){const owned=await env.DB.prepare("SELECT quantity FROM inventory_items WHERE kingdom_id=? AND item_key=?").bind(k.id,item).first();if(!owned||owned.quantity<quantity)return json({error:"Materiais insuficientes: "+CASTLE_MATERIALS[item].name+" ("+quantity+" necessários)."},409);}
     const cost={wood:Math.ceil(base.wood*factor),stone:Math.ceil(base.stone*factor),food:Math.ceil(base.food*factor),iron:Math.ceil(base.iron*factor)};
-    const debit=await env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,food=food-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND food>=? AND iron>=?")
-      .bind(cost.wood,cost.stone,cost.food,cost.iron,k.id,cost.wood,cost.stone,cost.food,cost.iron).run();
-    if(!debit.meta.changes)return json({error:"Recursos insuficientes para melhorar."},409);
-    for(const [item,quantity] of Object.entries(materialNeeds))await env.DB.prepare("UPDATE inventory_items SET quantity=quantity-? WHERE kingdom_id=? AND item_key=? AND quantity>=?").bind(quantity,k.id,item,quantity).run();
-    const upgradeMaterial=eventMaterialStatement(env,k.id,"upgrade");
-    await env.DB.prepare("UPDATE kingdom_buildings SET level=level+1,upgraded_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND building_type=?").bind(k.id,key).run();
-    if(upgradeMaterial)await upgradeMaterial.run();
-    if(key==="castle")await env.DB.prepare("UPDATE kingdoms SET castle_level=castle_level+1 WHERE id=?").bind(k.id).run();
-    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"building_upgraded",JSON.stringify({building:key,level:b.level+1,cost})).run();
+    const castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
+    if(!castle)return json({error:"Castelo não encontrado."},409);
+    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const materialChecks=Object.entries(materialNeeds).map(()=> " AND EXISTS(SELECT 1 FROM inventory_items WHERE kingdom_id=? AND item_key=? AND quantity>=?)").join("");
+    const materialBindings=Object.entries(materialNeeds).flatMap(([item,quantity])=>[k.id,item,quantity]);
+    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,food=food-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND food>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level=?) AND (?='castle' OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle' AND level>?))"+materialChecks)
+      .bind(cost.wood,cost.stone,cost.food,cost.iron,k.id,cost.wood,cost.stone,cost.food,cost.iron,k.id,key,b.level,key,k.id,b.level,...materialBindings);
+    const statements=[debit,
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)
+    ];
+    for(const [item,quantity] of Object.entries(materialNeeds)){
+      statements.push(env.DB.prepare("UPDATE inventory_items SET quantity=quantity-? WHERE kingdom_id=? AND item_key=? AND "+guard).bind(quantity,k.id,item,k.id,actionId));
+    }
+    statements.push(env.DB.prepare("UPDATE kingdom_buildings SET level=level+1,upgraded_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND building_type=? AND level=? AND "+guard).bind(k.id,key,b.level,k.id,actionId));
+    if(key==="castle")statements.push(env.DB.prepare("UPDATE kingdoms SET castle_level=castle_level+1 WHERE id=? AND "+guard).bind(k.id,k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"imperial_seal",k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"building_upgraded",JSON.stringify({building:key,level:b.level+1,cost}),k.id,actionId));
+    statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
+    const result=await env.DB.batch(statements);
+    if(!result[1]?.meta?.changes)return json({error:"Recursos ou materiais insuficientes, ou edifício alterado. Atualize e tente novamente."},409);
   }else if(type==="train"){
     const unit=String(body.unit||"militia"),quantity=Math.max(1,Math.min(100,Math.floor(Number(body.quantity)||10)));
     const spec=Object.hasOwn(UNITS,unit)?UNITS[unit]:null;if(!spec)return json({error:"Tipo de tropa inválido."},400);
@@ -682,31 +693,42 @@ async function gameAction(env,playerId,body){
     const trainingHall=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type=?").bind(k.id,requiredBuilding).first();
     if(!trainingHall||trainingHall.level<1)return json({error:"Construa o edifício de treinamento exigido."},409);
     const cost={food:spec.food*quantity,wood:spec.wood*quantity,iron:spec.iron*quantity};
-    const debit=await env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=?")
-      .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron).run();
-    if(!debit.meta.changes)return json({error:"Recursos insuficientes para treinar essas tropas."},409);
-    await env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) VALUES(?,?,1,?) ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,unit,quantity).run();
-    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"troops_trained",JSON.stringify({unit,quantity,cost})).run();
-    const trainingMaterial=eventMaterialStatement(env,k.id,"train");if(trainingMaterial)await trainingMaterial.run();
+    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const debit=env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level>=1)")
+      .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron,k.id,requiredBuilding);
+    const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
+    statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,unit,quantity,k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,?,? WHERE "+guard).bind(k.id,"troops_trained",JSON.stringify({unit,quantity,cost}),k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"royal_blueprint",k.id,actionId));
+    statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
+    const result=await env.DB.batch(statements);
+    if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes. Atualize o reino e tente novamente."},409);
   }else if(type==="research"){
     const key=String(body.research||"economy");
     const allowed={economy:{wood:250,stone:120,iron:0},military:{wood:300,stone:180,iron:40},construction:{wood:350,stone:250,iron:0},defense:{wood:220,stone:300,iron:25}};
-    if(!allowed[key])return json({error:"Pesquisa inválida."},400);
+    if(!Object.hasOwn(allowed,key))return json({error:"Pesquisa inválida."},400);
     const current=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key=?").bind(k.id,key).first();
     const level=current?.level||0;
     if(level>=30)return json({error:"Pesquisa no nível máximo."},409);
+    let centerLevel=0;
     if(key==="defense"){
       const center=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy'").bind(k.id).first();
       if(!center||center.level<1)return json({error:"Construa o Centro de Pesquisa Militar primeiro."},409);
-      const maxDefenseLevel=Math.min(30,center.level*3);
-      if(level>=maxDefenseLevel)return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis de defesa."},409);
+      centerLevel=Number(center.level);
+      if(level>=Math.min(30,centerLevel*3))return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis de defesa."},409);
     }
     const c=allowed[key],factor=level+1,cost={wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
-    const debit=await env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-? WHERE id=? AND wood>=? AND stone>=? AND iron>=?")
-      .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron).run();
-    if(!debit.meta.changes)return json({error:"Recursos insuficientes para pesquisar."},409);
-    await env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level) VALUES(?,?,1) ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=level+1").bind(k.id,key).run();
-    const researchMaterial=eventMaterialStatement(env,k.id,"research");if(researchMaterial)await researchMaterial.run();
+    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND (?<>'defense' OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?))")
+      .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,key,k.id,Math.ceil((level+1)/3));
+    const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
+    statements.push(env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=level+1 WHERE level=?").bind(k.id,key,k.id,actionId,level));
+    const researchMaterialKey=key==="defense"?"imperial_crest":"imperial_crest";
+    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,researchMaterialKey,k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,?,? WHERE "+guard).bind(k.id,"research_upgraded",JSON.stringify({research:key,level:level+1,cost}),k.id,actionId));
+    statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
+    const result=await env.DB.batch(statements);
+    if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes ou pesquisa alterada por outra ação. Atualize e tente novamente."},409);
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id FROM world_territories WHERE id=?").bind(targetId).first();
