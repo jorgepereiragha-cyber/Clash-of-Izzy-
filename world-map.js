@@ -101,6 +101,7 @@ function resetMapViewport() {
 function renderMap() {
   const root = $("mapContent");
   root.querySelectorAll(".territory-pin").forEach(pin => pin.remove());
+  const buttonRefs = new Map();
   for (const territory of state.territories || []) {
     const resource = RESOURCE[territory.resource_type] || { icon: "📍", label: "Território" };
     const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
@@ -109,6 +110,7 @@ function renderMap() {
       (owner === "Seu reino" ? " owned" : owner === "Outro reino" ? " enemy" : "") +
       (Number(territory.id) === Number(selectedTerritoryId) ? " selected" : ""));
     button.type = "button";
+    button.dataset.territoryId = String(territory.id);
     button.style.left = clamp(50 + Number(territory.x || 0) * 0.9, 9, 91) + "%";
     button.style.top = clamp(50 - Number(territory.z || 0) * 0.9, 10, 90) + "%";
     button.setAttribute("aria-label", territory.name + ", " + terrain.label + ", " + owner);
@@ -120,7 +122,19 @@ function renderMap() {
       renderMap();
       renderDetails();
     });
+    buttonRefs.set(Number(territory.id), button);
     root.append(button);
+  }
+  const visualState = {
+    territories: state.territories || [],
+    marches: state.marches || [],
+    kingdomId: state.kingdom?.id || 0
+  };
+  window.__coiWorldMapButtons = buttonRefs;
+  window.__coiWorldMapState = visualState;
+  if (window.__coiWorldMap3D) {
+    window.__coiWorldMap3D.setProjectionButtons(buttonRefs);
+    window.__coiWorldMap3D.update(visualState);
   }
   applyMapViewport();
 }
@@ -329,3 +343,10 @@ async function connect() {
   }
 }
 connect();
+window.setInterval(() => {
+  if (document.hidden || busy || !token) return;
+  refreshState().catch(error => setStatus(error.message, true));
+}, 15000);
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden && !busy && token) refreshState().catch(error => setStatus(error.message, true));
+});
