@@ -1444,6 +1444,8 @@ export default {
         };
         const wantsEntities=kind!=="players";
         const wantsPlayers=kind==="all"||kind==="players";
+        let entitySubstringAvailable=rawQuery.length<3;
+        let playerSubstringAvailable=rawQuery.length<3;
         if(wantsEntities){
           try{
             const indexed=await env.DB.prepare(
@@ -1462,6 +1464,7 @@ export default {
               const partial=await env.DB.prepare(
                 "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)), '') AS kingdom_alliance_tag,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,s.rank AS search_rank FROM game_search_substring_fts s JOIN game_search_documents d ON d.id=s.rowid WHERE game_search_substring_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1))) ORDER BY s.rank LIMIT ?"
               ).bind(substringQuery,kind,entityType,playerId,limit*4).all();
+              entitySubstringAvailable=true;
               if((partial.results||[]).length)usedFts=true;
               for(const row of partial.results||[]){
                 if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0),allianceTag:row.kingdom_alliance_tag||""},row.search_rank);
@@ -1469,24 +1472,24 @@ export default {
                 else if(row.entity_type==="territory")addResult({type:"territory",name:row.title,terrain:row.territory_terrain},row.search_rank);
                 else if(row.entity_type==="skin")addResult({type:"skin",name:row.title,description:row.subtitle},row.search_rank);
               }
-            }catch(error){console.warn("game_search_substring_unavailable",String(error?.message||error));}
+            }catch(error){entitySubstringAvailable=false;console.warn("game_search_substring_unavailable",String(error?.message||error));}
           }
           const hasType=type=>[...resultMap.values()].some(item=>item.type===type);
           const categoryLimit=kind==="all"?Math.max(1,Math.ceil(limit/5)):limit;
-          if((kind==="all"||kind==="kingdoms")&&!hasType("kingdom")){
+          if((kind==="all"||kind==="kingdoms")&&(!hasType("kingdom")||!entitySubstringAvailable)){
               const current=await env.DB.prepare("SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
               const rows=await env.DB.prepare("SELECT k.kingdom_name,k.power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag FROM kingdoms k WHERE k.id<>? AND k.kingdom_name LIKE ? ESCAPE '!' COLLATE NOCASE ORDER BY CASE WHEN lower(k.kingdom_name)=? THEN 0 WHEN lower(k.kingdom_name) LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,k.kingdom_name LIMIT ?").bind(current?.id||-1,pattern,queryKey,prefixPattern,categoryLimit).all();
               for(const row of rows.results||[])addResult({type:"kingdom",name:row.kingdom_name,power:Number(row.power||0),allianceTag:row.alliance_tag||""});
             }
-          if((kind==="all"||kind==="alliances")&&!hasType("alliance")){
+          if((kind==="all"||kind==="alliances")&&(!hasType("alliance")||!entitySubstringAvailable)){
               const rows=await env.DB.prepare("SELECT a.name,a.tag,a.level,a.territory_count,COUNT(am.kingdom_id) AS member_count FROM alliances a LEFT JOIN alliance_members am ON am.alliance_id=a.id WHERE (a.name LIKE ? ESCAPE '!' COLLATE NOCASE OR a.tag LIKE ? ESCAPE '!' COLLATE NOCASE) GROUP BY a.id ORDER BY CASE WHEN lower(a.tag)=? THEN 0 WHEN lower(a.name)=? THEN 1 WHEN lower(a.tag) LIKE ? ESCAPE '!' THEN 2 ELSE 3 END,a.level DESC,a.name LIMIT ?").bind(pattern,pattern,queryKey,queryKey,prefixPattern,categoryLimit).all();
               for(const row of rows.results||[])addResult({type:"alliance",name:row.name,tag:row.tag,level:Number(row.level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)});
             }
-          if((kind==="all"||kind==="territories")&&!hasType("territory")){
+          if((kind==="all"||kind==="territories")&&(!hasType("territory")||!entitySubstringAvailable)){
               const rows=await env.DB.prepare("SELECT name,terrain FROM world_territories WHERE (name LIKE ? ESCAPE '!' COLLATE NOCASE OR terrain LIKE ? ESCAPE '!' COLLATE NOCASE) ORDER BY level DESC,name LIMIT ?").bind(pattern,pattern,categoryLimit).all();
               for(const row of rows.results||[])addResult({type:"territory",name:row.name,terrain:row.terrain});
             }
-          if((kind==="all"||kind==="skins")&&!hasType("skin")){
+          if((kind==="all"||kind==="skins")&&(!hasType("skin")||!entitySubstringAvailable)){
               const rows=await env.DB.prepare("SELECT name FROM skins WHERE name LIKE ? ESCAPE '!' COLLATE NOCASE ORDER BY name LIMIT ?").bind(pattern,categoryLimit).all();
               for(const row of rows.results||[])addResult({type:"skin",name:row.name,description:"Skin cosmética"});
             }
@@ -1504,12 +1507,13 @@ export default {
               const players=await env.DB.prepare(
                 "SELECT n.nickname,k.kingdom_name,k.castle_level,k.power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag,f.rank AS search_rank FROM game_player_substring_fts f JOIN player_nicknames n ON n.player_id=f.rowid JOIN kingdoms k ON k.player_id=n.player_id WHERE game_player_substring_fts MATCH ? AND n.player_id<>(SELECT id FROM players WHERE player_id=?) ORDER BY f.rank LIMIT ?"
               ).bind(substringQuery,playerId,limit*2).all();
+              playerSubstringAvailable=true;
               if((players.results||[]).length)usedFts=true;
               for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0),allianceTag:row.alliance_tag||""},row.search_rank);
-            }catch(error){console.warn("game_player_substring_unavailable",String(error?.message||error));}
+            }catch(error){playerSubstringAvailable=false;console.warn("game_player_substring_unavailable",String(error?.message||error));}
           }
           const hasPlayers=[...resultMap.values()].some(item=>item.type==="player");
-          if(!hasPlayers){
+          if(!hasPlayers||!playerSubstringAvailable){
             const players=await env.DB.prepare("SELECT n.nickname,k.kingdom_name,k.castle_level,k.power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag FROM player_nicknames n JOIN kingdoms k ON k.player_id=n.player_id WHERE n.player_id<>(SELECT id FROM players WHERE player_id=?) AND n.nickname_key LIKE ? ESCAPE '!' ORDER BY CASE WHEN n.nickname_key=? THEN 0 WHEN n.nickname_key LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,n.nickname_key LIMIT ?").bind(playerId,pattern,queryKey,prefixPattern,limit).all();
             for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0),allianceTag:row.alliance_tag||""});
           }
