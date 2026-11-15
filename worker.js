@@ -375,14 +375,14 @@ async function processMarches(env,kingdomId){
   try{
    let target=null;
    if(m.march_type==="attack"){
-    target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(m.target_territory_id).first();
+    target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(m.target_territory_id).first();
     if(target){
      territoryLockToken=crypto.randomUUID();
      const lockExpiresAt=new Date(Date.now()+180000).toISOString();
      const lockResult=await env.DB.prepare("UPDATE world_territories SET combat_lock_token=?,combat_lock_expires_at=? WHERE id=? AND (combat_lock_token IS NULL OR combat_lock_expires_at IS NULL OR combat_lock_expires_at<=?)")
        .bind(territoryLockToken,lockExpiresAt,m.target_territory_id,now).run();
      if(!lockResult.meta?.changes)continue;
-     target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=? AND t.combat_lock_token=?").bind(m.target_territory_id,territoryLockToken).first();
+     target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=? AND t.combat_lock_token=?").bind(m.target_territory_id,territoryLockToken).first();
     }
    }
 
@@ -392,7 +392,7 @@ async function processMarches(env,kingdomId){
    const battleLog=[];
    let attackerPower=0,defenderPower=0,simulation=null;
    let pvpDefenderId=null,pvpDefenderRows=[],pvpProfile=null,pvpCancelledReason=null;
-   const isPveAttack=m.march_type==="attack"&&target&&target.owner_kingdom_id==null&&m.target_owner_kingdom_id==null;
+   const isPveAttack=m.march_type==="attack"&&target&&target.owner_kingdom_id==null&&target.alliance_id==null&&m.target_owner_kingdom_id==null;
    const isPvpCandidate=m.march_type==="attack"&&target&&target.owner_kingdom_id!=null
      &&Number(target.owner_kingdom_id)!==Number(kingdomId)
      &&Number(target.owner_kingdom_id)===Number(m.target_owner_kingdom_id);
@@ -512,12 +512,11 @@ async function processMarches(env,kingdomId){
      .bind(kingdomId,pvpDefenderId,m.target_territory_id,m.target_territory_id,kingdomId,kingdomId,"territory_pvp",attackerPower,defenderPower,JSON.stringify({attacker:losses,defender:defenderLosses}),JSON.stringify({territoryCaptured:won}),JSON.stringify(battleLog),m.id,kingdomId,resolutionToken));
     // PvP casualties are permanent for both sides; ordinary PvE marches remain
     // non-lethal and the Anjo da Morte keeps its own separate loss rules.
+    const defenderLossRemainders={...defenderLosses};
     for(const row of pvpDefenderRows){
-     const remainingLoss=Number(defenderLosses[row.unit_type]||0);
-     if(remainingLoss<=0)continue;
-     const alreadyAssigned=pvpDefenderRows.filter(x=>x.unit_type===row.unit_type&&Number(x.tier)>Number(row.tier))
-       .reduce((sum,x)=>sum+Math.min(Number(x.quantity),Number(defenderLosses[row.unit_type]||0)),0);
-     const lost=Math.min(Number(row.quantity),Math.max(0,remainingLoss-alreadyAssigned));
+     const remainingLoss=Math.max(0,Number(defenderLossRemainders[row.unit_type]||0));
+     const lost=Math.min(Number(row.quantity),remainingLoss);
+     defenderLossRemainders[row.unit_type]=remainingLoss-lost;
      if(lost>0)statements.push(env.DB.prepare("UPDATE army_units SET quantity=MAX(0,quantity-?) WHERE id=? AND kingdom_id=? AND "+guard)
       .bind(lost,row.id,pvpDefenderId,m.id,kingdomId,resolutionToken));
     }
