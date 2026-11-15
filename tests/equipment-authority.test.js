@@ -27,7 +27,7 @@ test("equipamentos usam estado persistente e validação no servidor", async () 
   const serviceWorker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   assert.ok(serviceWorker.includes('"/equipment-ui.html"'));
   assert.ok(serviceWorker.includes('"/equipment-system.js"'));
-  assert.match(worker, /equipment,heroEquipment,cosmetics,player/);
+  assert.match(worker, /equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses,cosmetics,player/);
   assert.match(worker, /function equipmentBonuses/);
   assert.match(worker, /equipmentProductionBonus/);
   assert.match(worker, /equipmentAttackBonusPercent:gear\.attackPercent/);
