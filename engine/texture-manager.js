@@ -2,6 +2,7 @@ import * as THREE from 'three';
 
 const textureCache = new Map();
 const textureLoader = new THREE.TextureLoader();
+let supportedAnisotropy = 1;
 
 const DEFAULTS = Object.freeze({
   colorSpace: THREE.SRGBColorSpace,
@@ -9,6 +10,10 @@ const DEFAULTS = Object.freeze({
   minFilter: THREE.LinearMipmapLinearFilter,
   generateMipmaps: true
 });
+
+export function initTextureManager(renderer) {
+  supportedAnisotropy = renderer?.capabilities?.getMaxAnisotropy?.() || 1;
+}
 
 /**
  * Loads a shared texture. Concurrent requests for the same name/URL share
@@ -28,12 +33,11 @@ export async function loadTexture(name, url, options = {}) {
 
   const entry = { url, texture: null, promise: null };
   entry.promise = textureLoader.loadAsync(url).then(texture => {
-    const maxAnisotropy = Math.max(1, options.maxAnisotropy || 4);
     texture.colorSpace = options.colorSpace || DEFAULTS.colorSpace;
     texture.magFilter = options.magFilter || DEFAULTS.magFilter;
     texture.minFilter = options.minFilter || DEFAULTS.minFilter;
     texture.generateMipmaps = options.generateMipmaps ?? DEFAULTS.generateMipmaps;
-    texture.anisotropy = Math.min(maxAnisotropy, 4);
+    texture.anisotropy = Math.min(options.anisotropy ?? 4, supportedAnisotropy);
     texture.needsUpdate = true;
     entry.texture = texture;
     return texture;
