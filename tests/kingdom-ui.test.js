@@ -33,7 +33,25 @@ test("central do reino mostra filas persistentes, treinamento e pesquisas", asyn
   assert.match(html, /data-completes/);
 });
 
+test("HUD shows server-owned gems and highlights only changed resource counters", async () => {
+  const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.match(html, /renderResourceHud\(k\)/);
+  assert.match(html, /"💎","Gemas","gems",state\?\.player\?\.gems/);
+  assert.match(html, /lastResourceSnapshot/);
+  assert.match(html, /resource-bump/);
+  assert.match(html, /grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);
+});
+
+test("queue progress uses D1 timestamps and updates the accessible progress bar live", async () => {
+  const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.match(html, /function queueProgressPercent\(startedAt,completesAt,now=Date\.now\(\)\)/);
+  assert.match(html, /data-started=/);
+  assert.match(html, /data-progress/);
+  assert.match(html, /role="progressbar"/);
+  assert.match(html, /queueProgressPercent\(el\.dataset\.started,el\.dataset\.completes,now\)/);
+});
+
 test("PWA cache version is bumped when queue UI is changed", async () => {
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /clash-of-izzy-shell-v12/);
+  assert.match(worker, /clash-of-izzy-shell-v13/);
 });
