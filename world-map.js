@@ -21,6 +21,8 @@ const UNIT_NAMES = {
 };
 let state = null;
 let selectedTerritoryId = null;
+const requestedTerritorySearch = new URLSearchParams(location.search).get("search") || "";
+let requestedTerritoryApplied = false;
 let selectedUnits = {};
 let busy = false;
 
@@ -197,6 +199,18 @@ async function refreshState() {
   const response = await request("/game/state");
   state = response.state || response;
   if (!state.kingdom) throw new Error("O servidor não retornou o reino.");
+  if (requestedTerritorySearch && !requestedTerritoryApplied) {
+    const normalize = value => String(value || "").normalize("NFKD").replace(/[\p{M}]/gu, "").toLocaleLowerCase("pt-BR");
+    const needle = normalize(requestedTerritorySearch);
+    const match = (state.territories || []).find(item => normalize(item.name).includes(needle));
+    if (match) {
+      selectedTerritoryId = match.id;
+      $("marchNotice").textContent = "Território localizado pela busca global: " + match.name + ".";
+    } else {
+      $("marchNotice").textContent = "O território pesquisado não está entre os territórios atualmente visíveis no mapa.";
+    }
+    requestedTerritoryApplied = true;
+  }
   if (!getSelectedTerritory() && state.territories?.length) selectedTerritoryId = state.territories[0].id;
   render();
 }
