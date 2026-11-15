@@ -7,7 +7,8 @@
     {label:"Início",href:"/index.html",icon:"⌂",keywords:"home início principal"},
     {label:"Meu reino",href:"/kingdom.html",icon:"🏰",keywords:"cidade castelo construções recursos edifícios reino"},
     {label:"Mapa mundial",href:"/world.html",icon:"🌍",keywords:"territórios exploração marchas mapa mundo"},
-    {label:"Forja & skins",href:"/equipment-ui.html",icon:"⚒",keywords:"equipamentos heróis pesquisa evolução loja skins nórdicas odin thor freyja loki tyr heimdall"},
+    {label:"Heróis & skins",href:"/equipment-ui.html",icon:"⚒",keywords:"heróis equipamentos antigos loja skins nórdicas odin thor freyja loki tyr heimdall"},
+    {label:"Forja Real",href:"/equipment-lab.html",icon:"🛠",keywords:"forja equipamentos slots runas pesquisa evolução ataque defesa crítico marcha"}
     {label:"Arena 3D",href:"/arena.html",icon:"⚔",keywords:"batalha combate arena treinamento"},
     {label:"Alianças",href:"/alliance.html",icon:"🤝",keywords:"aliança membros chat guerra diplomacia depósito"}
   ];
