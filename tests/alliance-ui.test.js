@@ -55,7 +55,7 @@ test("busca mundial autentica, limita consultas e retorna somente dados público
 });
 
 test("índice FTS5 mantém catálogo público sincronizado sem indexar dados privados", async () => {
-  const migration = await readFile(new URL("../migrations/0011_game_search.sql", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../migrations/0012_game_search.sql", import.meta.url), "utf8");
   for (const snippet of [
     "CREATE VIRTUAL TABLE IF NOT EXISTS game_search_fts USING fts5",
     "unicode61 remove_diacritics 2",
