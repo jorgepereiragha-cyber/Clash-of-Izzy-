@@ -44,7 +44,7 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0010`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0011`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
 
 ## Segurança e consistência
 
@@ -77,3 +77,9 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - A arena usa um carregador GLB com Draco/KTX2 opcional, cache de texturas, animações glTF e descarte de recursos GPU. O carregador utiliza o renderer já existente; não cria uma segunda cena ou renderer.
 - Modelos devem ser GLB autocontidos e ficar em `/assets/models/`; texturas avulsas ficam em `/assets/textures/`. O carregador bloqueia URLs externas para evitar downloads arbitrários.
 - Ainda não há modelos GLB reais publicados no repositório; a pipeline está pronta e os diretórios aguardam assets aprovados.
+
+
+## Loja oficial e aprovação Master
+- Pedidos de pacotes VIP e skins pagos usam `purchase_requests`, com chave de idempotência, produto/preço capturados do catálogo, método e referência de pagamento.
+- O jogador envia um pedido autenticado; o painel Master lista pedidos pendentes e só libera gemas/skin após aprovação manual.
+- O sistema ainda não processa PIX/cartão automaticamente nem confirma pagamento por webhook. O administrador deve conferir o recebimento fora do jogo antes de aprovar.
