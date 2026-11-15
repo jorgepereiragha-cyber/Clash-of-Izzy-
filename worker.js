@@ -1108,7 +1108,7 @@ export default {
       }else if(pending.product_kind==="vip_package"){
         result=await env.DB.batch([
           env.DB.prepare("UPDATE purchase_requests SET status='approved',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending' AND product_kind='vip_package'").bind(id),
-          env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.gems_amount,pending.player_id,id)
+          env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()=1 AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.gems_amount,pending.player_id,id)
         ]);
         if(!result[0]?.meta?.changes)return json({error:"Pedido já processado."},409);
       }else{
