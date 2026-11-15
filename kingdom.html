@@ -25,6 +25,14 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 @media(max-width:760px){.layout{grid-template-columns:1fr}.city{min-height:320px;grid-template-rows:repeat(3,minmax(78px,1fr));padding:10px;gap:7px}.resources{grid-template-columns:repeat(5,minmax(0,1fr))}.resource{font-size:10px;padding:6px 2px}.resource b{font-size:12px}.hero{align-items:start;flex-direction:column}}
 @media(max-width:390px){.city{min-height:280px}.building{padding:5px 3px}.building .emoji{font-size:22px}.building strong{font-size:9px}.building small{font-size:9px}.grid2{grid-template-columns:1fr}}
 .quick-nav{max-width:1120px;margin:12px auto 0;padding:10px;background:#101d30;border:1px solid #40556b;border-radius:10px;display:grid;gap:7px}.quick-nav label{color:var(--gold);font-weight:800;font-size:12px}.quick-nav input{width:100%;padding:10px;border-radius:8px;border:1px solid #52677d;background:#0e1a2a;color:#fff}.nav-results{display:flex;gap:7px;flex-wrap:wrap}
+
+/* Procedural kingdom art direction: lightweight, original canvas scene for mobile GPUs. */
+.city{position:relative;isolation:isolate;background:linear-gradient(145deg,#718e5a,#355c43 62%,#284636);overflow:hidden}
+.city:before{opacity:.14;background-image:radial-gradient(#e3d5a1 1px,transparent 1px);background-size:17px 17px}
+#kingdomScene{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none}
+.city .building{position:relative;z-index:1;background:linear-gradient(145deg,#263d50d9,#101d30e8);backdrop-filter:blur(2px);border-color:#d9b66f;box-shadow:0 5px 12px #07150e88}
+.city .building.castle{background:linear-gradient(145deg,#8b633ddf,#302a39ed);border-color:#ffe09a;box-shadow:0 0 0 1px #f4d78e66,0 6px 15px #0009}
+@media(prefers-reduced-motion:no-preference){.city .building{transition:transform .18s ease,border-color .18s ease}.city .building:hover{transform:translateY(-3px) scale(1.025)}}
 </style></head>
 <body>
 <header><div class="top"><div class="brand">⚔ CLASH OF IZZY <small>Estratégia medieval · Reino persistente</small></div><div id="status" role="status">Conectando ao reino…</div></div><div class="resources" id="resources"><div class="resource">🌾<b>—</b>Comida</div><div class="resource">🪵<b>—</b>Madeira</div><div class="resource">🪨<b>—</b>Pedra</div><div class="resource">⛓️<b>—</b>Ferro</div><div class="resource">🪙<b>—</b>Ouro</div></div></header>
@@ -49,8 +57,47 @@ const fmt=n=>Number(n||0).toLocaleString("pt-BR");
 function setStatus(message,error=false){const el=document.getElementById("status");el.textContent=message;el.classList.toggle("error",error)}
 async function request(path,options={}){const response=await fetch(API+path,{...options,headers:{...(options.headers||{}),...(token?{Authorization:"Bearer "+token}:{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Falha na comunicação com o servidor.");return data}
 async function connect(){setStatus("Sincronizando…");try{token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");let data;if(token){data=await request("/game/state");}else{data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});if(data.token){token=data.token;localStorage.setItem("coi_game_token",token);}}state=data.state||data;if(!state.kingdom)throw new Error("O servidor não retornou os dados do reino.");render();document.getElementById("loading").hidden=true;document.getElementById("game").hidden=false;setStatus("● Reino sincronizado");}catch(error){setStatus(error.message,true);const loading=document.getElementById("loading");loading.textContent=error.message+" Seu acesso salvo foi preservado. Tente novamente após verificar a conexão. ";let retry=document.getElementById("retryConnection");if(!retry){retry=document.createElement("button");retry.id="retryConnection";retry.type="button";retry.className="secondary";retry.textContent="↻ Tentar novamente";retry.style.marginTop="12px";retry.addEventListener("click",connect);loading.append(retry);}retry.disabled=false;}}
+
+function drawKingdomScene(buildings){
+ const host=document.getElementById("city");if(!host)return;
+ let canvas=document.getElementById("kingdomScene");
+ if(!canvas){canvas=document.createElement("canvas");canvas.id="kingdomScene";canvas.setAttribute("aria-hidden","true");host.prepend(canvas);}
+ const rect=host.getBoundingClientRect();if(!rect.width||!rect.height)return;
+ const dpr=Math.min(window.devicePixelRatio||1,1.5),w=Math.round(rect.width*dpr),h=Math.round(rect.height*dpr);
+ if(canvas.width!==w||canvas.height!==h){canvas.width=w;canvas.height=h;}
+ const ctx=canvas.getContext("2d",{alpha:true});if(!ctx)return;
+ ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,rect.width,rect.height);
+ const W=rect.width,H=rect.height,cols=3,rows=3,cw=W/cols,ch=H/rows;
+ const poly=(points,fill,stroke)=>{ctx.beginPath();points.forEach(([x,y],i)=>i?ctx.lineTo(x,y):ctx.moveTo(x,y));ctx.closePath();ctx.fillStyle=fill;ctx.fill();if(stroke){ctx.strokeStyle=stroke;ctx.lineWidth=1;ctx.stroke();}};
+ // Hand-painted terrain tiles with deterministic flecks; no external textures or network fetches.
+ for(let row=0;row<rows;row++)for(let col=0;col<cols;col++){
+  const x=col*cw,y=row*ch,shade=((row*7+col*11)%5)*3;
+  const tile=ctx.createLinearGradient(x,y,x+cw,y+ch);tile.addColorStop(0,"rgb("+(105-shade)+","+(139-shade)+",83)");tile.addColorStop(1,"rgb("+(54-shade)+","+(94-shade)+",62)");
+  poly([[x+2,y+2],[x+cw-2,y+2],[x+cw-2,y+ch-2],[x+2,y+ch-2]],tile,"#b9c78a22");
+  for(let n=0;n<13;n++){const px=x+((n*37+col*19+row*11)%(Math.max(1,cw-8)))+4,py=y+((n*23+row*31+col*7)%(Math.max(1,ch-8)))+4;ctx.fillStyle=n%3?"#d7d69a24":"#183c2b38";ctx.fillRect(px,py,2,2);}
+ }
+ // Stone road crossing the settlement.
+ ctx.save();ctx.globalAlpha=.9;ctx.strokeStyle="#c5b58a";ctx.lineWidth=Math.max(13,Math.min(cw,ch)*.15);ctx.lineCap="round";ctx.beginPath();ctx.moveTo(cw*.08,ch*2.52);ctx.bezierCurveTo(cw*.9,ch*2.18,cw*1.6,ch*1.95,cw*2.9,ch*.42);ctx.stroke();ctx.strokeStyle="#e7d9ae";ctx.lineWidth=1.2;ctx.setLineDash([5,8]);ctx.stroke();ctx.restore();
+ // Trees and shrubs decorate the outer tiles.
+ for(let n=0;n<12;n++){const col=n%3,row=Math.floor(n/3),x=col*cw+((n*43+17)%(Math.max(1,cw-28)))+14,y=row*ch+((n*29+13)%(Math.max(1,ch-26)))+13;if(n===4)continue;ctx.fillStyle="#172e20aa";ctx.beginPath();ctx.ellipse(x+3,y+5,8,4,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=n%2?"#315f3b":"#477747";ctx.beginPath();ctx.arc(x,y,7+(n%3),0,Math.PI*2);ctx.fill();ctx.fillStyle="#8eaa65";ctx.beginPath();ctx.arc(x-2,y-3,3,0,Math.PI*2);ctx.fill();}
+ const palette={castle:["#9b805c","#d6b777","#5a5362"],barracks:["#8e6447","#b18a5d","#4e3940"],farm:["#8c9b59","#c4bd75","#637a45"],quarry:["#858b8a","#c5c9bd","#59646a"],lumber_mill:["#795b3e","#b58a56","#493a31"],iron_mine:["#66727c","#a4aeb1","#394954"],market:["#a27a50","#d4b36c","#9a4f3d"],academy:["#6c7190","#c2b5a0","#4d4b6e"],wall:["#8d9695","#c6c4b3","#626d75"],hospital:["#d0c8b2","#e4d9b8","#a65a50"],watchtower:["#7d827b","#c3b58e","#5b4d3d"],stable:["#946a48","#c4a36d","#51403a"],archery_range:["#a18a58","#d0bd7b","#657c4c"],siege_workshop:["#6f6255","#a58d70","#51433c"],embassy:["#9b8a70","#d7c7a1","#536d81"],warehouse:["#8a7759","#c3a775","#5c4a3a"]};
+ const order=buildings.slice(0,9);
+ order.forEach((b,i)=>{const col=i%3,row=Math.floor(i/3),cx=col*cw+cw*.5,base=row*ch+ch*.73,scale=Math.min(cw,ch)/100,colors=palette[b.building_type]||palette.warehouse,level=Math.max(1,Number(b.level)||1),height=(22+Math.min(level,20)*1.35)*scale;
+  ctx.fillStyle="#07170f88";ctx.beginPath();ctx.ellipse(cx,base+3,Math.min(cw,ch)*.31,7*scale,0,0,Math.PI*2);ctx.fill();
+  const bw=Math.min(cw*.52,66*scale),wallH=height*.62,roofH=height*.48,left=cx-bw/2,right=cx+bw/2,top=base-wallH;
+  poly([[left,top],[right,top],[right,base],[left,base]],colors[0],"#342b25");
+  poly([[left,top],[cx,top-roofH],[right,top]],colors[1],"#4b382c");
+  poly([[right,top],[cx,top-roofH],[cx,base-roofH*.25],[right,base]],colors[2],"#352c2c");
+  ctx.fillStyle="#e9d49b";for(let q=0;q<2;q++){const wx=left+bw*(.25+q*.48);ctx.fillRect(wx,top+wallH*.35,Math.max(2,3*scale),Math.max(4,7*scale));}
+  ctx.fillStyle="#382b26";ctx.fillRect(cx-3*scale,base-12*scale,6*scale,12*scale);
+  if(b.building_type==="castle"){for(const side of [-1,1]){ctx.fillStyle=colors[0];ctx.fillRect(cx+side*bw*.37-4*scale,top-9*scale,8*scale,13*scale);ctx.fillStyle="#e6c06e";ctx.fillRect(cx+side*bw*.37,top-17*scale,1.5*scale,9*scale);poly([[cx+side*bw*.37,top-17*scale],[cx+side*bw*.37+9*scale,top-14*scale],[cx+side*bw*.37,top-11*scale]],"#b64c3e");}}
+  else if(i%3===0){ctx.fillStyle="#d8bb70";ctx.fillRect(cx-1,top-roofH-8*scale,2,8*scale);}
+ });
+}
+let kingdomResizeObserver=null;
+function watchKingdomScene(){const host=document.getElementById("city");if(!host)return;if(kingdomResizeObserver)kingdomResizeObserver.disconnect();if("ResizeObserver" in window){kingdomResizeObserver=new ResizeObserver(()=>drawKingdomScene(state?.buildings||[]));kingdomResizeObserver.observe(host);}else window.addEventListener("resize",()=>drawKingdomScene(state?.buildings||[]),{passive:true});}
 function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("resources").innerHTML=[["🌾","Comida","food"],["🪵","Madeira","wood"],["🪨","Pedra","stone"],["⛓️","Ferro","iron"],["🪙","Ouro","gold"]].map(([icon,label,key])=>'<div class="resource">'+icon+'<b>'+fmt(k[key])+'</b>'+label+'</div>').join("");
-const buildings=state.buildings||[];const city=document.getElementById("city");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+b.building_type+'"><span class="emoji">'+emoji+'</span><strong>'+name+'</strong><small>Nível '+b.level+'</small></button>'}).join("");
+const buildings=state.buildings||[];const city=document.getElementById("city");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+b.building_type+'"><span class="emoji">'+emoji+'</span><strong>'+name+'</strong><small>Nível '+b.level+'</small></button>'}).join("");drawKingdomScene(buildings);watchKingdomScene();
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+a+'</span><b>'+b+'</b></div>').join("");
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const blocked=b.level>=30;return '<div class="building-row"><div class="info"><strong>'+emoji+' '+name+'</strong><small>Nível '+b.level+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+b.building_type+'" '+(blocked||busy?"disabled":"")+'> '+(blocked?"MÁXIMO":"Evoluir")+' </button></div>'}).join("");
 const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Tropas",fmt(total)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+a+'</span><b>'+b+'</b></div>').join("");
