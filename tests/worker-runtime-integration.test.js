@@ -264,7 +264,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       }), 200, "recusa de pedido de skin");
     });
 
+    const executedActions = new Set();
     async function action(token, payload, expected = 200, label = payload.type) {
+      executedActions.add(payload.type);
       const result = await api("/api/game/action", { method: "POST", token, body: payload });
       return expectStatus(result, expected, "ação " + label);
     }
@@ -368,7 +370,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(await admin("/api/admin/purchase-requests/review", { requestId: -1, decision: "approve" }), 400, "revisão de pedido inválida");
       expectStatus(await admin("/api/admin/skins", { name: "Preço inválido", price: 0 }), 400, "cadastro de skin inválido");
       expectStatus(await admin("/api/admin/vip-packages", { name: "", price: 0, gems: -1 }), 400, "cadastro de VIP inválido");
-      expectStatus(await api("/api/admin/purchase-requests"), 401, "fila Master sem sessão");
+      expectStatus(await api("/api/admin/purchase-requests", { method: "POST", body: {} }), 401, "fila Master sem sessão");
     });
 
     await t.test("todas as 34 ações previstas foram alcançadas no fluxo de integração", async () => {
@@ -380,9 +382,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         "hero_evolve","hero_train","prestige","upgrade","train","research","march","battle","rename",
       ];
       assert.equal(actionTypes.length, 34);
-      const worker = await import("../worker.js");
-      assert.equal(typeof worker.default.fetch, "function");
-      // Each action was exercised by a preceding authenticated request above.
+      assert.deepEqual([...executedActions].sort(), [...actionTypes].sort(),
+        "cada um dos 34 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
   } finally {
     if (workerProcess && workerProcess.exitCode === null) {
