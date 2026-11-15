@@ -60,10 +60,31 @@ async function request(path, options = {}) {
   return data;
 }
 function territoryOwner(territory) {
-  if (!territory.owner_kingdom_id) return "Território neutro";
-  return Number(territory.owner_kingdom_id) === Number(state?.kingdom?.id)
-    ? "Seu reino"
-    : "Outro reino";
+  if (territory.owner_kingdom_id) {
+    return Number(territory.owner_kingdom_id) === Number(state?.kingdom?.id)
+      ? "Seu reino"
+      : "Outro reino";
+  }
+  if (territory.alliance_id) {
+    return Number(territory.alliance_id) === Number(state?.alliance?.id)
+      ? "Sua aliança"
+      : "Território de aliança";
+  }
+  return "Território neutro";
+}
+function territoryIsProtected(territory) {
+  const now = Date.now();
+  return [territory?.shield_until, territory?.protection_until]
+    .some(value => value && Number.isFinite(Date.parse(value)) && Date.parse(value) > now);
+}
+function territoryCanBeAttacked(territory) {
+  if (!territory) return false;
+  const ownerId = Number(territory.owner_kingdom_id || 0);
+  const ownId = Number(state?.kingdom?.id || 0);
+  if (!ownerId) return !territory.alliance_id;
+  if (ownerId === ownId || territoryIsProtected(territory)) return false;
+  if (territory.alliance_id && Number(territory.alliance_id) === Number(state?.alliance?.id || 0)) return false;
+  return true;
 }
 function getSelectedTerritory() {
   return (state?.territories || []).find(item => Number(item.id) === Number(selectedTerritoryId)) || null;
@@ -105,14 +126,16 @@ function renderMap() {
     const resource = RESOURCE[territory.resource_type] || { icon: "📍", label: "Território" };
     const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
     const owner = territoryOwner(territory);
+    const isFriendly = owner === "Seu reino" || owner === "Sua aliança";
     const button = make("button", "territory-pin" +
-      (owner === "Seu reino" ? " owned" : owner === "Outro reino" ? " enemy" : "") +
+      (isFriendly ? " owned" : owner === "Outro reino" || owner === "Território de aliança" ? " enemy" : "") +
       (Number(territory.id) === Number(selectedTerritoryId) ? " selected" : ""));
     button.type = "button";
     button.style.left = clamp(50 + Number(territory.x || 0) * 0.9, 9, 91) + "%";
     button.style.top = clamp(50 - Number(territory.z || 0) * 0.9, 10, 90) + "%";
-    button.setAttribute("aria-label", territory.name + ", " + terrain.label + ", " + owner);
-    button.title = territory.name + " · " + resource.label + " · " + owner;
+    const allianceLabel = territory.alliance_tag ? " · [" + territory.alliance_tag + "]" : "";
+    button.setAttribute("aria-label", territory.name + ", " + terrain.label + ", " + owner + allianceLabel);
+    button.title = territory.name + " · " + resource.label + " · " + owner + allianceLabel;
     button.append(make("span", "", resource.icon));
     button.append(make("small", "", territory.name));
     button.addEventListener("click", () => {
@@ -168,10 +191,14 @@ function renderTroops() {
 function updateActionButtons() {
   const territory = getSelectedTerritory();
   const hasTroops = Object.values(selectedUnits).some(quantity => Number(quantity) > 0);
-  const canVisit = Boolean(territory && territoryOwner(territory) !== "Outro reino");
+  const owner = territory ? territoryOwner(territory) : "";
+  const canVisit = Boolean(territory && (
+    owner === "Seu reino" || owner === "Sua aliança" || owner === "Território neutro"
+  ));
+  const canAttack = territoryCanBeAttacked(territory);
   $("gather").disabled = busy || !canVisit || !hasTroops;
   $("scout").disabled = busy || !canVisit || !hasTroops;
-  $("attack").disabled = busy || !territory || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  $("attack").disabled = busy || !canAttack || !hasTroops;
 }
 function renderDetails() {
   const root = $("territoryDetails");
@@ -186,16 +213,31 @@ function renderDetails() {
   const resource = RESOURCE[territory.resource_type] || { icon: "📍", label: "Recurso" };
   const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
   root.append(make("div", "territory-title", resource.icon + " " + territory.name));
-  root.append(make("p", "muted", territoryOwner(territory)));
+  const owner = territoryOwner(territory);
+  const ownerLabel = territory.owner_kingdom_name
+    ? owner + " · " + territory.owner_kingdom_name
+    : territory.alliance_name ? owner + " · " + territory.alliance_name
+    : owner;
+  root.append(make("p", "muted", ownerLabel));
   const grid = make("div", "detail-grid");
   addStat(grid, "Terreno", terrain.label);
   addStat(grid, "Recurso", resource.label);
   addStat(grid, "Produção", fmt(territory.resource_rate) + " / hora");
   addStat(grid, "Nível", fmt(territory.level || 1));
+  if (territory.alliance_tag) addStat(grid, "Aliança", "[" + territory.alliance_tag + "]");
+  if (territoryIsProtected(territory)) addStat(grid, "Proteção", "Ativa");
   root.append(grid);
-  $("marchNotice").textContent = territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
-    ? "Este território pertence a outro jogador. Ações PvP ainda não estão habilitadas."
-    : "Escolha as tropas e uma ação. O servidor confirma custos, disponibilidade e resultado.";
+  if (owner === "Outro reino") {
+    $("marchNotice").textContent = territoryIsProtected(territory)
+      ? "Este reino está protegido. O ataque ficará disponível quando a proteção terminar."
+      : "PvP habilitado: o exército defensor lutará com as tropas, herói, dragão, pesquisas e equipamentos reais. Baixas são permanentes para os dois lados. Uma confirmação será solicitada antes de partir.";
+  } else if (owner === "Território de aliança") {
+    $("marchNotice").textContent = "Território reivindicado por uma aliança. É necessária uma guerra de alianças; ataques individuais não são permitidos.";
+  } else if (owner === "Sua aliança") {
+    $("marchNotice").textContent = "Território aliado: membros podem enviar coleta e exploração. Ataques contra aliados são bloqueados.";
+  } else {
+    $("marchNotice").textContent = "Escolha as tropas e uma ação. Marchas contra territórios neutros continuam PvE e devolvem todas as tropas.";
+  }
   renderTroops();
 }
 function renderMarches() {
@@ -242,6 +284,10 @@ async function sendMarch(marchType) {
   const territory = getSelectedTerritory();
   const units = Object.fromEntries(Object.entries(selectedUnits).filter(([, quantity]) => Number(quantity) > 0));
   if (!territory || !Object.keys(units).length) return;
+  if (marchType === "attack" && territory.owner_kingdom_id && !confirm(
+    "ATENÇÃO: ataque PvP contra " + (territory.owner_kingdom_name || "outro reino") +
+    ". O servidor simulará a defesa real. As baixas serão permanentes para ambos os lados. Deseja enviar a marcha?"
+  )) return;
   busy = true;
   updateActionButtons();
   $("marchNotice").textContent = "Enviando ordem de marcha ao servidor…";
