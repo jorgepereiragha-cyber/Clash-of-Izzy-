@@ -1,5 +1,5 @@
-const CACHE_NAME="clash-of-izzy-shell-v1";
-const CORE_ASSETS=["/","/index.html","/arena.html","/manifest.json","/icon-192.svg","/icon-512.svg","/offline.html"];
+const CACHE_NAME="clash-of-izzy-shell-v2";
+const CORE_ASSETS=["/","/index.html","/arena.html","/kingdom.html","/world.html","/world-map.js","/manifest.json","/icon-192.svg","/icon-512.svg","/offline.html"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(CORE_ASSETS)).then(()=>self.skipWaiting()));
 });
