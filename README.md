@@ -28,6 +28,8 @@ Configure estes segredos no GitHub:
 - `CLOUDFLARE_API_TOKEN`: token de API Cloudflare válido (não use a Global API Key).
 - `CLOUDFLARE_ACCOUNT_ID`: ID da conta Cloudflare que contém o Worker e o banco D1.
 
+Configure também o segredo `SESSION_SECRET` diretamente no Worker Cloudflare (por exemplo, com `npx wrangler secret put SESSION_SECRET`). Use um valor aleatório forte e não o coloque no GitHub, no código ou no `wrangler.jsonc`; sem ele, a criação de reinos retorna erro 503.
+
 Permissões mínimas do token para este workflow:
 
 - D1: Edit, para executar migrações remotas.
