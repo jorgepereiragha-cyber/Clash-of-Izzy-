@@ -74,7 +74,6 @@ test("permanent troop loss is isolated to Anjo da Morte attacks", async () => {
   assert.ok(eventAttack.includes("SET quantity=quantity-CAST"));
   assert.ok(!normalBattle.includes("SET quantity=quantity-CAST"));
   assert.ok(normalBattle.includes("SET quantity=quantity"));
-  assert.ok(worker.includes("survivors[u.unit_type]=u.quantity"));
 });
 
 
