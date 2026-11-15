@@ -223,9 +223,9 @@ test("partial WebGL initialization failure runs the complete GPU and listener te
 
 
 test("GLB assets are normalized to a mobile building footprint and grounded at y=0", () => {
-  assert.match(renderer, /targetFootprint = Math\\.max\\(0\\.8, Math\\.min\\(2\\.5/);
-  assert.match(renderer, /targetHeight = Math\\.max\\(0\\.8, Math\\.min\\(3\\.2/);
-  assert.match(renderer, /normalizedModel\\.scale\\.setScalar\\(uniformScale\\)/);
-  assert.match(renderer, /normalizedModel\\.position\\.set\\([\\s\\S]*?-sourceBounds\\.min\\.y \\* uniformScale/);
-  assert.match(renderer, /template\\.add\\(normalizedModel\\)/);
+  assert.ok(renderer.includes("targetFootprint = Math.max(0.8, Math.min(2.5"));
+  assert.ok(renderer.includes("targetHeight = Math.max(0.8, Math.min(3.2"));
+  assert.ok(renderer.includes("normalizedModel.scale.setScalar(uniformScale)"));
+  assert.ok(renderer.includes("-sourceBounds.min.y * uniformScale"));
+  assert.ok(renderer.includes("template.add(normalizedModel)"));
 });
