@@ -153,3 +153,10 @@ Esta atualização é pesquisa e especificação. Não declara filas, scheduler,
 - Cura hospitalar, escudos com expiração automatizada, calendário global de eventos, WebSockets/chat instantâneo e push notifications ficam em etapas posteriores.
 - As novas filas dependem da migração 0009. Até o deploy e aplicação dessa migração, a versão em produção não recebe esse comportamento.
 - Nenhuma migração remota, merge ou deploy foi executado nesta etapa.
+
+
+## Persistência narrativa — migração 0010
+
+A campanha A Primeira Fenda e o Arquivo Velado usam agora `kingdom_story_progress`, associada ao reino e com chave primária composta por reino, campanha e etapa. O Worker valida o catálogo permitido, o nível do Castelo e o pré-requisito anterior antes de gravar. A inserção usa `INSERT OR IGNORE` e o evento de conclusão é registrado no mesmo `DB.batch()` somente quando há uma nova descoberta. Repetições não duplicam o registro. O estado da API inclui `storyProgress`, e o Centro de Comando lê esse estado do servidor. O cliente também tenta migrar progresso antigo de `localStorage`; os dados locais não são mais fonte de autoridade.
+
+Não há recompensas ou efeitos econômicos nessa primeira versão. A migração 0010 ainda precisa ser aplicada pelo pipeline em ambiente local/CI e, depois, em produção somente por deploy autorizado. Não foi executada migração remota manualmente.
