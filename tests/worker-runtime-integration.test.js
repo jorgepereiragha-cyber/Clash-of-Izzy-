@@ -380,7 +380,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "research"));
     });
 
-    await t.test("alianças: criar, convidar, entrar, promover, doar, ajudar, expulsar, guerra e território", async () => {
+    await t.test("alianças: criar, convidar, entrar, promover, doar, ajudar, expulsar, guerra e território", async allianceTest => {
       await action(tokenB, { type: "rename", name: "Reino Beta" }, 200);
       await action(tokenA, { type: "alliance_create", name: "Guardioes Alfa", tag: "ALFA" }, 200);
       await action(tokenA, { type: "alliance_invite", targetName: "Reino Beta" }, 200);
@@ -407,7 +407,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenC, { type: "alliance_join", tag: "ALFA" }, 200);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomC }, 200);
 
-      await t.test("PvP territorial real: proteção, aliança, guarnição, baixas e relatório bilateral", async () => {
+      await allianceTest.test("PvP territorial real: proteção, aliança, guarnição, baixas e relatório bilateral", async () => {
         console.log("[worker-d1] PvP state:start");
         stateA = (await api("/api/game/state", { token: tokenA })).data.state;
         console.log("[worker-d1] PvP state:done");
