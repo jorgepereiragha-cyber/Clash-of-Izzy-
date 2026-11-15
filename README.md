@@ -63,3 +63,10 @@ A interface usa Three.js com instanciamento de objetos repetidos, LOD, redução
 ## Equipamentos persistentes
 
 Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqueios são validados pelo Worker; a interface apenas solicita ações e renderiza o estado retornado pelo servidor. A migração correspondente é `0008_kingdom_equipment.sql`.
+
+
+## Renderização do reino e equipamentos de herói
+- A cidade usa um renderizador Three.js isométrico progressivo, com qualidade adaptativa, instanciamento de vegetação, materiais procedurais e fallback 2D.
+- A cena pode carregar modelos glTF/GLB pelo manifesto em `assets/3d/manifest.json`; o manifesto está preparado, mas ainda não contém modelos finais.
+- O inventário de equipamentos continua em `kingdom_equipment`; loadouts de heróis reutilizam a tabela existente `hero_equipment`, com um item por slot e sem criar um segundo sistema de inventário.
+- Os bônus de equipamento só entram em combate/produção quando o item está equipado no herói ativo (maior nível). O estado e as operações são validados no Worker.
