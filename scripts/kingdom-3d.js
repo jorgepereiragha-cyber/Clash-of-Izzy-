@@ -425,9 +425,23 @@ if (host && "WebGLRenderingContext" in window) {
     else { resizeHandler = resize; window.addEventListener("resize", resizeHandler, { passive: true }); }
     resize();
   } catch (error) {
-    console.warn("Clash of Izzy: WebGL indisponível; mantendo arte procedural 2D.", error);
-    host.classList.remove("has-3d");
-    renderer?.dispose();
+    // Initialization can fail after GPU resources or listeners were already created.
+    // Run the same deterministic teardown used by the context-loss fallback.
+    disposed = true;
+    resizeObserver?.disconnect();
+    resizeObserver = null;
+    if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+    if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+    disposeSceneResources();
+    ktx2?.dispose();
     renderer?.domElement.remove();
+    renderer?.dispose();
+    renderer = null;
+    scene = null;
+    camera = null;
+    host.classList.remove("has-3d");
+    delete host.dataset.qualityTier;
+    delete window.__coiKingdomDiagnostics;
+    console.warn("Clash of Izzy: WebGL indisponível; mantendo arte procedural 2D.", error);
   }
 }
