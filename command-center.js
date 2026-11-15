@@ -23,7 +23,7 @@ function render(){
  const k=state.kingdom||{},p=state.player||{};
  $("resources").innerHTML=[["🌾","Comida",k.food],["🪵","Madeira",k.wood],["🪨","Pedra",k.stone],["⛓","Ferro",k.iron],["🪙","Ouro",k.gold],["💎","Gemas",p.gems]].map(([icon,label,value])=>'<div class="resource"><small>'+icon+" "+label+'</small><strong>'+n(value)+'</strong></div>').join("");
  $("summary").innerHTML=[["🏰 Castelo","Nível "+n(k.castle_level)],["⚔ Tropas",n(state.totalTroops)],["🐉 Dragão","Nível "+n(state.dragon?.level)],["🛡 Aliança",state.alliance?esc(state.alliance.tag):"Sem aliança"]].map(([label,value])=>'<div class="tile"><small>'+label+'</small><strong>'+value+"</strong></div>").join("");
- renderBuildings();renderTroops();renderResearch();renderWorld();renderHeroes();renderDragon();renderAlliance();renderBattles();
+ renderBuildings();renderTroops();renderResearch();renderWorld();renderHeroes();renderDragon();renderAlliance();renderBattles();renderDailyEvents();
 }
 function renderBuildings(){
  const rows=state.buildings||[];
@@ -55,6 +55,15 @@ function renderAlliance(){
  $("allianceCreate").hidden=!!a;$("allianceJoin").hidden=!!a;$("warForm").hidden=!a||!["lider","co_lider","oficial"].includes(a.rank);
  const msgs=a?.chat||[];$("chatMessages").innerHTML=msgs.length?msgs.map(m=>'<div class="msg"><b>'+esc(m.kingdom_name||"Jogador")+'</b><div>'+esc(m.message)+'</div><small>'+esc(m.created_at||"")+'</small></div>').join(""):'<div class="empty">Sem mensagens. O chat é atualizado ao recarregar o painel.</div>';
 }
+function renderDailyEvents(){
+ const data=state.dailyEvents||{},tasks=data.tasks||[];
+ $("dailyReset").textContent=data.resetsAt?"Reinício: "+new Date(data.resetsAt).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short",timeZone:"UTC"})+" UTC":"";
+ $("dailyTasks").innerHTML=tasks.map(task=>{
+  const reward=Object.entries(task.reward||{}).map(([key,value])=>n(value)+" "+({food:"comida",wood:"madeira",stone:"pedra",iron:"ferro",gold:"ouro"}[key]||key)).join(" · ");
+  const ready=task.completed&&!task.claimed;
+  return '<article class="item"><h3>'+esc(task.icon)+' '+esc(task.title)+'</h3><div class="muted">'+esc(task.description)+'</div><div class="row"><strong>'+n(task.progress)+' / '+n(task.target)+'</strong><span class="pill">'+(task.claimed?"Resgatada":ready?"Concluída":"Em andamento")+'</span></div><div style="height:7px;background:#07111d;border-radius:9px;overflow:hidden;margin:9px 0"><div style="height:100%;width:'+Math.min(100,task.progress/task.target*100)+'%;background:linear-gradient(90deg,#b77a35,#f3d184)"></div></div><div class="row"><span class="muted">Prêmio: '+esc(reward)+'</span><button data-event-claim="'+esc(task.id)+'" '+(!ready?"disabled":"")+'>'+(task.claimed?"Resgatada":ready?"Resgatar":"Continuar")+'</button></div></article>';
+ }).join("")||'<div class="empty">Nenhuma missão diária disponível.</div>';
+}
 function renderBattles(){const rows=state.battleReports||[];$("battles").innerHTML=rows.slice(0,5).map(b=>'<div class="item"><b>'+esc(b.battle_type||"Batalha")+'</b><div class="muted">Força '+n(b.attacker_power)+' · Inimigo '+n(b.defender_power)+' · '+esc(b.created_at||"")+'</div></div>').join("")||'<div class="muted">Nenhuma batalha registrada.</div>'}
 async function refresh(){if(busy)return;try{const data=await request("/game/state");state=data.state;render();setConnection("🏰 Estado atualizado · "+(state.kingdom?.kingdom_name||"Reino"));}catch(error){notice(error.message,"error")}}
 async function act(body,success){
@@ -65,6 +74,7 @@ async function act(body,success){
 }
 $("tabs").addEventListener("click",event=>{const button=event.target.closest("[data-tab]");if(!button)return;document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected",String(x===button)));document.querySelectorAll(".section").forEach(x=>x.classList.toggle("active",x.id==="section-"+button.dataset.tab))});
 document.body.addEventListener("click",async event=>{
+ const claim=event.target.closest("[data-event-claim]");if(claim){try{await act({type:"event_claim",taskId:claim.dataset.eventClaim},"Recompensa diária resgatada.")}catch{}return}
  const up=event.target.closest("[data-upgrade]");if(up){try{await act({type:"upgrade",building:up.dataset.upgrade},"Estrutura melhorada.")}catch{}return}
  const research=event.target.closest("[data-research]");if(research){try{await act({type:"research",research:research.dataset.research},"Pesquisa concluída.")}catch{}return}
  const evolve=event.target.closest("[data-evolve]");if(evolve){try{await act({type:"hero_evolve",hero:evolve.dataset.evolve},"Herói evoluído.")}catch{}return}
