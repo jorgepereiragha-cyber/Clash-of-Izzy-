@@ -44,7 +44,7 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0012`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0014`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
 
 ## Segurança e consistência
 
@@ -107,7 +107,7 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 ## Busca global — melhoria 0014
 - A pesquisa unifica jogadores por nickname, reinos, alianças, territórios e skins na mesma API autenticada.
 - FTS5 com prefixos continua ativo; índices trigram adicionais cobrem correspondências parciais no meio de nomes e termos, com normalização de acentos.
-- Resultados são deduplicados, priorizam correspondência exata/prefixo e não expõem IDs internos. O fallback SQL continua disponível se um índice FTS estiver indisponível.
+- Resultados são deduplicados, priorizam correspondência exata/prefixo e não expõem IDs internos. A tolerância a erros usa candidatos limitados pelo índice trigram FTS5 e verificação Damerau–Levenshtein em memória; termos numéricos, curtos e CJK não recebem correção aproximada. O fallback SQL continua disponível se um índice FTS estiver indisponível.
 - A navegação mantém os resultados visíveis ao enviar a busca, informa falhas de sessão/limite/conexão e encaminha categorias para a tela de pesquisa compatível.
 
 ## Evento mundial Anjo da Morte

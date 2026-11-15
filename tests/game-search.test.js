@@ -93,7 +93,7 @@ test("search merges ranked matches across names, alliance tags, descriptions and
   assert.ok(worker.includes("const exactMatch=searchableFields.some(value=>value===queryKey)"));
   assert.ok(worker.includes("const prefixMatch=searchableFields.some(value=>value.startsWith(queryKey))"));
   assert.ok(worker.includes("const phraseMatch=searchableFields.some(value=>value.includes(queryKey))"));
-  assert.ok(worker.includes("coveredTokens===tokens.length?3:4"));
+  assert.ok(worker.includes("coveredTokens===tokens.length?3:typoCount!==null?4:5"));
   assert.ok(worker.includes('engine:usedFts?"fts5+trigram":"like-fallback"'));
   assert.ok(worker.includes("limit*4"));
   assert.ok(!worker.includes("player_email"));
@@ -153,6 +153,22 @@ test("CJK single-codepoint search is allowed while short Latin noise is rejected
   assert.ok(!alliance.includes('id="worldSearchQuery" type="search" minlength="2"'));
 });
 
+
+test("global search adds bounded typo matching only from indexed trigram candidates", async () => {
+  const worker = await read("worker.js");
+  const ranking = await read("search-ranking.js");
+  assert.ok(worker.includes('buildTrigramSearchQuery, fuzzyTokenDistance'));
+  assert.ok(worker.includes("const fuzzyQuery=buildTrigramSearchQuery(tokens)"));
+  assert.ok(worker.includes("game_search_typo_candidates_unavailable"));
+  assert.ok(worker.includes("game_player_typo_candidates_unavailable"));
+  assert.ok(worker.includes("Math.min(160,limit*8)"));
+  assert.ok(worker.includes("requireFuzzy&&typoCount===null"));
+  assert.ok(worker.includes("a._typos-b._typos"));
+  assert.ok(ranking.includes("Damerau"));
+  assert.ok(ranking.includes("supportedFuzzyToken"));
+  assert.ok(ranking.includes("firstCharacterPenalty"));
+  assert.ok(!worker.includes("SELECT * FROM game_search_documents"));
+});
 
 test("search fallback returns alliance tags for player nicknames without FTS", async () => {
   const worker = await read("worker.js");

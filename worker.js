@@ -1,6 +1,7 @@
 import { simulateBattle, calculateMarchDuration } from "./game-adapter.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
+import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -1425,6 +1426,7 @@ export default {
         const ftsQuery=tokens.map(token=>"("+tokenVariants(token).map(variant=>'"'+variant.replace(/"/g,'""')+'"*').join(" OR ")+")").join(" AND ");
         const playerFtsQuery=tokens.map(token=>'"'+token.replace(/"/g,'""')+'"*').join(" AND ");
         const substringQuery='"'+rawQuery.replace(/"/g,'""')+'"';
+        const fuzzyQuery=buildTrigramSearchQuery(tokens);
         const escaped=rawQuery.toLocaleLowerCase("en-US").replace(/[!%_]/g,ch=>"!"+ch);
         const pattern="%"+escaped+"%";
         const prefixPattern=escaped+"%";
@@ -1433,7 +1435,7 @@ export default {
         const queryKey=normalized(rawQuery);
         const resultMap=new Map();
         let usedFts=false;
-        const addResult=(item,rank=0)=>{
+        const addResult=(item,rank=0,requireFuzzy=false)=>{
           const name=item.nickname||item.name||"";
           const candidate=normalized(name);
           const searchableFields=[item.nickname,item.name,item.tag,item.description,item.kingdom_name,item.terrain]
@@ -1445,11 +1447,13 @@ export default {
             const normalizedToken=normalized(token);
             return searchableFields.some(value=>value.includes(normalizedToken));
           }).length;
-          const priority=exactMatch?0:prefixMatch?1:phraseMatch?2:coveredTokens===tokens.length?3:4;
+          const typoCount=fuzzyTokenDistance(tokens,searchableFields);
+          if(requireFuzzy&&typoCount===null)return;
+          const priority=exactMatch?0:prefixMatch?1:phraseMatch?2:coveredTokens===tokens.length?3:typoCount!==null?4:5;
           const key=item.type+"|"+candidate;
           const existing=resultMap.get(key);
-          if(!existing||priority<existing._priority||(priority===existing._priority&&Number(rank)<existing._rank))
-            resultMap.set(key,{...item,_priority:priority,_rank:Number(rank)||0});
+          if(!existing||priority<existing._priority||(priority===existing._priority&&(typoCount??99)<existing._typos)||(priority===existing._priority&&(typoCount??99)===existing._typos&&Number(rank)<existing._rank))
+            resultMap.set(key,{...item,_priority:priority,_typos:typoCount??99,_rank:Number(rank)||0});
         };
         const wantsEntities=kind!=="players";
         const wantsPlayers=kind==="all"||kind==="players";
@@ -1482,6 +1486,22 @@ export default {
                 else if(row.entity_type==="skin")addResult({type:"skin",name:row.title,description:row.subtitle},row.search_rank);
               }
             }catch(error){entitySubstringAvailable=false;console.warn("game_search_substring_unavailable",String(error?.message||error));}
+          }
+          // Typo candidates are fetched only from the indexed trigram FTS table,
+          // then strictly verified with bounded Damerau–Levenshtein distance.
+          if(fuzzyQuery){
+            try{
+              const fuzzy=await env.DB.prepare(
+                "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)), '') AS kingdom_alliance_tag,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,s.rank AS search_rank FROM game_search_substring_fts s JOIN game_search_documents d ON d.id=s.rowid WHERE game_search_substring_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1))) ORDER BY s.rank LIMIT ?"
+              ).bind(fuzzyQuery,kind,entityType,playerId,Math.min(160,limit*8)).all();
+              if((fuzzy.results||[]).length)usedFts=true;
+              for(const row of fuzzy.results||[]){
+                if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0),allianceTag:row.kingdom_alliance_tag||""},row.search_rank,true);
+                else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,description:row.subtitle,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank,true);
+                else if(row.entity_type==="territory")addResult({type:"territory",name:row.title,terrain:row.territory_terrain},row.search_rank,true);
+                else if(row.entity_type==="skin")addResult({type:"skin",name:row.title,description:row.subtitle},row.search_rank,true);
+              }
+            }catch(error){console.warn("game_search_typo_candidates_unavailable",String(error?.message||error));}
           }
           const hasType=type=>[...resultMap.values()].some(item=>item.type===type);
           const categoryLimit=kind==="all"?Math.max(1,Math.ceil(limit/5)):limit;
@@ -1521,13 +1541,23 @@ export default {
               for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0),allianceTag:row.alliance_tag||""},row.search_rank);
             }catch(error){playerSubstringAvailable=false;console.warn("game_player_substring_unavailable",String(error?.message||error));}
           }
+          // Player nickname typos use their dedicated trigram index and exclude self.
+          if(fuzzyQuery){
+            try{
+              const fuzzyPlayers=await env.DB.prepare(
+                "SELECT n.nickname,k.kingdom_name,k.castle_level,k.power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag,s.rank AS search_rank FROM game_player_substring_fts s JOIN player_nicknames n ON n.player_id=s.rowid JOIN kingdoms k ON k.player_id=n.player_id WHERE game_player_substring_fts MATCH ? AND n.player_id<>(SELECT id FROM players WHERE player_id=?) ORDER BY s.rank LIMIT ?"
+              ).bind(fuzzyQuery,playerId,Math.min(160,limit*8)).all();
+              if((fuzzyPlayers.results||[]).length)usedFts=true;
+              for(const row of fuzzyPlayers.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0),allianceTag:row.alliance_tag||""},row.search_rank,true);
+            }catch(error){console.warn("game_player_typo_candidates_unavailable",String(error?.message||error));}
+          }
           const hasPlayers=[...resultMap.values()].some(item=>item.type==="player");
           if(!hasPlayers||!playerSubstringAvailable||needsShortUnicodeFallback){
             const players=await env.DB.prepare("SELECT n.nickname,k.kingdom_name,k.castle_level,k.power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag FROM player_nicknames n JOIN kingdoms k ON k.player_id=n.player_id WHERE n.player_id<>(SELECT id FROM players WHERE player_id=?) AND n.nickname_key LIKE ? ESCAPE '!' ORDER BY CASE WHEN n.nickname_key=? THEN 0 WHEN n.nickname_key LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,n.nickname_key LIMIT ?").bind(playerId,pattern,queryKey,prefixPattern,limit).all();
             for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0),allianceTag:row.alliance_tag||""});
           }
         }
-        const results=[...resultMap.values()].sort((a,b)=>a._priority-b._priority||a._rank-b._rank||Number(b.power||0)-Number(a.power||0)||String(a.name).localeCompare(String(b.name),"pt-BR")).slice(0,limit).map(({_priority,_rank,...item})=>item);
+        const results=[...resultMap.values()].sort((a,b)=>a._priority-b._priority||a._typos-b._typos||a._rank-b._rank||Number(b.power||0)-Number(a.power||0)||String(a.name).localeCompare(String(b.name),"pt-BR")).slice(0,limit).map(({_priority,_typos,_rank,...item})=>item);
         return json({query:rawQuery,results,count:results.length,engine:usedFts?"fts5+trigram":"like-fallback"});
       }
       if(url.pathname==="/api/game/action"&&request.method==="POST"){
