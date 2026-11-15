@@ -154,6 +154,22 @@ test("CJK single-codepoint search is allowed while short Latin noise is rejected
 });
 
 
+test("global search adds bounded typo matching only from indexed trigram candidates", async () => {
+  const worker = await read("worker.js");
+  const ranking = await read("search-ranking.js");
+  assert.ok(worker.includes('buildTrigramSearchQuery, fuzzyTokenDistance'));
+  assert.ok(worker.includes("const fuzzyQuery=buildTrigramSearchQuery(tokens)"));
+  assert.ok(worker.includes("game_search_typo_candidates_unavailable"));
+  assert.ok(worker.includes("game_player_typo_candidates_unavailable"));
+  assert.ok(worker.includes("Math.min(160,limit*8)"));
+  assert.ok(worker.includes("requireFuzzy&&typoCount===null"));
+  assert.ok(worker.includes("a._typos-b._typos"));
+  assert.ok(ranking.includes("Damerau"));
+  assert.ok(ranking.includes("supportedFuzzyToken"));
+  assert.ok(ranking.includes("firstCharacterPenalty"));
+  assert.ok(!worker.includes("SELECT * FROM game_search_documents"));
+});
+
 test("search fallback returns alliance tags for player nicknames without FTS", async () => {
   const worker = await read("worker.js");
   assert.ok(worker.includes("COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag"));
