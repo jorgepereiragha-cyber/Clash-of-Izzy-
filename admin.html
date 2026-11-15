@@ -24,11 +24,12 @@ footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
 <form id="loginForm">
 <div class="form"><input id="email" type="email" autocomplete="username" placeholder="E-mail administrativo" required><input id="password" type="password" autocomplete="current-password" placeholder="Senha" required><button type="submit">Entrar</button></div>
 </form>
+<div id="notice" role="status" aria-live="polite"></div>
 <section id="dashboard">
 <div class="toolbar"><h2>👑 Jogadores do reino</h2><button class="secondary" id="logout" type="button">Sair</button></div>
 <p class="sub">Pesquise por nickname ou ID. Selecione um jogador para consultar os dados e, se necessário, creditar gemas.</p>
 <form id="searchForm" class="form"><input id="query" maxlength="64" placeholder="Digite nickname ou ID do jogador" required><button type="submit">Pesquisar</button></form>
-<div id="notice" role="status" aria-live="polite"></div><div id="results" class="results"></div>
+<div id="results" class="results"></div>
 </section>
 </section><footer>Clash of Izzy · Ações administrativas protegidas por sessão.</footer>
 </main>
@@ -62,5 +63,6 @@ async function searchPlayers(query){showNotice("Consultando o reino…");const d
 $("loginForm").addEventListener("submit",async event=>{event.preventDefault();showNotice("Validando acesso…");try{const data=await api("/admin/login",{email:$("email").value,password:$("password").value},false);token=data.token;sessionStorage.setItem("coi_admin_token",token);$("password").value="";setLoggedIn(true);showNotice("Acesso administrativo liberado.")}catch(e){showNotice(e.message)}});
 $("searchForm").addEventListener("submit",async event=>{event.preventDefault();try{await searchPlayers($("query").value.trim())}catch(e){showNotice(e.message);if(/sessão/i.test(e.message)){token="";sessionStorage.removeItem("coi_admin_token");setLoggedIn(false)}}});
 $("logout").addEventListener("click",()=>{token="";sessionStorage.removeItem("coi_admin_token");$("results").replaceChildren();showNotice("Sessão encerrada.");setLoggedIn(false)});
-setLoggedIn(false);
+setLoggedIn(Boolean(token));
+if(token)showNotice("Sessão administrativa recuperada.");
 </script></body></html>
