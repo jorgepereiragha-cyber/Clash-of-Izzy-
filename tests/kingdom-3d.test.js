@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { selectKingdomQualityProfile } from "../scripts/kingdom-quality.js";
+import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "../scripts/kingdom-quality.js";
 
 const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
@@ -125,4 +125,17 @@ test("renderer diagnostics expose only local rendering counters and are cleaned 
   assert.match(renderer, /geometries: info\.memory\.geometries/);
   assert.match(renderer, /textures: info\.memory\.textures/);
   assert.match(renderer, /delete window\.__coiKingdomDiagnostics/);
+});
+
+
+test("drawing buffer pixel count is capped for tall and high-density mobile viewports", () => {
+  const low = selectKingdomQualityProfile({ deviceMemory: 3, hardwareConcurrency: 4, viewportWidth: 390, maxTextureSize: 4096 });
+  const balanced = selectKingdomQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, viewportWidth: 720, maxTextureSize: 8192 });
+  const lowRatio = calculateKingdomPixelRatio({ width: 390, height: 844, devicePixelRatio: 3, profile: low });
+  const balancedRatio = calculateKingdomPixelRatio({ width: 720, height: 1600, devicePixelRatio: 3, profile: balanced });
+  assert.ok(390 * 844 * lowRatio * lowRatio <= low.maxPixelCount + 1);
+  assert.ok(720 * 1600 * balancedRatio * balancedRatio <= balanced.maxPixelCount + 1);
+  assert.ok(lowRatio < 1);
+  assert.ok(balancedRatio < balanced.pixelRatioCap);
+  assert.equal(calculateKingdomPixelRatio({ width: 1, height: 1, devicePixelRatio: 0, profile: low }), 0.5);
 });
