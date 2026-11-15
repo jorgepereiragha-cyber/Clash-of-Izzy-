@@ -345,7 +345,7 @@ async function processMarches(env,kingdomId){
      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
     });
     simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
-    losses=simulation.losses||{};battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
+    losses=simulation.losses||{};battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,criticalHits:simulation.criticalHits||0,permanentLosses:false},...(simulation.log||[])];
     for(const u of army)survivors[u.unit_type]=u.quantity;
    }else{
     for(const u of army)survivors[u.unit_type]=u.quantity;
@@ -1068,7 +1068,7 @@ async function gameAction(env,playerId,body){
       statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"royal_blueprint",k.id,actionId));
     }
     statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,?,?,?,?,?,?,? WHERE "+guard)
-      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent},{event:"combat_simulated",rounds:simulation.rounds,criticalHits:simulation.criticalHits||0,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}]),k.id,actionId));
+      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent},{event:"combat_simulated",rounds:simulation.rounds,criticalHits:simulation.criticalHits||0,permanentLosses:false,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}]),k.id,actionId));
     if(won){
       const ledgerRows=Object.entries(rewards).filter(([,amount])=>amount>0);
       if(ledgerRows.length)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+ledgerRows.map(()=> "SELECT ?,?,?,? WHERE "+guard).join(" UNION ALL "))
@@ -1116,12 +1116,12 @@ async function angelDeathEventState(env,playerId){
   if(player){
     participant=await env.DB.prepare("SELECT score,damage,attacks,troops_lost,last_attack_at FROM world_event_participants WHERE event_id=? AND kingdom_id=?").bind(event.id,player.id).first();
     if(participant){
-      const rank=await env.DB.prepare("SELECT COUNT(*)+1 AS rank FROM world_event_participants WHERE event_id=? AND (score>? OR (score=? AND damage>?))")
-        .bind(event.id,participant.score,participant.score,participant.damage).first();
+      const rank=await env.DB.prepare("SELECT COUNT(*)+1 AS rank FROM world_event_participants WHERE event_id=? AND (score>? OR (score=? AND damage>?) OR (score=? AND damage=? AND last_attack_at<?) OR (score=? AND damage=? AND last_attack_at=? AND kingdom_id<?))")
+        .bind(event.id,participant.score,participant.score,participant.damage,participant.score,participant.damage,participant.last_attack_at,participant.score,participant.damage,participant.last_attack_at,player.id).first();
       participant={...participant,rank:Number(rank?.rank||1)};
     }else participant={score:0,damage:0,attacks:0,troops_lost:0,rank:null,last_attack_at:null};
   }
-  const rows=await env.DB.prepare("SELECT COALESCE(n.nickname,p.name,k.kingdom_name) AS display_name,k.kingdom_name,ep.score,ep.damage,ep.attacks,ep.troops_lost FROM world_event_participants ep JOIN kingdoms k ON k.id=ep.kingdom_id JOIN players p ON p.id=k.player_id LEFT JOIN player_nicknames n ON n.player_id=p.id WHERE ep.event_id=? AND ep.score>0 ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC LIMIT 10")
+  const rows=await env.DB.prepare("SELECT COALESCE(n.nickname,NULLIF(p.name,'Jogador'),k.kingdom_name) AS display_name,k.kingdom_name,ep.score,ep.damage,ep.attacks,ep.troops_lost FROM world_event_participants ep JOIN kingdoms k ON k.id=ep.kingdom_id JOIN players p ON p.id=k.player_id LEFT JOIN player_nicknames n ON n.player_id=p.id WHERE ep.event_id=? AND ep.score>0 ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC LIMIT 10")
     .bind(event.id).all();
   return {event:{...event,boss_name:ANGEL_DEATH_EVENT.name,boss_epithet:ANGEL_DEATH_EVENT.epithet,boss_level:ANGEL_DEATH_EVENT.level,timezone:ANGEL_DEATH_EVENT.timezone,schedule:ANGEL_DEATH_EVENT.schedule},participant,leaderboard:rows.results||[]};
 }
@@ -1142,7 +1142,7 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   if(duplicate){
     const snapshot=JSON.parse(duplicate.troop_losses_json||"{}");
     const losses=Object.fromEntries(Object.entries(snapshot).map(([key,value])=>[key,Number(value?.loss||0)]));
-    return json({success:true,duplicate:true,damage:Number(duplicate.damage||0),score:Number(duplicate.score||0),losses});
+    return json({success:true,duplicate:true,damage:Number(duplicate.damage||0),score:Number(duplicate.score||0),losses,troopsLost:Object.values(losses).reduce((sum,value)=>sum+value,0)});
   }
   if(Number(event.boss_hp_remaining)<=0)return json({error:"O Anjo da Morte já foi derrotado. A classificação será fechada no fim de semana."},409);
   const requested=body.units;
@@ -1205,9 +1205,9 @@ async function distributeAngelDeathRewards(env,eventId,now=new Date()){
   const participants=await env.DB.prepare("SELECT ep.kingdom_id,k.player_id,ep.score FROM world_event_participants ep JOIN kingdoms k ON k.id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0 ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC")
     .bind(eventId).all();
   const rows=participants.results||[];
-  for(let offset=0;offset<rows.length;offset+=40){
+  for(let offset=0;offset<rows.length;offset+=15){
     const statements=[];
-    for(let index=offset;index<Math.min(rows.length,offset+40);index++){
+    for(let index=offset;index<Math.min(rows.length,offset+15);index++){
       const participant=rows[index],rank=index+1,reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
       statements.push(env.DB.prepare("INSERT OR IGNORE INTO world_event_rewards(event_id,kingdom_id,rank,score,reward_json) VALUES(?,?,?,?,?)").bind(eventId,participant.kingdom_id,rank,participant.score,rewardJson));
       statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()>0").bind(reward.food,reward.wood,reward.stone,reward.iron,reward.gold,participant.kingdom_id));
