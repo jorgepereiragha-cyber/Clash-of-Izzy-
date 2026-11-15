@@ -852,6 +852,25 @@ export default {
   const url=new URL(request.url);
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
+  if(url.pathname==="/api/health"&&request.method==="GET"){
+    const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars"];
+    let missingTables=[...requiredTables];
+    if(env.DB){
+      try{
+        await env.DB.prepare("SELECT 1 AS ready").first();
+        checks.database=true;
+        const rows=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
+        const existing=new Set((rows.results||[]).map(row=>row.name));
+        missingTables=requiredTables.filter(name=>!existing.has(name));
+        checks.schema=missingTables.length===0;
+      }catch(error){
+        console.error("health_check_failed",String(error?.message||error));
+      }
+    }
+    const ready=checks.database&&checks.session&&checks.schema;
+    return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables},ready?200:503);
+  }
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
   if(url.pathname==="/api/store/catalog"&&request.method==="GET"){
     try{
