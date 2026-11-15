@@ -23,7 +23,7 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
 
 test("3D scene is mobile-conscious and does not run an unnecessary animation loop", () => {
   assert.match(renderer, /powerPreference: "low-power"/);
-  assert.match(renderer, /Math\.min\(window\.devicePixelRatio \|\| 1, qualityProfile\.pixelRatioCap\)/);
+  assert.match(renderer, /calculateKingdomPixelRatio\(\{ width: host\.clientWidth, height: host\.clientHeight, devicePixelRatio: window\.devicePixelRatio \|\| 1, profile: qualityProfile \}\)/);
   assert.match(renderer, /renderer\.shadowMap\.enabled = qualityProfile\.shadows/);
   assert.match(renderer, /ResizeObserver/);
   assert.doesNotMatch(renderer, /requestAnimationFrame/);
@@ -138,4 +138,13 @@ test("drawing buffer pixel count is capped for tall and high-density mobile view
   assert.ok(lowRatio < 1);
   assert.ok(balancedRatio < balanced.pixelRatioCap);
   assert.equal(calculateKingdomPixelRatio({ width: 1, height: 1, devicePixelRatio: 0, profile: low }), 0.5);
+});
+
+
+test("pixel budget is reapplied on resize for tall high-density mobile viewports", () => {
+  const profile = selectKingdomQualityProfile({ deviceMemory: 4, hardwareConcurrency: 4, viewportWidth: 390, maxTextureSize: 4096 });
+  const ratio = calculateKingdomPixelRatio({ width: 390, height: 844, devicePixelRatio: 3, profile });
+  assert.ok(ratio <= 1);
+  assert.ok(390 * 844 * ratio * ratio <= profile.maxPixelCount + 1);
+  assert.match(renderer, /const resize = \(\) => \{[\s\S]*?calculateKingdomPixelRatio/);
 });
