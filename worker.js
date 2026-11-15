@@ -241,8 +241,8 @@ async function applyProduction(env,kingdomId){
     iron:2*(levels.iron_mine||1),
     gold:1.5*(levels.market||1)
   };
-  const equipmentRows=await env.DB.prepare("SELECT item_key,level,is_locked FROM kingdom_equipment WHERE kingdom_id=?").bind(kingdomId).all().catch(()=>({results:[]}));
-  const equipmentProductionBonus=equipmentBonuses(equipmentRows.results||[]).resourcePercent/100;
+  const equipmentRows=await ensureEquipmentTables(env,kingdomId);
+  const equipmentProductionBonus=equipmentBonuses(equipmentRows).resourcePercent/100;
   const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
