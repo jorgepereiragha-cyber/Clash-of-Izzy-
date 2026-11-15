@@ -11,7 +11,7 @@
 #controls{position:fixed;bottom:calc(18px + env(safe-area-inset-bottom));left:12px;z-index:3;display:grid;grid-template-columns:42px 42px 42px;grid-template-rows:42px 42px;gap:4px}.move{background:#17283dcc;border:1px solid #b88b45;color:white;border-radius:8px;font-size:18px;touch-action:none}.up{grid-column:2}.left{grid-column:1;grid-row:2}.down{grid-column:2;grid-row:2}.right{grid-column:3;grid-row:2}
 #rightActions{position:fixed;right:12px;bottom:calc(24px + env(safe-area-inset-bottom));z-index:3;display:flex;flex-direction:column;gap:8px}.action{background:#68451f;border:1px solid #e0b75d;color:#fff;padding:11px;border-radius:8px;font-weight:bold}
 #message{position:fixed;left:50%;top:45%;transform:translate(-50%,-50%);font-size:30px;font-weight:900;text-shadow:0 3px 8px black;display:none;z-index:5;text-align:center}
-#shop{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:8;padding:16px}#shop .inside{max-width:430px;width:100%;max-height:88vh;overflow:auto;background:#17283c;border:1px solid #e0b75d;border-radius:12px;padding:20px}#catalog{display:grid;gap:7px;margin:10px 0}#catalog button{display:flex;justify-content:space-between;gap:10px;text-align:left;width:100%;margin:0}#shop button{margin:5px;padding:10px;background:#68451f;border:1px solid #e0b75d;color:white;border-radius:7px}
+#shop{position:fixed;inset:0;background:#000b;display:none;align-items:center;justify-content:center;z-index:8;padding:16px}#shop .inside{max-width:430px;width:100%;max-height:88vh;overflow:auto;background:#17283c;border:1px solid #e0b75d;border-radius:12px;padding:20px}#catalog{display:grid;gap:7px;margin:10px 0}#catalog button{display:flex;justify-content:space-between;gap:10px;text-align:left;width:100%;margin:0}#kingdomStore{margin:14px 0;text-align:left}#kingdomStore h3{color:#f1c46a;margin:12px 0 6px}#kingdomStore .storeGrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:8px;margin:8px 0}#kingdomStore .storeCard{background:#0e1a29;border:1px solid #50647b;border-radius:9px;padding:10px;min-width:0}#kingdomStore .storeCard strong{display:block;color:#f5d28c;margin-bottom:4px}#kingdomStore .storeCard small{display:block;color:#c4ced9;line-height:1.4;margin-bottom:7px}#kingdomStore .storeCard button{width:100%;margin:3px 0 0;padding:8px;font-size:12px}#kingdomStore .storeMuted{color:#aeb9c8;font-size:12px}#shop button{margin:5px;padding:10px;background:#68451f;border:1px solid #e0b75d;color:white;border-radius:7px}
 #help{position:fixed;right:10px;top:86px;z-index:2;max-width:180px;font-size:11px;opacity:.9}
 #kingdomStatus{font-size:11px;max-width:290px;line-height:1.4}@media(max-width:650px){#kingdomStatus{max-width:160px;font-size:9px}}@media(max-width:650px){#help{display:none}.card{padding:7px;font-size:11px}.stats{gap:6px}.bar{min-width:90px}#skills{bottom:12px;left:auto;right:10px;transform:none;gap:4px}.skill{width:46px;height:50px;font-size:15px}#controls{bottom:15px}.action{padding:8px;font-size:11px}#objective{top:72px;font-size:11px}}
 
@@ -61,7 +61,7 @@
  <div id="territoryList"><div class="territoryCard">Carregando territórios…</div></div>
 </section>
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
-<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Selecione um item para consultar e comprar pelo WhatsApp. Skins de R$ 50 a R$ 1.000.</p><div id="catalog">Carregando catálogo oficial…</div><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
+<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Selecione um item para consultar e comprar pelo WhatsApp. Skins de R$ 50 a R$ 1.000.</p><div id="catalog">Carregando catálogo oficial…</div><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 const API_BASE='/api';
@@ -93,6 +93,7 @@ async function connectKingdom(){
   status.textContent='🏰 '+(k.kingdom_name||'Reino')+' · 🪙 '+Number(k.gold||0).toLocaleString('pt-BR')+' ouro · 💎 '+Number(p.gems||0).toLocaleString('pt-BR')+' gemas · ⚔ '+Number(kingdomSession.totalTroops||0).toLocaleString('pt-BR')+' tropas';
   document.getElementById('heroName').textContent=(p.name||'Lorde de Eldoria')+' · Reino conectado';
   document.getElementById('gold').textContent=Number(k.gold||0).toLocaleString('pt-BR');
+  renderKingdomStore();
  }catch(error){
   status.textContent='⚠️ Modo demonstração · '+error.message;
   console.warn('Clash of Izzy: falha ao conectar ao reino:',error);
@@ -372,13 +373,24 @@ function createMinion(team,x,lane){
  const healthFill=new THREE.Mesh(healthBarGeometry,blue?healthBlueMaterial:healthRedMaterial);healthFill.position.z=.006;healthFill.scale.set(1,1,1);healthBar.add(healthFill);g.add(healthBar);
  scene.add(g);return {mesh:g,legs,body,shield,spear,baseShieldX:shield.position.x,baseShieldZ:shield.rotation.z,baseSpearZ:spear.rotation.z,attackTimer:0,guardTimer:0,hitTimer:0,healthFill,healthBar,walkPhase:Math.random()*6.28,team,hp:140,max:140,damage:16,speed:4.5,lane,cd:0};
 }
+const keys={},touch={up:false,down:false,left:false,right:false};const skillCooldowns={q:0,w:0,e:0,r:0};const skillCooldownMax={q:4,w:7,e:10,r:35};let gold=500,kills=0,ended=false,damageBonus=0,speedBonus=0,healthBonus=0;
+const MAX_MINIONS=72,WAVE_INTERVAL_MS=18000;
 function spawnWave(){
  for(let i=minions.length-1;i>=0;i--){if(minions[i].hp<=0){scene.remove(minions[i].mesh);minions.splice(i,1)}}
+ if(minions.length+18>MAX_MINIONS)return false;
  for(const lane of [-20,0,20])for(let i=0;i<3;i++)minions.push(createMinion('blue',-39-i*1.2,lane));
  for(const lane of [-20,0,20])for(let i=0;i<3;i++)minions.push(createMinion('red',39+i*1.2,lane));
+ return true;
 }
-spawnWave();setInterval(()=>{if(!ended)spawnWave()},18000);
-const keys={},touch={up:false,down:false,left:false,right:false};const skillCooldowns={q:0,w:0,e:0,r:0};const skillCooldownMax={q:4,w:7,e:10,r:35};let gold=500,kills=0,ended=false,damageBonus=0,speedBonus=0,healthBonus=0;
+let waveInterval=null;
+function stopWaveTimer(){if(waveInterval!==null){clearInterval(waveInterval);waveInterval=null}}
+function startWaveTimer(){
+ if(waveInterval!==null||document.hidden||ended)return;
+ waveInterval=setInterval(()=>{if(document.hidden||ended)return;spawnWave()},WAVE_INTERVAL_MS);
+}
+spawnWave();
+document.addEventListener('visibilitychange',()=>{if(document.hidden)stopWaveTimer();else startWaveTimer()});
+startWaveTimer();
 window.addEventListener('keydown',e=>{const k=e.key.toLowerCase();keys[k]=true;if([' ','arrowup','arrowdown','arrowleft','arrowright'].includes(k))e.preventDefault();if(e.repeat)return;if(k===' ')attack();if(k==='b')toggleShop(true);if(['q','w','e','r'].includes(k))skill(k)});
 window.addEventListener('keyup',e=>keys[e.key.toLowerCase()]=false);
 document.querySelectorAll('[data-move]').forEach(b=>{const k=b.dataset.move;const on=e=>{e.preventDefault();touch[k]=true},off=e=>{e.preventDefault();touch[k]=false};b.addEventListener('pointerdown',on);b.addEventListener('pointerup',off);b.addEventListener('pointerleave',off);b.addEventListener('pointercancel',off)});
@@ -389,10 +401,92 @@ function attack(){if(ended)return;player.swing=.28;const t=nearestEnemy(5);if(t)
 function skill(k){if(ended||skillCooldowns[k]>0||player.mana<({q:15,w:20,e:25,r:45}[k]))return;player.mana-=({q:15,w:20,e:25,r:45}[k]);skillCooldowns[k]=skillCooldownMax[k];player.swing=.42;const radius=k==='r'?15:k==='e'?9:k==='q'?7:0;const colors={q:0xffd45c,w:0x78d7ff,e:0xff8a3d,r:0xc58aff};burstAt(player.group.position,colors[k],k==='r'?2.8:k==='e'?1.8:k==='q'?1.25:.9);if(k==='w'){player.group.position.x=Math.min(42,player.group.position.x+9);burstAt(player.group.position,colors.w,1.35)}else{const damage=k==='r'?390:k==='e'?180:115;for(const target of [bot,...minions.filter(m=>m.team==='red'&&m.hp>0).map(m=>({group:m.mesh,hp:m.hp,unit:m}))]){const p=target.group?.position;if(p&&player.group.position.distanceTo(p)<radius)hurt(target,damage)}}updateHud()}
 function finish(win){ended=true;const m=document.getElementById('message');m.innerHTML=win?'🏆 VITÓRIA!<br><small>O Nexus inimigo caiu.</small>':'💀 DERROTA';m.style.display='block';}
 function updateSkillHud(){document.querySelectorAll('[data-skill]').forEach(b=>{const k=b.dataset.skill;const remaining=skillCooldowns[k];const small=b.querySelector('small');b.disabled=remaining>0||player.mana<({q:15,w:20,e:25,r:45}[k]);if(remaining>0){small.textContent=remaining.toFixed(1)+'s';small.classList.add('cooldown')}else{small.textContent=({q:'Solar',w:'Avanço',e:'Explosão',r:'Suprema'})[k];small.classList.remove('cooldown')}})}function updateHud(){const hpRatio=Math.max(0,Math.min(1,player.hp/player.max));document.getElementById('hp').style.width=(hpRatio*100)+'%';document.getElementById('hpText').textContent=Math.ceil(Math.max(0,player.hp))+'/'+player.max;document.getElementById('hp').parentElement.classList.toggle('critical',hpRatio<=.25);document.getElementById('mp').style.width=Math.max(0,Math.min(100,player.mana/player.maxMana*100))+'%';document.getElementById('mpText').textContent=Math.floor(player.mana)+'/'+player.maxMana;document.getElementById('gold').textContent=gold;document.getElementById('kills').textContent=kills;document.getElementById('nexusHp').textContent=Math.max(0,Math.ceil(redNexus.hp/redNexus.max*100))+'%';updateSkillHud()}
-function toggleShop(show){document.getElementById('shop').style.display=show?'flex':'none'}
+function toggleShop(show){document.getElementById('shop').style.display=show?'flex':'none';if(show)refreshKingdomStore()}
 document.getElementById('attack').onclick=attack;document.querySelectorAll('[data-skill]').forEach(b=>b.onclick=()=>skill(b.dataset.skill));document.getElementById('openShop').onclick=()=>toggleShop(true);document.getElementById('closeShop').onclick=()=>toggleShop(false);
 document.getElementById('buyDamage').onclick=()=>{if(gold<300)return;gold-=300;damageBonus+=25;updateHud()};document.getElementById('buyHealth').onclick=()=>{if(gold<250)return;gold-=250;healthBonus+=150;player.max+=150;player.hp=Math.min(player.max,player.hp+150);updateHud()};document.getElementById('buySpeed').onclick=()=>{if(gold<200)return;gold-=200;speedBonus+=2;updateHud()};
 document.getElementById('whatsapp').onclick=()=>window.open('https://wa.me/5547996531437?text='+encodeURIComponent('Olá! Quero consultar os pacotes e skins do Clash of Izzy.'),'_blank');
+function storeCard(title,description,buttonLabel,onClick,disabled=false){
+ const card=document.createElement('article');card.className='storeCard';
+ const heading=document.createElement('strong');heading.textContent=title;
+ const detail=document.createElement('small');detail.textContent=description;
+ const button=document.createElement('button');button.type='button';button.textContent=buttonLabel;button.disabled=disabled;
+ if(onClick)button.addEventListener('click',onClick);
+ card.append(heading,detail,button);return card;
+}
+async function runStoreAction(payload,button){
+ if(button)button.disabled=true;
+ try{
+  const result=await chatApi('/game/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  kingdomSession=result.state;renderKingdomStore();
+  const status=document.getElementById('storeStatus');if(status)status.textContent='Operação concluída e reino atualizado.';
+ }catch(error){
+  const status=document.getElementById('storeStatus');if(status)status.textContent=error.message;
+  if(button)button.disabled=false;
+ }
+}
+function renderKingdomStore(){
+ const root=document.getElementById('kingdomStore');if(!root)return;
+ root.replaceChildren();
+ const heading=document.createElement('h3');heading.textContent='🏰 Loja e Coleções do Reino';root.append(heading);
+ const status=document.createElement('p');status.id='storeStatus';status.className='storeMuted';
+ if(!kingdomSession){status.textContent='Conecte seu reino para acessar a loja interna.';root.append(status);return}
+ const cosmetics=kingdomSession.cosmetics||{},shop=kingdomSession.shop||{},player=kingdomSession.player||{},kingdom=kingdomSession.kingdom||{};
+ status.textContent='💎 '+Number(player.gems||0).toLocaleString('pt-BR')+' gemas · 🪙 '+Number(kingdom.gold||0).toLocaleString('pt-BR')+' ouro · ✨ '+Number(cosmetics.shards||0).toLocaleString('pt-BR')+' fragmentos';
+ root.append(status);
+ const owned=new Set((cosmetics.owned||[]).map(x=>x.item_id));
+ const collections=cosmetics.collections||[];
+ const collectionTitle=document.createElement('h3');collectionTitle.textContent='🎖️ Recompensas de coleção';root.append(collectionTitle);
+ const collectionGrid=document.createElement('div');collectionGrid.className='storeGrid';
+ for(const collection of collections){
+  const required=collection.special?collections.filter(x=>!x.special).flatMap(x=>x.skins||[]):(collection.skins||[]);
+  const uniqueRequired=[...new Set(required)],progress=uniqueRequired.filter(id=>owned.has(id)).length;
+  const complete=progress===uniqueRequired.length,claimed=(cosmetics.claimed||[]).includes(collection.id);
+  const description=collection.special?'Complete todas as coleções anteriores.':collection.desc+' · '+progress+'/'+uniqueRequired.length+' skins';
+  const buttonLabel=claimed?'Recompensa resgatada':complete?'Resgatar '+Number(collection.gems||0).toLocaleString('pt-BR')+' gemas + '+Number(collection.shards||0)+' fragmentos':'Coleção em andamento';
+  collectionGrid.append(storeCard(collection.icon+' '+collection.name,description,buttonLabel,()=>runStoreAction({type:'cosmetic_claim',collection:collection.id}),!complete||claimed));
+ }
+ root.append(collectionGrid);
+ const seasonTitle=document.createElement('h3');seasonTitle.textContent='🌙 Skins da temporada';root.append(seasonTitle);
+ const seasonGrid=document.createElement('div');seasonGrid.className='storeGrid';
+ for(const skin of cosmetics.seasonal||[]){
+  const has=owned.has(skin.id),active=Boolean(cosmetics.seasonActive);
+  const desc=(skin.theme||'Skin especial')+' · '+(skin.special||'Visual exclusivo')+' · '+Number(skin.price||0).toLocaleString('pt-BR')+' gemas';
+  seasonGrid.append(storeCard(skin.icon+' '+skin.name,desc,has?'Já adquirida':active?'Adquirir skin':'Temporada encerrada',()=>runStoreAction({type:'seasonal_buy',skin:skin.id}),has||!active));
+ }
+ if(!seasonGrid.children.length){const note=document.createElement('p');note.className='storeMuted';note.textContent='Nenhuma skin sazonal disponível.';seasonGrid.append(note)}
+ root.append(seasonGrid);
+ const fusionTitle=document.createElement('h3');fusionTitle.textContent='⚒️ Forja de skins';root.append(fusionTitle);
+ const fusionGrid=document.createElement('div');fusionGrid.className='storeGrid';
+ for(const recipe of cosmetics.fusions||[]){
+  const output=recipe.output||{},ready=(recipe.inputs||[]).every(id=>owned.has(id)),already=owned.has(output.id);
+  const description='Receita: '+(recipe.inputs||[]).join(' + ')+' · Custo: 50 fragmentos';
+  fusionGrid.append(storeCard((output.icon||'✨')+' '+(output.name||'Skin fundida'),description,already?'Já possui':ready?'Fundir skins':'Faltam skins ou fragmentos',()=>runStoreAction({type:'skin_fuse',inputs:recipe.inputs}),!ready||already||Number(cosmetics.shards||0)<50));
+ }
+ root.append(fusionGrid);
+ const items=shop.items||{},offers=shop.offers||[];
+ const itemTitle=document.createElement('h3');itemTitle.textContent='🛒 Mercado de recursos';root.append(itemTitle);
+ const itemGrid=document.createElement('div');itemGrid.className='storeGrid';
+ for(const [id,item] of Object.entries(items)){
+  const currency=item.currency==='gems'?'gemas':'ouro';
+  itemGrid.append(storeCard((item.icon||'📦')+' '+item.name,item.desc+' · '+Number(item.price||0).toLocaleString('pt-BR')+' '+currency,'Comprar',()=>runStoreAction({type:'shop_buy',item:id,source:'shop'})));
+ }
+ root.append(itemGrid);
+ if(offers.length){
+  const merchantTitle=document.createElement('h3');merchantTitle.textContent='🧳 Mercador itinerante';root.append(merchantTitle);
+  const merchantGrid=document.createElement('div');merchantGrid.className='storeGrid';
+  for(const offer of offers){
+   const currency=offer.currency==='gems'?'gemas':'ouro',stock=Number(offer.stock||0);
+   merchantGrid.append(storeCard((offer.icon||'🧳')+' '+offer.name,offer.desc+' · '+Number(offer.price||0).toLocaleString('pt-BR')+' '+currency+' · Estoque: '+stock,stock>0?'Comprar oferta':'Esgotado',()=>runStoreAction({type:'shop_buy',item:offer.id,source:'merchant'}),stock<=0));
+  }
+  root.append(merchantGrid);
+ }
+ const note=document.createElement('p');note.className='storeMuted';note.textContent='As skins ficam registradas na coleção. A opção de equipar e visualizar cada aparência no castelo será integrada ao sistema visual em uma etapa própria; esta tela não promete equipagem ainda.';
+ root.append(note);
+}
+async function refreshKingdomStore(){
+ try{const data=await chatApi('/game/state');kingdomSession=data.state;renderKingdomStore()}
+ catch(error){renderKingdomStore();const status=document.getElementById('storeStatus');if(status)status.textContent=error.message}
+}
 async function loadCatalog(){
  const box=document.getElementById('catalog');
  try{
