@@ -89,6 +89,7 @@ test("search merges ranked matches across names, alliance tags, descriptions and
   const worker = await read("worker.js");
   assert.ok(worker.includes("resultMap=new Map()"));
   assert.ok(worker.includes("searchableFields=[item.nickname,item.name,item.tag,item.description,item.kingdom_name,item.terrain]"));
+  assert.ok(worker.includes('description:row.subtitle,level:Number(row.alliance_level||1)'));
   assert.ok(worker.includes("const exactMatch=searchableFields.some(value=>value===queryKey)"));
   assert.ok(worker.includes("const prefixMatch=searchableFields.some(value=>value.startsWith(queryKey))"));
   assert.ok(worker.includes("const phraseMatch=searchableFields.some(value=>value.includes(queryKey))"));
