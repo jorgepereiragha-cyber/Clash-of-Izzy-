@@ -27,12 +27,20 @@
 - A cena 3D é renderizada sob demanda, sem loop contínuo; não há animação de câmera ou ciclo de jogo nesta tela ainda.
 
 ## Regras de desempenho
-- Canvas 2D fallback limita DPR a 1.5; Three.js limita DPR a 1.25 e reduz para 1.0 em dispositivos que reportam até 4 GB de memória.
-- Redimensionar via `ResizeObserver` e renderizar quando os dados/tamanho mudarem, sem loop de animação permanente.
-- Sombras 3D ficam desativadas em áreas estreitas (abaixo de 680 px) para reduzir custo em dispositivos móveis.
+- Canvas 2D fallback limita DPR a 1.5. Three.js escolhe perfis low/balanced/high por memória, núcleos reportados, largura da viewport e limite de textura da GPU; os tetos de DPR são 1.0/1.25/1.5.
+- O framebuffer 3D também respeita orçamento de pixels por perfil (1.2/2.4/4.2 milhões), recalculado na inicialização e em cada `ResizeObserver`/resize para evitar picos em telas altas e HiDPI.
+- Sombras 3D ficam desativadas no perfil low e no perfil balanced com viewport até 1024 px; o perfil high pode ativá-las com shadow map limitado por tier.
 - Manter modelos procedurais como fallback até cada GLB real estar validado e habilitado no manifesto.
 - GLB clones são anexados explicitamente à cena; carregamentos assíncronos reaplicam o estado mais recente do reino para evitar modelos obsoletos após atualização rápida.
 - Se o contexto WebGL for perdido, desconectar observadores de tamanho, descartar o renderer e impedir novas chamadas de renderização; o Canvas 2D assume a exibição.
 - Canvas decorativo não intercepta toques; controles HTML permanecem acessíveis.
 - Respeitar `prefers-reduced-motion`.
 - Testar em Android real antes de elevar resolução, sombras ou efeitos.
+
+
+## Referências de engenharia aplicadas
+- Three.js recomenda limitar a resolução interna em telas HiDPI para evitar carga excessiva de GPU; o projeto aplica um teto de pixels por perfil também após redimensionamento.
+- Khronos KTX2/Basis mantém texturas em formato comprimido na GPU quando o hardware permite; adotar apenas junto de assets reais validados e manter fallback.
+- Android Developers recomenda medir CPU/GPU por cena, comparar antes/depois e observar consistência de frames e carga térmica em dispositivos reais.
+- Durable Objects com WebSocket Hibernation e mensagens agrupadas são uma opção futura para salas multiplayer, com estado persistido fora da memória volátil.
+- Perfis do navegador não conseguem ler de forma confiável o estado térmico nativo de todos os Androids; não simular essa informação nem prometer FPS sem testes físicos.
