@@ -125,3 +125,12 @@ As alterações foram gravadas na branch principal. O workflow configurado execu
 - O painel Master lista pedidos, método/referência e exige decisão explícita. Aprovação de pacotes credita gemas uma única vez; aprovação de skins libera ownership uma única vez; rejeição registra status e data.
 - A loja da arena deixou de abrir WhatsApp automaticamente para os itens oficiais e passou a enviar pedidos auditáveis. O WhatsApp permanece para atendimento de outros pacotes.
 - Importante: esta etapa é aprovação manual; ainda não há integração automática com gateway, QR PIX ou webhook de confirmação.
+
+
+## Forja, ciência e consistência dos heróis (15 nov 2026)
+- Adicionados oito projetos de forja ao catálogo existente; os itens não são entregues automaticamente. O Worker debita ouro/ferro e grava o equipamento em uma única operação D1 protegida contra duplicação.
+- Quatro pesquisas de equipamento reutilizam `research`: Metalurgia Rúnica, Runas de Proteção, Forja Vital e Passos de Asgard. A progressão exige Academia e tem teto por tecnologia.
+- Os bônus são calculados com precisão decimal e somente para o herói equipado/ativo. Crítico tem chance limitada a 15% no domínio do jogo; marcha tem bônus limitado a 25% no servidor.
+- O simulador usa semente crítica persistida nos relatórios; os testes cobrem repetibilidade, chance zero, chance garantida e limites de duração da marcha.
+- Foi encontrada duplicidade de modelo entre `hero_inventory` (convocações/estrelas/fragmentos) e `heroes` (equipamentos/treino). Criado sincronizador por `hero_key`, mapeando raridades e preservando o maior nível/experiência existentes. Treinamento passa a atualizar as duas representações de forma condicionada e atômica.
+- Pendência para próxima auditoria: transformar a invocação de heróis em um lote D1 único, pois o fluxo de sorteio ainda realiza gravações sequenciais após o débito de gemas.
