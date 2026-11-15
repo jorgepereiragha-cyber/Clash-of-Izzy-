@@ -257,7 +257,7 @@ async function processMarches(env,kingdomId){
   ];
   if(m.march_type==="attack"){
    const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
-   const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>UNITS[u.unit_type]&&u.quantity>0);
+   const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={};
    if(target&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
@@ -658,7 +658,7 @@ async function gameAction(env,playerId,body){
     await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"building_upgraded",JSON.stringify({building:key,level:b.level+1,cost})).run();
   }else if(type==="train"){
     const unit=String(body.unit||"militia"),quantity=Math.max(1,Math.min(100,Math.floor(Number(body.quantity)||10)));
-    const spec=UNITS[unit];if(!spec)return json({error:"Tipo de tropa inválido."},400);
+    const spec=Object.hasOwn(UNITS,unit)?UNITS[unit]:null;if(!spec)return json({error:"Tipo de tropa inválido."},400);
     const requiredBuilding={militia:"barracks",swordsman:"barracks",spearman:"barracks",archer:"archery_range",crossbowman:"archery_range",cavalry:"stable",knight:"stable",mage:"academy",catapult:"siege_workshop",ram:"siege_workshop",trebuchet:"siege_workshop"}[unit];
     const trainingHall=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type=?").bind(k.id,requiredBuilding).first();
     if(!trainingHall||trainingHall.level<1)return json({error:"Construa o edifício de treinamento exigido."},409);
@@ -696,20 +696,26 @@ async function gameAction(env,playerId,body){
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
     if(marchType==="attack"&&target.owner_kingdom_id)return json({error:"Nesta etapa, só é possível conquistar territórios neutros. Ataques PvP serão habilitados em uma atualização própria."},409);
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
-    const requested=body.units&&typeof body.units==="object"?body.units:{militia:5};
-    const selected={},statements=[];
+    const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
+    const selected={};
     for(const [unit,raw] of Object.entries(requested)){
+      if(!Object.hasOwn(UNITS,unit))continue;
       const qty=Math.max(0,Math.min(10000,Math.floor(Number(raw)||0)));
-      if(!UNITS[unit]||qty<1)continue;
-      const available=await env.DB.prepare("SELECT quantity FROM army_units WHERE kingdom_id=? AND unit_type=? AND tier=1").bind(k.id,unit).first();
-      if(!available||available.quantity<qty)return json({error:"Tropas insuficientes: "+unit},409);
-      selected[unit]=qty;
-      statements.push(env.DB.prepare("UPDATE army_units SET quantity=quantity-? WHERE kingdom_id=? AND unit_type=? AND tier=1 AND quantity>=?").bind(qty,k.id,unit,qty));
+      if(qty>0)selected[unit]=qty;
     }
-    if(!Object.keys(selected).length)return json({error:"Selecione pelo menos uma tropa."},400);
+    const unitTypes=Object.keys(selected);
+    if(!unitTypes.length)return json({error:"Selecione pelo menos uma tropa válida."},400);
+    const unitsJson=JSON.stringify(selected);
     const seconds=marchType==="scout"?15:marchType==="attack"?120:60;
-    statements.push(env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at) VALUES(?,?,?,?,?,?)").bind(k.id,target.id,marchType,JSON.stringify(selected),"marching",new Date(Date.now()+seconds*1000).toISOString()));
-    await env.DB.batch(statements);
+    const arrival=new Date(Date.now()+seconds*1000).toISOString();
+    // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
+    // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
+    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=?")
+      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length);
+    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at) SELECT ?,?,?,?,?,? WHERE changes()=?")
+      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,unitTypes.length);
+    const result=await env.DB.batch([debit,createMarch]);
+    if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes ou exército alterado por outra marcha. Atualize o reino e tente novamente."},409);
   }else if(type==="battle"){
     const units=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0").bind(k.id).all();
     const total=(units.results||[]).reduce((n,u)=>n+u.quantity,0);
