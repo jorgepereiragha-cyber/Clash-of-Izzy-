@@ -1385,7 +1385,7 @@ export default {
     if(body.__bodyError)return json({error:"Solicitação inválida."},400);
     const kind=String(body.kind||""),itemId=Number(body.itemId),requestKey=String(body.requestKey||"").slice(0,64);
     if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
-    const paymentMethod=["pix","bank_transfer","manual"].includes(String(body.paymentMethod||""))?String(body.paymentMethod):"manual";
+    const paymentMethod=["mercadopago_link","pix","bank_transfer","manual"].includes(String(body.paymentMethod||""))?String(body.paymentMethod):"manual";
     const paymentReference=String(body.paymentReference||"").trim().slice(0,120)||null;
     const player=await env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first();
     if(!player)return json({error:"Jogador não encontrado."},404);
