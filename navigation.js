@@ -71,9 +71,15 @@
     }
   }
 
+  const normalizeSearch = value => String(value||"").normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR");
+  const queryEligible = value => {
+    const length=Array.from(String(value||"")).length;
+    const cjk=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(String(value||""));
+    return length>=(cjk?1:2);
+  };
   function sectionResults(query) {
-    const normalized = query.toLocaleLowerCase("pt-BR");
-    const found = links.filter(item => (item.label+" "+item.keywords).toLocaleLowerCase("pt-BR").includes(normalized));
+    const normalized = normalizeSearch(query);
+    const found = links.filter(item => normalizeSearch(item.label+" "+item.keywords).includes(normalized));
     if (!found.length) return 0;
     addGroupLabel("Seções do jogo");
     for (const item of found) {
@@ -103,8 +109,8 @@
     const strong = document.createElement("strong");
     strong.textContent = item.type === "alliance" ? item.name+" ["+item.tag+"]" : item.name;
     const small = document.createElement("small");
-    if (item.type === "player") small.textContent = "Jogador · "+(item.kingdom_name||"Reino")+" · Castelo "+Number(item.castle_level||1)+" · poder "+Number(item.power||0).toLocaleString("pt-BR");
-    else if (item.type === "kingdom") small.textContent = "Reino · poder "+Number(item.power||0).toLocaleString("pt-BR");
+    if (item.type === "player") small.textContent = "Jogador · "+(item.kingdom_name||"Reino")+" · Castelo "+Number(item.castle_level||1)+" · poder "+Number(item.power||0).toLocaleString("pt-BR")+(item.allianceTag?" · Aliança ["+item.allianceTag+"]":"");
+    else if (item.type === "kingdom") small.textContent = "Reino · poder "+Number(item.power||0).toLocaleString("pt-BR")+(item.allianceTag?" · Aliança ["+item.allianceTag+"]":"");
     else if (item.type === "alliance") small.textContent = "Aliança · nível "+Number(item.level||1)+" · "+Number(item.members||0)+" membros";
     else if (item.type === "territory") small.textContent = "Território · "+(item.terrain||"terreno");
     else small.textContent = "Skin · catálogo cosmético";
@@ -113,7 +119,7 @@
   }
 
   async function onlineResults(query, sequence) {
-    if (query.length < 2 || sequence !== requestSequence) return;
+    if (!queryEligible(query) || sequence !== requestSequence) return;
     const token = getGameToken();
     if (!token) {
       if (sequence === requestSequence) addEmpty("Entre no reino para pesquisar conteúdo do mundo.");
@@ -159,7 +165,7 @@
     clearTimeout(searchTimer);
     if (!query) return;
     const localCount = sectionResults(query);
-    if (query.length < 2) {
+    if (!queryEligible(query)) {
       if (!localCount) addEmpty("Digite pelo menos 2 caracteres.");
       return;
     }
@@ -171,7 +177,7 @@
     event.preventDefault();
     const query = input.value.trim();
     search();
-    if (query.length >= 2) {
+    if (queryEligible(query)) {
       clearTimeout(searchTimer);
       const sequence = requestSequence;
       await onlineResults(query,sequence);
