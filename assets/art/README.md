@@ -44,3 +44,11 @@
 - Android Developers recomenda medir CPU/GPU por cena, comparar antes/depois e observar consistência de frames e carga térmica em dispositivos reais.
 - Durable Objects com WebSocket Hibernation e mensagens agrupadas são uma opção futura para salas multiplayer, com estado persistido fora da memória volátil.
 - Perfis do navegador não conseguem ler de forma confiável o estado térmico nativo de todos os Androids; não simular essa informação nem prometer FPS sem testes físicos.
+
+
+## Budgets adaptativos de cena (validados em CI)
+- Tier low: até 8 edifícios visíveis, DPR máximo 1.0, orçamento de 1,2 milhão de pixels e sombras desligadas.
+- Tier balanced: até 12 edifícios visíveis, DPR máximo 1.25 e orçamento de 2,4 milhões de pixels.
+- Tier high: até 16 edifícios visíveis, DPR máximo 1.5 e orçamento de 4,2 milhões de pixels.
+- O limite de pixels tem precedência sobre qualquer piso de resolução; em viewports extremos o DPR pode cair abaixo de 0.5 para não exceder o orçamento.
+- A quantidade de edifícios afeta apenas a representação 3D visível; o estado completo continua no servidor e na interface de gestão.
