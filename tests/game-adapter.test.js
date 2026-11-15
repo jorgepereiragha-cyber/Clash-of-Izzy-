@@ -116,10 +116,11 @@ test("contador de críticos não depende do limite de 80 entradas do relatório"
       { unit_type: "trebuchet", tier: 1, quantity: 100000 }
     ],
     defenderLevel: 30,
-    criticalChancePercent: 15,
+    criticalChancePercent: 100,
+    criticalDamageMultiplier: 1.25,
     criticalSeed: 24680,
     roll: 1
   });
-  assert.ok(result.log.length <= 80);
-  assert.ok(result.criticalHits >= result.log.filter(entry => entry.critical).length);
+  assert.equal(result.log.length, 80);
+  assert.ok(result.criticalHits > result.log.filter(entry => entry.critical).length);
 });
