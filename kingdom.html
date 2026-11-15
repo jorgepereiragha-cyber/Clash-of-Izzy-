@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#142b44"><meta name="description" content="Comande seu reino, evolua construções e prepare seu exército em Clash of Izzy.">
+<link rel="manifest" href="/manifest.json"><link rel="icon" href="/icon-192.svg" type="image/svg+xml">
+<title>Clash of Izzy — Reino</title>
+<style>
+:root{color-scheme:dark;--gold:#e7bd68;--gold2:#9a682d;--panel:#14243a;--line:#80643b;--muted:#b9c5d4}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -20%,#395779,#101a2b 60%,#080e18);color:#f5edda;font:14px system-ui,Arial,sans-serif;min-height:100vh}
+header{position:sticky;top:0;z-index:5;background:#101a2bf2;border-bottom:1px solid var(--line);padding:10px max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));backdrop-filter:blur(12px)}
+.top{max-width:1120px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-weight:950;letter-spacing:.08em;color:var(--gold)}.brand small{display:block;color:#d9e0e8;font-weight:500;letter-spacing:0;font-size:11px}
+.resources{max-width:1120px;margin:10px auto 0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.resource{background:#22364e;border:1px solid #52677d;border-radius:8px;padding:7px;text-align:center;font-size:11px}.resource b{display:block;color:var(--gold);font-size:14px}
+main{max-width:1120px;margin:18px auto;padding:0 12px 40px}.hero{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:14px}.hero h1{margin:0;color:var(--gold);font-size:clamp(22px,4vw,32px)}.muted{color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.8fr);gap:14px}
+.panel{background:linear-gradient(145deg,#1b3049,#101d30);border:1px solid var(--line);border-radius:13px;padding:14px;box-shadow:0 8px 25px #0005}.panel h2{margin:0 0 12px;color:var(--gold);font-size:17px}
+.city{min-height:350px;position:relative;overflow:hidden;border-radius:11px;border:1px solid #5e704e;background:linear-gradient(180deg,#7e9b76 0%,#456b4e 45%,#294c3c 100%);padding:18px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(82px,1fr));gap:10px;isolation:isolate}
+.city:before{content:"";position:absolute;inset:0;z-index:-1;opacity:.4;background:repeating-linear-gradient(35deg,transparent 0 35px,#d5d5a0 36px 38px,transparent 39px 72px),radial-gradient(ellipse at 50% 50%,#c6ad71 0 25%,transparent 26%)}
+.building{border:1px solid #d7b66e;border-radius:9px;background:linear-gradient(145deg,#3c5268ee,#172a3eee);color:#fff;padding:9px 7px;text-align:center;display:flex;flex-direction:column;justify-content:center;align-items:center;gap:4px;min-width:0;box-shadow:0 5px 10px #0007;cursor:pointer}.building:hover{border-color:#fff0b5;transform:translateY(-1px)}.building.castle{grid-column:2;grid-row:2;background:linear-gradient(145deg,#8d7047,#3d3340);border:2px solid #f4d78e}.building .emoji{font-size:27px;filter:drop-shadow(0 3px 2px #0008)}.building strong{font-size:11px}.building small{font-size:10px;color:#f4d78e}
+.building:disabled{opacity:.55;cursor:not-allowed}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:12px}.stat{background:#0e1a2a;border:1px solid #40556b;border-radius:8px;padding:10px}.stat span{display:block;color:var(--muted);font-size:11px}.stat b{font-size:17px;color:#fff}
+button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#68451f);color:#fff;border-radius:8px;padding:9px 12px;font-weight:800;cursor:pointer;text-decoration:none;display:inline-flex;justify-content:center;align-items:center;gap:6px}button:disabled{opacity:.45;cursor:not-allowed}.secondary{background:#243a55;border-color:#71839a}.building-list{display:grid;gap:8px}.building-row{display:flex;align-items:center;justify-content:space-between;gap:8px;background:#0e1a2a;border:1px solid #40556b;border-radius:9px;padding:9px}.building-row .info{min-width:0}.building-row strong{display:block}.building-row small{color:var(--muted)}.building-row button{font-size:11px;padding:7px 9px;white-space:nowrap}
+.stack{display:grid;gap:14px}.notice{padding:10px;border-radius:8px;background:#3a2d1c;border:1px solid #927344;color:#f4dca8;line-height:1.5}.events{display:grid;gap:7px}.event{background:#0e1a2a;padding:8px;border-radius:7px;color:#dbe3ec;font-size:12px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+#status{font-size:12px;color:#d8e2ee}#status.error{color:#ffb4a9}#loading{padding:25px;text-align:center;color:var(--muted)}
+@media(max-width:760px){.layout{grid-template-columns:1fr}.city{min-height:320px;grid-template-rows:repeat(3,minmax(78px,1fr));padding:10px;gap:7px}.resources{grid-template-columns:repeat(5,minmax(0,1fr))}.resource{font-size:10px;padding:6px 2px}.resource b{font-size:12px}.hero{align-items:start;flex-direction:column}}
+@media(max-width:390px){.city{min-height:280px}.building{padding:5px 3px}.building .emoji{font-size:22px}.building strong{font-size:9px}.building small{font-size:9px}.grid2{grid-template-columns:1fr}}
+</style></head>
+<body>
+<header><div class="top"><div class="brand">⚔ CLASH OF IZZY <small>Estratégia medieval · Reino persistente</small></div><div id="status" role="status">Conectando ao reino…</div></div><div class="resources" id="resources"><div class="resource">🌾<b>—</b>Comida</div><div class="resource">🪵<b>—</b>Madeira</div><div class="resource">🪨<b>—</b>Pedra</div><div class="resource">⛓️<b>—</b>Ferro</div><div class="resource">🪙<b>—</b>Ouro</div></div></header>
+<main>
+<div class="hero"><div><h1 id="kingdomName">Seu Reino</h1><div class="muted" id="playerName">Carregando comandante…</div></div><div class="toolbar"><a class="linkbtn secondary" href="/arena.html">⚔ Arena de combate</a><button class="secondary" id="refresh">↻ Atualizar</button></div></div>
+<div id="loading">Carregando seu reino e sincronizando com o servidor…</div>
+<div id="game" hidden>
+<div class="layout">
+<section class="panel"><h2>🏰 Sua cidade</h2><div class="city" id="city"></div><div class="grid2" id="summary"></div></section>
+<div class="stack">
+<section class="panel"><h2>🏗️ Edifícios e melhorias</h2><div class="building-list" id="buildings"></div></section>
+<section class="panel"><h2>🛡️ Poder do reino</h2><div class="grid2" id="army"></div><div class="toolbar"><button class="secondary" id="goMap">🌍 Explorar territórios</button></div></section>
+<section class="panel"><h2>📜 Crônicas do reino</h2><div class="events" id="events"></div></section>
+</div></div>
+<div class="notice" style="margin-top:14px">O tempo e os recursos são processados pelo servidor. Fechar o jogo não interrompe a evolução do reino; ao retornar, o estado é sincronizado novamente.</div>
+</div></main>
+<script>
+const API="/api";let token=null,state=null,busy=false;
+const names={castle:["Castelo","🏰"],barracks:["Quartel","⚔️"],farm:["Fazenda","🌾"],quarry:["Pedreira","🪨"],lumber_mill:["Serraria","🪵"],iron_mine:["Mina de ferro","⛓️"],market:["Mercado","🏪"],academy:["Academia","📚"],wall:["Muralha","🧱"],hospital:["Hospital","🏥"],watchtower:["Torre de vigia","🔭"],stable:["Estábulo","🐎"],archery_range:["Campo de arqueiros","🏹"],siege_workshop:["Oficina de cerco","🛠️"],embassy:["Embaixada","🏳️"],warehouse:["Armazém","📦"]};
+const fmt=n=>Number(n||0).toLocaleString("pt-BR");
+function setStatus(message,error=false){const el=document.getElementById("status");el.textContent=message;el.classList.toggle("error",error)}
+async function request(path,options={}){const response=await fetch(API+path,{...options,headers:{...(options.headers||{}),...(token?{Authorization:"Bearer "+token}:{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Falha na comunicação com o servidor.");return data}
+async function connect(){setStatus("Sincronizando…");try{token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");let data;if(token){data=await request("/game/state");}else{data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});if(data.token){token=data.token;localStorage.setItem("coi_game_token",token);}}state=data.state||data;if(!state.kingdom)throw new Error("O servidor não retornou os dados do reino.");render();document.getElementById("loading").hidden=true;document.getElementById("game").hidden=false;setStatus("● Reino sincronizado");}catch(error){setStatus(error.message,true);document.getElementById("loading").textContent=error.message+" Seu acesso salvo foi preservado. Tente novamente após verificar a conexão.";}}
+function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("resources").innerHTML=[["🌾","Comida","food"],["🪵","Madeira","wood"],["🪨","Pedra","stone"],["⛓️","Ferro","iron"],["🪙","Ouro","gold"]].map(([icon,label,key])=>'<div class="resource">'+icon+'<b>'+fmt(k[key])+'</b>'+label+'</div>').join("");
+const buildings=state.buildings||[];const city=document.getElementById("city");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+b.building_type+'"><span class="emoji">'+emoji+'</span><strong>'+name+'</strong><small>Nível '+b.level+'</small></button>'}).join("");
+document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+a+'</span><b>'+b+'</b></div>').join("");
+document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const blocked=b.level>=30;return '<div class="building-row"><div class="info"><strong>'+emoji+' '+name+'</strong><small>Nível '+b.level+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+b.building_type+'" '+(blocked||busy?"disabled":"")+'> '+(blocked?"MÁXIMO":"Evoluir")+' </button></div>'}).join("");
+const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Tropas",fmt(total)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+a+'</span><b>'+b+'</b></div>').join("");
+document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).map(e=>'<div class="event">'+String(e.event_type||"Atividade").replaceAll("_"," ")+'</div>').join("")||'<div class="muted">Seu reino está começando sua história.</div>';
+city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
+document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
+}
+async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;render();setStatus("Melhoria aplicada");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
+document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/arena.html#territories");
+connect();
+</script></body></html>
