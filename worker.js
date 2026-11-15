@@ -410,20 +410,22 @@ async function gameAction(env,playerId,body){
   let battleOutcome=null;
 
   if(type==="cosmetic_claim"){
+    await ensureCosmeticTables(env,k.id);
     const collectionId=String(body.collection||""),col=COSMETIC_COLLECTIONS.find(x=>x.id===collectionId);
     if(!col)return json({error:"Coleção inválida."},400);
-    const already=await env.DB.prepare("SELECT 1 FROM kingdom_collection_claims WHERE kingdom_id=? AND collection_id=?").bind(k.id,collectionId).first();
-    if(already)return json({error:"Esta recompensa já foi resgatada."},409);
     const ownedRows=await env.DB.prepare("SELECT item_id FROM kingdom_cosmetics WHERE kingdom_id=?").bind(k.id).all();
     const owned=new Set((ownedRows.results||[]).map(x=>x.item_id));
     const complete=col.special?COSMETIC_COLLECTIONS.filter(x=>!x.special).every(x=>x.skins.every(id=>owned.has(id))):col.skins.every(id=>owned.has(id));
     if(!complete)return json({error:"Ainda faltam skins para completar esta coleção."},409);
-    const debit=await env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=?").bind(col.gems,p.id).run();
-    await env.DB.batch([
-      env.DB.prepare("UPDATE kingdom_cosmetic_wallet SET shards=shards+? WHERE kingdom_id=?").bind(col.shards,k.id),
-      env.DB.prepare("INSERT INTO kingdom_collection_claims(kingdom_id,collection_id) VALUES(?,?)").bind(k.id,collectionId),
-      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"collection_reward",JSON.stringify({collection:collectionId,gems:col.gems,shards:col.shards}))
+    // A chave única da recompensa é o bloqueio de idempotência. Só a requisição
+    // que inserir a reivindicação pode creditar gemas, fragmentos e evento.
+    const result=await env.DB.batch([
+      env.DB.prepare("INSERT INTO kingdom_collection_claims(kingdom_id,collection_id) VALUES(?,?) ON CONFLICT(kingdom_id,collection_id) DO NOTHING").bind(k.id,collectionId),
+      env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()>0").bind(col.gems,p.id),
+      env.DB.prepare("UPDATE kingdom_cosmetic_wallet SET shards=shards+? WHERE kingdom_id=? AND changes()>0").bind(col.shards,k.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"collection_reward",JSON.stringify({collection:collectionId,gems:col.gems,shards:col.shards}))
     ]);
+    if(!result[0]?.meta?.changes)return json({error:"Esta recompensa já foi resgatada."},409);
   }else if(type==="seasonal_buy"){
     const id=String(body.skin||""),skin=SEASONAL_COSMETICS.find(x=>x.id===id);
     if(!skin)return json({error:"Skin sazonal inválida."},400);
