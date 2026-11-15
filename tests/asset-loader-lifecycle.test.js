@@ -56,3 +56,12 @@ test("arena and shared loaders use the same pinned Three.js version and page tea
   assert.match(arena, /pagehide/);
   assert.match(arena, /window\.COI_ASSETS\.dispose\(\)/);
 });
+
+
+test("asset loaders reject external URLs and non-approved file paths", () => {
+  assert.match(assetLoader, /parsed\.origin !== window\.location\.origin/);
+  assert.match(assetLoader, /parsed\.pathname\.startsWith\('\/assets\/models\/'\)/);
+  assert.match(assetLoader, /\\.glb\$/i);
+  assert.match(textureManager, /parsed\.pathname\.startsWith\('\/assets\/textures\/'\)/);
+  assert.match(textureManager, /!\['png','jpg','jpeg','webp','avif'\]\.includes\(extension\)/);
+});
