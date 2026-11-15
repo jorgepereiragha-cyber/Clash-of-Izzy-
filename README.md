@@ -53,7 +53,7 @@ Migrações atuais: `0001` a `0008`. A migração `0005` preserva frações da p
 
 ## Eventos e LiveOps
 
-A central de eventos já inclui missões diárias reais no servidor: treinar tropas, melhorar edifícios, concluir pesquisas e participar de batalhas PvE. O progresso é calculado a partir dos registros existentes em `kingdom_events` e `battle_reports`; o cliente não informa pontuação. A migração `0008` garante um único resgate por reino, missão e dia UTC. O calendário sazonal, chefes globais, torneios de aliança e eventos entre reinos permanecem identificados como em desenvolvimento e não concedem recompensas ainda.
+A central de eventos já inclui missões diárias reais no servidor: treinar tropas, melhorar edifícios, concluir pesquisas e participar de batalhas PvE. O progresso é calculado a partir dos registros existentes em `kingdom_events` e `battle_reports`; o cliente não informa pontuação. A migração `0008` garante um único resgate por reino, missão e dia UTC, registra o crédito confirmado e adiciona índices compostos para o progresso. Cada recompensa também é registrada no `resource_ledger`. O calendário sazonal, chefes globais, torneios de aliança e eventos entre reinos permanecem identificados como em desenvolvimento e não concedem recompensas ainda.
 
 O catálogo completo de eventos, cadência, critérios de justiça, métricas e roadmap está em [`docs/LIVEOPS_EVENT_DESIGN.md`](docs/LIVEOPS_EVENT_DESIGN.md).
 
