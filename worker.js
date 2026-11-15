@@ -427,7 +427,6 @@ async function gameAction(env,playerId,body){
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
   await applyProduction(env,k.id);
-  const equipmentState=await getEquipmentState(env,k.id);
   const type=String(body.type||"");
   let battleOutcome=null;
 
@@ -490,7 +489,7 @@ async function gameAction(env,playerId,body){
         .bind(k.id,"norse_skin_unlocked",JSON.stringify({skin:skinId,price:skin.price}))
     ]);
     if(!result[0]?.meta?.changes)return json({error:"Gemas insuficientes ou skin já adquirida."},409);
-  if(type==="cosmetic_claim"){
+  }else if(type==="cosmetic_claim"){
     await ensureCosmeticTables(env,k.id);
     const collectionId=String(body.collection||""),col=COSMETIC_COLLECTIONS.find(x=>x.id===collectionId);
     if(!col)return json({error:"Coleção inválida."},400);
@@ -859,6 +858,7 @@ async function gameAction(env,playerId,body){
     const result=await env.DB.batch([debit,createMarch]);
     if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes ou exército alterado por outra marcha. Atualize o reino e tente novamente."},409);
   }else if(type==="battle"){
+    const equipmentState=await getEquipmentState(env,k.id);
     await ensureHeroTables(env);
     const units=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY unit_type,tier").bind(k.id).all();
     const armyRows=units.results||[];
