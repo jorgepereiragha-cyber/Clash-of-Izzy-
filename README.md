@@ -115,3 +115,10 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - O servidor mantém o chefe, a vida global, os ataques, as perdas permanentes, a pontuação e o ranking no D1.
 - Somente ataques do Anjo da Morte removem tropas permanentemente; batalhas PvE comuns e ataques de território devolvem todas as tropas, mantendo as baixas simuladas apenas no relatório.
 - A classificação é encerrada automaticamente no fim do evento e as recompensas são creditadas uma única vez por reino, incluindo gemas, recursos e Essência da Morte.
+
+
+## Revisão de busca internacional
+- Consultas em chinês, japonês e coreano usam contagem por ponto de código Unicode; uma única ideografia/sílaba pode iniciar a busca.
+- Consultas CJK curtas ativam fallback SQL limitado por categoria, mesmo quando o índice de prefixos já retorna resultados; consultas maiores usam FTS5 e trigramas.
+- A busca portuguesa expande formas comuns de plural e mantém a consulta SQL parametrizada, com fallback por categoria quando um índice FTS falha.
+- Reinos vinculados a alianças continuam pesquisáveis e exibem a sigla pública, evitando convites inválidos.
