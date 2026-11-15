@@ -19,7 +19,7 @@ test("standard, seasonal and fused skins are cosmetic-only", () => {
     ["const SEASONAL_COSMETICS=[", "const SKIN_FUSIONS=["],
     ["const SKIN_FUSIONS=[", "async function ensureCosmeticDefaults"]
   ]) {
-    assert.doesNotMatch(block(start, end), /\\b(?:atk|def|attack|defense|special)\\s*:/i);
+    assert.doesNotMatch(block(start, end), /\b(?:atk|def|attack|defense|special)\s*:/i);
   }
 });
 
@@ -28,16 +28,16 @@ test("the six Norse deity skins are present in the existing cosmetic catalog", (
 });
 
 test("skin purchases and seasonal purchases debit gems and insert ownership atomically", () => {
-  assert.match(worker, /type==="cosmetic_buy"/);
-  assert.match(worker, /UPDATE players SET gems=gems-\\? WHERE id=\\? AND gems>=\\? AND NOT EXISTS/);
-  assert.match(worker, /INSERT INTO kingdom_cosmetics\\(kingdom_id,item_id,kind\\) SELECT/);
-  assert.match(worker, /WHERE changes\\(\\)>0/);
+  assert.ok(worker.includes('type==="cosmetic_buy"'));
+  assert.ok(worker.includes("UPDATE players SET gems=gems-? WHERE id=? AND gems>=? AND NOT EXISTS"));
+  assert.ok(worker.includes("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) SELECT"));
+  assert.ok(worker.includes("WHERE changes()>0"));
 });
 
 test("skin fusion debits fragments and consumes three inputs in one D1 batch", () => {
-  assert.match(worker, /UPDATE kingdom_cosmetic_wallet SET shards=shards-50/);
-  assert.match(worker, /SELECT COUNT\\(\\*\\) FROM kingdom_cosmetics/);
-  assert.match(worker, /DELETE FROM kingdom_cosmetics WHERE kingdom_id=\\? AND item_id=\\? AND changes\\(\\)>0/);
+  assert.ok(worker.includes("UPDATE kingdom_cosmetic_wallet SET shards=shards-50"));
+  assert.ok(worker.includes("SELECT COUNT(*) FROM kingdom_cosmetics"));
+  assert.ok(worker.includes("DELETE FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=? AND changes()>0"));
 });
 
 test("the equipment screen exposes the Norse skin shop and collection reward", () => {
