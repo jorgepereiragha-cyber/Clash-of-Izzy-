@@ -156,7 +156,6 @@ if (host && "WebGLRenderingContext" in window) {
     }
   }
   function createBuilding(type, level, x, z) {
-  function createBuilding(type, level, x, z) {
     const group = new THREE.Group(); group.position.set(x, 0, z); group.userData.coIType = type; group.userData.coIProcedural = true;
     const colors = palettes[type] || palettes.warehouse;
     const seed = [...String(type)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
