@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import {
   ANGEL_DEATH_EVENT,
   getAngelDeathWeekendWindow,
