@@ -848,7 +848,26 @@ async function gameAction(env,playerId,body){
   }else{return json({error:"Ação de jogo desconhecida."},400)}
   return json({success:true,state:await gameState(env,playerId),...(battleOutcome?{battle:battleOutcome}:{})});
 }
+async function processDueMarches(env){
+  if(!env.DB)return;
+  const now=new Date().toISOString();
+  const dueKingdoms=await env.DB.prepare(
+    "SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 100"
+  ).bind(now).all();
+  for(const row of dueKingdoms.results||[]){
+    try{
+      await processMarches(env,row.kingdom_id);
+    }catch(error){
+      // Uma falha num reino não impede a resolução das marchas dos demais.
+      console.error("scheduled_march_resolution_failed",row.kingdom_id,String(error?.message||error));
+    }
+  }
+}
+
 export default {
+ async scheduled(controller,env){
+  await processDueMarches(env);
+ },
  async fetch(request,env){
   if(request.method==="OPTIONS")return new Response(null,{headers:cors});
   const url=new URL(request.url);
