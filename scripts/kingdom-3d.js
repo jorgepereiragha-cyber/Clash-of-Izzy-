@@ -46,13 +46,27 @@ if (host && "WebGLRenderingContext" in window) {
         if (!mat) continue;
         resources.materials.add(mat);
         for (const value of Object.values(mat)) {
-          if (value?.isTexture) resources.textures.add(value);
+          if (!value?.isTexture) continue;
+          resources.textures.add(value);
+          const bitmap = value.source?.data || value.image;
+          if (typeof bitmap?.close === "function") resources.imageBitmaps.add(bitmap);
         }
       }
     });
   }
+  function disposeResourceSet(resources) {
+    for (const geometry of resources.geometries) geometry.dispose();
+    for (const texture of resources.textures) texture.dispose();
+    for (const mat of resources.materials) mat.dispose();
+    for (const bitmap of resources.imageBitmaps) bitmap.close();
+  }
+  function disposeDetachedObject3D(root) {
+    const resources = { geometries: new Set(), materials: new Set(), textures: new Set(), imageBitmaps: new Set() };
+    disposeObject3D(root, resources);
+    disposeResourceSet(resources);
+  }
   function disposeSceneResources() {
-    const resources = { geometries: new Set(), materials: new Set(), textures: new Set() };
+    const resources = { geometries: new Set(), materials: new Set(), textures: new Set(), imageBitmaps: new Set() };
     disposeObject3D(scene, resources);
     for (const template of glbTemplates.values()) disposeObject3D(template, resources);
     for (const texture of surfaceTextureCache.values()) resources.textures.add(texture);
@@ -61,9 +75,7 @@ if (host && "WebGLRenderingContext" in window) {
       resources.materials.add(mat);
       if (mat.map) resources.textures.add(mat.map);
     }
-    for (const geometry of resources.geometries) geometry.dispose();
-    for (const texture of resources.textures) texture.dispose();
-    for (const mat of resources.materials) mat.dispose();
+    disposeResourceSet(resources);
     scene?.clear();
     surfaceTextureCache.clear();
     glbTemplates.clear();
@@ -278,14 +290,20 @@ if (host && "WebGLRenderingContext" in window) {
     manifestLoad = (async () => {
       try {
         const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
-        if (!response.ok) return;
+        if (disposed || !renderer || !response.ok) return;
         const manifest = await response.json();
+        if (disposed || !renderer) return;
         for (const asset of (Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [])) {
+          if (disposed || !renderer) break;
           if (asset.enabled !== true || typeof asset.type !== "string" || !Object.hasOwn(palettes, asset.type) || typeof asset.src !== "string") continue;
           try {
             const assetUrl = new URL(asset.src, window.location.origin);
             if (assetUrl.origin !== window.location.origin || !assetUrl.pathname.startsWith("/assets/3d/") || !assetUrl.pathname.toLowerCase().endsWith(".glb")) continue;
             const gltf = await gltfLoader.loadAsync(assetUrl.href);
+            if (disposed || !renderer) {
+              disposeDetachedObject3D(gltf.scene);
+              continue;
+            }
             const template = gltf.scene;
             template.traverse(node => {
               if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
@@ -295,7 +313,7 @@ if (host && "WebGLRenderingContext" in window) {
             console.info(`Clash of Izzy: GLB ${asset.type} indisponível; mantendo modelo procedural.`, assetError);
           }
         }
-        if (glbTemplates.size) renderBuildings(latestBuildings);
+        if (!disposed && renderer && glbTemplates.size) renderBuildings(latestBuildings);
       } catch (error) {
         console.info("Clash of Izzy: GLB asset not ready; procedural 3D models remain active.", error);
       }
