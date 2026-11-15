@@ -329,7 +329,7 @@ if (host && "WebGLRenderingContext" in window) {
     qualityProfile = selectKingdomQualityProfile({
       deviceMemory,
       hardwareConcurrency: navigator.hardwareConcurrency,
-      viewportWidth: host.clientWidth,
+      viewportWidth: host.clientWidth || window.innerWidth,
       maxTextureSize: renderer.capabilities.maxTextureSize
     });
     renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }));
