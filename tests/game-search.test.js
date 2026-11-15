@@ -94,3 +94,16 @@ test("search merges ranked matches and never exposes internal identifiers", asyn
   assert.ok(!worker.includes("player_email"));
   assert.ok(!worker.includes("password_hash"));
 });
+
+
+test("short CJK queries use bounded LIKE fallback even when FTS prefix already returned a result", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("const queryLength=Array.from(rawQuery).length"));
+  assert.ok(worker.includes("if(queryLength<2)"));
+  assert.ok(worker.includes("if(queryLength>48)"));
+  assert.ok(worker.includes("if(queryLength>=3)"));
+  assert.ok(worker.includes("if(!hasEntity||queryLength<3)"));
+  assert.ok(worker.includes("if(!hasPlayers||queryLength<3)"));
+  assert.ok(worker.includes("const pattern=\"%\"+escaped+\"%\""));
+  assert.ok(worker.includes("nickname_key LIKE ? ESCAPE '!'"));
+});
