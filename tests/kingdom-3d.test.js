@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { selectKingdomQualityProfile } from "../scripts/kingdom-quality.js";
 
 const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
@@ -12,7 +13,7 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(renderer, /new THREE\.WebGLRenderer/);
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
   assert.match(renderer, /coi:kingdom-render/);
-  assert.match(renderer, /slice\(0, 16\)/);
+  assert.match(renderer, /slice\(0, qualityProfile\?\.maxBuildings \|\| 16\)/);
   assert.match(renderer, /const col = i % 4/);
   assert.ok(renderer.includes("new THREE.InstancedMesh"));
   assert.match(renderer, /addForestInstances/);
@@ -66,8 +67,11 @@ test("state refresh keeps the live WebGL canvas mounted in the kingdom", () => {
 
 test("renderer degrades gracefully on low-memory Android and WebGL context loss", () => {
   assert.match(renderer, /navigator\.deviceMemory/);
-  assert.match(renderer, /deviceMemory <= 4 \? 1 : 1\.25/);
-  assert.match(renderer, /host\.clientWidth > 680 && !\(deviceMemory > 0 && deviceMemory <= 4\)/);
+  assert.match(renderer, /selectKingdomQualityProfile/);
+  assert.match(renderer, /qualityProfile\.pixelRatioCap/);
+  assert.match(renderer, /qualityProfile\.shadows/);
+  assert.match(renderer, /qualityProfile\.shadowMapSize/);
+  assert.match(renderer, /qualityProfile\.anisotropy/);
   assert.match(renderer, /webglcontextlost/);
   assert.match(renderer, /host\.classList\.remove\("has-3d"\)/);
   assert.match(renderer, /arte 2D restaurada/);
@@ -96,4 +100,28 @@ test("GLB manifest accepts only bounded same-origin assets for known buildings",
   assert.match(renderer, /assetUrl\.pathname\.startsWith\("\/assets\/3d\/"\)/);
   assert.match(renderer, /pathname\.toLowerCase\(\)\.endsWith\("\.glb"\)/);
   assert.match(renderer, /GLB \$\{asset\.type\} indisponível; mantendo modelo procedural/);
+});
+
+test("quality profiles scale conservatively across low, balanced and high capability devices", () => {
+  const low = selectKingdomQualityProfile({ deviceMemory: 4, hardwareConcurrency: 4, viewportWidth: 390, maxTextureSize: 4096 });
+  const balanced = selectKingdomQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, viewportWidth: 720, maxTextureSize: 8192 });
+  const high = selectKingdomQualityProfile({ deviceMemory: 12, hardwareConcurrency: 12, viewportWidth: 1200, maxTextureSize: 16384 });
+  assert.equal(low.tier, "low");
+  assert.equal(low.pixelRatioCap, 1);
+  assert.equal(low.shadows, false);
+  assert.equal(balanced.tier, "balanced");
+  assert.equal(balanced.pixelRatioCap, 1.25);
+  assert.equal(high.tier, "high");
+  assert.equal(high.pixelRatioCap, 1.5);
+  assert.equal(high.shadows, true);
+  assert.equal(high.maxBuildings, 16);
+});
+
+test("renderer diagnostics expose only local rendering counters and are cleaned on fallback", () => {
+  assert.match(renderer, /window\.__coiKingdomDiagnostics = diagnostics/);
+  assert.match(renderer, /drawCalls: info\.render\.calls/);
+  assert.match(renderer, /triangles: info\.render\.triangles/);
+  assert.match(renderer, /geometries: info\.memory\.geometries/);
+  assert.match(renderer, /textures: info\.memory\.textures/);
+  assert.match(renderer, /delete window\.__coiKingdomDiagnostics/);
 });
