@@ -51,3 +51,8 @@ Nenhum pacote de arte entra na branch principal sem:
 3. manter materiais e animações;
 4. passar inspeção visual em Android;
 5. cumprir o orçamento de memória e carregamento definido para a cena.
+
+
+## Validação automatizada do manifesto v2
+
+O comando `npm run assets:validate` valida as listas `models`, `props` e `units`, IDs e caminhos duplicados, arquivos locais sem traversal nem fuga por link simbólico, assinatura e estrutura GLB 2.0, dependências de imagem/buffer locais e os limites de 12 MiB por GLB e 48 MiB no conjunto habilitado. A verificação não baixa URLs, não executa modelos e não substitui o Khronos glTF Validator nem a inspeção visual em Android.

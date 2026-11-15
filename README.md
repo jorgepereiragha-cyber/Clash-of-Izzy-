@@ -17,6 +17,7 @@ Comandos úteis:
 - `npm test`: testes de regras, contratos e integração Worker+D1 local.
 - `node scripts/production-smoke.js`: smoke test de produção (requer `WORKER_BASE_URL`).
 - `npm run check`: valida o bundle do Worker sem publicar.
+- `npm run assets:validate`: valida o manifesto 3D v2, GLBs locais, referências de textura e orçamento de arquivos.
 - `npm run db:migrate:local`: aplica as migrações no D1 local.
 - `npm run db:migrate:remote`: aplica as migrações no D1 remoto.
 
@@ -75,7 +76,7 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 
 ## Renderização do reino e equipamentos de herói
 - A cidade usa um renderizador Three.js isométrico progressivo, com qualidade adaptativa, instanciamento de vegetação, materiais procedurais e fallback 2D.
-- A cena pode carregar modelos glTF/GLB pelo manifesto em `assets/3d/manifest.json`; o manifesto está preparado, mas ainda não contém modelos finais.
+- A cena carrega modelos CC0 iniciais de Kenney (torre, muralha, trebuchet, árvores e arqueiro) pelo manifesto v2 em `assets/3d/manifest.json`; eles complementam a geometria procedural, mas ainda não representam a arte final original de todos os edifícios, tropas e heróis.
 - O inventário de equipamentos continua em `kingdom_equipment`; loadouts de heróis reutilizam a tabela existente `hero_equipment`, com um item por slot e sem criar um segundo sistema de inventário.
 - Os bônus de equipamento só entram em combate/produção quando o item está equipado no herói ativo (maior nível). O estado e as operações são validados no Worker.
 
