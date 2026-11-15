@@ -7,6 +7,15 @@ const disposedBitmaps = new WeakSet();
 let supportedAnisotropy = 1;
 let textureGeneration = 0;
 
+function validateTextureUrl(url) {
+  const parsed = new URL(String(url), window.location.href);
+  const extension = parsed.pathname.toLowerCase().split('.').pop();
+  if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith('/assets/textures/') || !['png','jpg','jpeg','webp','avif'].includes(extension)) {
+    throw new TypeError('Texturas devem ser imagens locais em /assets/textures/.');
+  }
+  return parsed.href;
+}
+
 const DEFAULTS = Object.freeze({
   colorSpace: THREE.SRGBColorSpace,
   magFilter: THREE.LinearFilter,
@@ -36,18 +45,19 @@ export function initTextureManager(renderer) {
 export async function loadTexture(name, url, options = {}) {
   if (!name || !url) throw new TypeError('loadTexture requer name e url.');
 
+  const safeUrl = validateTextureUrl(url);
   const cacheKey = String(name);
   const existing = textureCache.get(cacheKey);
   if (existing) {
-    if (existing.url !== url) {
+    if (existing.url !== safeUrl) {
       throw new Error(`A textura "${cacheKey}" já está associada a outra URL.`);
     }
     return existing.promise;
   }
 
   const generation = textureGeneration;
-  const entry = { url, texture: null, promise: null };
-  entry.promise = textureLoader.loadAsync(url).then(texture => {
+  const entry = { url: safeUrl, texture: null, promise: null };
+  entry.promise = textureLoader.loadAsync(safeUrl).then(texture => {
     // Do not resurrect GPU resources after a scene has been disposed.
     if (generation !== textureGeneration) {
       disposeTexture(texture);
