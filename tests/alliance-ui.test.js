@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 test("interface de alianças usa sessão persistida e estado real do Worker", async () => {
   const html = await readFile(new URL("../alliance.html", import.meta.url), "utf8");
   assert.match(html, /localStorage.getItem("coi_game_token")/);
-  assert.match(html, /request("/game/state")/);
+  assert.match(html, /request\("\/game\/state"\)/);
   assert.match(html, /state.alliance/);
   assert.match(html, /state.pendingInvites/);
   assert.match(html, /alliance_create/);
@@ -20,7 +20,7 @@ test("interface de alianças usa sessão persistida e estado real do Worker", as
 
 test("central do reino oferece acesso à gestão de alianças", async () => {
   const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
-  assert.match(html, /href="/alliance.html">🤝 Alianças/);
+  assert.match(html, /href="\/alliance.html">🤝 Alianças/);
 });
 
 test("estado do reino entrega os saldos do depósito da aliança", async () => {
