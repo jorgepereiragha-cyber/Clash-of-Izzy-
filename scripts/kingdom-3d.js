@@ -382,9 +382,11 @@ if (host && "WebGLRenderingContext" in window) {
       const targetBase = new THREE.Mesh(new THREE.CircleGeometry(.31, 16), mats.wood);
       targetBase.position.set(.5, .72, .68);
       group.add(targetBase);
-      for (const [radius, color] of [[.23, "#F5EDDA"], [.15, "#A9433B"], [.07, "#E7BD68"]]) {
-        const ring = new THREE.Mesh(new THREE.CircleGeometry(radius, 16), material(color));
-        ring.position.set(.5, .72, .69 + (.23 - radius) * .01);
+      for (const [radius, tube, color, offset] of [
+        [.23, .035, "#F5EDDA", .71], [.15, .028, "#A9433B", .72], [.07, .02, "#E7BD68", .73]
+      ]) {
+        const ring = new THREE.Mesh(new THREE.TorusGeometry(radius, tube, 6, 16), material(color));
+        ring.position.set(.5, .72, offset);
         group.add(ring);
       }
     } else if (type === "siege_workshop") {
