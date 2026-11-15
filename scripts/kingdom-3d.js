@@ -2,10 +2,11 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
 import { KTX2Loader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/KTX2Loader.js";
+import { selectKingdomQualityProfile } from "./kingdom-quality.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
-  let renderer, scene, camera, resizeObserver, ktx2, gltfLoader, resizeHandler;
+  let renderer, scene, camera, resizeObserver, ktx2, gltfLoader, resizeHandler, qualityProfile;
   let latestBuildings = [];
   let activeModels = [];
   const glbTemplates = new Map();
@@ -87,7 +88,7 @@ if (host && "WebGLRenderingContext" in window) {
     texture.colorSpace = THREE.SRGBColorSpace;
     texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
     texture.repeat.set(kind === "grass" ? 9 : 3, kind === "grass" ? 7 : 3);
-    texture.anisotropy = Math.min(4, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+    texture.anisotropy = Math.min(qualityProfile?.anisotropy || 2, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
     texture.needsUpdate = true;
     return texture;
   }
@@ -222,7 +223,7 @@ if (host && "WebGLRenderingContext" in window) {
       });
     }
     activeModels = [];
-    const list = (Array.isArray(buildings) ? buildings : []).slice(0, 16);
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, qualityProfile?.maxBuildings || 16);
     list.forEach((b, i) => {
       const col = i % 4, row = Math.floor(i / 4);
       const x = (col - 1.5) * 2.9, z = (row - 1.5) * 2.3;
@@ -266,17 +267,22 @@ if (host && "WebGLRenderingContext" in window) {
   }
   try {
     const deviceMemory = Number(navigator.deviceMemory || 0);
-    const maxDpr = deviceMemory > 0 && deviceMemory <= 4 ? 1 : 1.25;
     renderer = new THREE.WebGLRenderer({
       alpha: true, antialias: false, powerPreference: "low-power",
       depth: true, stencil: false, preserveDrawingBuffer: false
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr));
+    qualityProfile = selectKingdomQualityProfile({
+      deviceMemory,
+      hardwareConcurrency: navigator.hardwareConcurrency,
+      viewportWidth: host.clientWidth,
+      maxTextureSize: renderer.capabilities.maxTextureSize
+    });
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, qualityProfile.pixelRatioCap));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.12;
-    renderer.shadowMap.enabled = host.clientWidth > 680 && !(deviceMemory > 0 && deviceMemory <= 4);
+    renderer.shadowMap.enabled = qualityProfile.shadows;
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.id = "kingdom3d";
     renderer.domElement.setAttribute("aria-hidden", "true");
@@ -288,7 +294,7 @@ if (host && "WebGLRenderingContext" in window) {
     scene.add(new THREE.HemisphereLight("#e6f0d6", "#43513b", 2.05));
     const sun = new THREE.DirectionalLight("#ffe0a4", 2.4);
     sun.position.set(-5, 10, 6); sun.castShadow = renderer.shadowMap.enabled;
-    sun.shadow.mapSize.set(1024, 1024); sun.shadow.camera.left = -9; sun.shadow.camera.right = 9;
+    sun.shadow.mapSize.set(qualityProfile.shadowMapSize, qualityProfile.shadowMapSize); sun.shadow.camera.left = -9; sun.shadow.camera.right = 9;
     sun.shadow.camera.top = 9; sun.shadow.camera.bottom = -9; scene.add(sun);
     applyProceduralSurfaceMaps();
     buildGround();
@@ -297,8 +303,27 @@ if (host && "WebGLRenderingContext" in window) {
     ktx2.detectSupport(renderer);
     gltfLoader = new GLTFLoader(); gltfLoader.setKTX2Loader(ktx2);
     host.classList.add("has-3d");
+    host.dataset.qualityTier = qualityProfile.tier;
+    const diagnostics = () => {
+      if (!renderer) return { available: false, tier: qualityProfile?.tier || "unavailable" };
+      const info = renderer.info;
+      return {
+        available: true,
+        tier: qualityProfile.tier,
+        drawCalls: info.render.calls,
+        triangles: info.render.triangles,
+        geometries: info.memory.geometries,
+        textures: info.memory.textures,
+        pixelRatio: renderer.getPixelRatio(),
+        maxTextureSize: renderer.capabilities.maxTextureSize,
+        shadows: renderer.shadowMap.enabled
+      };
+    };
+    window.__coiKingdomDiagnostics = diagnostics;
     const restore2DFallback = () => {
       host.classList.remove("has-3d");
+      delete host.dataset.qualityTier;
+      if (window.__coiKingdomDiagnostics === diagnostics) delete window.__coiKingdomDiagnostics;
       resizeObserver?.disconnect();
       resizeObserver = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
@@ -320,7 +345,7 @@ if (host && "WebGLRenderingContext" in window) {
       camera.left = -viewWidth / 2; camera.right = viewWidth / 2;
       camera.top = viewHeight / 2; camera.bottom = -viewHeight / 2;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, qualityProfile.pixelRatioCap));
       renderer.setSize(host.clientWidth, host.clientHeight, false);
       renderer.render(scene, camera);
     };
