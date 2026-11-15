@@ -11,7 +11,7 @@
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -20%,#395779,#101a2b 60%,#080e18);color:#f5edda;font:14px system-ui,Arial,sans-serif;min-height:100vh}
 header{position:sticky;top:0;z-index:5;background:#101a2bf2;border-bottom:1px solid var(--line);padding:10px max(12px,env(safe-area-inset-right)) 10px max(12px,env(safe-area-inset-left));backdrop-filter:blur(12px)}
 .top{max-width:1120px;margin:auto;display:flex;align-items:center;justify-content:space-between;gap:12px}.brand{font-weight:950;letter-spacing:.08em;color:var(--gold)}.brand small{display:block;color:#d9e0e8;font-weight:500;letter-spacing:0;font-size:11px}
-.resources{max-width:1120px;margin:10px auto 0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}.resource{background:#22364e;border:1px solid #52677d;border-radius:8px;padding:7px;text-align:center;font-size:11px}.resource b{display:block;color:var(--gold);font-size:14px}
+.resources{max-width:1120px;margin:10px auto 0;display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:6px}.resource{background:#22364e;border:1px solid #52677d;border-radius:8px;padding:7px;text-align:center;font-size:11px;transition:transform .18s,border-color .18s,box-shadow .18s}.resource b{display:block;color:var(--gold);font-size:14px}.resource-icon{display:inline-block;margin-right:3px}.resource.bump{animation:resource-bump .42s ease-out}@keyframes resource-bump{0%{transform:scale(.96);border-color:#f4dca8;box-shadow:0 0 0 2px #e7bd6840}100%{transform:scale(1);border-color:#52677d;box-shadow:none}}
 main{max-width:1120px;margin:18px auto;padding:0 12px 40px}.hero{display:flex;align-items:end;justify-content:space-between;gap:12px;margin-bottom:14px}.hero h1{margin:0;color:var(--gold);font-size:clamp(22px,4vw,32px)}.muted{color:var(--muted)}.layout{display:grid;grid-template-columns:minmax(0,1.55fr) minmax(260px,.8fr);gap:14px}
 .panel{background:linear-gradient(145deg,#1b3049,#101d30);border:1px solid var(--line);border-radius:13px;padding:14px;box-shadow:0 8px 25px #0005}.panel h2{margin:0 0 12px;color:var(--gold);font-size:17px}
 .city{min-height:350px;position:relative;overflow:hidden;border-radius:11px;border:1px solid #5e704e;background:linear-gradient(180deg,#7e9b76 0%,#456b4e 45%,#294c3c 100%);padding:18px;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));grid-template-rows:repeat(3,minmax(82px,1fr));gap:10px;isolation:isolate}
@@ -24,15 +24,15 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .queue-card{display:grid;gap:5px;background:#0e1a2a;border:1px solid #52677d;border-radius:9px;padding:10px}
 .queue-card strong{color:#f5edda}.queue-card small{color:var(--muted)}
 .queue-progress{height:7px;overflow:hidden;border-radius:999px;background:#26394d}
-.queue-progress span{display:block;height:100%;background:linear-gradient(90deg,#9a682d,#e7bd68);width:35%;animation:queue-pulse 1.7s ease-in-out infinite alternate}
+.queue-progress span{display:block;height:100%;background:linear-gradient(90deg,#9a682d,#e7bd68);width:0%;transition:width .9s linear;animation:queue-pulse 1.7s ease-in-out infinite alternate}
 .queue-remaining{color:#f1c46a;font-weight:800;font-variant-numeric:tabular-nums}
 .queue-form{display:grid;gap:8px;margin-top:10px}
 .queue-form label{font-size:12px;color:var(--muted)}
 .queue-form button{width:100%}
-@keyframes queue-pulse{from{opacity:.55}to{opacity:1}}
+@keyframes queue-pulse{from{opacity:.55}to{opacity:1}}@media(prefers-reduced-motion:reduce){.resource.bump,.queue-progress span{animation:none;transition:none}}
 .stack{display:grid;gap:14px}.notice{padding:10px;border-radius:8px;background:#3a2d1c;border:1px solid #927344;color:#f4dca8;line-height:1.5}.events{display:grid;gap:7px}.event{background:#0e1a2a;padding:8px;border-radius:7px;color:#dbe3ec;font-size:12px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 #status{font-size:12px;color:#d8e2ee}#status.error{color:#ffb4a9}#loading{padding:25px;text-align:center;color:var(--muted)}
-@media(max-width:760px){.layout{grid-template-columns:1fr}.city{min-height:320px;grid-template-rows:repeat(3,minmax(78px,1fr));padding:10px;gap:7px}.resources{grid-template-columns:repeat(5,minmax(0,1fr))}.resource{font-size:10px;padding:6px 2px}.resource b{font-size:12px}.hero{align-items:start;flex-direction:column}}
+@media(max-width:760px){.layout{grid-template-columns:1fr}.city{min-height:320px;grid-template-rows:repeat(3,minmax(78px,1fr));padding:10px;gap:7px}.resources{grid-template-columns:repeat(3,minmax(0,1fr))}.resource{font-size:10px;padding:6px 2px}.resource b{font-size:12px}.hero{align-items:start;flex-direction:column}}
 @media(max-width:390px){.city{min-height:280px}.building{padding:5px 3px}.building .emoji{font-size:22px}.building strong{font-size:9px}.building small{font-size:9px}.grid2{grid-template-columns:1fr}}
 
 #kingdomScene{position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none;transition:opacity .2s ease}
@@ -114,7 +114,17 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div class="notice" style="margin-top:14px">O tempo e os recursos são processados pelo servidor. Fechar o jogo não interrompe a evolução do reino; ao retornar, o estado é sincronizado novamente.</div>
 </div></main>
 <script>
-const API="/api";let token=null,state=null,busy=false;
+const API="/api";let token=null,state=null,busy=false;let lastResourceSnapshot=null;
+function renderResourceHud(kingdom){
+ const entries=[["🌾","Comida","food",kingdom?.food],["🪵","Madeira","wood",kingdom?.wood],["🪨","Pedra","stone",kingdom?.stone],["⛓️","Ferro","iron",kingdom?.iron],["🪙","Ouro","gold",kingdom?.gold],["💎","Gemas","gems",state?.player?.gems]];
+ const snapshot=Object.fromEntries(entries.map(([, ,key,value])=>[key,Number(value)||0]));
+ document.getElementById("resources").innerHTML=entries.map(([icon,label,key])=>{
+  const value=fmt(snapshot[key]);
+  const changed=lastResourceSnapshot!==null&&lastResourceSnapshot[key]!==snapshot[key];
+  return '<div class="resource'+(changed?' bump':'')+'" aria-label="'+esc(label+": "+value)+'"><span class="resource-icon" aria-hidden="true">'+icon+'</span><b>'+value+'</b>'+label+'</div>';
+ }).join("");
+ lastResourceSnapshot=snapshot;
+}
 const names={castle:["Castelo","🏰"],barracks:["Quartel","⚔️"],farm:["Fazenda","🌾"],quarry:["Pedreira","🪨"],lumber_mill:["Serraria","🪵"],iron_mine:["Mina de ferro","⛓️"],market:["Mercado","🏪"],academy:["Academia","📚"],wall:["Muralha","🧱"],hospital:["Hospital","🏥"],watchtower:["Torre de vigia","🔭"],stable:["Estábulo","🐎"],archery_range:["Campo de arqueiros","🏹"],siege_workshop:["Oficina de cerco","🛠️"],embassy:["Embaixada","🏳️"],warehouse:["Armazém","📦"]};
 const fmt=n=>Number(n||0).toLocaleString("pt-BR");
 const esc=value=>String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll(String.fromCharCode(34),"&quot;").replaceAll(String.fromCharCode(39),"&#39;");
@@ -184,7 +194,7 @@ window.addEventListener("coi:kingdom-2d-fallback",()=>{
   button.style.top="";
  });
 });
-function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";document.getElementById("resources").innerHTML=[["🌾","Comida","food"],["🪵","Madeira","wood"],["🪨","Pedra","stone"],["⛓️","Ferro","iron"],["🪙","Ouro","gold"]].map(([icon,label,key])=>'<div class="resource">'+icon+'<b>'+fmt(k[key])+'</b>'+label+'</div>').join("");
+function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);
 const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings);if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[]}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const constructionRunning=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running");
@@ -205,6 +215,12 @@ function formatDuration(seconds){
  if(minutes)return minutes+"m "+String(rest).padStart(2,"0")+"s";
  return rest+"s";
 }
+function queueProgressPercent(startedAt,completesAt,now=Date.now()){
+ const started=Date.parse(startedAt||"");
+ const completes=Date.parse(completesAt||"");
+ if(!Number.isFinite(started)||!Number.isFinite(completes)||completes<=started)return 0;
+ return Math.round(Math.max(0,Math.min(100,((now-started)/(completes-started))*100)));
+}
 function renderQueues(){
  const root=document.getElementById("queues");
  const active=(state?.queues||[]).filter(q=>q.status==="running");
@@ -212,10 +228,13 @@ function renderQueues(){
  const targets={castle:"Castelo",barracks:"Quartel",farm:"Fazenda",quarry:"Pedreira",lumber_mill:"Serraria",iron_mine:"Mina de ferro",academy:"Academia",militia:"Milícia",swordsman:"Espadachim",spearman:"Lanceiro",archer:"Arqueiro",crossbowman:"Besteiro",cavalry:"Cavalaria",knight:"Cavaleiro",mage:"Mago",catapult:"Catapulta",ram:"Aríete",trebuchet:"Trabuquete",economy:"Economia",military:"Doutrina militar",construction:"Engenharia",defense:"Defesa",gear_forging:"Metalurgia rúnica",gear_ward:"Runas de proteção",gear_vitality:"Forja vital",gear_logistics:"Logística rúnica"};
  if(!active.length){root.innerHTML='<div class="muted">Nenhuma ordem em andamento. Construção, treinamento e pesquisa podem funcionar em paralelo.</div>';return;}
  root.innerHTML=active.map(q=>{
-   const remaining=Math.max(0,Math.ceil((Date.parse(q.completes_at)-Date.now())/1000));
+   const completionTime=Date.parse(q.completes_at||"");
+   const remaining=Number.isFinite(completionTime)?Math.max(0,Math.ceil((completionTime-Date.now())/1000)):0;
    const target=targets[q.target_key]||q.target_key;
+   const queueLabel=labels[q.queue_type]||q.queue_type;
    const detail=q.queue_type==="construction"?"Nível "+q.to_level:q.queue_type==="training"?"Quantidade: "+fmt(q.quantity):"Nível "+q.to_level;
-   return '<div class="queue-card"><strong>'+esc(labels[q.queue_type]||q.queue_type)+' · '+esc(target)+'</strong><small>'+esc(detail)+' · termina em '+new Date(q.completes_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+'</small><span class="queue-remaining" data-completes="'+esc(q.completes_at)+'">'+formatDuration(remaining)+'</span><div class="queue-progress" aria-hidden="true"><span></span></div></div>';
+   const progress=queueProgressPercent(q.started_at,q.completes_at);
+   return '<div class="queue-card"><strong>'+esc(queueLabel)+' · '+esc(target)+'</strong><small>'+esc(detail)+' · termina em '+new Date(q.completes_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+'</small><span class="queue-remaining" data-started="'+esc(q.started_at)+'" data-completes="'+esc(q.completes_at)+'">'+formatDuration(remaining)+'</span><div class="queue-progress" role="progressbar" aria-label="Progresso: '+esc(queueLabel)+' - '+esc(target)+'" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progress+'"><span data-progress style="width:'+progress+'%"></span></div></div>';
  }).join("");
 }
 async function refreshQueueState(){
@@ -273,7 +292,7 @@ async function searchPlayers(event){
 document.getElementById("nicknameForm").addEventListener("submit",setNickname);
 document.getElementById("trainingForm").addEventListener("submit",startTraining);
 document.getElementById("researchForm").addEventListener("submit",startResearch);
-window.setInterval(()=>{document.querySelectorAll("[data-completes]").forEach(el=>{const remaining=Math.max(0,Math.ceil((Date.parse(el.dataset.completes)-Date.now())/1000));el.textContent=formatDuration(remaining);});},1000);
+window.setInterval(()=>{const now=Date.now();document.querySelectorAll("[data-completes]").forEach(el=>{const completionTime=Date.parse(el.dataset.completes||"");const remaining=Number.isFinite(completionTime)?Math.max(0,Math.ceil((completionTime-now)/1000)):0;el.textContent=formatDuration(remaining);const progress=queueProgressPercent(el.dataset.started,el.dataset.completes,now);const bar=el.closest(".queue-card")?.querySelector("[data-progress]");if(bar)bar.style.width=progress+"%";if(bar?.parentElement)bar.parentElement.setAttribute("aria-valuenow",String(progress));});},1000);
 window.setInterval(refreshQueueState,30000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshQueueState();});
 document.getElementById("playerSearchForm").addEventListener("submit",searchPlayers);
