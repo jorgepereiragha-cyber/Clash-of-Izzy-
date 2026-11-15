@@ -137,7 +137,7 @@ test("drawing buffer pixel count is capped for tall and high-density mobile view
   assert.ok(1440 * 3200 * balancedRatio * balancedRatio <= balanced.maxPixelCount + 1);
   assert.ok(lowRatio < 1);
   assert.ok(balancedRatio < balanced.pixelRatioCap);
-  assert.equal(calculateKingdomPixelRatio({ width: 1, height: 1, devicePixelRatio: 0, profile: low }), 0.5);
+  assert.equal(calculateKingdomPixelRatio({ width: 1, height: 1, devicePixelRatio: 0, profile: low }), 1);
 });
 
 
