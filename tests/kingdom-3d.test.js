@@ -220,3 +220,19 @@ test("partial WebGL initialization failure runs the complete GPU and listener te
   assert.match(renderer, /delete window\.__coiKingdomDiagnostics/);
   assert.match(renderer, /delete host\.dataset\.qualityTier/);
 });
+
+
+test("optional GLB assets load only for visible building types with bounded concurrency", () => {
+  assert.match(renderer, /const neededTypes = new Set/);
+  assert.match(renderer, /glbLoadPromises\.has\(asset\.type\)/);
+  assert.match(renderer, /Math\.min\(3, queue\.length\)/);
+  assert.match(renderer, /loadOptionalGlbAssets\(list\)/);
+  assert.match(renderer, /loadOptionalGlbAssets\(window\.__coiKingdomBuildings\)/);
+  assert.match(renderer, /manifestLoad = null/);
+});
+
+test("failed optional GLB downloads preserve procedural models and allow a later retry", () => {
+  assert.match(renderer, /GLB asset not ready; procedural 3D models remain active/);
+  assert.match(renderer, /glbLoadPromises\.delete\(asset\.type\)/);
+  assert.match(renderer, /manifestLoad = null/);
+});
