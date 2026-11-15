@@ -1043,12 +1043,20 @@ export default {
       ?await env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages WHERE id=?").bind(itemId).first()
       :await env.DB.prepare("SELECT id,name,price_brl FROM skins WHERE id=?").bind(itemId).first();
     if(!item)return json({error:"Produto não encontrado no catálogo."},404);
+    if(kind==="skin"){
+      const owned=await env.DB.prepare("SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?").bind(player.id,item.id).first();
+      if(owned)return json({error:"Você já possui esta skin."},409);
+    }
+    const pending=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
+    if(pending)return json({success:true,request:pending,reused:true,message:"Você já possui um pedido aguardando análise."},200);
     try{
       await env.DB.prepare("INSERT INTO purchase_requests(player_id,kingdom_id,product_kind,product_id,product_name,price_brl,gems_amount,request_key) VALUES(?,?,?,?,?,?,?,?)")
         .bind(player.id,kingdom.id,kind,item.id,item.name,item.price_brl,kind==="vip_package"?Number(item.gems||0):0,requestKey).run();
     }catch(error){
       const existing=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
       if(existing)return json({success:true,request:existing,reused:true},200);
+      const duplicate=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
+      if(duplicate)return json({success:true,request:duplicate,reused:true,message:"Você já possui um pedido aguardando análise."},200);
       throw error;
     }
     const created=await env.DB.prepare("SELECT id,status,product_name,price_brl,created_at FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
