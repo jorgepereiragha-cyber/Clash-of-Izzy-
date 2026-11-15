@@ -23,3 +23,6 @@ coverage/
 *.db
 *.log
 *.map
+
+# Art pipeline documentation is kept in Git, not served as a game asset.
+assets/art/README.md
