@@ -11,6 +11,8 @@ if (host && "WebGLRenderingContext" in window) {
   let activeModels = [];
   const glbTemplates = new Map();
   let manifestLoad = null;
+  let manifestAssets = [];
+  const glbLoadPromises = new Map();
   const material = (color, roughness = 0.92) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.02 });
   const mats = {
     grass: material("#577a49"), grassLight: material("#78945a"),
@@ -287,57 +289,76 @@ if (host && "WebGLRenderingContext" in window) {
   }
   async function loadOptionalGlbAssets(buildings = []) {
     // Data Saver keeps the procedural scene available but skips optional GLB downloads.
-    if (!qualityProfile?.loadOptionalAssets) return Promise.resolve();
-    if (manifestLoad) return manifestLoad;
-    manifestLoad = (async () => {
-      try {
-        const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
-        if (disposed || !renderer || !response.ok) return;
-        const manifest = await response.json();
-        if (disposed || !renderer) return;
-        for (const asset of (Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [])) {
-          if (disposed || !renderer) break;
-          if (asset.enabled !== true || typeof asset.type !== "string" || !Object.hasOwn(palettes, asset.type) || typeof asset.src !== "string") continue;
-          try {
-            const assetUrl = new URL(asset.src, window.location.origin);
-            if (assetUrl.origin !== window.location.origin || !assetUrl.pathname.startsWith("/assets/3d/") || !assetUrl.pathname.toLowerCase().endsWith(".glb")) continue;
-            const gltf = await gltfLoader.loadAsync(assetUrl.href);
-            if (disposed || !renderer) {
-              disposeDetachedObject3D(gltf.scene);
-              continue;
-            }
-            const sourceBounds = new THREE.Box3().setFromObject(gltf.scene);
-            const sourceSize = sourceBounds.getSize(new THREE.Vector3());
-            const sourceCenter = sourceBounds.getCenter(new THREE.Vector3());
-            const footprint = Math.max(sourceSize.x, sourceSize.z, 0.001);
-            const height = Math.max(sourceSize.y, 0.001);
-            const targetFootprint = Math.max(0.8, Math.min(2.5, Number(asset.targetFootprint) || 2.05));
-            const targetHeight = Math.max(0.8, Math.min(3.2, Number(asset.targetHeight) || 2.4));
-            const uniformScale = Math.min(targetFootprint / footprint, targetHeight / height);
-            const template = new THREE.Group();
-            const normalizedModel = new THREE.Group();
-            normalizedModel.add(gltf.scene);
-            normalizedModel.scale.setScalar(uniformScale);
-            normalizedModel.position.set(
-              -sourceCenter.x * uniformScale,
-              -sourceBounds.min.y * uniformScale,
-              -sourceCenter.z * uniformScale
-            );
-            template.add(normalizedModel);
-            template.traverse(node => {
-              if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
-            });
-            glbTemplates.set(asset.type, template);
-          } catch (assetError) {
-            console.info(`Clash of Izzy: GLB ${asset.type} indisponível; mantendo modelo procedural.`, assetError);
-          }
-        }
-        if (!disposed && renderer && glbTemplates.size) renderBuildings(latestBuildings);
-      } catch (error) {
-        console.info("Clash of Izzy: GLB asset not ready; procedural 3D models remain active.", error);
+    if (!qualityProfile?.loadOptionalAssets || disposed || !renderer) return;
+    try {
+      if (!manifestLoad) {
+        manifestLoad = (async () => {
+          const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
+          if (disposed || !renderer) return;
+          if (!response.ok) throw new Error("Manifesto 3D indisponível.");
+          const manifest = await response.json();
+          if (disposed || !renderer) return;
+          manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [];
+        })().catch(error => {
+          manifestLoad = null;
+          throw error;
+        });
       }
-    })();
-    return manifestLoad;
+      await manifestLoad;
+      if (disposed || !renderer) return;
+
+      // Load only models for buildings currently present. Later construction events
+      // can request another type without downloading every optional asset up front.
+      const neededTypes = new Set(
+        (Array.isArray(buildings) ? buildings : [])
+          .map(item => item?.building_type)
+          .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
+      );
+      if (!neededTypes.size) return;
+
+      const queuedTypes = new Set();
+      const queue = manifestAssets.filter(asset => {
+        if (!asset || asset.enabled !== true || typeof asset.type !== "string" || typeof asset.src !== "string") return false;
+        if (!neededTypes.has(asset.type) || glbTemplates.has(asset.type) || glbLoadPromises.has(asset.type) || queuedTypes.has(asset.type)) return false;
+        queuedTypes.add(asset.type);
+        return true;
+      });
+      let cursor = 0;
+
+      const loadAsset = async asset => {
+        try {
+          const assetUrl = new URL(asset.src, window.location.origin);
+          if (assetUrl.origin !== window.location.origin || !assetUrl.pathname.startsWith("/assets/3d/") || !assetUrl.pathname.toLowerCase().endsWith(".glb")) return;
+          const loadPromise = gltfLoader.loadAsync(assetUrl.href);
+          glbLoadPromises.set(asset.type, loadPromise);
+          const gltf = await loadPromise;
+          if (disposed || !renderer) {
+            disposeDetachedObject3D(gltf.scene);
+            return;
+          }
+          const template = gltf.scene;
+          template.traverse(node => {
+            if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+          });
+          glbTemplates.set(asset.type, template);
+        } catch (assetError) {
+          console.info(`Clash of Izzy: GLB ${asset.type} indisponível; mantendo modelo procedural.`, assetError);
+        } finally {
+          glbLoadPromises.delete(asset.type);
+        }
+      };
+
+      const worker = async () => {
+        while (!disposed && cursor < queue.length) {
+          const asset = queue[cursor++];
+          await loadAsset(asset);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => worker()));
+      if (!disposed && renderer && queue.length && glbTemplates.size) renderBuildings(latestBuildings);
+    } catch (error) {
+      console.info("Clash of Izzy: GLB asset not ready; procedural 3D models remain active.", error);
+    }
   }
   try {
     const deviceMemory = Number(navigator.deviceMemory || 0);
