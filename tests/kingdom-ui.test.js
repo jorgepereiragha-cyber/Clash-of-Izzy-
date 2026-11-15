@@ -19,3 +19,21 @@ test("central do reino consome estado e melhorias pela API autenticada", async (
   assert.match(html, /state\.alliance/);
   assert.doesNotMatch(html, /localStorage\.removeItem\("coi_game_token"\)/);
 });
+
+test("central do reino mostra filas persistentes, treinamento e pesquisas", async () => {
+  const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.match(html, /id="queues"/);
+  assert.match(html, /id="trainingForm"/);
+  assert.match(html, /value="mage"/);
+  assert.match(html, /id="researchForm"/);
+  assert.match(html, /renderQueues\(\)/);
+  assert.match(html, /refreshQueueState/);
+  assert.match(html, /type:"train"/);
+  assert.match(html, /type:"research"/);
+  assert.match(html, /data-completes/);
+});
+
+test("PWA cache version is bumped when queue UI is changed", async () => {
+  const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
+  assert.match(worker, /clash-of-izzy-shell-v10/);
+});
