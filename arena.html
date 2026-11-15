@@ -433,7 +433,7 @@ function adaptRenderResolution(dt){
  perfElapsed=0;perfFrames=0;
 }
 if(new URLSearchParams(location.search).get('debug')==='1'){const panel=document.createElement('div');panel.style.cssText='position:fixed;left:8px;top:8px;z-index:20;padding:6px 9px;background:#07111ddd;color:#bdf4c5;border:1px solid #6b9870;border-radius:6px;font:11px monospace;pointer-events:none';panel.textContent='Medição gráfica iniciando…';document.body.append(panel);window.mapDebugPanel=panel}
-let last=performance.now();function loop(now){requestAnimationFrame(loop);if(document.hidden){last=now;return}const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);updateMapChunks(dt);renderer.render(scene,camera);adaptRenderResolution(dt)}requestAnimationFrame(loop);
+let last=performance.now();function loop(now){if(document.hidden){last=now;return}const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);updateMapChunks(dt);renderer.render(scene,camera);adaptRenderResolution(dt)}renderer.setAnimationLoop(loop);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false)});
 updateHud();
 </script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script></body></html>
