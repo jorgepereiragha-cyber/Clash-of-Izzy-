@@ -24,6 +24,11 @@ function successfulFetch() {
     });
     if (path === "/api/game/state") return makeResponse({ error: "Sessão inválida." }, 401);
     if (path === "/api/store/catalog") return makeResponse({ skins: [], packages: [] });
+    if (path === "/arena.html") return makeResponse(
+      '<select id="purchaseMethod"><option value="mercadopago_link" selected>Mercado Pago</option></select> https://link.mercadopago.com.br/pagamentosskin paymentWindow',
+      200,
+      "text/html; charset=utf-8"
+    );
     if (path === "/manifest.json") return makeResponse({ name: "Clash of Izzy" });
     if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v10";', 200, "text/javascript");
     return makeResponse("<!doctype html><html lang=\"pt-BR\"><head><title>Clash of Izzy</title></head><body><main>Clash of Izzy - estratégia medieval e reino</main></body></html>", 200, "text/html; charset=utf-8");
@@ -40,7 +45,9 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.apiHealth, true);
   assert.equal(result.checks.d1, true);
   assert.equal(result.checks.adminConfiguration, true);
+  assert.equal(result.checks.mercadoPagoCheckout, true);
   assert.equal(result.checks.staticPages, 8);
+  assert.ok(calls.includes("/arena.html"));
   assert.ok(calls.includes("/api/game/state"));
   assert.ok(calls.includes("/events.html"));
   assert.ok(calls.includes("/world.html"));
