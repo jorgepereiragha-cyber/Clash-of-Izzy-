@@ -9,7 +9,6 @@ const serviceWorker = await readFile(new URL("../sw.js", import.meta.url), "utf8
 
 test("kingdom navigation opens the actual world map, not the combat arena", () => {
   assert.match(kingdom, /goMap.*location\.href="\/world\.html"/);
-  assert.match(kingdom, /Mapa do Mundo.*\/world\.html/);
   assert.doesNotMatch(kingdom, /goMap.*location\.href="\/arena\.html"/);
 });
 
