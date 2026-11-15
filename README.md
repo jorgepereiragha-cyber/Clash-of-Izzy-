@@ -122,3 +122,11 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - Consultas CJK curtas ativam fallback SQL limitado por categoria, mesmo quando o índice de prefixos já retorna resultados; consultas maiores usam FTS5 e trigramas.
 - A busca portuguesa expande formas comuns de plural e mantém a consulta SQL parametrizada, com fallback por categoria quando um índice FTS falha.
 - Reinos vinculados a alianças continuam pesquisáveis e exibem a sigla pública, evitando convites inválidos.
+
+
+## Busca internacional e resiliente
+- Consultas em chinês, japonês e coreano usam contagem por ponto de código Unicode; uma única ideografia ou sílaba pode iniciar a busca.
+- Consultas CJK curtas ativam fallback SQL limitado por categoria, mesmo quando o índice de prefixos já retornou resultados; consultas maiores usam FTS5 e trigramas.
+- A busca em português expande formas comuns de singular/plural, remove diferenças de acentuação e mantém SQL parametrizado.
+- Reinos que já pertencem a alianças continuam pesquisáveis e exibem sua sigla pública; convites inválidos são bloqueados na interface.
+- O fallback é acionado por categoria quando um índice FTS falha, evitando que um índice parcialmente indisponível esconda resultados de outras categorias.
