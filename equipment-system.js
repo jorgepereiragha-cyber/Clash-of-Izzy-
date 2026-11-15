@@ -1,7 +1,9 @@
 // Equipamentos persistentes: inventário e loadout são validados pelo Worker.
 (() => {
   const API="/api";
-  let token=null,state=null,selected="coroa_izzy",selectedHeroId=null,busy=false;
+  let token=null,state=null,selected="coroa_izzy",selectedHeroId=null,busy=false,searchFocusApplied=false;
+  const requestedSkinSearch=new URLSearchParams(location.search).get("search")||"";
+  const normalizeSearch=value=>String(value||"").normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR");
   const $=id=>document.getElementById(id);
   const fmt=value=>Number(value||0).toLocaleString("pt-BR");
   const labels={defense:"Defesa",health:"Vida",attack:"Ataque",resourceBonus:"Produção",critical:"Acerto crítico",march:"Velocidade de marcha"};
@@ -84,6 +86,16 @@
       button.addEventListener("click",()=>perform({type:"cosmetic_buy",skin:id},"Skin "+skin.name+" adquirida."));
       card.append(title,rarity,description,button);return card;
     }));
+    if(requestedSkinSearch&&!searchFocusApplied){
+      const needle=normalizeSearch(requestedSkinSearch);
+      const matches=[...grid.children].filter(card=>normalizeSearch(card.textContent).includes(needle));
+      if(matches.length){
+        matches[0].style.outline="3px solid #ffe09a";
+        matches[0].scrollIntoView({behavior:"smooth",block:"center"});
+        setStatus("Skin localizada pela busca global: "+requestedSkinSearch+".");
+      }else setStatus("A skin pesquisada não foi encontrada no catálogo cosmético atual.");
+      searchFocusApplied=true;
+    }
     $("skin-gems").textContent="Gemas: "+fmt(state?.player?.gems);
     $("skin-shards").textContent="Fragmentos: "+fmt(cosmetics.shards);
     const collection=cosmetics.collections?.find(item=>item.id==="col_norse");
