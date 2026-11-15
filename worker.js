@@ -1436,7 +1436,16 @@ export default {
         const addResult=(item,rank=0)=>{
           const name=item.nickname||item.name||"";
           const candidate=normalized(name);
-          const priority=candidate===queryKey?0:candidate.startsWith(queryKey)?1:candidate.includes(queryKey)?2:3;
+          const searchableFields=[item.nickname,item.name,item.tag,item.description,item.kingdom_name,item.terrain]
+            .map(normalized).filter(Boolean);
+          const exactMatch=searchableFields.some(value=>value===queryKey);
+          const prefixMatch=searchableFields.some(value=>value.startsWith(queryKey));
+          const phraseMatch=searchableFields.some(value=>value.includes(queryKey));
+          const coveredTokens=tokens.filter(token=>{
+            const normalizedToken=normalized(token);
+            return searchableFields.some(value=>value.includes(normalizedToken));
+          }).length;
+          const priority=exactMatch?0:prefixMatch?1:phraseMatch?2:coveredTokens===tokens.length?3:4;
           const key=item.type+"|"+candidate;
           const existing=resultMap.get(key);
           if(!existing||priority<existing._priority||(priority===existing._priority&&Number(rank)<existing._rank))
@@ -1454,7 +1463,7 @@ export default {
             if((indexed.results||[]).length)usedFts=true;
             for(const row of indexed.results||[]){
               if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0),allianceTag:row.kingdom_alliance_tag||""},row.search_rank);
-              else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
+              else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,description:row.subtitle,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
               else if(row.entity_type==="territory")addResult({type:"territory",name:row.title,terrain:row.territory_terrain},row.search_rank);
               else if(row.entity_type==="skin")addResult({type:"skin",name:row.title,description:row.subtitle},row.search_rank);
             }
@@ -1468,7 +1477,7 @@ export default {
               if((partial.results||[]).length)usedFts=true;
               for(const row of partial.results||[]){
                 if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0),allianceTag:row.kingdom_alliance_tag||""},row.search_rank);
-                else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
+                else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,description:row.subtitle,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
                 else if(row.entity_type==="territory")addResult({type:"territory",name:row.title,terrain:row.territory_terrain},row.search_rank);
                 else if(row.entity_type==="skin")addResult({type:"skin",name:row.title,description:row.subtitle},row.search_rank);
               }
