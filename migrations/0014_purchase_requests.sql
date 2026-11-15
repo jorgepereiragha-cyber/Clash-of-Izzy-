@@ -21,3 +21,8 @@ CREATE INDEX IF NOT EXISTS idx_purchase_requests_status_created
 
 CREATE INDEX IF NOT EXISTS idx_purchase_requests_player_created
   ON purchase_requests(player_id, created_at DESC);
+
+-- One open request per player and catalog item; prevents duplicate pending orders.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_purchase_requests_one_pending_product
+  ON purchase_requests(player_id, product_kind, product_id)
+  WHERE status='pending';
