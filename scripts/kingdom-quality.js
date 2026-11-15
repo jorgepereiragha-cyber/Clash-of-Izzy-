@@ -1,17 +1,21 @@
 // Conservative, capability-based quality tiers for the WebGL kingdom renderer.
-// This deliberately avoids guessing Android thermal state from unsupported web APIs.
+// Optional browser hints are treated as hints only; missing APIs never block rendering.
 export function selectKingdomQualityProfile({
   deviceMemory = 0,
   hardwareConcurrency = 4,
   viewportWidth = 720,
   maxTextureSize = 4096,
+  saveData = false,
+  prefersReducedMotion = false,
 } = {}) {
   const memory = Number.isFinite(Number(deviceMemory)) ? Number(deviceMemory) : 0;
   const cores = Number.isFinite(Number(hardwareConcurrency)) ? Number(hardwareConcurrency) : 4;
   const width = Math.max(1, Number(viewportWidth) || 1);
   const textureLimit = Math.max(0, Number(maxTextureSize) || 0);
+  const dataSaver = saveData === true;
 
-  const low = (memory > 0 && memory <= 4)
+  const low = dataSaver
+    || (memory > 0 && memory <= 4)
     || (cores > 0 && cores <= 4)
     || width < 520
     || (textureLimit > 0 && textureLimit < 4096);
@@ -21,11 +25,13 @@ export function selectKingdomQualityProfile({
   return Object.freeze({
     tier,
     pixelRatioCap: tier === "low" ? 1 : tier === "high" ? 1.5 : 1.25,
-    shadows: tier === "high" || (tier === "balanced" && width > 1024),
+    shadows: !dataSaver && (tier === "high" || (tier === "balanced" && width > 1024)),
     shadowMapSize: tier === "high" ? 1536 : tier === "balanced" ? 1024 : 512,
     anisotropy: tier === "high" ? 8 : tier === "balanced" ? 4 : 2,
     maxBuildings: tier === "low" ? 8 : tier === "balanced" ? 12 : 16,
     maxPixelCount: tier === "low" ? 1200000 : tier === "high" ? 4200000 : 2400000,
+    loadOptionalAssets: !dataSaver,
+    prefersReducedMotion: prefersReducedMotion === true,
   });
 }
 
