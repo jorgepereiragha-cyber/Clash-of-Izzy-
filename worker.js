@@ -769,49 +769,73 @@ async function gameAction(env,playerId,body){
     const result=await env.DB.batch([debit,createMarch]);
     if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes ou exército alterado por outra marcha. Atualize o reino e tente novamente."},409);
   }else if(type==="battle"){
-    const units=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0").bind(k.id).all();
-    const total=(units.results||[]).reduce((n,u)=>n+u.quantity,0);
+    await ensureHeroTables(env);
+    const units=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY unit_type,tier").bind(k.id).all();
+    const armyRows=units.results||[];
+    const total=armyRows.reduce((n,u)=>n+u.quantity,0);
     if(total<1)return json({error:"Treine tropas antes de iniciar uma batalha."},409);
-    const hero=await env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first();
-    const dragon=await env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first();
-    const tech=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first();
-    const defenseTech=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(k.id).first();
+    const [hero,dragon,tech,defenseTech,battleState,activeHero]=await Promise.all([
+      env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first(),
+      env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first(),
+      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first(),
+      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(k.id).first(),
+      env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(k.id).first(),
+      env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first()
+    ]);
     const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)));
-    const troopPower=(units.results||[]).reduce((n,u)=>n+u.quantity*(UNITS[u.unit_type]?.power||1)*u.tier,0);
-    let attackerPower=Math.max(1,Math.floor(troopPower+(hero?.level||1)*8+(dragon?.level||1)*10+(tech?.level||0)*12));
-    let defenderPower=80+Number(k.castle_level||1)*95;
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const simulation=simulateBattle({
-      army:units.results||[],
-      castleLevel:Number(k.castle_level||1),
-      heroLevel:Number(hero?.level||1),
-      dragonLevel:Number(dragon?.level||1),
-      researchLevel:Number(tech?.level||0),
-      defenseBonusPercent,
-      castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),
-      roll
+      army:armyRows,castleLevel:Number(k.castle_level||1),
+      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
+      researchLevel:Number(tech?.level||0),defenseBonusPercent,
+      castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
     });
-    const won=simulation.won;
-    attackerPower=simulation.attackerPower;
-    defenderPower=simulation.defenderPower;
-    const losses={};
-    const remainingLosses={...simulation.losses};
-    const statements=(units.results||[]).map(u=>{
-      const lost=Math.min(u.quantity,Math.max(0,Number(remainingLosses[u.unit_type]||0)));
-      remainingLosses[u.unit_type]=Math.max(0,Number(remainingLosses[u.unit_type]||0)-lost);
-      losses[u.unit_type]=(losses[u.unit_type]||0)+lost;
-      return env.DB.prepare("UPDATE army_units SET quantity=quantity-? WHERE kingdom_id=? AND unit_type=? AND tier=?").bind(lost,k.id,u.unit_type,u.tier);
-    });
+    const won=simulation.won,attackerPower=simulation.attackerPower,defenderPower=simulation.defenderPower;
+    const losses={},remainingLosses={...simulation.losses},snapshot={};
+    for(const unit of armyRows){
+      const lost=Math.min(unit.quantity,Math.max(0,Number(remainingLosses[unit.unit_type]||0)));
+      remainingLosses[unit.unit_type]=Math.max(0,Number(remainingLosses[unit.unit_type]||0)-lost);
+      losses[unit.unit_type]=(losses[unit.unit_type]||0)+lost;
+      snapshot[unit.unit_type+"_"+unit.tier]={quantity:unit.quantity,loss:lost};
+    }
+    const snapshotJson=JSON.stringify(snapshot),expectedRows=armyRows.length;
+    const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID(),actionId=crypto.randomUUID();
+    const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const battleLock=env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,k.id,previousBattleToken);
+    const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND (SELECT COUNT(*) FROM army_units WHERE kingdom_id=? AND quantity>0)=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
+      .bind(snapshotJson,k.id,snapshotJson,k.id,expectedRows,k.id,expectedRows,k.id,battleToken);
+    const statements=[battleLock,troopUpdate,
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
+        .bind(k.id,"__internal_action_guard",actionId,expectedRows,k.id,battleToken)
+    ];
     const rewards=won?{food:500,wood:300,stone:200,gold:100}:{food:0,wood:0,stone:0,gold:0};
-    if(won){statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+500,wood=wood+300,stone=stone+200,gold=gold+100 WHERE id=?").bind(k.id));const material=eventMaterialStatement(env,k.id,"battle");if(material)statements.push(material);}
-    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) VALUES(?,?,?,?,?,?,?,?)")
-      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_simulated",rounds:simulation.rounds,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}])));
-    if(won)for(const [resource,amount] of Object.entries(rewards))if(amount>0)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(k.id,resource,amount,"recompensa de batalha PvE"));
-    await env.DB.batch(statements);
+    if(won){
+      statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+500,wood=wood+300,stone=stone+200,gold=gold+100 WHERE id=? AND "+guard).bind(k.id,k.id,actionId));
+      statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"royal_blueprint",k.id,actionId));
+    }
+    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,?,?,?,?,?,?,? WHERE "+guard)
+      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_simulated",rounds:simulation.rounds,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}]),k.id,actionId));
+    if(won){
+      const ledgerRows=Object.entries(rewards).filter(([,amount])=>amount>0);
+      if(ledgerRows.length)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+ledgerRows.map(()=> "SELECT ?,?,?,? WHERE "+guard).join(" UNION ALL "))
+        .bind(...ledgerRows.flatMap(([resource,amount])=>[k.id,resource,amount,"recompensa de batalha PvE",k.id,actionId]));
+    }
+    let heroUpdateIndex=-1,heroProgress=null;
+    if(activeHero){
+      const cap=HERO_RARITY[activeHero.rarity]?.maxLevel||30;
+      let level=activeHero.level,xp=activeHero.experience+(won?100:40);
+      while(level<cap&&xp>=level*50){xp-=level*50;level++;}
+      heroProgress={hero:activeHero.hero_key,level,experience:xp,gained:won?100:40};
+      heroUpdateIndex=statements.length;
+      statements.push(env.DB.prepare("UPDATE hero_inventory SET level=?,experience=? WHERE kingdom_id=? AND hero_key=? AND level=? AND experience=? AND "+guard)
+        .bind(level,xp,k.id,activeHero.hero_key,activeHero.level,activeHero.experience,k.id,actionId));
+    }
+    statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
+    const result=await env.DB.batch(statements);
+    if(!result[2]?.meta?.changes)return json({error:"O exército mudou ou outra batalha foi processada. Atualize o reino e tente novamente."},409);
     battleOutcome={won,attackerPower,defenderPower,losses,rewards,message:won?"Vitória! O reino recebeu recursos.":"Derrota! Reorganize o exército e tente novamente."};
-    const activeHero=await env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first();
-    if(activeHero){const cap=HERO_RARITY[activeHero.rarity]?.maxLevel||30;let level=activeHero.level,xp=activeHero.experience+(won?100:40);while(level<cap&&xp>=level*50){xp-=level*50;level++;}await env.DB.prepare("UPDATE hero_inventory SET level=?,experience=? WHERE kingdom_id=? AND hero_key=?").bind(level,xp,k.id,activeHero.hero_key).run();battleOutcome.heroProgress={hero:activeHero.hero_key,level,experience:xp,gained:won?100:40};}
-  }else if(type==="rename"){
+    if(heroProgress&&result[heroUpdateIndex]?.meta?.changes)battleOutcome.heroProgress=heroProgress;
+   }else if(type==="rename"){
     const name=String(body.name||"").trim().slice(0,32);if(name.length<3)return json({error:"O nome deve ter de 3 a 32 caracteres."},400);
     await env.DB.prepare("UPDATE kingdoms SET kingdom_name=? WHERE id=?").bind(name,k.id).run();
   }else{return json({error:"Ação de jogo desconhecida."},400)}
