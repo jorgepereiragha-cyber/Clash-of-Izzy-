@@ -79,6 +79,8 @@ function makeApi(baseUrl) {
     const headers = { ...(options.headers || {}) };
     if (options.token) headers.Authorization = "Bearer " + options.token;
     if (options.body !== undefined) headers["Content-Type"] = "application/json";
+    const startedAt = Date.now();
+    console.log("[worker-d1] request:start", options.method || "GET", route);
     const response = await fetch(baseUrl + route, {
       method: options.method || "GET",
       headers,
@@ -86,6 +88,7 @@ function makeApi(baseUrl) {
       signal: AbortSignal.timeout(15_000),
     });
     const data = await response.json().catch(() => ({}));
+    console.log("[worker-d1] request:done", route, response.status, Date.now() - startedAt + "ms");
     return { status: response.status, data, headers: response.headers };
   };
 }
