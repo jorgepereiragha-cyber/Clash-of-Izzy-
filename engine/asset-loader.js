@@ -18,7 +18,7 @@ const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/
 
 function validateModelUrl(url) {
   const parsed = new URL(String(url), window.location.href);
-  if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith('/assets/models/') || !/\\.glb$/i.test(parsed.pathname)) {
+  if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith('/assets/models/') || !/\.glb$/i.test(parsed.pathname)) {
     throw new TypeError('Modelos devem ser arquivos GLB locais em /assets/models/.');
   }
   return parsed.href;
