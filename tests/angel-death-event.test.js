@@ -92,3 +92,12 @@ test("leaderboard ties use the same stable ordering as final reward distribution
   assert.ok(worker.includes("ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC"));
   assert.ok(worker.includes("offset+=15"));
 });
+
+
+test("the browser reuses a pending attack request ID after a network retry", async () => {
+  const client = await readFile(new URL("../events.js", import.meta.url), "utf8");
+  assert.ok(client.includes('sessionStorage.getItem("coi_angel_death_request")'));
+  assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_request",pendingRequestId)'));
+  assert.ok(client.includes("requestId:pendingRequestId"));
+  assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_request")'));
+});
