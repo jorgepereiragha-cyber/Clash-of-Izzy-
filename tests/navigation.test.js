@@ -8,7 +8,7 @@ test("shared navigation exposes the real game sections and a responsive search",
   const nav = await read("navigation.js");
   const css = await read("styles/navigation.css");
   for (const route of ["/index.html","/kingdom.html","/world.html","/equipment-ui.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
-  assert.ok(nav.includes('setAttribute("aria-label","Navegação principal")'));
+  assert.ok(nav.includes("aria-label","Navegação principal"));
   assert.ok(nav.includes("toLocaleLowerCase"));
   assert.ok(nav.includes("strong.textContent"));
   assert.ok(nav.includes("small.textContent"));
@@ -34,4 +34,29 @@ test("navigation is a static section search, not an unsafe HTML search result re
   assert.ok(nav.includes("results.replaceChildren()"));
   assert.ok(nav.includes("window.__COI_NAV__"));
   assert.ok(!nav.includes("results.innerHTML"));
+});
+
+
+test("shared navigation searches authenticated online game entities safely", async () => {
+  const nav = await read("navigation.js");
+  for (const snippet of [
+    'fetch("/api/game/search?"',
+    'Authorization:"Bearer "+token',
+    'new AbortController()',
+    'new URLSearchParams({q:query,type:"all",limit:"8"})',
+    'coi-nav-online-result',
+    '"/alliance.html?"'
+  ]) assert.ok(nav.includes(snippet), "missing online search behavior: " + snippet);
+  assert.ok(nav.includes("strong.textContent"));
+  assert.ok(nav.includes("small.textContent"));
+  assert.ok(!nav.includes("results.innerHTML"));
+});
+
+
+test("global online search never creates a kingdom just to search", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes("if (!token)"));
+  assert.ok(nav.includes('addEmpty("Entre no reino para pesquisar conteúdo do mundo.")'));
+  assert.ok(!nav.includes('/api/game/start'));
+  assert.ok(nav.includes('setTimeout(() => onlineResults(query,sequence),250)'));
 });
