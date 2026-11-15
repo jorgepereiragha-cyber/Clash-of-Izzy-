@@ -13,7 +13,8 @@
     *{box-sizing:border-box}
     body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:radial-gradient(ellipse at top,#263d5b 0,#101a2b 58%,#080e18 100%);color:#f5edda;font:16px system-ui,-apple-system,Segoe UI,sans-serif}
     main{width:min(100%,520px);text-align:center;padding:36px 24px;border:1px solid #b88b45;border-radius:18px;background:#101a2be8;box-shadow:0 18px 60px #0008}
-    .crest{font-size:54px;line-height:1.2}
+    .crest{display:flex;justify-content:center;align-items:center;margin:0 auto 8px}
+    .crest img{display:block;width:clamp(104px,28vw,148px);height:auto;filter:drop-shadow(0 8px 18px rgba(0,0,0,.38))}
     h1{margin:12px 0 4px;color:#f1c46a;letter-spacing:.08em;font-size:clamp(26px,7vw,38px)}
     p{color:#d8d1c2;line-height:1.6;margin:12px auto 24px;max-width:38ch}
     a{display:inline-flex;justify-content:center;align-items:center;min-height:50px;padding:0 24px;border-radius:10px;background:linear-gradient(#d6ad5c,#9a682d);color:#17120a;text-decoration:none;font-weight:800;letter-spacing:.04em}
@@ -23,7 +24,7 @@
 </head>
 <body>
   <main>
-    <div class="crest" aria-hidden="true">⚔️</div>
+    <div class="crest"><img src="/icon-512.svg" alt="Brasão oficial do Clash of Izzy" width="512" height="512"></div>
     <h1>CLASH OF IZZY</h1>
     <p>Seu reino está esperando. Entre na arena e prepare-se para a batalha.</p>
     <a href="./arena.html">ENTRAR NO JOGO</a>
