@@ -10,3 +10,16 @@ dist/**
 game-adapter.js
 package.json
 docs/**
+
+# Build/runtime artifacts must never be published as public game assets.
+.wrangler/
+tests/
+coverage/
+.gitignore
+.dev.vars*
+.env*
+*.sqlite
+*.sqlite-*
+*.db
+*.log
+*.map
