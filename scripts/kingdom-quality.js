@@ -24,7 +24,7 @@ export function selectKingdomQualityProfile({
     shadows: tier === "high" || (tier === "balanced" && width > 1024),
     shadowMapSize: tier === "high" ? 1536 : tier === "balanced" ? 1024 : 512,
     anisotropy: tier === "high" ? 8 : tier === "balanced" ? 4 : 2,
-    maxBuildings: 16,
+    maxBuildings: tier === "low" ? 8 : tier === "balanced" ? 12 : 16,
     maxPixelCount: tier === "low" ? 1200000 : tier === "high" ? 4200000 : 2400000,
   });
 }
@@ -34,9 +34,10 @@ export function selectKingdomQualityProfile({
 export function calculateKingdomPixelRatio({ width, height, devicePixelRatio = 1, profile } = {}) {
   const safeWidth = Math.max(1, Number(width) || 1);
   const safeHeight = Math.max(1, Number(height) || 1);
-  const requested = Math.max(0.5, Number(devicePixelRatio) || 1);
-  const cap = Math.max(0.5, Number(profile?.pixelRatioCap) || 1);
+  const requested = Math.max(0.1, Number(devicePixelRatio) || 1);
+  const cap = Math.max(0.1, Number(profile?.pixelRatioCap) || 1);
   const budget = Math.max(250000, Number(profile?.maxPixelCount) || 1200000);
   const pixelBudgetCap = Math.sqrt(budget / (safeWidth * safeHeight));
-  return Math.max(0.5, Math.min(requested, cap, pixelBudgetCap));
+  // Do not impose a 0.5 floor: on extreme high-density viewports it can break the pixel budget.
+  return Math.min(requested, cap, pixelBudgetCap);
 }
