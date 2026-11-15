@@ -1,0 +1,487 @@
+import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
+
+/*
+ * Strategic world map for Clash of Izzy.
+ * The map is server-state driven: territory ownership and active marches are
+ * visualized from the same D1 snapshot used by the tactical controls.
+ * Marching formations travel from the home keep to their actual destination;
+ * there is no free-roaming hero or random left/right character animation.
+ */
+(() => {
+  "use strict";
+
+  const host = document.getElementById("worldMap");
+  const canvas = document.getElementById("world3d");
+  if (!host || !canvas) return;
+
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  const lowMemory = Number(navigator.deviceMemory || 4) <= 2;
+  const saveData = connection?.saveData === true;
+  const quality = lowMemory || saveData ? "low" : Number(navigator.deviceMemory || 4) >= 8 ? "high" : "balanced";
+
+  let renderer = null;
+  let scene = null;
+  let camera = null;
+  let resizeObserver = null;
+  let frame = 0;
+  let disposed = false;
+  let worldState = null;
+  let activeMarches = [];
+  let projectionButtons = new Map();
+  let lastFrameTime = 0;
+
+  const worldRoot = new THREE.Group();
+  const terrainRoot = new THREE.Group();
+  const routeRoot = new THREE.Group();
+  const territoryRoot = new THREE.Group();
+  const armyRoot = new THREE.Group();
+  const shared = {
+    grass: new THREE.MeshStandardMaterial({ color: 0x668b4f, roughness: 1 }),
+    grassLight: new THREE.MeshStandardMaterial({ color: 0x8eaa62, roughness: 1 }),
+    forest: new THREE.MeshStandardMaterial({ color: 0x315f43, roughness: 1 }),
+    forestLight: new THREE.MeshStandardMaterial({ color: 0x47764e, roughness: 1 }),
+    trunk: new THREE.MeshStandardMaterial({ color: 0x735038, roughness: 1 }),
+    stone: new THREE.MeshStandardMaterial({ color: 0x89918e, roughness: .94 }),
+    stoneLight: new THREE.MeshStandardMaterial({ color: 0xb4b9a8, roughness: .9 }),
+    roof: new THREE.MeshStandardMaterial({ color: 0x395d84, roughness: .78 }),
+    gold: new THREE.MeshStandardMaterial({ color: 0xe7bd68, metalness: .28, roughness: .5 }),
+    banner: new THREE.MeshStandardMaterial({ color: 0x285f9b, roughness: .72 }),
+    enemy: new THREE.MeshStandardMaterial({ color: 0x9d3939, roughness: .75 }),
+    neutral: new THREE.MeshStandardMaterial({ color: 0xc28b39, roughness: .75 }),
+    road: new THREE.MeshStandardMaterial({ color: 0xb99c6b, roughness: 1 }),
+    roadEdge: new THREE.MeshStandardMaterial({ color: 0x5d513d, roughness: 1 }),
+    water: new THREE.MeshStandardMaterial({ color: 0x315f78, roughness: .32, metalness: .04 }),
+    food: new THREE.MeshStandardMaterial({ color: 0x97ad4c, roughness: .9 }),
+    wood: new THREE.MeshStandardMaterial({ color: 0x806044, roughness: 1 }),
+    iron: new THREE.MeshStandardMaterial({ color: 0x879da6, metalness: .35, roughness: .65 }),
+    blueTroop: new THREE.MeshStandardMaterial({ color: 0x2c70ab, roughness: .7 }),
+    redTroop: new THREE.MeshStandardMaterial({ color: 0xa83d3d, roughness: .7 }),
+    leather: new THREE.MeshStandardMaterial({ color: 0x57402f, roughness: 1 }),
+    skin: new THREE.MeshStandardMaterial({ color: 0xd9ad82, roughness: .9 }),
+    spear: new THREE.MeshStandardMaterial({ color: 0x9ca9a5, metalness: .38, roughness: .55 })
+  };
+
+  function seeded(seed) {
+    let value = (Number(seed) || 1) >>> 0;
+    return () => {
+      value = (Math.imul(value ^ (value >>> 15), 1 | value) + 0x6d2b79f5) | 0;
+      let out = value;
+      out = Math.imul(out ^ (out >>> 7), 61 | out);
+      return ((out ^ (out >>> 14)) >>> 0) / 4294967296;
+    };
+  }
+
+  function terrainHeight(x, z) {
+    return Math.sin(x * .095) * .48 + Math.cos(z * .13) * .34
+      + Math.sin((x + z) * .055) * .28 + Math.cos((x - z) * .035) * .22;
+  }
+
+  function makeMesh(geometry, material, parent, x, y, z) {
+    const item = new THREE.Mesh(geometry, material);
+    item.position.set(x, y, z);
+    item.castShadow = quality !== "low";
+    item.receiveShadow = true;
+    parent.add(item);
+    return item;
+  }
+
+  function box(parent, width, height, depth, material, x, y, z) {
+    return makeMesh(new THREE.BoxGeometry(width, height, depth), material, parent, x, y, z);
+  }
+
+  function cone(parent, radius, height, material, x, y, z, sides = 5) {
+    return makeMesh(new THREE.ConeGeometry(radius, height, sides), material, parent, x, y, z);
+  }
+
+  function addTree(parent, x, z, scale = 1, variant = 0) {
+    const group = new THREE.Group();
+    group.position.set(x, terrainHeight(x, z), z);
+    group.scale.setScalar(scale);
+    const trunk = makeMesh(new THREE.CylinderGeometry(.13, .18, .85, 5), shared.trunk, group, 0, .4, 0);
+    trunk.castShadow = quality !== "low";
+    const crownA = cone(group, .72, 1.35, variant % 2 ? shared.forest : shared.forestLight, 0, 1.2, 0, 6);
+    crownA.castShadow = quality !== "low";
+    const crownB = cone(group, .48, .95, shared.forest, 0, 1.86, 0, 6);
+    crownB.castShadow = quality !== "low";
+    parent.add(group);
+    return group;
+  }
+
+  function createGround() {
+    const geometry = new THREE.PlaneGeometry(112, 92, 56, 46);
+    const positions = geometry.attributes.position;
+    const colors = [];
+    const greenA = new THREE.Color(0x658950);
+    const greenB = new THREE.Color(0x8ca75e);
+    const marsh = new THREE.Color(0x526f50);
+    for (let i = 0; i < positions.count; i++) {
+      const x = positions.getX(i);
+      const z = -positions.getY(i);
+      const h = terrainHeight(x, z);
+      positions.setZ(i, h);
+      const edge = Math.pow(x / 56, 2) + Math.pow(z / 46, 2);
+      const noise = (Math.sin(x * .31) + Math.cos(z * .27)) * .035;
+      const color = edge > .9 ? marsh.clone() : (noise > 0 ? greenB.clone() : greenA.clone());
+      color.multiplyScalar(1 - Math.max(0, edge - .58) * .23);
+      colors.push(color.r, color.g, color.b);
+    }
+    geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
+    geometry.rotateX(-Math.PI / 2);
+    geometry.computeVertexNormals();
+    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+    const ground = makeMesh(geometry, material, terrainRoot, 0, -.25, 0);
+    ground.receiveShadow = true;
+
+    const water = makeMesh(new THREE.PlaneGeometry(132, 112), shared.water, terrainRoot, 0, -1.2, 0);
+    water.rotation.x = -Math.PI / 2;
+    water.receiveShadow = false;
+
+    // River and old trade roads establish a readable strategic landscape.
+    const river = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(-50, -.86, -22),
+      new THREE.Vector3(-30, -.82, -10),
+      new THREE.Vector3(-10, -.82, -14),
+      new THREE.Vector3(12, -.82, -5),
+      new THREE.Vector3(34, -.84, -13),
+      new THREE.Vector3(52, -.86, -7)
+    ]);
+    makeMesh(new THREE.TubeGeometry(river, 48, .72, 7, false), shared.water, terrainRoot, 0, 0, 0);
+
+    const random = seeded(27011);
+    const treeCount = quality === "low" ? 38 : quality === "high" ? 105 : 68;
+    for (let i = 0; i < treeCount; i++) {
+      const x = (random() - .5) * 96;
+      const z = (random() - .5) * 72;
+      // Keep the main roads and central settlement readable.
+      if (Math.abs(x) < 9 && Math.abs(z) < 9) continue;
+      if (Math.abs(z + 10) < 3 && x > -52 && x < 52) continue;
+      addTree(terrainRoot, x, z, .62 + random() * .58, i);
+    }
+
+    // A few ridges make the mountain belt visible even before a territory is selected.
+    for (const [x, z, scale] of [[-42, -31, 1.5], [-30, 34, 1.25], [43, 28, 1.65], [47, -36, 1.15], [0, 37, .9]]) {
+      const rock = cone(terrainRoot, 4.2 * scale, 7.2 * scale, shared.stone, x, terrainHeight(x, z) + 3.1 * scale, z, 5);
+      rock.rotation.y = .35;
+      const snow = cone(terrainRoot, 1.45 * scale, 2.4 * scale, shared.stoneLight, x, terrainHeight(x, z) + 6.2 * scale, z, 5);
+      snow.rotation.y = .35;
+    }
+  }
+
+  function makeTower(parent, x, z, height = 3, material = shared.stone) {
+    const y = terrainHeight(x, z);
+    box(parent, 1.1, height, 1.1, material, x, y + height / 2, z);
+    box(parent, 1.35, .22, 1.35, shared.stoneLight, x, y + height, z);
+    cone(parent, .92, 1.3, shared.roof, x, y + height + .75, z, 4);
+    const pole = box(parent, .08, 1.45, .08, shared.gold, x + .24, y + height + 1.55, z);
+    pole.castShadow = false;
+    box(parent, .8, .42, .06, shared.banner, x + .61, y + height + 1.82, z);
+  }
+
+  function createCastle(parent, x, z, scale = 1, color = "home") {
+    const group = new THREE.Group();
+    group.position.set(x, terrainHeight(x, z), z);
+    group.scale.setScalar(scale);
+    const wall = color === "enemy" ? shared.enemy : shared.stone;
+    const banner = color === "enemy" ? shared.enemy : shared.banner;
+    box(group, 5.6, 1.35, 4.5, wall, 0, .76, 0);
+    box(group, 3.2, 2.8, 3.1, shared.stoneLight, 0, 2.55, 0);
+    box(group, 1.15, 1.9, .18, shared.wood, 0, 1.1, 1.64);
+    for (const [tx, tz] of [[-2.5, -1.9], [2.5, -1.9], [-2.5, 1.9], [2.5, 1.9]]) {
+      const tower = new THREE.Group();
+      tower.position.set(tx, 0, tz);
+      group.add(tower);
+      box(tower, 1.25, 2.6, 1.25, shared.stone, 0, 1.3, 0);
+      box(tower, 1.42, .2, 1.42, shared.stoneLight, 0, 2.65, 0);
+      cone(tower, 1.05, 1.45, shared.roof, 0, 3.45, 0, 4);
+    }
+    cone(group, 1.8, 1.25, shared.roof, 0, 4.55, 0, 4);
+    box(group, .08, 1.85, .08, shared.gold, .55, 5.45, 0);
+    box(group, 1.0, .48, .07, banner, 1.02, 5.83, 0);
+    parent.add(group);
+    return group;
+  }
+
+  function createMine(parent, x, z, resource) {
+    const material = resource === "iron" ? shared.iron : resource === "stone" ? shared.stoneLight : resource === "food" ? shared.food : shared.wood;
+    const y = terrainHeight(x, z);
+    box(parent, 2.5, 1.55, 2.1, shared.wood, x, y + .78, z);
+    cone(parent, 1.9, .9, shared.roof, x, y + 1.95, z, 4);
+    box(parent, .65, 1.05, .12, material, x + .5, y + .62, z + 1.1);
+  }
+
+  function createTerritoryFeature(parent, territory) {
+    const x = Number(territory.x) || 0;
+    const z = Number(territory.z) || 0;
+    const y = terrainHeight(x, z);
+    const ownId = Number(worldState?.kingdomId || 0);
+    const ownerId = Number(territory.owner_kingdom_id || 0);
+    const ownership = ownerId && ownId && ownerId === ownId ? "owned" : ownerId ? "enemy" : "neutral";
+    const padMaterial = ownership === "owned" ? shared.banner : ownership === "enemy" ? shared.enemy : shared.neutral;
+    const pad = makeMesh(new THREE.CylinderGeometry(2.65, 2.9, .32, 6), padMaterial, parent, x, y + .12, z);
+    pad.rotation.y = Math.PI / 6;
+    const inset = makeMesh(new THREE.CylinderGeometry(2.1, 2.2, .12, 6), shared.stoneLight, parent, x, y + .31, z);
+    inset.rotation.y = Math.PI / 6;
+
+    if (territory.terrain === "mountain") {
+      for (let i = 0; i < 3; i++) {
+        const rockX = x - .9 + i * .9;
+        const rockZ = z + (i % 2 ? .6 : -.45);
+        cone(parent, .72 + i * .09, 1.55 + i * .25, shared.stone, rockX, y + 1.1 + i * .1, rockZ, 5);
+      }
+    } else if (territory.terrain === "forest") {
+      addTree(parent, x - .9, z - .1, .74, 2);
+      addTree(parent, x + .95, z + .45, .68, 3);
+      addTree(parent, x, z - 1.05, .62, 4);
+    } else {
+      box(parent, 1.25, .58, 1.15, shared.food, x, y + .78, z);
+      cone(parent, .9, .55, shared.roof, x, y + 1.32, z, 4);
+    }
+
+    if (territory.resource_type === "iron" || territory.resource_type === "stone" || territory.resource_type === "wood") {
+      createMine(parent, x + 1.55, z + .8, territory.resource_type);
+    }
+    if (ownership === "owned" || ownership === "enemy") {
+      makeTower(parent, x - 1.35, z - 1.15, 2.4, ownership === "enemy" ? shared.enemy : shared.stone);
+    }
+  }
+
+  function rebuildTerritories() {
+    while (territoryRoot.children.length) {
+      const child = territoryRoot.children.pop();
+      territoryRoot.remove(child);
+    }
+    const rows = Array.isArray(worldState?.territories) ? worldState.territories : [];
+    for (const territory of rows) createTerritoryFeature(territoryRoot, territory);
+  }
+
+  function rebuildRoads() {
+    while (routeRoot.children.length) {
+      const child = routeRoot.children.pop();
+      routeRoot.remove(child);
+    }
+    const territories = Array.isArray(worldState?.territories) ? worldState.territories : [];
+    for (const territory of territories) {
+      const x = Number(territory.x) || 0;
+      const z = Number(territory.z) || 0;
+      const curve = new THREE.QuadraticBezierCurve3(
+        new THREE.Vector3(0, terrainHeight(0, 0) + .1, 0),
+        new THREE.Vector3(x * .44, Math.max(1.15, terrainHeight(x * .44, z * .44) + .85), z * .44),
+        new THREE.Vector3(x, terrainHeight(x, z) + .12, z)
+      );
+      makeMesh(new THREE.TubeGeometry(curve, 18, .14, 5, false), shared.roadEdge, routeRoot, 0, 0, 0);
+      makeMesh(new THREE.TubeGeometry(curve, 18, .075, 5, false), shared.road, routeRoot, 0, .06, 0);
+    }
+  }
+
+  function createSoldier(parent, material, x, z, variant = 0) {
+    const soldier = new THREE.Group();
+    soldier.position.set(x, .1, z);
+    const body = makeMesh(new THREE.CylinderGeometry(.22, .27, .78, 6), material, soldier, 0, .57, 0);
+    body.castShadow = quality !== "low";
+    makeMesh(new THREE.SphereGeometry(.19, 7, 6), shared.skin, soldier, 0, 1.12, 0);
+    cone(soldier, .25, .32, shared.gold, 0, 1.34, 0, 5);
+    box(soldier, .38, .43, .12, shared.leather, variant % 2 ? -.28 : .28, .6, .04);
+    const spear = makeMesh(new THREE.CylinderGeometry(.025, .035, 1.35, 5), shared.wood, soldier, .3, 1.14, -.08);
+    spear.rotation.z = -.16;
+    cone(soldier, .085, .24, shared.spear, .3, 1.85, -.08, 4);
+    return soldier;
+  }
+
+  function createMarchFormation(march) {
+    const group = new THREE.Group();
+    const material = march.march_type === "attack" ? shared.redTroop : shared.blueTroop;
+    createSoldier(group, material, -.42, -.28, 0);
+    createSoldier(group, material, .42, -.28, 1);
+    createSoldier(group, material, 0, .48, 2);
+    const flagPole = box(group, .07, 1.45, .07, shared.gold, 0, 1.25, -.72);
+    flagPole.castShadow = false;
+    box(group, .67, .35, .06, material, .3, 1.73, -.72);
+    group.scale.setScalar(.9);
+    armyRoot.add(group);
+    return {
+      id: Number(march.id),
+      group,
+      startAt: Date.parse(march.started_at || ""),
+      endAt: Date.parse(march.arrives_at || ""),
+      targetId: Number(march.target_territory_id),
+      marchType: march.march_type
+    };
+  }
+
+  function rebuildMarches() {
+    while (armyRoot.children.length) {
+      const child = armyRoot.children.pop();
+      armyRoot.remove(child);
+    }
+    activeMarches = [];
+    const rows = (Array.isArray(worldState?.marches) ? worldState.marches : [])
+      .filter(march => march.status === "marching" && Number.isFinite(Date.parse(march.arrives_at || "")));
+    for (const march of rows.slice(0, 8)) activeMarches.push(createMarchFormation(march));
+    animateMarches();
+  }
+
+  function updateMarchPositions(now) {
+    const territories = new Map((worldState?.territories || []).map(item => [Number(item.id), item]));
+    for (const march of activeMarches) {
+      const target = territories.get(march.targetId);
+      if (!target) continue;
+      const start = Number.isFinite(march.startAt) ? march.startAt : now;
+      const end = Number.isFinite(march.endAt) ? march.endAt : now + 1000;
+      const progress = THREE.MathUtils.clamp((now - start) / Math.max(1000, end - start), 0, 1);
+      const x = Number(target.x) || 0;
+      const z = Number(target.z) || 0;
+      const curve = new THREE.QuadraticBezierCurve3(
+        new THREE.Vector3(0, terrainHeight(0, 0) + .15, 0),
+        new THREE.Vector3(x * .44, 1.55, z * .44),
+        new THREE.Vector3(x, terrainHeight(x, z) + .35, z)
+      );
+      const point = curve.getPoint(progress);
+      march.group.position.copy(point);
+      march.group.rotation.y = Math.atan2(x, z);
+      const bob = reduceMotion ? 0 : Math.sin(now * .009 + march.id) * .045;
+      march.group.position.y += bob;
+    }
+  }
+
+  function projectTerritories() {
+    if (!camera || !renderer || !worldState) return;
+    const width = host.clientWidth || 1;
+    const height = host.clientHeight || 1;
+    const rows = Array.isArray(worldState.territories) ? worldState.territories : [];
+    for (const territory of rows) {
+      const button = projectionButtons.get(Number(territory.id));
+      if (!button) continue;
+      const point = new THREE.Vector3(
+        Number(territory.x) || 0,
+        terrainHeight(Number(territory.x) || 0, Number(territory.z) || 0) + 2.45,
+        Number(territory.z) || 0
+      ).project(camera);
+      button.style.left = ((point.x * .5 + .5) * width) + "px";
+      button.style.top = ((-point.y * .5 + .5) * height) + "px";
+    }
+  }
+
+  function draw() {
+    if (disposed || !renderer || !scene || !camera) return;
+    renderer.render(scene, camera);
+    projectTerritories();
+  }
+
+  function animateMarches() {
+    if (frame || disposed || reduceMotion || !activeMarches.length) return;
+    lastFrameTime = 0;
+    const tick = timestamp => {
+      frame = 0;
+      if (disposed || !renderer || !scene) return;
+      const now = Date.now();
+      updateMarchPositions(now);
+      renderer.render(scene, camera);
+      projectTerritories();
+      if (activeMarches.some(march => now < march.endAt)) frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+  }
+
+  function setWorldState(nextState) {
+    if (!nextState || !Array.isArray(nextState.territories)) return;
+    worldState = nextState;
+    rebuildTerritories();
+    rebuildRoads();
+    rebuildMarches();
+    draw();
+  }
+
+  function resize() {
+    if (!renderer || !camera || !host.clientWidth || !host.clientHeight) return;
+    const width = host.clientWidth;
+    const height = host.clientHeight;
+    const aspect = width / height;
+    const viewHeight = 94;
+    camera.left = -viewHeight * aspect / 2;
+    camera.right = viewHeight * aspect / 2;
+    camera.top = viewHeight / 2;
+    camera.bottom = -viewHeight / 2;
+    camera.updateProjectionMatrix();
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === "high" ? 1.6 : 1.15));
+    renderer.setSize(width, height, false);
+    draw();
+  }
+
+  function dispose() {
+    disposed = true;
+    if (frame) cancelAnimationFrame(frame);
+    resizeObserver?.disconnect();
+    if (renderer) {
+      renderer.setAnimationLoop(null);
+      renderer.dispose();
+      renderer.domElement.remove();
+    }
+    Object.values(shared).forEach(material => material.dispose());
+  }
+
+  function init() {
+    try {
+      renderer = new THREE.WebGLRenderer({
+        canvas,
+        alpha: false,
+        antialias: quality !== "low",
+        powerPreference: "low-power",
+        stencil: false,
+        depth: true
+      });
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1.05;
+      renderer.shadowMap.enabled = quality !== "low";
+      renderer.shadowMap.type = THREE.PCFShadowMap;
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === "high" ? 1.6 : 1.15));
+      scene = new THREE.Scene();
+      scene.background = new THREE.Color(0x355d69);
+      scene.fog = new THREE.Fog(0x355d69, 78, 155);
+      camera = new THREE.OrthographicCamera(-56, 56, 47, -47, .1, 220);
+      camera.position.set(58, 78, 62);
+      camera.lookAt(0, 0, 0);
+      scene.add(new THREE.HemisphereLight(0xe8f0d7, 0x43513e, 2.05));
+      const sun = new THREE.DirectionalLight(0xffe0a4, 2.6);
+      sun.position.set(-35, 62, 32);
+      sun.castShadow = quality !== "low";
+      if (sun.castShadow) sun.shadow.mapSize.set(quality === "high" ? 1024 : 512, quality === "high" ? 1024 : 512);
+      scene.add(sun);
+      scene.add(worldRoot);
+      worldRoot.add(terrainRoot, routeRoot, territoryRoot, armyRoot);
+      createGround();
+      createCastle(terrainRoot, 0, 0, 1.4, "home");
+      resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
+      resizeObserver?.observe(host);
+      window.addEventListener("resize", resize, { passive: true });
+      canvas.addEventListener("webglcontextlost", event => {
+        event.preventDefault();
+        if (frame) cancelAnimationFrame(frame);
+        canvas.hidden = true;
+        host.classList.add("map-3d-fallback");
+        console.warn("Clash of Izzy: WebGL do mapa indisponível; marcadores táticos continuam ativos.");
+      }, { once: true });
+      resize();
+      window.__coiWorldMap3D = {
+        update: setWorldState,
+        setProjectionButtons(buttons) {
+          projectionButtons = buttons instanceof Map ? buttons : new Map();
+          projectTerritories();
+        },
+        project: projectTerritories
+      };
+      window.dispatchEvent(new CustomEvent("coi:world-map-3d-ready"));
+      if (window.__coiWorldMapState) setWorldState(window.__coiWorldMapState);
+      if (window.__coiWorldMapButtons) projectionButtons = window.__coiWorldMapButtons;
+      projectTerritories();
+      window.addEventListener("pagehide", dispose, { once: true });
+    } catch (error) {
+      canvas.hidden = true;
+      host.classList.add("map-3d-fallback");
+      console.warn("Clash of Izzy: mapa 3D não pôde iniciar; mantendo mapa tático acessível.", error);
+    }
+  }
+
+  init();
+})();
