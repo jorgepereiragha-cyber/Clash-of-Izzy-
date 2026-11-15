@@ -345,7 +345,7 @@ if (host && "WebGLRenderingContext" in window) {
       camera.left = -viewWidth / 2; camera.right = viewWidth / 2;
       camera.top = viewHeight / 2; camera.bottom = -viewHeight / 2;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, qualityProfile.pixelRatioCap));
+      renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }));
       renderer.setSize(host.clientWidth, host.clientHeight, false);
       renderer.render(scene, camera);
     };
