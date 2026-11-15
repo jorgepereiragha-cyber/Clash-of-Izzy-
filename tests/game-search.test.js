@@ -9,8 +9,8 @@ test("game search requires a valid player session and rate limits player and net
   assert.ok(worker.includes('url.pathname==="/api/game/search"&&request.method==="GET"'));
   assert.ok(worker.includes('rateLimitDecision(env,"game-search-player",playerId,30,60)'));
   assert.ok(worker.includes('rateLimitDecision(env,"game-search-network"'));
-  assert.ok(worker.includes('rawQuery.length<2'));
-  assert.ok(worker.includes('rawQuery.length>48'));
+  assert.ok(worker.includes('queryLength<2'));
+  assert.ok(worker.includes('queryLength>48'));
 });
 
 test("search accepts only public categories and builds a parameterized FTS query", async () => {
