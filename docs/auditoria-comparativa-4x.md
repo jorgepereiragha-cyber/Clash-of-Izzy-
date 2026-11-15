@@ -92,3 +92,11 @@ A comparação recebida é útil como roteiro, mas algumas afirmações não cor
 
 ## Estado de validação
 As alterações foram gravadas na branch principal. O workflow configurado executa testes, valida o bundle, aplica migrações locais e remotas e publica Worker/assets. A execução e o resultado do pipeline precisam ser confirmados antes de declarar a versão publicada e pronta.
+
+
+## Integração dos bônus de equipamentos (15 nov 2026)
+- Os atributos persistidos dos quatro equipamentos agora alimentam o jogo: ataque e vida aumentam os exércitos nas simulações PvE; defesa reduz dano recebido; bônus de recursos multiplica a produção passiva.
+- Conversão de atributos para bônus percentuais: ataque e defesa usam 10 pontos por 1%; vida usa 25 pontos por 1%; produção usa o percentual declarado no item. Limites atuais: 30% para atributos de combate e 50% para produção, evitando crescimento sem teto.
+- Os cálculos continuam no Worker; o cliente não escolhe nem calcula os bônus aplicados.
+- A migração 0008 já existe e o deploy dessa migração foi confirmado no workflow 43739543760.
+- Próxima validação necessária: testes de integração D1 para provar que cada atributo afeta somente o sistema correto, incluindo bloqueio, concorrência e limites máximos.
