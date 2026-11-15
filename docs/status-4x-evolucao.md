@@ -16,7 +16,7 @@ O objetivo continua sendo um jogo de estratégia medieval 4X, persistente e prio
 | Pesquisa | Fila persistente, níveis confirmados no servidor | Árvore ainda é curta; pré-requisitos e efeitos precisam ser expandidos e balanceados |
 | Exército | Catálogo de unidades e quantidades persistentes; schema agora aceita magos | Não há formação de marcha completa, reforços entre reinos ou counters de PvP completos |
 | Marchas | Persistentes e resolvidas pelo cron | Ações ofensivas são PvE contra territórios neutros; ataques PvP estão explicitamente bloqueados |
-| Mapa mundial | Territórios com coordenadas, terreno, recursos e proprietários são exibidos como pins | Ainda não é um mapa 4X extenso com tiles, zoom, exploração, névoa de guerra e fronteiras dinâmicas |
+| Mapa mundial | Territórios com coordenadas, terreno, recursos e proprietários, seleção, pan e zoom mobile/desktop | Ainda não é um mundo de tiles extenso com névoa de guerra, exploração persistida e fronteiras dinâmicas |
 | Combate | Simulador no Worker com relatórios e regras server-authoritative | PvP, defesa de cidade, rally, reforços, cerco e balanceamento competitivo ainda não estão completos |
 | Alianças | Criação/entrada, membros, convites, chat, doações, guerras e estados persistentes | Fluxos de rally, ajuda temporizada, diplomacia e guerra de território precisam de validação ponta a ponta |
 | Heróis e equipamentos | Inventário, heróis, equipamentos e bônus validados no servidor | Faltam mais personagens, habilidades/efeitos ligados a batalhas e validação visual integrada |
@@ -25,6 +25,12 @@ O objetivo continua sendo um jogo de estratégia medieval 4X, persistente e prio
 | Busca mundial | FTS5, trigramas, tolerância controlada a erros, português e busca CJK por substring | Não é crawler da Internet; falta segmentação por dicionário CJK, romanização e telemetria de relevância |
 | Cidade 3D | Renderizador Three.js isométrico progressivo, materiais procedurais e fallback | A arte final de castelo/heróis/monstros ainda precisa de GLBs aprovados e testados em Android físico |
 | PWA/offline | Shell, navegação e tela offline em cache | Batalhas e sincronização exigem Internet; offline não é modo de jogo completo |
+
+## Evolução do mapa nesta etapa
+
+- Pan por arraste com Pointer Events, zoom por botões e roda do mouse, botão de centralização e limites de deslocamento para não perder o mapa da tela.
+- O mapa mantém a seleção e os contratos de marcha existentes; a proteção contra ataques a territórios ocupados permanece ativa.
+- A PWA passa ao cache v11 e inclui o helper de viewport para uso offline da interface.
 
 ## Correções nesta etapa
 
