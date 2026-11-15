@@ -27,3 +27,7 @@ package-lock.json
 
 # Test-only files are not part of the game client.
 tests/
+# Backend-only modules and private key material are not browser assets.
+api-rate-limit.js
+*.pem
+*.key
