@@ -65,7 +65,7 @@
  <div id="territoryList"><div class="territoryCard">Carregando territórios…</div></div>
 </section>
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
-<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Envie um pedido ao painel Master. A liberação acontece somente depois da conferência manual do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><label>Forma de pagamento<select id="purchaseMethod"><option value="pix">PIX</option><option value="bank_transfer">Transferência</option><option value="manual">Combinar com o suporte</option></select></label><label>Referência do pagamento (opcional)<input id="purchaseReference" maxlength="120" placeholder="ID da transação ou observação; nunca informe senha"></label></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
+<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Envie um pedido ao painel Master. A liberação acontece somente depois da conferência manual do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><label>Forma de pagamento<select id="purchaseMethod"><option value="mercadopago_link" selected>Mercado Pago · PIX e outros meios</option><option value="pix">PIX direto</option><option value="bank_transfer">Transferência</option><option value="manual">Combinar com o suporte</option></select></label><label>Referência do pagamento (opcional)<input id="purchaseReference" maxlength="120" placeholder="ID da transação ou observação; nunca informe senha"></label></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'three';
 import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } from './engine/asset-loader.js';
@@ -547,6 +547,9 @@ async function refreshKingdomStore(){
 }
 async function requestOfficialPurchase(item,kind,button){
  const notice=document.getElementById('purchaseNotice');
+ const paymentMethod=document.getElementById('purchaseMethod')?.value||'manual';
+ const paymentWindow=paymentMethod==='mercadopago_link'?window.open('about:blank','_blank'):null;
+ if(paymentWindow)paymentWindow.opener=null;
  const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
  if(!token){notice.textContent='Conecte seu reino antes de solicitar uma compra.';return}
  button.disabled=true;notice.textContent='Enviando pedido ao painel Master…';
@@ -556,15 +559,17 @@ async function requestOfficialPurchase(item,kind,button){
    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
    body:JSON.stringify({
     kind,itemId:item.id,requestKey:crypto.randomUUID(),
-    paymentMethod:document.getElementById('purchaseMethod')?.value||'manual',
+    paymentMethod,
     paymentReference:document.getElementById('purchaseReference')?.value||''
    })
   });
   const data=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(data.error||'Não foi possível enviar o pedido.');
-  notice.textContent='Pedido #'+data.request.id+' enviado ao painel Master. Aguarde a confirmação do pagamento e a liberação.';
+  notice.textContent='Pedido #'+data.request.id+' registrado. Conclua o pagamento no Mercado Pago; a equipe Master confirmará o recebimento antes de liberar o pacote ou skin.';
   button.textContent='Pedido enviado · #'+data.request.id;
- }catch(error){notice.textContent=error.message;button.disabled=false}
+  if(paymentWindow)paymentWindow.location.href='https://link.mercadopago.com.br/pagamentosskin';
+  else if(paymentMethod==='mercadopago_link')notice.textContent+=' Abra o link: https://link.mercadopago.com.br/pagamentosskin';
+ }catch(error){if(paymentWindow)paymentWindow.close();notice.textContent=error.message;button.disabled=false}
 }
 async function loadCatalog(){
  const box=document.getElementById('catalog');
