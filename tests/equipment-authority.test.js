@@ -6,7 +6,7 @@ test("equipamentos usam estado persistente e validação no servidor", async () 
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   const ui = await readFile(new URL("../equipment-system.js", import.meta.url), "utf8");
   const migration = await readFile(new URL("../migrations/0008_kingdom_equipment.sql", import.meta.url), "utf8");
-  assert.match(worker, /CREATE TABLE IF NOT EXISTS kingdom_equipment/);
+  assert.match(worker, /ensureEquipmentTables\(env,kingdomId\)/);\n  assert.match(worker, /kingdom_equipment/);
   assert.match(worker, /type==="equipment_upgrade"/);
   assert.match(worker, /gold=gold-\?/);
   assert.match(worker, /level=level\+1/);
