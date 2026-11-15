@@ -1003,7 +1003,7 @@ export default {
         const escaped=rawQuery.replace(/[\\%_]/g,ch=>"\\"+ch);
         const exact=rawQuery.toLocaleLowerCase();
         const pattern="%"+escaped+"%";
-        const limit=Math.min(20,Math.max(1,Number(url.searchParams.get("limit"))||10));
+        const limit=Math.min(20,Math.max(1,Math.floor(Number(url.searchParams.get("limit"))||10)));
         const categoryLimit=kind==="all"?Math.max(1,Math.ceil(limit/2)):limit;
         const results=[];
         if(kind==="all"||kind==="kingdoms"){
