@@ -255,16 +255,18 @@ if (host && "WebGLRenderingContext" in window) {
     return manifestLoad;
   }
   try {
+    const deviceMemory = Number(navigator.deviceMemory || 0);
+    const maxDpr = deviceMemory > 0 && deviceMemory <= 4 ? 1 : 1.25;
     renderer = new THREE.WebGLRenderer({
       alpha: true, antialias: false, powerPreference: "low-power",
       depth: true, stencil: false, preserveDrawingBuffer: false
     });
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr));
     renderer.setSize(host.clientWidth, host.clientHeight, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.12;
-    renderer.shadowMap.enabled = host.clientWidth > 680;
+    renderer.shadowMap.enabled = host.clientWidth > 680 && !(deviceMemory > 0 && deviceMemory <= 4);
     renderer.shadowMap.type = THREE.PCFShadowMap;
     renderer.domElement.id = "kingdom3d";
     renderer.domElement.setAttribute("aria-hidden", "true");
@@ -285,6 +287,13 @@ if (host && "WebGLRenderingContext" in window) {
     ktx2.detectSupport(renderer);
     gltfLoader = new GLTFLoader(); gltfLoader.setKTX2Loader(ktx2);
     host.classList.add("has-3d");
+    renderer.domElement.addEventListener("webglcontextlost", event => {
+      event.preventDefault();
+      host.classList.remove("has-3d");
+      renderer.domElement.remove();
+      renderer.dispose();
+      console.warn("Clash of Izzy: contexto WebGL perdido; arte 2D restaurada.");
+    }, { once: true });
     window.addEventListener("coi:kingdom-render", event => { const list = event.detail?.buildings || []; renderBuildings(list); loadOptionalGlbAssets(list); });
     if (Array.isArray(window.__coiKingdomBuildings)) { renderBuildings(window.__coiKingdomBuildings); loadOptionalGlbAssets(window.__coiKingdomBuildings); }
     const resize = () => {
@@ -294,7 +303,7 @@ if (host && "WebGLRenderingContext" in window) {
       camera.left = -viewWidth / 2; camera.right = viewWidth / 2;
       camera.top = viewHeight / 2; camera.bottom = -viewHeight / 2;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.25));
+      renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, maxDpr));
       renderer.setSize(host.clientWidth, host.clientHeight, false);
       renderer.render(scene, camera);
     };
