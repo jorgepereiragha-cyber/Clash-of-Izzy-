@@ -371,7 +371,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         const pvpTarget = stateA.territories.find(item => !item.owner_kingdom_id && !item.alliance_id);
         assert.ok(pvpTarget?.id, "existe território neutro para preparar o cenário PvP");
 
-        const fixtureSql = [
+        const fixtureStatements = [
           "UPDATE world_territories SET owner_kingdom_id=" + kingdomA +
             ",alliance_id=(SELECT alliance_id FROM alliance_members WHERE kingdom_id=" + kingdomA + ")," +
             "shield_until=NULL,combat_lock_token=NULL,combat_lock_expires_at=NULL WHERE id=" + Number(pvpTarget.id),
@@ -381,13 +381,15 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
             "(" + kingdomA + ",'militia',1,120,0)," +
             "(" + kingdomA + ",'archer',1,80,0)," +
             "(" + kingdomB + ",'knight',1,500,0)"
-        ].join("; ");
-        await runCli([
-          "--config", "wrangler.jsonc",
-          "d1", "execute", "clash-of-izzy-db",
-          "--local", "--persist-to", persistDir,
-          "--command", fixtureSql
-        ]);
+        ];
+        for (const sql of fixtureStatements) {
+          await runCli([
+            "--config", "wrangler.jsonc",
+            "d1", "execute", "clash-of-izzy-db",
+            "--local", "--persist-to", persistDir,
+            "--command", sql
+          ]);
+        }
 
         await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "ataque contra reino protegido");
         await runCli([
