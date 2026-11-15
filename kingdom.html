@@ -55,7 +55,7 @@ document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).
 city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
 document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
 }
-async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;render();setStatus("Melhoria aplicada");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
-document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/arena.html#territories");
+async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;busy=false;render();setStatus("Melhoria aplicada");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
+document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/arena.html");
 connect();
 </script></body></html>
