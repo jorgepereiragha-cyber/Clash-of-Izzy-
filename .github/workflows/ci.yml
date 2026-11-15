@@ -22,6 +22,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --ignore-scripts
+      - name: Validate PWA installation and offline assets
+        run: node scripts/check-pwa.mjs
       - name: Validate service worker
         run: node --check sw.js
       - name: Validate kingdom command center script
