@@ -31,7 +31,7 @@ jobs:
           test -d migrations || (echo "migrations directory not found" && exit 1)
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
 
       - name: Run automated tests
         run: npm test
