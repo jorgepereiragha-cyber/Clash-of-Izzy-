@@ -105,11 +105,11 @@ export function simulateAngelDeathAttack({ army, castleLevel = 1, heroLevel = 1,
 
 export function angelDeathRewardForRank(rank) {
   const position = Math.max(1, Math.floor(Number(rank) || 1));
-  if (position === 1) return { gems: 500, food: 1000000, wood: 1000000, stone: 750000, iron: 300000, gold: 1500000, deathEssence: 100 };
-  if (position === 2) return { gems: 350, food: 750000, wood: 750000, stone: 500000, iron: 200000, gold: 1000000, deathEssence: 70 };
-  if (position === 3) return { gems: 250, food: 500000, wood: 500000, stone: 350000, iron: 150000, gold: 750000, deathEssence: 50 };
-  if (position <= 10) return { gems: 150, food: 300000, wood: 300000, stone: 200000, iron: 80000, gold: 500000, deathEssence: 30 };
-  if (position <= 50) return { gems: 75, food: 150000, wood: 150000, stone: 100000, iron: 40000, gold: 250000, deathEssence: 15 };
-  if (position <= 100) return { gems: 40, food: 80000, wood: 80000, stone: 50000, iron: 20000, gold: 125000, deathEssence: 8 };
-  return { gems: 20, food: 40000, wood: 40000, stone: 25000, iron: 10000, gold: 60000, deathEssence: 3 };
+  if (position === 1) return { gems: 12000, food: 5000000, wood: 5000000, stone: 3000000, iron: 1000000, gold: 5000000, deathEssence: 500 };
+  if (position === 2) return { gems: 9000, food: 4000000, wood: 4000000, stone: 2500000, iron: 800000, gold: 4000000, deathEssence: 350 };
+  if (position === 3) return { gems: 7000, food: 3000000, wood: 3000000, stone: 2000000, iron: 600000, gold: 3000000, deathEssence: 250 };
+  if (position <= 10) return { gems: 6000, food: 2000000, wood: 2000000, stone: 1500000, iron: 400000, gold: 2000000, deathEssence: 150 };
+  if (position <= 50) return { gems: 3000, food: 1500000, wood: 1500000, stone: 1000000, iron: 300000, gold: 1000000, deathEssence: 100 };
+  if (position <= 100) return { gems: 1000, food: 1000000, wood: 1000000, stone: 750000, iron: 200000, gold: 750000, deathEssence: 60 };
+  return { gems: 100, food: 500000, wood: 500000, stone: 300000, iron: 100000, gold: 500000, deathEssence: 30 };
 }

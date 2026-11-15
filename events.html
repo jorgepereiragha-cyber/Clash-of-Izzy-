@@ -18,7 +18,7 @@ h1{margin:7px 0;color:#f5ce78;font-size:clamp(27px,6vw,44px);letter-spacing:.04e
 main{max-width:1100px;margin:18px auto;padding:0 12px 40px;display:grid;gap:14px}
 .panel{background:linear-gradient(145deg,#282039,#15192a);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 12px 28px #0006}
 .boss{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center}
-.boss-art{height:150px;border-radius:14px;display:grid;place-items:center;font-size:76px;background:radial-gradient(circle,#8b3f4d 0,#3a263f 55%,#141525 100%);border:1px solid #bd795c;box-shadow:inset 0 0 30px #0008}
+.boss-art{height:150px;border-radius:14px;display:grid;place-items:center;background:radial-gradient(circle,#8b3f4d 0,#3a263f 55%,#141525 100%);border:1px solid #bd795c;box-shadow:inset 0 0 30px #0008;overflow:hidden}.boss-art svg{width:100%;height:100%;display:block}.boss-art .aura{transform-origin:120px 116px;animation:death-pulse 3.2s ease-in-out infinite}.boss-art .eye-glow{filter:drop-shadow(0 0 5px #ff314f)}@keyframes death-pulse{0%,100%{opacity:.55;transform:scale(.96)}50%{opacity:1;transform:scale(1.04)}}@media(prefers-reduced-motion:reduce){.boss-art .aura{animation:none}}
 h2{margin:0 0 10px;color:#f2cd7a;font-size:19px}
 h3{margin:0 0 8px;color:#f2cd7a}
 .muted{color:var(--muted);line-height:1.55}
@@ -57,7 +57,42 @@ button:disabled{opacity:.4;cursor:not-allowed}
 </header>
 <main>
  <section class="panel boss">
-  <div class="boss-art" aria-hidden="true">☠️🪽</div>
+  <div class="boss-art">
+  <svg viewBox="0 0 240 240" role="img" aria-label="Anjo da Morte, chefe lendário com asas negras e foice">
+   <defs>
+    <radialGradient id="death-aura"><stop offset="0" stop-color="#ff6b67" stop-opacity=".62"/><stop offset=".55" stop-color="#8e3558" stop-opacity=".25"/><stop offset="1" stop-color="#1b1427" stop-opacity="0"/></radialGradient>
+    <linearGradient id="death-wing" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#c6a8b9"/><stop offset=".35" stop-color="#57465e"/><stop offset="1" stop-color="#171321"/></linearGradient>
+    <linearGradient id="death-cloak" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#51445d"/><stop offset=".45" stop-color="#171724"/><stop offset="1" stop-color="#080c18"/></linearGradient>
+    <linearGradient id="death-blade" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#fff1cb"/><stop offset=".35" stop-color="#c9d0d7"/><stop offset="1" stop-color="#687b91"/></linearGradient>
+    <radialGradient id="death-core"><stop stop-color="#ffb2a0"/><stop offset=".35" stop-color="#d83a52"/><stop offset="1" stop-color="#541d39"/></radialGradient>
+   </defs>
+   <circle class="aura" cx="120" cy="116" r="110" fill="url(#death-aura)"/>
+   <g stroke="#a58a9c" stroke-width="2" stroke-linejoin="round">
+    <path d="M104 92C75 47 40 27 13 34c22 10 32 26 37 42C29 62 17 64 7 72c29 4 46 18 58 39 8 13 18 20 33 21z" fill="url(#death-wing)"/>
+    <path d="M136 92c29-45 64-65 91-58-22 10-32 26-37 42 21-14 33-12 43-4-29 4-46 18-58 39-8 13-18 20-33 21z" fill="url(#death-wing)"/>
+    <path d="M98 94C75 73 57 58 35 53M93 108C68 97 48 87 27 83M142 94c23-21 41-36 63-41M147 108c25-11 45-21 66-25" fill="none" opacity=".75"/>
+    <path d="M108 83 88 53M100 98 70 72M132 83l20-30M140 98l30-26" fill="none" opacity=".6"/>
+   </g>
+   <g>
+    <path d="M111 84 185 24c10-8 23-5 25 4 1 8-8 16-19 17l-73 49z" fill="#4d4058" stroke="#c4a6ae" stroke-width="3"/>
+    <path d="M184 25c20-12 38-2 37 13-1 17-18 30-39 29 12-8 17-16 16-24-3-9-8-13-14-18z" fill="url(#death-blade)" stroke="#e9d7d6" stroke-width="2"/>
+    <path d="M189 32c9-2 16 1 20 8" stroke="#fff" stroke-width="2" fill="none" opacity=".7"/>
+   </g>
+   <path d="M120 66c-29 0-44 20-42 46 2 22 15 34 22 40l-13 60 33-18 33 18-13-60c7-6 20-18 22-40 2-26-13-46-42-46z" fill="url(#death-cloak)" stroke="#b69aa8" stroke-width="3"/>
+   <path d="M89 104c-7-26 7-49 31-49s38 23 31 49c-6 18-18 26-31 26s-25-8-31-26z" fill="#181522" stroke="#bba4b2" stroke-width="3"/>
+   <path d="M96 92c4-22 14-31 24-31s20 9 24 31c-10-7-18-10-24-10s-14 3-24 10z" fill="#070b15" stroke="#8b7189" stroke-width="2"/>
+   <ellipse cx="108" cy="101" rx="6" ry="4" fill="#ff4058" class="eye-glow"/>
+   <ellipse cx="132" cy="101" rx="6" ry="4" fill="#ff4058" class="eye-glow"/>
+   <path d="M120 105v13m-9 5 9 4 9-4" fill="none" stroke="#c9b6c0" stroke-width="3" stroke-linecap="round"/>
+   <path d="M101 139 120 153l19-14M107 150l13 11 13-11M109 167l11 9 11-9" fill="none" stroke="#8f8297" stroke-width="3" opacity=".9"/>
+   <path d="M104 188 120 176l16 12-7 29h-18z" fill="#080d18" stroke="#a58b9e" stroke-width="2"/>
+   <path d="M103 143 72 174l16 7 17-23M137 143l31 31-16 7-17-23" fill="url(#death-cloak)" stroke="#a58b9e" stroke-width="2"/>
+   <path d="M120 133v38" stroke="#d5b5a6" stroke-width="2" opacity=".65"/>
+   <circle cx="120" cy="146" r="9" fill="url(#death-core)" stroke="#f0b36e" stroke-width="2"/>
+   <path d="M120 138v16m-8-8h16" stroke="#ffe6b0" stroke-width="2" opacity=".85"/>
+   <path d="M76 209 164 209" stroke="#b98c6b" stroke-width="2" opacity=".45"/>
+  </svg>
+ </div>
   <div>
    <div id="eventStatus" class="status">Sincronizando evento…</div>
    <h2 style="margin-top:10px">A criatura mais poderosa já vista em Eldoria</h2>
@@ -75,6 +110,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
    <div class="stat"><span>Sua posição</span><b id="myRank">—</b></div>
    <div class="stat"><span>Seus ataques</span><b id="myAttacks">0</b></div>
    <div class="stat"><span>Tropas perdidas no evento</span><b id="myLosses">0</b></div>
+   <div class="stat"><span>Essências da Morte</span><b id="myEssence">0</b></div>
   </div>
  </section>
  <div class="grid">
@@ -99,13 +135,13 @@ button:disabled{opacity:.4;cursor:not-allowed}
   <h2>🎁 Recompensas lendárias</h2>
   <p class="muted">As recompensas são creditadas automaticamente no encerramento do evento. Não é necessário resgatar manualmente.</p>
   <div class="reward-grid">
-   <div class="reward"><b>1º lugar</b><small>500 gemas · 1,5 milhão de ouro · 100 Essências da Morte</small></div>
-   <div class="reward"><b>2º lugar</b><small>350 gemas · 1 milhão de ouro · 70 Essências</small></div>
-   <div class="reward"><b>3º lugar</b><small>250 gemas · 750 mil de ouro · 50 Essências</small></div>
-   <div class="reward"><b>Top 10</b><small>150 gemas · 500 mil de ouro · 30 Essências</small></div>
-   <div class="reward"><b>Top 50</b><small>75 gemas · 250 mil de ouro · 15 Essências</small></div>
-   <div class="reward"><b>Top 100</b><small>40 gemas · 125 mil de ouro · 8 Essências</small></div>
-   <div class="reward"><b>Participação</b><small>20 gemas · 60 mil de ouro · 3 Essências</small></div>
+   <div class="reward"><b>1º lugar</b><small>12.000 gemas · 5 milhões de ouro · 500 Essências da Morte</small></div>
+   <div class="reward"><b>2º lugar</b><small>9.000 gemas · 4 milhões de ouro · 350 Essências</small></div>
+   <div class="reward"><b>3º lugar</b><small>7.000 gemas · 3 milhões de ouro · 250 Essências</small></div>
+   <div class="reward"><b>Top 10</b><small>6.000 gemas · 2 milhões de ouro · 150 Essências</small></div>
+   <div class="reward"><b>Top 50</b><small>3.000 gemas · 1 milhão de ouro · 100 Essências</small></div>
+   <div class="reward"><b>Top 100</b><small>1.000 gemas · 750 mil de ouro · 60 Essências</small></div>
+   <div class="reward"><b>Participação</b><small>100 gemas · 500 mil de ouro · 30 Essências</small></div>
    <div class="reward"><b>Todos os colocados</b><small>Comida, madeira, pedra e ferro conforme sua posição</small></div>
   </div>
  </section>
