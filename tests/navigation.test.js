@@ -80,6 +80,8 @@ test("global navigation keeps search results visible on submit and includes play
   assert.ok(nav.includes('results.hidden = false'));
   assert.ok(!nav.includes("location.href = first.href"));
   assert.ok(nav.includes('event.key==="Escape"'));
+  assert.ok(nav.includes('normalize(item.label+" "+item.keywords).includes(needle)'));
+  assert.ok(nav.includes('normalize("NFKD")'));
 });
 
 test("global navigation exposes the Anjo da Morte weekend event", async () => {
@@ -105,5 +107,6 @@ test("player search results invite only kingdoms without an existing alliance", 
   assert.ok(alliance.includes('if(item.type==="player"||item.type==="kingdom")'));
   assert.ok(alliance.includes('if(item.allianceTag){status("Este reino já pertence à aliança ["+item.allianceTag+"]");return;}'));
   assert.ok(alliance.includes('$("inviteName").value=item.type==="player"?item.kingdom_name:item.name'));
-  assert.ok(!alliance.includes('location.href="/world.html?search="+encodeURIComponent(item.name);'));
+  const playerSelection = alliance.slice(alliance.indexOf('if(item.type==="player"||item.type==="kingdom")'), alliance.indexOf('}else if(item.type==="alliance"){', alliance.indexOf('if(item.type==="player"||item.type==="kingdom")')));
+  assert.ok(!playerSelection.includes('location.href="/world.html?search="'));
 });
