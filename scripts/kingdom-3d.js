@@ -7,6 +7,8 @@ const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
   let renderer, scene, camera, resizeObserver, ktx2, gltfLoader;
   let activeModels = [];
+  const glbTemplates = new Map();
+  let manifestLoad = null;
   const material = (color, roughness = 0.92) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.02 });
   const mats = {
     grass: material("#577a49"), grassLight: material("#78945a"),
@@ -104,43 +106,36 @@ if (host && "WebGLRenderingContext" in window) {
     list.forEach((b, i) => {
       const col = i % 3, row = Math.floor(i / 3);
       const x = (col - 1) * 3.7, z = (row - 1) * 2.85;
-      const group = createBuilding(b.building_type, b.level, x, z);
+      const template = glbTemplates.get(b.building_type);
+      const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z);
+      group.position.set(x, 0, z); group.userData.coIType = b.building_type;
+      group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       activeModels.push(group);
     });
     renderer.render(scene, camera);
   }
   async function loadOptionalGlbAssets(buildings = []) {
-    try {
-      const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
-      if (!response.ok) return;
-      const manifest = await response.json();
-      for (const asset of (manifest.models || [])) {
-        if (asset.enabled !== true || !asset.type || !asset.src) continue;
-        const gltf = await gltfLoader.loadAsync(asset.src);
-        const template = gltf.scene;
-        template.traverse(node => {
-          if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
-        });
-        const data = (Array.isArray(buildings) ? buildings : []).find(item => item.building_type === asset.type);
-        const target = activeModels.find(model => model.userData.coIType === asset.type);
-        if (!target) continue;
-        const position = target.position.clone();
-        scene.remove(target);
-        const model = template.clone(true);
-        model.position.copy(position);
-        const scale = Number(asset.scale) > 0 ? Number(asset.scale) : 1;
-        model.scale.setScalar(scale);
-        model.userData.coIType = asset.type;
-        model.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
-        scene.add(model);
-        activeModels = activeModels.filter(item => item !== target);
-        activeModels.push(model);
-        if (data?.level) model.userData.coILevel = Number(data.level);
+    if (manifestLoad) return manifestLoad;
+    manifestLoad = (async () => {
+      try {
+        const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
+        if (!response.ok) return;
+        const manifest = await response.json();
+        for (const asset of (manifest.models || [])) {
+          if (asset.enabled !== true || !asset.type || !asset.src) continue;
+          const gltf = await gltfLoader.loadAsync(asset.src);
+          const template = gltf.scene;
+          template.traverse(node => {
+            if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
+          });
+          glbTemplates.set(asset.type, template);
+        }
+        if (glbTemplates.size) renderBuildings(buildings);
+      } catch (error) {
+        console.info("Clash of Izzy: GLB asset not ready; procedural 3D models remain active.", error);
       }
-      renderer.render(scene, camera);
-    } catch (error) {
-      console.info("Clash of Izzy: GLB asset not ready; procedural 3D models remain active.", error);
-    }
+    })();
+    return manifestLoad;
   }
   try {
     renderer = new THREE.WebGLRenderer({
@@ -187,7 +182,7 @@ if (host && "WebGLRenderingContext" in window) {
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
     else window.addEventListener("resize", resize, { passive: true });
     resize();
-    loadOptionalGlbAssets();
+    loadOptionalGlbAssets([]);
   } catch (error) {
     console.warn("Clash of Izzy: WebGL indisponível; mantendo arte procedural 2D.", error);
     host.classList.remove("has-3d");
