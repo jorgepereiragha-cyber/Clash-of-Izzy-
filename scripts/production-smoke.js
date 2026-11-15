@@ -93,6 +93,7 @@ export async function runProductionSmokeTests({
   assert(arena.includes('value="mercadopago_link"'), "A opção Mercado Pago não está ativa na loja publicada.");
   assert(arena.includes("https://link.mercadopago.com.br/pagamentosskin"), "O link Mercado Pago não está presente na loja publicada.");
   assert(arena.includes("paymentWindow"), "O fluxo de abertura do checkout Mercado Pago não está disponível.");
+  assert(!/<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i.test(arena), "A loja ainda oferece um método de pagamento desativado.");
 
   const manifestResponse = await get("/manifest.json");
   assert(manifestResponse.status === 200, "Manifest da PWA indisponível.");
