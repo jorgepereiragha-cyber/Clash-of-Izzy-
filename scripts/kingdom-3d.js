@@ -123,15 +123,39 @@ if (host && "WebGLRenderingContext" in window) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
-  function addTree(x, z, scale = 1) {
-    const group = new THREE.Group(); group.position.set(x, 0, z); group.scale.setScalar(scale);
-    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(.09, .13, .65, 5), mats.wood);
-    trunk.position.y = .32; trunk.castShadow = true; group.add(trunk);
-    const crown = new THREE.Mesh(new THREE.ConeGeometry(.62, 1.45, 6), mats.leaf);
-    crown.position.y = 1.22; crown.castShadow = true; group.add(crown);
-    const crown2 = new THREE.Mesh(new THREE.ConeGeometry(.43, 1.05, 6), mats.leafLight);
-    crown2.position.y = 1.72; crown2.castShadow = true; group.add(crown2); scene.add(group);
+  function addForestInstances() {
+    const count = 18;
+    const trunkGeometry = new THREE.CylinderGeometry(.09, .13, .65, 5);
+    const crownGeometry = new THREE.ConeGeometry(.62, 1.45, 6);
+    const crownTopGeometry = new THREE.ConeGeometry(.43, 1.05, 6);
+    const trunks = new THREE.InstancedMesh(trunkGeometry, mats.wood, count);
+    const crowns = new THREE.InstancedMesh(crownGeometry, mats.leaf, count);
+    const crownTops = new THREE.InstancedMesh(crownTopGeometry, mats.leafLight, count);
+    trunks.castShadow = crowns.castShadow = crownTops.castShadow = true;
+    trunks.receiveShadow = true;
+    const dummy = new THREE.Object3D();
+    let added = 0;
+    for (let i = 0; i < count; i++) {
+      const x = ((i * 37) % 125) / 10 - 6.2;
+      const z = ((i * 23) % 95) / 10 - 4.7;
+      if (Math.abs(x) < 5 && Math.abs(z) < 4) continue;
+      const scale = .72 + (i % 4) * .12;
+      dummy.position.set(x, .32 * scale, z);
+      dummy.scale.setScalar(scale); dummy.updateMatrix(); trunks.setMatrixAt(added, dummy.matrix);
+      dummy.position.set(x, 1.22 * scale, z);
+      dummy.scale.setScalar(scale); dummy.updateMatrix(); crowns.setMatrixAt(added, dummy.matrix);
+      dummy.position.set(x, 1.72 * scale, z);
+      dummy.scale.setScalar(scale); dummy.updateMatrix(); crownTops.setMatrixAt(added, dummy.matrix);
+      added++;
+    }
+    for (const mesh of [trunks, crowns, crownTops]) {
+      mesh.count = added;
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      scene.add(mesh);
+    }
   }
+  function createBuilding(type, level, x, z) {
   function createBuilding(type, level, x, z) {
     const group = new THREE.Group(); group.position.set(x, 0, z); group.userData.coIType = type; group.userData.coIProcedural = true;
     const colors = palettes[type] || palettes.warehouse;
@@ -182,12 +206,8 @@ if (host && "WebGLRenderingContext" in window) {
     road.receiveShadow = true; scene.add(road);
     const verge = new THREE.Mesh(new THREE.TubeGeometry(curve, 36, .38, 6, false), mats.roadEdge);
     verge.position.y = -.025; scene.add(verge);
-    // Rock clusters and forest border, deterministic and inexpensive.
-    for (let i = 0; i < 18; i++) {
-      const x = ((i * 37) % 125) / 10 - 6.2, z = ((i * 23) % 95) / 10 - 4.7;
-      if (Math.abs(x) < 5 && Math.abs(z) < 4) continue;
-      addTree(x, z, .72 + (i % 4) * .12);
-    }
+    // Forest is batched into three instanced draw calls instead of one per tree part.
+    addForestInstances();
   }
   function renderBuildings(buildings) {
     for (const item of activeModels) {
