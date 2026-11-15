@@ -15,7 +15,7 @@ self.addEventListener("fetch",event=>{
   event.respondWith(fetch(request).then(async response=>{
    if(response.ok){const cache=await caches.open(CACHE_NAME);await cache.put(request,response.clone());}
    return response;
-  }).catch(async()=>await caches.match(request)||await caches.match("/offline.html")));
+  }).catch(async()=>await caches.match("/offline.html")));
   return;
  }
  event.respondWith(caches.match(request).then(cached=>{
