@@ -21,6 +21,19 @@ test("cidade 3D segue a bíblia visual com telhados azul-real e detalhes dourado
   assert.match(renderer, /Royal blue roofs and restrained gold standards/);
 });
 
+test("edifícios 3D possuem silhuetas e marcos próprios por função", async () => {
+  const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
+  for (const feature of [
+    'type === "market"', 'type === "barracks"', 'type === "quarry"',
+    'type === "lumber_mill"', 'type === "academy"', 'type === "hospital"',
+    'type === "archery_range"', 'type === "siege_workshop"',
+    'type === "embassy"', 'type === "warehouse"', 'type === "stable"'
+  ]) assert.ok(renderer.includes(feature), "marco arquitetônico ausente: " + feature);
+  assert.match(renderer, /emissiveIntensity: 0\.28/);
+  assert.match(renderer, /new THREE\.DodecahedronGeometry/);
+  assert.match(renderer, /new THREE\.TorusGeometry/);
+});
+
 test("tema compartilhado define tokens da marca e acessibilidade básica", async () => {
   const css = await readFile(new URL("../styles/coi-theme.css", import.meta.url), "utf8");
   for (const token of ["--coi-night:", "--coi-blue:", "--coi-gold:", "--coi-parchment:", "--coi-forest:", "--coi-war:"]) {
