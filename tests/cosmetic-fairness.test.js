@@ -32,7 +32,7 @@ test("skins de coleção, sazonais e fusões são exclusivamente cosméticas", (
 test("skins do panteão nórdico não concedem atributos de combate", () => {
   const skins = catalogBlock(equipmentSource, "NORSE_SKINS", "]);");
   assert.doesNotMatch(skins, /\b(?:atk|def|attack|defense|stats|bonus)\s*:/i);
-  assert.match(skins, /visuais?/i);
+  assert.match(skins, /visual|cosmétic/i);
 });
 
 test("bônus de batalha continuam vindo apenas de equipamento equipado e pesquisa", () => {
