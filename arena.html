@@ -218,6 +218,7 @@ window.COI_ASSETS={
  update:updateAssetAnimations,
  dispose(){disposeAssetLoader();disposeTextures()}
 };
+window.addEventListener('pagehide',event=>{if(!event.persisted)window.COI_ASSETS.dispose()},{once:true});
 scene.add(new THREE.HemisphereLight(0xdcecff,0x33452e,1.8));const sun=new THREE.DirectionalLight(0xffe4b2,2.6);sun.position.set(-25,45,25);sun.castShadow=!lowPowerProfile;sun.shadow.mapSize.set(mobileProfile?512:1024,mobileProfile?512:1024);sun.shadow.camera.left=-60;sun.shadow.camera.right=60;sun.shadow.camera.top=50;sun.shadow.camera.bottom=-50;sun.shadow.bias=-0.00025;scene.add(sun);
 const contextNotice=document.createElement('div');contextNotice.textContent='Reconectando os gráficos…';contextNotice.style.cssText='display:none;position:fixed;inset:0;z-index:30;align-items:center;justify-content:center;background:#101a2b;color:#f5edda;font: bold 16px Arial';renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();contextNotice.style.display='flex'});renderer.domElement.addEventListener('webglcontextrestored',()=>{contextNotice.style.display='none';renderer.setPixelRatio(adaptivePixelRatio);renderer.setSize(innerWidth,innerHeight,false)});document.body.appendChild(contextNotice);
 const mat=(c)=>new THREE.MeshStandardMaterial({color:c,roughness:.86});
