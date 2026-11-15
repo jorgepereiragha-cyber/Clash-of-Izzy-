@@ -70,3 +70,10 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - A cena pode carregar modelos glTF/GLB pelo manifesto em `assets/3d/manifest.json`; o manifesto está preparado, mas ainda não contém modelos finais.
 - O inventário de equipamentos continua em `kingdom_equipment`; loadouts de heróis reutilizam a tabela existente `hero_equipment`, com um item por slot e sem criar um segundo sistema de inventário.
 - Os bônus de equipamento só entram em combate/produção quando o item está equipado no herói ativo (maior nível). O estado e as operações são validados no Worker.
+
+
+## Assets 3D da arena
+- A arena e a cidade compartilham a versão Three.js 0.187.0.
+- A arena usa um carregador GLB com Draco/KTX2 opcional, cache de texturas, animações glTF e descarte de recursos GPU. O carregador utiliza o renderer já existente; não cria uma segunda cena ou renderer.
+- Modelos devem ser GLB autocontidos e ficar em `/assets/models/`; texturas avulsas ficam em `/assets/textures/`. O carregador bloqueia URLs externas para evitar downloads arbitrários.
+- Ainda não há modelos GLB reais publicados no repositório; a pipeline está pronta e os diretórios aguardam assets aprovados.
