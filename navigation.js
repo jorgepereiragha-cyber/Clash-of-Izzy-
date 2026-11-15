@@ -10,8 +10,8 @@
     {label:"Mapa mundial",href:"/world.html",icon:"🌍",keywords:"territórios exploração marchas mapa mundo"},
     {label:"Eventos",href:"/events.html",icon:"💀",keywords:"anjo da morte ceifador monstros chefes evento mundial fim de semana recompensas ranking"},
     {label:"Forja & skins",href:"/equipment-ui.html",icon:"⚒",keywords:"equipamentos heróis pesquisa evolução loja skins nórdicas odin thor freyja loki tyr heimdall"},
-    {label:"Arena (modo secundário)",href:"/arena.html",icon:"⚔",keywords:"batalha combate arena ação individual treinamento"},
-    {label:"Alianças",href:"/alliance.html",icon:"🤝",keywords:"aliança membros chat guerra diplomacia depósito"}
+    {label:"Alianças",href:"/alliance.html",icon:"🤝",keywords:"aliança membros chat guerra diplomacia depósito"},
+    {label:"Arena (modo secundário)",href:"/arena.html",icon:"⚔",keywords:"batalha combate arena ação individual treinamento"}
   ];
 
   const path = location.pathname.replace(/\/$/,"") || "/index.html";
