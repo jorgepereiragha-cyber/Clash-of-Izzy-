@@ -1178,8 +1178,8 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   }
   const snapshotJson=JSON.stringify(snapshot),expectedRows=selected.length;
   const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID();
-  const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) AND EXISTS(SELECT 1 FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>?)")
-    .bind(snapshotJson,kingdom.id,snapshotJson,kingdom.id,expectedRows,kingdom.id,battleToken,event.id,instant,instant);
+  const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND EXISTS(SELECT 1 FROM json_each(?) AS selected WHERE selected.key=army_units.unit_type||'_'||army_units.tier) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) AND EXISTS(SELECT 1 FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>?)")
+    .bind(snapshotJson,kingdom.id,snapshotJson,snapshotJson,kingdom.id,expectedRows,kingdom.id,battleToken,event.id,instant,instant);
   const statements=[
     env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,kingdom.id,previousBattleToken),
     troopUpdate,
