@@ -7,7 +7,8 @@ const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
 const equipmentSource = await readFile(new URL("../equipment-engine.js", import.meta.url), "utf8");
 
 function catalogBlock(source, name, endMarker) {
-  const start = source.indexOf(`const ${name}=`);
+  const candidates = [`const ${name}=`, `const ${name} =`, `export const ${name}=`, `export const ${name} =`].map(marker => source.indexOf(marker)).filter(index => index >= 0);
+  const start = candidates.length ? Math.min(...candidates) : -1;
   assert.ok(start >= 0, `catálogo ${name} encontrado`);
   const end = source.indexOf(endMarker, start);
   assert.ok(end > start, `fim do catálogo ${name} encontrado`);
