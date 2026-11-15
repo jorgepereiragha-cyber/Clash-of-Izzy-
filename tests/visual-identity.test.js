@@ -18,7 +18,7 @@ test("cidade 3D segue a bíblia visual com telhados azul-real e detalhes dourado
   assert.match(renderer, /roof: material\("#24476B"\)/);
   assert.match(renderer, /\[mats\.roof, "#24476B", "roof"/);
   assert.match(renderer, /color: "#E7BD68"/);
-  assert.match(renderer, /Royal blue roofs and restrained gold standards/);
+  assert.match(renderer, /heraldic seal/);
 });
 
 test("edifícios 3D possuem silhuetas e marcos próprios por função", async () => {
