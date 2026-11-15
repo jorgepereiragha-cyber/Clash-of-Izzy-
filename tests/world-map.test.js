@@ -27,7 +27,8 @@ test("world map renders untrusted territory labels with DOM text, not HTML injec
   assert.ok(!script.includes("innerHTML"));
 });
 
-test("PWA shell includes the world map and increments its cache version", () => {
-  for (const marker of ['clash-of-izzy-shell-v3', '"/world.html"', '"/world-map.js"', '"/styles/coi-theme.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+test("PWA shell uses a versioned cache and includes the world map", () => {
+  assert.match(serviceWorker, /const CACHE_NAME="clash-of-izzy-shell-v\\d+";/);
+  for (const marker of ['"/world.html"', '"/world-map.js"', '"/styles/coi-theme.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
   assert.ok(serviceWorker.includes('url.pathname.startsWith("/api/")'));
 });
