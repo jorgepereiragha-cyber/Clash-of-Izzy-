@@ -133,3 +133,11 @@ test("event page includes accessible original boss artwork and reduced-motion su
   assert.ok(html.includes("death-cloak"));
   assert.ok(html.includes("prefers-reduced-motion:reduce"));
 });
+
+
+test("event page shows the player's Death Essence inventory balance", async () => {
+  const html = await readFile(new URL("../events.html", import.meta.url), "utf8");
+  const client = await readFile(new URL("../events.js", import.meta.url), "utf8");
+  assert.ok(html.includes('id="myEssence"'));
+  assert.ok(client.includes('item.item_key==="death_essence"'));
+});
