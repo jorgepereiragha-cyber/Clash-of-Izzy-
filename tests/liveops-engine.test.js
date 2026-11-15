@@ -39,13 +39,15 @@ test("daily task state is server-derived and reports claimed tasks", async () =>
   assert.equal(state.tasks.find(task => task.id === "battle").completed, true);
 });
 
-test("daily task claim is persisted as a single batch", async () => {
+test("daily task claim credits reward and writes economy ledger in one batch", async () => {
   const DB = fakeDb({ progress: 25 });
   const result = await claimDailyTask({ DB }, 42, "train_troops", new Date("2026-11-14T12:00:00.000Z"));
   assert.equal(result.ok, true);
   assert.equal(result.cycleId, "2026-11-14");
   assert.equal(DB.calls.length, 1);
-  assert.ok(DB.calls[0].length >= 4);\n  assert.match(DB.calls[0][2].sql, /credited_at/);\n  assert.ok(DB.calls[0].some(statement => /INSERT INTO resource_ledger/.test(statement.sql)));
+  assert.ok(DB.calls[0].length >= 4);
+  assert.match(DB.calls[0][2].sql, /credited_at/);
+  assert.ok(DB.calls[0].some(statement => /INSERT INTO resource_ledger/.test(statement.sql)));
 });
 
 test("unknown daily task cannot be claimed", async () => {
