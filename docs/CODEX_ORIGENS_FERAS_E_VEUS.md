@@ -194,3 +194,14 @@ Não aplicar migrações remotas, fazer merge ou publicar sem validação e auto
 
 ---
 **Este documento é direção de design, não confirmação de funcionalidades implementadas.**
+
+## 12. Protótipo implementado: primeira fatia narrativa
+
+Na branch feature/offline-kingdom-progression foi acrescentada ao Centro de Comando a campanha local **A Primeira Fenda**:
+- bloqueio visual até o Castelo nível 3;
+- três capítulos em sequência: Duas ofertas, O campo silencioso e A marca e o exílio;
+- ao concluir os capítulos, abre-se o vestígio do Basilisco para catalogação no bestiário;
+- depois, o jogador arquiva a descoberta fictícia Cartografia das Fundações;
+- progresso gravado localmente na chave `coi_origin_campaign_v1`.
+
+**Limitações explícitas:** é um protótipo narrativo no navegador. Não há validação do progresso no servidor, sincronização entre dispositivos, combate contra o Basilisco, bônus, efeito real de tecnologia ou recompensa econômica. O desbloqueio por nível é apenas interface e não é proteção contra manipulação. A campanha não é conteúdo religioso oficial. Antes de transformar em sistema definitivo, migrar progresso para o servidor, criar endpoints autenticados e resgates idempotentes, testes de autorização e integração com o catálogo de pesquisa existente.
