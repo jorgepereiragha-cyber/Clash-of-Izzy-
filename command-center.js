@@ -9,13 +9,31 @@ const n=value=>Number(value||0).toLocaleString("pt-BR");
 function notice(message,type=""){const el=$("notice");el.textContent=message;el.className="notice"+(type?" "+type:"")}
 function setConnection(message){$("connection").textContent=message}
 async function request(path,options={}){const response=await fetch(API+path,{...options,headers:{...(options.headers||{}),...(token?{Authorization:"Bearer "+token}:{})}});const data=await response.json().catch(()=>({error:"Resposta inválida do servidor."}));if(!response.ok)throw new Error(data.error||"Falha de comunicação.");return data}
+async function migrateLegacyStoryProgress(){
+ const originRaw=localStorage.getItem("coi_origin_campaign_v1"),veilRaw=localStorage.getItem("coi_veil_clues");
+ if(originRaw===null&&veilRaw===null)return;
+ let origin={steps:[],basilisk:false,technology:false},veil=[];
+ try{if(originRaw)origin=JSON.parse(originRaw)||origin}catch{}
+ try{if(veilRaw)veil=JSON.parse(veilRaw)||[]}catch{}
+ const requested=[];
+ for(const step of ORIGIN_STEPS)if((origin.steps||[]).includes(step.id))requested.push({campaign:"first_rift",step:step.id});
+ if(origin.basilisk)requested.push({campaign:"first_rift",step:"basilisk"});
+ if(origin.technology)requested.push({campaign:"first_rift",step:"foundations"});
+ for(const clue of VEIL_CLUES)if(veil.includes(clue.id))requested.push({campaign:"veil_archive",step:clue.id});
+ let migrated=true;
+ for(const item of requested){
+  try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"story_step",...item})});state=result.state}
+  catch{migrated=false}
+ }
+ if(migrated){localStorage.removeItem("coi_origin_campaign_v1");localStorage.removeItem("coi_veil_clues")}
+}
 async function connect(){
  token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
  try{
   let data;
   if(token){try{data=await request("/game/state")}catch{localStorage.removeItem("coi_game_token");sessionStorage.removeItem("coi_game_token");token=null}}
   if(!data){data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"});token=data.token;if(token){localStorage.setItem("coi_game_token",token);sessionStorage.setItem("coi_game_token",token)}}
-  state=data.state;setConnection("🏰 "+(state.kingdom?.kingdom_name||"Reino conectado")+" · Sessão autenticada no servidor.");render();notice("Seu reino está conectado.","ok");
+  state=data.state;await migrateLegacyStoryProgress();setConnection("🏰 "+(state.kingdom?.kingdom_name||"Reino conectado")+" · Sessão autenticada no servidor.");render();notice("Seu reino está conectado.","ok");
  }catch(error){setConnection("⚠ Não foi possível conectar: "+error.message);notice("Verifique a conexão e a configuração do servidor.","error")}
 }
 function renderTasks(){
@@ -119,7 +137,7 @@ function renderDailyEvents(){
  }).join("")||'<div class="empty">Nenhuma missão diária disponível.</div>';
 }
 function renderBattles(){const rows=state.battleReports||[];$("battles").innerHTML=rows.slice(0,5).map(b=>'<div class="item"><b>'+esc(b.battle_type||"Batalha")+'</b><div class="muted">Força '+n(b.attacker_power)+' · Inimigo '+n(b.defender_power)+' · '+esc(b.created_at||"")+'</div></div>').join("")||'<div class="muted">Nenhuma batalha registrada.</div>'}
-async function refresh(){if(busy)return;try{const data=await request("/game/state");state=data.state;render();setConnection("🏰 Estado atualizado · "+(state.kingdom?.kingdom_name||"Reino"));}catch(error){notice(error.message,"error")}}
+async function refresh(){if(busy)return;try{const data=await request("/game/state");state=data.state;await migrateLegacyStoryProgress();render();setConnection("🏰 Estado atualizado · "+(state.kingdom?.kingdom_name||"Reino"));}catch(error){notice(error.message,"error")}}
 async function act(body,success){
  if(busy)return;busy=true;notice("Executando comando…");
  try{const data=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});state=data.state;render();notice(success||data.battle?.message||"Comando concluído.","ok");return data}
