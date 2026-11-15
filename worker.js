@@ -303,89 +303,286 @@ async function seedWorld(env){
  ];
  await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate) VALUES(?,?,?,?,?,?,?)").bind(...n,90)));
 }
+async function loadKingdomCombatProfile(env, kingdomId) {
+  const [kingdom, hero, dragon, military, defense] = await Promise.all([
+    env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
+    env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
+    env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
+    env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
+    env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
+  ]);
+  if (!kingdom) return null;
+  const [equipmentRows, gearResearchRows] = await Promise.all([
+    hero?.id
+      ? env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id,kingdomId).all()
+      : Promise.resolve({results:[]}),
+    env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
+  ]);
+  const gear = equipmentBonuses(equipmentRows.results || [], gearResearchRows.results || []);
+  const castleLevel = Number(kingdom.castle_level || 1);
+  return {
+    castleLevel,
+    heroLevel: Number(hero?.level || 1),
+    dragonLevel: Number(dragon?.level || 1),
+    researchLevel: Number(military?.level || 0),
+    defenseBonusPercent: Math.min(30, Math.max(0, Number(defense?.level || 0) + gear.defensePercent)),
+    equipmentAttackBonusPercent: gear.attackPercent,
+    equipmentHealthBonusPercent: gear.healthPercent,
+    criticalChancePercent: gear.criticalChancePercent,
+    castlePowerBonusPercent: Math.min(30, Math.max(0, castleLevel))
+  };
+}
+
+async function acquireKingdomBattleLocks(env, kingdomIds) {
+  const locks = [];
+  const ids = [...new Set(kingdomIds.map(Number))].sort((a,b)=>a-b);
+  for (const id of ids) {
+    const current = await env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(id).first();
+    if (!current) {
+      await releaseKingdomBattleLocks(env, locks);
+      return null;
+    }
+    // Never replace an active battle lease. The previous token is only
+    // retained for safe rollback of an empty lock.
+    if (current.battle_token) {
+      await releaseKingdomBattleLocks(env, locks);
+      return null;
+    }
+    const previous = current.battle_token ?? null;
+    const token = crypto.randomUUID();
+    const result = await env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')")
+      .bind(token,id,previous ?? "").run();
+    if (!result.meta?.changes) {
+      await releaseKingdomBattleLocks(env, locks);
+      return null;
+    }
+    locks.push({id,token,previous});
+  }
+  return locks;
+}
+
+async function releaseKingdomBattleLocks(env, locks) {
+  for (const lock of locks || []) {
+    await env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND battle_token=?")
+      .bind(lock.previous,lock.id,lock.token).run();
+  }
+}
+
 async function processMarches(env,kingdomId){
  const now=new Date().toISOString();
- const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
+ const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id,target_owner_kingdom_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
  for(const m of due.results||[]){
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
   const resolvedAt=new Date().toISOString(),resolutionToken=crypto.randomUUID();
   const guard="EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)";
-  const statements=[
-   // A resolução inteira é uma transação D1. Se qualquer escrita falhar, o status e todas as recompensas voltam juntos.
-   env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
-  ];
-  if(m.march_type==="attack"){
-   const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
-   const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
-   let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={};
-   if(target&&!target.owner_kingdom_id&&army.length){
-    const [kingdom,hero,dragon,military,defense]=await Promise.all([
-     env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
-     env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
-     env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
-     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
-     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
-    ]);
-    const [equipmentRows,gearResearchRows]=await Promise.all([
-     hero?.id?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id,kingdomId).all():Promise.resolve({results:[]}),
-     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
-    ]);
-    const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
-    const castleLevel=Number(kingdom?.castle_level||1);
-    const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
-    const simulation=simulateBattle({
-     army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
-     heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
-     researchLevel:Number(military?.level||0),
-     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
-     equipmentAttackBonusPercent:gear.attackPercent,
-     equipmentHealthBonusPercent:gear.healthPercent,
-     criticalChancePercent:gear.criticalChancePercent,
-     criticalDamageMultiplier:1.5,
-     criticalSeed,
-     castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
-     roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
-    });
-    simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
-    losses=simulation.losses||{};battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
-    for(const u of army)survivors[u.unit_type]=u.quantity;
-   }else{
-    for(const u of army)survivors[u.unit_type]=u.quantity;
-    battleLog=[{event:"attack_cancelled",reason:target?"territory_already_owned":"territory_missing"}];
-   }
-   // A captura é condicional e imediatamente seguida pelo relatório, que lê changes() da captura.
-   statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
-   statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,? WHERE "+guard)
-    .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits:simulation.criticalHits||0}),JSON.stringify({territoryCaptured:false,criticalHits:simulation.criticalHits||0}),JSON.stringify(battleLog),m.id,kingdomId,resolutionToken));
-   // Uma pequena recompensa de material acompanha cada conquista válida.
-   statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE EXISTS(SELECT 1 FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? AND winner_kingdom_id=? ORDER BY id DESC LIMIT 1) AND "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1")
-    .bind(kingdomId,"power_crystal",kingdomId,m.target_territory_id,kingdomId,m.id,kingdomId,resolutionToken));
-   for(const [unit,qty] of Object.entries(survivors)){
-    if(qty>0)statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,1,qty,m.id,kingdomId,resolutionToken));
-   }
-   statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,CASE WHEN json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured')=1 THEN 'territory_captured' ELSE 'territory_attack_resolved' END,json_object('territoryId',?,'won',json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured'),'losses',json(?)) WHERE "+guard)
-    .bind(kingdomId,kingdomId,m.target_territory_id,m.target_territory_id,kingdomId,m.target_territory_id,JSON.stringify(losses),m.id,kingdomId,resolutionToken));
-  }else{
-   const marchMaterial=eventMaterialStatement(env,kingdomId,m.march_type==="gather"?"gather":"scout");
-   if(marchMaterial){
-    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,m.march_type==="gather"?"power_crystal":"svip_medal",m.id,kingdomId,resolutionToken));
-   }
-   for(const [unit,raw] of Object.entries(units)){
-    const qty=Math.max(0,Math.floor(Number(raw)||0));if(!Object.hasOwn(UNITS,unit)||qty<1)continue;
-    statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,1,qty,m.id,kingdomId,resolutionToken));
-   }
-   if(m.march_type==="gather"){
-    const target=await env.DB.prepare("SELECT resource_type,resource_rate FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
-    if(target&&["food","wood","stone","iron"].includes(target.resource_type)){
-     const amount=Math.max(1,Number(target.resource_rate)||90);
-     statements.push(env.DB.prepare("UPDATE kingdoms SET "+target.resource_type+"="+target.resource_type+"+? WHERE id=? AND "+guard).bind(amount,kingdomId,m.id,kingdomId,resolutionToken));
-     statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE "+guard).bind(kingdomId,target.resource_type,amount,"coleta por marcha",m.id,kingdomId,resolutionToken));
+  let territoryLockToken=null;
+  let kingdomBattleLocks=[];
+  let batchCommitted=false;
+  try{
+   let target=null;
+   if(m.march_type==="attack"){
+    target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(m.target_territory_id).first();
+    if(target){
+     territoryLockToken=crypto.randomUUID();
+     const lockExpiresAt=new Date(Date.now()+180000).toISOString();
+     const lockResult=await env.DB.prepare("UPDATE world_territories SET combat_lock_token=?,combat_lock_expires_at=? WHERE id=? AND (combat_lock_token IS NULL OR combat_lock_expires_at IS NULL OR combat_lock_expires_at<=?)")
+       .bind(territoryLockToken,lockExpiresAt,m.target_territory_id,now).run();
+     if(!lockResult.meta?.changes)continue;
+     target=await env.DB.prepare("SELECT t.id,t.name,t.level,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=? AND t.combat_lock_token=?").bind(m.target_territory_id,territoryLockToken).first();
     }
    }
+
+   const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
+   const survivors={};
+   const losses={};
+   const battleLog=[];
+   let attackerPower=0,defenderPower=0,simulation=null;
+   let pvpDefenderId=null,pvpDefenderRows=[],pvpProfile=null,pvpCancelledReason=null;
+   const isPveAttack=m.march_type==="attack"&&target&&target.owner_kingdom_id==null&&target.alliance_id==null&&m.target_owner_kingdom_id==null;
+   const isPvpCandidate=m.march_type==="attack"&&target&&target.owner_kingdom_id!=null
+     &&Number(target.owner_kingdom_id)!==Number(kingdomId)
+     &&Number(target.owner_kingdom_id)===Number(m.target_owner_kingdom_id);
+
+   if(isPvpCandidate){
+    pvpDefenderId=Number(target.owner_kingdom_id);
+    const nowMs=Date.now();
+    const shielded=[target.shield_until,target.protection_until].some(value=>value&&Date.parse(value)>nowMs);
+    if(shielded){
+     pvpCancelledReason="territory_protected";
+    }else{
+     const sameAlliance=await env.DB.prepare(
+       "SELECT 1 AS allied FROM alliance_members attacker JOIN alliance_members defender ON defender.alliance_id=attacker.alliance_id WHERE attacker.kingdom_id=? AND defender.kingdom_id=? LIMIT 1"
+     ).bind(kingdomId,pvpDefenderId).first();
+     if(sameAlliance){
+      pvpCancelledReason="friendly_territory";
+     }else{
+      kingdomBattleLocks=await acquireKingdomBattleLocks(env,[kingdomId,pvpDefenderId]);
+      if(!kingdomBattleLocks)continue;
+      const defenderRows=await env.DB.prepare("SELECT id,unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY tier DESC,unit_type").bind(pvpDefenderId).all();
+      pvpDefenderRows=defenderRows.results||[];
+      const [attackerProfile,defenderProfile]=await Promise.all([
+       loadKingdomCombatProfile(env,kingdomId),
+       loadKingdomCombatProfile(env,pvpDefenderId)
+      ]);
+      if(!attackerProfile||!defenderProfile){
+       pvpCancelledReason="kingdom_unavailable";
+      }else{
+       pvpProfile={attacker:attackerProfile,defender:defenderProfile};
+       const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
+       const defenderCriticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
+       simulation=simulateBattle({
+        army, ...attackerProfile,
+        defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
+        ...(pvpDefenderRows.length?{
+          defendingArmy:pvpDefenderRows,
+          defenderCastlePowerBonusPercent:defenderProfile.castlePowerBonusPercent,
+          defenderHeroLevel:defenderProfile.heroLevel,
+          defenderDragonLevel:defenderProfile.dragonLevel,
+          defenderResearchLevel:defenderProfile.researchLevel,
+          defenderDefenseBonusPercent:defenderProfile.defenseBonusPercent,
+          defenderEquipmentAttackBonusPercent:defenderProfile.equipmentAttackBonusPercent,
+          defenderEquipmentHealthBonusPercent:defenderProfile.equipmentHealthBonusPercent,
+          defenderCriticalChancePercent:defenderProfile.criticalChancePercent,
+          defenderCriticalSeed
+        }:{}),
+        criticalSeed,
+        roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
+       });
+       attackerPower=simulation.attackerPower;
+       defenderPower=simulation.defenderPower;
+       Object.assign(losses,simulation.losses||{});
+       battleLog.push({
+        event:"combat_metadata",
+        mode:"territory_pvp",
+        attackerCriticalSeed:criticalSeed,
+        defenderCriticalSeed,
+        attackerCriticalHits:simulation.criticalHits||0,
+        targetOwnerAtLaunch:Number(m.target_owner_kingdom_id)
+       },...(simulation.log||[]));
+       for(const unit of army){
+        const lost=Math.min(unit.quantity,Math.max(0,Number(losses[unit.unit_type]||0)));
+        survivors[unit.unit_type]=Math.max(0,unit.quantity-lost);
+       }
+      }
+     }
+    }
+   }else if(isPveAttack&&army.length){
+    const attackerProfile=await loadKingdomCombatProfile(env,kingdomId);
+    if(attackerProfile){
+     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
+     simulation=simulateBattle({
+      army,...attackerProfile,
+      defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
+      criticalSeed,
+      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
+     });
+     attackerPower=simulation.attackerPower;
+     defenderPower=simulation.defenderPower;
+     Object.assign(losses,simulation.losses||{});
+     battleLog.push({event:"combat_metadata",criticalSeed,criticalChancePercent:attackerProfile.criticalChancePercent,criticalHits:simulation.criticalHits||0},...(simulation.log||[]));
+    }else{
+     battleLog.push({event:"attack_cancelled",reason:"attacker_kingdom_unavailable"});
+    }
+   }else if(m.march_type==="attack"){
+    pvpCancelledReason=target?"territory_owner_changed_or_invalid":"territory_missing";
+   }
+
+   const statements=[
+    env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?")
+     .bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
+   ];
+
+   if(m.march_type==="attack"&&isPveAttack&&simulation){
+    const won=Boolean(simulation.won);
+    // Neutral PvE remains non-lethal: every dispatched unit returns to its owner.
+    statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND ?=1 AND combat_lock_token=? AND "+guard)
+     .bind(kingdomId,m.target_territory_id,won?1:0,territoryLockToken,m.id,kingdomId,resolutionToken));
+    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,? WHERE "+guard)
+     .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits:simulation.criticalHits||0}),JSON.stringify({territoryCaptured:false,criticalHits:simulation.criticalHits||0}),JSON.stringify(battleLog),m.id,kingdomId,resolutionToken));
+    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE EXISTS(SELECT 1 FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? AND winner_kingdom_id=? ORDER BY id DESC LIMIT 1) AND "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1")
+     .bind(kingdomId,"power_crystal",kingdomId,m.target_territory_id,kingdomId,m.id,kingdomId,resolutionToken));
+    for(const u of army){
+     if(u.quantity>0)statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
+      .bind(kingdomId,u.unit_type,1,u.quantity,m.id,kingdomId,resolutionToken));
+    }
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,CASE WHEN json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured')=1 THEN 'territory_captured' ELSE 'territory_attack_resolved' END,json_object('territoryId',?,'won',json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured'),'losses',json(?)) WHERE "+guard)
+     .bind(kingdomId,kingdomId,m.target_territory_id,m.target_territory_id,kingdomId,m.target_territory_id,JSON.stringify(losses),m.id,kingdomId,resolutionToken));
+   }else if(m.march_type==="attack"&&isPvpCandidate&&simulation&&!pvpCancelledReason){
+    const won=Boolean(simulation.won);
+    const defenderLosses=simulation.defenderLosses||{};
+    // The ownership snapshot and expiring lock guarantee that a second army
+    // cannot resolve against the same stale garrison.
+    statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=?,alliance_id=(SELECT alliance_id FROM alliance_members WHERE kingdom_id=?),shield_until=NULL WHERE id=? AND owner_kingdom_id=? AND combat_lock_token=? AND ?=1 AND "+guard)
+     .bind(kingdomId,kingdomId,m.target_territory_id,pvpDefenderId,territoryLockToken,won?1:0,m.id,kingdomId,resolutionToken));
+    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,defender_kingdom_id,territory_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,?,?,CASE WHEN (SELECT owner_kingdom_id FROM world_territories WHERE id=?)=? THEN ? ELSE NULL END,?,?,?,?,?,? WHERE "+guard)
+     .bind(kingdomId,pvpDefenderId,m.target_territory_id,m.target_territory_id,kingdomId,kingdomId,"territory_pvp",attackerPower,defenderPower,JSON.stringify({attacker:losses,defender:defenderLosses}),JSON.stringify({territoryCaptured:won}),JSON.stringify(battleLog),m.id,kingdomId,resolutionToken));
+    // PvP casualties are permanent for both sides; ordinary PvE marches remain
+    // non-lethal and the Anjo da Morte keeps its own separate loss rules.
+    const defenderLossRemainders={...defenderLosses};
+    for(const row of pvpDefenderRows){
+     const remainingLoss=Math.max(0,Number(defenderLossRemainders[row.unit_type]||0));
+     const lost=Math.min(Number(row.quantity),remainingLoss);
+     defenderLossRemainders[row.unit_type]=remainingLoss-lost;
+     if(lost>0)statements.push(env.DB.prepare("UPDATE army_units SET quantity=MAX(0,quantity-?) WHERE id=? AND kingdom_id=? AND "+guard)
+      .bind(lost,row.id,pvpDefenderId,m.id,kingdomId,resolutionToken));
+    }
+    for(const unit of army){
+     const qty=Math.max(0,Number(survivors[unit.unit_type]||0));
+     if(qty>0)statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
+      .bind(kingdomId,unit.unit_type,1,qty,m.id,kingdomId,resolutionToken));
+    }
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
+     .bind(kingdomId,won?"territory_captured":"territory_pvp_resolved",JSON.stringify({territoryId:m.target_territory_id,defenderKingdomId:pvpDefenderId,won,losses,enemyLosses:defenderLosses}),m.id,kingdomId,resolutionToken));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
+     .bind(pvpDefenderId,won?"territory_lost":"territory_defended",JSON.stringify({territoryId:m.target_territory_id,attackerKingdomId:kingdomId,won,losses:defenderLosses,enemyLosses:losses}),m.id,kingdomId,resolutionToken));
+    if(won)statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE (SELECT owner_kingdom_id FROM world_territories WHERE id=?)=? AND "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1")
+     .bind(kingdomId,"power_crystal",m.target_territory_id,kingdomId,m.id,kingdomId,resolutionToken));
+   }else if(m.march_type==="attack"){
+    for(const u of army){
+     if(u.quantity>0)statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
+      .bind(kingdomId,u.unit_type,1,u.quantity,m.id,kingdomId,resolutionToken));
+    }
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
+     .bind(kingdomId,"territory_attack_cancelled",JSON.stringify({territoryId:m.target_territory_id,reason:pvpCancelledReason||"attack_not_resolved"}),m.id,kingdomId,resolutionToken));
+   }else{
+    const marchMaterial=eventMaterialStatement(env,kingdomId,m.march_type==="gather"?"gather":"scout");
+    if(marchMaterial){
+     statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1")
+      .bind(kingdomId,m.march_type==="gather"?"power_crystal":"svip_medal",m.id,kingdomId,resolutionToken));
+    }
+    for(const [unit,raw] of Object.entries(units)){
+     const qty=Math.max(0,Math.floor(Number(raw)||0));
+     if(!Object.hasOwn(UNITS,unit)||qty<1)continue;
+     statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
+      .bind(kingdomId,unit,1,qty,m.id,kingdomId,resolutionToken));
+    }
+    if(m.march_type==="gather"){
+     const gatherTarget=await env.DB.prepare("SELECT resource_type,resource_rate FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+     if(gatherTarget&&["food","wood","stone","iron"].includes(gatherTarget.resource_type)){
+      const amount=Math.max(1,Number(gatherTarget.resource_rate)||90);
+      statements.push(env.DB.prepare("UPDATE kingdoms SET "+gatherTarget.resource_type+"="+gatherTarget.resource_type+"+? WHERE id=? AND "+guard)
+       .bind(amount,kingdomId,m.id,kingdomId,resolutionToken));
+      statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE "+guard)
+       .bind(kingdomId,gatherTarget.resource_type,amount,"coleta por marcha",m.id,kingdomId,resolutionToken));
+     }
+    }
+   }
+
+   if(territoryLockToken)statements.push(env.DB.prepare("UPDATE world_territories SET combat_lock_token=NULL,combat_lock_expires_at=NULL WHERE id=? AND combat_lock_token=?").bind(m.target_territory_id,territoryLockToken));
+   for(const lock of kingdomBattleLocks){
+    statements.push(env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND battle_token=?").bind(lock.previous,lock.id,lock.token));
+   }
+   await env.DB.batch(statements);
+   batchCommitted=true;
+  }finally{
+   if(!batchCommitted){
+    await releaseKingdomBattleLocks(env,kingdomBattleLocks);
+    if(territoryLockToken)await env.DB.prepare("UPDATE world_territories SET combat_lock_token=NULL,combat_lock_expires_at=NULL WHERE id=? AND combat_lock_token=?").bind(m.target_territory_id,territoryLockToken).run();
+   }
   }
-  await env.DB.batch(statements);
  }
 }
+
 const CASTLE_MATERIALS={
  royal_blueprint:{name:"Projeto Real",description:"Projeto especial para ampliar o Castelo."},
  imperial_seal:{name:"Brasão Imperial",description:"Selo raro exigido nas grandes evoluções."},
@@ -482,9 +679,9 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,hero_key,hero_name,level,experience,rarity,assigned_to FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id").bind(kingdom.id).all(),
     env.DB.prepare("SELECT dragon_key,dragon_name,level,experience,bond FROM dragons WHERE kingdom_id=?").bind(kingdom.id).first(),
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,name,terrain,x,z,resource_type,resource_rate,owner_kingdom_id,alliance_id,level FROM world_territories ORDER BY id").all(),
+    env.DB.prepare("SELECT t.id,t.name,t.terrain,t.x,t.z,t.resource_type,t.resource_rate,t.owner_kingdom_id,t.alliance_id,t.level,t.shield_until,k.protection_until,k.kingdom_name AS owner_kingdom_name,a.name AS alliance_name,a.tag AS alliance_tag FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id LEFT JOIN alliances a ON a.id=t.alliance_id ORDER BY t.id").all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
+    env.DB.prepare("SELECT id,attacker_kingdom_id,defender_kingdom_id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id).all(),
     env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key").bind(kingdom.id).all(),
     env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id).all()
@@ -993,12 +1190,24 @@ async function gameAction(env,playerId,body){
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
-    const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id FROM world_territories WHERE id=?").bind(targetId).first();
+    if(k.battle_token)return json({error:"Seu exército está resolvendo uma batalha. Aguarde o resultado antes de enviar outra marcha."},409);
+    const target=await env.DB.prepare("SELECT t.id,t.resource_type,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(targetId).first();
     if(!target)return json({error:"Território não encontrado."},404);
     const marchType=String(body.marchType||"gather");
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
-    if(marchType==="attack"&&target.owner_kingdom_id)return json({error:"Nesta etapa, só é possível conquistar territórios neutros. Ataques PvP serão habilitados em uma atualização própria."},409);
+    if(marchType==="attack"&&Number(target.owner_kingdom_id)===Number(k.id))return json({error:"Este território já pertence ao seu reino."},409);
+    if(marchType==="attack"&&!target.owner_kingdom_id&&target.alliance_id)return json({error:"Este território está protegido por uma aliança. Ataques a territórios de aliança exigem uma guerra de alianças."},409);
+    if(marchType==="attack"&&target.owner_kingdom_id){
+      const protectedUntil=[target.shield_until,target.protection_until].some(value=>value&&Date.parse(value)>Date.now());
+      if(protectedUntil)return json({error:"Este reino está sob proteção e não pode ser atacado agora."},409);
+      const allied=await env.DB.prepare("SELECT 1 AS allied FROM alliance_members a JOIN alliance_members b ON b.alliance_id=a.alliance_id WHERE a.kingdom_id=? AND b.kingdom_id=? LIMIT 1").bind(k.id,target.owner_kingdom_id).first();
+      if(allied)return json({error:"Ataques contra membros da sua própria aliança estão bloqueados."},409);
+    }
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
+    if(marchType!=="attack"&&target.alliance_id){
+      const member=await env.DB.prepare("SELECT 1 AS member FROM alliance_members WHERE alliance_id=? AND kingdom_id=? LIMIT 1").bind(target.alliance_id,k.id).first();
+      if(!member)return json({error:"Este território pertence a uma aliança. Somente membros podem enviar coleta ou exploração."},409);
+    }
     const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
     const selected={};
     for(const [unit,raw] of Object.entries(requested)){
@@ -1021,10 +1230,10 @@ async function gameAction(env,playerId,body){
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
-    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=?")
-      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length);
-    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at) SELECT ?,?,?,?,?,? WHERE changes()=?")
-      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,unitTypes.length);
+    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND COALESCE(battle_token,'')='')")
+      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length,k.id);
+    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at,target_owner_kingdom_id) SELECT ?,?,?,?,?,?,? WHERE changes()=?")
+      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,target.owner_kingdom_id??null,unitTypes.length);
     const result=await env.DB.batch([debit,createMarch]);
     if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes ou exército alterado por outra marcha. Atualize o reino e tente novamente."},409);
   }else if(type==="battle"){
