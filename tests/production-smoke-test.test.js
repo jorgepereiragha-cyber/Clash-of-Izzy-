@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { runProductionSmokeTests } from "../scripts/production-smoke-test.js";
+import { runProductionSmokeTests } from "../scripts/production-smoke.js";
 
 function makeResponse(body, status = 200, contentType = "application/json; charset=utf-8") {
   return new Response(typeof body === "string" ? body : JSON.stringify(body), {
@@ -26,7 +26,7 @@ function successfulFetch() {
     if (path === "/api/store/catalog") return makeResponse({ skins: [], packages: [] });
     if (path === "/manifest.json") return makeResponse({ name: "Clash of Izzy" });
     if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v10";', 200, "text/javascript");
-    return makeResponse("<!doctype html><html><body>Clash of Izzy</body></html>", 200, "text/html; charset=utf-8");
+    return makeResponse("<!doctype html><html lang=\"pt-BR\"><head><title>Clash of Izzy</title></head><body><main>Clash of Izzy - estratégia medieval e reino</main></body></html>", 200, "text/html; charset=utf-8");
   };
   return { fetchImpl, calls };
 }
