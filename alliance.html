@@ -16,13 +16,13 @@ header{padding:14px max(14px,env(safe-area-inset-right)) 14px max(14px,env(safe-
 <h1 id="title">Alianças do reino</h1><p class="muted" id="subtitle">Conectando ao servidor…</p><div id="status" class="status" role="status"></div>
 <section class="panel" aria-labelledby="globalSearchTitle">
 <h2 id="globalSearchTitle">🔎 Busca do mundo</h2>
-<p class="muted">Encontre reinos disponíveis para convite e alianças por nome ou sigla.</p>
+<p class="muted">Pesquise reinos, alianças, territórios e skins em um só lugar.</p>
 <form id="worldSearchForm" class="row">
 <label class="hidden" for="worldSearchQuery">Buscar no mundo</label>
 <input id="worldSearchQuery" type="search" minlength="2" maxlength="48" autocomplete="off" placeholder="Nome do reino, aliança ou sigla…" required>
 <label class="hidden" for="worldSearchType">Categoria</label>
 <select id="worldSearchType" aria-label="Categoria da busca" style="max-width:150px;flex:0 0 150px">
-<option value="all">Tudo</option><option value="kingdoms">Reinos</option><option value="alliances">Alianças</option>
+<option value="all">Tudo</option><option value="kingdoms">Reinos</option><option value="alliances">Alianças</option><option value="territories">Territórios</option><option value="skins">Skins</option>
 </select>
 <button type="submit">Buscar</button>
 </form>
@@ -95,17 +95,19 @@ $("worldSearchForm").addEventListener("submit",async event=>{
    const title=document.createElement("strong");
    title.textContent=item.type==="alliance"?item.name+" ["+item.tag+"]":item.name;
    const detail=document.createElement("small");
-   detail.textContent=item.type==="alliance"?"Aliança · nível "+item.level+" · "+item.members+" membros":"Reino · poder "+Number(item.power||0).toLocaleString("pt-BR");
+   detail.textContent=item.type==="alliance"?"Aliança · nível "+item.level+" · "+item.members+" membros":item.type==="kingdom"?"Reino · poder "+Number(item.power||0).toLocaleString("pt-BR"):item.type==="territory"?"Território · "+(item.terrain||"terreno desconhecido"):"Catálogo · "+(item.description||"Skin cosmética");
    button.append(title,detail);
    button.addEventListener("click",()=>{
     if(item.type==="kingdom"){
      $("inviteName").value=item.name;
      $("inviteName").focus();
      status("Reino selecionado. Use Convidar para enviar o convite.");
-    }else{
+    }else if(item.type==="alliance"){
      $("joinTag").value=item.tag;
      $("joinTag").focus();
      status("Aliança selecionada. Use Solicitar entrada para continuar.");
+    }else{
+     status(item.type==="territory"?"Território encontrado no índice mundial.":"Skin encontrada no catálogo.");
     }
    });
    list.append(button);
