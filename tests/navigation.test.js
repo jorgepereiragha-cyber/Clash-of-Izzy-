@@ -98,3 +98,12 @@ test("global search results can deep-link to territory and skin catalog pages", 
   assert.ok(world.includes("requestedTerritorySearch"));
   assert.ok(equipment.includes("requestedSkinSearch"));
 });
+
+
+test("player search results invite only kingdoms without an existing alliance", async () => {
+  const alliance = await read("alliance.html");
+  assert.ok(alliance.includes('if(item.type==="player"||item.type==="kingdom")'));
+  assert.ok(alliance.includes('if(item.allianceTag){status("Este reino já pertence à aliança ["+item.allianceTag+"]");return;}'));
+  assert.ok(alliance.includes('$("inviteName").value=item.type==="player"?item.kingdom_name:item.name'));
+  assert.ok(!alliance.includes('location.href="/world.html?search="+encodeURIComponent(item.name);'));
+});
