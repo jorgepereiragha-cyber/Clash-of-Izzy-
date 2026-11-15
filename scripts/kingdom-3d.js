@@ -336,7 +336,24 @@ if (host && "WebGLRenderingContext" in window) {
             disposeDetachedObject3D(gltf.scene);
             return;
           }
-          const template = gltf.scene;
+          const sourceBounds = new THREE.Box3().setFromObject(gltf.scene);
+          const sourceSize = sourceBounds.getSize(new THREE.Vector3());
+          const sourceCenter = sourceBounds.getCenter(new THREE.Vector3());
+          const footprint = Math.max(sourceSize.x, sourceSize.z, 0.001);
+          const height = Math.max(sourceSize.y, 0.001);
+          const targetFootprint = Math.max(0.8, Math.min(2.5, Number(asset.targetFootprint) || 2.05));
+          const targetHeight = Math.max(0.8, Math.min(3.2, Number(asset.targetHeight) || 2.4));
+          const uniformScale = Math.min(targetFootprint / footprint, targetHeight / height);
+          const template = new THREE.Group();
+          const normalizedModel = new THREE.Group();
+          normalizedModel.add(gltf.scene);
+          normalizedModel.scale.setScalar(uniformScale);
+          normalizedModel.position.set(
+            -sourceCenter.x * uniformScale,
+            -sourceBounds.min.y * uniformScale,
+            -sourceCenter.z * uniformScale
+          );
+          template.add(normalizedModel);
           template.traverse(node => {
             if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; }
           });
