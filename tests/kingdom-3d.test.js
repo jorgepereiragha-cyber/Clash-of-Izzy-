@@ -22,7 +22,7 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
 
 test("3D scene is mobile-conscious and does not run an unnecessary animation loop", () => {
   assert.match(renderer, /powerPreference: "low-power"/);
-  assert.match(renderer, /Math\.min\(window\.devicePixelRatio \|\| 1, 1\.25\)/);
+  assert.match(renderer, /Math\.min\(window\.devicePixelRatio \|\| 1, maxDpr\)/);
   assert.match(renderer, /renderer\.shadowMap\.enabled = host\.clientWidth > 680/);
   assert.match(renderer, /ResizeObserver/);
   assert.doesNotMatch(renderer, /requestAnimationFrame/);
