@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#101a2b">
+<meta name="theme-color" content="#101a2b">\n<meta name="apple-mobile-web-app-capable" content="yes">\n<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="description" content="Centro de comando do reino — Clash of Izzy.">
 <link rel="manifest" href="/manifest.json">
 <link rel="icon" href="/icon-192.svg" type="image/svg+xml">
@@ -37,7 +37,7 @@ footer{text-align:center;color:#8fa1b5;font-size:11px;padding:12px}
 <div class="shell">
 <header>
  <div class="brand"><img src="/icon-192.svg" alt="Brasão Clash of Izzy"><div><h1>CLASH OF IZZY</h1><div class="sub">CENTRO DE COMANDO DO REINO</div></div></div>
- <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="./arena.html">⚔ Arena</a><button id="refresh" class="primary" type="button">↻ Atualizar reino</button></div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="installApp" class="primary" type="button" hidden>＋ Instalar jogo</button><a class="btn" href="./arena.html">⚔ Arena</a><button id="refresh" class="primary" type="button">↻ Atualizar reino</button></div>
 </header>
 <div id="connection" role="status" aria-live="polite">Conectando ao reino…</div>
 <section class="resources" id="resources" aria-label="Recursos do reino"></section>
@@ -93,5 +93,5 @@ footer{text-align:center;color:#8fa1b5;font-size:11px;padding:12px}
 <footer>Clash of Izzy · Centro de Comando · O servidor valida todas as ações e recursos.</footer>
 </div>
 <script type="module" src="/command-center.js"></script>
-<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script>
+<script>\nlet deferredInstallPrompt=null;\nconst installButton=document.getElementById("installApp");\nwindow.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;installButton.hidden=false;});\ninstallButton.addEventListener("click",async()=>{if(!deferredInstallPrompt){alert("No Android, abra o menu do navegador e escolha \\\"Adicionar à tela inicial\\\" ou \\\"Instalar app\\\".");return;}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;installButton.hidden=true;});\nwindow.addEventListener("appinstalled",()=>{installButton.hidden=true;});\nif("serviceWorker" in navigator){window.addEventListener("load",async()=>{try{const registration=await navigator.serviceWorker.register("/sw.js");registration.update();let refreshing=false;navigator.serviceWorker.addEventListener("controllerchange",()=>{if(refreshing)return;refreshing=true;window.location.reload();});}catch(error){console.warn("PWA service worker unavailable",error);}});}\n</script>
 </body></html>
