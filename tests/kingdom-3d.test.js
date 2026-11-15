@@ -12,6 +12,8 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(renderer, /new THREE\.WebGLRenderer/);
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
   assert.match(renderer, /coi:kingdom-render/);
+  assert.match(renderer, /slice\(0, 16\)/);
+  assert.match(renderer, /const col = i % 4/);
 });
 
 test("3D scene is mobile-conscious and does not run an unnecessary animation loop", () => {
