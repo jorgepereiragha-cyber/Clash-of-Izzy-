@@ -1,5 +1,6 @@
 import { simulateBattle } from "./game-adapter.js";
 import { getDailyTasks, claimDailyTask } from "./liveops-engine.js";
+import { taskDurationSeconds } from "./task-engine.js";
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
@@ -358,13 +359,6 @@ function eventMaterialStatement(env,kingdomId,eventKey){
  const rewards={battle:"royal_blueprint",gather:"power_crystal",scout:"svip_medal",upgrade:"imperial_seal",research:"imperial_crest",train:"royal_blueprint"};
  const key=rewards[eventKey];if(!key)return null;
  return env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) VALUES(?,?,1) ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,key);
-}
-function taskDurationSeconds(kind, level, quantity=1, unit='militia'){
- const n=Math.max(1,Number(level)||1);
- if(kind==='construction')return Math.min(86400,Math.round(45*Math.pow(n,1.35)));
- if(kind==='research')return Math.min(86400,Math.round(60*Math.pow(n+1,1.3)));
- const factor={militia:1,swordsman:1.4,spearman:1.2,archer:1.3,crossbowman:1.6,cavalry:2.2,knight:3,mage:2.5,catapult:5,ram:4.5,trebuchet:6};
- return Math.min(86400,Math.max(5,Math.round(quantity*2*(factor[unit]||1))));
 }
 async function processDueKingdomTasks(env,limit=100){
  const now=new Date().toISOString();
