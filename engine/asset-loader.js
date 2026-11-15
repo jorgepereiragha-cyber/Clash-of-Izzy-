@@ -3,19 +3,25 @@ import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
+import { disposeGLTFResources } from './resource-disposal.js';
 
 const modelPromises = new Map();
 const mixers = new Set();
+const activeInstances = new Set();
 let gltfLoader = null;
 let dracoLoader = null;
 let ktx2Loader = null;
+let loaderGeneration = 0;
+let disposed = true;
 
-const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/libs/';
+const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/';
 
 export function initAssetLoader(renderer, options = {}) {
   if (!renderer) throw new TypeError('initAssetLoader requer o WebGLRenderer existente.');
-  if (gltfLoader) return gltfLoader;
+  if (gltfLoader && !disposed) return gltfLoader;
 
+  loaderGeneration += 1;
+  disposed = false;
   dracoLoader = new DRACOLoader();
   dracoLoader.setDecoderPath(options.dracoPath || `${THREE_CDN}draco/gltf/`);
 
@@ -31,17 +37,26 @@ export function initAssetLoader(renderer, options = {}) {
 }
 
 export function loadModel(name, url) {
-  if (!gltfLoader) throw new Error('Inicialize o carregador após criar o renderer.');
+  if (!gltfLoader || disposed) throw new Error('Inicialize o carregador após criar o renderer.');
   if (!name || !url) return Promise.reject(new TypeError('loadModel requer name e url.'));
 
   const cacheKey = String(url);
   if (modelPromises.has(cacheKey)) return modelPromises.get(cacheKey);
 
-  const promise = gltfLoader.loadAsync(url).then(gltf => {
-    gltf.scene.name ||= String(name);
+  const loader = gltfLoader;
+  const generation = loaderGeneration;
+  let promise;
+  promise = loader.loadAsync(url).then(gltf => {
+    // A resposta pode chegar depois de uma troca de cena/contexto. Nunca manter
+    // recursos GPU pertencentes a uma geração de loader já encerrada.
+    if (disposed || generation !== loaderGeneration) {
+      disposeGLTFResources(gltf);
+      throw new Error('O carregamento do modelo foi cancelado porque a cena foi encerrada.');
+    }
+    if (gltf.scene) gltf.scene.name ||= String(name);
     return gltf;
   }).catch(error => {
-    modelPromises.delete(cacheKey);
+    if (modelPromises.get(cacheKey) === promise) modelPromises.delete(cacheKey);
     console.warn(`[COI assets] Falha ao carregar modelo "${name}" (${url}).`, error);
     throw error;
   });
@@ -55,7 +70,11 @@ export async function addModel(scene, name, url, options = {}) {
   if (!scene?.isScene && !scene?.isObject3D) {
     throw new TypeError('addModel requer uma THREE.Scene ou Object3D.');
   }
+  const generation = loaderGeneration;
   const gltf = await loadModel(name, url);
+  if (disposed || generation !== loaderGeneration) {
+    throw new Error('A cena foi encerrada antes de o modelo ser anexado.');
+  }
   const root = cloneSkinned(gltf.scene);
   root.name = options.instanceName || String(name);
 
@@ -76,13 +95,13 @@ export async function addModel(scene, name, url, options = {}) {
     }
   }
 
-  let disposed = false;
-  return {
+  let instanceDisposed = false;
+  const instance = {
     root,
     gltf,
     mixer,
     play(animationName) {
-      if (!mixer) return null;
+      if (instanceDisposed || !mixer) return null;
       const clip = gltf.animations.find(item => item.name === animationName);
       if (!clip) return null;
       mixer.stopAllAction();
@@ -91,16 +110,20 @@ export async function addModel(scene, name, url, options = {}) {
       return action;
     },
     dispose() {
-      if (disposed) return;
-      disposed = true;
+      if (instanceDisposed) return;
+      instanceDisposed = true;
       if (mixer) {
         mixer.stopAllAction();
         mixers.delete(mixer);
       }
       root.removeFromParent();
-      // Do not dispose geometry/materials here: they are shared by cached GLTF instances.
+      activeInstances.delete(instance);
+      // Geometry/material/texture are shared with the cached GLTF template.
+      // The global loader disposal owns their final release.
     }
   };
+  activeInstances.add(instance);
+  return instance;
 }
 
 export function updateAssetAnimations(deltaSeconds) {
@@ -108,10 +131,22 @@ export function updateAssetAnimations(deltaSeconds) {
 }
 
 export function disposeAssetLoader() {
+  if (disposed && !gltfLoader && !dracoLoader && !ktx2Loader && !modelPromises.size && !activeInstances.size) return;
+  disposed = true;
+  loaderGeneration += 1;
+
+  for (const instance of [...activeInstances]) instance.dispose();
   for (const mixer of mixers) mixer.stopAllAction();
   mixers.clear();
+
+  // Cached models and in-flight loads share this cleanup path. A pending load
+  // also checks loaderGeneration before it can return a usable GLTF object.
+  for (const promise of modelPromises.values()) {
+    promise.then(disposeGLTFResources).catch(() => {});
+  }
+  modelPromises.clear();
+
   dracoLoader?.dispose();
   ktx2Loader?.dispose();
-  modelPromises.clear();
   gltfLoader = dracoLoader = ktx2Loader = null;
 }
