@@ -163,9 +163,12 @@ chatLanguage.addEventListener('change',()=>{translatedCache.clear();chatLastId=0
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x92a8b4);scene.fog=new THREE.Fog(0x92a8b4,65,125);
 const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,220);
 const mobileProfile=matchMedia('(max-width: 800px)').matches||/Android|iPhone|iPad/i.test(navigator.userAgent);
-let adaptivePixelRatio=Math.min(devicePixelRatio,mobileProfile?1.25:1.5);const minPixelRatio=mobileProfile?.78:.9;let perfElapsed=0,perfFrames=0,perfTime=0;
-const renderer=new THREE.WebGLRenderer({antialias:true,powerPreference:'high-performance'});renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(adaptivePixelRatio);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=true;renderer.shadowMap.type=THREE.PCFSoftShadowMap;document.body.appendChild(renderer.domElement);
-scene.add(new THREE.HemisphereLight(0xdcecff,0x33452e,1.8));const sun=new THREE.DirectionalLight(0xffe4b2,2.6);sun.position.set(-25,45,25);sun.castShadow=true;sun.shadow.mapSize.set(mobileProfile?512:1024,mobileProfile?512:1024);sun.shadow.camera.left=-60;sun.shadow.camera.right=60;sun.shadow.camera.top=50;sun.shadow.camera.bottom=-50;sun.shadow.bias=-0.00025;scene.add(sun);
+const lowPowerProfile=mobileProfile&&((navigator.hardwareConcurrency||8)<=4||(navigator.deviceMemory||4)<=4);
+const maxPixelRatio=mobileProfile?(lowPowerProfile?1:1.2):1.5;
+let adaptivePixelRatio=Math.min(window.devicePixelRatio||1,maxPixelRatio);const minPixelRatio=lowPowerProfile?.65:mobileProfile?.78:.9;let perfElapsed=0,perfFrames=0;
+const renderer=new THREE.WebGLRenderer({antialias:!mobileProfile,powerPreference:mobileProfile?'low-power':'high-performance',stencil:false,preserveDrawingBuffer:false});renderer.setPixelRatio(adaptivePixelRatio);renderer.setSize(innerWidth,innerHeight,false);renderer.outputColorSpace=THREE.SRGBColorSpace;renderer.toneMapping=THREE.ACESFilmicToneMapping;renderer.toneMappingExposure=1.08;renderer.shadowMap.enabled=!lowPowerProfile;renderer.shadowMap.type=THREE.PCFShadowMap;document.body.appendChild(renderer.domElement);
+scene.add(new THREE.HemisphereLight(0xdcecff,0x33452e,1.8));const sun=new THREE.DirectionalLight(0xffe4b2,2.6);sun.position.set(-25,45,25);sun.castShadow=!lowPowerProfile;sun.shadow.mapSize.set(mobileProfile?512:1024,mobileProfile?512:1024);sun.shadow.camera.left=-60;sun.shadow.camera.right=60;sun.shadow.camera.top=50;sun.shadow.camera.bottom=-50;sun.shadow.bias=-0.00025;scene.add(sun);
+const contextNotice=document.createElement('div');contextNotice.textContent='Reconectando os gráficos…';contextNotice.style.cssText='display:none;position:fixed;inset:0;z-index:30;align-items:center;justify-content:center;background:#101a2b;color:#f5edda;font: bold 16px Arial';renderer.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();contextNotice.style.display='flex'});renderer.domElement.addEventListener('webglcontextrestored',()=>{contextNotice.style.display='none';renderer.setPixelRatio(adaptivePixelRatio);renderer.setSize(innerWidth,innerHeight,false)});document.body.appendChild(contextNotice);
 const mat=(c)=>new THREE.MeshStandardMaterial({color:c,roughness:.86});
 function makeTexture(kind){
  const canvas=document.createElement('canvas');canvas.width=canvas.height=256;const ctx=canvas.getContext('2d');
@@ -189,7 +192,7 @@ const woodTexture=makeTexture('wood');woodTexture.repeat.set(2,1);
 const waterCanvas=document.createElement('canvas');waterCanvas.width=256;waterCanvas.height=64;
 const waterCtx=waterCanvas.getContext('2d');waterCtx.fillStyle='#286f83';waterCtx.fillRect(0,0,256,64);
 for(let i=0;i<90;i++){waterCtx.strokeStyle=i%3===0?'rgba(190,235,230,.38)':'rgba(105,190,200,.22)';waterCtx.lineWidth=1+Math.random()*2;waterCtx.beginPath();const x=Math.random()*256,y=Math.random()*64;waterCtx.moveTo(x,y);waterCtx.quadraticCurveTo(x+12,y-5,x+28,y+Math.random()*8-4);waterCtx.stroke()}
-const waterTexture=new THREE.CanvasTexture(waterCanvas);waterTexture.colorSpace=THREE.SRGBColorSpace;waterTexture.wrapS=waterTexture.wrapT=THREE.RepeatWrapping;waterTexture.repeat.set(5,1);waterTexture.anisotropy=Math.min(4,renderer.capabilities.getMaxAnisotropy());
+const waterTexture=new THREE.CanvasTexture(waterCanvas);waterTexture.colorSpace=THREE.SRGBColorSpace;waterTexture.wrapS=waterTexture.wrapT=THREE.RepeatWrapping;waterTexture.repeat.set(5,1);waterTexture.anisotropy=Math.min(mobileProfile?2:4,renderer.capabilities.getMaxAnisotropy());
 const waterMaterial=new THREE.MeshStandardMaterial({map:waterTexture,color:0xb1e0e4,roughness:.28,metalness:.08});
 const waterPositions=[],waterIndices=[];
 for(const side of [-1,1]){const start=waterPositions.length/3;for(let i=0;i<=28;i++){const x=-54+i*(108/28),center=side*(34+Math.sin(x*.085)*1.15);waterPositions.push(x,-.025,center-.85,x,-.025,center+.85);if(i<28){const a=start+i*2;waterIndices.push(a,a+1,a+2,a+1,a+3,a+2)}}}
@@ -423,14 +426,14 @@ player.mana=Math.min(player.maxMana,player.mana+7*dt);player.hp=Math.min(player.
 function adaptRenderResolution(dt){
  perfElapsed+=dt;perfFrames++;if(perfElapsed<2)return;
  const averageFrame=perfElapsed/Math.max(1,perfFrames);
- if(averageFrame>.023&&adaptivePixelRatio>minPixelRatio){adaptivePixelRatio=Math.max(minPixelRatio,adaptivePixelRatio-.1)}
- else if(averageFrame<.0155&&adaptivePixelRatio<Math.min(devicePixelRatio,mobileProfile?1.25:1.5)){adaptivePixelRatio=Math.min(Math.min(devicePixelRatio,mobileProfile?1.25:1.5),adaptivePixelRatio+.05)}
+ if(averageFrame>.025&&adaptivePixelRatio>minPixelRatio){adaptivePixelRatio=Math.max(minPixelRatio,adaptivePixelRatio-.08)}
+ else if(averageFrame<.0167&&adaptivePixelRatio<Math.min(window.devicePixelRatio||1,maxPixelRatio)){adaptivePixelRatio=Math.min(Math.min(window.devicePixelRatio||1,maxPixelRatio),adaptivePixelRatio+.04)}
  if(Math.abs(renderer.getPixelRatio()-adaptivePixelRatio)>.01){renderer.setPixelRatio(adaptivePixelRatio);renderer.setSize(innerWidth,innerHeight,false)}
- if(window.mapDebugPanel){window.mapDebugPanel.textContent='FPS médio: '+Math.round(1/averageFrame)+' · Draw calls: '+renderer.info.render.calls+' · Triângulos: '+renderer.info.render.triangles.toLocaleString('pt-BR')+' · Resolução: '+adaptivePixelRatio.toFixed(2)+'x'}
+ if(window.mapDebugPanel){window.mapDebugPanel.textContent='FPS médio: '+Math.round(1/averageFrame)+' · Draw calls: '+renderer.info.render.calls+' · Triângulos: '+renderer.info.render.triangles.toLocaleString('pt-BR')+' · Resolução: '+adaptivePixelRatio.toFixed(2)+'x · Sombras: '+(renderer.shadowMap.enabled?'ON':'economia')}
  perfElapsed=0;perfFrames=0;
 }
 if(new URLSearchParams(location.search).get('debug')==='1'){const panel=document.createElement('div');panel.style.cssText='position:fixed;left:8px;top:8px;z-index:20;padding:6px 9px;background:#07111ddd;color:#bdf4c5;border:1px solid #6b9870;border-radius:6px;font:11px monospace;pointer-events:none';panel.textContent='Medição gráfica iniciando…';document.body.append(panel);window.mapDebugPanel=panel}
-let last=performance.now();function loop(now){requestAnimationFrame(loop);const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);updateMapChunks(dt);renderer.render(scene,camera);adaptRenderResolution(dt)}requestAnimationFrame(loop);
-window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+let last=performance.now();function loop(now){requestAnimationFrame(loop);if(document.hidden){last=now;return}const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);updateMapChunks(dt);renderer.render(scene,camera);adaptRenderResolution(dt)}requestAnimationFrame(loop);
+window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false)});
 updateHud();
 </script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script></body></html>
