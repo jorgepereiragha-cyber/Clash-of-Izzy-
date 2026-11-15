@@ -1,5 +1,5 @@
-const CACHE_NAME="clash-of-izzy-shell-v3";
-const CORE_ASSETS=["/","/index.html","/arena.html","/kingdom.html","/world.html","/world-map.js","/scripts/kingdom-3d.js","/scripts/kingdom-quality.js","/assets/3d/manifest.json","/styles/coi-theme.css","/manifest.json","/icon-192.svg","/icon-512.svg","/offline.html"];
+const CACHE_NAME="clash-of-izzy-shell-v4";
+const CORE_ASSETS=["/","/index.html","/arena.html","/kingdom.html","/world.html","/world-map.js","/scripts/kingdom-3d.js","/scripts/kingdom-quality.js","/assets/3d/manifest.json","/engine/asset-loader.js","/engine/resource-disposal.js","/engine/texture-manager.js","/styles/coi-theme.css","/manifest.json","/icon-192.svg","/icon-512.svg","/offline.html"];
 self.addEventListener("install",event=>{
  event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(CORE_ASSETS)).then(()=>self.skipWaiting()));
 });
