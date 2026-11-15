@@ -18,7 +18,7 @@ test("equipamentos usam estado persistente e validação no servidor", async () 
   assert.match(worker, /type==="equipment_equip"/);
   assert.match(worker, /type==="equipment_unequip"/);
   assert.match(worker, /JOIN hero_equipment he ON he.item_key=ke.item_key/);
-  assert.match(worker, /heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses,cosmetics/);
+  assert.match(worker, /heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics/);
   assert.match(coreMigration, /CREATE TABLE IF NOT EXISTS hero_equipment/);
   assert.match(coreMigration, /UNIQUE \(hero_id, slot\)/);
   assert.match(page, /id="hero-select"/);
@@ -27,7 +27,7 @@ test("equipamentos usam estado persistente e validação no servidor", async () 
   const serviceWorker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   assert.ok(serviceWorker.includes('"/equipment-ui.html"'));
   assert.ok(serviceWorker.includes('"/equipment-system.js"'));
-  assert.match(worker, /equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses,cosmetics,player/);
+  assert.match(worker, /equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player/);
   assert.match(worker, /function equipmentBonuses/);
   assert.match(worker, /equipmentProductionBonus/);
   assert.match(worker, /equipmentAttackBonusPercent:gear\.attackPercent/);
