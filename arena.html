@@ -64,7 +64,7 @@
  <div id="territoryList"><div class="territoryCard">Carregando territórios…</div></div>
 </section>
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
-<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Selecione um item para consultar e comprar pelo WhatsApp. Skins de R$ 50 a R$ 1.000.</p><div id="catalog">Carregando catálogo oficial…</div><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
+<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Toque em um item para enviar o pedido ao painel Master. A liberação ocorre após a conferência do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js';
 const API_BASE='/api';
@@ -535,20 +535,37 @@ async function refreshKingdomStore(){
  try{const data=await chatApi('/game/state');kingdomSession=data.state;renderKingdomStore()}
  catch(error){renderKingdomStore();const status=document.getElementById('storeStatus');if(status)status.textContent=error.message}
 }
+async function requestOfficialPurchase(item,kind,button){
+ const notice=document.getElementById('purchaseNotice');
+ const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
+ if(!token){notice.textContent='Conecte seu reino antes de solicitar uma compra.';return}
+ button.disabled=true;notice.textContent='Enviando pedido ao painel Master…';
+ try{
+  const response=await fetch(API_BASE+'/store/purchase-request',{
+   method:'POST',
+   headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+   body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID()})
+  });
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(data.error||'Não foi possível enviar o pedido.');
+  notice.textContent='Pedido #'+data.request.id+' enviado ao painel Master. Aguarde a confirmação do pagamento e a liberação.';
+  button.textContent='Pedido enviado · #'+data.request.id;
+ }catch(error){notice.textContent=error.message;button.disabled=false}
+}
 async function loadCatalog(){
  const box=document.getElementById('catalog');
  try{
   const res=await fetch('/api/store/catalog');if(!res.ok)throw new Error('Catálogo indisponível');
-  const data=await res.json();box.innerHTML='';
-  const entries=[...(data.packages||[]).map(x=>({...x,kind:'Pacote VIP'})),...(data.skins||[]).map(x=>({...x,kind:'Skin'}))];
+  const data=await res.json();box.replaceChildren();
+  const entries=[...(data.packages||[]).map(x=>({...x,kind:'Pacote VIP',productKind:'vip_package'})),...(data.skins||[]).map(x=>({...x,kind:'Skin',productKind:'skin'}))];
   if(!entries.length){box.textContent='Nenhum item cadastrado no catálogo neste momento.';return}
   for(const item of entries){
    const b=document.createElement('button');const label=document.createElement('span');const price=document.createElement('b');
    label.textContent=item.kind+' · '+item.name;price.textContent='R$ '+Number(item.price_brl).toFixed(2).replace('.',',');
-   b.append(label,price);b.onclick=()=>window.open('https://wa.me/5547996531437?text='+encodeURIComponent('Olá! Quero comprar/consultar '+item.kind+': '+item.name+' — R$ '+Number(item.price_brl).toFixed(2).replace('.',',')+'. Meu jogo é Clash of Izzy: Arena.'),'_blank');
+   b.append(label,price);b.addEventListener('click',()=>requestOfficialPurchase(item,item.productKind,b));
    box.appendChild(b);
   }
- }catch(e){box.textContent='Não foi possível carregar o catálogo agora. Fale conosco pelo WhatsApp.'}
+ }catch(e){box.textContent='Não foi possível carregar o catálogo agora. Tente novamente mais tarde.'}
 }
 loadCatalog();
 function update(dt,time){for(const k of ['q','w','e','r'])skillCooldowns[k]=Math.max(0,skillCooldowns[k]-dt);waterTexture.offset.x=(waterTexture.offset.x+dt*.035)%1;
