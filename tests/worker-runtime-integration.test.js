@@ -187,10 +187,42 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(state.heroInventory?.length >= 1, "herói inicial sincronizado");
       expectStatus(await api("/api/game/players/search?q=Beta", { token: tokenA }), 200, "busca de jogadores");
       expectStatus(await api("/api/game/search?q=Eldoria&kind=all", { token: tokenA }), 200, "busca global do jogo");
-      expectStatus(await api("/api/game/event", { token: tokenA }), 200, "estado do Anjo da Morte");
+      const eventState = expectStatus(await api("/api/game/event", { token: tokenA }), 200, "estado do Anjo da Morte");
+      assert.ok(eventState.event?.id, "o calendário cria um evento persistente para o ciclo atual ou seguinte");
       expectStatus(await api("/api/game/event/attack", {
         method: "POST", token: tokenA, body: { requestId: "nao-e-uuid" },
       }), 400, "ataque do evento com identificador inválido");
+
+      const eventRequestId = "11111111-1111-4111-8111-111111111111";
+      const initialMilitia = state.troops.find(unit => unit.unit_type === "militia" && Number(unit.tier) === 1);
+      assert.ok(initialMilitia && Number(initialMilitia.quantity) >= 1, "reino inicial possui milícia para o evento");
+      if (eventState.event.status === "active" && Number(eventState.event.boss_hp_remaining) > 0) {
+        const attack = expectStatus(await api("/api/game/event/attack", {
+          method: "POST", token: tokenA,
+          body: { requestId: eventRequestId, units: { militia_1: 1 } },
+        }), 200, "ataque válido ao Anjo da Morte");
+        assert.equal(attack.success, true);
+        assert.ok(Number(attack.damage) > 0, "ataque registra dano positivo");
+        assert.ok(Number(attack.troopsLost) >= 0 && Number(attack.troopsLost) <= 1);
+
+        const retry = expectStatus(await api("/api/game/event/attack", {
+          method: "POST", token: tokenA,
+          body: { requestId: eventRequestId, units: { militia_1: 1 } },
+        }), 200, "repetição idempotente do ataque");
+        assert.equal(retry.duplicate, true);
+        assert.equal(retry.damage, attack.damage);
+        assert.equal(retry.troopsLost, attack.troopsLost);
+
+        const afterAttack = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado após ataque do evento");
+        const remainingMilitia = afterAttack.state.troops.find(unit => unit.unit_type === "militia" && Number(unit.tier) === 1);
+        assert.equal(Number(initialMilitia.quantity) - Number(remainingMilitia.quantity), Number(attack.troopsLost),
+          "repetir o mesmo requestId não aplica baixas permanentes duas vezes");
+      } else {
+        expectStatus(await api("/api/game/event/attack", {
+          method: "POST", token: tokenA,
+          body: { requestId: eventRequestId, units: { militia_1: 1 } },
+        }), 409, "ataque ao Anjo da Morte fora da janela ativa");
+      }
       expectStatus(await api("/api/store/purchase-request", {
         method: "POST", token: tokenA,
         body: { kind: "invalid", itemId: 1, requestKey: "invalid-request-key-01" },
