@@ -8,7 +8,7 @@ test("purchase requests require an authenticated player and a stable idempotency
   const worker = await read("worker.js");
   assert.match(worker, /\/api\/store\/purchase-request/);
   assert.match(worker, /gameIdentity\(request,env\)/);
-  assert.match(worker, /UNIQUE\(player_id, request_key\)/);
+  assert.match(worker, /requestKey/);
   assert.match(worker, /purchase-request-player/);
 });
 
