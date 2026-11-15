@@ -133,7 +133,7 @@ As alterações foram gravadas na branch principal. O workflow configurado execu
 - Os bônus são calculados com precisão decimal e somente para o herói equipado/ativo. Crítico tem chance limitada a 15% no domínio do jogo; marcha tem bônus limitado a 25% no servidor.
 - O simulador usa semente crítica persistida nos relatórios; os testes cobrem repetibilidade, chance zero, chance garantida e limites de duração da marcha.
 - Foi encontrada duplicidade de modelo entre `hero_inventory` (convocações/estrelas/fragmentos) e `heroes` (equipamentos/treino). Criado sincronizador por `hero_key`, mapeando raridades e preservando o maior nível/experiência existentes. Treinamento passa a atualizar as duas representações de forma condicionada e atômica.
-- Pendência para próxima auditoria: transformar a invocação de heróis em um lote D1 único, pois o fluxo de sorteio ainda realiza gravações sequenciais após o débito de gemas.
+- Invocação de heróis corrigida: sorteios são preparados antes da gravação e gemas, fragmentos, inventário, roster de equipamentos e histórico são persistidos em um único lote D1 protegido por guard. Falha de gravação não deixa gemas debitadas sem os resultados. O sincronizador também evita UPDATEs quando os valores já estão alinhados.
 
 
 ## Busca global FTS5 (15 nov 2026)
