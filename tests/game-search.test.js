@@ -9,7 +9,7 @@ test("game search requires a valid player session and rate limits player and net
   assert.ok(worker.includes('url.pathname==="/api/game/search"&&request.method==="GET"'));
   assert.ok(worker.includes('rateLimitDecision(env,"game-search-player",playerId,30,60)'));
   assert.ok(worker.includes('rateLimitDecision(env,"game-search-network"'));
-  assert.ok(worker.includes('queryLength<2'));
+  assert.ok(worker.includes('queryLength<(containsCjk?1:2)'));
   assert.ok(worker.includes('queryLength>48'));
 });
 
@@ -99,7 +99,7 @@ test("search merges ranked matches and never exposes internal identifiers", asyn
 test("short CJK queries use bounded LIKE fallback even when FTS prefix already returned a result", async () => {
   const worker = await read("worker.js");
   assert.ok(worker.includes("const queryLength=Array.from(rawQuery).length"));
-  assert.ok(worker.includes("if(queryLength<2)"));
+  assert.ok(worker.includes("queryLength<(containsCjk?1:2)"));
   assert.ok(worker.includes("if(queryLength>48)"));
   assert.ok(worker.includes("if(queryLength>=3)"));
   assert.ok(!worker.includes("rawQuery.length>=3"));
@@ -109,6 +109,7 @@ test("short CJK queries use bounded LIKE fallback even when FTS prefix already r
   assert.ok(worker.includes("Script=Han"));
   assert.ok(worker.includes("Script=Hiragana"));
   assert.ok(worker.includes("Script=Katakana"));
+  assert.ok(worker.includes("Script=Hangul"));
   assert.ok(worker.includes("!entitySubstringAvailable||needsShortUnicodeFallback"));
   assert.ok(worker.includes("!playerSubstringAvailable||needsShortUnicodeFallback"));
   assert.ok(worker.includes("if((kind===\"all\"||kind===\"kingdoms\")"));
