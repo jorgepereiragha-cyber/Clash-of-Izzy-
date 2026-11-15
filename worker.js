@@ -1,4 +1,5 @@
-import { simulateBattle } from "./game-adapter.js";
+import { simulateBattle, calculateMarchDuration } from "./game-adapter.js";
+import { EQUIPMENT_CATALOG as FORGE_EQUIPMENT_CATALOG, EQUIPMENT_RESEARCH, equipmentBonuses as forgeEquipmentBonuses } from "./equipment-engine.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
@@ -408,6 +409,33 @@ function equipmentView(row){
  const next={};for(const [key,value] of Object.entries(def.base))next[key]=value+(def.growth[key]||0)*level;
  const multiplier=({comum:1,raro:1.1,epico:1.2,lendario:1.5})[def.rarity]||1;
  return {id:row.item_key,name:def.name,slot:def.slot,rarity:def.rarity,level,maxLevel:def.maxLevel,isLocked:Boolean(row.is_locked),stats,nextLevelStats:level<def.maxLevel?next:null,upgradeCost:Math.floor(100*Math.pow(1.3,level)*multiplier)};
+}
+
+async function ensureForgeEquipmentState(env,kingdomId){
+ await env.DB.batch([
+  env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level) VALUES(?,?,1)").bind(kingdomId,"iron_sword"),
+  ...EQUIPMENT_RESEARCH.map(x=>env.DB.prepare("INSERT OR IGNORE INTO research(kingdom_id,research_key,level) VALUES(?,?,0)").bind(kingdomId,x.id))
+ ]);
+}
+async function getForgeEquipmentState(env,kingdomId){
+ await ensureForgeEquipmentState(env,kingdomId);
+ const [owned,equipped,research]=await Promise.all([
+  env.DB.prepare("SELECT item_key,level,acquired_at FROM kingdom_equipment WHERE kingdom_id=? ORDER BY acquired_at,item_key").bind(kingdomId).all(),
+  env.DB.prepare("SELECT slot,item_key,equipped_at FROM equipped_kingdom_equipment WHERE kingdom_id=? ORDER BY slot").bind(kingdomId).all(),
+  env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key LIKE 'gear_%' ORDER BY research_key").bind(kingdomId).all()
+ ]);
+ const ownedRows=owned.results||[],equippedRows=equipped.results||[],researchRows=research.results||[];
+ return {owned:ownedRows,equipped:equippedRows,research:researchRows,bonuses:forgeEquipmentBonuses(ownedRows,equippedRows,researchRows),catalog:FORGE_EQUIPMENT_CATALOG,researchCatalog:EQUIPMENT_RESEARCH};
+}
+function mergeForgeBonuses(heroGear,forge){
+ return {
+  attackPercent:Math.min(30,(heroGear.attackPercent||0)+(forge.attackPercent||0)),
+  defensePercent:Math.min(30,(heroGear.defensePercent||0)+(forge.defensePercent||0)),
+  healthPercent:Math.min(25,(heroGear.healthPercent||0)+(forge.healthPercent||0)),
+  marchSpeedPercent:Math.min(20,forge.marchSpeedPercent||0),
+  criticalChancePercent:Math.min(15,forge.criticalChancePercent||0),
+  resourcePercent:Math.min(50,heroGear.resourcePercent||0)
+ };
 }
 
 async function gameState(env,playerId){
