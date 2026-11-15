@@ -20,6 +20,7 @@ function runCli(args, timeoutMs = 120_000) {
       cwd: root,
       env: { ...process.env, CI: "1", WRANGLER_SEND_METRICS: "false", NO_COLOR: "1" },
       stdio: ["ignore", "pipe", "pipe"],
+      detached: process.platform !== "win32",
     });
     let output = "";
     const append = chunk => {
@@ -28,7 +29,9 @@ function runCli(args, timeoutMs = 120_000) {
     child.stdout.on("data", append);
     child.stderr.on("data", append);
     const timer = setTimeout(() => {
-      child.kill("SIGKILL");
+      if (process.platform !== "win32" && child.pid) {
+        try { process.kill(-child.pid, "SIGKILL"); } catch { child.kill("SIGKILL"); }
+      } else child.kill("SIGKILL");
       reject(new Error("Wrangler ultrapassou o tempo limite.\n" + output));
     }, timeoutMs);
     child.once("error", error => {
@@ -160,29 +163,20 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       }
       if (child.exitCode === null) child.kill(signal);
     };
-    const waitForWorkerGroupExit = async timeoutMs => {
-      const child = workerProcess;
-      if (!child) return true;
-      const deadline = Date.now() + timeoutMs;
-      while (Date.now() < deadline) {
-        let groupAlive = false;
-        if (process.platform !== "win32" && child.pid) {
-          try { process.kill(-child.pid, 0); groupAlive = true; }
-          catch (error) { if (error?.code !== "ESRCH") groupAlive = true; }
-        } else {
-          groupAlive = child.exitCode === null && child.signalCode === null;
-        }
-        if (!groupAlive) return true;
-        await delay(100);
-      }
-      return false;
+    const waitForWorkerClose = async (child, timeoutMs) => {
+      if (child.exitCode !== null || child.signalCode !== null) return true;
+      return Promise.race([
+        new Promise(resolve => child.once("close", () => resolve(true))),
+        delay(timeoutMs).then(() => false),
+      ]);
     };
     const stopWorker = async () => {
-      if (!workerProcess) return;
+      const child = workerProcess;
+      if (!child) return;
       signalWorkerGroup("SIGTERM");
-      if (!await waitForWorkerGroupExit(5000)) {
+      if (!await waitForWorkerClose(child, 5000)) {
         signalWorkerGroup("SIGKILL");
-        await waitForWorkerGroupExit(5000);
+        await waitForWorkerClose(child, 3000);
       }
       workerProcess = null;
     };
