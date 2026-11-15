@@ -29,7 +29,7 @@ test("game state exposes Forge separately from legacy and hero equipment", () =>
 });
 
 test("Forge actions are namespaced and server validated", () => {
-  for (const action of ["forge_equipment_craft", "forge_equipment_upgrade", "forge_equipment_equip", "forge_equipment_research"]) {
+  for (const action of ["forge_equipment_craft", "forge_equipment_upgrade", "forge_equipment_equip", "forge_equipment_unequip", "forge_equipment_research"]) {
     assert.ok(worker.includes('type==="' + action + '"'), "missing server action: " + action);
     assert.ok(forgeScript.includes('type:"' + action + '"'), "UI does not call action: " + action);
   }
