@@ -87,6 +87,13 @@ export async function runProductionSmokeTests({
     assert(body.length > 100, page + " está vazio ou incompleto.");
   }
 
+  const arenaResponse = await get("/arena.html");
+  assert(arenaResponse.status === 200, "Página da arena respondeu HTTP " + arenaResponse.status + ".");
+  const arena = await arenaResponse.text();
+  assert(arena.includes('value="mercadopago_link"'), "A opção Mercado Pago não está ativa na loja publicada.");
+  assert(arena.includes("https://link.mercadopago.com.br/pagamentosskin"), "O link Mercado Pago não está presente na loja publicada.");
+  assert(arena.includes("paymentWindow"), "O fluxo de abertura do checkout Mercado Pago não está disponível.");
+
   const manifestResponse = await get("/manifest.json");
   assert(manifestResponse.status === 200, "Manifest da PWA indisponível.");
   const manifest = await readJson(manifestResponse, "Manifest da PWA");
@@ -106,6 +113,7 @@ export async function runProductionSmokeTests({
       adminConfiguration: true,
       unauthenticatedAccessBlocked: true,
       storeCatalog: true,
+      mercadoPagoCheckout: true,
       staticPages: REQUIRED_PAGES.length,
       pwaManifest: true,
       serviceWorker: true,
