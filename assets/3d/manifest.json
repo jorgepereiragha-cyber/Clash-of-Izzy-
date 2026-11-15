@@ -1,4 +1,82 @@
 {
-  "version": 1,
-  "models": []
+  "version": 2,
+  "models": [
+    {
+      "id": "kenney-castle-watchtower",
+      "type": "watchtower",
+      "src": "/assets/3d/kenney/castle-kit/Models/GLB format/tower-square.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 2.35,
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "kenney-castle-wall",
+      "type": "wall",
+      "src": "/assets/3d/kenney/castle-kit/Models/GLB format/wall.glb",
+      "enabled": true,
+      "targetFootprint": 1.75,
+      "targetHeight": 1.8,
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0"
+    }
+  ],
+  "props": [
+    {
+      "id": "kenney-siege-trebuchet",
+      "src": "/assets/3d/kenney/castle-kit/Models/GLB format/siege-trebuchet.glb",
+      "enabled": true,
+      "positions": [
+        [
+          5.1,
+          0,
+          2.5
+        ]
+      ],
+      "targetFootprint": 1.9,
+      "targetHeight": 2.15,
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "kenney-tree-high",
+      "src": "/assets/3d/kenney/mini-forest/Models/GLB format/tree-high.glb",
+      "enabled": true,
+      "positions": [
+        [
+          -6,
+          0,
+          -4.5
+        ],
+        [
+          6,
+          0,
+          -4.5
+        ]
+      ],
+      "targetFootprint": 1.25,
+      "targetHeight": 2.6,
+      "source": "Kenney Mini Forest",
+      "sourceUrl": "https://kenney.nl/assets/mini-forest",
+      "license": "CC0-1.0"
+    }
+  ],
+  "units": [
+    {
+      "id": "kenney-archer",
+      "unit_type": "archer",
+      "src": "/assets/3d/kenney/mini-forest/Models/GLB format/character-archer.glb",
+      "enabled": true,
+      "targetFootprint": 0.9,
+      "targetHeight": 1.65,
+      "animation": "idle",
+      "source": "Kenney Mini Forest",
+      "sourceUrl": "https://kenney.nl/assets/mini-forest",
+      "license": "CC0-1.0"
+    }
+  ]
 }
