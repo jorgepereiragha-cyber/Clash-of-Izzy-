@@ -130,3 +130,9 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - A busca em português expande formas comuns de singular/plural, remove diferenças de acentuação e mantém SQL parametrizado.
 - Reinos que já pertencem a alianças continuam pesquisáveis e exibem sua sigla pública; convites inválidos são bloqueados na interface.
 - O fallback é acionado por categoria quando um índice FTS falha, evitando que um índice parcialmente indisponível esconda resultados de outras categorias.
+
+
+## Tecnologias gratuitas e pipeline de assets
+- Ferramentas open-source recomendadas, licenças, fluxo Blender → GLB → otimização → validação e política de proveniência estão em `docs/FREE_TECH_STACK.md`.
+- `npm run assets:validate` valida o manifesto de modelos 3D, caminhos locais, cabeçalhos GLB 2.0, duplicatas e orçamentos de tamanho antes de integrar novos modelos.
+- O pipeline não adiciona outra engine nem dependências pagas ao runtime. O catálogo continua vazio até os assets originais serem criados, licenciados, validados e testados em Android físico.
