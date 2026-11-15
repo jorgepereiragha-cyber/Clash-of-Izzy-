@@ -2,7 +2,10 @@ import * as THREE from 'three';
 
 const textureCache = new Map();
 const textureLoader = new THREE.TextureLoader();
+const disposedTextures = new WeakSet();
+const disposedBitmaps = new WeakSet();
 let supportedAnisotropy = 1;
+let textureGeneration = 0;
 
 const DEFAULTS = Object.freeze({
   colorSpace: THREE.SRGBColorSpace,
@@ -10,6 +13,17 @@ const DEFAULTS = Object.freeze({
   minFilter: THREE.LinearMipmapLinearFilter,
   generateMipmaps: true
 });
+
+function disposeTexture(texture) {
+  if (!texture || disposedTextures.has(texture)) return;
+  disposedTextures.add(texture);
+  texture.dispose();
+  const image = texture.source?.data || texture.image;
+  if (image && typeof image.close === 'function' && !disposedBitmaps.has(image)) {
+    disposedBitmaps.add(image);
+    image.close();
+  }
+}
 
 export function initTextureManager(renderer) {
   supportedAnisotropy = renderer?.capabilities?.getMaxAnisotropy?.() || 1;
@@ -31,8 +45,14 @@ export async function loadTexture(name, url, options = {}) {
     return existing.promise;
   }
 
+  const generation = textureGeneration;
   const entry = { url, texture: null, promise: null };
   entry.promise = textureLoader.loadAsync(url).then(texture => {
+    // Do not resurrect GPU resources after a scene has been disposed.
+    if (generation !== textureGeneration) {
+      disposeTexture(texture);
+      throw new Error('O carregamento da textura foi cancelado porque a cena foi encerrada.');
+    }
     texture.colorSpace = options.colorSpace || DEFAULTS.colorSpace;
     texture.magFilter = options.magFilter || DEFAULTS.magFilter;
     texture.minFilter = options.minFilter || DEFAULTS.minFilter;
@@ -66,6 +86,10 @@ export function getTexture(name) {
 }
 
 export function disposeTextures() {
-  for (const entry of textureCache.values()) entry.texture?.dispose();
+  textureGeneration += 1;
+  for (const entry of textureCache.values()) {
+    if (entry.texture) disposeTexture(entry.texture);
+    // Pending requests observe the generation change and dispose on arrival.
+  }
   textureCache.clear();
 }
