@@ -178,7 +178,26 @@ async function verify(token,secret){
     return payload.exp>Math.floor(Date.now()/1000)?payload:false;
   }catch{return false}
 }
-async function readBody(request){try{return await request.json()}catch{return {}}}
+async function readBody(request,maxBytes=32768){
+ const declaredLength=Number(request.headers.get("content-length")||0);
+ if(declaredLength>maxBytes)return {__bodyError:"payload_too_large"};
+ if(!request.body)return {};
+ const reader=request.body.getReader(),chunks=[];
+ let total=0;
+ try{
+  while(true){
+   const part=await reader.read();if(part.done)break;
+   total+=part.value.byteLength;
+   if(total>maxBytes){await reader.cancel();return {__bodyError:"payload_too_large"}}
+   chunks.push(part.value);
+  }
+  const bytes=new Uint8Array(total);let offset=0;
+  for(const chunk of chunks){bytes.set(chunk,offset);offset+=chunk.byteLength}
+  const parsed=JSON.parse(new TextDecoder().decode(bytes));
+  if(!parsed||typeof parsed!=="object"||Array.isArray(parsed))return {__bodyError:"invalid_json"};
+  return parsed;
+ }catch{return {__bodyError:"invalid_json"}}
+}
 async function gameIdentity(request,env){
   const header=request.headers.get("Authorization")||"";
   const token=header.startsWith("Bearer ")?header.slice(7):"";
@@ -788,7 +807,7 @@ export default {
       await ensureKingdom(env,playerId);
       const token=await sign({sub:playerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365},env.SESSION_SECRET);
       return json({token,state:await gameState(env,playerId)},201);
-    }catch(e){return json({error:"Não foi possível fundar o reino. Aplique as migrações D1 0001, 0002 e 0003.",detail:String(e?.message||e)},503)}
+    }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
   const isGamePath=url.pathname.startsWith("/api/game/");
   if(isGamePath){
@@ -798,12 +817,12 @@ export default {
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);
       }
-      if(url.pathname==="/api/game/action"&&request.method==="POST")return await gameAction(env,playerId,await readBody(request));
+      if(url.pathname==="/api/game/action"&&request.method==="POST"){const body=await readBody(request);if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);return await gameAction(env,playerId,body);}
       return json({error:"Rota de jogo não encontrada."},404);
-    }catch(e){return json({error:"Falha ao processar o jogo. Verifique se todas as migrações D1 foram aplicadas.",detail:String(e?.message||e)},500)}
+    }catch(e){console.error("game_request_failed",String(e?.message||e));return json({error:"Falha ao processar o jogo. Tente novamente."},500)}
   }
   if(request.method!=="POST")return json({error:"Método não permitido."},405);
-  const body=await readBody(request);
+  const body=await readBody(request);if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);
   if(url.pathname==="/api/admin/login"){
     if(!env.ADMIN_EMAIL||!env.ADMIN_PASSWORD||!env.SESSION_SECRET)return json({error:"Configure ADMIN_EMAIL, ADMIN_PASSWORD e SESSION_SECRET nos segredos do Worker."},503);
     if(String(body.email||"").trim().toLowerCase()!==String(env.ADMIN_EMAIL).trim().toLowerCase()||body.password!==env.ADMIN_PASSWORD)return json({error:"E-mail ou senha incorretos."},401);
