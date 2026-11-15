@@ -40,10 +40,13 @@ test("alvos dos edifícios seguem a projeção isométrica real, inclusive após
   assert.match(renderer, /const col = i % 3, row = Math\.floor\(i \/ 3\)/);
   assert.match(renderer, /Math\.min\(9, qualityProfile\?\.maxBuildings \|\| 9\)/);
   assert.match(renderer, /function publishBuildingHitTargets\(buildings = latestBuildings\)/);
-  assert.match(renderer, /new THREE\.Vector3\(x, \.18, z\)\.project\(camera\)/);\n  assert.match(renderer, /publishBuildingHitTargets\(latestBuildings\)/);\n  assert.match(kingdom, /\.city\.has-3d\{display:block;padding:0\}/);
+  assert.match(renderer, /new THREE\.Vector3\(x, \.18, z\)\.project\(camera\)/);
+  assert.match(renderer, /publishBuildingHitTargets\(latestBuildings\)/);
+  assert.match(kingdom, /\.city\.has-3d\{display:block;padding:0\}/);
   assert.match(kingdom, /\.city\.has-3d \.building \.emoji\{display:none\}/);
   assert.match(kingdom, /window\.addEventListener\("coi:kingdom-projection"/);
-  assert.match(kingdom, /button\.style\.left=point\.left\.toFixed\(3\)/);\n  assert.match(kingdom, /coi:kingdom-2d-fallback/);
+  assert.match(kingdom, /button\.style\.left=point\.left\.toFixed\(3\)/);
+  assert.match(kingdom, /coi:kingdom-2d-fallback/);
 });
 
 test("tema compartilhado define tokens da marca e acessibilidade básica", async () => {
