@@ -8,7 +8,7 @@ test("shared navigation exposes the real game sections and a responsive search",
   const nav = await read("navigation.js");
   const css = await read("styles/navigation.css");
   for (const route of ["/index.html","/kingdom.html","/world.html","/equipment-ui.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
-  assert.ok(nav.includes("aria-label","Navegação principal"));
+  assert.ok(nav.includes('setAttribute("aria-label","Navegação principal")'));
   assert.ok(nav.includes("toLocaleLowerCase"));
   assert.ok(nav.includes("strong.textContent"));
   assert.ok(nav.includes("small.textContent"));
