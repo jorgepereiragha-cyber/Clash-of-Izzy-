@@ -7,7 +7,7 @@ const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 test("shared navigation exposes the real game sections and a responsive search", async () => {
   const nav = await read("navigation.js");
   const css = await read("styles/navigation.css");
-  for (const route of ["/index.html","/kingdom.html","/world.html","/equipment-ui.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
+  for (const route of ["/index.html","/kingdom.html","/world.html","/events.html","/equipment-ui.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
   assert.ok(nav.includes('setAttribute("aria-label","Navegação principal")'));
   assert.ok(nav.includes("toLocaleLowerCase"));
   assert.ok(nav.includes("strong.textContent"));
@@ -73,13 +73,17 @@ test("alliance page handles navigation deep links and renders search results saf
 });
 
 
-test("global search includes public nickname discovery and deep-links to the kingdom hub", async () => {
+test("global navigation keeps search results visible on submit and includes player destinations", async () => {
   const nav = await read("navigation.js");
-  assert.ok(nav.includes('fetch("/api/game/players/search?"'));
-  assert.ok(nav.includes('new URLSearchParams({playerSearch:player.nickname})'));
-  assert.ok(nav.includes('player.nickname+" · "+player.kingdom_name'));
-  assert.ok(nav.includes("const canSearchPlayers = /^[\\p{L}\\p{N}_-]{3,20}$/u.test(nicknameQuery)"));
-  const kingdom = await read("kingdom.html");
-  assert.ok(kingdom.includes('new URLSearchParams(location.search).get("playerSearch")'));
-  assert.ok(kingdom.includes('document.getElementById("playerSearchForm").requestSubmit()'));
+  assert.ok(nav.includes('item.type === "player" ? "players"'));
+  assert.ok(nav.includes('item.kingdom_name||"Reino"'));
+  assert.ok(nav.includes('results.hidden = false'));
+  assert.ok(!nav.includes("location.href = first.href"));
+  assert.ok(nav.includes('event.key==="Escape"'));
+});
+
+test("global navigation exposes the Anjo da Morte weekend event", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes('href:"/events.html"'));
+  assert.ok(nav.includes("anjo da morte"));
 });

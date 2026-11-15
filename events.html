@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#100d18">
+<meta name="description" content="Evento mundial Anjo da Morte — Clash of Izzy. Enfrente o chefe mais poderoso e dispute recompensas lendárias.">
+<link rel="stylesheet" href="/styles/coi-theme.css">
+<link rel="stylesheet" href="/styles/navigation.css">
+<title>Anjo da Morte — Clash of Izzy</title>
+<style>
+:root{color-scheme:dark;--gold:#efc56d;--panel:#19182a;--line:#76543b;--muted:#c0bdca}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -15%,#523348 0,#171526 48%,#080d18 100%);color:#f7f0e4;font:14px system-ui,Arial,sans-serif}
+header{padding:22px 14px 14px;text-align:center;border-bottom:1px solid #76543b;background:linear-gradient(180deg,#251a2d,#171526)}
+header small{display:block;color:#d5c5b7;letter-spacing:.14em;text-transform:uppercase;font-weight:800}
+h1{margin:7px 0;color:#f5ce78;font-size:clamp(27px,6vw,44px);letter-spacing:.04em}
+main{max-width:1100px;margin:18px auto;padding:0 12px 40px;display:grid;gap:14px}
+.panel{background:linear-gradient(145deg,#282039,#15192a);border:1px solid var(--line);border-radius:14px;padding:16px;box-shadow:0 12px 28px #0006}
+.boss{display:grid;grid-template-columns:150px 1fr;gap:16px;align-items:center}
+.boss-art{height:150px;border-radius:14px;display:grid;place-items:center;font-size:76px;background:radial-gradient(circle,#8b3f4d 0,#3a263f 55%,#141525 100%);border:1px solid #bd795c;box-shadow:inset 0 0 30px #0008}
+h2{margin:0 0 10px;color:#f2cd7a;font-size:19px}
+h3{margin:0 0 8px;color:#f2cd7a}
+.muted{color:var(--muted);line-height:1.55}
+.status{display:inline-flex;padding:6px 10px;border:1px solid #a4774e;border-radius:999px;background:#30243a;color:#ffe3a4;font-weight:800}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}
+.stat{background:#101827;border:1px solid #4d4350;border-radius:9px;padding:10px;min-width:0}
+.stat span{display:block;color:#c5bdc8;font-size:11px}.stat b{display:block;margin-top:4px;font-size:17px;color:#fff;overflow-wrap:anywhere}
+.health{height:18px;border-radius:99px;overflow:hidden;background:#090d17;border:1px solid #8d6c60;margin:10px 0}
+.health>div{height:100%;width:100%;background:linear-gradient(90deg,#8b263b,#e15a54,#f0b45d);transition:width .25s}
+.grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(280px,.9fr);gap:14px}
+.troops{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.troop{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:9px;background:#101827;border:1px solid #4d4350;border-radius:8px}
+.troop label{font-size:12px;line-height:1.4}.troop small{display:block;color:#bdb6c4}
+.troop input{width:86px;min-width:70px;padding:8px;border:1px solid #78647a;border-radius:7px;background:#090e19;color:#fff;text-align:right}
+button{border:1px solid #e5bb65;border-radius:9px;padding:11px 16px;background:linear-gradient(#b77c3a,#77451f);color:#fff;font-weight:900;cursor:pointer}
+button:disabled{opacity:.4;cursor:not-allowed}
+.actions{display:flex;gap:9px;align-items:center;flex-wrap:wrap;margin-top:12px}
+.notice{padding:10px;border-radius:9px;background:#35232d;border:1px solid #8b514c;color:#f3d2c5;line-height:1.5;margin-top:10px}
+.leaderboard{width:100%;border-collapse:collapse}
+.leaderboard th,.leaderboard td{text-align:left;padding:9px 7px;border-bottom:1px solid #493d51;font-size:12px}
+.leaderboard th{color:#f2cd7a}
+.leaderboard td:last-child,.leaderboard th:last-child{text-align:right}
+#message{min-height:22px;margin-top:10px;color:#f3d99f}
+.reward-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.reward{padding:10px;border-radius:9px;background:#101827;border:1px solid #65503f}
+.reward b{display:block;color:#ffe09b;font-size:16px}.reward small{color:#c4bdca}
+@media(max-width:720px){.boss{grid-template-columns:90px 1fr}.boss-art{height:90px;font-size:48px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}.reward-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:420px){.troops{grid-template-columns:1fr}.boss{grid-template-columns:1fr}.boss-art{height:110px}}
+</style>
+</head>
+<body>
+<header>
+ <small>Evento mundial · Clash of Izzy</small>
+ <h1>💀 ANJO DA MORTE</h1>
+ <div>O Ceifador do Fim · Chefe nível 1.000</div>
+</header>
+<main>
+ <section class="panel boss">
+  <div class="boss-art" aria-hidden="true">☠️🪽</div>
+  <div>
+   <div id="eventStatus" class="status">Sincronizando evento…</div>
+   <h2 style="margin-top:10px">A criatura mais poderosa já vista em Eldoria</h2>
+   <p class="muted">Reinos de todo o mundo enfrentam o mesmo inimigo. Cada ataque aumenta sua pontuação. A classificação final define as maiores recompensas do jogo.</p>
+   <div class="muted" id="schedule">Sexta-feira 18:00 até segunda-feira 00:00 · Horário de Brasília</div>
+   <h3 id="countdown" style="margin-top:8px">Calculando calendário…</h3>
+  </div>
+ </section>
+ <section class="panel">
+  <h2>❤️ Vida global do Anjo da Morte</h2>
+  <div class="health"><div id="bossHpBar"></div></div>
+  <div class="muted" id="bossHpText">Carregando vida do chefe…</div>
+  <div class="stats">
+   <div class="stat"><span>Sua pontuação</span><b id="myScore">0</b></div>
+   <div class="stat"><span>Sua posição</span><b id="myRank">—</b></div>
+   <div class="stat"><span>Seus ataques</span><b id="myAttacks">0</b></div>
+   <div class="stat"><span>Tropas perdidas no evento</span><b id="myLosses">0</b></div>
+  </div>
+ </section>
+ <div class="grid">
+  <section class="panel">
+   <h2>⚔️ Enviar exército para a batalha</h2>
+   <p class="muted">Escolha as tropas que deseja arriscar. O servidor calcula dano, pontuação e baixas. Não é possível recuperar tropas perdidas neste evento.</p>
+   <div id="troops" class="troops"><div class="muted">Carregando tropas disponíveis…</div></div>
+   <div class="actions">
+    <button id="attack" type="button" disabled>⚔️ ATACAR O ANJO DA MORTE</button>
+    <button id="refresh" type="button">↻ Atualizar</button>
+   </div>
+   <div id="message" role="status" aria-live="polite"></div>
+   <div class="notice">Atenção: somente este evento causa perda permanente de tropas. Batalhas PvE normais e ataques de territórios preservam o seu exército.</div>
+  </section>
+  <section class="panel">
+   <h2>🏆 Classificação mundial</h2>
+   <p class="muted">A pontuação é o dano efetivamente registrado pelo servidor. Empates são resolvidos pelo dano acumulado e horário de participação.</p>
+   <div id="leaderboard"><div class="muted">Carregando classificação…</div></div>
+  </section>
+ </div>
+ <section class="panel">
+  <h2>🎁 Recompensas lendárias</h2>
+  <p class="muted">As recompensas são creditadas automaticamente no encerramento do evento. Não é necessário resgatar manualmente.</p>
+  <div class="reward-grid">
+   <div class="reward"><b>1º lugar</b><small>500 gemas · 1,5 milhão de ouro · 100 Essências da Morte</small></div>
+   <div class="reward"><b>2º lugar</b><small>350 gemas · 1 milhão de ouro · 70 Essências</small></div>
+   <div class="reward"><b>3º lugar</b><small>250 gemas · 750 mil de ouro · 50 Essências</small></div>
+   <div class="reward"><b>Top 10</b><small>150 gemas · 500 mil de ouro · 30 Essências</small></div>
+   <div class="reward"><b>Top 50</b><small>75 gemas · 250 mil de ouro · 15 Essências</small></div>
+   <div class="reward"><b>Top 100</b><small>40 gemas · 125 mil de ouro · 8 Essências</small></div>
+   <div class="reward"><b>Participação</b><small>20 gemas · 60 mil de ouro · 3 Essências</small></div>
+   <div class="reward"><b>Todos os colocados</b><small>Comida, madeira, pedra e ferro conforme sua posição</small></div>
+  </div>
+ </section>
+</main>
+<script type="module" src="/events.js"></script>
+<script src="/navigation.js" defer></script>
+</body>
+</html>

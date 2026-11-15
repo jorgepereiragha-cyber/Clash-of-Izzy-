@@ -15,21 +15,21 @@ test("game search requires a valid player session and rate limits player and net
 
 test("search accepts only public categories and builds a parameterized FTS query", async () => {
   const worker = await read("worker.js");
-  assert.ok(worker.includes('["all","kingdoms","alliances","territories","skins"].includes(kind)'));
+  assert.ok(worker.includes('["all","players","kingdoms","alliances","territories","skins"].includes(kind)'));
   assert.ok(worker.includes("rawQuery.match"));
   assert.ok(worker.includes("\\p{L}"));
   assert.ok(worker.includes('game_search_fts MATCH ?'));
   assert.ok(worker.includes('entityType=({kingdoms:"kingdom",alliances:"alliance",territories:"territory",skins:"skin"})[kind]||""'));
-  assert.ok(worker.includes('.bind(ftsQuery,kind,entityType,playerId,limit)'));
+  assert.ok(worker.includes('.bind(ftsQuery,kind,entityType,playerId,limit*4)'));
   assert.ok(worker.includes('Math.min(20,Math.max(1,Math.floor(Number(url.searchParams.get("limit"))||10)))'));
 });
 
 test("LIKE fallback escapes wildcard characters and returns only public result fields", async () => {
   const worker = await read("worker.js");
-  assert.ok(worker.includes('rawQuery.replace(/[!%_]/g,ch=>"!"+ch)'));
+  assert.ok(worker.includes('toLocaleLowerCase("en-US").replace(/[!%_]/g,ch=>"!"+ch)'));
   assert.ok(worker.includes("ESCAPE '!' COLLATE NOCASE"));
-  assert.ok(worker.includes('engine:"like-fallback"'));
-  assert.ok(worker.includes('engine:"fts5"'));
+  assert.ok(worker.includes('engine:usedFts?"fts5+trigram":"like-fallback"'));
+  assert.ok(worker.includes('game_search_fts MATCH ?'));
   assert.ok(!worker.includes("player_email"));
   assert.ok(!worker.includes("password_hash"));
 });
@@ -67,4 +67,30 @@ test("player discovery UI renders server data as text and uses the authenticated
   assert.ok(kingdom.includes('title.textContent=player.nickname'));
   assert.ok(kingdom.includes('details.textContent="Castelo nível "+player.castle_level'));
   assert.ok(!kingdom.includes('row.innerHTML=player.nickname'));
+});
+
+
+test("global search includes public player nicknames and merges prefix and substring FTS results", async () => {
+  const worker = await read("worker.js");
+  const migration = await read("migrations/0014_search_quality_angel_death.sql");
+  assert.ok(worker.includes('"all","players","kingdoms","alliances","territories","skins"'));
+  assert.ok(worker.includes('game_player_search_fts MATCH ?'));
+  assert.ok(worker.includes('game_player_substring_fts MATCH ?'));
+  assert.ok(worker.includes('game_search_substring_fts MATCH ?'));
+  assert.ok(worker.includes('type:"player"'));
+  assert.ok(migration.includes("tokenize='trigram remove_diacritics 1'"));
+  assert.ok(migration.includes("game_player_search_ai"));
+  assert.ok(migration.includes("game_player_search_au"));
+  assert.ok(migration.includes("game_player_search_ad"));
+  assert.ok(!worker.includes("player_id:row.player_id"));
+});
+
+test("search merges ranked matches and never exposes internal identifiers", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("resultMap=new Map()"));
+  assert.ok(worker.includes("candidate===queryKey?0:candidate.startsWith(queryKey)?1:candidate.includes(queryKey)?2:3"));
+  assert.ok(worker.includes('engine:usedFts?"fts5+trigram":"like-fallback"'));
+  assert.ok(worker.includes("limit*4"));
+  assert.ok(!worker.includes("player_email"));
+  assert.ok(!worker.includes("password_hash"));
 });
