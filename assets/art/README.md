@@ -20,6 +20,8 @@
 ## Cena atual
 - `kingdom.html` mantém a arte procedural 2D em Canvas como fallback para WebGL indisponível.
 - `scripts/kingdom-3d.js` adiciona uma cena isométrica Three.js com terreno, estrada, árvores, iluminação, até 16 edifícios 3D procedurais e mapas de textura tileáveis gerados por código para pedra, madeira, telhado, grama e estrada.
+- A vegetação usa `InstancedMesh` para agrupar partes repetidas em poucos draw calls. Os modelos procedurais antigos liberam geometrias e materiais próprios ao serem substituídos; texturas compartilhadas permanecem em cache.
+- `kingdom.html` declara um import map para que `GLTFLoader` e `KTX2Loader` resolvam a mesma instância do módulo `three` no navegador.
 - `assets/3d/manifest.json` é o catálogo versionado para substituição explícita por modelos GLB reais (`enabled: true`). O manifesto começa vazio: ainda não há modelos GLB artísticos finais no repositório.
 - O carregador usa `GLTFLoader` e `KTX2Loader`/Basis Universal. Texturas KTX2 só serão usadas quando um GLB real com `KHR_texture_basisu` for adicionado e testado.
 - A cena 3D é renderizada sob demanda, sem loop contínuo; não há animação de câmera ou ciclo de jogo nesta tela ainda.
