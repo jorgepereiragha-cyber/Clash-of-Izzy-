@@ -209,3 +209,14 @@ test("reduced-motion preference is detected without requiring optional browser A
   assert.equal(standard.prefersReducedMotion, false);
   assert.match(renderer, /window\.matchMedia\?\.\("\(prefers-reduced-motion: reduce\)"\)\?\.matches === true/);
 });
+
+
+test("partial WebGL initialization failure runs the complete GPU and listener teardown", () => {
+  assert.match(renderer, /Initialization can fail after GPU resources or listeners were already created/);
+  assert.match(renderer, /resizeObserver\?\.disconnect\(\)/);
+  assert.match(renderer, /window\.removeEventListener\("coi:kingdom-render", kingdomRenderHandler\)/);
+  assert.match(renderer, /disposeSceneResources\(\);[\s\S]*?ktx2\?\.dispose\(\)/);
+  assert.match(renderer, /renderer\?\.domElement\.remove\(\);[\s\S]*?renderer\?\.dispose\(\)/);
+  assert.match(renderer, /delete window\.__coiKingdomDiagnostics/);
+  assert.match(renderer, /delete host\.dataset\.qualityTier/);
+});
