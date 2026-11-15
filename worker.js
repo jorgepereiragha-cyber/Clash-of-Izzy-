@@ -1097,7 +1097,13 @@ async function gameAction(env,playerId,body){
 }
 
 async function ensureAngelDeathWeekend(env,now=new Date()){
-  const window=getAngelDeathWeekendWindow(now),instant=now.toISOString();
+  let window=getAngelDeathWeekendWindow(now);
+  const instant=now.toISOString();
+  const current=await env.DB.prepare("SELECT id FROM world_events WHERE event_key=? AND starts_at=?").bind(ANGEL_DEATH_EVENT.key,window.startsAt).first();
+  if(!current&&now.getTime()-Date.parse(window.startsAt)>15*60*1000&&now.getTime()<Date.parse(window.endsAt)){
+    const history=await env.DB.prepare("SELECT id FROM world_events WHERE event_key=? ORDER BY starts_at DESC LIMIT 1").bind(ANGEL_DEATH_EVENT.key).first();
+    if(!history)window=getAngelDeathWeekendWindow(new Date(Date.parse(window.startsAt)+7*86400000));
+  }
   await env.DB.prepare("INSERT OR IGNORE INTO world_events(event_key,starts_at,ends_at,status,boss_hp_total,boss_hp_remaining) VALUES(?,?,?,?,?,?)")
     .bind(ANGEL_DEATH_EVENT.key,window.startsAt,window.endsAt,Date.parse(window.startsAt)<=now.getTime()?"active":"scheduled",ANGEL_DEATH_EVENT.bossHp,ANGEL_DEATH_EVENT.bossHp).run();
   await env.DB.prepare("UPDATE world_events SET status='active' WHERE event_key=? AND starts_at<=? AND ends_at>? AND status='scheduled'")
@@ -1392,7 +1398,7 @@ export default {
         const queryLength=Array.from(rawQuery).length;
         const containsCjk=/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(rawQuery);
         const needsShortUnicodeFallback=queryLength<3&&containsCjk;
-        if(queryLength<2)return json({error:"Digite pelo menos 2 caracteres.",results:[]},400);
+        if(queryLength<(containsCjk?1:2))return json({error:"Digite pelo menos 2 caracteres (ou 1 caractere CJK).",results:[]},400);
         if(queryLength>48)return json({error:"A busca aceita até 48 caracteres.",results:[]},400);
         const kind=String(url.searchParams.get("type")||"all").toLowerCase();
         if(!["all","players","kingdoms","alliances","territories","skins"].includes(kind))return json({error:"Categoria de busca inválida.",results:[]},400);
@@ -1508,7 +1514,7 @@ export default {
           }
           const hasPlayers=[...resultMap.values()].some(item=>item.type==="player");
           if(!hasPlayers||!playerSubstringAvailable||needsShortUnicodeFallback){
-            const players=await env.DB.prepare("SELECT n.nickname,k.kingdom_name,k.castle_level,k.power FROM player_nicknames n JOIN kingdoms k ON k.player_id=n.player_id WHERE n.player_id<>(SELECT id FROM players WHERE player_id=?) AND n.nickname_key LIKE ? ESCAPE '!' ORDER BY CASE WHEN n.nickname_key=? THEN 0 WHEN n.nickname_key LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,n.nickname_key LIMIT ?").bind(playerId,pattern,queryKey,prefixPattern,limit).all();
+            const players=await env.DB.prepare("SELECT n.nickname,k.kingdom_name,k.castle_level,k.power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=k.id),'') AS alliance_tag FROM player_nicknames n JOIN kingdoms k ON k.player_id=n.player_id WHERE n.player_id<>(SELECT id FROM players WHERE player_id=?) AND n.nickname_key LIKE ? ESCAPE '!' ORDER BY CASE WHEN n.nickname_key=? THEN 0 WHEN n.nickname_key LIKE ? ESCAPE '!' THEN 1 ELSE 2 END,k.power DESC,n.nickname_key LIMIT ?").bind(playerId,pattern,queryKey,prefixPattern,limit).all();
             for(const row of players.results||[])addResult({type:"player",name:row.nickname,nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0),allianceTag:row.alliance_tag||""});
           }
         }
