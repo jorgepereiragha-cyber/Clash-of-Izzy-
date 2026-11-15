@@ -11,7 +11,7 @@ export function clampMapViewport({ zoom = 1, panX = 0, panY = 0, width = 0, heig
   return {
     zoom: safeZoom,
     panX: normalizeZero(Math.max(-maxX, Math.min(maxX, finite(panX)))),
-    panY: normalizeZero(Math.max(-maxY, Math.min(maxY, finite(panY))),
+    panY: normalizeZero(Math.max(-maxY, Math.min(maxY, finite(panY)))),
   };
 }
 
