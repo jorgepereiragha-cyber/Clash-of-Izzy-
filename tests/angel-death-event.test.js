@@ -50,3 +50,28 @@ test("Anjo da Morte rewards are monotonic by rank and include death essence", ()
   assert.ok(first.deathEssence > participant.deathEssence);
   assert.equal(ANGEL_DEATH_EVENT.key, "angel_of_death");
 });
+
+
+test("event rewards and lifecycle are idempotent and scheduled by the Worker", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const migration = await readFile(new URL("../migrations/0014_search_quality_angel_death.sql", import.meta.url), "utf8");
+  assert.ok(worker.includes("async function processAngelDeathEventLifecycle"));
+  assert.ok(worker.includes("await processAngelDeathEventLifecycle(env)"));
+  assert.ok(worker.includes("INSERT OR IGNORE INTO world_event_rewards"));
+  assert.ok(worker.includes("rewards_distributed_at"));
+  assert.ok(migration.includes("UNIQUE(event_key,starts_at)"));
+  assert.ok(migration.includes("UNIQUE(event_id,kingdom_id,request_id)"));
+  assert.ok(migration.includes("UNIQUE(event_id,kingdom_id)"));
+});
+
+test("permanent troop loss is isolated to Anjo da Morte attacks", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const eventAttack = worker.slice(worker.indexOf("async function angelDeathEventAttack"), worker.indexOf("async function distributeAngelDeathRewards"));
+  const normalBattleStart = worker.indexOf('}else if(type==="battle"){');
+  const normalBattleEnd = worker.indexOf('}else if(type==="rename"){', normalBattleStart);
+  const normalBattle = worker.slice(normalBattleStart, normalBattleEnd);
+  assert.ok(eventAttack.includes("SET quantity=quantity-CAST"));
+  assert.ok(!normalBattle.includes("SET quantity=quantity-CAST"));
+  assert.ok(normalBattle.includes("SET quantity=quantity"));
+  assert.ok(worker.includes("survivors[u.unit_type]=u.quantity"));
+});
