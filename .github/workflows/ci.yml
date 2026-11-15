@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, feat/3d-kingdom-visual-pipeline, feat/adaptive-3d-quality-diagnostics]
   pull_request:
-    branches: [main, security/api-rate-limits]
+    branches: [main, security/api-rate-limits, feat/3d-kingdom-visual-pipeline]
 
 concurrency:
   group: clash-of-izzy-ci-${{ github.ref }}
