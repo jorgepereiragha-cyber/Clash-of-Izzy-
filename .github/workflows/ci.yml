@@ -22,6 +22,8 @@ jobs:
           node-version: 22
       - name: Install dependencies
         run: npm install --ignore-scripts
+      - name: Validate service worker
+        run: node --check sw.js
       - name: Test combat simulator
         run: npm test
       - name: Validate Worker bundle
