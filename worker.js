@@ -314,23 +314,27 @@ async function processMarches(env,kingdomId){
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={};
    if(target&&!target.owner_kingdom_id&&army.length){
-    const [kingdom,hero,dragon,military,defense]=await Promise.all([
+    const [kingdom,hero,dragon,military,defense,forgeState]=await Promise.all([
      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT id,level FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
-     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
+     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first(),
+     getForgeEquipmentState(env,kingdomId)
     ]);
     const equipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id,kingdomId).all():{results:[]};
-    const gear=equipmentBonuses(equipmentRows.results||[]);
+    const gear=mergeForgeBonuses(equipmentBonuses(equipmentRows.results||[]),forgeState.bonuses);
     const castleLevel=Number(kingdom?.castle_level||1);
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      researchLevel:Number(military?.level||0),
-     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
+     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0))),
      equipmentAttackBonusPercent:gear.attackPercent,
+     equipmentDefensePercent:gear.defensePercent,
      equipmentHealthBonusPercent:gear.healthPercent,
+     criticalChancePercent:gear.criticalChancePercent,
+     criticalSeed:Number(m.id)+Number(kingdomId)*31,
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
     });
