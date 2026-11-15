@@ -674,7 +674,7 @@ async function gameAction(env,playerId,body){
     }
     const factor=b.level;
     const base=BUILDINGS[key];
-    const materialNeeds=key==="castle"?(b.level>=25?{imperial_crest:2,power_crystal:2}:b.level>=20?{imperial_crest:1,power_crystal:2}:b.level>=15?{power_crystal:2,imperial_seal:1}:b.level>=10?{imperial_seal:2,royal_blueprint:1}:b.level>=5?{royal_blueprint:2}:{ });
+    const materialNeeds=key==="castle"?(b.level>=25?{imperial_crest:2,power_crystal:2}:b.level>=20?{imperial_crest:1,power_crystal:2}:b.level>=15?{power_crystal:2,imperial_seal:1}:b.level>=10?{imperial_seal:2,royal_blueprint:1}:b.level>=5?{royal_blueprint:2}:{}):{};
     for(const [item,quantity] of Object.entries(materialNeeds)){const owned=await env.DB.prepare("SELECT quantity FROM inventory_items WHERE kingdom_id=? AND item_key=?").bind(k.id,item).first();if(!owned||owned.quantity<quantity)return json({error:"Materiais insuficientes: "+CASTLE_MATERIALS[item].name+" ("+quantity+" necessários)."},409);}
     const cost={wood:Math.ceil(base.wood*factor),stone:Math.ceil(base.stone*factor),food:Math.ceil(base.food*factor),iron:Math.ceil(base.iron*factor)};
     const castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
