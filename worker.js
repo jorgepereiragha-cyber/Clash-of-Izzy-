@@ -36,10 +36,32 @@ const HERO_RARITY={white:{label:"Branco · Comum",multiplier:1,fragments:5,maxLe
 const HERO_STAR_COST={2:10,3:20,4:40,5:80,6:150,7:300};
 
 const COSMETIC_SKINS={
- c1:{name:"Pedra Antiga",icon:"🏰",rarity:"comum",theme:"Medieval",atk:5,def:5},c2:{name:"Madeira Rústica",icon:"🏚️",rarity:"comum",theme:"Viking",atk:6,def:4},c3:{name:"Aço Forjado",icon:"⚙️",rarity:"comum",theme:"Industrial",atk:7,def:6},c4:{name:"Areia do Deserto",icon:"🏜️",rarity:"comum",theme:"Egípcio",atk:5,def:7},c5:{name:"Gelo Eterno",icon:"❄️",rarity:"comum",theme:"Nórdico",atk:6,def:6},c6:{name:"Floresta Verde",icon:"🌲",rarity:"comum",theme:"Élfico",atk:5,def:8},c7:{name:"Vulcão",icon:"🌋",rarity:"comum",theme:"Vulcânico",atk:8,def:5},c8:{name:"Oceano",icon:"🌊",rarity:"comum",theme:"Marinho",atk:6,def:7},
- r1:{name:"Ouro Envelhecido",icon:"👑",rarity:"rara",theme:"Real",atk:12,def:10},r2:{name:"Cristal Azul",icon:"💎",rarity:"rara",theme:"Cristalino",atk:10,def:13},r3:{name:"Esmeralda",icon:"💚",rarity:"rara",theme:"Élfico",atk:11,def:12},r4:{name:"Rubi Sangrento",icon:"❤️",rarity:"rara",theme:"Vampírico",atk:14,def:10},r5:{name:"Ametista",icon:"💜",rarity:"rara",theme:"Arcano",atk:12,def:12},
- e1:{name:"Diamante Eterno",icon:"💠",rarity:"épica",theme:"Supremo",atk:20,def:20},e2:{name:"Fogo Dracônico",icon:"🔥",rarity:"épica",theme:"Dragão",atk:25,def:15},e3:{name:"Trovão Divino",icon:"⚡",rarity:"épica",theme:"Tempestade",atk:22,def:22},e4:{name:"Sombra Demoníaca",icon:"👹",rarity:"épica",theme:"Abissal",atk:28,def:18},
- l1:{name:"Dragão Primordial",icon:"🐉",rarity:"lendária",theme:"Supremo",atk:45,def:35},l2:{name:"Celestial Divino",icon:"✨",rarity:"lendária",theme:"Celestial",atk:35,def:50},l3:{name:"Caos Primordial",icon:"🌀",rarity:"lendária",theme:"Caos",atk:48,def:48}
+ c1:{name:"Pedra Antiga",icon:"🏰",rarity:"comum",theme:"Medieval",price:250,visual:"Pedra clara, bandeiras de reino e acabamento clássico"},
+ c2:{name:"Madeira Rústica",icon:"🏚️",rarity:"comum",theme:"Viking",price:250,visual:"Madeira escura, cordas e escudos nórdicos"},
+ c3:{name:"Aço Forjado",icon:"⚙️",rarity:"comum",theme:"Industrial",price:250,visual:"Aço escovado e rebites de ferreiro"},
+ c4:{name:"Areia do Deserto",icon:"🏜️",rarity:"comum",theme:"Egípcio",price:250,visual:"Pedra dourada e tecidos do deserto"},
+ c5:{name:"Gelo Eterno",icon:"❄️",rarity:"comum",theme:"Nórdico",price:250,visual:"Cristais de gelo e brilho azul"},
+ c6:{name:"Floresta Verde",icon:"🌲",rarity:"comum",theme:"Élfico",price:250,visual:"Madeira viva e folhagens"},
+ c7:{name:"Vulcão",icon:"🌋",rarity:"comum",theme:"Vulcânico",price:250,visual:"Rocha escura e veios incandescentes"},
+ c8:{name:"Oceano",icon:"🌊",rarity:"comum",theme:"Marinho",price:250,visual:"Pedra azul e reflexos de água"},
+ r1:{name:"Ouro Envelhecido",icon:"👑",rarity:"rara",theme:"Real",price:700,visual:"Ouro antigo e ornamentos reais"},
+ r2:{name:"Cristal Azul",icon:"💎",rarity:"rara",theme:"Cristalino",price:700,visual:"Cristais azuis translúcidos"},
+ r3:{name:"Esmeralda",icon:"💚",rarity:"rara",theme:"Élfico",price:700,visual:"Jade e entalhes élficos"},
+ r4:{name:"Rubi Sangrento",icon:"❤️",rarity:"rara",theme:"Vampírico",price:700,visual:"Rubi escuro e detalhes carmesim"},
+ r5:{name:"Ametista",icon:"💜",rarity:"rara",theme:"Arcano",price:700,visual:"Ametista e inscrições arcanas"},
+ e1:{name:"Diamante Eterno",icon:"💠",rarity:"épica",theme:"Supremo",price:1500,visual:"Facetas cristalinas e luz prateada"},
+ e2:{name:"Fogo Dracônico",icon:"🔥",rarity:"épica",theme:"Dragão",price:1500,visual:"Escamas e veios de fogo"},
+ e3:{name:"Trovão Divino",icon:"⚡",rarity:"épica",theme:"Tempestade",price:1500,visual:"Metal de tempestade e faíscas"},
+ e4:{name:"Sombra Demoníaca",icon:"👹",rarity:"épica",theme:"Abissal",price:1500,visual:"Obsidiana e fumaça sombria"},
+ l1:{name:"Dragão Primordial",icon:"🐉",rarity:"lendária",theme:"Supremo",price:3000,visual:"Escamas ancestrais e brilho dracônico"},
+ l2:{name:"Celestial Divino",icon:"✨",rarity:"lendária",theme:"Celestial",price:3000,visual:"Ouro branco e luz celestial"},
+ l3:{name:"Caos Primordial",icon:"🌀",rarity:"lendária",theme:"Caos",price:3000,visual:"Runas instáveis e energia cósmica"},
+ n1:{name:"Odin — Pai de Todos",icon:"🪶",rarity:"lendária",theme:"Panteão Nórdico",price:2400,visual:"Manto azul-escuro, lança rúnica, dois corvos e brilho de sabedoria"},
+ n2:{name:"Thor — Senhor do Trovão",icon:"⚡",rarity:"lendária",theme:"Panteão Nórdico",price:2400,visual:"Armadura de tempestade, Mjölnir e arcos elétricos"},
+ n3:{name:"Freyja — Brilho de Fólkvangr",icon:"✨",rarity:"épica",theme:"Panteão Nórdico",price:1800,visual:"Manto dourado, colar Brísingamen e motivos de falcão"},
+ n4:{name:"Loki — Véu da Trapaça",icon:"🐍",rarity:"épica",theme:"Panteão Nórdico",price:1800,visual:"Armadura verde e negra, runas mutáveis e ilusões"},
+ n5:{name:"Týr — Juramento de Fenrir",icon:"🛡️",rarity:"épica",theme:"Panteão Nórdico",price:1800,visual:"Armadura de juramento, escudo rúnico e luz dourada"},
+ n6:{name:"Heimdall — Guardião do Bifröst",icon:"🌈",rarity:"épica",theme:"Panteão Nórdico",price:1800,visual:"Armadura dourada, espada Hofund e aurora Bifröst"}
 };
 const COSMETIC_COLLECTIONS=[
  {id:"col_medieval",name:"Coleção Medieval",icon:"🏰",desc:"Complete as skins medievais",skins:["c1","c2","c3"],gems:500,shards:20},
@@ -47,24 +69,25 @@ const COSMETIC_COLLECTIONS=[
  {id:"col_rara",name:"Mestre das Raras",icon:"💎",desc:"Colecione todas as skins raras",skins:["r1","r2","r3","r4","r5"],gems:2000,shards:60},
  {id:"col_epica",name:"Lenda Épica",icon:"🔥",desc:"Obtenha todas as skins épicas",skins:["e1","e2","e3","e4"],gems:5000,shards:100},
  {id:"col_lendaria",name:"Panteão Lendário",icon:"👑",desc:"Alcance todas as lendárias",skins:["l1","l2","l3"],gems:15000,shards:300},
+ {id:"col_norse",name:"Panteão de Asgard",icon:"⚡",desc:"Reúna os seis visuais dos deuses nórdicos",skins:["n1","n2","n3","n4","n5","n6"],gems:5000,shards:200},
  {id:"col_completa",name:"Colecionador Supremo",icon:"🏆",desc:"Complete todas as coleções",skins:[],special:true,gems:50000,shards:1000}
 ];
 const SEASON_END="2026-11-30T23:59:59.000Z";
 const SEASONAL_COSMETICS=[
- {id:"s1",name:"Abóbora Assombrada",icon:"🎃",theme:"Halloween",atk:30,def:25,special:"+15% dano sombrio · +10% roubo de vida",price:3000},
- {id:"s2",name:"Castelo dos Mortos",icon:"💀",theme:"Necromante",atk:35,def:30,special:"+20% invocações · +15% defesa contra luz",price:4500},
- {id:"s3",name:"Fortaleza Vampírica",icon:"🧛",theme:"Vampiro Lorde",atk:40,def:35,special:"+25% roubo de vida · +20% velocidade noturna",price:6000},
- {id:"s4",name:"Mansão Fantasma",icon:"👻",theme:"Assombração",atk:32,def:38,special:"+30% evasão · +15% imunidade a atordoamento",price:5000},
- {id:"s5",name:"Teia Demoníaca",icon:"🕷️",theme:"Aracnídeo",atk:38,def:32,special:"+20% imobilização · +25% dano venenoso",price:5500},
- {id:"s6",name:"Noite Eterna",icon:"🦇",theme:"Lenda Sombria",atk:50,def:45,special:"+40% atributos sombrios · aura assombrada",price:12000,legendary:true}
+ {id:"s1",name:"Abóbora Assombrada",icon:"🎃",theme:"Halloween",visual:"Lanterna de abóbora, névoa e luz espectral",price:3000},
+ {id:"s2",name:"Castelo dos Mortos",icon:"💀",theme:"Necromante",visual:"Pedra tumular, estandartes gastos e névoa",price:4500},
+ {id:"s3",name:"Fortaleza Vampírica",icon:"🧛",theme:"Vampiro Lorde",visual:"Veludo escuro, rubis e vitrais carmesim",price:6000},
+ {id:"s4",name:"Mansão Fantasma",icon:"👻",theme:"Assombração",visual:"Arquitetura espectral e luz fria",price:5000},
+ {id:"s5",name:"Teia Demoníaca",icon:"🕷️",theme:"Aracnídeo",visual:"Obsidiana, seda e detalhes venenosos",price:5500},
+ {id:"s6",name:"Noite Eterna",icon:"🦇",theme:"Lenda Sombria",visual:"Asas de morcego, lua negra e aura assombrada",price:12000,legendary:true}
 ];
 const SKIN_FUSIONS=[
- {inputs:["c1","c2","c3"],output:{id:"f_medieval",name:"Fortaleza Medieval Suprema",icon:"🏰",rarity:"fundida",atk:25,def:25,special:"+15% atributos medievais"}},
- {inputs:["c5","c6","c7"],output:{id:"f_elemental",name:"Convergência Elemental",icon:"🌪️",rarity:"fundida",atk:28,def:22,special:"+20% dano elemental"}},
- {inputs:["r1","r2","r3"],output:{id:"f_gemmaster",name:"Mestre das Gemas",icon:"💎",rarity:"fundida",atk:35,def:30,special:"+25% recursos por hora"}},
- {inputs:["e1","e2","e3"],output:{id:"f_ascendant",name:"Ascensão Divina",icon:"⚡",rarity:"fundida lendária",atk:55,def:50,special:"+40% atributos · aura dourada"}},
- {inputs:["e2","e4","r4"],output:{id:"f_demonlord",name:"Senhor Demônio",icon:"👹",rarity:"fundida lendária",atk:60,def:40,special:"+50% dano crítico · aura infernal"}},
- {inputs:["l1","l2","l3"],output:{id:"f_cosmos",name:"Entidade Cósmica",icon:"🌌",rarity:"fundida mítica",atk:80,def:80,special:"+100% atributos · aura cósmica"}}
+ {inputs:["c1","c2","c3"],output:{id:"f_medieval",name:"Fortaleza Medieval Suprema",icon:"🏰",rarity:"fundida",visual:"Pedra nobre, madeira entalhada e aço polido"}},
+ {inputs:["c5","c6","c7"],output:{id:"f_elemental",name:"Convergência Elemental",icon:"🌪️",rarity:"fundida",visual:"Gelo, folhas e rocha vulcânica em harmonia"}},
+ {inputs:["r1","r2","r3"],output:{id:"f_gemmaster",name:"Mestre das Gemas",icon:"💎",rarity:"fundida",visual:"Ouro, cristal azul e esmeralda"}},
+ {inputs:["e1","e2","e3"],output:{id:"f_ascendant",name:"Ascensão Divina",icon:"⚡",rarity:"fundida lendária",visual:"Cristal, fogo dracônico e relâmpagos"}},
+ {inputs:["e2","e4","r4"],output:{id:"f_demonlord",name:"Senhor Demônio",icon:"👹",rarity:"fundida lendária",visual:"Chamas, obsidiana e rubi"}},
+ {inputs:["l1","l2","l3"],output:{id:"f_cosmos",name:"Entidade Cósmica",icon:"🌌",rarity:"fundida mítica",visual:"Escamas ancestrais, luz celestial e runas cósmicas"}}
 ];
 async function ensureCosmeticDefaults(env,kingdomId){
  const initialized=await env.DB.prepare("INSERT OR IGNORE INTO kingdom_cosmetic_wallet(kingdom_id,shards) VALUES(?,150)").bind(kingdomId).run();
@@ -486,6 +509,17 @@ async function gameAction(env,playerId,body){
     const rows=await ensureEquipmentTables(env,k.id),row=rows.find(x=>x.item_key===itemKey);
     if(!row)return json({error:"Equipamento não encontrado."},404);
     await env.DB.prepare("UPDATE kingdom_equipment SET is_locked=?,updated_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND item_key=?").bind(Number(!Number(row.is_locked)),k.id,itemKey).run();
+  }else if(type==="cosmetic_buy"){
+    await ensureCosmeticDefaults(env,k.id);
+    const id=String(body.skin||""),skin=COSMETIC_SKINS[id];
+    if(!skin)return json({error:"Skin inválida."},400);
+    const price=Math.max(1,Math.floor(Number(skin.price)||0));
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=? AND NOT EXISTS(SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?)").bind(price,p.id,price,k.id,id),
+      env.DB.prepare("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) SELECT ?,?,'standard' WHERE changes()>0").bind(k.id,id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"cosmetic_skin_purchased",JSON.stringify({skin:id,price}))
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Diamantes insuficientes ou skin já adquirida."},409);
   }else if(type==="cosmetic_claim"){
     await ensureCosmeticDefaults(env,k.id);
     const collectionId=String(body.collection||""),col=COSMETIC_COLLECTIONS.find(x=>x.id===collectionId);
@@ -509,12 +543,12 @@ async function gameAction(env,playerId,body){
     if(Date.now()>=Date.parse(SEASON_END))return json({error:"O evento sazonal terminou."},409);
     const exists=await env.DB.prepare("SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?").bind(k.id,id).first();
     if(exists)return json({error:"Você já possui esta skin."},409);
-    const debit=await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(skin.price,p.id,skin.price).run();
-    if(!debit.meta.changes)return json({error:"Diamantes insuficientes."},409);
-    await env.DB.batch([
-      env.DB.prepare("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) VALUES(?,?,'seasonal')").bind(k.id,id),
-      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"seasonal_skin_purchased",JSON.stringify({skin:id,price:skin.price}))
+    const purchase=await env.DB.batch([
+      env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=? AND NOT EXISTS(SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?)").bind(skin.price,p.id,skin.price,k.id,id),
+      env.DB.prepare("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) SELECT ?,?,'seasonal' WHERE changes()>0").bind(k.id,id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"seasonal_skin_purchased",JSON.stringify({skin:id,price:skin.price}))
     ]);
+    if(!purchase[0]?.meta?.changes)return json({error:"Diamantes insuficientes ou skin já adquirida."},409);
   }else if(type==="skin_fuse"){
     const inputs=Array.isArray(body.inputs)?body.inputs.map(String):[];
     if(inputs.length!==3||new Set(inputs).size!==3)return json({error:"Selecione três skins diferentes."},400);
@@ -523,12 +557,15 @@ async function gameAction(env,playerId,body){
     const output=recipe.output;
     const owned=await env.DB.prepare("SELECT item_id FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id IN (?,?,?)").bind(k.id,...inputs).all();
     if((owned.results||[]).length!==3)return json({error:"Você não possui todas as skins selecionadas."},409);
-    const wallet=await env.DB.prepare("UPDATE kingdom_cosmetic_wallet SET shards=shards-50 WHERE kingdom_id=? AND shards>=50").bind(k.id).run();
-    if(!wallet.meta.changes)return json({error:"São necessários 50 fragmentos de fusão."},409);
-    const statements=inputs.map(id=>env.DB.prepare("DELETE FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?").bind(k.id,id));
-    statements.push(env.DB.prepare("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) VALUES(?,?,'fused')").bind(k.id,output.id));
-    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"skin_fused",JSON.stringify({inputs,output:output.id,shards:50})));
-    await env.DB.batch(statements);
+    const fusion=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdom_cosmetic_wallet SET shards=shards-50 WHERE kingdom_id=? AND shards>=50 AND (SELECT COUNT(*) FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id IN (?,?,?))=3 AND NOT EXISTS(SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?)").bind(k.id,k.id,...inputs,k.id,output.id),
+      env.DB.prepare("DELETE FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=? AND changes()>0").bind(k.id,inputs[0]),
+      env.DB.prepare("DELETE FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=? AND changes()>0").bind(k.id,inputs[1]),
+      env.DB.prepare("DELETE FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=? AND changes()>0").bind(k.id,inputs[2]),
+      env.DB.prepare("INSERT INTO kingdom_cosmetics(kingdom_id,item_id,kind) SELECT ?,?,'fused' WHERE changes()>0").bind(k.id,output.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"skin_fused",JSON.stringify({inputs,output:output.id,shards:50}))
+    ]);
+    if(!fusion[0]?.meta?.changes)return json({error:"Fragmentos insuficientes, skins alteradas ou fusão já realizada."},409);
   }else if(type==="shop_buy"){
 
     const itemId=String(body.item||""),source=String(body.source||"shop"),item=Object.hasOwn(SHOP_ITEMS,itemId)?SHOP_ITEMS[itemId]:null;
