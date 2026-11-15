@@ -57,3 +57,7 @@ Migrações atuais: `0001` a `0007`. A migração `0005` preserva frações da p
 ## Aplicativo e desempenho
 
 A interface usa Three.js com instanciamento de objetos repetidos, LOD, redução de resolução adaptativa e perfil móvel. O manifesto e o service worker permitem instalar o shell do jogo e mostrar uma página própria quando não há conexão. Batalhas e sincronização do reino continuam exigindo Internet.
+
+## Equipamentos persistentes
+
+Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqueios são validados pelo Worker; a interface apenas solicita ações e renderiza o estado retornado pelo servidor. A migração correspondente é `0008_kingdom_equipment.sql`.
