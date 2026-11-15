@@ -855,7 +855,12 @@ export default {
   if(request.method==="OPTIONS")return new Response(null,{headers:cors});
   const url=new URL(request.url);
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
-  if(url.pathname==="/api/health"&&request.method==="GET"){\n    if(!env.DB||!env.SESSION_SECRET)return json({ok:false,status:"not_ready"},503);\n    try{await env.DB.prepare("SELECT 1 AS ready").first();return json({ok:true,status:"ready"});}\n    catch(e){console.error("health_check_failed",String(e?.message||e));return json({ok:false,status:"database_unavailable"},503);}\n  }\n  if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
+  if(url.pathname==="/api/health"&&request.method==="GET"){
+    if(!env.DB||!env.SESSION_SECRET)return json({ok:false,status:"not_ready"},503);
+    try{await env.DB.prepare("SELECT 1 AS ready").first();return json({ok:true,status:"ready"});}
+    catch(e){console.error("health_check_failed",String(e?.message||e));return json({ok:false,status:"database_unavailable"},503);}
+  }
+  if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
   if(url.pathname==="/api/store/catalog"&&request.method==="GET"){
     try{
