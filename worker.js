@@ -361,7 +361,7 @@ function eventMaterialStatement(env,kingdomId,eventKey){
 async function gameState(env,playerId){
   await ensureHeroTables(env);
   await ensureShopTables(env);
-  const p=await env.DB.prepare("SELECT id,player_id,name,gems FROM players WHERE player_id=?").bind(playerId).first();
+  const p=await env.DB.prepare("SELECT p.id,p.player_id,p.name,p.gems,n.nickname FROM players p LEFT JOIN player_nicknames n ON n.player_id=p.id WHERE p.player_id=?").bind(playerId).first();
   if(!p)return null;
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
@@ -409,7 +409,15 @@ async function gameAction(env,playerId,body){
   const type=String(body.type||"");
   let battleOutcome=null;
 
-  if(type==="cosmetic_claim"){
+  if(type==="set_nickname"){
+    const nickname=String(body.nickname||"").normalize("NFC").trim();
+    if(!/^[\\p{L}\\p{N}_-]{3,20}$/u.test(nickname))return json({error:"Use um nickname de 3 a 20 caracteres: letras, números, _ ou -."},400);
+    const nicknameKey=nickname.toLocaleLowerCase("pt-BR");
+    try{
+      await env.DB.prepare("INSERT INTO player_nicknames(player_id,nickname,nickname_key) VALUES(?,?,?) ON CONFLICT(player_id) DO UPDATE SET nickname=excluded.nickname,nickname_key=excluded.nickname_key").bind(p.id,nickname,nicknameKey).run();
+      await env.DB.prepare("UPDATE players SET name=? WHERE id=?").bind(nickname,p.id).run();
+    }catch(error){return json({error:"Este nickname já está sendo usado por outro jogador."},409)}
+  }else if(type==="cosmetic_claim"){
     await ensureCosmeticTables(env,k.id);
     const collectionId=String(body.collection||""),col=COSMETIC_COLLECTIONS.find(x=>x.id===collectionId);
     if(!col)return json({error:"Coleção inválida."},400);
@@ -918,6 +926,13 @@ export default {
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     try{
+      if(url.pathname==="/api/game/players/search"&&request.method==="GET"){
+        const query=String(url.searchParams.get("q")||"").normalize("NFC").trim();
+        if(!/^[\\p{L}\\p{N}_-]{3,20}$/u.test(query))return json({error:"Digite ao menos 3 caracteres válidos para pesquisar."},400);
+        const key=query.toLocaleLowerCase("pt-BR");
+        const matches=await env.DB.prepare("SELECT p.player_id,n.nickname,k.kingdom_name,k.castle_level,k.power FROM player_nicknames n JOIN players p ON p.id=n.player_id JOIN kingdoms k ON k.player_id=p.id WHERE n.nickname_key LIKE ? ORDER BY k.power DESC LIMIT 20").bind("%"+key+"%").all();
+        return json({players:matches.results||[]});
+      }
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);
       }
