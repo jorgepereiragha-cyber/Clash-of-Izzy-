@@ -117,3 +117,33 @@ test("short CJK queries use bounded LIKE fallback even when FTS prefix already r
   assert.ok(worker.includes("const pattern=\"%\"+escaped+\"%\""));
   assert.ok(worker.includes("nickname_key LIKE ? ESCAPE '!'"));
 });
+
+
+test("global search includes allied kingdoms, Portuguese word forms and resilient per-category fallbacks", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("kingdom_alliance_tag"));
+  assert.ok(worker.includes('allianceTag:row.kingdom_alliance_tag||""'));
+  assert.ok(!worker.includes("NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER))"));
+  assert.ok(!worker.includes("NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id)"));
+  assert.ok(worker.includes('normalized.endsWith("oes")'));
+  assert.ok(worker.includes('normalized.endsWith("aes")'));
+  assert.ok(worker.includes('normalized.endsWith("eis")'));
+  assert.ok(worker.includes("tokenVariants(token)"));
+  assert.ok(worker.includes('!hasType("kingdom")'));
+  assert.ok(worker.includes('!hasType("alliance")'));
+  assert.ok(worker.includes('!hasType("territory")'));
+  assert.ok(worker.includes('!hasType("skin")'));
+  assert.ok(worker.includes("entitySubstringAvailable=false"));
+  assert.ok(worker.includes("playerSubstringAvailable=false"));
+});
+
+test("CJK single-codepoint search is allowed while short Latin noise is rejected", async () => {
+  const worker = await read("worker.js");
+  const navigation = await read("navigation.js");
+  const alliance = await read("alliance.html");
+  assert.ok(worker.includes("queryLength<(containsCjk?1:2)"));
+  assert.ok(worker.includes("Script=Hangul"));
+  assert.ok(navigation.includes("return length>=(cjk?1:2)"));
+  assert.ok(alliance.includes("return length>=(cjk?1:2)"));
+  assert.ok(!alliance.includes('id="worldSearchQuery" type="search" minlength="2"'));
+});
