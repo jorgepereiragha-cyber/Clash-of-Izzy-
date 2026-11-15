@@ -87,3 +87,12 @@ test("global navigation exposes the Anjo da Morte weekend event", async () => {
   assert.ok(nav.includes('href:"/events.html"'));
   assert.ok(nav.includes("anjo da morte"));
 });
+
+
+test("global navigation supports one-character CJK searches and accent-insensitive local sections", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes("const queryEligible = value"));
+  assert.ok(nav.includes("Array.from(String(value||\"\")).length"));
+  assert.ok(nav.includes("Script=Han"));
+  assert.ok(nav.includes("normalizeSearch(item.label+\" \"+item.keywords).includes(normalized)"));
+});
