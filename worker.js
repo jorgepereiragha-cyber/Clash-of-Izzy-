@@ -1097,7 +1097,16 @@ async function gameAction(env,playerId,body){
 }
 
 async function ensureAngelDeathWeekend(env,now=new Date()){
-  const window=getAngelDeathWeekendWindow(now),instant=now.toISOString();
+  let window=getAngelDeathWeekendWindow(now);
+  const instant=now.toISOString();
+  const current=await env.DB.prepare("SELECT id FROM world_events WHERE event_key=? AND starts_at=?").bind(ANGEL_DEATH_EVENT.key,window.startsAt).first();
+  if(!current&&now.getTime()-Date.parse(window.startsAt)>15*60*1000&&now.getTime()<Date.parse(window.endsAt)){
+    const history=await env.DB.prepare("SELECT id FROM world_events WHERE event_key=? ORDER BY starts_at DESC LIMIT 1").bind(ANGEL_DEATH_EVENT.key).first();
+    if(!history){
+      const nextStart=new Date(Date.parse(window.startsAt)+7*86400000);
+      window=getAngelDeathWeekendWindow(nextStart);
+    }
+  }
   await env.DB.prepare("INSERT OR IGNORE INTO world_events(event_key,starts_at,ends_at,status,boss_hp_total,boss_hp_remaining) VALUES(?,?,?,?,?,?)")
     .bind(ANGEL_DEATH_EVENT.key,window.startsAt,window.endsAt,Date.parse(window.startsAt)<=now.getTime()?"active":"scheduled",ANGEL_DEATH_EVENT.bossHp,ANGEL_DEATH_EVENT.bossHp).run();
   await env.DB.prepare("UPDATE world_events SET status='active' WHERE event_key=? AND starts_at<=? AND ends_at>? AND status='scheduled'")
