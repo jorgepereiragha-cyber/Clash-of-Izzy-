@@ -29,4 +29,5 @@ test("normal world PvE marches return all troops; permanent losses are reserved 
   assert.ok(!battle.includes("SET quantity=quantity-CAST"));
   assert.ok(worker.includes("async function angelDeathEventAttack"));
   assert.ok(worker.includes("SET quantity=quantity-CAST"));
+  assert.ok(worker.includes("AS selected WHERE selected.key=army_units.unit_type"));
 });
