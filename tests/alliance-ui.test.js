@@ -50,6 +50,8 @@ test("busca mundial autentica, limita consultas e retorna somente dados público
     'JOIN players p ON p.id=k.player_id WHERE p.player_id=?',
     'COUNT(am.kingdom_id) AS member_count'
   ]) assert.ok(worker.includes(snippet), `busca mundial deve conter: ${snippet}`);
+  assert.ok(!worker.includes('results.push({type:"kingdom",id:row.id'));
+  assert.ok(!worker.includes('results.push({type:"alliance",id:row.id'));
 });
 
 test("central de alianças oferece busca acessível de reinos e alianças", async () => {
