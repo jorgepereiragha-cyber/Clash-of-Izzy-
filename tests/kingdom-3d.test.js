@@ -62,3 +62,13 @@ test("state refresh keeps the live WebGL canvas mounted in the kingdom", () => {
   assert.match(kingdom, /const kingdom3d=city\.querySelector\("#kingdom3d"\)/);
   assert.match(kingdom, /if\(kingdom3d\)city\.append\(kingdom3d\)/);
 });
+
+
+test("renderer degrades gracefully on low-memory Android and WebGL context loss", () => {
+  assert.match(renderer, /navigator\.deviceMemory/);
+  assert.match(renderer, /deviceMemory <= 4 \? 1 : 1\.25/);
+  assert.match(renderer, /host\.clientWidth > 680 && !\(deviceMemory > 0 && deviceMemory <= 4\)/);
+  assert.match(renderer, /webglcontextlost/);
+  assert.match(renderer, /host\.classList\.remove\("has-3d"\)/);
+  assert.match(renderer, /arte 2D restaurada/);
+});
