@@ -7,3 +7,6 @@ README.md
 migrations/**
 node_modules/**
 dist/**
+game-adapter.js
+package.json
+docs/**
