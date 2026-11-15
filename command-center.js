@@ -40,7 +40,7 @@ function render(){
  const k=state.kingdom||{},p=state.player||{};
  $("resources").innerHTML=[["🌾","Comida",k.food],["🪵","Madeira",k.wood],["🪨","Pedra",k.stone],["⛓","Ferro",k.iron],["🪙","Ouro",k.gold],["💎","Gemas",p.gems]].map(([icon,label,value])=>'<div class="resource"><small>'+icon+" "+label+'</small><strong>'+n(value)+'</strong></div>').join("");
  $("summary").innerHTML=[["🏰 Castelo","Nível "+n(k.castle_level)],["⚔ Tropas",n(state.totalTroops)],["🐉 Dragão","Nível "+n(state.dragon?.level)],["🛡 Aliança",state.alliance?esc(state.alliance.tag):"Sem aliança"]].map(([label,value])=>'<div class="tile"><small>'+label+'</small><strong>'+value+"</strong></div>").join("");
- renderTasks();renderBuildings();renderTroops();renderResearch();renderWorld();renderHeroes();renderDragon();renderAlliance();renderBattles();renderDailyEvents();
+ renderTasks();renderBuildings();renderTroops();renderResearch();renderWorld();renderHeroes();renderDragon();renderAlliance();renderBattles();renderDailyEvents();renderVeilArchive();
 }
 function renderBuildings(){
  const rows=state.buildings||[];
@@ -72,6 +72,18 @@ function renderAlliance(){
  $("allianceCreate").hidden=!!a;$("allianceJoin").hidden=!!a;$("warForm").hidden=!a||!["lider","co_lider","oficial"].includes(a.rank);
  const msgs=a?.chat||[];$("chatMessages").innerHTML=msgs.length?msgs.map(m=>'<div class="msg"><b>'+esc(m.kingdom_name||"Jogador")+'</b><div>'+esc(m.message)+'</div><small>'+esc(m.created_at||"")+'</small></div>').join(""):'<div class="empty">Sem mensagens. O chat é atualizado ao recarregar o painel.</div>';
 }
+const VEIL_CLUES=[
+ {id:"lens",title:"A lente sob o castelo",place:"Cripta das fundações",text:"Atrás de uma pedra sem inscrição repousa uma lente azulada. Ela não amplia objetos: revela riscos minúsculos que formam um mapa de túneis esquecidos.",hint:"Uma construção antiga sempre esconde mais do que aparenta."},
+ {id:"star",title:"A estrela deslocada",place:"Observatório abandonado",text:"No teto, sete estrelas foram talhadas em prata. Uma delas está fora de posição. Quando vista do pátio, aponta para uma torre que não consta em nenhum registro.",hint:"Nem toda constelação foi feita para olhar o céu."},
+ {id:"ledger",title:"O livro sem autor",place:"Sala dos mapas",text:"Um livro registra guerras antes de acontecerem — mas suas páginas finais estão vazias. Na lombada, o discreto arco duplo da Vigília.",hint:"Os mapas mostram fronteiras; as margens contam segredos."}
+];
+function renderVeilArchive(){
+ const found=new Set(JSON.parse(localStorage.getItem("coi_veil_clues")||"[]"));
+ $("veilClues").innerHTML=VEIL_CLUES.map(clue=>{
+  const unlocked=found.has(clue.id);
+  return '<article class="item"><h3>'+ (unlocked?"✧ ":"") +esc(clue.title)+'</h3><div class="muted">'+esc(clue.place)+'</div><p class="muted">'+(unlocked?esc(clue.text):esc(clue.hint))+'</p><div class="row"><span class="pill">'+(unlocked?"Fragmento arquivado":"Registro selado")+'</span><button type="button" data-veil-clue="'+esc(clue.id)+'" '+(unlocked?"disabled":"")+'>'+(unlocked?"Descoberto":"Examinar pista")+'</button></div></article>';
+ }).join("");
+}
 function renderDailyEvents(){
  const data=state.dailyEvents||{},tasks=data.tasks||[];
  $("dailyReset").textContent=data.resetsAt?"Reinício no seu horário: "+new Date(data.resetsAt).toLocaleString("pt-BR",{dateStyle:"short",timeStyle:"short"})+" · UTC: "+new Date(data.resetsAt).toISOString().slice(0,16).replace("T"," ")+"Z":"";
@@ -91,6 +103,15 @@ async function act(body,success){
 }
 $("tabs").addEventListener("click",event=>{const button=event.target.closest("[data-tab]");if(!button)return;document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected",String(x===button)));document.querySelectorAll(".section").forEach(x=>x.classList.toggle("active",x.id==="section-"+button.dataset.tab))});
 document.body.addEventListener("click",async event=>{
+ const veil=event.target.closest("[data-veil-clue]");
+ if(veil){
+  const found=new Set(JSON.parse(localStorage.getItem("coi_veil_clues")||"[]"));
+  found.add(veil.dataset.veilClue);
+  localStorage.setItem("coi_veil_clues",JSON.stringify([...found]));
+  renderVeilArchive();
+  notice("Fragmento encontrado. A Vigília deixou mais um sinal.", "ok");
+  return;
+ }
  const claim=event.target.closest("[data-event-claim]");if(claim){try{await act({type:"event_claim",taskId:claim.dataset.eventClaim},"Recompensa diária resgatada.")}catch{}return}
  const up=event.target.closest("[data-upgrade]");if(up){try{await act({type:"upgrade",building:up.dataset.upgrade},"Melhoria iniciada; o reino continuará construindo offline.")}catch{}return}
  const research=event.target.closest("[data-research]");if(research){try{await act({type:"research",research:research.dataset.research},"Pesquisa iniciada; o servidor concluirá automaticamente.")}catch{}return}
