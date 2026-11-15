@@ -1,6 +1,8 @@
 # Clash of Izzy — arte e texturas
 
 ## Direção visual
+- Combinar três metas de produção comuns em jogos de alto nível: silhuetas estilizadas e leitura imediata, materiais PBR consistentes e acabamento artesanal de cenário, sempre com orçamento de GPU adequado a Android.
+- Usar referências internacionais como inspiração técnica, sem copiar personagens, marcas, mapas ou assets protegidos de outros jogos.
 - Fantasia medieval original, com leitura clara em telas pequenas.
 - Materiais: pedra desgastada, madeira escura, telhados cerâmicos, campos, caminhos de terra e vegetação.
 - Silhuetas e paleta devem distinguir cada edifício mesmo sem depender de texto.
@@ -17,7 +19,7 @@
 
 ## Cena atual
 - `kingdom.html` mantém a arte procedural 2D em Canvas como fallback para WebGL indisponível.
-- `scripts/kingdom-3d.js` adiciona uma cena isométrica Three.js com terreno, estrada, árvores, iluminação e edifícios 3D procedurais.
+- `scripts/kingdom-3d.js` adiciona uma cena isométrica Three.js com terreno, estrada, árvores, iluminação, até 16 edifícios 3D procedurais e mapas de textura tileáveis gerados por código para pedra, madeira, telhado, grama e estrada.
 - `assets/3d/manifest.json` é o catálogo versionado para substituição explícita por modelos GLB reais (`enabled: true`). O manifesto começa vazio: ainda não há modelos GLB artísticos finais no repositório.
 - O carregador usa `GLTFLoader` e `KTX2Loader`/Basis Universal. Texturas KTX2 só serão usadas quando um GLB real com `KHR_texture_basisu` for adicionado e testado.
 - A cena 3D é renderizada sob demanda, sem loop contínuo; não há animação de câmera ou ciclo de jogo nesta tela ainda.
