@@ -44,3 +44,27 @@ test("FTS5 migration indexes the four public categories and maintains its index 
   assert.ok(migration.includes("game_search_documents_ad"));
   assert.ok(migration.includes("game_search_fts(game_search_fts) VALUES('rebuild')"));
 });
+
+
+test("player discovery uses a unique normalized nickname and never exposes private account data", async () => {
+  const worker = await read("worker.js");
+  const migration = await read("migrations/0013_player_nicknames.sql");
+  assert.ok(migration.includes("nickname_key TEXT NOT NULL UNIQUE"));
+  assert.ok(migration.includes("REFERENCES players(id) ON DELETE CASCADE"));
+  assert.ok(worker.includes('type==="set_nickname"'));
+  assert.ok(worker.includes('ON CONFLICT(player_id) DO UPDATE SET nickname=excluded.nickname,nickname_key=excluded.nickname_key'));
+  assert.ok(worker.includes('url.pathname==="/api/game/players/search"&&request.method==="GET"'));
+  assert.ok(worker.includes('rateLimitDecision(env,"player-search-player"'));
+  assert.ok(worker.includes('rateLimitDecision(env,"player-search-network"'));
+  assert.ok(worker.includes('n.player_id<>(SELECT id FROM players WHERE player_id=?)'));
+  assert.ok(worker.includes("nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0)"));
+  assert.ok(!worker.includes("email:row.email"));
+});
+
+test("player discovery UI renders server data as text and uses the authenticated game adapter", async () => {
+  const kingdom = await read("kingdom.html");
+  assert.ok(kingdom.includes('request("/game/players/search?q="+encodeURIComponent(query))'));
+  assert.ok(kingdom.includes('title.textContent=player.nickname'));
+  assert.ok(kingdom.includes('details.textContent="Castelo nível "+player.castle_level'));
+  assert.ok(!kingdom.includes('row.innerHTML=player.nickname'));
+});
