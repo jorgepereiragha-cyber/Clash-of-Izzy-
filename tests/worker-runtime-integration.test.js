@@ -240,11 +240,12 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         body: {
           kind: "vip_package", itemId: vip.id,
           requestKey: "integration-vip-request-01",
-          paymentMethod: "pix", paymentReference: "TESTE-NAO-PAGO",
+          paymentMethod: "mercadopago_link", paymentReference: "TESTE-NAO-PAGO",
         },
       }), 201, "criação de pedido VIP");
       assert.ok(purchase.request?.id);
       assert.equal(purchase.request.status, "pending");
+      assert.equal(purchase.request.payment_method, "mercadopago_link");
 
       const pending = expectStatus(await admin("/api/admin/purchase-requests", {}), 200, "fila Master de pedidos");
       assert.ok(pending.requests.some(item => Number(item.id) === Number(purchase.request.id)));
