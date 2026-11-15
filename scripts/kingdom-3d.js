@@ -617,6 +617,63 @@ if (host && "WebGLRenderingContext" in window) {
     // Optional art is skipped in Data Saver mode; procedural models remain available.
     if (!qualityProfile?.loadOptionalAssets || disposed || !renderer) return Promise.resolve();
     try {
+      if (!manifestLoad) {
+        manifestLoad = (async () => {
+          const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
+          if (disposed || !renderer) return;
+          if (!response.ok) throw new Error("Manifesto 3D indisponível.");
+          const manifest = await response.json();
+          if (disposed || !renderer) return;
+          manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [];
+          manifestProps = Array.isArray(manifest.props) ? manifest.props.slice(0, 16) : [];
+          manifestUnits = Array.isArray(manifest.units) ? manifest.units.slice(0, 8) : [];
+        })().catch(error => {
+          manifestLoad = null;
+          throw error;
+        });
+      }
+      await manifestLoad;
+      if (disposed || !renderer) return;
+
+      const neededTypes = new Set(
+        (Array.isArray(buildings) ? buildings : [])
+          .map(item => item?.building_type)
+          .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
+      );
+      const presentUnits = new Set(
+        (Array.isArray(troops) ? troops : [])
+          .filter(unit => Number(unit?.quantity) > 0)
+          .map(unit => unit?.unit_type)
+          .filter(type => typeof type === "string")
+      );
+      const queue = [
+        ...manifestAssets
+          .filter(asset => asset?.enabled === true && neededTypes.has(asset.type) && !glbTemplates.has(asset.type))
+          .map(asset => ({ asset, kind: "building", key: `building:${asset.type}` })),
+        ...manifestProps
+          .filter(asset => asset?.enabled === true && typeof asset.id === "string" && !glbPropTemplates.has(asset.id))
+          .map(asset => ({ asset, kind: "prop", key: `prop:${asset.id}` })),
+        ...manifestUnits
+          .filter(asset => asset?.enabled === true && presentUnits.has(asset.unit_type) && !glbUnitTemplates.has(asset.unit_type))
+          .map(asset => ({ asset, kind: "unit", key: `unit:${asset.unit_type}` }))
+      ].filter(entry => !glbLoadPromises.has(entry.key));
+      let cursor = 0;
+      const worker = async () => {
+        while (!disposed && cursor < queue.length) {
+          await loadManifestAsset(queue[cursor++]);
+        }
+      };
+      await Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => worker()));
+      if (!disposed && renderer) {
+        renderBuildings(latestBuildings);
+        renderManifestProps();
+        renderKingdomTroops(latestTroops);
+      }
+    } catch (error) {
+      console.info("Clash of Izzy: GLB assets not ready; procedural models remain active.", error);
+    }
+  }
+  try {
     const deviceMemory = Number(navigator.deviceMemory || 0);
     renderer = new THREE.WebGLRenderer({
       alpha: true, antialias: false, powerPreference: "low-power",
