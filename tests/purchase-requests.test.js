@@ -37,6 +37,8 @@ test("official store submits an auditable payment request instead of opening Wha
   assert.ok(arena.includes("Pedido #"));
   assert.ok(arena.includes('id="purchaseMethod"'));
   assert.ok(arena.includes('id="purchaseReference"'));
+  assert.ok(arena.includes("https://link.mercadopago.com.br/pagamentosskin"));
+  assert.ok(arena.includes("mercadopago_link"));
   assert.ok(arena.includes('id="whatsapp"'));
 });
 
@@ -44,7 +46,7 @@ test("purchase schema restricts products, states, payment methods and duplicate 
   const migration = await read("migrations/0011_purchase_requests.sql");
   assert.ok(migration.includes("CHECK (product_kind IN ('vip_package','skin'))"));
   assert.ok(migration.includes("CHECK (status IN ('pending','approved','rejected'))"));
-  assert.ok(migration.includes("CHECK (payment_method IN ('pix','bank_transfer','manual'))"));
+  assert.ok(migration.includes("CHECK (payment_method IN ('mercadopago_link','pix','bank_transfer','manual'))"));
   assert.ok(migration.includes("UNIQUE (player_id, request_key)"));
   assert.ok(migration.includes("idx_purchase_requests_status_created"));
   assert.ok(migration.includes("idx_purchase_requests_one_pending_product"));
