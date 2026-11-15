@@ -12,6 +12,7 @@ concurrency:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    timeout-minutes: 25
     permissions:
       contents: read
     name: Validate, migrate and deploy
@@ -63,6 +64,8 @@ jobs:
 
       - name: Verify Cloudflare API token
         shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
           python - <<'PY'
           import json
@@ -70,6 +73,9 @@ jobs:
           import urllib.error
           import urllib.request
 
+          account_id = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+          if not account_id:
+              raise SystemExit("CLOUDFLARE_ACCOUNT_ID ausente. Configure o ID da conta nos GitHub Actions secrets.")
           token = os.environ.get("CLOUDFLARE_API_TOKEN", "").strip()
           if not token:
               raise SystemExit("Token Cloudflare ausente. Configure CLOUDFLARE_API_TOKEN nos GitHub Actions secrets.")
@@ -101,6 +107,21 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
 
       - name: Deploy Worker and static assets
-        run: npx wrangler --config wrangler.jsonc deploy
+        id: deploy_worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler --config wrangler.jsonc deploy 2>&1 | tee "$RUNNER_TEMP/clash-of-izzy-deploy.log"
+          WORKER_BASE_URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/clash-of-izzy-deploy.log" | tail -n 1 || true)"
+          if [[ -z "$WORKER_BASE_URL" ]]; then
+            echo "::error::Wrangler não informou a URL workers.dev; confira workers_dev no wrangler.jsonc e os domínios do Worker."
+            exit 1
+          fi
+          echo "WORKER_BASE_URL=$WORKER_BASE_URL" >> "$GITHUB_ENV"
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Smoke test production Worker
+        run: node scripts/production-smoke.js
+        env:
+          WORKER_BASE_URL: ${{ env.WORKER_BASE_URL }}

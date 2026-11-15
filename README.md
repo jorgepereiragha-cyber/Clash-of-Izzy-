@@ -14,14 +14,15 @@ npm run dev
 
 Comandos úteis:
 
-- `npm test`: testes do simulador de combate.
+- `npm test`: testes de regras, contratos e integração Worker+D1 local.
+- `node scripts/production-smoke.js`: smoke test de produção (requer `WORKER_BASE_URL`).
 - `npm run check`: valida o bundle do Worker sem publicar.
 - `npm run db:migrate:local`: aplica as migrações no D1 local.
 - `npm run db:migrate:remote`: aplica as migrações no D1 remoto.
 
 ## Deploy automático
 
-O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`.
+O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, páginas principais e PWA. O deploy só termina com sucesso quando esses checks passam.
 
 Configure estes segredos no GitHub:
 
