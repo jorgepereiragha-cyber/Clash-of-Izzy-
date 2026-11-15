@@ -274,7 +274,7 @@ document.getElementById("nicknameForm").addEventListener("submit",setNickname);
 document.getElementById("trainingForm").addEventListener("submit",startTraining);
 document.getElementById("researchForm").addEventListener("submit",startResearch);
 window.setInterval(()=>{document.querySelectorAll("[data-completes]").forEach(el=>{const remaining=Math.max(0,Math.ceil((Date.parse(el.dataset.completes)-Date.now())/1000));el.textContent=formatDuration(remaining);});},1000);
-window.setInterval(refreshQueueState,20000);
+window.setInterval(refreshQueueState,30000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshQueueState();});
 document.getElementById("playerSearchForm").addEventListener("submit",searchPlayers);
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
