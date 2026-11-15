@@ -818,7 +818,7 @@ async function gameAction(env,playerId,body){
     if(won){
       const ledgerRows=Object.entries(rewards).filter(([,amount])=>amount>0);
       if(ledgerRows.length)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+ledgerRows.map(()=> "SELECT ?,?,?,? WHERE "+guard).join(" UNION ALL "))
-        .bind(...ledgerRows.flatMap(([resource,amount])=>[k.id,resource,amount,"recompensa de batalha PvE",k.id,actionId]));
+        .bind(...ledgerRows.flatMap(([resource,amount])=>[k.id,resource,amount,"recompensa de batalha PvE",k.id,actionId])));
     }
     let heroUpdateIndex=-1,heroProgress=null;
     if(activeHero){
