@@ -1,4 +1,4 @@
-import { simulateBattle } from "./game-adapter.js";
+import { simulateBattle, calculateMarchDuration } from "./game-adapter.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
@@ -262,8 +262,11 @@ async function applyProduction(env,kingdomId){
   };
   await ensureEquipmentTables(env,kingdomId);
   const activeHero=await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first();
-  const equippedRows=activeHero?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,activeHero.id,kingdomId).all():{results:[]};
-  const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[]).resourcePercent/100;
+  const [equippedRows,gearResearchRows]=await Promise.all([
+    activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,activeHero.id,kingdomId).all():Promise.resolve({results:[]}),
+    env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
+  ]);
+  const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).resourcePercent/100;
   const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
@@ -320,8 +323,11 @@ async function processMarches(env,kingdomId){
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
     ]);
-    const equipmentRows=hero?.id?await env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id,kingdomId).all():{results:[]};
-    const gear=equipmentBonuses(equipmentRows.results||[]);
+    const [equipmentRows,gearResearchRows]=await Promise.all([
+     hero?.id?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,hero.id,kingdomId).all():Promise.resolve({results:[]}),
+     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
+    ]);
+    const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
     const castleLevel=Number(kingdom?.castle_level||1);
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
@@ -330,6 +336,9 @@ async function processMarches(env,kingdomId){
      defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
      equipmentAttackBonusPercent:gear.attackPercent,
      equipmentHealthBonusPercent:gear.healthPercent,
+     criticalChancePercent:gear.criticalChancePercent,
+     criticalDamageMultiplier:1.5,
+     criticalSeed:crypto.getRandomValues(new Uint32Array(1))[0],
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
     });
@@ -343,7 +352,7 @@ async function processMarches(env,kingdomId){
    // A captura é condicional e imediatamente seguida pelo relatório, que lê changes() da captura.
    statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,? WHERE "+guard)
-    .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true}),JSON.stringify({territoryCaptured:false}),JSON.stringify(battleLog),m.id,kingdomId,resolutionToken));
+    .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits:simulation.criticalHits||0}),JSON.stringify({territoryCaptured:false,criticalHits:simulation.criticalHits||0}),JSON.stringify(battleLog),m.id,kingdomId,resolutionToken));
    // Uma pequena recompensa de material acompanha cada conquista válida.
    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE EXISTS(SELECT 1 FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? AND winner_kingdom_id=? ORDER BY id DESC LIMIT 1) AND "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1")
     .bind(kingdomId,"power_crystal",kingdomId,m.target_territory_id,kingdomId,m.id,kingdomId,resolutionToken));
@@ -386,19 +395,46 @@ function eventMaterialStatement(env,kingdomId,eventKey){
  return env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) VALUES(?,?,1) ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,key);
 }
 const EQUIPMENT_CATALOG={
- coroa_izzy:{name:"Coroa de Izzy",slot:"helmet",rarity:"lendario",maxLevel:20,base:{defense:10,resourceBonus:5},growth:{defense:5,resourceBonus:2}},
- manto_real:{name:"Manto Real",slot:"armor",rarity:"epico",maxLevel:15,base:{health:50},growth:{health:25}},
- anel_poder:{name:"Anel do Poder",slot:"accessory",rarity:"raro",maxLevel:10,base:{attack:20},growth:{attack:8}},
- espada_guerreiro:{name:"Espada do Guerreiro",slot:"weapon",rarity:"raro",maxLevel:30,base:{attack:50,health:100},growth:{attack:8,health:25}}
+ coroa_izzy:{name:"Coroa de Izzy",slot:"helmet",rarity:"lendario",maxLevel:20,icon:"👑",description:"Relíquia real que amplia a proteção e a produção.",base:{defense:10,resourceBonus:5},growth:{defense:5,resourceBonus:2}},
+ manto_real:{name:"Manto Real",slot:"armor",rarity:"epico",maxLevel:15,icon:"🧥",description:"Manto reforçado que aumenta a vitalidade.",base:{health:50},growth:{health:25}},
+ anel_poder:{name:"Anel do Poder",slot:"accessory",rarity:"raro",maxLevel:10,icon:"💍",description:"Anel antigo que fortalece o ataque.",base:{attack:20},growth:{attack:8}},
+ espada_guerreiro:{name:"Espada do Guerreiro",slot:"weapon",rarity:"raro",maxLevel:30,icon:"⚔️",description:"Espada confiável para os primeiros heróis.",base:{attack:50,health:100},growth:{attack:8,health:25}},
+ iron_sword:{name:"Lâmina de Ferro",slot:"weapon",rarity:"comum",maxLevel:20,icon:"⚔️",description:"Arma equilibrada, acessível para novos ferreiros.",base:{attack:12,critical:0.2},growth:{attack:3.5,critical:0.05},craft:{gold:650,iron:35}},
+ rune_spear:{name:"Lança das Runas",slot:"weapon",rarity:"epico",maxLevel:20,icon:"🔱",description:"Lança rúnica com maior chance de acerto crítico.",base:{attack:21,critical:0.4},growth:{attack:4.5,critical:0.08},craft:{gold:2400,iron:100},requiredResearch:{gear_forging:2}},
+ raven_helm:{name:"Elmo dos Corvos",slot:"helmet",rarity:"raro",maxLevel:20,icon:"🪶",description:"Elmo inspirado nos corvos de Odin.",base:{defense:13,critical:0.25},growth:{defense:3,critical:0.05},craft:{gold:1100,iron:55}},
+ warden_plate:{name:"Couraça do Guardião",slot:"armor",rarity:"raro",maxLevel:20,icon:"🛡️",description:"Placas reforçadas para a linha de frente.",base:{defense:20,health:25},growth:{defense:4,health:6},craft:{gold:1500,iron:75},requiredResearch:{gear_ward:2}},
+ storm_boots:{name:"Botas da Tempestade",slot:"boots",rarity:"epico",maxLevel:20,icon:"🥾",description:"Botas leves que aceleram as marchas.",base:{march:1,health:10},growth:{march:0.4,health:2},craft:{gold:2200,iron:90},requiredResearch:{gear_logistics:1}},
+ frost_ring:{name:"Anel do Inverno",slot:"accessory",rarity:"raro",maxLevel:20,icon:"❄️",description:"Equilibra ataque e defesa com runas de gelo.",base:{attack:6,defense:6},growth:{attack:1.5,defense:1.5},craft:{gold:1300,iron:60},requiredResearch:{gear_ward:1}},
+ mjolnir_fragment:{name:"Fragmento de Mjölnir",slot:"weapon",rarity:"lendario",maxLevel:20,icon:"⚡",description:"Relíquia lendária que amplia o poder crítico.",base:{attack:32,critical:0.8},growth:{attack:6,critical:0.12},craft:{gold:6200,iron:220},requiredResearch:{gear_forging:5,gear_ward:3}},
+ valkyrie_charm:{name:"Talismã das Valquírias",slot:"accessory",rarity:"lendario",maxLevel:20,icon:"🪽",description:"Bênção de vigor e resistência.",base:{defense:15,health:45},growth:{defense:3,health:10},craft:{gold:5800,iron:200},requiredResearch:{gear_vitality:4}}
+};
+const STARTER_EQUIPMENT_KEYS=["coroa_izzy","manto_real","anel_poder","espada_guerreiro"];
+const EQUIPMENT_RESEARCH={
+ gear_forging:{name:"Metalurgia Rúnica",icon:"⚒️",description:"Aumenta o ataque concedido pelos equipamentos.",effect:"Ataque",perLevel:0.75,maxLevel:10,cost:{wood:500,stone:300,iron:60}},
+ gear_ward:{name:"Runas de Proteção",icon:"ᛉ",description:"Aprimora a defesa concedida pelas peças.",effect:"Defesa",perLevel:0.75,maxLevel:10,cost:{wood:450,stone:400,iron:70}},
+ gear_vitality:{name:"Forja Vital",icon:"❤️",description:"Amplia a vida concedida pelos equipamentos.",effect:"Vida",perLevel:0.5,maxLevel:10,cost:{wood:500,stone:350,iron:60}},
+ gear_logistics:{name:"Passos de Asgard",icon:"🌬️",description:"Aumenta a velocidade das marchas do reino.",effect:"Marcha",perLevel:0.5,maxLevel:10,cost:{wood:600,stone:350,iron:100}}
 };
 async function ensureEquipmentTables(env,kingdomId){
- await env.DB.batch(Object.keys(EQUIPMENT_CATALOG).map(key=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level,is_locked) VALUES(?,?,1,0)").bind(kingdomId,key)));
+ await env.DB.batch(STARTER_EQUIPMENT_KEYS.map(key=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level,is_locked) VALUES(?,?,1,0)").bind(kingdomId,key)));
  return (await env.DB.prepare("SELECT item_key,level,is_locked,updated_at FROM kingdom_equipment WHERE kingdom_id=? ORDER BY item_key").bind(kingdomId).all()).results||[];
 }
-function equipmentBonuses(rows=[]){
- const totals={attack:0,defense:0,health:0,resourceBonus:0};
+function equipmentBonuses(rows=[],researchRows=[]){
+ const totals={attack:0,defense:0,health:0,resourceBonus:0,critical:0,march:0};
  for(const row of rows){const item=equipmentView(row);if(!item)continue;for(const key of Object.keys(totals))totals[key]+=Math.max(0,Number(item.stats?.[key])||0);}
- return {attackPercent:Math.min(30,Math.floor(totals.attack/10)),defensePercent:Math.min(30,Math.floor(totals.defense/10)),healthPercent:Math.min(30,Math.floor(totals.health/25)),resourcePercent:Math.min(50,totals.resourceBonus)};
+ const levels=Object.fromEntries(researchRows.map(row=>[row.research_key,Math.max(0,Number(row.level)||0)]));
+ const forging=Math.min(10,levels.gear_forging||0)*0.75;
+ const ward=Math.min(10,levels.gear_ward||0)*0.75;
+ const vitality=Math.min(10,levels.gear_vitality||0)*0.5;
+ const logistics=Math.min(10,levels.gear_logistics||0)*0.5;
+ return {
+  attackPercent:Math.min(30,Math.floor(totals.attack/10)+forging),
+  defensePercent:Math.min(30,Math.floor(totals.defense/10)+ward),
+  healthPercent:Math.min(30,Math.floor(totals.health/25)+vitality),
+  resourcePercent:Math.min(50,totals.resourceBonus),
+  criticalChancePercent:Math.min(15,totals.critical),
+  marchSpeedPercent:Math.min(25,totals.march+logistics)
+ };
 }
 
 function equipmentView(row){
@@ -407,7 +443,7 @@ function equipmentView(row){
  for(const [key,value] of Object.entries(def.base))stats[key]=value+(def.growth[key]||0)*(level-1);
  const next={};for(const [key,value] of Object.entries(def.base))next[key]=value+(def.growth[key]||0)*level;
  const multiplier=({comum:1,raro:1.1,epico:1.2,lendario:1.5})[def.rarity]||1;
- return {id:row.item_key,name:def.name,slot:def.slot,rarity:def.rarity,level,maxLevel:def.maxLevel,isLocked:Boolean(row.is_locked),stats,nextLevelStats:level<def.maxLevel?next:null,upgradeCost:Math.floor(100*Math.pow(1.3,level)*multiplier)};
+ return {id:row.item_key,name:def.name,slot:def.slot,rarity:def.rarity,icon:def.icon||"⚔️",description:def.description||"",craft:def.craft||null,requiredResearch:def.requiredResearch||{},level,maxLevel:def.maxLevel,isLocked:Boolean(row.is_locked),stats,nextLevelStats:level<def.maxLevel?next:null,upgradeCost:Math.floor(100*Math.pow(1.3,level)*multiplier)};
 }
 
 async function gameState(env,playerId){
@@ -453,7 +489,14 @@ async function gameState(env,playerId){
   const heroEquipment=(await env.DB.prepare("SELECT he.hero_id,h.hero_name,he.slot,he.item_key,he.level FROM hero_equipment he JOIN heroes h ON h.id=he.hero_id WHERE h.kingdom_id=? ORDER BY h.level DESC,h.id,he.slot").bind(kingdom.id).all()).results||[];
   const equippedByItem=new Map(heroEquipment.map(item=>[item.item_key,Number(item.hero_id)]));
   const equipment=equipmentRows.map(row=>({...equipmentView(row),equippedHeroId:equippedByItem.get(row.item_key)||null})).filter(Boolean);
-  return {equipment,heroEquipment,cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  const ownedEquipmentKeys=new Set(equipmentRows.map(row=>row.item_key));
+  const equipmentCatalog=Object.entries(EQUIPMENT_CATALOG).map(([id,def])=>({...def,id,owned:ownedEquipmentKeys.has(id)}));
+  const researchLevels=new Map((research.results||[]).map(row=>[row.research_key,Number(row.level)||0]));
+  const equipmentResearch=Object.entries(EQUIPMENT_RESEARCH).map(([id,def])=>{const level=researchLevels.get(id)||0;return {...def,id,level,nextCost:Object.fromEntries(Object.entries(def.cost).map(([resource,amount])=>[resource,amount*(level+1)]))};});
+  const activeHeroId=Number((heroes.results||[])[0]?.id||0);
+  const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
+  const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
+  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -464,7 +507,26 @@ async function gameAction(env,playerId,body){
   const type=String(body.type||"");
   let battleOutcome=null;
 
-  if(type==="equipment_upgrade"){
+  if(type==="equipment_craft"){
+    const itemKey=String(body.itemId||""),def=EQUIPMENT_CATALOG[itemKey];
+    if(!def||!def.craft)return json({error:"Projeto de forja inválido."},400);
+    const owned=await ensureEquipmentTables(env,k.id);
+    if(owned.some(row=>row.item_key===itemKey))return json({error:"Você já possui este equipamento."},409);
+    for(const [researchKey,requiredLevel] of Object.entries(def.requiredResearch||{})){
+      const current=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key=?").bind(k.id,researchKey).first();
+      if(Number(current?.level||0)<requiredLevel)return json({error:"Pesquise "+(EQUIPMENT_RESEARCH[researchKey]?.name||researchKey)+" nível "+requiredLevel+" antes de forjar esta peça."},409);
+    }
+    const goldCost=Math.max(0,Math.floor(Number(def.craft.gold)||0)),ironCost=Math.max(0,Math.floor(Number(def.craft.iron)||0));
+    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND gold>=? AND iron>=? AND NOT EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?)").bind(goldCost,ironCost,k.id,goldCost,ironCost,k.id,itemKey),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId),
+      env.DB.prepare("INSERT INTO kingdom_equipment(kingdom_id,item_key,level,is_locked) SELECT ?,?,1,0 WHERE "+guard).bind(k.id,itemKey,k.id,actionId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"equipment_crafted",JSON.stringify({item:itemKey,gold:goldCost,iron:ironCost}),k.id,actionId),
+      env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId)
+    ]);
+    if(!result[0]?.meta?.changes)return json({error:"Ouro ou ferro insuficiente, ou projeto já forjado."},409);
+  }else if(type==="equipment_upgrade"){
     const itemKey=String(body.itemId||""),def=EQUIPMENT_CATALOG[itemKey];
     if(!def)return json({error:"Equipamento inválido."},400);
     const rows=await ensureEquipmentTables(env,k.id),row=rows.find(x=>x.item_key===itemKey);
@@ -836,21 +898,21 @@ async function gameAction(env,playerId,body){
     if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes. Atualize o reino e tente novamente."},409);
   }else if(type==="research"){
     const key=String(body.research||"economy");
-    const allowed={economy:{wood:250,stone:120,iron:0},military:{wood:300,stone:180,iron:40},construction:{wood:350,stone:250,iron:0},defense:{wood:220,stone:300,iron:25}};
+    const allowed={economy:{wood:250,stone:120,iron:0},military:{wood:300,stone:180,iron:40},construction:{wood:350,stone:250,iron:0},defense:{wood:220,stone:300,iron:25},gear_forging:{wood:500,stone:300,iron:60},gear_ward:{wood:450,stone:400,iron:70},gear_vitality:{wood:500,stone:350,iron:60},gear_logistics:{wood:600,stone:350,iron:100}};
     if(!Object.hasOwn(allowed,key))return json({error:"Pesquisa inválida."},400);
     const current=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key=?").bind(k.id,key).first();
-    const level=current?.level||0;
-    if(level>=30)return json({error:"Pesquisa no nível máximo."},409);
+    const level=current?.level||0,maxLevel=key.startsWith("gear_")?(EQUIPMENT_RESEARCH[key]?.maxLevel||10):30;
+    if(level>=maxLevel)return json({error:"Pesquisa no nível máximo."},409);
     let centerLevel=0;
-    if(key==="defense"){
+    if(key==="defense"||key.startsWith("gear_")){
       const center=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy'").bind(k.id).first();
       if(!center||center.level<1)return json({error:"Construa o Centro de Pesquisa Militar primeiro."},409);
       centerLevel=Number(center.level);
-      if(level>=Math.min(30,centerLevel*3))return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis de defesa."},409);
+      if(level>=Math.min(maxLevel,centerLevel*3))return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis desta ciência."},409);
     }
     const c=allowed[key],factor=level+1,cost={wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
     const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
-    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND (?<>'defense' OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?))")
+    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND (? NOT IN ('defense','gear_forging','gear_ward','gear_vitality','gear_logistics') OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?))")
       .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,key,k.id,Math.ceil((level+1)/3));
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
     statements.push(env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=level+1 WHERE level=?").bind(k.id,key,k.id,actionId,level));
@@ -879,7 +941,15 @@ async function gameAction(env,playerId,body){
     const unitTypes=Object.keys(selected);
     if(!unitTypes.length)return json({error:"Selecione pelo menos uma tropa válida."},400);
     const unitsJson=JSON.stringify(selected);
-    const seconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
+    await ensureEquipmentTables(env,k.id);
+    const activeHero=await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(k.id).first();
+    const [equippedRows,gearResearchRows]=await Promise.all([
+      activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,activeHero.id).all():Promise.resolve({results:[]}),
+      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
+    ]);
+    const marchBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).marchSpeedPercent;
+    const seconds=calculateMarchDuration(baseSeconds,marchBonus);
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
@@ -894,20 +964,30 @@ async function gameAction(env,playerId,body){
     const armyRows=units.results||[];
     const total=armyRows.reduce((n,u)=>n+u.quantity,0);
     if(total<1)return json({error:"Treine tropas antes de iniciar uma batalha."},409);
-    const [hero,dragon,tech,defenseTech,battleState,activeHero]=await Promise.all([
+    const [hero,dragon,tech,defenseTech,battleState,activeHero,gearHero]=await Promise.all([
       env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(k.id).first(),
       env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(k.id).first(),
-      env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first()
+      env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first(),
+      env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(k.id).first()
     ]);
-    const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)));
+    await ensureEquipmentTables(env,k.id);
+    const [equippedRows,gearResearchRows]=await Promise.all([
+      gearHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,gearHero.id).all():Promise.resolve({results:[]}),
+      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
+    ]);
+    const gear=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]);
+    const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)+gear.defensePercent));
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const simulation=simulateBattle({
       army:armyRows,castleLevel:Number(k.castle_level||1),
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
+      equipmentAttackBonusPercent:gear.attackPercent,equipmentHealthBonusPercent:gear.healthPercent,
+      criticalChancePercent:gear.criticalChancePercent,criticalDamageMultiplier:1.5,
+      criticalSeed:crypto.getRandomValues(new Uint32Array(1))[0],
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
     });
     const won=simulation.won,attackerPower=simulation.attackerPower,defenderPower=simulation.defenderPower;
@@ -934,7 +1014,7 @@ async function gameAction(env,playerId,body){
       statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"royal_blueprint",k.id,actionId));
     }
     statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,?,?,?,?,?,?,? WHERE "+guard)
-      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_simulated",rounds:simulation.rounds,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}]),k.id,actionId));
+      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_simulated",rounds:simulation.rounds,criticalHits:simulation.criticalHits||0,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}]),k.id,actionId));
     if(won){
       const ledgerRows=Object.entries(rewards).filter(([,amount])=>amount>0);
       if(ledgerRows.length)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+ledgerRows.map(()=> "SELECT ?,?,?,? WHERE "+guard).join(" UNION ALL "))
