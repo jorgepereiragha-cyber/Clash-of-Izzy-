@@ -70,3 +70,5 @@ A comparação recebida é útil como roteiro, mas algumas afirmações não cor
 4. Criar mapa mundial navegável com terreno, coordenadas, fog of war e territórios; preservar a arena como modo separado.
 5. Implementar PvP assíncrono entre reinos com proteção, reforços, relatório e anti-replay antes de considerar tempo real.
 6. Integrar pagamento real somente com provedor, webhook assinado e entrega idempotente.
+
+- Reforçada a entrada por sigla: `alliance_join` agora verifica a capacidade máxima antes de inserir o membro; foi adicionado teste de regressão para esse limite.
