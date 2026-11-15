@@ -95,6 +95,12 @@ export async function runProductionSmokeTests({
   assert(arena.includes("paymentWindow"), "O fluxo de abertura do checkout Mercado Pago não está disponível.");
   assert(!/<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i.test(arena), "A loja ainda oferece um método de pagamento desativado.");
 
+  const mapHelperResponse = await get("/world-map-viewport.js");
+  assert(mapHelperResponse.status === 200, "Módulo de navegação do mapa indisponível.");
+  const mapHelper = await mapHelperResponse.text();
+  assert(mapHelper.includes("clampMapViewport") && mapHelper.includes("mapViewportTransform"),
+    "Módulo de navegação do mapa está incompleto.");
+
   const manifestResponse = await get("/manifest.json");
   assert(manifestResponse.status === 200, "Manifest da PWA indisponível.");
   const manifest = await readJson(manifestResponse, "Manifest da PWA");
@@ -103,7 +109,8 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v10"), "Service worker não contém o cache esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v11"), "Service worker não contém o cache esperado.");
+  assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
 
   return {
     baseUrl: base.origin,
@@ -118,6 +125,7 @@ export async function runProductionSmokeTests({
       staticPages: REQUIRED_PAGES.length,
       pwaManifest: true,
       serviceWorker: true,
+      worldMapNavigation: true,
     },
   };
 }
