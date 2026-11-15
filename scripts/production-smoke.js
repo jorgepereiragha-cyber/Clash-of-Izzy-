@@ -115,7 +115,7 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v12"), "Service worker não contém o cache esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v13"), "Service worker não contém o cache esperado.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
 
