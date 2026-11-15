@@ -4,7 +4,13 @@
   let token=null,state=null,selected="coroa_izzy",selectedHeroId=null,busy=false;
   const $=id=>document.getElementById(id);
   const fmt=value=>Number(value||0).toLocaleString("pt-BR");
-  const labels={defense:"Defesa",health:"Vida",attack:"Ataque",resourceBonus:"Bônus de recursos"};
+  const labels={defense:"Defesa",health:"Vida",attack:"Ataque",resourceBonus:"Produção",critical:"Acerto crítico",march:"Velocidade de marcha"};
+  function formatGearStat(key,value){
+    const number=Number(value)||0;
+    if(key==="attack"||key==="defense")return (number/10).toFixed(1)+"%";
+    if(key==="health")return (number/25).toFixed(1)+"%";
+    return number.toFixed(2).replace(/\\.?0+$/,"")+"%";
+  }
   const slotLabels={weapon:"Arma",helmet:"Capacete",armor:"Armadura",boots:"Botas",accessory:"Acessório"};
   const rarityLabels={comum:"Comum",raro:"Raro",epico:"Épico",lendario:"Lendário"};
   function setStatus(message,error=false){
@@ -16,6 +22,51 @@
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||"Falha ao sincronizar equipamentos.");
     return data;
+  }
+  function renderForge(){
+    const research=state?.equipmentResearch||[],levels=new Map(research.map(item=>[item.id,Number(item.level)||0]));
+    const academy=Number((state?.buildings||[]).find(item=>item.building_type==="academy")?.level||0);
+    const researchGrid=$("forge-research-list");
+    if(researchGrid){
+      researchGrid.replaceChildren(...research.map(item=>{
+        const card=document.createElement("article");card.className="forge-card";
+        const title=document.createElement("h3");title.textContent=(item.icon||"⚒️")+" "+item.name;
+        const description=document.createElement("p");description.textContent=item.description;
+        const level=document.createElement("strong");level.textContent="Nível "+item.level+"/"+item.maxLevel+" · +"+item.perLevel+"% por nível em "+item.effect;
+        const cost=document.createElement("p");cost.className="forge-cost";cost.textContent="Próxima pesquisa: "+fmt(item.nextCost?.wood)+" madeira · "+fmt(item.nextCost?.stone)+" pedra · "+fmt(item.nextCost?.iron)+" ferro";
+        const requiredAcademy=Math.ceil((Number(item.level)+1)/3);
+        const gate=document.createElement("small");gate.textContent="Centro de Pesquisa Militar: nível "+requiredAcademy;
+        const button=document.createElement("button");button.type="button";button.className="forge-action";
+        button.disabled=busy||item.level>=item.maxLevel||academy<requiredAcademy;
+        button.textContent=item.level>=item.maxLevel?"PESQUISA MÁXIMA":academy<requiredAcademy?"MELHORE A ACADEMIA":"PESQUISAR";
+        button.addEventListener("click",()=>perform({type:"research",research:item.id},"Pesquisa "+item.name+" evoluída."));
+        card.append(title,description,level,cost,gate,button);return card;
+      }));
+    }
+    const catalogGrid=$("forge-catalog-list");
+    if(catalogGrid){
+      const available=(state?.equipmentCatalog||[]).filter(item=>item.craft&&!item.owned);
+      catalogGrid.replaceChildren(...(available.length?available.map(item=>{
+        const card=document.createElement("article");card.className="forge-card";
+        const title=document.createElement("h3");title.textContent=(item.icon||"⚔️")+" "+item.name;
+        const rarity=document.createElement("small");rarity.textContent=(item.rarity||"").toUpperCase()+" · "+(slotLabels[item.slot]||item.slot);
+        const description=document.createElement("p");description.textContent=item.description||"Equipamento forjado no reino.";
+        const stats=document.createElement("p");stats.className="forge-stats";stats.textContent="Atributos iniciais: "+Object.entries(item.base||{}).map(([key,value])=>(labels[key]||key)+": "+formatGearStat(key,value)).join(" · ");
+        const requirements=Object.entries(item.requiredResearch||{});
+        const missing=requirements.filter(([key,required])=>(levels.get(key)||0)<required);
+        const requirementText=document.createElement("small");requirementText.textContent=missing.length?"Pesquisa necessária: "+missing.map(([key,required])=>(research.find(x=>x.id===key)?.name||key)+" Nv. "+required).join(", "):"Requisitos de pesquisa atendidos";
+        const cost=document.createElement("p");cost.className="forge-cost";cost.textContent="Custo: "+fmt(item.craft.gold)+" ouro · "+fmt(item.craft.iron)+" ferro";
+        const button=document.createElement("button");button.type="button";button.className="forge-action";
+        const enough=Number(state?.kingdom?.gold||0)>=Number(item.craft.gold||0)&&Number(state?.kingdom?.iron||0)>=Number(item.craft.iron||0);
+        button.disabled=busy||missing.length>0||!enough;
+        button.textContent=!enough?"RECURSOS INSUFICIENTES":missing.length?"PESQUISE PRIMEIRO":"⚒️ FORJAR";
+        button.addEventListener("click",()=>perform({type:"equipment_craft",itemId:item.id},"Equipamento "+item.name+" forjado e adicionado ao inventário."));
+        card.append(title,rarity,description,stats,requirementText,cost,button);return card;
+      }):[(()=>{const empty=document.createElement("p");empty.textContent="Todos os projetos disponíveis já foram forjados.";return empty;})()]));
+    }
+    const bonus=state?.equipmentBonuses||{};
+    const summary=$("equipment-bonus-summary");
+    if(summary)summary.textContent="Bônus do herói ativo: Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%";
   }
   function renderNorseSkins(){
     const cosmetics=state?.cosmetics||{},catalog=cosmetics.skins||{},owned=new Set((cosmetics.owned||[]).map(item=>item.item_id));
@@ -80,8 +131,8 @@
     $("current-level").textContent=item.level;
     $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";
     const current=item.stats||{},next=item.nextLevelStats||{};
-    $("current-def").textContent=Object.entries(current).map(([key,value])=>labels[key]+": "+(key==="resourceBonus"?value+"%":fmt(value))).join(" · ")||"—";
-    $("next-def").textContent=Object.entries(next).map(([key,value])=>labels[key]+": "+(key==="resourceBonus"?value+"%":fmt(value))).join(" · ")||"Nível máximo";
+    $("current-def").textContent=Object.entries(current).map(([key,value])=>(labels[key]||key)+": "+formatGearStat(key,value)).join(" · ")||"—";
+    $("next-def").textContent=Object.entries(next).map(([key,value])=>(labels[key]||key)+": "+formatGearStat(key,value)).join(" · ")||"Nível máximo";
     $("current-res").textContent=item.equippedHeroId?"Equipado em "+(heroes.find(hero=>Number(hero.id)===Number(item.equippedHeroId))?.hero_name||"herói"):"Não equipado";
     $("next-res").textContent="Slot: "+(slotLabels[item.slot]||item.slot)+" · Máximo: nível "+item.maxLevel;
     $("upgrade-cost").textContent=fmt(item.upgradeCost);
@@ -98,6 +149,7 @@
     if(!heroes.length)setStatus("Convoque um herói para usar seus equipamentos. O inventário já está salvo.",true);
     else if(selectedHero)setStatus("Herói selecionado: "+(selectedHero.hero_name||selectedHero.hero_key)+". Cada slot aceita um item.");
     renderNorseSkins();
+    renderForge();
   }
   async function refresh(){
     token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
