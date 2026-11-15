@@ -16,7 +16,7 @@ Concentrar os comandos de administração do reino em uma interface mobile-first
 - Reutiliza o token `coi_game_token` já compartilhado com a arena.
 - Usa `GET /api/game/state`, `POST /api/game/start` e `POST /api/game/action`.
 - O servidor continua sendo a autoridade para saldo, custo, limites, permissões, tropas, batalhas e recompensas.
-- A migração `0008_liveops_daily_claims.sql` registra os resgates diários com chave única por reino, dia UTC e missão.
+- A migração `0008_liveops_daily_claims.sql` registra os resgates diários com chave única por reino, dia UTC e missão, marca o crédito confirmado e adiciona índices para as consultas de progresso. Cada prêmio também gera lançamento no `resource_ledger` dentro do mesmo lote D1.
 - A entrada principal agora leva ao centro de comando; a arena permanece acessível pelo botão próprio.
 - A arena ganhou um atalho de retorno ao centro de comando.
 
@@ -27,7 +27,7 @@ Concentrar os comandos de administração do reino em uma interface mobile-first
 - Melhorias e treinamento são imediatos no backend atual; não foi criada uma fila de construção ou treinamento falsa.
 - O chat atual é persistido em D1 e o painel atualiza por recarga manual; WebSocket/Durable Objects ainda precisam ser implementados.
 - O backend ainda limita ataques a territórios neutros; PvP entre reinos não foi simulado nem anunciado como ativo.
-- Missões diárias ativas: treinar 20 tropas, melhorar um edifício, concluir uma pesquisa e participar de uma batalha PvE. Progresso é derivado dos registros autoritativos existentes; recompensas são creditadas pelo servidor e cada missão só pode ser resgatada uma vez por dia UTC.
+- Missões diárias ativas: treinar 20 tropas, melhorar um edifício, concluir uma pesquisa e participar de uma batalha PvE. Progresso é derivado dos registros autoritativos existentes; recompensas são creditadas pelo servidor, registradas no ledger e cada missão só pode ser resgatada uma vez por dia UTC. O painel mostra o próximo reinício no horário local e em UTC.
 - Ainda não há rally/ataque coordenado, calendário global automatizado, chefe mundial, torneio sazonal competitivo ou notificações push.
 - A aba Eventos separa missões diárias ativas do roteiro de eventos futuros; apenas as missões diárias entregam recompensas nesta fase.
 - A loja continua na arena; não foi duplicada.
@@ -45,8 +45,13 @@ Concentrar os comandos de administração do reino em uma interface mobile-first
 - Clash of Kings — Strongest Kingdom, Monster Culling, eventos de chefe e ajustes de etapas: https://apps.apple.com/us/app/clash-of-kings-cok/id945274928
 - Cloudflare Durable Objects — coordenação de salas, estado persistente e agendamento: https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/
 
+## Melhorias incorporadas da pesquisa de eventos 2026
+- A tela de missões informa o reinício tanto no horário local quanto em UTC, reduzindo confusão de fuso.
+- O catálogo de design prevê janelas de sessão, limites de tentativas, lista de participantes, avisos fixados, canal de liderança e tutoriais curtos na primeira participação.
+- Eventos futuros devem ser liberados por regras configuráveis de idade do reino e temporada, com matchmaking por faixa de poder.
+
 ## Segurança e publicação
-- Nenhuma migração foi adicionada ou aplicada.
+- A migração `0008_liveops_daily_claims.sql` foi adicionada à branch, mas ainda não foi aplicada ao D1 remoto.
 - Nenhum segredo, token ou dado de jogador foi lido ou gravado.
 - Nenhuma alteração foi publicada em produção.
 - O PR deve passar pelo CI existente (Node 22, testes de combate e validação do bundle do Worker) antes de ser considerado pronto para merge.
