@@ -44,13 +44,15 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0009`. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0010`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
 
 ## Segurança e consistência
 
 - A API valida as ações no servidor; o cliente não determina resultados de combate.
 - Débitos de tropas, recompensas, upgrades, pesquisas e batalhas usam operações condicionais e lotes D1.
 - Requisições JSON da API têm limite de tamanho.
+- Limites de frequência são aplicados no servidor com contadores atômicos em D1; IPs e e-mails não são persistidos em texto aberto.
+- A API é same-origin e não libera CORS universal; a limpeza de contadores expirados roda no cron.
 - Respostas da API não expõem detalhes internos de exceções.
 - O token de sessão do jogo é enviado como Bearer token.
 
