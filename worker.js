@@ -1318,7 +1318,8 @@ async function processDueMarches(env){
 
 export default {
  async scheduled(controller,env){
-  await processDueKingdomQueues(env);
+  try{await processDueKingdomQueues(env);}
+  catch(error){console.error("scheduled_kingdom_queue_resolution_failed",String(error?.message||error));}
   await processDueMarches(env);
   try{await processAngelDeathEventLifecycle(env);}
   catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
