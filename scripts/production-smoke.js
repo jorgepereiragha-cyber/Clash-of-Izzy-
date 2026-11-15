@@ -92,10 +92,17 @@ export async function runProductionSmokeTests({
   const manifest = await readJson(manifestResponse, "Manifest da PWA");
   assert(manifest.name === "Clash of Izzy", "Manifest não identifica o Clash of Izzy.");
 
+  const mapHelperResponse = await get("/world-map-viewport.js");
+  assert(mapHelperResponse.status === 200, "Módulo de navegação do mapa indisponível.");
+  const mapHelper = await mapHelperResponse.text();
+  assert(mapHelper.includes("clampMapViewport") && mapHelper.includes("mapViewportTransform"),
+    "Módulo de navegação do mapa está incompleto.");
+
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
   assert(serviceWorker.includes("clash-of-izzy-shell-v11"), "Service worker não contém o cache esperado.");
+  assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
 
   return {
     baseUrl: base.origin,
@@ -109,6 +116,7 @@ export async function runProductionSmokeTests({
       staticPages: REQUIRED_PAGES.length,
       pwaManifest: true,
       serviceWorker: true,
+      worldMapNavigation: true,
     },
   };
 }
