@@ -359,6 +359,46 @@ function eventMaterialStatement(env,kingdomId,eventKey){
  const key=rewards[eventKey];if(!key)return null;
  return env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) VALUES(?,?,1) ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,key);
 }
+function taskDurationSeconds(kind, level, quantity=1, unit='militia'){
+ const n=Math.max(1,Number(level)||1);
+ if(kind==='construction')return Math.min(86400,Math.round(45*Math.pow(n,1.35)));
+ if(kind==='research')return Math.min(86400,Math.round(60*Math.pow(n+1,1.3)));
+ const factor={militia:1,swordsman:1.4,spearman:1.2,archer:1.3,crossbowman:1.6,cavalry:2.2,knight:3,mage:2.5,catapult:5,ram:4.5,trebuchet:6};
+ return Math.min(86400,Math.max(5,Math.round(quantity*2*(factor[unit]||1))));
+}
+async function processDueKingdomTasks(env,limit=100){
+ const now=new Date().toISOString();
+ const due=await env.DB.prepare("SELECT id,kingdom_id,task_type,payload_json FROM kingdom_tasks WHERE status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT ?").bind(now,limit).all();
+ let processed=0;
+ for(const task of due.results||[]){
+  let p={};try{p=JSON.parse(task.payload_json||'{}')}catch{}
+  const token=crypto.randomUUID(),stamp=new Date().toISOString();
+  const guard="EXISTS(SELECT 1 FROM kingdom_tasks WHERE id=? AND status='completed' AND completion_token=?)";
+  const q=[env.DB.prepare("UPDATE kingdom_tasks SET status='completed',completed_at=?,completion_token=? WHERE id=? AND status='running' AND completes_at<=?").bind(stamp,token,task.id,now)];
+  if(task.task_type==='construction'){
+   q.push(env.DB.prepare('UPDATE kingdom_buildings SET level=?,upgraded_at=? WHERE kingdom_id=? AND building_type=? AND level=? AND '+guard).bind(p.toLevel,stamp,task.kingdom_id,p.building,p.fromLevel,task.id,token));
+   if(p.building==='castle')q.push(env.DB.prepare('UPDATE kingdoms SET castle_level=? WHERE id=? AND castle_level=? AND '+guard).bind(p.toLevel,task.kingdom_id,p.fromLevel,task.id,token));
+   q.push(env.DB.prepare('INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE '+guard+' ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1').bind(task.kingdom_id,'imperial_seal',task.id,token));
+   q.push(env.DB.prepare('INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE '+guard).bind(task.kingdom_id,'building_upgrade_completed',JSON.stringify(p),task.id,token));
+  }else if(task.task_type==='training'){
+   q.push(env.DB.prepare('INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE '+guard+' ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity').bind(task.kingdom_id,p.unit,p.quantity,task.id,token));
+   q.push(env.DB.prepare('INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE '+guard+' ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1').bind(task.kingdom_id,'royal_blueprint',task.id,token));
+   q.push(env.DB.prepare('INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE '+guard).bind(task.kingdom_id,'troops_training_completed',JSON.stringify(p),task.id,token));
+  }else if(task.task_type==='research'){
+   q.push(env.DB.prepare('INSERT INTO research(kingdom_id,research_key,level,completed_at) SELECT ?,?,?,? WHERE '+guard+' ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=excluded.level,completed_at=excluded.completed_at').bind(task.kingdom_id,p.research,p.toLevel,stamp,task.id,token));
+   q.push(env.DB.prepare('INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE '+guard+' ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1').bind(task.kingdom_id,'imperial_crest',task.id,token));
+   q.push(env.DB.prepare('INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE '+guard).bind(task.kingdom_id,'research_completed',JSON.stringify(p),task.id,token));
+  }
+  const result=await env.DB.batch(q);if(result[0]&&result[0].meta.changes)processed++;
+ }
+ return processed;
+}
+async function processAllDueMarches(env,limit=100){
+ const now=new Date().toISOString();
+ const rows=await env.DB.prepare("SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT ?").bind(now,limit).all();
+ for(const row of rows.results||[])await processMarches(env,row.kingdom_id);
+ return rows.results?rows.results.length:0;
+}
 async function gameState(env,playerId){
   await ensureHeroTables(env);
   await ensureShopTables(env);
@@ -367,6 +407,7 @@ async function gameState(env,playerId){
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
   await applyProduction(env,kingdom.id);
+  await processDueKingdomTasks(env,100);
   await seedWorld(env);
   await processMarches(env,kingdom.id);
   const [fresh,buildings,troops,heroes,dragon,research,territories,marches,reports,heroInventory,heroHistory,inventoryItems]=await Promise.all([
@@ -398,8 +439,9 @@ async function gameState(env,playerId){
   const totalTroops=(troops.results||[]).reduce((n,u)=>n+u.quantity,0);
   const shop=await getShopState(env,kingdom.id);
   const dailyEvents=await getDailyTasks(env,kingdom.id);
+  const activeTasks=await env.DB.prepare("SELECT id,task_type,slot_key,payload_json,started_at,completes_at FROM kingdom_tasks WHERE kingdom_id=? AND status='running' ORDER BY completes_at,id").bind(kingdom.id).all();
   const cosmetics=await getCosmeticState(env,kingdom.id);
-  return {cosmetics,dailyEvents,player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
+  return {cosmetics,dailyEvents,activeTasks:activeTasks.results||[],serverTime:new Date().toISOString(),player:{player_id:p.player_id,name:p.name,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -407,6 +449,7 @@ async function gameAction(env,playerId,body){
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
   await applyProduction(env,k.id);
+  await processDueKingdomTasks(env,100);
   const type=String(body.type||"");
   let battleOutcome=null;
 
@@ -851,6 +894,10 @@ async function gameAction(env,playerId,body){
   return json({success:true,state:await gameState(env,playerId),...(battleOutcome?{battle:battleOutcome}:{})});
 }
 export default {
+ async scheduled(controller,env,ctx){
+  try{await processDueKingdomTasks(env,250);await processAllDueMarches(env,250);}
+  catch(error){console.error('scheduled_world_tick_failed',String(error&&error.message||error));throw error;}
+ },
  async fetch(request,env){
   if(request.method==="OPTIONS")return new Response(null,{headers:cors});
   const url=new URL(request.url);
