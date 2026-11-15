@@ -1,148 +1,58 @@
-// ============================================
-// CLASH OF IZZY - SISTEMA DE EQUIPAMENTOS
-// ============================================
-
-window.playerState = window.playerState || {
-    gold: 5000,
-    sovereignLevel: 5,
-    inventory: []
-};
-
-window.sovereignGearDB = {
-    "coroa_izzy": {
-        id: "coroa_izzy",
-        name: "Coroa de Izzy",
-        slot: "coroa",
-        rarity: "lendario",
-        level: 1,
-        maxLevel: 20,
-        isLocked: false,
-        stats: { defense: 10, resourceBonus: 0.05 },
-        nextLevelStats: { defense: 15, resourceBonus: 0.07 }
-    },
-    "manto_real": {
-        id: "manto_real",
-        name: "Manto Real",
-        slot: "manto",
-        rarity: "epico",
-        level: 1,
-        maxLevel: 15,
-        isLocked: false,
-        stats: { health: 50 },
-        nextLevelStats: { health: 75 }
-    },
-    "anel_poder": {
-        id: "anel_poder",
-        name: "Anel do Poder",
-        slot: "anel",
-        rarity: "raro",
-        level: 1,
-        maxLevel: 10,
-        isLocked: false,
-        stats: { attack: 20 },
-        nextLevelStats: { attack: 28 }
-    }
-};
-
-window.heroGearDB = {
-    "espada_guerreiro": {
-        id: "espada_guerreiro",
-        heroId: "hero_warrior",
-        name: "Espada do Guerreiro",
-        slot: "arma",
-        level: 1,
-        maxLevel: 30,
-        isLocked: false,
-        stats: { attack: 50, health: 100 }
-    }
-};
-
-function calculateUpgradeCost(item) {
-    const baseCost = 100;
-    const rarityMultiplier = {
-        'comum': 1.0, 'raro': 1.1, 'epico': 1.2, 'lendario': 1.5
-    }[item.rarity] || 1.0;
-    return Math.floor(baseCost * Math.pow(1.3, item.level) * rarityMultiplier);
-}
-
-function upgradeEquipment(itemId) {
-    const item = window.sovereignGearDB[itemId] || window.heroGearDB[itemId];
-    if (!item) return alert("❌ Item não encontrado!");
-
-    if (item.isLocked) {
-        alert("🔒 Item travado! Destrave antes.");
-        return;
-    }
-    if (item.level >= item.maxLevel) {
-        alert("⚠️ Nível máximo!");
-        return;
-    }
-
-    const cost = calculateUpgradeCost(item);
-    if (window.playerState.gold < cost) {
-        alert("❌ Ouro insuficiente!");
-        return;
-    }
-
-    window.playerState.gold -= cost;
-    item.level += 1;
-
-    if (item.nextLevelStats) {
-        item.stats = { ...item.nextLevelStats };
-        item.nextLevelStats = {
-            defense: (item.stats.defense || 0) + 5,
-            health: (item.stats.health || 0) + 25,
-            attack: (item.stats.attack || 0) + 8,
-            resourceBonus: (item.stats.resourceBonus || 0) + 0.02
-        };
-    }
-
-    alert(`✅ ${item.name} evoluiu para Nível ${item.level}!`);
-    renderEquipmentScreen(itemId);
-    updateGoldDisplay();
-}
-
-function toggleLock(itemId) {
-    const item = window.sovereignGearDB[itemId] || window.heroGearDB[itemId];
-    if (!item) return;
-    item.isLocked = !item.isLocked;
-    renderEquipmentScreen(itemId);
-}
-
-function updateGoldDisplay() {
-    const el = document.getElementById('player-gold');
-    if (el) el.innerText = window.playerState.gold;
-}
-
-function renderEquipmentScreen(itemId) {
-    const item = window.sovereignGearDB[itemId] || window.heroGearDB[itemId];
-    if (!item) return;
-
-    const cost = calculateUpgradeCost(item);
-    const set = (id, val) => {
-        const el = document.getElementById(id);
-        if (el) el.innerText = val;
-    };
-
-    set('item-name', item.name);
-    set('current-level', item.level);
-    set('next-level', item.level + 1);
-    set('current-def', item.stats.defense || 0);
-    set('next-def', item.nextLevelStats?.defense || '—');
-    set('current-res', Math.round((item.stats.resourceBonus || 0) * 100) + '%');
-    set('next-res', Math.round((item.nextLevelStats?.resourceBonus || 0) * 100) + '%');
-    set('upgrade-cost', cost);
-    updateGoldDisplay();
-
-    const lockBtn = document.getElementById('lock-btn');
-    if (lockBtn) {
-        lockBtn.innerText = item.isLocked ? '🔒 Travado' : '🔓 Destravado';
-        lockBtn.classList.toggle('locked', item.isLocked);
-    }
-}
-
-document.addEventListener('DOMContentLoaded', () => {
-    if (window.sovereignGearDB['coroa_izzy']) {
-        renderEquipmentScreen('coroa_izzy');
-    }
-});
+// Equipamentos persistentes: o Worker é a única autoridade para ouro, nível e bloqueio.
+(() => {
+  const API="/api";
+  let token=null,state=null,selected="coroa_izzy",busy=false;
+  const $=id=>document.getElementById(id);
+  const fmt=value=>Number(value||0).toLocaleString("pt-BR");
+  const labels={defense:"Defesa",health:"Vida",attack:"Ataque",resourceBonus:"Bônus de recursos"};
+  function setStatus(message,error=false){
+    let node=$("equipment-status");
+    if(!node){node=document.createElement("p");node.id="equipment-status";node.setAttribute("role","status");node.style.cssText="color:#f5d58a;line-height:1.45;margin:12px 0";document.querySelector(".mobile-equipment-container")?.append(node);}
+    node.textContent=message;node.style.color=error?"#ffb4a9":"#f5d58a";
+  }
+  async function request(path,options={}){
+    const response=await fetch(API+path,{...options,headers:{...(options.headers||{}),...(token?{Authorization:"Bearer "+token}:{})}});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok)throw new Error(data.error||"Falha ao sincronizar equipamentos.");
+    return data;
+  }
+  function render(){
+    const item=(state?.equipment||[]).find(x=>x.id===selected)||(state?.equipment||[])[0];
+    if(!item){setStatus("Nenhum equipamento disponível neste reino.",true);return;}
+    selected=item.id;
+    $("item-name").textContent=item.name;
+    $("current-level").textContent=item.level;
+    $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";
+    const current=item.stats||{},next=item.nextLevelStats||{};
+    $("current-def").textContent=Object.entries(current).map(([k,v])=>labels[k]+": "+(k==="resourceBonus"?v+"%":fmt(v))).join(" · ")||"—";
+    $("next-def").textContent=Object.entries(next).map(([k,v])=>labels[k]+": "+(k==="resourceBonus"?v+"%":fmt(v))).join(" · ")||"Nível máximo";
+    $("current-res").textContent=item.isLocked?"Equipamento bloqueado":"Equipamento disponível";
+    $("next-res").textContent="Máximo: nível "+item.maxLevel;
+    $("upgrade-cost").textContent=fmt(item.upgradeCost);
+    $("player-gold").textContent=fmt(state.kingdom?.gold);
+    const lock=$("lock-btn");lock.textContent=item.isLocked?"🔒 Travado":"🔓 Destravado";
+    lock.setAttribute("aria-pressed",String(item.isLocked));
+    const upgrade=document.querySelector(".upgrade-btn-mobile");
+    upgrade.disabled=busy||item.isLocked||item.level>=item.maxLevel;
+    upgrade.textContent=item.level>=item.maxLevel?"NÍVEL MÁXIMO":item.isLocked?"DESTRAVE PARA EVOLUIR":"⚒️ EVOLUIR EQUIPAMENTO";
+  }
+  async function refresh(){
+    token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
+    if(!token){setStatus("Entre no seu reino primeiro. Depois volte para evoluir seus equipamentos.",true);return;}
+    const response=await request("/game/state");
+    state=response.state;render();
+  }
+  window.upgradeEquipment=async itemId=>{
+    if(busy)return;busy=true;render();
+    try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"equipment_upgrade",itemId:itemId||selected})});state=result.state;setStatus("Equipamento evoluído e salvo no servidor.");}
+    catch(error){setStatus(error.message,true);try{await refresh()}catch{}}
+    finally{busy=false;render();}
+  };
+  window.toggleLock=async itemId=>{
+    if(busy)return;busy=true;render();
+    try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"equipment_lock",itemId:itemId||selected})});state=result.state;setStatus("Bloqueio do equipamento atualizado no servidor.");}
+    catch(error){setStatus(error.message,true);try{await refresh()}catch{}}
+    finally{busy=false;render();}
+  };
+  document.addEventListener("DOMContentLoaded",()=>{refresh().catch(error=>setStatus(error.message,true));});
+})();
