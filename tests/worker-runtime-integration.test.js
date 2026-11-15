@@ -384,8 +384,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         const fixtureStatements = [
           "UPDATE kingdoms SET battle_token='legacy-attacker-battle-nonce' WHERE id=" + kingdomB,
           "UPDATE kingdoms SET battle_token='legacy-defender-battle-nonce' WHERE id=" + kingdomA,
+          "DELETE FROM alliance_members WHERE kingdom_id=" + kingdomA,
           "UPDATE world_territories SET owner_kingdom_id=" + kingdomA +
-            ",alliance_id=(SELECT alliance_id FROM alliance_members WHERE kingdom_id=" + kingdomA + ")," +
+            ",alliance_id=(SELECT id FROM alliances WHERE tag='ALFA')," +
             "shield_until=NULL,combat_lock_token=NULL,combat_lock_expires_at=NULL WHERE id=" + Number(pvpTarget.id),
           "UPDATE kingdoms SET protection_until='2099-01-01T00:00:00.000Z' WHERE id=" + kingdomA,
           "DELETE FROM army_units WHERE kingdom_id IN (" + kingdomA + "," + kingdomB + ")",
