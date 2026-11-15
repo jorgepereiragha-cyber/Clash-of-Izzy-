@@ -45,3 +45,15 @@ test("nível do castelo aumenta o poder calculado do atacante", () => {
   const high = simulateBattle({ army, castleLevel: 30, defenderLevel: 1, roll: 1 });
   assert.ok(high.attackerPower > low.attackerPower);
 });
+
+
+test("cliente preserva o token e não funda outro reino quando a sessão salva falha", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const arena = await readFile(new URL("../arena.html", import.meta.url), "utf8");
+  const connect = arena.slice(arena.indexOf("async function connectKingdom()"), arena.indexOf("\nfunction renderChronicle()"));
+  assert.match(connect, /if\(savedToken\)[\s\S]*?fetch\(API_BASE\+'\/game\/state'/);
+  assert.match(connect, /Seu acesso foi preservado/);
+  assert.doesNotMatch(connect, /localStorage\.removeItem\('coi_game_token'\)/);
+  assert.doesNotMatch(connect, /sessionStorage\.removeItem\('coi_game_token'\)/);
+  assert.match(connect, /}else\{[\s\S]*?fetch\(API_BASE\+'\/game\/start'/);
+});
