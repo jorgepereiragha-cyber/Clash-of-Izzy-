@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#101a2b">
+<meta name="description" content="Centro de comando do reino — Clash of Izzy.">
+<link rel="manifest" href="/manifest.json">
+<link rel="icon" href="/icon-192.svg" type="image/svg+xml">
+<link rel="stylesheet" href="/visual-system.css">
+<title>Centro de Comando · Clash of Izzy</title>
+<style>
+:root{color-scheme:dark}*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at top,#294765 0,#14263b 42%,#0b1422 100%);color:#f4ead4;font:14px Inter,system-ui,sans-serif}
+.shell{width:min(1180px,100%);margin:auto;padding:calc(14px + env(safe-area-inset-top)) 14px calc(28px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.brand{display:flex;align-items:center;gap:12px}.brand img{width:54px;height:54px;object-fit:contain;filter:drop-shadow(0 5px 12px #0008)}h1{font-size:clamp(19px,4vw,28px);margin:0;color:var(--izzy-gold-bright);letter-spacing:.06em}.sub{color:var(--izzy-muted);font-size:12px;margin-top:3px}
+a.btn,button{border:1px solid var(--izzy-line);border-radius:10px;padding:10px 13px;background:linear-gradient(145deg,#29435e,#172a40);color:#f4ead4;text-decoration:none;font-weight:750;cursor:pointer;min-height:42px}
+a.primary,button.primary{background:linear-gradient(180deg,var(--izzy-gold-bright),var(--izzy-gold) 60%,#a96d30);color:#21180d;border-color:#f5d58d}
+button:disabled{opacity:.45;cursor:not-allowed}
+#connection{padding:10px 12px;border:1px solid var(--izzy-line);border-radius:10px;background:#101f32;margin-bottom:12px;color:var(--izzy-muted)}
+.resources{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px;margin:12px 0}.resource,.panel,.tile{background:linear-gradient(145deg,rgba(32,56,80,.97),rgba(13,25,41,.98));border:1px solid var(--izzy-line);border-radius:14px;box-shadow:0 8px 22px #0003}.resource{padding:10px}.resource small{display:block;color:var(--izzy-muted);font-size:11px}.resource strong{display:block;font-size:18px;margin-top:4px;font-variant-numeric:tabular-nums}
+.summary{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-bottom:14px}.tile{padding:12px}.tile small{color:var(--izzy-muted)}.tile strong{display:block;font-size:17px;margin-top:4px}
+nav{display:flex;gap:7px;overflow:auto;padding:2px 0 10px;margin-bottom:8px;scrollbar-width:thin}nav button{white-space:nowrap}nav button[aria-selected=true]{background:linear-gradient(180deg,var(--izzy-gold-bright),var(--izzy-gold));color:#21180d;border-color:#f5d58d}
+.panel{padding:15px;margin:0 0 14px}.panel h2{margin:0 0 5px;color:var(--izzy-gold-bright);font-size:18px}.lead{color:var(--izzy-muted);margin:0 0 13px;line-height:1.5}
+.section{display:none}.section.active{display:block}
+.grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.item{background:#102035;border:1px solid #50647b;border-radius:11px;padding:11px;min-width:0}.item h3{margin:0 0 5px;font-size:14px;color:#f5d28c}.muted{color:var(--izzy-muted);font-size:12px;line-height:1.5}.item .row{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-top:9px}
+form.controls{display:flex;align-items:end;gap:8px;flex-wrap:wrap;margin:10px 0 14px}.field{display:grid;gap:5px;min-width:120px;flex:1}.field label{font-size:11px;color:var(--izzy-muted)}input,select{width:100%;min-height:42px;padding:9px;border-radius:8px;border:1px solid #65758b;background:#0d1725;color:#fff}
+.notice{min-height:20px;margin:8px 0;color:#f4d58d;font-size:12px}.notice.error{color:#ff9b9b}.notice.ok{color:#83dda7}
+.list{display:grid;gap:8px}.pill{font-size:10px;border:1px solid #60758b;border-radius:999px;padding:3px 8px;color:#d9e4ef}.empty{color:var(--izzy-muted);padding:14px;border:1px dashed #60758b;border-radius:10px}
+.chat{display:grid;gap:8px}.messages{display:grid;gap:7px;max-height:270px;overflow:auto}.msg{background:#0d1a2a;padding:8px 10px;border-radius:8px;overflow-wrap:anywhere}.msg b{color:#f1c46a}.msg small{display:block;color:var(--izzy-muted);font-size:10px;margin-top:3px}
+footer{text-align:center;color:#8fa1b5;font-size:11px;padding:12px}
+@media(max-width:700px){.resources{grid-template-columns:repeat(3,minmax(0,1fr))}.summary{grid-template-columns:repeat(2,minmax(0,1fr))}.grid{grid-template-columns:1fr}.brand img{width:46px;height:46px}.shell{padding-left:10px;padding-right:10px}}
+@media(max-width:380px){.resources{grid-template-columns:repeat(2,minmax(0,1fr))}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header>
+ <div class="brand"><img src="/icon-192.svg" alt="Brasão Clash of Izzy"><div><h1>CLASH OF IZZY</h1><div class="sub">CENTRO DE COMANDO DO REINO</div></div></div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap"><a class="btn" href="./arena.html">⚔ Arena</a><button id="refresh" class="primary" type="button">↻ Atualizar reino</button></div>
+</header>
+<div id="connection" role="status" aria-live="polite">Conectando ao reino…</div>
+<section class="resources" id="resources" aria-label="Recursos do reino"></section>
+<section class="summary" id="summary"></section>
+<nav aria-label="Comandos do reino" id="tabs">
+ <button data-tab="kingdom" aria-selected="true">🏰 Reino</button>
+ <button data-tab="army" aria-selected="false">⚔ Exército</button>
+ <button data-tab="research" aria-selected="false">🔬 Ciência</button>
+ <button data-tab="world" aria-selected="false">🌍 Mundo</button>
+ <button data-tab="heroes" aria-selected="false">🐉 Heróis e dragão</button>
+ <button data-tab="alliance" aria-selected="false">🛡 Aliança</button>
+ <button data-tab="events" aria-selected="false">🎖 Eventos</button>
+</nav>
+<div id="notice" class="notice" role="status" aria-live="polite"></div>
+<section class="section active" id="section-kingdom">
+ <div class="panel"><h2>🏰 Administração do reino</h2><p class="lead">Melhore as estruturas para liberar progressão, produção e treinamento. Os comandos abaixo usam o servidor oficial do jogo.</p><div class="grid" id="buildings"></div></div>
+</section>
+<section class="section" id="section-army">
+ <div class="panel"><h2>⚔ Quartel e mobilização</h2><p class="lead">Treine unidades disponíveis. A quantidade por comando segue o limite atual do servidor.</p>
+ <form class="controls" id="trainForm"><div class="field"><label for="unitType">Unidade</label><select id="unitType"><option value="militia">Milícia</option><option value="swordsman">Espadachim</option><option value="spearman">Lanceiro</option><option value="archer">Arqueiro</option><option value="crossbowman">Besteiro</option><option value="cavalry">Cavalaria</option><option value="knight">Cavaleiro</option><option value="mage">Mago</option><option value="catapult">Catapulta</option><option value="ram">Aríete</option><option value="trebuchet">Trabuquete</option></select></div><div class="field"><label for="trainQty">Quantidade (1–100)</label><input id="trainQty" type="number" min="1" max="100" value="10"></div><button class="primary" type="submit">Treinar tropas</button></form><div id="troops" class="grid"></div></div>
+ <div class="panel"><h2>Relatório de batalha</h2><p class="lead">Batalha PvE de teste processada pelo servidor. O PvP entre reinos ainda não está liberado.</p><button id="battle" class="primary" type="button">⚔ Iniciar batalha PvE</button><div id="battles" class="list" style="margin-top:10px"></div></div>
+</section>
+<section class="section" id="section-research">
+ <div class="panel"><h2>🔬 Academia e ciência</h2><p class="lead">Escolha uma linha de pesquisa. Os níveis e custos são validados pelo servidor.</p><div id="researchList" class="grid"></div></div>
+</section>
+<section class="section" id="section-world">
+ <div class="panel"><h2>🌍 Mapa do reino</h2><p class="lead">Envie destacamentos para explorar, coletar ou atacar territórios neutros. Selecione uma unidade e a quantidade antes de emitir uma ordem.</p>
+ <form class="controls" id="marchForm"><div class="field"><label for="marchUnit">Tropa</label><select id="marchUnit"></select></div><div class="field"><label for="marchQty">Quantidade</label><input id="marchQty" type="number" min="1" value="1"></div></form>
+ <div id="marches" class="list" style="margin-bottom:12px"></div><div id="territories" class="grid"></div></div>
+</section>
+<section class="section" id="section-heroes">
+ <div class="panel"><h2>🐉 Heróis</h2><p class="lead">Recrutamento usa gemas do reino. Confira o saldo antes de confirmar.</p><div class="row"><button id="summonOne" type="button">Invocar 1 · 100 gemas</button><button id="summonTen" class="primary" type="button">Invocar 10 · 900 gemas</button></div><div id="heroes" class="grid" style="margin-top:12px"></div></div>
+ <div class="panel"><h2>🐲 Dragão do reino</h2><div id="dragon"></div><button id="dragonUpgrade" class="primary" type="button">Evoluir dragão</button></div>
+</section>
+<section class="section" id="section-alliance">
+ <div class="panel"><h2>🛡 Aliança e diplomacia</h2><div id="allianceInfo"></div>
+ <form class="controls" id="allianceCreate"><div class="field"><label for="allianceName">Nome da aliança</label><input id="allianceName" maxlength="32" minlength="3" placeholder="Ex.: Guardiões de Izzy"></div><div class="field"><label for="allianceTag">Sigla (2–5)</label><input id="allianceTag" maxlength="5" minlength="2" placeholder="IZZY"></div><button type="submit">Criar aliança</button></form>
+ <form class="controls" id="allianceJoin"><div class="field"><label for="joinTag">Sigla da aliança</label><input id="joinTag" maxlength="5" placeholder="SIGLA"></div><button type="submit">Solicitar entrada</button></form>
+ <form class="controls" id="warForm"><div class="field"><label for="warTag">Sigla da aliança adversária</label><input id="warTag" maxlength="5" placeholder="INIMIGA"></div><button type="submit">Declarar guerra</button></form>
+ </div>
+ <div class="panel"><h2>💬 Chat da aliança</h2><p class="lead">Mensagens são persistidas no servidor. Atualize para carregar as mais recentes.</p><div id="chatMessages" class="messages"></div><form class="controls" id="chatForm"><div class="field"><label for="chatText">Mensagem</label><input id="chatText" maxlength="300" placeholder="Escreva para sua aliança…"></div><button class="primary" type="submit">Enviar</button></form></div>
+</section>
+<section class="section" id="section-events">
+ <div class="panel"><h2>🎖 Central de eventos</h2><p class="lead">A estrutura de comandos está preparada para receber eventos sazonais, desafios de aliança, chefes mundiais e recompensas diárias.</p><div class="grid">
+ <article class="item"><h3>🐉 Despertar dos Dragões</h3><p class="muted">Evento planejado: evolução de dragões, missões cooperativas e recompensas por etapas.</p><span class="pill">Planejado · não ativo no servidor</span></article>
+ <article class="item"><h3>🌑 Invasão das Trevas</h3><p class="muted">Evento planejado: chefe global, contribuição individual e ranking de alianças.</p><span class="pill">Planejado · não ativo no servidor</span></article>
+ <article class="item"><h3>🏆 Torneio das Alianças</h3><p class="muted">Evento planejado: objetivos semanais, pontuação auditável e recompensas gratuitas.</p><span class="pill">Planejado · não ativo no servidor</span></article>
+ </div></div>
+</section>
+<footer>Clash of Izzy · Centro de Comando · O servidor valida todas as ações e recursos.</footer>
+</div>
+<script type="module" src="/command-center.js"></script>
+<script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script>
+</body></html>
