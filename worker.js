@@ -346,7 +346,7 @@ async function processMarches(env,kingdomId){
     });
     simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
     losses=simulation.losses||{};battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
-    for(const u of army)survivors[u.unit_type]=Math.max(0,u.quantity-Math.max(0,Number(losses[u.unit_type]||0)));
+    for(const u of army)survivors[u.unit_type]=u.quantity;
    }else{
     for(const u of army)survivors[u.unit_type]=u.quantity;
     battleLog=[{event:"attack_cancelled",reason:target?"territory_already_owned":"territory_missing"}];
@@ -1056,8 +1056,8 @@ async function gameAction(env,playerId,body){
     const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID(),actionId=crypto.randomUUID();
     const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const battleLock=env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,k.id,previousBattleToken);
-    const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND (SELECT COUNT(*) FROM army_units WHERE kingdom_id=? AND quantity>0)=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
-      .bind(snapshotJson,k.id,snapshotJson,k.id,expectedRows,k.id,expectedRows,k.id,battleToken);
+    const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity WHERE kingdom_id=? AND quantity>0 AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND (SELECT COUNT(*) FROM army_units WHERE kingdom_id=? AND quantity>0)=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
+      .bind(k.id,snapshotJson,k.id,expectedRows,k.id,expectedRows,k.id,battleToken);
     const statements=[battleLock,troopUpdate,
       env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
         .bind(k.id,"__internal_action_guard",actionId,expectedRows,k.id,battleToken)
@@ -1087,7 +1087,7 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const result=await env.DB.batch(statements);
     if(!result[2]?.meta?.changes)return json({error:"O exército mudou ou outra batalha foi processada. Atualize o reino e tente novamente."},409);
-    battleOutcome={won,attackerPower,defenderPower,losses,rewards,message:won?"Vitória! O reino recebeu recursos.":"Derrota! Reorganize o exército e tente novamente."};
+    battleOutcome={won,attackerPower,defenderPower,losses,rewards,message:won?"Vitória! O reino recebeu recursos. As tropas foram preservadas.":"Derrota! As tropas foram preservadas; reorganize o exército e tente novamente."};
     if(heroProgress&&result[heroUpdateIndex]?.meta?.changes)battleOutcome.heroProgress=heroProgress;
    }else if(type==="rename"){
     const name=String(body.name||"").trim().slice(0,32);if(name.length<3)return json({error:"O nome deve ter de 3 a 32 caracteres."},400);
@@ -1139,7 +1139,11 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   if(!event)return json({error:"O Anjo da Morte não está ativo. O evento acontece automaticamente no fim de semana."},409);
   const duplicate=await env.DB.prepare("SELECT damage,score,troop_losses_json FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?")
     .bind(event.id,kingdom.id,requestId).first();
-  if(duplicate)return json({success:true,duplicate:true,damage:Number(duplicate.damage||0),score:Number(duplicate.score||0),losses:JSON.parse(duplicate.troop_losses_json||"{}")});
+  if(duplicate){
+    const snapshot=JSON.parse(duplicate.troop_losses_json||"{}");
+    const losses=Object.fromEntries(Object.entries(snapshot).map(([key,value])=>[key,Number(value?.loss||0)]));
+    return json({success:true,duplicate:true,damage:Number(duplicate.damage||0),score:Number(duplicate.score||0),losses});
+  }
   if(Number(event.boss_hp_remaining)<=0)return json({error:"O Anjo da Morte já foi derrotado. A classificação será fechada no fim de semana."},409);
   const requested=body.units;
   if(!requested||typeof requested!=="object"||Array.isArray(requested))return json({error:"Selecione as tropas que participarão do ataque."},400);
@@ -1190,8 +1194,11 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   ];
   const result=await env.DB.batch(statements);
   if(!result[2]?.meta?.changes)return json({error:"O exército mudou, o chefe foi derrotado ou outro ataque foi processado. Atualize e tente novamente."},409);
-  const updated=await env.DB.prepare("SELECT boss_hp_remaining FROM world_events WHERE id=?").bind(event.id).first();
-  return json({success:true,damage:Number(result[2]?.meta?.changes?simulation.damage:0),score:simulation.damage,losses:simulation.losses,troopsLost:simulation.troopsLost,lossRatePercent:Math.round(simulation.lossRate*100),bossHpRemaining:Number(updated?.boss_hp_remaining||0),message:"Ataque registrado. As baixas foram aplicadas permanentemente ao exército deste evento."});
+  const [updated,attackRecord]=await Promise.all([
+    env.DB.prepare("SELECT boss_hp_remaining FROM world_events WHERE id=?").bind(event.id).first(),
+    env.DB.prepare("SELECT damage,score FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?").bind(event.id,kingdom.id,requestId).first()
+  ]);
+  return json({success:true,damage:Number(attackRecord?.damage||0),score:Number(attackRecord?.score||0),losses:simulation.losses,troopsLost:simulation.troopsLost,lossRatePercent:Math.round(simulation.lossRate*100),bossHpRemaining:Number(updated?.boss_hp_remaining||0),message:"Ataque registrado. As baixas foram aplicadas permanentemente ao exército deste evento."});
 }
 
 async function distributeAngelDeathRewards(env,eventId,now=new Date()){
