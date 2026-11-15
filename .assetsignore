@@ -10,3 +10,20 @@ dist/**
 game-adapter.js
 package.json
 docs/**
+# Wrangler local state and generated artifacts must never be public.
+.wrangler/
+**/.wrangler/**
+*.sqlite*
+*.map
+*.log
+
+# Local credentials and dependency metadata.
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+.npmrc
+package-lock.json
+
+# Test-only files are not part of the game client.
+tests/
