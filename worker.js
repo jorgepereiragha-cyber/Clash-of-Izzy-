@@ -674,9 +674,9 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,hero_key,hero_name,level,experience,rarity,assigned_to FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id").bind(kingdom.id).all(),
     env.DB.prepare("SELECT dragon_key,dragon_name,level,experience,bond FROM dragons WHERE kingdom_id=?").bind(kingdom.id).first(),
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,name,terrain,x,z,resource_type,resource_rate,owner_kingdom_id,alliance_id,level FROM world_territories ORDER BY id").all(),
+    env.DB.prepare("SELECT t.id,t.name,t.terrain,t.x,t.z,t.resource_type,t.resource_rate,t.owner_kingdom_id,t.alliance_id,t.level,t.shield_until,k.protection_until,k.kingdom_name AS owner_kingdom_name,a.name AS alliance_name,a.tag AS alliance_tag FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id LEFT JOIN alliances a ON a.id=t.alliance_id ORDER BY t.id").all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
+    env.DB.prepare("SELECT id,attacker_kingdom_id,defender_kingdom_id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id).all(),
     env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key").bind(kingdom.id).all(),
     env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id).all()
@@ -1185,11 +1185,19 @@ async function gameAction(env,playerId,body){
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
-    const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id FROM world_territories WHERE id=?").bind(targetId).first();
+    if(k.battle_token)return json({error:"Seu exército está resolvendo uma batalha. Aguarde o resultado antes de enviar outra marcha."},409);
+    const target=await env.DB.prepare("SELECT t.id,t.resource_type,t.owner_kingdom_id,t.alliance_id,t.shield_until,k.protection_until FROM world_territories t LEFT JOIN kingdoms k ON k.id=t.owner_kingdom_id WHERE t.id=?").bind(targetId).first();
     if(!target)return json({error:"Território não encontrado."},404);
     const marchType=String(body.marchType||"gather");
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
-    if(marchType==="attack"&&target.owner_kingdom_id)return json({error:"Nesta etapa, só é possível conquistar territórios neutros. Ataques PvP serão habilitados em uma atualização própria."},409);
+    if(marchType==="attack"&&Number(target.owner_kingdom_id)===Number(k.id))return json({error:"Este território já pertence ao seu reino."},409);
+    if(marchType==="attack"&&!target.owner_kingdom_id&&target.alliance_id)return json({error:"Este território está protegido por uma aliança. Ataques a territórios de aliança exigem uma guerra de alianças."},409);
+    if(marchType==="attack"&&target.owner_kingdom_id){
+      const protectedUntil=[target.shield_until,target.protection_until].some(value=>value&&Date.parse(value)>Date.now());
+      if(protectedUntil)return json({error:"Este reino está sob proteção e não pode ser atacado agora."},409);
+      const allied=await env.DB.prepare("SELECT 1 AS allied FROM alliance_members a JOIN alliance_members b ON b.alliance_id=a.alliance_id WHERE a.kingdom_id=? AND b.kingdom_id=? LIMIT 1").bind(k.id,target.owner_kingdom_id).first();
+      if(allied)return json({error:"Ataques contra membros da sua própria aliança estão bloqueados."},409);
+    }
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
     const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
     const selected={};
@@ -1213,10 +1221,10 @@ async function gameAction(env,playerId,body){
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
-    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=?")
-      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length);
-    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at) SELECT ?,?,?,?,?,? WHERE changes()=?")
-      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,unitTypes.length);
+    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND COALESCE(battle_token,'')='')")
+      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length,k.id);
+    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at,target_owner_kingdom_id) SELECT ?,?,?,?,?,?,? WHERE changes()=?")
+      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,target.owner_kingdom_id??null,unitTypes.length);
     const result=await env.DB.batch([debit,createMarch]);
     if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes ou exército alterado por outra marcha. Atualize o reino e tente novamente."},409);
   }else if(type==="battle"){
