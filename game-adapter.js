@@ -73,16 +73,16 @@ function attackPhase(acting, opposing, round, log, bonus = 0) {
   }
 }
 
-export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, castlePowerBonusPercent, roll = 1 }) {
+export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackPercent = 0, equipmentDefensePercent = 0, castlePowerBonusPercent, roll = 1 }) {
   const attackers = (army || [])
     .filter(row => Number(row.quantity) > 0)
     .map((row, index) => makeStack(row, "attacker", index));
-  const defenseBonus = clamp(Number(defenseBonusPercent) || 0, 0, 30);
+  const defenseBonus = clamp((Number(defenseBonusPercent) || 0) + (Number(equipmentDefensePercent) || 0), 0, 50);
   const castlePowerBonus = clamp(Number(castlePowerBonusPercent ?? castleLevel) || 0, 0, 30) / 100;
   for (const stack of attackers) {
     stack.defenseBonusPercent = defenseBonus;
-    stack.power = stack.power * (1 + castlePowerBonus);
-    stack.hpPerUnit = Math.floor(stack.hpPerUnit * (1 + castlePowerBonus));
+    stack.power = stack.power * (1 + castlePowerBonus + clamp(Number(equipmentAttackPercent) || 0, 0, 30) / 100);
+    stack.hpPerUnit = Math.floor(stack.hpPerUnit * (1 + castlePowerBonus + clamp(Number(equipmentDefensePercent) || 0, 0, 25) / 100));
     stack.hp = stack.quantity * stack.hpPerUnit;
   }
   if (!attackers.length) throw new Error("Exército vazio.");
