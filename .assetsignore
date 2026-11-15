@@ -10,3 +10,15 @@ dist/**
 game-adapter.js
 package.json
 docs/**
+# Internal backend implementation and test-only files
+api-rate-limit.js
+tests/**
+
+# Local credentials, Wrangler state and private key material
+.env
+.env.*
+.dev.vars
+.dev.vars.*
+.wrangler/**
+*.pem
+*.key
