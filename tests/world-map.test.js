@@ -38,3 +38,16 @@ test("world map opens a territory selected from global search parameters", () =>
   assert.ok(script.includes("requestedTerritorySearch"));
   assert.ok(script.includes("requestedTerritoryApplied"));
 });
+
+test("mapa libera PvP somente contra reinos inimigos desprotegidos e confirma baixas permanentes", () => {
+  assert.match(script, /function territoryIsProtected\(territory\)/);
+  assert.match(script, /function territoryCanBeAttacked\(territory\)/);
+  assert.match(script, /owner === "Território neutro"/);
+  assert.match(script, /owner === "Outro reino"/);
+  assert.match(script, /territory\.alliance_id/);
+  assert.match(script, /territory\.protection_until/);
+  assert.match(script, /territory\.shield_until/);
+  assert.match(script, /Baixas são permanentes para ambos os lados/);
+  assert.match(script, /if \(marchType === "attack" && territory\.owner_kingdom_id && !confirm\(/);
+  assert.match(script, /Território de aliança/);
+});
