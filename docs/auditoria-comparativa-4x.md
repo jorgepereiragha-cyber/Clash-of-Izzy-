@@ -108,3 +108,12 @@ As alterações foram gravadas na branch principal. O workflow configurado execu
 - Removido CORS universal. As páginas oficiais consomem a API no mesmo domínio; OPTIONS retorna 204 sem abrir acesso cross-origin.
 - A migração 0010_api_rate_limits.sql foi aplicada no D1 remoto e o Worker foi publicado. CI, testes e bundle passaram.
 - .assetsignore agora exclui .wrangler/, tests/, arquivos SQLite, logs, mapas e arquivos de ambiente para evitar publicação de artefatos locais.
+
+
+## Cidade 3D e loadout de heróis (15 nov 2026)
+- Portada para main a pipeline visual das branches de qualidade: `scripts/kingdom-3d.js`, `scripts/kingdom-quality.js`, manifesto de assets, fallback 2D e cache PWA v3. CI validou a cena e o deploy Cloudflare foi concluído.
+- A cena procedural usa Three.js, InstancedMesh para vegetação, orçamento de pixel ratio, perfil de qualidade por hardware/viewport e recuperação para 2D em falha/perda de contexto WebGL. Ainda não há GLB final no manifesto.
+- Revisão do esquema encontrou `hero_equipment` já criada em `0002_world.sql`; portanto, não foi criada tabela duplicada. Ações `equipment_equip` e `equipment_unequip` usam a restrição existente `UNIQUE(hero_id, slot)`.
+- A atualização do nível de um item mantém o nível do item equipado sincronizado. Os bônus de combate e produção consultam apenas os itens equipados no herói ativo.
+- A interface de equipamentos agora permite selecionar herói, equipar, desequipar, bloquear e evoluir. O Worker continua autoridade de ouro, níveis e loadouts.
+- Adicionado teste de sintaxe dos módulos de navegador antes da publicação.
