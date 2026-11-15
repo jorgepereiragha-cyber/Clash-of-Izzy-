@@ -57,7 +57,7 @@ test("online search never creates a kingdom just to search", async () => {
   assert.ok(nav.includes("if (!token)"));
   assert.ok(nav.includes('addEmpty("Entre no reino para pesquisar conteúdo do mundo.")'));
   assert.ok(!nav.includes("/api/game/start"));
-  assert.ok(nav.includes("setTimeout(() => onlineResults(query,sequence),250)"));
+  assert.ok(nav.includes("setTimeout(() => onlineResults(query,sequence),400)"));
 });
 
 test("alliance page handles navigation deep links and renders search results safely", async () => {
