@@ -83,3 +83,10 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - Pedidos de pacotes VIP e skins pagos usam `purchase_requests`, com chave de idempotência, produto/preço capturados do catálogo, método e referência de pagamento.
 - O jogador envia um pedido autenticado; o painel Master lista pedidos pendentes e só libera gemas/skin após aprovação manual.
 - O sistema ainda não processa PIX/cartão automaticamente nem confirma pagamento por webhook. O administrador deve conferir o recebimento fora do jogo antes de aprovar.
+
+
+## Forja, ciência e progressão de heróis
+- O catálogo de equipamentos permanece em `worker.js` e usa `kingdom_equipment`/`hero_equipment`; os quatro itens iniciais são semeados, enquanto novas peças exigem forja com ouro e ferro.
+- A árvore `gear_forging`, `gear_ward`, `gear_vitality` e `gear_logistics` reutiliza a tabela `research` existente e exige o Centro de Pesquisa Militar. Os bônus são calculados no servidor e aplicados ao herói ativo: ataque, defesa, vida, crítico, marcha e produção.
+- Acertos críticos usam semente registrada no relatório de batalha, permitindo auditoria/reprodução do cálculo. A velocidade de marcha usa uma função determinística com limite de bônus.
+- `hero_inventory` é a fonte de progressão/estrelas/fragmentos; `heroes` é a identidade relacional usada por equipamentos. `syncHeroSystems` mantém ambos alinhados por `(kingdom_id, hero_key)` e o treinamento atualiza os dois no mesmo lote.
