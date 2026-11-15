@@ -26,8 +26,8 @@ jobs:
         run: node scripts/check-pwa.mjs
       - name: Validate service worker
         run: node --check sw.js
-      - name: Validate kingdom command center script
-        run: node --check command-center.js
+      - name: Validate kingdom and admin panel scripts
+        run: node --check command-center.js && node --check admin.js
       - name: Validate LiveOps engine
         run: node --check liveops-engine.js
       - name: Validate onboarding and realm policy modules
