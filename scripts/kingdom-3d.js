@@ -19,7 +19,7 @@ if (host && "WebGLRenderingContext" in window) {
     road: material("#b8a57d"), roadEdge: material("#76664c"),
     stone: material("#9c9b8b"), darkStone: material("#555d5c"),
     wood: material("#745039"), roof: material("#24476B"),
-    gold: material("#d5b16b", 0.55), window: new THREE.MeshBasicMaterial({ color: "#f4d68b" }),
+    gold: material("#d5b16b", 0.55), window: new THREE.MeshStandardMaterial({ color: "#ffe0a0", emissive: "#c88b35", emissiveIntensity: 0.28, roughness: 0.48 }),
     leaf: material("#3d7043"), leafLight: material("#628a4d")
   };
   const palettes = {
@@ -208,47 +208,200 @@ if (host && "WebGLRenderingContext" in window) {
       scene.add(mesh);
     }
   }
+  function addCylinder(parent, radiusTop, radiusBottom, height, mat, x, y, z, segments = 8) {
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(radiusTop, radiusBottom, height, segments), mat);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  }
+  function addBuildingWheel(parent, x, y, z, radius = .25) {
+    const wheel = new THREE.Mesh(new THREE.TorusGeometry(radius, .055, 6, 12), mats.wood);
+    wheel.position.set(x, y, z);
+    wheel.castShadow = true;
+    wheel.rotation.y = Math.PI / 2;
+    parent.add(wheel);
+    addCylinder(parent, .055, .055, .18, mats.darkStone, x, y, z, 8).rotation.z = Math.PI / 2;
+  }
   function createBuilding(type, level, x, z) {
-    const group = new THREE.Group(); group.position.set(x, 0, z); group.userData.coIType = type; group.userData.coIProcedural = true;
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    group.userData.coIType = type;
+    group.userData.coIProcedural = true;
     const colors = palettes[type] || palettes.warehouse;
     const seed = [...String(type)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
     const wall = surfaceMaterial(colors[0], "stone", seed);
     const roof = surfaceMaterial(colors[1], "roof", seed + 101);
     const height = 1.0 + Math.min(30, Math.max(1, Number(level) || 1)) * .035;
-    box(group, 1.42, height, 1.18, wall, 0, height / 2, 0);
-    const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(.98, .88, 4), roof);
-    roofMesh.rotation.y = Math.PI / 4; roofMesh.position.y = height + .42; roofMesh.castShadow = true; group.add(roofMesh);
-    // Front door and warm windows improve readability at the isometric camera angle.
-    box(group, .23, .48, .035, mats.wood, 0, .24, .61);
-    for (const wx of [-.43, .43]) box(group, .16, .2, .04, mats.window, wx, height * .63, .61);
+
+    // Shared architectural language: visible stone footing, timber eaves and a
+    // readable roof silhouette, while each building keeps its own landmark.
+    box(group, 1.56, .14, 1.32, mats.darkStone, 0, .05, 0);
+    box(group, 1.48, height, 1.22, wall, 0, height / 2, 0);
+    box(group, 1.55, .09, 1.29, mats.wood, 0, height + .035, 0);
+    const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(1.02, .88, 4), roof);
+    roofMesh.rotation.y = Math.PI / 4;
+    roofMesh.position.y = height + .48;
+    roofMesh.castShadow = true;
+    group.add(roofMesh);
+
+    // Warm emissive windows stay legible in the isometric view without adding
+    // real-time point lights to every building.
+    box(group, .23, .48, .04, mats.wood, 0, .24, .635);
+    for (const wx of [-.45, .45]) {
+      box(group, .18, .22, .045, mats.window, wx, height * .63, .635);
+      box(group, .035, .25, .055, mats.wood, wx, height * .63, .66);
+      box(group, .2, .035, .055, mats.wood, wx, height * .63, .66);
+    }
+
     if (type === "castle") {
+      // Four corner keeps, crenellated parapet, royal standards and a heraldic seal.
       for (const tx of [-.56, .56]) for (const tz of [-.43, .43]) {
-        box(group, .34, 1.48, .34, mats.stone, tx, .74, tz);
-        const turret = new THREE.Mesh(new THREE.ConeGeometry(.25, .5, 4), mats.roof);
-        turret.position.set(tx, 1.72, tz); turret.rotation.y = Math.PI / 4; turret.castShadow = true; group.add(turret);
-        box(group, .38, .09, .38, mats.gold, tx, 1.47, tz);
+        box(group, .36, 1.5, .36, mats.stone, tx, .75, tz);
+        const turret = new THREE.Mesh(new THREE.ConeGeometry(.27, .54, 4), mats.roof);
+        turret.position.set(tx, 1.78, tz);
+        turret.rotation.y = Math.PI / 4;
+        turret.castShadow = true;
+        group.add(turret);
+        box(group, .4, .09, .4, mats.gold, tx, 1.51, tz);
       }
-      // Royal blue roofs and restrained gold standards follow the shared visual bible.
+      for (let i = -2; i <= 2; i++) {
+        box(group, .18, .22, .18, mats.stone, i * .24, height + .16, -.58);
+        box(group, .18, .22, .18, mats.stone, i * .24, height + .16, .58);
+      }
       for (const tx of [-.56, .56]) {
         box(group, .045, .52, .045, mats.gold, tx, 1.92, .49);
-        const banner = new THREE.Mesh(
-          new THREE.PlaneGeometry(.34, .42),
-          new THREE.MeshStandardMaterial({ color: "#E7BD68", roughness: .82, side: THREE.DoubleSide })
-        );
+        const banner = new THREE.Mesh(new THREE.PlaneGeometry(.34, .42), new THREE.MeshStandardMaterial({
+          color: "#E7BD68", roughness: .82, side: THREE.DoubleSide
+        }));
         banner.position.set(tx + .18, 1.86, .515);
         banner.castShadow = true;
         group.add(banner);
       }
-      // Small gatehouse makes the keep distinct from ordinary buildings.
-      box(group, .58, .22, .24, mats.gold, 0, height + .08, .72);
+      const seal = new THREE.Mesh(new THREE.CircleGeometry(.2, 8), mats.gold);
+      seal.position.set(0, 1.02, .66);
+      seal.castShadow = true;
+      group.add(seal);
+      const sealCore = new THREE.Mesh(new THREE.CircleGeometry(.12, 8), material("#24476B", .58));
+      sealCore.position.set(0, 1.02, .668);
+      group.add(sealCore);
+      box(group, .62, .24, .24, mats.gold, 0, height + .08, .76);
     } else if (type === "watchtower") {
       box(group, .16, .95, .16, mats.wood, 0, height + .42, 0);
-      const flag = new THREE.Mesh(new THREE.PlaneGeometry(.48, .28), material("#b64b3e"));
-      flag.position.set(.25, height + .78, 0); flag.rotation.y = Math.PI / 2; group.add(flag);
+      const flag = new THREE.Mesh(new THREE.PlaneGeometry(.48, .28), material("#A9433B"));
+      flag.position.set(.25, height + .78, 0);
+      flag.rotation.y = Math.PI / 2;
+      group.add(flag);
+      box(group, .48, .12, .48, mats.gold, 0, height + .82, 0);
     } else if (type === "farm") {
+      // Crop beds with raised furrows and golden grain heads.
       for (let i = -1; i <= 1; i++) {
-        const row = box(group, .16, .04, .9, material("#b4a45d"), i * .42, .05, -.82);
+        const row = box(group, .17, .045, .96, material("#9A682D"), i * .42, .06, -.82);
         row.rotation.y = .08;
+        for (let j = 0; j < 3; j++) {
+          addCylinder(group, .018, .025, .22, material("#D6BD65"), i * .42, .2, -.48 - j * .22, 5);
+        }
+      }
+    } else if (type === "barracks") {
+      // Weapon rack and practice dummies make the military function obvious.
+      box(group, .9, .08, .12, mats.wood, 0, .48, -.7);
+      for (const sx of [-.32, 0, .32]) {
+        addCylinder(group, .025, .025, .72, mats.gold, sx, .84, -.7, 6);
+        box(group, .19, .055, .055, mats.wood, sx, 1.0, -.7);
+      }
+      for (const sx of [-.48, .48]) {
+        addCylinder(group, .07, .09, .58, mats.wood, sx, .35, .72, 7);
+        box(group, .3, .07, .07, mats.wood, sx, .62, .72);
+      }
+    } else if (type === "market") {
+      // Blue-and-gold striped stall canopy and a timber counter.
+      box(group, .92, .13, .42, mats.wood, 0, .78, .76);
+      for (const sx of [-.48, -.16, .16, .48]) {
+        addCylinder(group, .025, .025, .88, mats.wood, sx, .48, .76, 6);
+      }
+      for (let i = 0; i < 4; i++) {
+        const stripe = new THREE.Mesh(new THREE.PlaneGeometry(.25, .42), new THREE.MeshStandardMaterial({
+          color: i % 2 ? "#E7BD68" : "#24476B", side: THREE.DoubleSide, roughness: .9
+        }));
+        stripe.position.set(-.36 + i * .24, .84, .76);
+        stripe.rotation.x = -.12;
+        group.add(stripe);
+      }
+    } else if (type === "quarry") {
+      for (const [sx, sz, scale] of [[-.48, -.72, .22], [0, -.78, .3], [.48, -.7, .2]]) {
+        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(scale, 0), mats.darkStone);
+        rock.position.set(sx, scale * .72, sz);
+        rock.rotation.set(.2, sx * 2, .35);
+        rock.castShadow = true;
+        group.add(rock);
+      }
+      addCylinder(group, .035, .035, .7, mats.gold, .55, .48, .72, 6);
+    } else if (type === "lumber_mill") {
+      for (let i = 0; i < 4; i++) {
+        const log = addCylinder(group, .11, .11, .82, mats.wood, -.52 + i * .28, .2, -.76, 7);
+        log.rotation.z = Math.PI / 2;
+      }
+      box(group, .12, .82, .12, mats.darkStone, .58, .48, .65);
+      const saw = new THREE.Mesh(new THREE.TorusGeometry(.22, .045, 6, 12), mats.gold);
+      saw.position.set(.58, .76, .73);
+      group.add(saw);
+    } else if (type === "iron_mine") {
+      for (const [sx, sz, scale] of [[-.4, -.72, .2], [0, -.8, .27], [.42, -.72, .18]]) {
+        const ore = new THREE.Mesh(new THREE.IcosahedronGeometry(scale, 0), material("#8798A5", .32));
+        ore.position.set(sx, scale * .72, sz);
+        ore.castShadow = true;
+        group.add(ore);
+      }
+      box(group, .62, .08, .12, mats.wood, 0, .32, .75);
+    } else if (type === "academy") {
+      addCylinder(group, .26, .32, 1.05, mats.stone, .52, height + .48, -.25, 8);
+      const spire = new THREE.Mesh(new THREE.ConeGeometry(.34, .68, 6), mats.roof);
+      spire.position.set(.52, height + 1.32, -.25);
+      spire.castShadow = true;
+      group.add(spire);
+      const orb = new THREE.Mesh(new THREE.SphereGeometry(.09, 8, 6), mats.gold);
+      orb.position.set(.52, height + 1.7, -.25);
+      group.add(orb);
+    } else if (type === "wall") {
+      for (let i = -2; i <= 2; i++) {
+        box(group, .2, .24, .2, mats.stone, i * .24, height + .14, -.56);
+        box(group, .2, .24, .2, mats.stone, i * .24, height + .14, .56);
+      }
+    } else if (type === "hospital") {
+      box(group, .16, .56, .08, material("#A9433B"), 0, .82, .67);
+      box(group, .48, .16, .08, material("#A9433B"), 0, .82, .67);
+    } else if (type === "stable") {
+      for (const sx of [-.52, .52]) box(group, .08, .55, .08, mats.wood, sx, .32, .76);
+      for (const sy of [.2, .48]) box(group, 1.05, .07, .08, mats.wood, 0, sy, .76);
+      const hay = new THREE.Mesh(new THREE.CylinderGeometry(.18, .18, .3, 7), material("#C9A75A"));
+      hay.position.set(.42, .18, -.76);
+      hay.rotation.z = Math.PI / 2;
+      group.add(hay);
+    } else if (type === "archery_range") {
+      const targetBase = new THREE.Mesh(new THREE.CircleGeometry(.31, 16), mats.wood);
+      targetBase.position.set(.5, .72, .68);
+      group.add(targetBase);
+      for (const [radius, color] of [[.23, "#F5EDDA"], [.15, "#A9433B"], [.07, "#E7BD68"]]) {
+        const ring = new THREE.Mesh(new THREE.CircleGeometry(radius, 16), material(color));
+        ring.position.set(.5, .72, .69 + (.23 - radius) * .01);
+        group.add(ring);
+      }
+    } else if (type === "siege_workshop") {
+      addBuildingWheel(group, -.55, .3, .72, .25);
+      addBuildingWheel(group, .55, .3, .72, .25);
+      box(group, .9, .12, .16, mats.wood, 0, .52, .72);
+      addCylinder(group, .06, .06, .8, mats.gold, 0, .92, .72, 6);
+    } else if (type === "embassy") {
+      for (const sx of [-.48, 0, .48]) {
+        addCylinder(group, .07, .09, .86, mats.stone, sx, .48, .75, 8);
+        box(group, .18, .08, .18, mats.gold, sx, .92, .75);
+      }
+    } else if (type === "warehouse") {
+      for (let row = 0; row < 2; row++) for (let col = 0; col < 2; col++) {
+        const crate = box(group, .32, .32, .32, mats.wood, -.34 + col * .68, .22 + row * .34, -.76);
+        crate.rotation.y = (row + col) * .12;
+        box(group, .34, .035, .035, mats.gold, -.34 + col * .68, .22 + row * .34, -.59);
       }
     }
     return group;
