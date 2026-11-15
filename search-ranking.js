@@ -136,7 +136,11 @@ const cjkScripts = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Scri
 export function buildTrigramSearchQuery(tokens) {
   const grams = new Set();
   for (const rawToken of Array.isArray(tokens) ? tokens : []) {
-    const token = normalizeSearchText(rawToken);
+    // Preserve precomposed CJK code points for FTS5 trigram lookup. NFKD is
+    // useful for accent-insensitive Latin matching but decomposes Hangul
+    // syllables into jamo, which do not match the indexed source trigrams.
+    const rawText = String(rawToken ?? "").normalize("NFC").toLocaleLowerCase("pt-BR").trim();
+    const token = cjkScripts.test(rawText) ? rawText : normalizeSearchText(rawText);
     const characters = Array.from(token);
     if (isTypoEligibleToken(token)) {
       for (let index = 0; index <= characters.length - 3; index += 1) {
