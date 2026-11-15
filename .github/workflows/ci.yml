@@ -26,6 +26,8 @@ jobs:
         run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
       - name: Validate service worker
         run: node --check sw.js
+      - name: Validate 3D asset manifest and GLB budgets
+        run: npm run assets:validate
       - name: Test combat simulator
         run: npm test
       - name: Validate Worker bundle
