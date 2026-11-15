@@ -94,3 +94,19 @@ test("search merges ranked matches and never exposes internal identifiers", asyn
   assert.ok(!worker.includes("player_email"));
   assert.ok(!worker.includes("password_hash"));
 });
+
+
+test("global search includes allied kingdoms, ranks Portuguese variants, and falls back per category", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("kingdom_alliance_tag"));
+  assert.ok(worker.includes('allianceTag:row.kingdom_alliance_tag||""'));
+  assert.ok(!worker.includes("NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER))"));
+  assert.ok(!worker.includes("NOT EXISTS (SELECT 1 FROM alliance_members am WHERE am.kingdom_id=k.id)"));
+  assert.ok(worker.includes('normalized.endsWith("oes")'));
+  assert.ok(worker.includes('normalized.endsWith("aes")'));
+  assert.ok(worker.includes('normalized.endsWith("eis")'));
+  assert.ok(worker.includes('!hasType("kingdom")'));
+  assert.ok(worker.includes('!hasType("alliance")'));
+  assert.ok(worker.includes('!hasType("territory")'));
+  assert.ok(worker.includes('!hasType("skin")'));
+});
