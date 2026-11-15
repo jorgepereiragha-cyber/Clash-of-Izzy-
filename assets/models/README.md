@@ -2,7 +2,7 @@
 
 Coloque aqui modelos **.glb** otimizados. O diretório raiz do projeto já é publicado como asset estático pelo Wrangler; portanto, os arquivos ficam acessíveis em `/assets/models/nome-do-modelo.glb`.
 
-O carregador da arena usa a mesma versão Three.js já usada pelo jogo (0.160.0), com suporte opcional a:
+O carregador da arena usa a mesma versão Three.js já usada pelo jogo (0.187.0), com suporte opcional a:
 - Draco para geometria comprimida;
 - KTX2/Basis para texturas comprimidas;
 - animações glTF por AnimationMixer.
