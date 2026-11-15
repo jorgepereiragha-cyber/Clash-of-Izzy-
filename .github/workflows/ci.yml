@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [main]
 
+permissions:
+  contents: read
+
 concurrency:
   group: clash-of-izzy-ci-${{ github.ref }}
   cancel-in-progress: true
@@ -21,10 +24,12 @@ jobs:
         with:
           node-version: 22
       - name: Install dependencies
-        run: npm install --ignore-scripts
+        run: npm ci --ignore-scripts
       - name: Validate service worker
         run: node --check sw.js
       - name: Test combat simulator
         run: npm test
       - name: Validate Worker bundle
         run: npm run check
+      - name: Validate D1 migrations locally
+        run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
