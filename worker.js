@@ -494,9 +494,11 @@ async function gameAction(env,playerId,body){
     if(!tag)return json({error:"Informe a sigla da aliança."},400);
     const existing=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(existing)return json({error:"Seu reino já pertence a uma aliança."},409);
-    const alliance=await env.DB.prepare("SELECT id FROM alliances WHERE tag=?").bind(tag).first();
+    const alliance=await env.DB.prepare("SELECT id,max_members FROM alliances WHERE tag=?").bind(tag).first();
     if(!alliance)return json({error:"Aliança não encontrada."},404);
-    await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) VALUES(?,?,'member')").bind(alliance.id,k.id).run();
+    const joined=await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT ?,?,'member' WHERE (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=?) < ?")
+      .bind(alliance.id,k.id,alliance.id,alliance.max_members).run();
+    if(!joined.meta.changes)return json({error:"A aliança atingiu o limite de membros."},409);
   }else if(type==="alliance_invite"){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não permite convidar jogadores."},403);
