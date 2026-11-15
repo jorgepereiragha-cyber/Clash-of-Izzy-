@@ -87,3 +87,14 @@ test("global navigation exposes the Anjo da Morte weekend event", async () => {
   assert.ok(nav.includes('href:"/events.html"'));
   assert.ok(nav.includes("anjo da morte"));
 });
+
+
+test("global search results can deep-link to territory and skin catalog pages", async () => {
+  const alliance = await read("alliance.html");
+  const world = await read("world-map.js");
+  const equipment = await read("equipment-system.js");
+  assert.ok(alliance.includes('location.href="/world.html?search="+encodeURIComponent(item.name)'));
+  assert.ok(alliance.includes('location.href="/equipment-ui.html?search="+encodeURIComponent(item.name)'));
+  assert.ok(world.includes("requestedTerritorySearch"));
+  assert.ok(equipment.includes("requestedSkinSearch"));
+});
