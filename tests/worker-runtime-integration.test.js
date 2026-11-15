@@ -403,7 +403,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           "--config", "wrangler.jsonc",
           "d1", "execute", "clash-of-izzy-db",
           "--local", "--persist-to", persistDir,
-          "--command": "UPDATE marches SET arrives_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id=" + kingdomB +
+          "--command", "UPDATE marches SET arrives_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id=" + kingdomB +
             " AND target_territory_id=" + Number(pvpTarget.id) + " AND march_type='attack' AND status='marching'"
         ]);
         const afterAttackB = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "resolver marcha PvP");
