@@ -4,7 +4,6 @@ CREATE TABLE IF NOT EXISTS kingdom_equipment (
   kingdom_id INTEGER NOT NULL REFERENCES kingdoms(id) ON DELETE CASCADE,
   item_key TEXT NOT NULL,
   level INTEGER NOT NULL DEFAULT 1 CHECK (level BETWEEN 1 AND 20),
-  acquired_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (kingdom_id, item_key)
 );
 
