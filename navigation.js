@@ -186,7 +186,7 @@
       if (!localCount) addEmpty("Digite pelo menos 2 caracteres.");
       return;
     }
-    searchTimer = setTimeout(() => onlineResults(query,sequence),250);
+    searchTimer = setTimeout(() => onlineResults(query,sequence),400);
   }
 
   input.addEventListener("input",search);
