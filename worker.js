@@ -299,11 +299,13 @@ async function processMarches(env,kingdomId){
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
     ]);
     const castleLevel=Number(kingdom?.castle_level||1);
+    const gear=await getEquipmentState(env,kingdomId);
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      researchLevel:Number(military?.level||0),
      defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0))),
+     equipmentAttackPercent:gear.bonuses.attackPercent,equipmentDefensePercent:gear.bonuses.defensePercent,equipmentHealthPercent:gear.bonuses.healthPercent,
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
     });
@@ -876,7 +878,7 @@ async function gameAction(env,playerId,body){
       army:armyRows,castleLevel:Number(k.castle_level||1),
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
-      equipmentAttackPercent:equipmentState.bonuses.attackPercent,equipmentDefensePercent:equipmentState.bonuses.defensePercent,
+      equipmentAttackPercent:equipmentState.bonuses.attackPercent,equipmentDefensePercent:equipmentState.bonuses.defensePercent,equipmentHealthPercent:equipmentState.bonuses.healthPercent,
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
     });
     const won=simulation.won,attackerPower=simulation.attackerPower,defenderPower=simulation.defenderPower;
