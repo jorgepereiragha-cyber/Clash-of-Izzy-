@@ -26,6 +26,10 @@ jobs:
         run: node --check sw.js
       - name: Validate kingdom command center script
         run: node --check command-center.js
+      - name: Validate LiveOps engine
+        run: node --check liveops-engine.js
+      - name: Test LiveOps engine
+        run: node --test tests/liveops-engine.test.js
       - name: Test combat simulator
         run: npm test
       - name: Validate Worker bundle
