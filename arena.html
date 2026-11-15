@@ -450,7 +450,7 @@ function renderKingdomStore(){
  const seasonGrid=document.createElement('div');seasonGrid.className='storeGrid';
  for(const skin of cosmetics.seasonal||[]){
   const has=owned.has(skin.id),active=Boolean(cosmetics.seasonActive);
-  const desc=(skin.theme||'Skin especial')+' · '+(skin.special||'Visual exclusivo')+' · '+Number(skin.price||0).toLocaleString('pt-BR')+' gemas';
+  const desc=(skin.theme||'Skin especial')+' · Aparência visual temática'+(skin.legendary?' · Lendária':'')+' · '+Number(skin.price||0).toLocaleString('pt-BR')+' gemas';
   seasonGrid.append(storeCard(skin.icon+' '+skin.name,desc,has?'Já adquirida':active?'Adquirir skin':'Temporada encerrada',()=>runStoreAction({type:'seasonal_buy',skin:skin.id}),has||!active));
  }
  if(!seasonGrid.children.length){const note=document.createElement('p');note.className='storeMuted';note.textContent='Nenhuma skin sazonal disponível.';seasonGrid.append(note)}
