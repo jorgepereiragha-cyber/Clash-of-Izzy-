@@ -44,7 +44,7 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0011`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0012`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
 
 ## Segurança e consistência
 
@@ -90,3 +90,9 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - A árvore `gear_forging`, `gear_ward`, `gear_vitality` e `gear_logistics` reutiliza a tabela `research` existente e exige o Centro de Pesquisa Militar. Os bônus são calculados no servidor e aplicados ao herói ativo: ataque, defesa, vida, crítico, marcha e produção.
 - Acertos críticos usam semente registrada no relatório de batalha, permitindo auditoria/reprodução do cálculo. A velocidade de marcha usa uma função determinística com limite de bônus.
 - `hero_inventory` é a fonte de progressão/estrelas/fragmentos; `heroes` é a identidade relacional usada por equipamentos. `syncHeroSystems` mantém ambos alinhados por `(kingdom_id, hero_key)` e o treinamento atualiza os dois no mesmo lote.
+
+
+## Busca global do mundo
+- A navegação oferece busca local por seções e busca online autenticada por reinos públicos, alianças, territórios e skins.
+- A API `/api/game/search` usa FTS5 com remoção de diacríticos e prefixos, limites de tamanho/resultados e rate limit por jogador/rede; mantém fallback SQL `LIKE` caso o índice FTS5 esteja indisponível.
+- A migração 0012 cria índice e triggers sincronizados com as tabelas de origem. O endpoint não retorna IDs de jogador nem dados privados.
