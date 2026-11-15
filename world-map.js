@@ -25,7 +25,7 @@ let selectedUnits = {};
 let busy = false;
 const requestedTerritorySearch = new URLSearchParams(location.search).get("search") || "";
 let requestedTerritoryApplied = false;
-const normalizeTerritorySearch = value => String(value || "").normalize("NFKD").replace(/[\\p{M}]/gu, "").toLocaleLowerCase("pt-BR").trim();
+const normalizeTerritorySearch = value => String(value || "").normalize("NFKD").replace(/[\p{M}]/gu, "").toLocaleLowerCase("pt-BR").trim();
 
 function setStatus(message, error = false) {
   $("status").textContent = message;
