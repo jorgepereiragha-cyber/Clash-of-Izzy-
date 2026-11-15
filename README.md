@@ -76,3 +76,4 @@ A interface usa Three.js com instanciamento de objetos repetidos, LOD, redução
 - [Exploração 3D e pistas do mundo — arquitetura, segurança e desempenho](docs/EXPLORACAO_3D_PISTAS.md)
 
 - [Jornada inicial, retenção e abertura de reinos](docs/RETENCAO_E_ABERTURA_DE_REINOS.md)
+- [Painel administrativo e busca de jogadores](docs/PAINEL_ADMINISTRATIVO.md)
