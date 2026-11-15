@@ -404,7 +404,21 @@ function updateSkillHud(){document.querySelectorAll('[data-skill]').forEach(b=>{
 function toggleShop(show){document.getElementById('shop').style.display=show?'flex':'none';if(show)refreshKingdomStore()}
 document.getElementById('attack').onclick=attack;document.querySelectorAll('[data-skill]').forEach(b=>b.onclick=()=>skill(b.dataset.skill));document.getElementById('openShop').onclick=()=>toggleShop(true);document.getElementById('closeShop').onclick=()=>toggleShop(false);
 document.getElementById('buyDamage').onclick=()=>{if(gold<300)return;gold-=300;damageBonus+=25;updateHud()};document.getElementById('buyHealth').onclick=()=>{if(gold<250)return;gold-=250;healthBonus+=150;player.max+=150;player.hp=Math.min(player.max,player.hp+150);updateHud()};document.getElementById('buySpeed').onclick=()=>{if(gold<200)return;gold-=200;speedBonus+=2;updateHud()};
-document.getElementById('whatsapp').onclick=()=>window.open('https://wa.me/5547996531437?text='+encodeURIComponent('Olá! Quero consultar os pacotes e skins do Clash of Izzy.'),'_blank');
+const WHATSAPP_FALLBACK='5547996531437';
+let whatsappContact=WHATSAPP_FALLBACK;
+function setWhatsAppContact(value){
+ const digits=String(value||'').replace(/\\D/g,'');
+ if(digits.length>=10&&digits.length<=15)whatsappContact=digits;
+}
+function openWhatsAppMessage(message){
+ const digits=String(whatsappContact||WHATSAPP_FALLBACK).replace(/\\D/g,'');
+ if(digits.length<10||digits.length>15){console.error('Contato do WhatsApp inválido.');return false;}
+ const link=new URL('https://wa.me/'+digits);
+ link.searchParams.set('text',String(message||''));
+ window.open(link.toString(),'_blank','noopener,noreferrer');
+ return true;
+}
+document.getElementById('whatsapp').onclick=()=>openWhatsAppMessage('Olá! Quero consultar os pacotes e skins do Clash of Izzy.');
 function storeCard(title,description,buttonLabel,onClick,disabled=false){
  const card=document.createElement('article');card.className='storeCard';
  const heading=document.createElement('strong');heading.textContent=title;
@@ -492,12 +506,28 @@ async function loadCatalog(){
  try{
   const res=await fetch('/api/store/catalog');if(!res.ok)throw new Error('Catálogo indisponível');
   const data=await res.json();box.innerHTML='';
+  setWhatsAppContact(data.whatsapp);
   const entries=[...(data.packages||[]).map(x=>({...x,kind:'Pacote VIP'})),...(data.skins||[]).map(x=>({...x,kind:'Skin'}))];
   if(!entries.length){box.textContent='Nenhum item cadastrado no catálogo neste momento.';return}
   for(const item of entries){
    const b=document.createElement('button');const label=document.createElement('span');const price=document.createElement('b');
    label.textContent=item.kind+' · '+item.name;price.textContent='R$ '+Number(item.price_brl).toFixed(2).replace('.',',');
-   b.append(label,price);b.onclick=()=>window.open('https://wa.me/5547996531437?text='+encodeURIComponent('Olá! Quero comprar/consultar '+item.kind+': '+item.name+' — R$ '+Number(item.price_brl).toFixed(2).replace('.',',')+'. Meu jogo é Clash of Izzy: Arena.'),'_blank');
+   b.type='button';b.append(label,price);
+   b.onclick=()=>{
+    const amount=Number(item.price_brl);
+    const formatted=Number.isFinite(amount)?'R$ '+amount.toFixed(2).replace('.',','):'Preço a confirmar';
+    const message=[
+     'Olá! Quero consultar a compra de um item do Clash of Izzy.',
+     '',
+     '🎁 Item: '+item.name,
+     '🏷️ Categoria: '+item.kind,
+     '🆔 Código: '+String(item.id||'não informado'),
+     '💰 Valor anunciado: '+formatted,
+     '',
+     'Por favor, confirme a disponibilidade, a forma de pagamento e como os itens serão entregues na minha conta.'
+    ].join('\\n');
+    openWhatsAppMessage(message);
+   };
    box.appendChild(b);
   }
  }catch(e){box.textContent='Não foi possível carregar o catálogo agora. Fale conosco pelo WhatsApp.'}
