@@ -102,8 +102,12 @@ test("short CJK queries use bounded LIKE fallback even when FTS prefix already r
   assert.ok(worker.includes("if(queryLength<2)"));
   assert.ok(worker.includes("if(queryLength>48)"));
   assert.ok(worker.includes("if(queryLength>=3)"));
-  assert.ok(worker.includes("if(!hasEntity||queryLength<3)"));
-  assert.ok(worker.includes("if(!hasPlayers||queryLength<3)"));
+  assert.ok(worker.includes("needsShortUnicodeFallback=queryLength<3"));
+  assert.ok(worker.includes("Script=Han"));
+  assert.ok(worker.includes("Script=Hiragana"));
+  assert.ok(worker.includes("Script=Katakana"));
+  assert.ok(worker.includes("if(!hasEntity||needsShortUnicodeFallback)"));
+  assert.ok(worker.includes("if(!hasPlayers||needsShortUnicodeFallback)"));
   assert.ok(worker.includes("const pattern=\"%\"+escaped+\"%\""));
   assert.ok(worker.includes("nickname_key LIKE ? ESCAPE '!'"));
 });
