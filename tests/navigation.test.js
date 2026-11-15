@@ -128,3 +128,12 @@ test("alliance search inline script parses before deployment", async () => {
   assert.ok(start >= 0 && end > start, "alliance page must contain its application script");
   new vm.Script(html.slice(start + 8, end), { filename: "alliance.html:inline-script" });
 });
+
+
+test("skin results are highlighted in the equipment catalog after navigation", async () => {
+  const equipment = await read("equipment-system.js");
+  assert.ok(equipment.includes("requestedSkinSearch"));
+  assert.ok(equipment.includes("searchFocusApplied"));
+  assert.ok(equipment.includes("matches[0].scrollIntoView"));
+  assert.ok(equipment.includes("normalizeSearch(card.textContent).includes(needle)"));
+});
