@@ -1,14 +1,15 @@
-// Equipamentos persistentes: o Worker é a única autoridade para ouro, nível e bloqueio.
+// Equipamentos persistentes: inventário e loadout são validados pelo Worker.
 (() => {
   const API="/api";
-  let token=null,state=null,selected="coroa_izzy",busy=false;
+  let token=null,state=null,selected="coroa_izzy",selectedHeroId=null,busy=false;
   const $=id=>document.getElementById(id);
   const fmt=value=>Number(value||0).toLocaleString("pt-BR");
   const labels={defense:"Defesa",health:"Vida",attack:"Ataque",resourceBonus:"Bônus de recursos"};
+  const slotLabels={weapon:"Arma",helmet:"Capacete",armor:"Armadura",boots:"Botas",accessory:"Acessório"};
+  const rarityLabels={comum:"Comum",raro:"Raro",epico:"Épico",lendario:"Lendário"};
   function setStatus(message,error=false){
-    let node=$("equipment-status");
-    if(!node){node=document.createElement("p");node.id="equipment-status";node.setAttribute("role","status");node.style.cssText="color:#f5d58a;line-height:1.45;margin:12px 0";document.querySelector(".mobile-equipment-container")?.append(node);}
-    node.textContent=message;node.style.color=error?"#ffb4a9":"#f5d58a";
+    const node=$("equipment-status");
+    if(node){node.textContent=message;node.style.color=error?"#ffb4a9":"#f5d58a";}
   }
   async function request(path,options={}){
     const response=await fetch(API+path,{...options,headers:{...(options.headers||{}),...(token?{Authorization:"Bearer "+token}:{})}});
@@ -18,6 +19,8 @@
   }
   function render(){
     const container=document.querySelector(".mobile-equipment-container");
+    const equipment=Array.isArray(state?.equipment)?state.equipment:[];
+    const heroes=Array.isArray(state?.heroes)?state.heroes:[];
     let picker=$("equipment-select");
     if(!picker&&container){
       picker=document.createElement("select");picker.id="equipment-select";picker.setAttribute("aria-label","Selecionar equipamento");
@@ -25,45 +28,75 @@
       container.insertBefore(picker,container.firstChild);
       picker.addEventListener("change",()=>{selected=picker.value;render()});
     }
-    if(picker&&state?.equipment){
-      picker.replaceChildren(...state.equipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
+    if(picker){
+      picker.replaceChildren(...equipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
     }
-    const item=(state?.equipment||[]).find(x=>x.id===selected)||(state?.equipment||[])[0];
+    const item=equipment.find(x=>x.id===selected)||equipment[0];
     if(!item){setStatus("Nenhum equipamento disponível neste reino.",true);return;}
     selected=item.id;
+    if(!selectedHeroId||!heroes.some(hero=>Number(hero.id)===selectedHeroId)){
+      selectedHeroId=Number(item.equippedHeroId)||Number(heroes[0]?.id)||null;
+    }
+    const heroPicker=$("hero-select");
+    heroPicker.replaceChildren();
+    if(!heroes.length){
+      const option=document.createElement("option");option.value="";option.textContent="Convoque um herói primeiro";heroPicker.append(option);
+    }else{
+      for(const hero of heroes){
+        const option=document.createElement("option");option.value=String(hero.id);
+        option.textContent=(hero.hero_name||hero.hero_key||"Herói")+" · Nv. "+hero.level;
+        heroPicker.append(option);
+      }
+      heroPicker.value=selectedHeroId?String(selectedHeroId):"";
+    }
+    heroPicker.disabled=busy||!heroes.length;
+    const selectedHero=heroes.find(hero=>Number(hero.id)===selectedHeroId);
     $("item-name").textContent=item.name;
     $("current-level").textContent=item.level;
     $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";
     const current=item.stats||{},next=item.nextLevelStats||{};
-    $("current-def").textContent=Object.entries(current).map(([k,v])=>labels[k]+": "+(k==="resourceBonus"?v+"%":fmt(v))).join(" · ")||"—";
-    $("next-def").textContent=Object.entries(next).map(([k,v])=>labels[k]+": "+(k==="resourceBonus"?v+"%":fmt(v))).join(" · ")||"Nível máximo";
-    $("current-res").textContent=item.isLocked?"Equipamento bloqueado":"Equipamento disponível";
-    $("next-res").textContent="Máximo: nível "+item.maxLevel;
+    $("current-def").textContent=Object.entries(current).map(([key,value])=>labels[key]+": "+(key==="resourceBonus"?value+"%":fmt(value))).join(" · ")||"—";
+    $("next-def").textContent=Object.entries(next).map(([key,value])=>labels[key]+": "+(key==="resourceBonus"?value+"%":fmt(value))).join(" · ")||"Nível máximo";
+    $("current-res").textContent=item.equippedHeroId?"Equipado em "+(heroes.find(hero=>Number(hero.id)===Number(item.equippedHeroId))?.hero_name||"herói"):"Não equipado";
+    $("next-res").textContent="Slot: "+(slotLabels[item.slot]||item.slot)+" · Máximo: nível "+item.maxLevel;
     $("upgrade-cost").textContent=fmt(item.upgradeCost);
     $("player-gold").textContent=fmt(state.kingdom?.gold);
-    const lock=$("lock-btn");lock.textContent=item.isLocked?"🔒 Travado":"🔓 Destravado";
-    lock.setAttribute("aria-pressed",String(item.isLocked));
-    const upgrade=document.querySelector(".upgrade-btn-mobile");
-    upgrade.disabled=busy||item.isLocked||item.level>=item.maxLevel;
+    const rarity=$("rarity-badge");
+    rarity.textContent=rarityLabels[item.rarity]||item.rarity;
+    rarity.className="rarity-badge "+item.rarity;
+    const lock=$("lock-btn");lock.textContent=item.isLocked?"🔒 Travado":"🔓 Destravado";lock.setAttribute("aria-pressed",String(item.isLocked));
+    const upgrade=$("upgrade-btn");upgrade.disabled=busy||item.isLocked||item.level>=item.maxLevel;
     upgrade.textContent=item.level>=item.maxLevel?"NÍVEL MÁXIMO":item.isLocked?"DESTRAVE PARA EVOLUIR":"⚒️ EVOLUIR EQUIPAMENTO";
+    const equip=$("equip-btn");equip.disabled=busy||!selectedHeroId||Number(item.equippedHeroId)===selectedHeroId;
+    equip.textContent=Number(item.equippedHeroId)===selectedHeroId?"EQUIPADO NESTE HERÓI":"EQUIPAR NESTE HERÓI";
+    $("unequip-btn").disabled=busy||!item.equippedHeroId;
+    if(!heroes.length)setStatus("Convoque um herói para usar seus equipamentos. O inventário já está salvo.",true);
+    else if(selectedHero)setStatus("Herói selecionado: "+(selectedHero.hero_name||selectedHero.hero_key)+". Cada slot aceita um item.");
   }
   async function refresh(){
     token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
-    if(!token){setStatus("Entre no seu reino primeiro. Depois volte para evoluir seus equipamentos.",true);return;}
-    const response=await request("/game/state");
-    state=response.state;render();
+    if(!token){setStatus("Entre no seu reino primeiro. Depois volte para equipar seus heróis.",true);return;}
+    const response=await request("/game/state");state=response.state;render();
   }
-  window.upgradeEquipment=async itemId=>{
+  async function perform(action,success){
     if(busy)return;busy=true;render();
-    try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"equipment_upgrade",itemId:itemId||selected})});state=result.state;setStatus("Equipamento evoluído e salvo no servidor.");}
+    try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(action)});state=result.state;setStatus(success);}
     catch(error){setStatus(error.message,true);try{await refresh()}catch{}}
     finally{busy=false;render();}
+  }
+  window.upgradeEquipment=()=>perform({type:"equipment_upgrade",itemId:selected},"Equipamento evoluído e salvo no servidor.");
+  window.toggleLock=()=>perform({type:"equipment_lock",itemId:selected},"Bloqueio do equipamento atualizado no servidor.");
+  window.equipEquipment=()=>selectedHeroId?perform({type:"equipment_equip",itemId:selected,heroId:selectedHeroId},"Equipamento atribuído ao herói."):setStatus("Selecione um herói válido.",true);
+  window.unequipEquipment=()=>{
+    const item=(state?.equipment||[]).find(x=>x.id===selected);
+    if(item?.equippedHeroId)return perform({type:"equipment_unequip",itemId:selected,heroId:Number(item.equippedHeroId)},"Equipamento removido do herói.");
   };
-  window.toggleLock=async itemId=>{
-    if(busy)return;busy=true;render();
-    try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"equipment_lock",itemId:itemId||selected})});state=result.state;setStatus("Bloqueio do equipamento atualizado no servidor.");}
-    catch(error){setStatus(error.message,true);try{await refresh()}catch{}}
-    finally{busy=false;render();}
-  };
-  document.addEventListener("DOMContentLoaded",()=>{refresh().catch(error=>setStatus(error.message,true));});
+  document.addEventListener("DOMContentLoaded",()=>{
+    $("hero-select").addEventListener("change",event=>{selectedHeroId=Number(event.target.value)||null;render();});
+    $("upgrade-btn").addEventListener("click",()=>window.upgradeEquipment());
+    $("lock-btn").addEventListener("click",()=>window.toggleLock());
+    $("equip-btn").addEventListener("click",()=>window.equipEquipment());
+    $("unequip-btn").addEventListener("click",()=>window.unequipEquipment());
+    refresh().catch(error=>setStatus(error.message,true));
+  });
 })();
