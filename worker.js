@@ -992,7 +992,7 @@ async function gameAction(env,playerId,body){
     const armyRows=units.results||[];
     const total=armyRows.reduce((n,u)=>n+u.quantity,0);
     if(total<1)return json({error:"Treine tropas antes de iniciar uma batalha."},409);
-    const [hero,dragon,tech,defenseTech,battleState,activeHero,gearHero]=await Promise.all([
+    const [hero,dragon,tech,defenseTech,battleState,activeHero]=await Promise.all([
       env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC LIMIT 1").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first(),
