@@ -365,7 +365,6 @@ const EQUIPMENT_CATALOG={
  espada_guerreiro:{name:"Espada do Guerreiro",slot:"weapon",rarity:"raro",maxLevel:30,base:{attack:50,health:100},growth:{attack:8,health:25}}
 };
 async function ensureEquipmentTables(env,kingdomId){
- await env.DB.prepare("CREATE TABLE IF NOT EXISTS kingdom_equipment (kingdom_id INTEGER NOT NULL REFERENCES kingdoms(id) ON DELETE CASCADE,item_key TEXT NOT NULL,level INTEGER NOT NULL DEFAULT 1 CHECK(level BETWEEN 1 AND 30),is_locked INTEGER NOT NULL DEFAULT 0 CHECK(is_locked IN (0,1)),updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(kingdom_id,item_key))").run();
  await env.DB.batch(Object.keys(EQUIPMENT_CATALOG).map(key=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level,is_locked) VALUES(?,?,1,0)").bind(kingdomId,key)));
  return (await env.DB.prepare("SELECT item_key,level,is_locked,updated_at FROM kingdom_equipment WHERE kingdom_id=? ORDER BY item_key").bind(kingdomId).all()).results||[];
 }
@@ -440,14 +439,16 @@ async function gameAction(env,playerId,body){
     if(level>=def.maxLevel)return json({error:"Este equipamento já atingiu o nível máximo."},409);
     const multiplier=({comum:1,raro:1.1,epico:1.2,lendario:1.5})[def.rarity]||1;
     const cost=Math.floor(100*Math.pow(1.3,level)*multiplier);
-    const debit=await env.DB.prepare("UPDATE kingdoms SET gold=gold-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND gold>=? AND EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=? AND level=? AND is_locked=0)").bind(cost,k.id,cost,k.id,itemKey,level).run();
-    if(!debit.meta.changes)return json({error:"Ouro insuficiente ou equipamento alterado. Atualize e tente novamente."},409);
-    const upgraded=await env.DB.prepare("UPDATE kingdom_equipment SET level=level+1,updated_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND item_key=? AND level=? AND is_locked=0").bind(k.id,itemKey,level).run();
-    if(!upgraded.meta.changes){
-      await env.DB.prepare("UPDATE kingdoms SET gold=gold+? WHERE id=?").bind(cost,k.id).run();
-      return json({error:"Não foi possível confirmar a evolução. O ouro foi estornado."},409);
-    }
-    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"equipment_upgraded",JSON.stringify({item:itemKey,from:level,to:level+1,cost})).run();
+    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const statements=[
+      env.DB.prepare("UPDATE kingdoms SET gold=gold-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND gold>=? AND EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=? AND level=? AND is_locked=0)").bind(cost,k.id,cost,k.id,itemKey,level),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId),
+      env.DB.prepare("UPDATE kingdom_equipment SET level=level+1,updated_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND item_key=? AND level=? AND is_locked=0 AND "+guard+"").bind(k.id,itemKey,level,k.id,actionId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard+"").bind(k.id,"equipment_upgraded",JSON.stringify({item:itemKey,from:level,to:level+1,cost}),k.id,actionId),
+      env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId)
+    ];
+    const result=await env.DB.batch(statements);
+    if(!result[0]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Ouro insuficiente ou equipamento alterado. Atualize e tente novamente."},409);
   }else if(type==="equipment_lock"){
     const itemKey=String(body.itemId||"");
     if(!EQUIPMENT_CATALOG[itemKey])return json({error:"Equipamento inválido."},400);
@@ -922,7 +923,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
