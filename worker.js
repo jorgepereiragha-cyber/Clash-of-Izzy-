@@ -1463,7 +1463,7 @@ export default {
             if((indexed.results||[]).length)usedFts=true;
             for(const row of indexed.results||[]){
               if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0),allianceTag:row.kingdom_alliance_tag||""},row.search_rank);
-              else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
+              else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,description:row.subtitle,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
               else if(row.entity_type==="territory")addResult({type:"territory",name:row.title,terrain:row.territory_terrain},row.search_rank);
               else if(row.entity_type==="skin")addResult({type:"skin",name:row.title,description:row.subtitle},row.search_rank);
             }
@@ -1477,7 +1477,7 @@ export default {
               if((partial.results||[]).length)usedFts=true;
               for(const row of partial.results||[]){
                 if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0),allianceTag:row.kingdom_alliance_tag||""},row.search_rank);
-                else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
+                else if(row.entity_type==="alliance")addResult({type:"alliance",name:row.title,tag:row.alliance_tag,description:row.subtitle,level:Number(row.alliance_level||1),members:Number(row.member_count||0),territories:Number(row.territory_count||0)},row.search_rank);
                 else if(row.entity_type==="territory")addResult({type:"territory",name:row.title,terrain:row.territory_terrain},row.search_rank);
                 else if(row.entity_type==="skin")addResult({type:"skin",name:row.title,description:row.subtitle},row.search_rank);
               }
