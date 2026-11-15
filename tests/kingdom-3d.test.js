@@ -68,7 +68,7 @@ test("state refresh keeps the live WebGL canvas mounted in the kingdom", () => {
 test("renderer degrades gracefully on low-memory Android and WebGL context loss", () => {
   assert.match(renderer, /navigator\.deviceMemory/);
   assert.match(renderer, /selectKingdomQualityProfile/);
-  assert.match(renderer, /qualityProfile\.pixelRatioCap/);
+  assert.match(renderer, /calculateKingdomPixelRatio/);
   assert.match(renderer, /qualityProfile\.shadows/);
   assert.match(renderer, /qualityProfile\.shadowMapSize/);
   assert.match(renderer, /qualityProfile\?\.anisotropy/);
@@ -131,10 +131,10 @@ test("renderer diagnostics expose only local rendering counters and are cleaned 
 test("drawing buffer pixel count is capped for tall and high-density mobile viewports", () => {
   const low = selectKingdomQualityProfile({ deviceMemory: 3, hardwareConcurrency: 4, viewportWidth: 390, maxTextureSize: 4096 });
   const balanced = selectKingdomQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, viewportWidth: 720, maxTextureSize: 8192 });
-  const lowRatio = calculateKingdomPixelRatio({ width: 390, height: 844, devicePixelRatio: 3, profile: low });
-  const balancedRatio = calculateKingdomPixelRatio({ width: 720, height: 1600, devicePixelRatio: 3, profile: balanced });
-  assert.ok(390 * 844 * lowRatio * lowRatio <= low.maxPixelCount + 1);
-  assert.ok(720 * 1600 * balancedRatio * balancedRatio <= balanced.maxPixelCount + 1);
+  const lowRatio = calculateKingdomPixelRatio({ width: 1080, height: 2400, devicePixelRatio: 3, profile: low });
+  const balancedRatio = calculateKingdomPixelRatio({ width: 1440, height: 3200, devicePixelRatio: 3, profile: balanced });
+  assert.ok(1080 * 2400 * lowRatio * lowRatio <= low.maxPixelCount + 1);
+  assert.ok(1440 * 3200 * balancedRatio * balancedRatio <= balanced.maxPixelCount + 1);
   assert.ok(lowRatio < 1);
   assert.ok(balancedRatio < balanced.pixelRatioCap);
   assert.equal(calculateKingdomPixelRatio({ width: 1, height: 1, devicePixelRatio: 0, profile: low }), 0.5);
