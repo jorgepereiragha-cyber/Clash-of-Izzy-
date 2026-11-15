@@ -51,3 +51,12 @@ test("shared navigation searches authenticated online game entities safely", asy
   assert.ok(nav.includes("small.textContent"));
   assert.ok(!nav.includes("results.innerHTML"));
 });
+
+
+test("global online search never creates a kingdom just to search", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes("if (!token)"));
+  assert.ok(nav.includes('addEmpty("Entre no reino para pesquisar conteúdo do mundo.")'));
+  assert.ok(!nav.includes('/api/game/start'));
+  assert.ok(nav.includes('setTimeout(() => onlineResults(query,sequence),250)'));
+});
