@@ -28,8 +28,8 @@ test("central do reino mostra filas persistentes, treinamento e pesquisas", asyn
   assert.match(html, /id="researchForm"/);
   assert.match(html, /renderQueues\(\)/);
   assert.match(html, /refreshQueueState/);
-  assert.match(html, /type:"train"/);
-  assert.match(html, /type:"research"/);
+  assert.match(html, /submitQueue\("train"/);
+  assert.match(html, /submitQueue\("research"/);
   assert.match(html, /data-completes/);
 });
 
