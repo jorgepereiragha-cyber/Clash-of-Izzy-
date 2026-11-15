@@ -39,7 +39,7 @@ footer{text-align:center;color:#8fa1b5;font-size:11px;padding:12px}
 <div class="shell">
 <header>
  <div class="brand"><img src="/icon-192.svg" alt="Brasão Clash of Izzy"><div><h1>CLASH OF IZZY</h1><div class="sub">CENTRO DE COMANDO DO REINO</div></div></div>
- <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="installApp" class="primary" type="button" hidden>＋ Instalar jogo</button><a class="btn" href="./arena.html">⚔ Arena</a><button id="refresh" class="primary" type="button">↻ Atualizar reino</button></div>
+ <div style="display:flex;gap:8px;flex-wrap:wrap"><button id="installApp" class="primary" type="button" hidden>＋ Instalar jogo</button><button id="shareGame" type="button">↗ Compartilhar</button><a class="btn" href="./arena.html">⚔ Arena</a><button id="refresh" class="primary" type="button">↻ Atualizar reino</button></div>
 </header>
 <div id="connection" role="status" aria-live="polite">Conectando ao reino…</div>
 <section class="resources" id="resources" aria-label="Recursos do reino"></section>
@@ -97,7 +97,7 @@ footer{text-align:center;color:#8fa1b5;font-size:11px;padding:12px}
 <script type="module" src="/command-center.js"></script>
 <script>
 let deferredInstallPrompt=null;
-const installButton=document.getElementById("installApp");
+const installButton=document.getElementById("installApp");\nconst shareButton=document.getElementById("shareGame");\nshareButton.addEventListener("click",async()=>{const url=location.origin+"/command-center.html";try{if(navigator.share){await navigator.share({title:"Clash of Izzy",text:"Entre no meu reino em Clash of Izzy!",url});}else if(navigator.clipboard?.writeText){await navigator.clipboard.writeText(url);alert("Link do jogo copiado: "+url);}else{prompt("Copie o link do jogo:",url);}}catch(error){if(error.name!=="AbortError")alert("Não foi possível compartilhar automaticamente. Link: "+url);}});
 window.addEventListener("beforeinstallprompt",event=>{event.preventDefault();deferredInstallPrompt=event;installButton.hidden=false;});
 installButton.addEventListener("click",async()=>{if(!deferredInstallPrompt){alert("No Android, abra o menu do navegador e escolha \\\"Adicionar à tela inicial\\\" ou \\\"Instalar app\\\".");return;}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;installButton.hidden=true;});
 window.addEventListener("appinstalled",()=>{installButton.hidden=true;});
