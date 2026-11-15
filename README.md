@@ -96,3 +96,9 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - A navegação oferece busca local por seções e busca online autenticada por reinos públicos, alianças, territórios e skins.
 - A API `/api/game/search` usa FTS5 com remoção de diacríticos e prefixos, limites de tamanho/resultados e rate limit por jogador/rede; mantém fallback SQL `LIKE` caso o índice FTS5 esteja indisponível.
 - A migração 0012 cria índice e triggers sincronizados com as tabelas de origem. O endpoint não retorna IDs de jogador nem dados privados.
+
+
+## Descoberta de jogadores
+- Cada jogador pode registrar um nickname público único (3–20 caracteres), normalizado para evitar duplicatas por diferenças de maiúsculas/minúsculas.
+- A busca autenticada usa prefixo de nickname, exclui o próprio jogador e retorna somente nickname, reino, nível do castelo e poder; identificadores internos e dados de conta nunca são expostos.
+- Limites separados por jogador e rede protegem a rota de descoberta. A migração 0013_player_nicknames.sql adiciona a tabela sem alterar os dados existentes.

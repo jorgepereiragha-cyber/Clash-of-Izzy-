@@ -46,6 +46,21 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <section class="panel"><h2>🛡️ Poder do reino</h2><div class="grid2" id="army"></div><div class="toolbar"><button class="secondary" id="goMap">🌍 Explorar territórios</button></div></section>
 <section class="panel"><h2>📜 Crônicas do reino</h2><div class="events" id="events"></div></section>
 </div></div>
+<section class="panel" style="margin-top:14px">
+<h2>👥 Jogadores do mundo</h2>
+<form id="nicknameForm" class="toolbar">
+<label for="nicknameInput" class="muted">Seu nickname (3–20 caracteres)</label>
+<input id="nicknameInput" minlength="3" maxlength="20" autocomplete="nickname" placeholder="Ex.: LordeIzzy" required style="min-width:180px;flex:1;padding:10px;border-radius:8px;border:1px solid #71839a;background:#0e1a2a;color:#fff">
+<button type="submit">Salvar nickname</button>
+</form>
+<div id="nicknameStatus" class="muted" role="status" aria-live="polite" style="margin-top:8px"></div>
+<form id="playerSearchForm" class="toolbar">
+<label for="playerSearchInput" class="muted">Encontrar jogadores</label>
+<input id="playerSearchInput" minlength="3" maxlength="20" autocomplete="off" placeholder="Digite o início do nickname" required style="min-width:180px;flex:1;padding:10px;border-radius:8px;border:1px solid #71839a;background:#0e1a2a;color:#fff">
+<button type="submit" class="secondary">🔎 Buscar</button>
+</form>
+<div id="playerSearchResults" class="events" aria-live="polite" style="margin-top:10px"></div>
+</section>
 <div class="notice" style="margin-top:14px">O tempo e os recursos são processados pelo servidor. Fechar o jogo não interrompe a evolução do reino; ao retornar, o estado é sincronizado novamente.</div>
 </div></main>
 <script>
@@ -100,7 +115,7 @@ function watchKingdomScene(){
  if("ResizeObserver" in window){kingdomResizeObserver=new ResizeObserver(()=>drawKingdomScene(state?.buildings||[]));kingdomResizeObserver.observe(host);}
  else{kingdomResizeHandler=()=>drawKingdomScene(state?.buildings||[]);window.addEventListener("resize",kingdomResizeHandler,{passive:true});}
 }
-function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("resources").innerHTML=[["🌾","Comida","food"],["🪵","Madeira","wood"],["🪨","Pedra","stone"],["⛓️","Ferro","iron"],["🪙","Ouro","gold"]].map(([icon,label,key])=>'<div class="resource">'+icon+'<b>'+fmt(k[key])+'</b>'+label+'</div>').join("");
+function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";document.getElementById("resources").innerHTML=[["🌾","Comida","food"],["🪵","Madeira","wood"],["🪨","Pedra","stone"],["⛓️","Ferro","iron"],["🪙","Ouro","gold"]].map(([icon,label,key])=>'<div class="resource">'+icon+'<b>'+fmt(k[key])+'</b>'+label+'</div>').join("");
 const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings);if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const blocked=b.level>=30;return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked||busy?"disabled":"")+'> '+(blocked?"MÁXIMO":"Evoluir")+' </button></div>'}).join("");
@@ -110,6 +125,35 @@ city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click"
 document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
 }
 async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;busy=false;render();setStatus("Melhoria aplicada");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
+async function setNickname(event){
+ event.preventDefault();
+ const input=document.getElementById("nicknameInput"),status=document.getElementById("nicknameStatus");
+ status.textContent="Salvando nickname…";
+ try{
+  await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"set_nickname",nickname:input.value})});
+  const fresh=await request("/game/state");state=fresh.state;render();
+  status.textContent="Nickname salvo. Agora outros jogadores podem encontrar seu reino.";
+ }catch(error){status.textContent=error.message;}
+}
+async function searchPlayers(event){
+ event.preventDefault();
+ const query=document.getElementById("playerSearchInput").value.trim(),results=document.getElementById("playerSearchResults");
+ results.replaceChildren();
+ const loading=document.createElement("div");loading.className="event";loading.textContent="Pesquisando jogadores…";results.append(loading);
+ try{
+  const data=await request("/game/players/search?q="+encodeURIComponent(query));
+  results.replaceChildren();
+  if(!data.players?.length){const empty=document.createElement("div");empty.className="event";empty.textContent="Nenhum jogador encontrado. A busca considera o início do nickname.";results.append(empty);return;}
+  for(const player of data.players){
+   const row=document.createElement("div");row.className="event";
+   const title=document.createElement("strong");title.textContent=player.nickname+" · "+player.kingdom_name;
+   const details=document.createElement("div");details.className="muted";details.textContent="Castelo nível "+player.castle_level+" · Poder "+Number(player.power||0).toLocaleString("pt-BR");
+   row.append(title,details);results.append(row);
+  }
+ }catch(error){results.replaceChildren();const message=document.createElement("div");message.className="event";message.textContent=error.message;results.append(message);}
+}
+document.getElementById("nicknameForm").addEventListener("submit",setNickname);
+document.getElementById("playerSearchForm").addEventListener("submit",searchPlayers);
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 connect();
 </script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-3d.js"></script>  <script src="/navigation.js" defer></script>
