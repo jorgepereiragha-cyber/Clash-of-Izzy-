@@ -16,6 +16,14 @@ let disposed = true;
 
 const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/';
 
+function validateModelUrl(url) {
+  const parsed = new URL(String(url), window.location.href);
+  if (parsed.origin !== window.location.origin || !parsed.pathname.startsWith('/assets/models/') || !/\\.glb$/i.test(parsed.pathname)) {
+    throw new TypeError('Modelos devem ser arquivos GLB locais em /assets/models/.');
+  }
+  return parsed.href;
+}
+
 export function initAssetLoader(renderer, options = {}) {
   if (!renderer) throw new TypeError('initAssetLoader requer o WebGLRenderer existente.');
   if (gltfLoader && !disposed) return gltfLoader;
@@ -40,13 +48,14 @@ export function loadModel(name, url) {
   if (!gltfLoader || disposed) throw new Error('Inicialize o carregador após criar o renderer.');
   if (!name || !url) return Promise.reject(new TypeError('loadModel requer name e url.'));
 
-  const cacheKey = String(url);
+  const safeUrl = validateModelUrl(url);
+  const cacheKey = safeUrl;
   if (modelPromises.has(cacheKey)) return modelPromises.get(cacheKey);
 
   const loader = gltfLoader;
   const generation = loaderGeneration;
   let promise;
-  promise = loader.loadAsync(url).then(gltf => {
+  promise = loader.loadAsync(safeUrl).then(gltf => {
     // A resposta pode chegar depois de uma troca de cena/contexto. Nunca manter
     // recursos GPU pertencentes a uma geração de loader já encerrada.
     if (disposed || generation !== loaderGeneration) {
