@@ -10,8 +10,8 @@ export function clampMapViewport({ zoom = 1, panX = 0, panY = 0, width = 0, heig
   const maxY = safeHeight * (safeZoom - 1) / 2;
   return {
     zoom: safeZoom,
-    panX: Math.max(-maxX, Math.min(maxX, finite(panX))),
-    panY: Math.max(-maxY, Math.min(maxY, finite(panY))),
+    panX: normalizeZero(Math.max(-maxX, Math.min(maxX, finite(panX)))),
+    panY: normalizeZero(Math.max(-maxY, Math.min(maxY, finite(panY))),
   };
 }
 
@@ -21,10 +21,15 @@ export function nextMapZoom(currentZoom, delta) {
   return Math.max(1, Math.min(3, current + change));
 }
 
+function normalizeZero(value) {
+  return Object.is(value, -0) ? 0 : value;
+}
 export function mapViewportTransform({ zoom = 1, panX = 0, panY = 0 } = {}) {
-  const safe = value => {
+  const safeCoordinate = value => {
     const number = Number(value);
-    return Number.isFinite(number) ? Math.round(number * 100) / 100 : 0;
+    return normalizeZero(Number.isFinite(number) ? Math.round(number * 100) / 100 : 0);
   };
-  return "translate3d(" + safe(panX) + "px, " + safe(panY) + "px, 0) scale(" + safe(zoom) + ")";
+  const rawZoom = Number(zoom);
+  const safeZoom = Number.isFinite(rawZoom) ? Math.max(1, Math.min(3, rawZoom)) : 1;
+  return "translate3d(" + safeCoordinate(panX) + "px, " + safeCoordinate(panY) + "px, 0) scale(" + safeZoom + ")";
 }
