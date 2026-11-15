@@ -190,3 +190,25 @@ test("GLTF ImageBitmap resources are explicitly closed with GPU textures", () =>
   assert.match(renderer, /for \(const bitmap of resources\.imageBitmaps\) bitmap\.close\(\)/);
   assert.match(renderer, /const resources = \{ geometries: new Set\(\), materials: new Set\(\), textures: new Set\(\), imageBitmaps: new Set\(\) \}/);
 });
+
+
+test("Data Saver avoids optional 3D downloads while preserving the procedural kingdom", () => {
+  const profile = selectKingdomQualityProfile({
+    deviceMemory: 12, hardwareConcurrency: 12, viewportWidth: 1200,
+    maxTextureSize: 16384, saveData: true
+  });
+  assert.equal(profile.tier, "low");
+  assert.equal(profile.shadows, false);
+  assert.equal(profile.loadOptionalAssets, false);
+  assert.equal(profile.maxBuildings, 8);
+  assert.match(renderer, /if \(!qualityProfile\?\.loadOptionalAssets\) return Promise\.resolve\(\)/);
+  assert.match(renderer, /dataSaver: !qualityProfile\.loadOptionalAssets/);
+});
+
+test("reduced-motion preference is detected without requiring optional browser APIs", () => {
+  const reduced = selectKingdomQualityProfile({ prefersReducedMotion: true });
+  const standard = selectKingdomQualityProfile({});
+  assert.equal(reduced.prefersReducedMotion, true);
+  assert.equal(standard.prefersReducedMotion, false);
+  assert.match(renderer, /window\.matchMedia\?\.\("\(prefers-reduced-motion: reduce\)"\)\?\.matches === true/);
+});
