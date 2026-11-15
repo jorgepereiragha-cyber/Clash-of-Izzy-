@@ -13,6 +13,11 @@ test("equipamentos usam estado persistente e validação no servidor", async () 
   assert.match(worker, /level=level\+1/);
   assert.match(worker, /type==="equipment_lock"/);
   assert.match(worker, /equipment,cosmetics,player/);
+  assert.match(worker, /function equipmentBonuses/);
+  assert.match(worker, /equipmentProductionBonus/);
+  assert.match(worker, /equipmentAttackBonusPercent:gear\.attackPercent/);
+  assert.match(worker, /equipmentHealthBonusPercent:gear\.healthPercent/);
+  assert.match(worker, /gear\.defensePercent/);
   assert.match(migration, /PRIMARY KEY \(kingdom_id, item_key\)/);
   assert.match(ui, /type:"equipment_upgrade"/);
   assert.match(ui, /type:"equipment_lock"/);
