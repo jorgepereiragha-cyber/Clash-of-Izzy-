@@ -56,3 +56,9 @@ test("rendered scene preserves accessible interactive building controls", () => 
   assert.match(kingdom, /setAttribute\("aria-hidden","true"\)/);
   assert.match(renderer, /setAttribute\("aria-hidden", "true"\)/);
 });
+
+
+test("state refresh keeps the live WebGL canvas mounted in the kingdom", () => {
+  assert.match(kingdom, /const kingdom3d=city\.querySelector\("#kingdom3d"\)/);
+  assert.match(kingdom, /if\(kingdom3d\)city\.append\(kingdom3d\)/);
+});
