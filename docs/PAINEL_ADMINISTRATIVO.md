@@ -16,6 +16,7 @@ O login emite um token assinado com validade de oito horas. O navegador mantém 
 ## Recursos implementados
 - Visão geral: total de jogadores, reinos, alianças, marchas em andamento e eventos das últimas 24 horas.
 - Busca por trecho do nick, nome do reino ou ID, sem diferenciar maiúsculas/minúsculas.
+- Jogadores podem definir um nick único (3–20 caracteres) no Centro de Comando; o servidor valida duplicidade antes de salvar.
 - Ficha do jogador com estado atual do servidor: recursos, edifícios, tropas, heróis, dragão, pesquisas, marchas, batalhas, inventário, eventos, tarefas e aliança.
 - Gestão de recursos e gemas, com validação de saldo não negativo e registro no ledger de recursos.
 - Renomear reino e liberar skin já cadastrada.
@@ -23,7 +24,7 @@ O login emite um token assinado com validade de oito horas. O navegador mantém 
 - Auditoria das alterações administrativas, com ator, ação, jogador-alvo, detalhes e horário.
 
 ## Limites
-- A busca identifica o jogador por `player_id` estável e encontra nomes/nicks por substring em `players.name` e `kingdoms.kingdom_name`. O schema atual não tem uma coluna separada de username público; o nome do reino é o identificador visível mais útil nesta versão.
+- A busca identifica o jogador por `player_id` estável e encontra nomes/nicks por substring em `players.name` e `kingdoms.kingdom_name`. O schema atual usa `players.name` como nick público e `kingdoms.kingdom_name` como nome do reino; a busca consulta ambos.
 - O painel mostra dados reais retornados pelo Worker; não simula contas, jogadores online ou funcionalidades ainda não implementadas.
 - A tela de ficha chama a rotina de estado existente, que pode reconciliar filas e marchas vencidas daquele reino, como ocorre quando o próprio jogador retorna.
 - Não há botão de excluir conta, transferir propriedade, alterar senha de jogador ou ler credenciais privadas.
