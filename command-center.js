@@ -1,3 +1,4 @@
+import { buildOnboardingSteps } from "./onboarding-engine.js";
 const API="/api";
 const BUILDINGS={castle:"Castelo",barracks:"Quartel",farm:"Fazenda",quarry:"Pedreira",lumber_mill:"Serraria",iron_mine:"Mina de ferro",market:"Mercado",academy:"Academia",wall:"Muralha",hospital:"Hospital",watchtower:"Torre de vigia",stable:"Estábulo",archery_range:"Campo de arqueiros",siege_workshop:"Oficina de cerco",embassy:"Embaixada",warehouse:"Armazém"};
 const UNITS={militia:"Milícia",swordsman:"Espadachim",spearman:"Lanceiro",archer:"Arqueiro",crossbowman:"Besteiro",cavalry:"Cavalaria",knight:"Cavaleiro",mage:"Mago",catapult:"Catapulta",ram:"Aríete",trebuchet:"Trabuquete"};
@@ -39,6 +40,12 @@ async function connect(){
   state=data.state;await migrateLegacyStoryProgress();setConnection("🏰 "+(state.kingdom?.kingdom_name||"Reino conectado")+" · Sessão autenticada no servidor.");render();notice("Seu reino está conectado.","ok");
  }catch(error){setConnection("⚠ Não foi possível conectar: "+error.message);notice("Verifique a conexão e a configuração do servidor.","error")}
 }
+function renderOnboarding(){
+ const host=$("onboardingGuide");if(!host)return;
+ const steps=buildOnboardingSteps(state),done=steps.filter(step=>step.done).length,percent=Math.round(done/steps.length*100);
+ const next=steps.find(step=>!step.done);
+ host.innerHTML='<div class="onboarding-progress"><div><strong>'+percent+'% concluído</strong><span>'+done+' de '+steps.length+' marcos</span></div><div class="progress-track"><i style="width:'+percent+'%"></i></div></div><div class="grid">'+steps.map(step=>'<article class="item onboarding-step"><h3>'+(step.done?'✓ ':'')+esc(step.title)+'</h3><p class="muted">'+esc(step.description)+'</p><div class="row"><span class="pill">'+(step.done?'Concluído':step===next?'Próximo passo':'Etapa futura')+'</span><button type="button" data-onboarding-tab="'+esc(step.tab)+'" '+(step.done?'disabled':'')+'>'+(step.done?'Concluído':'Abrir')+'</button></div></article>').join('')+'</div><p class="muted onboarding-note">Sem prazo e sem perda de progresso: avance no seu ritmo. Novos objetivos aparecem conforme o reino cresce.</p>';
+}
 function renderTasks(){
  const rows=state.activeTasks||[];
  const labels={construction:"Construção",training:"Treinamento",research:"Pesquisa"};
@@ -61,7 +68,7 @@ function render(){
  const k=state.kingdom||{},p=state.player||{};
  $("resources").innerHTML=[["🌾","Comida",k.food],["🪵","Madeira",k.wood],["🪨","Pedra",k.stone],["⛓","Ferro",k.iron],["🪙","Ouro",k.gold],["💎","Gemas",p.gems]].map(([icon,label,value])=>'<div class="resource"><small>'+icon+" "+label+'</small><strong>'+n(value)+'</strong></div>').join("");
  $("summary").innerHTML=[["🏰 Castelo","Nível "+n(k.castle_level)],["⚔ Tropas",n(state.totalTroops)],["🐉 Dragão","Nível "+n(state.dragon?.level)],["🛡 Aliança",state.alliance?esc(state.alliance.tag):"Sem aliança"]].map(([label,value])=>'<div class="tile"><small>'+label+'</small><strong>'+value+"</strong></div>").join("");
- renderTasks();renderBuildings();renderTroops();renderResearch();renderWorld();renderHeroes();renderDragon();renderAlliance();renderBattles();renderDailyEvents();renderVeilArchive();
+ renderOnboarding();renderTasks();renderBuildings();renderTroops();renderResearch();renderWorld();renderHeroes();renderDragon();renderAlliance();renderBattles();renderDailyEvents();renderVeilArchive();
 }
 function renderBuildings(){
  const rows=state.buildings||[];
@@ -149,6 +156,7 @@ async function act(body,success){
 }
 $("tabs").addEventListener("click",event=>{const button=event.target.closest("[data-tab]");if(!button)return;document.querySelectorAll("#tabs button").forEach(x=>x.setAttribute("aria-selected",String(x===button)));document.querySelectorAll(".section").forEach(x=>x.classList.toggle("active",x.id==="section-"+button.dataset.tab))});
 document.body.addEventListener("click",async event=>{
+  const guide=event.target.closest("[data-onboarding-tab]");if(guide){const tab=document.querySelector('#tabs [data-tab="'+guide.dataset.onboardingTab+'"]');if(tab)tab.click();return;}
  const story=event.target.closest("[data-story-step]");
  if(story){
   try{await act({type:"story_step",campaign:story.dataset.storyCampaign,step:story.dataset.storyStep},"Descoberta registrada no servidor e vinculada ao seu reino.")}catch{}
