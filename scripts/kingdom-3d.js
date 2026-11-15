@@ -244,9 +244,9 @@ if (host && "WebGLRenderingContext" in window) {
         const manifest = await response.json();
         for (const asset of (Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [])) {
           if (asset.enabled !== true || typeof asset.type !== "string" || !Object.hasOwn(palettes, asset.type) || typeof asset.src !== "string") continue;
-          const assetUrl = new URL(asset.src, window.location.origin);
-          if (assetUrl.origin !== window.location.origin || !assetUrl.pathname.startsWith("/assets/3d/") || !assetUrl.pathname.toLowerCase().endsWith(".glb")) continue;
           try {
+            const assetUrl = new URL(asset.src, window.location.origin);
+            if (assetUrl.origin !== window.location.origin || !assetUrl.pathname.startsWith("/assets/3d/") || !assetUrl.pathname.toLowerCase().endsWith(".glb")) continue;
             const gltf = await gltfLoader.loadAsync(assetUrl.href);
             const template = gltf.scene;
             template.traverse(node => {
