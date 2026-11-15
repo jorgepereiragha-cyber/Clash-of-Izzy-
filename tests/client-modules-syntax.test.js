@@ -4,6 +4,7 @@ import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const files = [
+  "../navigation.js",
   "../world-map.js",
   "../equipment-system.js",
   "../scripts/kingdom-3d.js",
