@@ -94,11 +94,45 @@ async function connectKingdom(){
   document.getElementById('heroName').textContent=(p.name||'Lorde de Eldoria')+' · Reino conectado';
   document.getElementById('gold').textContent=Number(k.gold||0).toLocaleString('pt-BR');
   renderKingdomStore();
+  renderChronicle();
  }catch(error){
   status.textContent='⚠️ Modo demonstração · '+error.message;
   console.warn('Clash of Izzy: falha ao conectar ao reino:',error);
  }
 }
+
+function renderChronicle(){
+ const hud=document.getElementById('hud');
+ let button=document.getElementById('openChronicle');
+ let panel=document.getElementById('chroniclePanel');
+ if(!button){
+  button=document.createElement('button');button.id='openChronicle';button.type='button';button.textContent='📜 CRÔNICAS';
+  button.style.cssText='position:fixed;right:10px;top:calc(76px + env(safe-area-inset-top));z-index:5;background:#17263b;color:#f5d58a;border:1px solid #b88b45;border-radius:8px;padding:9px 12px;font-weight:800;';
+  hud.append(button);
+  panel=document.createElement('section');panel.id='chroniclePanel';panel.hidden=true;
+  panel.style.cssText='position:fixed;right:10px;top:calc(120px + env(safe-area-inset-top));width:min(340px,calc(100vw - 20px));max-height:55vh;overflow:auto;z-index:6;background:#101a2bf2;color:#f5edda;border:1px solid #b88b45;border-radius:10px;padding:12px;box-shadow:0 8px 28px #000b;';
+  const head=document.createElement('div');head.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+  const title=document.createElement('strong');title.textContent='📜 Crônicas do Reino';
+  const close=document.createElement('button');close.type='button';close.textContent='Fechar';close.style.cssText='background:#293b55;color:#fff;border:1px solid #80643b;border-radius:6px;padding:5px 8px;';
+  close.addEventListener('click',()=>{panel.hidden=true});head.append(title,close);
+  const list=document.createElement('div');list.id='chronicleList';panel.append(head,list);document.body.append(panel);
+  button.addEventListener('click',()=>{panel.hidden=!panel.hidden});
+ }
+ const list=document.getElementById('chronicleList');if(!list)return;list.replaceChildren();
+ const labels={building_upgraded:'🏗️ Construção melhorada',troops_trained:'⚔️ Tropas treinadas',research_upgraded:'🔬 Pesquisa concluída',dragon_evolved:'🐉 Dragão evoluído',hero_trained:'🛡️ Herói treinado',castle_prestige:'👑 Prestígio do castelo',territory_captured:'🗺️ Território conquistado',territory_attack_resolved:'⚔️ Marcha de ataque resolvida',alliance_help:'🤝 Ajuda da aliança',collection_reward:'🎁 Coleção resgatada',seasonal_skin_purchased:'✨ Skin sazonal adquirida',skin_fused:'✨ Fusão de skin',shop_purchase:'🛒 Compra realizada',troops_trained:'⚔️ Tropas treinadas'};
+ const events=kingdomSession?.recentEvents||[];
+ if(!events.length){const empty=document.createElement('p');empty.textContent='As atividades do seu reino aparecerão aqui conforme você construir, pesquisar, treinar e conquistar.';empty.style.color='#cbd5e1';list.append(empty);return}
+ for(const event of events){
+  let payload={};try{payload=JSON.parse(event.payload_json||'{}')}catch{}
+  const item=document.createElement('article');item.style.cssText='padding:8px 0;border-bottom:1px solid #40516a;';
+  const heading=document.createElement('strong');heading.textContent=labels[event.event_type]||'📌 Atividade do reino';
+  const detail=document.createElement('div');detail.style.cssText='font-size:12px;color:#cbd5e1;margin-top:3px;';
+  const bits=[];for(const [key,value] of Object.entries(payload)){if(['fromName','building','unit','research','hero','level','quantity','prestige','territoryId','won'].includes(key)&&['string','number','boolean'].includes(typeof value))bits.push(key+': '+String(value));}
+  detail.textContent=bits.length?bits.join(' · '):'Registro #'+Number(event.id||0);
+  item.append(heading,detail);list.append(item);
+ }
+}
+
 connectKingdom();
 
 const materialsPanel=document.getElementById('materialsPanel');
