@@ -2,7 +2,7 @@ name: Clash of Izzy CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, feat/3d-kingdom-visual-pipeline, feat/adaptive-3d-quality-diagnostics]
   pull_request:
     branches: [main, security/api-rate-limits]
 
