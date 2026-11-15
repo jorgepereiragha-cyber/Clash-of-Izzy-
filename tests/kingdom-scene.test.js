@@ -9,7 +9,7 @@ test("kingdom scene renders original procedural terrain and building silhouettes
   assert.match(kingdom, /createLinearGradient/);
   assert.match(kingdom, /const palette=/);
   assert.match(kingdom, /drawKingdomScene\(buildings\)/);
-  assert.match(kingdom, /id="kingdomScene"/);
+  assert.match(kingdom, /canvas\.id="kingdomScene"/);
 });
 
 test("kingdom canvas is responsive and caps device pixel ratio for mobile GPUs", () => {
