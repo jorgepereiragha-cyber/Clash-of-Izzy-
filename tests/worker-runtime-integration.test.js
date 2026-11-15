@@ -382,6 +382,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         assert.ok(pvpTarget?.id, "existe território neutro para preparar o cenário PvP");
 
         const fixtureStatements = [
+          "UPDATE kingdoms SET battle_token='legacy-attacker-battle-nonce' WHERE id=" + kingdomB,
+          "UPDATE kingdoms SET battle_token='legacy-defender-battle-nonce' WHERE id=" + kingdomA,
           "UPDATE world_territories SET owner_kingdom_id=" + kingdomA +
             ",alliance_id=(SELECT alliance_id FROM alliance_members WHERE kingdom_id=" + kingdomA + ")," +
             "shield_until=NULL,combat_lock_token=NULL,combat_lock_expires_at=NULL WHERE id=" + Number(pvpTarget.id),
