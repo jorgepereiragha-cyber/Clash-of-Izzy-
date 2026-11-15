@@ -17,6 +17,31 @@
     if(!response.ok)throw new Error(data.error||"Falha ao sincronizar equipamentos.");
     return data;
   }
+  function renderNorseSkins(){
+    const cosmetics=state?.cosmetics||{},catalog=cosmetics.skins||{},owned=new Set((cosmetics.owned||[]).map(item=>item.item_id));
+    const skins=Object.entries(catalog).filter(([,skin])=>skin.theme==="Panteão Nórdico");
+    const grid=$("norse-skin-list");
+    if(!grid)return;
+    grid.replaceChildren(...skins.map(([id,skin])=>{
+      const card=document.createElement("article");card.className="norse-skin-card";
+      const title=document.createElement("h3");title.textContent=skin.icon+" "+skin.name;
+      const rarity=document.createElement("span");rarity.className="skin-rarity";rarity.textContent=skin.rarity;
+      const description=document.createElement("p");description.textContent=skin.visual||"Visual cosmético exclusivo.";
+      const button=document.createElement("button");button.type="button";button.className="skin-buy-btn";
+      const hasSkin=owned.has(id);button.disabled=busy||hasSkin;
+      button.textContent=hasSkin?"ADQUIRIDA":"Comprar · "+fmt(skin.price)+" gemas";
+      button.addEventListener("click",()=>perform({type:"cosmetic_buy",skin:id},"Skin "+skin.name+" adquirida."));
+      card.append(title,rarity,description,button);return card;
+    }));
+    $("skin-gems").textContent="Gemas: "+fmt(state?.player?.gems);
+    $("skin-shards").textContent="Fragmentos: "+fmt(cosmetics.shards);
+    const collection=cosmetics.collections?.find(item=>item.id==="col_norse");
+    const complete=Boolean(collection?.skins?.every(id=>owned.has(id)));
+    const claimed=(cosmetics.claimed||[]).includes("col_norse");
+    const claim=$("claim-norse-collection");
+    claim.disabled=busy||!complete||claimed;
+    claim.textContent=claimed?"RECOMPENSA RESGATADA":complete?"RESGATAR COLEÇÃO · +5.000 GEMAS / 200 FRAGMENTOS":"COLEÇÃO "+skins.filter(([id])=>owned.has(id)).length+"/6";
+  }
   function render(){
     const container=document.querySelector(".mobile-equipment-container");
     const equipment=Array.isArray(state?.equipment)?state.equipment:[];
@@ -72,6 +97,7 @@
     $("unequip-btn").disabled=busy||!item.equippedHeroId;
     if(!heroes.length)setStatus("Convoque um herói para usar seus equipamentos. O inventário já está salvo.",true);
     else if(selectedHero)setStatus("Herói selecionado: "+(selectedHero.hero_name||selectedHero.hero_key)+". Cada slot aceita um item.");
+    renderNorseSkins();
   }
   async function refresh(){
     token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
@@ -91,12 +117,14 @@
     const item=(state?.equipment||[]).find(x=>x.id===selected);
     if(item?.equippedHeroId)return perform({type:"equipment_unequip",itemId:selected,heroId:Number(item.equippedHeroId)},"Equipamento removido do herói.");
   };
+  window.claimNorseCollection=()=>perform({type:"cosmetic_claim",collection:"col_norse"},"Recompensa do Panteão de Asgard resgatada.");
   document.addEventListener("DOMContentLoaded",()=>{
     $("hero-select").addEventListener("change",event=>{selectedHeroId=Number(event.target.value)||null;render();});
     $("upgrade-btn").addEventListener("click",()=>window.upgradeEquipment());
     $("lock-btn").addEventListener("click",()=>window.toggleLock());
     $("equip-btn").addEventListener("click",()=>window.equipEquipment());
     $("unequip-btn").addEventListener("click",()=>window.unequipEquipment());
+    $("claim-norse-collection").addEventListener("click",()=>window.claimNorseCollection());
     refresh().catch(error=>setStatus(error.message,true));
   });
 })();
