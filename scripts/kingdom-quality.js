@@ -25,5 +25,18 @@ export function selectKingdomQualityProfile({
     shadowMapSize: tier === "high" ? 1536 : tier === "balanced" ? 1024 : 512,
     anisotropy: tier === "high" ? 8 : tier === "balanced" ? 4 : 2,
     maxBuildings: 16,
+    maxPixelCount: tier === "low" ? 1200000 : tier === "high" ? 4200000 : 2400000,
   });
+}
+
+// Bound the drawing buffer by physical pixel count, not only devicePixelRatio.
+// This prevents tall/high-density mobile screens from multiplying GPU work.
+export function calculateKingdomPixelRatio({ width, height, devicePixelRatio = 1, profile } = {}) {
+  const safeWidth = Math.max(1, Number(width) || 1);
+  const safeHeight = Math.max(1, Number(height) || 1);
+  const requested = Math.max(0.5, Number(devicePixelRatio) || 1);
+  const cap = Math.max(0.5, Number(profile?.pixelRatioCap) || 1);
+  const budget = Math.max(250000, Number(profile?.maxPixelCount) || 1200000);
+  const pixelBudgetCap = Math.sqrt(budget / (safeWidth * safeHeight));
+  return Math.max(0.5, Math.min(requested, cap, pixelBudgetCap));
 }
