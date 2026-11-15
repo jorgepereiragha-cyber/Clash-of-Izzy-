@@ -375,6 +375,66 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
       await action(tokenC, { type: "alliance_join", tag: "ALFA" }, 200);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomC }, 200);
+
+      await t.test("PvP territorial real: proteção, aliança, guarnição, baixas e relatório bilateral", async () => {
+        stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+        const pvpTarget = stateA.territories.find(item => !item.owner_kingdom_id && !item.alliance_id);
+        assert.ok(pvpTarget?.id, "existe território neutro para preparar o cenário PvP");
+
+        const fixtureStatements = [
+          "UPDATE world_territories SET owner_kingdom_id=" + kingdomA +
+            ",alliance_id=(SELECT alliance_id FROM alliance_members WHERE kingdom_id=" + kingdomA + ")," +
+            "shield_until=NULL,combat_lock_token=NULL,combat_lock_expires_at=NULL WHERE id=" + Number(pvpTarget.id),
+          "UPDATE kingdoms SET protection_until='2099-01-01T00:00:00.000Z' WHERE id=" + kingdomA,
+          "DELETE FROM army_units WHERE kingdom_id IN (" + kingdomA + "," + kingdomB + ")",
+          "INSERT INTO army_units(kingdom_id,unit_type,tier,quantity,wounded) VALUES " +
+            "(" + kingdomA + ",'militia',1,120,0)," +
+            "(" + kingdomA + ",'archer',1,80,0)," +
+            "(" + kingdomB + ",'knight',1,500,0)"
+        ];
+        for (const sql of fixtureStatements) {
+          await runCli([
+            "--config", "wrangler.jsonc",
+            "d1", "execute", "clash-of-izzy-db",
+            "--local", "--persist-to", persistDir,
+            "--command", sql
+          ]);
+        }
+
+        await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "ataque contra reino protegido");
+        await runCli([
+          "--config", "wrangler.jsonc",
+          "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE kingdoms SET protection_until=NULL WHERE id=" + kingdomA
+        ]);
+        await action(tokenC, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 1 } }, 409, "ataque contra aliado");
+        await action(tokenB, { type: "march", targetId: pvpTarget.id, marchType: "attack", units: { knight: 500 } }, 200, "marcha PvP contra inimigo");
+
+        await runCli([
+          "--config", "wrangler.jsonc",
+          "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE marches SET arrives_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id=" + kingdomB +
+            " AND target_territory_id=" + Number(pvpTarget.id) + " AND march_type='attack' AND status='marching'"
+        ]);
+        const afterAttackB = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "resolver marcha PvP");
+        const resolvedTerritory = afterAttackB.state.territories.find(item => Number(item.id) === Number(pvpTarget.id));
+        assert.equal(Number(resolvedTerritory.owner_kingdom_id), kingdomB, "vencedor captura o território inimigo");
+        const attackerReport = afterAttackB.state.battleReports.find(report =>
+          report.battle_type === "territory_pvp" && Number(report.attacker_kingdom_id) === kingdomB
+          && Number(report.defender_kingdom_id) === kingdomA
+        );
+        assert.ok(attackerReport, "o reino atacante recebe o relatório PvP");
+        assert.ok(attackerReport.losses_json.includes("attacker") && attackerReport.losses_json.includes("defender"));
+
+        const afterAttackA = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "relatório PvP do defensor");
+        const defenderReport = afterAttackA.state.battleReports.find(report => Number(report.id) === Number(attackerReport.id));
+        assert.ok(defenderReport, "o mesmo relatório aparece no reino defensor");
+        assert.ok(afterAttackA.state.recentEvents.some(event => event.event_type === "territory_lost"),
+          "o defensor recebe evento de território perdido");
+      });
+
       await action(tokenC, { type: "alliance_leave" }, 200);
     });
 
