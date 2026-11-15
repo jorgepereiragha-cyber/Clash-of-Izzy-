@@ -242,11 +242,19 @@ async function applyProduction(env,kingdomId){
     gold:1.5*(levels.market||1)
   };
   const prestigeBonus=1+Math.max(0,Number(row.prestige||0))*.10;
-  const gains=Object.fromEntries(Object.entries(perHour).map(([key,rate])=>[key,Math.floor(rate*prestigeBonus*elapsed/3600)]));
-  // Compare-and-set: evita creditar a mesma produção duas vezes em chamadas simultâneas.
+  let previousRemainders={};
+  try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
+  const gains={},nextRemainders={};
+  for(const [key,rate] of Object.entries(perHour)){
+    const accumulated=rate*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
+    gains[key]=Math.floor(accumulated/3600);
+    nextRemainders[key]=accumulated-gains[key]*3600;
+  }
+  // Guarda as frações de produção: consultas frequentes não descartam os segundos acumulados.
+  // Compare-and-set impede duas chamadas simultâneas de creditar o mesmo intervalo.
   const productionTimestamp=new Date(now).toISOString();
-  const productionUpdate=env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,last_production_at=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND COALESCE(last_production_at,'')=COALESCE(?, '')")
-    .bind(gains.food,gains.wood,gains.stone,gains.iron,gains.gold,productionTimestamp,kingdomId,row.last_production_at??"");
+  const productionUpdate=env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,last_production_at=?,production_remainders=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND COALESCE(last_production_at,'')=COALESCE(?, '')")
+    .bind(gains.food,gains.wood,gains.stone,gains.iron,gains.gold,productionTimestamp,JSON.stringify(nextRemainders),kingdomId,row.last_production_at??"");
   const ledgerRows=Object.entries(gains).filter(([,amount])=>amount>0);
   const ledgerInsert=ledgerRows.length?env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+ledgerRows.map(()=> "SELECT ?,?,?,? WHERE changes()>0").join(" UNION ALL "))
     .bind(...ledgerRows.flatMap(([resource,amount])=>[kingdomId,resource,amount,"produção automática"])):null;
