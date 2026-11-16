@@ -216,6 +216,18 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const tokenA = startA.token, tokenB = startB.token, tokenC = startC.token;
     let stateA = startA.state;
     const kingdomA = Number(stateA.kingdom.id);
+    const coreResourceKeys = ["food", "wood", "stone", "iron", "gold"];
+    for (const key of coreResourceKeys) {
+      const value = Number(stateA.kingdom?.[key]);
+      assert.ok(Number.isFinite(value) && value >= 0,
+        "reino inicial retorna recurso numérico válido: " + key);
+    }
+    for (const building of ["castle", "barracks", "farm", "quarry", "lumber_mill", "iron_mine"]) {
+      assert.ok(stateA.buildings.some(item => item.building_type === building),
+        "reino inicial contém o edifício " + building);
+    }
+    assert.ok(stateA.troops.some(unit => unit.unit_type === "militia" && Number(unit.quantity) > 0),
+      "reino inicial entrega tropas utilizáveis");
     const kingdomB = Number(startB.state.kingdom.id);
     const kingdomC = Number(startC.state.kingdom.id);
     const playerA = stateA.player.player_id;
@@ -715,6 +727,15 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     });
 
     await t.test("duas filas simultâneas, capacidade de tropas e marchas", async () => {
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const resourcesBeforeQueues = Object.fromEntries(coreResourceKeys.map(key => [key, Number(stateA.kingdom[key])]));
+      const troopCount = (type, snapshot = stateA) => snapshot.troops
+        .filter(unit => unit.unit_type === type)
+        .reduce((sum, unit) => sum + Number(unit.quantity || 0), 0);
+      const mageBeforeTraining = troopCount("mage");
+      const archerBeforeTraining = troopCount("archer");
+      const farmLevelBefore = Number(stateA.buildings.find(item => item.building_type === "farm")?.level || 0);
+      const barracksLevelBefore = Number(stateA.buildings.find(item => item.building_type === "barracks")?.level || 0);
       await action(tokenA, { type: "upgrade", building: "building_invalid" }, 400);
       await action(tokenA, { type: "upgrade", building: "castle" }, 200);
 
@@ -753,6 +774,29 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(stateA.queues.filter(item => item.status === "running" && item.queue_type === "training").length === 2,
         "dois treinamentos simultâneos permanecem persistidos");
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "research"));
+
+      const resourcesAfterDebit = Object.fromEntries(coreResourceKeys.map(key => [key, Number(stateA.kingdom[key])]));
+      assert.ok(coreResourceKeys.some(key => resourcesAfterDebit[key] < resourcesBeforeQueues[key]),
+        "iniciar melhorias e treinamentos debita recursos do reino");
+
+      // A conclusão é forçada somente no D1 local isolado do teste; o Worker
+      // continua sendo responsável por processar a fila no próximo GET /state.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdom_queues SET started_at=datetime('now','-2 seconds'),completes_at=datetime('now','-1 seconds') WHERE kingdom_id=" + kingdomA + " AND status='running' AND queue_type IN ('construction','training');",
+      ]);
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      assert.ok(Number(stateA.buildings.find(item => item.building_type === "farm")?.level || 0) > farmLevelBefore,
+        "construção da fazenda é aplicada ao concluir a fila");
+      assert.ok(Number(stateA.buildings.find(item => item.building_type === "barracks")?.level || 0) > barracksLevelBefore,
+        "melhoria do quartel é aplicada ao concluir a fila");
+      assert.ok(troopCount("mage", stateA) >= mageBeforeTraining + 1,
+        "tropa treinada entra no exército após a conclusão");
+      assert.ok(troopCount("archer", stateA) >= archerBeforeTraining + 1,
+        "segunda tropa treinada também entra no exército");
+      assert.equal(stateA.queues.filter(item => item.status === "running" && ["construction", "training"].includes(item.queue_type)).length, 0,
+        "filas de construção e treinamento são encerradas após a conclusão");
     });
     await t.test("alianças: criar, convidar, entrar, promover, doar, ajudar, expulsar, guerra e território", async () => {
       await action(tokenB, { type: "rename", name: "Reino Beta" }, 200);
