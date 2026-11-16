@@ -1,0 +1,32 @@
+#valhalla-admin-section{margin:22px 0 0;padding:16px;border:1px solid #9b59b6;border-radius:14px;background:linear-gradient(145deg,#1a0f25,#122238)}
+#valhalla-admin-section h2,#valhalla-admin-section h3{color:#f5d58e;margin-top:0}
+.va-header,.va-actions{display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap}
+.va-badge{display:inline-flex;align-items:center;border-radius:999px;padding:6px 12px;font-size:12px;font-weight:900;letter-spacing:.06em}
+.va-badge.active{background:#14532d;color:#bbf7d0;border:1px solid #22c55e}
+.va-badge.inactive{background:#374151;color:#e5e7eb;border:1px solid #6b7280}
+.va-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:9px;margin:14px 0}
+.va-stat{min-width:0;padding:12px;border:1px solid #4c3a5d;border-radius:10px;background:#080f1bcc}
+.va-stat span{display:block;color:#c4b5d1;font-size:11px;line-height:1.35}
+.va-stat strong{display:block;margin-top:5px;color:#f8d879;font-size:20px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.va-card{margin-top:14px;padding:14px;border:1px solid #4b3d5a;border-radius:11px;background:#0b1422}
+.va-form-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px}
+#valhalla-admin-section label{display:grid;gap:6px;color:#e6d6f0;font-size:12px;font-weight:700}
+#valhalla-admin-section input{width:100%;min-width:0;padding:10px;border:1px solid #6b5680;border-radius:8px;background:#070d18;color:#fff;font:inherit}
+#valhalla-admin-section button{border:1px solid #d8b65e;border-radius:8px;padding:10px 14px;background:linear-gradient(135deg,#78509a,#3b3454);color:#ffe7a1;font-weight:800;cursor:pointer}
+#valhalla-admin-section button:disabled{opacity:.5;cursor:not-allowed}
+#valhalla-admin-section .va-danger{background:linear-gradient(135deg,#9b2c35,#5b1d2a);border-color:#e78b83}
+#valhalla-admin-section .va-secondary{background:#26384f;border-color:#70819a;color:#fff}
+#valhalla-admin-notice{min-height:20px;margin-top:10px;color:#f5d58e;font-size:12px}
+.va-top-items{display:grid;gap:7px;padding:0;margin:10px 0 0;list-style:none}
+.va-top-items li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:8px;align-items:center;padding:9px;border-radius:8px;background:#17243a;color:#e5e7eb;font-size:12px}
+.va-top-items .va-rank{color:#f8d879;font-weight:900}
+.va-table-wrap{overflow-x:auto;margin-top:10px}
+.va-table{width:100%;min-width:690px;border-collapse:collapse;font-size:12px}
+.va-table th,.va-table td{padding:9px 8px;border-bottom:1px solid #453650;text-align:left;white-space:nowrap}
+.va-table th{color:#f8d879;background:#241832}
+.va-table td{color:#e5e7eb}
+.va-table tbody tr:hover{background:#22172f}
+.va-muted{color:#b9c5d4;font-size:11px;line-height:1.5}
+.va-section-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:12px}
+@media(max-width:560px){#valhalla-admin-section{padding:12px}.va-card{padding:11px}.va-stat strong{font-size:18px}.va-header{align-items:flex-start}}
+@media(prefers-reduced-motion:no-preference){#valhalla-admin-section button{transition:filter .15s,transform .15s}#valhalla-admin-section button:hover:not(:disabled){filter:brightness(1.14);transform:translateY(-1px)}}
