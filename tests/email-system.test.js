@@ -49,6 +49,10 @@ test("email queue checks contact preferences at enqueue and send time, escapes H
   assert.ok(email.includes("email_verified_at"));
   assert.ok(email.includes("preference_disabled"));
   assert.ok(email.includes("recipient_unverified_or_opted_out"));
+  assert.ok(email.includes("c.email,c.email_verified_at"));
+  assert.ok(email.includes("marketing_opt_in=CASE WHEN player_email_contacts.email<>excluded.email THEN 0"));
+  assert.ok(email.includes("event_alerts_opt_in=CASE WHEN player_email_contacts.email<>excluded.email THEN 0"));
+  assert.ok(email.includes("attack_alerts_opt_in=CASE WHEN player_email_contacts.email<>excluded.email THEN 0"));
   assert.ok(email.includes("Idempotency-Key"));
   assert.ok(email.includes("MAX_ATTEMPTS = 3"));
   assert.ok(email.includes("RETRY_SECONDS = 15 * 60"));
