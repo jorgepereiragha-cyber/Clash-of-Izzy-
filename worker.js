@@ -1,4 +1,4 @@
-import { simulateBattle, calculateMarchDuration } from "./game-adapter.js";
+import { simulateBattle, simulatePvpBattle, calculateMarchDuration } from "./game-adapter.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
@@ -397,6 +397,249 @@ async function seedWorld(env){
   ["old_mine","Mina Abandonada","mountain",-35,28,"iron"]
  ];
  await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate) VALUES(?,?,?,?,?,?,?)").bind(...n,90)));
+}
+
+function jsonObject(value){
+  try{const parsed=JSON.parse(value||"{}");return parsed&&typeof parsed==="object"&&!Array.isArray(parsed)?parsed:{};}catch{return {};}
+}
+function makeHospitalWounds(losses,unitRows,hospitalLevel){
+  const currentWounded=(unitRows||[]).reduce((sum,row)=>sum+Math.max(0,Number(row.wounded)||0),0);
+  let capacity=Math.max(0,Math.floor(Number(hospitalLevel)||0)*100-currentWounded);
+  const wounded={};
+  for(const row of unitRows||[]){
+    const lost=Math.max(0,Math.floor(Number(losses[row.unit_type])||0));
+    const recoverable=Math.min(capacity,Math.floor(lost*0.5));
+    if(recoverable>0){
+      const key=row.unit_type+"_"+Number(row.tier||1);
+      wounded[key]=recoverable;
+      capacity-=recoverable;
+    }
+  }
+  return wounded;
+}
+async function restoreCancelledMarch(env,march,kingdomId,units,reason){
+  const now=new Date().toISOString(),token=crypto.randomUUID();
+  const guard="EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)";
+  const statements=[
+    env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?")
+      .bind(now,token,march.id,kingdomId,now)
+  ];
+  for(const [unit,raw] of Object.entries(units||{})){
+    const quantity=Math.max(0,Math.floor(Number(raw)||0));
+    if(!Object.hasOwn(UNITS,unit)||quantity<1)continue;
+    statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity,wounded) SELECT ?,?,1,?,0 WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
+      .bind(kingdomId,unit,quantity,march.id,kingdomId,token));
+  }
+  statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,'march_cancelled',? WHERE "+guard)
+    .bind(kingdomId,JSON.stringify({marchId:march.id,reason}),march.id,kingdomId,token));
+  await env.DB.batch(statements);
+}
+async function resolvePvpMarch(env,march,attackerKingdomId,units,target){
+  const defenderId=Number(target?.owner_kingdom_id||0);
+  if(!defenderId||defenderId===Number(attackerKingdomId)){
+    await restoreCancelledMarch(env,march,attackerKingdomId,units,"alvo inválido ou castelo próprio");
+    return;
+  }
+  const [attacker,defender,attackerTroops,defenderTroops,attackerBuildings,defenderBuildings,attackerHero,defenderHero,attackerDragon,defenderDragon,attackerMilitary,defenderMilitary,attackerDefense,defenderDefense]=await Promise.all([
+    env.DB.prepare("SELECT id,castle_level,protection_until FROM kingdoms WHERE id=?").bind(attackerKingdomId).first(),
+    env.DB.prepare("SELECT id,castle_level,protection_until,battle_token,wall_hp,wall_max_hp,defense_power FROM kingdoms WHERE id=?").bind(defenderId).first(),
+    env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY tier,unit_type").bind(attackerKingdomId).all(),
+    env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY tier,unit_type").bind(defenderId).all(),
+    env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='hospital'").bind(attackerKingdomId).first(),
+    env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='hospital'").bind(defenderId).first(),
+    env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(attackerKingdomId).first(),
+    env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(defenderId).first(),
+    env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(attackerKingdomId).first(),
+    env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(defenderId).first(),
+    env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(attackerKingdomId).first(),
+    env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(defenderId).first(),
+    env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(attackerKingdomId).first(),
+    env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(defenderId).first()
+  ]);
+  if(!attacker||!defender){
+    await restoreCancelledMarch(env,march,attackerKingdomId,units,"reino de destino não encontrado");
+    return;
+  }
+  const now=new Date().toISOString();
+  const protectedUntil=Date.parse(String(defender.protection_until||""));
+  if(Number.isFinite(protectedUntil)&&protectedUntil>Date.now()){
+    await restoreCancelledMarch(env,march,attackerKingdomId,units,"castelo protegido por escudo");
+    return;
+  }
+  const allied=await env.DB.prepare(
+    "SELECT 1 AS allied FROM alliance_members a JOIN alliance_members b ON b.alliance_id=a.alliance_id WHERE a.kingdom_id=? AND b.kingdom_id=? LIMIT 1"
+  ).bind(attackerKingdomId,defenderId).first();
+  if(allied){
+    await restoreCancelledMarch(env,march,attackerKingdomId,units,"ataque contra aliado bloqueado");
+    return;
+  }
+  const attackerArmy=Object.entries(units||{}).map(([unit,quantity])=>({
+    unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))
+  })).filter(row=>Object.hasOwn(UNITS,row.unit_type)&&row.quantity>0);
+  if(!attackerArmy.length){
+    await restoreCancelledMarch(env,march,attackerKingdomId,units,"marcha sem tropas válidas");
+    return;
+  }
+
+  await ensureEquipmentTables(env,attackerKingdomId);
+  await ensureEquipmentTables(env,defenderId);
+  const activeGearRows=async(kingdomId,hero)=>{
+    if(!hero?.id)return {results:[]};
+    return env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?")
+      .bind(kingdomId,hero.id,kingdomId).all();
+  };
+  const researchRows=async kingdomId=>env.DB.prepare(
+    "SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')"
+  ).bind(kingdomId).all();
+  const [
+    attackerGearRows,defenderGearRows,attackerGearResearch,defenderGearResearch,
+    attackerValhalla,defenderValhalla,attackerPet,defenderPet
+  ]=await Promise.all([
+    activeGearRows(attackerKingdomId,attackerHero),activeGearRows(defenderId,defenderHero),
+    researchRows(attackerKingdomId),researchRows(defenderId),
+    getValhallaBuffMultipliers(env,attackerKingdomId),getValhallaBuffMultipliers(env,defenderId),
+    getPetBonuses(env,attackerKingdomId),getPetBonuses(env,defenderId)
+  ]);
+  const attackerGear=equipmentBonuses(attackerGearRows.results||[],attackerGearResearch.results||[]);
+  const defenderGear=equipmentBonuses(defenderGearRows.results||[],defenderGearResearch.results||[]);
+  const attackerAttackBonus=attackerGear.attackPercent+Math.round((attackerValhalla.attackPower-1)*100);
+  const defenderAttackBonus=defenderGear.attackPercent+Math.round((defenderValhalla.attackPower-1)*100);
+  const attackerDefenseBonus=Math.min(30,Math.max(0,Number(attackerDefense?.level||0)+attackerGear.defensePercent));
+  const defenderDefenseBonus=Math.min(30,Math.max(0,Number(defenderDefense?.level||0)+defenderGear.defensePercent));
+  const attackerFlat=Number(attackerHero?.level||1)*1.5+Number(attackerDragon?.level||1)*2+Number(attackerMilitary?.level||0)*2.5;
+  const defenderFlat=Number(defenderHero?.level||1)*1.5+Number(defenderDragon?.level||1)*2+Number(defenderMilitary?.level||0)*2.5;
+  const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
+  const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
+  const wallHp=Math.max(0,Number(defender.wall_hp)||0);
+  const simulation=simulatePvpBattle({
+    army:attackerArmy,
+    defenderArmy:defenderTroops.results||[],
+    attackerCastleLevel:Number(attacker.castle_level||1),
+    defenderCastleLevel:Number(defender.castle_level||1),
+    attackerDefenseBonusPercent:attackerDefenseBonus,
+    defenderDefenseBonusPercent:defenderDefenseBonus,
+    attackerAttackBonusPercent:attackerAttackBonus+attackerPet.infantryAttackPercent,
+    defenderAttackBonusPercent:defenderAttackBonus+defenderPet.infantryAttackPercent,
+    attackerHealthBonusPercent:attackerGear.healthPercent,
+    defenderHealthBonusPercent:defenderGear.healthPercent,
+    attackerFlatBonus:attackerFlat,
+    defenderFlatBonus:defenderFlat+Math.max(0,Number(defender.defense_power)||0)/100,
+    wallHp,roll,criticalSeed,
+    criticalChancePercent:attackerGear.criticalChancePercent,
+    criticalDamageMultiplier:1.5
+  });
+
+  const attackerLosses=simulation.losses||{};
+  const defenderLosses=simulation.defenderLosses||{};
+  const attackerCurrent=attackerTroops.results||[];
+  const defenderCurrent=defenderTroops.results||[];
+  const attackerWounded=makeHospitalWounds(attackerLosses,attackerCurrent,attackerBuildings?.level);
+  const defenderWounded=makeHospitalWounds(defenderLosses,defenderCurrent,defenderBuildings?.level);
+  const attackerWoundedTotal=Object.values(attackerWounded).reduce((sum,value)=>sum+value,0);
+  const defenderWoundedTotal=Object.values(defenderWounded).reduce((sum,value)=>sum+value,0);
+  const attackerSurvivors=simulation.attackerSurvivors||{};
+  const defenderSurvivors=simulation.defenderSurvivors||{};
+  const attackerAlive=Object.values(attackerSurvivors).reduce((sum,value)=>sum+Number(value||0),0)>0;
+  const defenderAlive=simulation.wallRemainingHp>0||Object.values(defenderSurvivors).reduce((sum,value)=>sum+Number(value||0),0)>0;
+  const result=simulation.won?"win":(!attackerAlive?"lose":(!defenderAlive?"win":"draw"));
+  const winner=result==="win"?attackerKingdomId:(result==="lose"?defenderId:null);
+  const battleToken=crypto.randomUUID(),resolutionToken=crypto.randomUUID(),resolvedAt=new Date().toISOString();
+  const defenderSnapshot=Object.fromEntries(defenderCurrent.map(row=>[
+    row.unit_type+"_"+Number(row.tier||1),
+    {quantity:Number(row.quantity)||0,wounded:Number(row.wounded)||0}
+  ]));
+  const expectedDefenderRows=defenderCurrent.length;
+  const snapshotJson=JSON.stringify(defenderSnapshot);
+  const pvpGuard="EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?) AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)";
+  const defenderLock=env.DB.prepare(
+    "UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '') AND wall_hp=? " +
+    "AND (protection_until IS NULL OR datetime(protection_until)<=datetime(?)) " +
+    "AND (SELECT COUNT(*) FROM army_units WHERE kingdom_id=? AND quantity>0)=? " +
+    "AND NOT EXISTS(SELECT 1 FROM json_each(?) expected LEFT JOIN army_units current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=expected.key " +
+      "WHERE current.id IS NULL OR current.quantity<>CAST(json_extract(expected.value,'$.quantity') AS INTEGER) OR current.wounded<>CAST(json_extract(expected.value,'$.wounded') AS INTEGER)) " +
+    "AND NOT EXISTS(SELECT 1 FROM alliance_members own JOIN alliance_members other ON own.alliance_id=other.alliance_id WHERE own.kingdom_id=? AND other.kingdom_id=?)"
+  ).bind(battleToken,defenderId,defender.battle_token??"",wallHp,now,defenderId,expectedDefenderRows,snapshotJson,defenderId,attackerKingdomId,defenderId);
+  const marchClaim=env.DB.prepare(
+    "UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=? " +
+    "AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)"
+  ).bind(resolvedAt,resolutionToken,march.id,attackerKingdomId,now,defenderId,battleToken);
+  const statements=[defenderLock,marchClaim];
+  for(const row of defenderCurrent){
+    const key=row.unit_type+"_"+Number(row.tier||1);
+    const lost=Math.min(Number(row.quantity)||0,Math.max(0,Number(defenderLosses[row.unit_type]||0)));
+    const wounded=Math.min(lost,Math.max(0,Number(defenderWounded[key]||0)));
+    if(lost>0||wounded>0){
+      statements.push(env.DB.prepare(
+        "UPDATE army_units SET quantity=MAX(0,quantity-?),wounded=wounded+? WHERE kingdom_id=? AND unit_type=? AND tier=? AND quantity=? AND wounded=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) AND EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)"
+      ).bind(lost,wounded,defenderId,row.unit_type,row.tier,row.quantity,row.wounded??0,defenderId,battleToken,march.id,attackerKingdomId,resolutionToken));
+    }
+  }
+  if(simulation.wallDamage>0){
+    statements.push(env.DB.prepare(
+      "UPDATE kingdoms SET wall_hp=MAX(0,wall_hp-?) WHERE id=? AND wall_hp=? AND battle_token=? AND EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)"
+    ).bind(simulation.wallDamage,defenderId,wallHp,battleToken,march.id,attackerKingdomId,resolutionToken));
+  }
+  for(const [unit,qtyRaw] of Object.entries(attackerSurvivors)){
+    const qty=Math.max(0,Math.floor(Number(qtyRaw)||0));
+    const wounded=Math.max(0,Math.floor(Number(attackerWounded[unit+"_1"])||0));
+    if(qty>0||wounded>0){
+      statements.push(env.DB.prepare(
+        "INSERT INTO army_units(kingdom_id,unit_type,tier,quantity,wounded) SELECT ?,?,1,?,?,0 WHERE "+pvpGuard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity,wounded=wounded+excluded.wounded"
+      ).bind(attackerKingdomId,unit,qty,wounded,march.id,attackerKingdomId,resolutionToken,defenderId,battleToken));
+    }
+  }
+  const lossesJson=JSON.stringify({attacker:attackerLosses,defender:defenderLosses});
+  const woundedJson=JSON.stringify({attacker:attackerWounded,defender:defenderWounded});
+  const replay=JSON.stringify({
+    version:1,mode:"pvp",seed:{criticalSeed,roll},
+    participants:{
+      attacker:{kingdom_id:attackerKingdomId,kingdom_name:attacker.kingdom_name||null,army:attackerArmy},
+      defender:{kingdom_id:defenderId,kingdom_name:defender.kingdom_name||null,army:defenderCurrent,wall_hp:wallHp}
+    },
+    modifiers:{
+      attacker:{attack:attackerAttackBonus,defense:attackerDefenseBonus,health:attackerGear.healthPercent,pet:attackerPet},
+      defender:{attack:defenderAttackBonus,defense:defenderDefenseBonus,health:defenderGear.healthPercent,pet:defenderPet}
+    },
+    outcome:{
+      result,rounds:simulation.rounds,attacker_power:simulation.attackerPower,
+      defender_power:simulation.defenderPower,losses:JSON.parse(lossesJson),
+      wounded:JSON.parse(woundedJson),wall_damage:simulation.wallDamage,
+      wall_remaining_hp:simulation.wallRemainingHp
+    },
+    frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))
+  });
+  const battleLog=JSON.stringify([
+    {event:"pvp_battle_started",attackerKingdomId,defenderKingdomId:defenderId},
+    {event:"pvp_combat_result",result,rounds:simulation.rounds,wallDamage:simulation.wallDamage,criticalHits:simulation.criticalHits||0},
+    ...(simulation.log||[])
+  ]);
+  statements.push(env.DB.prepare(
+    "INSERT INTO battle_reports(attacker_kingdom_id,defender_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,wounded_json,wall_damage,rewards_json,battle_log,replay_json) " +
+    "SELECT ?,?,?,?,?,?,?,?,?,?,?,?,? WHERE "+pvpGuard
+  ).bind(
+    attackerKingdomId,defenderId,winner,target.id,"pvp",simulation.attackerPower,
+    simulation.defenderPower,lossesJson,woundedJson,simulation.wallDamage,
+    JSON.stringify({result,wallRemainingHp:simulation.wallRemainingHp,attackerWounded:attackerWoundedTotal,defenderWounded:defenderWoundedTotal}),
+    battleLog,replay,march.id,attackerKingdomId,resolutionToken,defenderId,battleToken
+  ));
+  statements.push(env.DB.prepare(
+    "INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,'pvp_battle_attack',? WHERE "+pvpGuard
+  ).bind(attackerKingdomId,JSON.stringify({marchId:march.id,defenderKingdomId:defenderId,result,losses:attackerLosses,wounded:attackerWounded,wallDamage:simulation.wallDamage}),march.id,attackerKingdomId,resolutionToken,defenderId,battleToken));
+  statements.push(env.DB.prepare(
+    "INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,'pvp_battle_defense',? WHERE "+pvpGuard
+  ).bind(defenderId,JSON.stringify({marchId:march.id,attackerKingdomId,result,losses:defenderLosses,wounded:defenderWounded,wallDamage:simulation.wallDamage}),march.id,attackerKingdomId,resolutionToken,defenderId,battleToken));
+  statements.push(env.DB.prepare(
+    "INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'pvp_battle_resolved',? WHERE "+pvpGuard
+  ).bind(attackerKingdomId,JSON.stringify({marchId:march.id,opponentKingdomId:defenderId,result}),march.id,attackerKingdomId,resolutionToken,defenderId,battleToken));
+  statements.push(env.DB.prepare(
+    "INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'pvp_battle_received',? WHERE "+pvpGuard
+  ).bind(defenderId,JSON.stringify({marchId:march.id,opponentKingdomId:attackerKingdomId,result}),march.id,attackerKingdomId,resolutionToken,defenderId,battleToken));
+  const resultBatch=await env.DB.batch(statements);
+  if(!resultBatch[0]?.meta?.changes||!resultBatch[1]?.meta?.changes)return;
+  await Promise.all([
+    recalculateKingdomPower(env,attackerKingdomId),
+    recalculateKingdomPower(env,defenderId)
+  ]);
 }
 async function processMarches(env,kingdomId){
  const now=new Date().toISOString();
