@@ -401,15 +401,29 @@ async function seedWorld(env){
 function jsonObject(value){
   try{const parsed=JSON.parse(value||"{}");return parsed&&typeof parsed==="object"&&!Array.isArray(parsed)?parsed:{};}catch{return {};}
 }
-function makeHospitalWounds(losses,unitRows,hospitalLevel,currentRows=unitRows){
+function distributeLossesByStack(losses,unitRows){
+  const remaining=new Map(Object.entries(losses||{}).map(([unit,quantity])=>[
+    unit,Math.max(0,Math.floor(Number(quantity)||0))
+  ]));
+  const byStack={};
+  for(const row of unitRows||[]){
+    const key=row.unit_type+"_"+Number(row.tier||1);
+    const pending=remaining.get(row.unit_type)||0;
+    const lost=Math.min(Math.max(0,Math.floor(Number(row.quantity)||0)),pending);
+    byStack[key]=lost;
+    remaining.set(row.unit_type,pending-lost);
+  }
+  return byStack;
+}
+function makeHospitalWounds(lossesByStack,unitRows,hospitalLevel,currentRows=unitRows){
   const currentWounded=(currentRows||[]).reduce((sum,row)=>sum+Math.max(0,Number(row.wounded)||0),0);
   let capacity=Math.max(0,Math.floor(Number(hospitalLevel)||0)*100-currentWounded);
   const wounded={};
   for(const row of unitRows||[]){
-    const lost=Math.max(0,Math.floor(Number(losses[row.unit_type])||0));
+    const key=row.unit_type+"_"+Number(row.tier||1);
+    const lost=Math.max(0,Math.floor(Number(lossesByStack[key])||0));
     const recoverable=Math.min(capacity,Math.floor(lost*0.5));
     if(recoverable>0){
-      const key=row.unit_type+"_"+Number(row.tier||1);
       wounded[key]=recoverable;
       capacity-=recoverable;
     }
@@ -532,8 +546,10 @@ async function resolvePvpMarch(env,march,attackerKingdomId,units,target){
   const defenderLosses=simulation.defenderLosses||{};
   const attackerCurrent=attackerTroops.results||[];
   const defenderCurrent=defenderTroops.results||[];
-  const attackerWounded=makeHospitalWounds(attackerLosses,attackerArmy,attackerBuildings?.level,attackerCurrent);
-  const defenderWounded=makeHospitalWounds(defenderLosses,defenderCurrent,defenderBuildings?.level);
+  const attackerLossesByStack=distributeLossesByStack(attackerLosses,attackerArmy);
+  const defenderLossesByStack=distributeLossesByStack(defenderLosses,defenderCurrent);
+  const attackerWounded=makeHospitalWounds(attackerLossesByStack,attackerArmy,attackerBuildings?.level,attackerCurrent);
+  const defenderWounded=makeHospitalWounds(defenderLossesByStack,defenderCurrent,defenderBuildings?.level);
   const attackerWoundedTotal=Object.values(attackerWounded).reduce((sum,value)=>sum+value,0);
   const defenderWoundedTotal=Object.values(defenderWounded).reduce((sum,value)=>sum+value,0);
   const attackerSurvivors=simulation.attackerSurvivors||{};
@@ -565,7 +581,7 @@ async function resolvePvpMarch(env,march,attackerKingdomId,units,target){
   const statements=[defenderLock,marchClaim];
   for(const row of defenderCurrent){
     const key=row.unit_type+"_"+Number(row.tier||1);
-    const lost=Math.min(Number(row.quantity)||0,Math.max(0,Number(defenderLosses[row.unit_type]||0)));
+    const lost=Math.min(Number(row.quantity)||0,Math.max(0,Number(defenderLossesByStack[key]||0)));
     const wounded=Math.min(lost,Math.max(0,Number(defenderWounded[key]||0)));
     if(lost>0||wounded>0){
       statements.push(env.DB.prepare(
