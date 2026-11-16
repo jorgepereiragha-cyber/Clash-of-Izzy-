@@ -754,6 +754,64 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         "dois treinamentos simultâneos permanecem persistidos");
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "research"));
     });
+    await t.test("PvP: castelo inimigo, muralha, baixas, feridos e escudo", async () => {
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const enemyCastle = stateA.territories.find(item =>
+        item.territory_kind === "castle" && Number(item.owner_kingdom_id) === kingdomB
+      );
+      assert.ok(enemyCastle?.id, "o mapa mostra o castelo do segundo reino");
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "INSERT INTO army_units(kingdom_id,unit_type,tier,quantity,wounded) VALUES(" + kingdomB +
+          ",'militia',2,5,0) ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+5;",
+      ]);
+      const beforeB = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "estado antes da defesa PvP");
+      const wallBefore = Number(beforeB.state.kingdom.wall_hp);
+      const defenderMilitiaBefore = beforeB.state.troops
+        .filter(item => item.unit_type === "militia")
+        .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      const attackUnit = stateA.troops.find(item => Number(item.tier) === 1 && Number(item.quantity) > 0);
+      assert.ok(attackUnit?.unit_type, "o atacante possui ao menos uma tropa disponível");
+      await action(tokenA, {
+        type: "march", targetId: enemyCastle.id, marchType: "attack", units: { [attackUnit.unit_type]: 1 },
+      }, 200, "marcha de ataque PvP");
+
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE marches SET arrives_at=datetime('now','-1 seconds') WHERE kingdom_id=" + kingdomA +
+          " AND target_territory_id=" + Number(enemyCastle.id) + " AND march_type='attack' AND status='marching';",
+      ]);
+      const afterAttack = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "resolução da marcha PvP");
+      const report = (afterAttack.state.battleReports || []).find(item =>
+        item.battle_type === "pvp" && Number(item.defender_kingdom_id) === kingdomB
+      );
+      assert.ok(report?.id, "o servidor grava relatório PvP para os dois reinos");
+      assert.ok(Number(report.wall_damage) > 0, "a batalha aplica dano real à muralha");
+      assert.ok(Number(report.attacker_power) > 0 && Number(report.defender_power) > 0, "o relatório calcula os dois poderes");
+      const losses = JSON.parse(report.losses_json || "{}");
+      assert.ok(losses.attacker && losses.defender, "o relatório separa perdas de atacante e defensor");
+      const wounded = JSON.parse(report.wounded_json || "{}");
+      assert.ok(wounded.attacker && wounded.defender, "os feridos são separados por reino");
+      const afterB = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "estado após defesa PvP");
+      assert.ok(Number(afterB.state.kingdom.wall_hp) < wallBefore, "a vida da muralha persiste após a batalha");
+      const defenderMilitiaAfter = afterB.state.troops
+        .filter(item => item.unit_type === "militia")
+        .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      assert.equal(defenderMilitiaBefore - defenderMilitiaAfter, Number(losses.defender.militia || 0),
+        "perdas agregadas são distribuídas uma única vez entre os tiers da mesma unidade");
+
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdoms SET protection_until=datetime('now','+1 hour') WHERE id=" + kingdomB + ";",
+      ]);
+      await action(tokenA, {
+        type: "march", targetId: enemyCastle.id, marchType: "attack", units: { militia: 1 },
+      }, 409, "escudo impede novo ataque");
+    });
+
     await t.test("alianças: criar, convidar, entrar, promover, doar, ajudar, expulsar, guerra e território", async () => {
       await action(tokenB, { type: "rename", name: "Reino Beta" }, 200);
       await action(tokenA, { type: "alliance_create", name: "Guardioes Alfa", tag: "ALFA" }, 200);

@@ -53,7 +53,7 @@ test("construction and troop training each support two independent atomic queue 
   assert.ok(worker.includes("async function processDueKingdomQueues"));
 });
 
-test("world map shows player castles but does not route unsupported PvP attacks", async () => {
+test("world map shows player castles and routes PvP attacks through server rules", async () => {
   const page = await read("world-map.js");
   const scene = await read("world-map-3d.js");
   const worker = await read("worker.js");
@@ -63,6 +63,9 @@ test("world map shows player castles but does not route unsupported PvP attacks"
   assert.ok(page.includes("if (isCastle)"));
   assert.ok(scene.includes('territory.territory_kind === "castle"'));
   assert.ok(scene.includes('ownership === "enemy" ? "enemy" : "home"'));
-  assert.ok(worker.includes("O combate PvP será habilitado na Fase 10"));
+  assert.ok(worker.includes("async function resolvePvpMarch"));
+  assert.ok(worker.includes("simulatePvpBattle"));
+  assert.ok(worker.includes("castelo protegido por escudo"));
+  assert.ok(worker.includes("ataque contra aliado bloqueado"));
   assert.ok(worker.includes("applyUnitLosses(army, losses)"), "PvE march resolution must return only surviving troops");
 });
