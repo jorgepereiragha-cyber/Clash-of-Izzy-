@@ -80,3 +80,40 @@ CREATE TABLE IF NOT EXISTS action_logs (
 );
 CREATE INDEX IF NOT EXISTS idx_action_logs_kingdom_created
   ON action_logs(kingdom_id,created_at DESC);
+
+-- Enforce warehouse capacity for every gameplay mutation, not only passive ticks.
+-- This prevents loot, shop purchases and alliance rewards from bypassing storage limits.
+CREATE TRIGGER IF NOT EXISTS trg_kingdom_food_capacity
+AFTER UPDATE OF food ON kingdoms
+WHEN NEW.food > NEW.food_capacity
+BEGIN
+  UPDATE kingdoms SET food=NEW.food_capacity WHERE id=NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_kingdom_wood_capacity
+AFTER UPDATE OF wood ON kingdoms
+WHEN NEW.wood > NEW.wood_capacity
+BEGIN
+  UPDATE kingdoms SET wood=NEW.wood_capacity WHERE id=NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_kingdom_stone_capacity
+AFTER UPDATE OF stone ON kingdoms
+WHEN NEW.stone > NEW.stone_capacity
+BEGIN
+  UPDATE kingdoms SET stone=NEW.stone_capacity WHERE id=NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_kingdom_iron_capacity
+AFTER UPDATE OF iron ON kingdoms
+WHEN NEW.iron > NEW.iron_capacity
+BEGIN
+  UPDATE kingdoms SET iron=NEW.iron_capacity WHERE id=NEW.id;
+END;
+
+CREATE TRIGGER IF NOT EXISTS trg_kingdom_gold_capacity
+AFTER UPDATE OF gold ON kingdoms
+WHEN NEW.gold > NEW.gold_capacity
+BEGIN
+  UPDATE kingdoms SET gold=NEW.gold_capacity WHERE id=NEW.id;
+END;
