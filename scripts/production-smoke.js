@@ -145,7 +145,7 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v17"), "Service worker não contém o cache v17 esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v18"), "Service worker não contém o cache v18 esperado.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
   assert(serviceWorker.includes("/admin.html"), "PWA não inclui o painel Master.");
@@ -155,6 +155,9 @@ export async function runProductionSmokeTests({
   assert(serviceWorker.includes("/landing.js"), "PWA não inclui o controlador da landing page.");
   assert(serviceWorker.includes("/valhalla-shop-ui.js"), "PWA não inclui a interface da Loja de Valhalla.");
   assert(serviceWorker.includes("/styles/valhalla-shop.css"), "PWA não inclui os estilos da Loja de Valhalla.");
+  assert(serviceWorker.includes("/technology-tree.js"), "PWA não inclui a árvore de tecnologias.");
+  assert(serviceWorker.includes("/styles/technology-tree.css"), "PWA não inclui os estilos da árvore tecnológica.");
+  assert(serviceWorker.includes("/styles/visual-polish.css"), "PWA não inclui o polimento visual compartilhado.");
 
   return {
     baseUrl: base.origin,
