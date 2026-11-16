@@ -11,6 +11,7 @@ export function selectKingdomQualityProfile({
   const memory = Number.isFinite(Number(deviceMemory)) ? Number(deviceMemory) : 0;
   const cores = Number.isFinite(Number(hardwareConcurrency)) ? Number(hardwareConcurrency) : 4;
   const textureLimit = Math.max(0, Number(maxTextureSize) || 0);
+  const width = Math.max(1, Number(viewportWidth) || 1); // usado só no custo de sombras, nunca no tier
   const dataSaver = saveData === true;
 
   // CSS viewport width is a layout measurement, not a reliable GPU capability signal.
