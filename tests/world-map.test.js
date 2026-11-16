@@ -16,7 +16,7 @@ test("kingdom navigation opens the actual world map, not the combat arena", () =
 });
 
 test("world map page loads authenticated territory and march interface", () => {
-  for (const marker of ['id="worldMap"', 'id="territoryDetails"', 'id="troops"', 'id="marches"', 'src="/world-map.js"']) assert.ok(html.includes(marker), "missing world map marker: " + marker);
+  for (const marker of ['id="worldMap"', 'id="territoryDetails"', 'id="troops"', 'id="marches"', 'id="spyReports"', 'id="heroSkillSelection"', 'src="/world-map.js"']) assert.ok(html.includes(marker), "missing world map marker: " + marker);
 });
 
 test("world map presents an isometric 3D strategy view instead of a free-roaming arena hero", async () => {
@@ -47,7 +47,7 @@ test("world map renders untrusted territory labels with DOM text, not HTML injec
 });
 
 test("PWA shell includes the world map and increments its cache version", () => {
-  for (const marker of ['clash-of-izzy-shell-v18', '"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  for (const marker of ['clash-of-izzy-shell-v19', '"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
   assert.ok(serviceWorker.includes('url.pathname.startsWith("/api/")'));
 });
 
