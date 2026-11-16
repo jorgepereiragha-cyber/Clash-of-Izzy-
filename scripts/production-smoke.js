@@ -3,6 +3,7 @@ import { pathToFileURL } from "node:url";
 const REQUIRED_PAGES = [
   "/",
   "/index.html",
+  "/account.html",
   "/kingdom.html",
   "/world.html",
   "/events.html",
@@ -70,6 +71,9 @@ export async function runProductionSmokeTests({
   assert(admin.hasADMIN_PASSWORD === true, "ADMIN_PASSWORD não está configurado no Worker.");
   const emailProviderConfigured = admin.hasEmailProvider === true;
 
+  const accountStatusResponse = await get("/api/account/status");
+  assert(accountStatusResponse.status === 401, "O status da conta deve exigir sessão; recebido HTTP " + accountStatusResponse.status + ".");
+
   const stateResponse = await get("/api/game/state");
   assert(stateResponse.status === 401, "O estado do jogo deve exigir sessão; recebido HTTP " + stateResponse.status + ".");
 
@@ -109,6 +113,11 @@ export async function runProductionSmokeTests({
   const landingJs = await landingJsResponse.text();
   assert(landingJs.includes("showInstallGuide") && landingJs.includes("/api/game/referral/link"),
     "Fluxos de instalação e indicação não estão publicados.");
+
+  const accountPageResponse = await get("/account.html");
+  assert(accountPageResponse.status === 200, "Página de conta persistente respondeu HTTP " + accountPageResponse.status + ".");
+  const accountPage = await accountPageResponse.text();
+  assert(accountPage.includes('id="loginForm"') && accountPage.includes('id="registerForm"'), "Tela de login/cadastro da conta não está publicada.");
 
   const kingdomResponse = await get("/kingdom.html");
   assert(kingdomResponse.status === 200, "Central do reino respondeu HTTP " + kingdomResponse.status + ".");
@@ -171,6 +180,7 @@ export async function runProductionSmokeTests({
     /const\s+CACHE_NAME\s*=\s*["']clash-of-izzy-shell-v\d+["']/.test(serviceWorker),
     "Service worker não declara um nome de cache versionado."
   );
+  assert(serviceWorker.includes("/account.html"), "PWA não inclui a página de conta persistente.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
   assert(serviceWorker.includes("/admin.html"), "PWA não inclui o painel Master.");
