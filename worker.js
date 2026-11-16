@@ -1846,6 +1846,26 @@ export default {
     return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables},ready?200:503);
   }
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
+  if(url.pathname==="/api/realtime"){
+    if(request.method!=="GET")return json({error:"Método não permitido."},405);
+    if(request.headers.get("Upgrade")?.toLowerCase()!=="websocket")return json({error:"Upgrade WebSocket obrigatório."},426);
+    if(!env.GAME_REALTIME||!env.SESSION_SECRET)return json({error:"Tempo real indisponível."},503);
+    const ticket=String(url.searchParams.get("ticket")||"");
+    const payload=await verify(ticket,env.SESSION_SECRET);
+    const kingdomId=Number(payload?.kingdomId),region=Number(payload?.region);
+    if(!payload||payload.scope!=="realtime"||!payload.sub||!payload.nonce||
+      !Number.isSafeInteger(kingdomId)||kingdomId<1||!Number.isSafeInteger(region)||region<1){
+      return json({error:"Ticket de tempo real inválido ou expirado."},401);
+    }
+    const headers=new Headers(request.headers);
+    headers.set("X-Realtime-Gateway",env.SESSION_SECRET);
+    headers.set("X-Realtime-Player",String(payload.sub));
+    headers.set("X-Realtime-Kingdom",String(kingdomId));
+    headers.set("X-Realtime-Region",String(region));
+    const upstream=new Request("https://game-realtime.internal/connect",{method:"GET",headers});
+    const id=env.GAME_REALTIME.idFromName("region:"+region);
+    return await env.GAME_REALTIME.get(id).fetch(upstream);
+  }
   if(url.pathname.startsWith("/api/account/"))return await handlePlayerAccountRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   const mpRouteResponse=await handleMercadoPagoRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   if(mpRouteResponse)return mpRouteResponse;
@@ -1957,6 +1977,21 @@ export default {
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     try{
+      if(url.pathname==="/api/game/realtime-ticket"&&request.method==="GET"){
+        if(!env.GAME_REALTIME||!env.SESSION_SECRET)return json({error:"Tempo real indisponível."},503);
+        const limited=await rateLimitDecision(env,"realtime-ticket-player",playerId,20,60);
+        if(limited)return limited;
+        const kingdom=await env.DB.prepare(
+          "SELECT k.id,k.map_region FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?"
+        ).bind(playerId).first();
+        if(!kingdom)return json({error:"Reino não encontrado."},404);
+        const ticket=await sign({
+          sub:playerId,scope:"realtime",kingdomId:Number(kingdom.id),
+          region:Math.max(1,Number(kingdom.map_region)||1),
+          exp:Math.floor(Date.now()/1000)+45,nonce:crypto.randomUUID()
+        },env.SESSION_SECRET);
+        return json({ticket,endpoint:"/api/realtime",expiresIn:45});
+      }
       if(url.pathname==="/api/game/referral/link"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"referral-link-player",playerId,15,60);
         if(limited)return limited;
