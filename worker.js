@@ -1073,7 +1073,7 @@ async function gameAction(env,playerId,body){
     const marchType=String(body.marchType||"gather");
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
     if(marchType==="attack"&&target.owner_kingdom_id)return json({error:"Nesta etapa, só é possível conquistar territórios neutros. Ataques PvP serão habilitados em uma atualização própria."},409);
-    if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
+    if(marchType==="gather"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino. Envie uma marcha de espionagem para obter informações."},409);
     const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
     const selected={};
     for(const [unit,raw] of Object.entries(requested)){
@@ -1084,6 +1084,19 @@ async function gameAction(env,playerId,body){
     const unitTypes=Object.keys(selected);
     if(!unitTypes.length)return json({error:"Selecione pelo menos uma tropa válida."},400);
     const unitsJson=JSON.stringify(selected);
+    const heroKey=String(body.heroKey||"").trim().slice(0,64);
+    const heroSkillKey=String(body.heroSkillKey||"").trim().slice(0,64);
+    const activeSkill=heroSkillKey?getHeroActiveSkill(heroKey):null;
+    if(heroSkillKey){
+      if(marchType!=="attack"||!heroKey||!activeSkill||activeSkill.key!==heroSkillKey)return json({error:"Habilidade ativa ou herói inválido para esta marcha."},400);
+      const ownedHero=await env.DB.prepare("SELECT 1 AS owned FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
+      if(!ownedHero)return json({error:"Este herói não pertence ao seu reino."},404);
+    }
+    const nowSeconds=Math.floor(Date.now()/1000);
+    if(activeSkill){
+      const cooldown=await env.DB.prepare("SELECT cooldown_until FROM hero_skill_cooldowns WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
+      if(Number(cooldown?.cooldown_until||0)>nowSeconds)return json({error:"Habilidade em recarga. Aguarde o cooldown antes de usá-la novamente."},409);
+    }
     const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
     await ensureEquipmentTables(env,k.id);
     const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(k.id).first();
@@ -1096,12 +1109,20 @@ async function gameAction(env,playerId,body){
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
-    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=?")
-      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length);
-    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at) SELECT ?,?,?,?,?,? WHERE changes()=?")
-      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,unitTypes.length);
-    const result=await env.DB.batch([debit,createMarch]);
-    if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes ou exército alterado por outra marcha. Atualize o reino e tente novamente."},409);
+    const skillRequested=activeSkill?1:0;
+    const cooldownGuard="(?=0 OR NOT EXISTS(SELECT 1 FROM hero_skill_cooldowns WHERE kingdom_id=? AND hero_key=? AND cooldown_until>?))";
+    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=? AND "+cooldownGuard)
+      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length,skillRequested,k.id,heroKey,nowSeconds);
+    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at,hero_key,hero_skill_key) SELECT ?,?,?,?,?,?,?,? WHERE changes()=? AND "+cooldownGuard)
+      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,activeSkill?heroKey:null,activeSkill?heroSkillKey:null,unitTypes.length,skillRequested,k.id,heroKey,nowSeconds);
+    const cooldownStatement=activeSkill?env.DB.prepare(
+      "INSERT INTO hero_skill_cooldowns(kingdom_id,hero_key,skill_key,cooldown_until,last_used_at,use_count) SELECT ?,?,?,?,?,1 WHERE changes()=1 " +
+      "ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET skill_key=excluded.skill_key,cooldown_until=excluded.cooldown_until,last_used_at=excluded.last_used_at,use_count=hero_skill_cooldowns.use_count+1 " +
+      "WHERE hero_skill_cooldowns.cooldown_until<=?"
+    ).bind(k.id,heroKey,heroSkillKey,nowSeconds+activeSkill.cooldownSeconds,nowSeconds,nowSeconds):null;
+    const result=await env.DB.batch(cooldownStatement?[debit,createMarch,cooldownStatement]:[debit,createMarch]);
+    if(!result[1]?.meta?.changes)return json({error:activeSkill?"Tropas insuficientes ou habilidade em recarga. Atualize o reino e tente novamente.":"Tropas insuficientes ou exército alterado por outra marcha. Atualize o reino e tente novamente."},409);
+    if(cooldownStatement&&!result[2]?.meta?.changes)return json({error:"Não foi possível reservar o cooldown da habilidade. Tente novamente."},409);
   }else if(type==="battle"){
     const units=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY unit_type,tier").bind(k.id).all();
     const armyRows=units.results||[];
