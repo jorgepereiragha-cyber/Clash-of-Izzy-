@@ -82,7 +82,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <label for="unitQuantity">Quantidade (1–100)</label>
 <input id="unitQuantity" type="number" min="1" max="100" value="10" step="1" inputmode="numeric" required>
 <button id="trainButton" type="submit">Iniciar treinamento</button>
-<p class="muted">Os recursos são cobrados ao iniciar. As tropas entram no exército quando o cronômetro terminar.</p>
+<p class="muted">Os recursos são cobrados ao iniciar. As tropas entram no exército ao concluir. A capacidade considera tropas no castelo, em marcha e em treinamento:  + fmt(state.armyCount) +  /  + fmt(state.troopCapacity) + .</p>
 </form>
 </section>
 <section class="panel"><h2>🔬 Academia e pesquisas</h2>
@@ -230,9 +230,9 @@ document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emo
 renderQueues();
 document.getElementById("researchLevels").innerHTML=(state.research||[]).map(r=>'<div class="event">'+esc(String(r.research_key).replaceAll("_"," "))+' · nível '+fmt(r.level)+'</div>').join("")||'<div class="muted">Nenhuma pesquisa concluída ainda.</div>';
 const activeTrainingCount=(state.queues||[]).filter(q=>q.queue_type==="training"&&q.status==="running").length;
-document.getElementById("trainButton").disabled=busy||activeTrainingCount>=2;
+document.getElementById("trainButton").disabled=busy||activeTrainingCount>=2||Number(state.armyCount||0)>=Number(state.troopCapacity||500);
 document.getElementById("researchButton").disabled=busy||(state.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running");
-const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Tropas",fmt(total)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
+const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Exército / capacidade",fmt(state.armyCount??total)+" / "+fmt(state.troopCapacity||500)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).map(e=>'<div class="event">'+esc(String(e.event_type||"Atividade").replaceAll("_"," "))+'</div>').join("")||'<div class="muted">Seu reino está começando sua história.</div>';
 renderPets();renderBattleReports();
 city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
