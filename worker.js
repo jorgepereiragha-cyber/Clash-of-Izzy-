@@ -1677,32 +1677,49 @@ export default {
   if(!payload||payload.scope!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
   try{
     if(url.pathname==="/api/admin/purchase-requests"){
-      const rows=await env.DB.prepare("SELECT r.id,r.product_kind,r.product_name,r.price_brl,r.currency,r.gems_amount,r.payment_method,r.payment_reference,r.status,r.created_at,p.player_id,p.name AS player_name,k.kingdom_name FROM purchase_requests r JOIN players p ON p.id=r.player_id JOIN kingdoms k ON k.id=r.kingdom_id WHERE r.status='pending' ORDER BY r.created_at ASC LIMIT 100").all();
+      const rows=await env.DB.prepare("SELECT r.id,r.product_kind,r.product_ref,r.kingdom_id,r.product_name,r.price_brl,r.currency,r.gems_amount,r.payment_method,r.payment_reference,r.status,r.created_at,p.player_id,p.name AS player_name,k.kingdom_name FROM purchase_requests r JOIN players p ON p.id=r.player_id JOIN kingdoms k ON k.id=r.kingdom_id WHERE r.status='pending' ORDER BY r.created_at ASC LIMIT 100").all();
       return json({requests:rows.results||[]});
     }
     if(url.pathname==="/api/admin/purchase-requests/review"){
       const id=Number(body.requestId),decision=String(body.decision||"");
       if(!Number.isSafeInteger(id)||id<1||!["approve","reject"].includes(decision))return json({error:"Pedido ou decisão inválidos."},400);
-      const pending=await env.DB.prepare("SELECT id,product_kind,product_id,player_id,gems_amount FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
+      const pending=await env.DB.prepare("SELECT id,product_kind,product_id,product_ref,player_id,kingdom_id,gems_amount FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
       if(!pending)return json({error:"Pedido já processado ou não encontrado."},409);
       let result;
       if(decision==="reject"){
         result=await env.DB.prepare("UPDATE purchase_requests SET status='rejected',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending'").bind(id).run();
+        if(!result.meta?.changes)return json({error:"Pedido já processado."},409);
       }else if(pending.product_kind==="vip_package"){
         result=await env.DB.batch([
           env.DB.prepare("UPDATE purchase_requests SET status='approved',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending' AND product_kind='vip_package'").bind(id),
-          env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()=1 AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.gems_amount,pending.player_id,id)
+          env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()=1 AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.gems_amount,pending.player_id,id),
+          env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?, 'purchase_approved', json_object('requestId',?,'productKind','vip_package') WHERE EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.kingdom_id,id,id)
         ]);
         if(!result[0]?.meta?.changes)return json({error:"Pedido já processado."},409);
-      }else{
+      }else if(pending.product_kind==="skin"){
         result=await env.DB.batch([
           env.DB.prepare("UPDATE purchase_requests SET status='approved',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending' AND product_kind='skin'").bind(id),
-          env.DB.prepare("INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT player_id,product_id FROM purchase_requests WHERE id=? AND status='approved'").bind(id)
+          env.DB.prepare("INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT player_id,product_id FROM purchase_requests WHERE id=? AND status='approved'").bind(id),
+          env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?, 'purchase_approved', json_object('requestId',?,'productKind','skin') WHERE EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.kingdom_id,id,id)
         ]);
         if(!result[0]?.meta?.changes)return json({error:"Pedido já processado."},409);
+      }else if(pending.product_kind==="battle_pass"){
+        const seasonId=String(pending.product_ref||"");
+        if(!seasonId)return json({error:"Temporada do Passe Premium inválida."},409);
+        const season=await env.DB.prepare("SELECT id FROM battle_pass_seasons WHERE id=?").bind(seasonId).first();
+        if(!season)return json({error:"A temporada do Passe Premium não existe mais."},409);
+        await env.DB.prepare("INSERT OR IGNORE INTO battle_pass_progress(kingdom_id,season_id) VALUES(?,?)").bind(pending.kingdom_id,seasonId).run();
+        result=await env.DB.batch([
+          env.DB.prepare("UPDATE purchase_requests SET status='approved',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending' AND product_kind='battle_pass'").bind(id),
+          env.DB.prepare("UPDATE battle_pass_progress SET has_premium=1,premium_purchase_request_id=? WHERE kingdom_id=? AND season_id=? AND changes()=1 AND has_premium=0").bind(id,pending.kingdom_id,seasonId),
+          env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?, 'purchase_approved', json_object('requestId',?,'productKind','battle_pass','seasonId',?) WHERE changes()=1").bind(pending.kingdom_id,id,seasonId)
+        ]);
+        if(!result[0]?.meta?.changes)return json({error:"Pedido já processado."},409);
+        if(!result[1]?.meta?.changes)return json({error:"Passe Premium já ativado ou progresso incompatível; solicite revisão manual."},409);
+      }else{
+        return json({error:"Tipo de compra não suportado pelo painel."},400);
       }
-      if(decision==="reject"&&!result.meta?.changes)return json({error:"Pedido já processado."},409);
-      return json({success:true,message:decision==="approve"?"Pedido aprovado e pacote liberado.":"Pedido recusado."});
+      return json({success:true,message:decision==="approve"?(pending.product_kind==="battle_pass"?"Pagamento confirmado manualmente; Passe Premium ativado.":"Pedido aprovado e produto liberado."):"Pedido recusado."});
     }
     if(url.pathname==="/api/admin/player-search"){
       const query=String(body.query||body.playerId||"").trim().slice(0,64);
