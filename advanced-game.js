@@ -1,4 +1,4 @@
-import { randomUUID } from "node:crypto";
+const randomUUID = () => crypto.randomUUID();
 
 const UNIT_TYPES = new Set([
   "militia","swordsman","spearman","archer","cavalry","knight",
@@ -32,7 +32,7 @@ async function getTech(env,kingdomId){
     "c.prerequisite_tech,c.effect_json,COALESCE(t.level,0) AS level," +
     "COALESCE(t.research_end_time,0) AS research_end_time " +
     "FROM tech_catalog c LEFT JOIN kingdom_tech t ON t.tech_id=c.id AND t.kingdom_id=? " +
-    "WHERE c.active=1 ORDER BY c.category,c.id"
+    "ORDER BY c.category,c.id"
   ).bind(kingdomId).all();
   return (rows.results||[]).map(row=>({
     ...row,effect:parseJson(row.effect_json),
