@@ -73,19 +73,30 @@ test("rankings and formations use current kingdom schema and validate ownership"
 test("visual effects reuse the kingdom page and avoid a second Three.js renderer loop", async () => {
   const page = await read("kingdom.html");
   const visual = await read("visual-effects.js");
+  const metaUi = await read("kingdom-meta-ui.js");
+  const metaCss = await read("styles/kingdom-meta-ui.css");
   const css = await read("styles/visual-effects.css");
   const sw = await read("sw.js");
   assert.ok(page.includes("coi:game-ready"));
   assert.ok(page.includes("coi:game-battle"));
   assert.ok(page.includes("/visual-effects.js"));
   assert.ok(page.includes("/styles/visual-effects.css"));
+  assert.ok(page.includes("/kingdom-meta-ui.js"));
+  assert.ok(page.includes("/styles/kingdom-meta-ui.css"));
+  for (const route of ["tasks/claim","achievements/claim","mail/claim","speedups/use","formations/save","ranking"]) {
+    assert.ok(metaUi.includes('api("' + route + '"') || metaUi.includes('api("' + route));
+  }
+  assert.ok(metaUi.includes("coi-meta-root"));
+  assert.ok(metaCss.includes(".coi-meta-grid"));
   assert.ok(visual.includes("cancelAnimationFrame"));
   assert.ok(visual.includes("prefers-reduced-motion"));
   assert.ok(visual.includes("coi:game-battle"));
   assert.ok(css.includes("coi-city-shake"));
   assert.ok(!/from ["']three|new THREE\./.test(visual));
-  assert.ok(sw.includes("clash-of-izzy-shell-v18"));
+  assert.ok(sw.includes("clash-of-izzy-shell-v19"));
   assert.ok(sw.includes('"/visual-effects.js"'));
+  assert.ok(sw.includes('"/kingdom-meta-ui.js"'));
+  assert.ok(sw.includes('"/styles/kingdom-meta-ui.css"'));
 });
 
 test("PWA installation reuses the existing accessible installer rather than duplicating it", async () => {
