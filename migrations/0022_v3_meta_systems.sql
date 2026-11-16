@@ -55,7 +55,7 @@ VALUES
 
 CREATE TABLE IF NOT EXISTS kingdom_speedups (
   kingdom_id INTEGER NOT NULL REFERENCES kingdoms(id) ON DELETE CASCADE,
-  queue_type TEXT NOT NULL CHECK (queue_type IN ('construction','training','research')),
+  queue_type TEXT NOT NULL CHECK (queue_type IN ('construction','training','research','march')),
   duration_seconds INTEGER NOT NULL CHECK (duration_seconds IN (60,300,900,3600,14400,86400)),
   quantity INTEGER NOT NULL DEFAULT 0 CHECK (quantity >= 0),
   PRIMARY KEY (kingdom_id,queue_type,duration_seconds)
@@ -124,6 +124,8 @@ CREATE TABLE IF NOT EXISTS kingdom_achievement_progress (
 );
 CREATE INDEX IF NOT EXISTS idx_kingdom_achievements
   ON kingdom_achievement_progress(kingdom_id,completed,claimed);
+CREATE INDEX IF NOT EXISTS idx_battle_reports_winner
+  ON battle_reports(winner_kingdom_id,id);
 
 INSERT OR IGNORE INTO achievement_catalog
   (id,title,description,category,tier,event_type,progress_field,requirement_value,reward_json)
