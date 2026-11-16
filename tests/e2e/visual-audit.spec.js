@@ -285,6 +285,16 @@ test.describe("Mobile visual audit captures", () => {
     await expect(overlay.locator("article.va-shop-item")).toBeVisible();
     await expect(page.locator("#valhalla-shop-balance")).toHaveText("420");
 
+    // Let the one-time seasonal toast leave the product area before the audit capture.
+    await expect(page.locator(".va-shop-toast")).toHaveCount(0);
+
+    // The modal must sit above the persistent recorder panel while the shop is open.
+    const layerOrder = await page.evaluate(() => ({
+      shop: Number.parseInt(getComputedStyle(document.querySelector("#valhalla-shop-overlay")).zIndex, 10),
+      recorder: Number.parseInt(getComputedStyle(document.querySelector("#trailer-recorder-panel")).zIndex, 10),
+    }));
+    expect(layerOrder.shop).toBeGreaterThan(layerOrder.recorder);
+
     await attachScreenshot(page, testInfo, "valhalla-shop-mobile");
     await attachLayoutMetrics(page, testInfo, "valhalla-shop-mobile", [
       "#valhalla-shop-overlay",
