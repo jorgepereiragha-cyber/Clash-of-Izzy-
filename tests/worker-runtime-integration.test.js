@@ -722,7 +722,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await runCli([
         "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
         "--local", "--persist-to", persistDir,
-        "--command", "UPDATE kingdom_queues SET completes_at=datetime('now','-1 seconds') WHERE kingdom_id=" + kingdomA + " AND queue_type='construction' AND target_key='castle' AND status='running';",
+        "--command", "UPDATE kingdom_queues SET started_at=datetime('now','-2 seconds'),completes_at=datetime('now','-1 seconds') WHERE kingdom_id=" + kingdomA + " AND queue_type='construction' AND target_key='castle' AND status='running';",
       ]);
       stateA = (await api("/api/game/state", { token: tokenA })).data.state;
       assert.ok(stateA.buildings.find(building => building.building_type === "castle")?.level >= 2,
