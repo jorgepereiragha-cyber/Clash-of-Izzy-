@@ -841,6 +841,7 @@ async function gameState(env,playerId){
       "CASE WHEN wt.territory_kind='castle' THEN wt.z-? ELSE wt.z END AS z,"+
       "wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,wt.territory_kind,"+
       "owner.id AS kingdom_id,owner.kingdom_name,owner.castle_level,owner.power,"+
+      "owner.wall_hp,owner.wall_max_hp,owner.defense_power,owner.protection_until,"+
       "COALESCE(n.nickname,op.name) AS commander_name,"+
       "COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=owner.id),'') AS alliance_tag "+
       "FROM world_territories wt LEFT JOIN kingdoms owner ON owner.id=wt.owner_kingdom_id "+
@@ -851,7 +852,7 @@ async function gameState(env,playerId){
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45).all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at,CASE WHEN replay_expires_at>unixepoch() AND replay_json<>'{}' THEN 1 ELSE 0 END AS has_replay FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id).all(),
+    env.DB.prepare("SELECT id,battle_type,attacker_kingdom_id,defender_kingdom_id,attacker_power,defender_power,winner_kingdom_id,losses_json,wounded_json,wall_damage,rewards_json,created_at,CASE WHEN replay_expires_at>unixepoch() AND replay_json<>'{}' THEN 1 ELSE 0 END AS has_replay FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id).all(),
     env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key").bind(kingdom.id).all(),
     env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id).all()
@@ -1399,9 +1400,23 @@ async function gameAction(env,playerId,body){
     if(!target)return json({error:"Território não encontrado."},404);
     const marchType=String(body.marchType||"gather");
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
-    if(marchType==="attack"&&(target.owner_kingdom_id||target.territory_kind==="castle"))return json({error:"O castelo de outro comandante está visível no mapa. O combate PvP será habilitado na Fase 10; por enquanto, ataque apenas territórios neutros."},409);
-    if(target.territory_kind==="castle"&&marchType!=="attack")return json({error:"Castelos de jogadores não podem ser coletados nem usados como ponto de exploração."},409);
-    if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
+    if(marchType==="attack"){
+      if(target.territory_kind==="castle"){
+        const defenderId=Number(target.owner_kingdom_id||0);
+        if(!defenderId||defenderId===Number(k.id))return json({error:"Escolha um castelo inimigo válido."},409);
+        if(Date.parse(String(k.protection_until||""))>Date.now())return json({error:"Seu escudo de proteção impede iniciar ataques."},403);
+        const defender=await env.DB.prepare("SELECT id,protection_until FROM kingdoms WHERE id=?").bind(defenderId).first();
+        if(!defender)return json({error:"Reino defensor não encontrado."},404);
+        if(Date.parse(String(defender.protection_until||""))>Date.now())return json({error:"Este castelo está protegido por escudo."},409);
+        const allied=await env.DB.prepare("SELECT 1 AS allied FROM alliance_members a JOIN alliance_members b ON b.alliance_id=a.alliance_id WHERE a.kingdom_id=? AND b.kingdom_id=? LIMIT 1").bind(k.id,defenderId).first();
+        if(allied)return json({error:"Ataques contra membros da sua aliança são bloqueados."},403);
+      }else if(target.owner_kingdom_id){
+        return json({error:"Ataques a territórios de outro reino exigem selecionar o castelo do comandante."},409);
+      }
+    }else{
+      if(target.territory_kind==="castle")return json({error:"Castelos de jogadores só aceitam ordens de ataque."},409);
+      if(target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
+    }
     const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
     const selected={};
     for(const [unit,raw] of Object.entries(requested)){
