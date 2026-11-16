@@ -342,6 +342,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         assert.equal(shopCatalog.player_runes, 30000);
         assert.ok(shopCatalog.catalog.some(item => item.id === "einherjar_pack_10"));
         assert.ok(shopCatalog.catalog.some(item => item.id === "fenrir_pack_1"));
+        expectStatus(await api("/api/game/valhalla-shop/buy", {
+          method: "POST", token: tokenA, body: { catalog_id: "einherjar_pack_10" },
+        }), 400, "request_key obrigatório na compra");
 
         const buy = (token, catalog_id, request_key) => api("/api/game/valhalla-shop/buy", {
           method: "POST", token, body: { catalog_id, request_key },
@@ -354,7 +357,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         const einherjarRetry = expectStatus(await buy(tokenA, "einherjar_pack_10", einherjarKey), 200, "retry idempotente da compra");
         assert.equal(einherjarRetry.replayed, true);
         assert.equal(einherjarRetry.new_runes_balance, 29500);
-        expectStatus(await buy(tokenA, "fenrir_pack_1", einherjarKey), 409, "chave de compra reutilizada em outro item");
+        expectStatus(await buy(tokenB, "fenrir_pack_1", einherjarKey), 409, "chave de compra reutilizada por outro reino");
 
         for (let index = 1; index <= 3; index++) {
           const result = expectStatus(
@@ -444,9 +447,6 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           "--command", "UPDATE kingdoms SET destiny_runes=1 WHERE id=" + kingdomB + ";",
         ]);
         expectStatus(await buy(tokenB, "einherjar_pack_10", "valhalla-insufficient-runic-01"), 402, "bloqueio de runas insuficientes");
-        expectStatus(await api("/api/game/valhalla-shop/buy", {
-          method: "POST", token: tokenA, body: { catalog_id: "einherjar_pack_10" },
-        }), 400, "request_key obrigatório na compra");
         
         const woodBeforeProduction = Number(afterDuplicateCron.state.kingdom.wood || 0);
         await runCli([
