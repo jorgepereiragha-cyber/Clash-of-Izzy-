@@ -213,7 +213,6 @@
       }
       details.textContent = quantity.options.length ? "Estoque disponível para o tipo selecionado." : "Sem aceleradores para esta atividade.";
     }
-    target.addEventListener("change", refreshDurations);
     refreshDurations();
     const apply = actionButton("Aplicar acelerador", async () => {
       const [type, id] = String(target.value).split(":");
@@ -221,6 +220,10 @@
         method: "POST",
         body: { queue_type: type, target_queue_id: Number(id), duration_seconds: Number(quantity.value) },
       }), "Acelerador aplicado.");
+    });
+    target.addEventListener("change", () => {
+      refreshDurations();
+      apply.disabled = !quantity.value;
     });
     const form = $("div", "coi-meta-form");
     form.append($("label", "", "Fila ou marcha"), target, $("label", "", "Acelerador"), quantity, details, apply);
@@ -336,7 +339,6 @@
     setStatus("Processando...");
     try {
       await task();
-      await refresh();
       window.dispatchEvent(new Event("coi:meta-reward-claimed"));
       setStatus(success || "Alteração salva.");
     } catch (error) {
