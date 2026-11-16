@@ -36,14 +36,23 @@ function makeVector3(x, y, z) {
   };
 }
 
-function createCaptureHarness({ rejectExplicitMime = false, deviceMemory = 4 } = {}) {
+function createCaptureHarness({
+  rejectExplicitMime = false,
+  deviceMemory = 4,
+  wakeLockSupported = false,
+  rejectWakeLock = false
+} = {}) {
   const restores = [];
   const events = [];
   const constructorOptions = [];
+  const sentinels = [];
+  const documentListeners = new Map();
   let trackStopped = false;
   let active = false;
   let renderedFrames = 0;
   let frameId = 0;
+  let wakeLockRequests = 0;
+  let wakeLockReleases = 0;
 
   class FakeMediaRecorder {
     static isTypeSupported(type) {
@@ -80,6 +89,47 @@ function createCaptureHarness({ rejectExplicitMime = false, deviceMemory = 4 } =
       this.fps = fps;
       return { getTracks: () => [{ stop() { trackStopped = true; } }] };
     }
+  }
+
+  const fakeDocument = {
+    visibilityState: "visible",
+    createElement: () => new FakeCanvas(),
+    addEventListener(type, handler) {
+      if (!documentListeners.has(type)) documentListeners.set(type, new Set());
+      documentListeners.get(type).add(handler);
+    },
+    removeEventListener(type, handler) {
+      documentListeners.get(type)?.delete(handler);
+    },
+    dispatchEvent(event) {
+      for (const handler of documentListeners.get(event.type) || []) handler(event);
+    }
+  };
+  const fakeNavigator = { deviceMemory };
+  if (wakeLockSupported) {
+    fakeNavigator.wakeLock = {
+      async request(type) {
+        wakeLockRequests++;
+        if (type !== "screen") throw new Error("Unsupported wake lock type");
+        if (rejectWakeLock) throw new Error("Wake lock denied by platform");
+        const listeners = new Map();
+        const sentinel = {
+          released: false,
+          addEventListener(eventType, handler) {
+            if (!listeners.has(eventType)) listeners.set(eventType, new Set());
+            listeners.get(eventType).add(handler);
+          },
+          async release() {
+            if (this.released) return;
+            this.released = true;
+            wakeLockReleases++;
+            for (const handler of listeners.get("release") || []) handler({ type: "release" });
+          }
+        };
+        sentinels.push(sentinel);
+        return sentinel;
+      }
+    };
   }
 
   const renderer = {
@@ -119,20 +169,27 @@ function createCaptureHarness({ rejectExplicitMime = false, deviceMemory = 4 } =
 
   restores.push(setTestGlobal("MediaRecorder", FakeMediaRecorder));
   restores.push(setTestGlobal("HTMLCanvasElement", FakeCanvas));
-  restores.push(setTestGlobal("document", { createElement: () => new FakeCanvas() }));
+  restores.push(setTestGlobal("document", fakeDocument));
   restores.push(setTestGlobal("window", { dispatchEvent(event) { events.push(event); } }));
   restores.push(setTestGlobal("CustomEvent", class {
     constructor(type, options = {}) { this.type = type; this.detail = options.detail; }
   }));
   restores.push(setTestGlobal("requestAnimationFrame", () => ++frameId));
   restores.push(setTestGlobal("cancelAnimationFrame", () => {}));
-  restores.push(setTestGlobal("navigator", { deviceMemory }));
+  restores.push(setTestGlobal("navigator", fakeNavigator));
 
   return {
     api, renderer, camera, events, constructorOptions,
     get trackStopped() { return trackStopped; },
     get active() { return active; },
     get renderedFrames() { return renderedFrames; },
+    get wakeLockRequests() { return wakeLockRequests; },
+    get wakeLockReleases() { return wakeLockReleases; },
+    get sentinels() { return sentinels; },
+    setVisibility(state) {
+      fakeDocument.visibilityState = state;
+      fakeDocument.dispatchEvent({ type: "visibilitychange" });
+    },
     restore() { for (const restore of restores.reverse()) restore(); }
   };
 }
@@ -185,7 +242,7 @@ test("recorder uses the renderer API instead of an assumed window.map3d global",
 });
 
 test("PWA and shared styles include the recorder resources", () => {
-  assert.match(serviceWorker, /clash-of-izzy-shell-v22/);
+  assert.match(serviceWorker, /clash-of-izzy-shell-v23/);
   for (const path of [
     "/scripts/cinematic/capture-system.js",
     "/scripts/cinematic/media-recorder-support.js",
@@ -278,6 +335,59 @@ test("capture retries native codec selection when the mobile encoder rejects an 
     assert.ok(completed.detail.blob.size > 0);
   } finally {
     harness.restore();
+  }
+});
+
+test("screen wake lock is reacquired after the page becomes visible and released after recording", async () => {
+  const harness = createCaptureHarness({ wakeLockSupported: true });
+  try {
+    const capture = new CinematicCapture(harness.api);
+    capture.setCameraPath([
+      { time: 0, position: [4, 6, 8], lookAt: [0, 0, 0], zoom: 1 },
+      { time: 8, position: [5, 7, 9], lookAt: [0, 0, 0], zoom: 1.1 }
+    ]);
+    await capture.startRecording({ width: 1280, height: 720, fps: 30, bitrate: 2500000, expectedDuration: 8 });
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(harness.wakeLockRequests, 1);
+    assert.equal(capture.wakeLock?.released, false);
+
+    harness.setVisibility("hidden");
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(harness.wakeLockReleases, 1);
+    assert.equal(capture.wakeLock, null);
+
+    harness.setVisibility("visible");
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(harness.wakeLockRequests, 2);
+    assert.equal(capture.wakeLock?.released, false);
+
+    capture.stopRecording();
+    await new Promise(resolve => setImmediate(resolve));
+    assert.equal(harness.wakeLockReleases, 2);
+    assert.equal(capture.wakeLock, null);
+    assert.equal(harness.active, false);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("recording continues when the browser does not support or grant screen wake lock", async () => {
+  for (const options of [{}, { wakeLockSupported: true, rejectWakeLock: true }]) {
+    const harness = createCaptureHarness(options);
+    try {
+      const capture = new CinematicCapture(harness.api);
+      capture.setCameraPath([
+        { time: 0, position: [4, 6, 8], lookAt: [0, 0, 0], zoom: 1 },
+        { time: 5, position: [5, 7, 9], lookAt: [0, 0, 0], zoom: 1.1 }
+      ]);
+      await capture.startRecording({ width: 1280, height: 720, fps: 30, bitrate: 2500000, expectedDuration: 5 });
+      await new Promise(resolve => setImmediate(resolve));
+      assert.equal(capture.isRecording, true);
+      assert.equal(harness.wakeLockRequests, options.wakeLockSupported ? 1 : 0);
+      capture.stopRecording();
+    } finally {
+      harness.restore();
+    }
   }
 });
 
