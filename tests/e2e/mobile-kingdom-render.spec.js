@@ -110,6 +110,18 @@ test.describe("Mobile kingdom rendering", () => {
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
 
+    // The expanded recorder panel used to cover upgrade/training controls on phones.
+    // It now starts minimized on mobile and remains accessible through its toggle.
+    const recorderBody = page.locator("#coi-recorder-body");
+    const recorderToggle = page.locator("#coi-recorder-toggle");
+    await expect(recorderToggle).toHaveAttribute("aria-expanded", "false");
+    await expect(recorderBody).toBeHidden();
+    await recorderToggle.click();
+    await expect(recorderToggle).toHaveAttribute("aria-expanded", "true");
+    await expect(recorderBody).toBeVisible();
+    await recorderToggle.click();
+    await expect(recorderBody).toBeHidden();
+
     // The live HUD has five resources plus the server-owned premium currency.
     await expect(page.locator("#resources .resource")).toHaveCount(6);
     await expect(page.locator("#resources .resource").filter({ hasText: "Comida" }).locator("b"))
