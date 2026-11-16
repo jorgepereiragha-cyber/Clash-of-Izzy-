@@ -145,13 +145,6 @@ ALTER TABLE alliance_wars ADD COLUMN winner_alliance_id INTEGER REFERENCES allia
 ALTER TABLE alliance_wars ADD COLUMN end_reason TEXT;
 UPDATE alliance_wars SET phase='ended' WHERE status='finished';
 
--- Battle actions are request-keyed so retries never consume troops or score twice.
-ALTER TABLE alliance_war_battles ADD COLUMN objective_id INTEGER REFERENCES alliance_war_objectives(id) ON DELETE SET NULL;
-ALTER TABLE alliance_war_battles ADD COLUMN request_key TEXT;
-CREATE UNIQUE INDEX idx_alliance_war_battles_request
-  ON alliance_war_battles(war_id,attacker_kingdom_id,request_key)
-  WHERE request_key IS NOT NULL;
-
 CREATE TABLE alliance_war_objectives (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   war_id INTEGER NOT NULL REFERENCES alliance_wars(id) ON DELETE CASCADE,
@@ -168,6 +161,13 @@ CREATE TABLE alliance_war_objectives (
   last_capture_request_key TEXT,
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
+-- Battle actions are request-keyed so retries never consume troops or score twice.
+ALTER TABLE alliance_war_battles ADD COLUMN objective_id INTEGER REFERENCES alliance_war_objectives(id) ON DELETE SET NULL;
+ALTER TABLE alliance_war_battles ADD COLUMN request_key TEXT;
+CREATE UNIQUE INDEX idx_alliance_war_battles_request
+  ON alliance_war_battles(war_id,attacker_kingdom_id,request_key)
+  WHERE request_key IS NOT NULL;
+
 CREATE INDEX idx_alliance_war_objectives_war ON alliance_war_objectives(war_id);
 CREATE TABLE alliance_war_participants (
   war_id INTEGER NOT NULL REFERENCES alliance_wars(id) ON DELETE CASCADE,
