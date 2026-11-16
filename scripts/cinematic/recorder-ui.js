@@ -69,7 +69,9 @@ class TrailerRecorderUI {
       const toggle = this.panel.querySelector("#coi-recorder-toggle");
       body.hidden = true;
       toggle.setAttribute("aria-expanded", "false");
+      toggle.setAttribute("aria-label", "Expandir gravador");
       toggle.textContent = "+";
+      this.panel.classList.add("is-collapsed");
     }
     document.body.append(this.panel);
   }
@@ -80,7 +82,9 @@ class TrailerRecorderUI {
       const collapsed = body.hidden;
       body.hidden = !collapsed;
       event.currentTarget.setAttribute("aria-expanded", String(collapsed));
+      event.currentTarget.setAttribute("aria-label", collapsed ? "Minimizar gravador" : "Expandir gravador");
       event.currentTarget.textContent = collapsed ? "−" : "+";
+      this.panel.classList.toggle("is-collapsed", !collapsed);
     });
 
     const trainingQuantity = document.getElementById("unitQuantity");
