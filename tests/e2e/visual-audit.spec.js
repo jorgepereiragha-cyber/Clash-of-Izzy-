@@ -189,7 +189,7 @@ test.describe("Mobile visual audit captures", () => {
     await expect(page.locator("#trainButton")).toBeVisible();
 
     await attachScreenshot(page, testInfo, "kingdom-mobile", {
-      mask: [page.locator("#city canvas"), page.locator(".queue-remaining")],
+      mask: [page.locator(".queue-remaining")],
     });
     await attachLayoutMetrics(page, testInfo, "kingdom-mobile", [
       "#trainButton",
@@ -209,9 +209,7 @@ test.describe("Mobile visual audit captures", () => {
     await expect(page.locator(".territory-pin")).toHaveCount(2);
     await expect(page.locator(".territory-title")).toContainText("Pedreira do Norte");
 
-    await attachScreenshot(page, testInfo, "world-map-mobile", {
-      mask: [page.locator("#world3d")],
-    });
+    await attachScreenshot(page, testInfo, "world-map-mobile");
     await attachLayoutMetrics(page, testInfo, "world-map-mobile", [
       "#worldMap",
       "#zoomIn",
@@ -287,9 +285,7 @@ test.describe("Mobile visual audit captures", () => {
     await expect(overlay.locator("article.va-shop-item")).toBeVisible();
     await expect(page.locator("#valhalla-shop-balance")).toHaveText("420");
 
-    await attachScreenshot(page, testInfo, "valhalla-shop-mobile", {
-      mask: [page.locator("#city canvas")],
-    });
+    await attachScreenshot(page, testInfo, "valhalla-shop-mobile");
     await attachLayoutMetrics(page, testInfo, "valhalla-shop-mobile", [
       "#valhalla-shop-overlay",
       "#valhalla-shop-dialog",
