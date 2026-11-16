@@ -8,6 +8,7 @@ import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaCon
 import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
+import { handleRally, processDueRallies } from "./rally.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -1349,6 +1350,8 @@ export default {
     if(rewardResult.granted>0)console.log("valhalla_daily_runes_distributed",rewardResult);
   }catch(error){console.error("scheduled_valhalla_runes_failed",String(error?.message||error));}
   await processDueMarches(env);
+  try{await processDueRallies(env);}
+  catch(error){console.error("scheduled_rally_resolution_failed",String(error?.message||error));}
   try{await processAngelDeathEventLifecycle(env);}
   catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
   try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();}
@@ -1364,7 +1367,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET),hasEmailProvider:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.FRONTEND_URL),hasResendApiKey:Boolean(env.RESEND_API_KEY),hasEmailFrom:Boolean(env.EMAIL_FROM),hasFrontendUrl:Boolean(env.FRONTEND_URL)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1793,6 +1796,21 @@ export default {
         const ip=request.headers.get("CF-Connecting-IP")||"unknown";
         const networkLimit=await rateLimitDecision(env,"game-action-network",ip,600,60);
         if(networkLimit)return networkLimit;
+      }
+      if(url.pathname.startsWith("/api/game/rally/")){
+        const rallyPath=url.pathname.slice("/api/game/rally/".length);
+        if(!["active","nodes","create","join","occupy","collect","recall"].includes(rallyPath))return json({error:"Rota de guerra não encontrada."},404);
+        const isWrite=request.method==="POST";
+        if(!isWrite&&request.method!=="GET")return json({error:"Método não permitido."},405);
+        const playerLimit=await rateLimitDecision(env,isWrite?"rally-write-player":"rally-read-player",playerId,isWrite?20:120,60);
+        if(playerLimit)return playerLimit;
+        if(isWrite){
+          const networkLimit=await rateLimitDecision(env,"rally-write-network",request.headers.get("CF-Connecting-IP")||"unknown",120,60);
+          if(networkLimit)return networkLimit;
+        }
+        const rallyBody=isWrite?await readBody(request,8192):{};
+        if(rallyBody.__bodyError)return json({error:"Solicitação de guerra inválida."},rallyBody.__bodyError==="payload_too_large"?413:400);
+        return await handleRally(request,env,playerId,rallyPath,rallyBody);
       }
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);
