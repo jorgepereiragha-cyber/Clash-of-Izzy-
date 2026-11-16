@@ -159,7 +159,7 @@ async function useSpeedup(env,playerId,kingdomId,body){
     const end=Date.parse(target.completes_at||"");
     if(!Number.isFinite(end)||end<=now)return json({error:"Esta marcha já está concluída."},409);
     nextValue=new Date(Math.max(now,end-seconds*1000)).toISOString();
-    sql="UPDATE marches SET arrives_at=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at=?";
+    sql="UPDATE marches SET arrives_at=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at=? AND changes()=1";
     bindings=[nextValue,targetId,kingdomId,target.completes_at];
   }else{
     const queueType=type==="build"?"construction":type==="train"?"training":"research";
@@ -170,7 +170,7 @@ async function useSpeedup(env,playerId,kingdomId,body){
     const end=Date.parse(target.completes_at||"");
     if(!Number.isFinite(end)||end<=now)return json({error:"Esta fila já está concluída."},409);
     nextValue=new Date(Math.max(now,end-seconds*1000)).toISOString();
-    sql="UPDATE kingdom_queues SET completes_at=? WHERE id=? AND kingdom_id=? AND queue_type=? AND status='running' AND completes_at=?";
+    sql="UPDATE kingdom_queues SET completes_at=? WHERE id=? AND kingdom_id=? AND queue_type=? AND status='running' AND completes_at=? AND changes()=1";
     bindings=[nextValue,targetId,kingdomId,queueType,target.completes_at];
   }
   const inventory=env.DB.prepare(
@@ -181,11 +181,7 @@ async function useSpeedup(env,playerId,kingdomId,body){
     ")"
   ).bind(playerId,type,seconds,targetId,kingdomId,target.completes_at);
   const update=env.DB.prepare(sql).bind(...bindings);
-  const refund=env.DB.prepare(
-    "UPDATE player_speedups SET quantity=quantity+1 WHERE player_id=? AND speedup_type=? " +
-    "AND duration_seconds=? AND changes()=0"
-  ).bind(playerId,type,seconds);
-  const result=await env.DB.batch([inventory,update,refund]);
+  const result=await env.DB.batch([inventory,update]);
   if(Number(result[0]?.meta?.changes||0)!==1||Number(result[1]?.meta?.changes||0)!==1){
     return json({error:"Acelerador indisponível ou alvo alterado. Nada foi consumido."},409);
   }
@@ -544,6 +540,21 @@ async function saveVisualSettings(env,playerId,body){
   return json({success:true,settings:values});
 }
 
+
+async function getQueues(env,kingdomId){
+  const [queues,marches]=await Promise.all([
+    env.DB.prepare(
+      "SELECT id,queue_type,target_key,quantity,started_at,completes_at FROM kingdom_queues " +
+      "WHERE kingdom_id=? AND status='running' ORDER BY completes_at,id"
+    ).bind(kingdomId).all(),
+    env.DB.prepare(
+      "SELECT id,march_type,target_territory_id,arrives_at AS completes_at FROM marches " +
+      "WHERE kingdom_id=? AND status='marching' ORDER BY arrives_at,id"
+    ).bind(kingdomId).all()
+  ]);
+  return {queues:queues.results||[],marches:marches.results||[]};
+}
+
 async function getRanking(env){
   const rows=await env.DB.prepare(
     "SELECT k.kingdom_name,k.castle_level,k.power," +
@@ -580,6 +591,7 @@ export async function handleAdvancedGame(request,env,publicPlayerId,path,body={}
       if(path==="mail")return json({mail:await getMail(env,ctx)});
       if(path==="achievements")return json({achievements:await getAchievements(env,ctx)});
       if(path==="ranking")return json({ranking:await getRanking(env)});
+      if(path==="queues")return json(await getQueues(env,ctx.kingdom_id));
       if(path==="formations")return json({formations:await getFormations(env,ctx.kingdom_id)});
       if(path==="mounts")return json({mounts:await getMounts(env,ctx.kingdom_id)});
       if(path==="visuals")return json({settings:await getVisualSettings(env,ctx.player_id)});
