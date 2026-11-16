@@ -50,14 +50,14 @@ function withdrawalStatement(troopsJson,kingdomId,extraSql,extraBindings){
  )`;
  return {sql,bindings:[troopsJson,kingdomId,...types,...extraBindings,troopsJson,kingdomId]};
 }
-async function loadNodes(env){
+async function loadNodes(env,kingdomId){
  const rows=await env.DB.prepare(
   "SELECT id,node_type,map_x,map_y,level,current_resources,max_resources,regen_rate,occupied_by,occupation_start,reserved_by_rally,last_regen FROM resource_nodes ORDER BY level DESC,id"
  ).all();
  const now=Math.floor(Date.now()/1000);
  return (rows.results||[]).map(row=>({
   ...row,current_resources:nodeRegeneration(row,now),
-  resource_type:resourceForNode(row.node_type)
+  resource_type:resourceForNode(row.node_type),is_mine:Number(row.occupied_by||0)===kingdomId
  }));
 }
 async function listRallies(env,kingdomId){
@@ -220,7 +220,7 @@ export async function handleRally(request,env,publicPlayerId,path,body={}){
  try{
   const kingdomId=await kingdomForPlayer(env,publicPlayerId);
   if(!kingdomId)return reply({error:"Reino não encontrado."},404);
-  if(request.method==="GET"&&path==="nodes")return reply({nodes:await loadNodes(env)});
+  if(request.method==="GET"&&path==="nodes")return reply({nodes:await loadNodes(env,kingdomId)});
   if(request.method==="GET"&&path==="active")return reply(await listRallies(env,kingdomId));
   if(request.method!=="POST")return reply({error:"Método não permitido."},405);
   if(path==="create")return await createRally(env,kingdomId,body);
