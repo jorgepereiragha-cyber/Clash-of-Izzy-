@@ -9,6 +9,7 @@ export class AdvancedShaders {
     this.camera = camera;
     this.THREE = THREE;
     this.materials = new Set();
+    this.geometries = new Set();
     this.disposed = false;
   }
 
@@ -60,7 +61,9 @@ export class AdvancedShaders {
         }`
     });
     this.materials.add(material);
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(size, size, 1, 1), material);
+    const geometry = new THREE.PlaneGeometry(size, size, 64, 64);
+    this.geometries.add(geometry);
+    const mesh = new THREE.Mesh(geometry, material);
     mesh.rotation.x = -Math.PI / 2;
     mesh.position.copy(position);
     mesh.userData.isWater = true;
@@ -80,6 +83,8 @@ export class AdvancedShaders {
     if (this.disposed) return;
     this.disposed = true;
     for (const material of this.materials) material.dispose();
+    for (const geometry of this.geometries) geometry.dispose();
     this.materials.clear();
+    this.geometries.clear();
   }
 }
