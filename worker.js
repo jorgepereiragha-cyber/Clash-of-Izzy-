@@ -402,8 +402,8 @@ async function seedWorld(env){
 function jsonObject(value){
   try{const parsed=JSON.parse(value||"{}");return parsed&&typeof parsed==="object"&&!Array.isArray(parsed)?parsed:{};}catch{return {};}
 }
-function makeHospitalWounds(losses,unitRows,hospitalLevel){
-  const currentWounded=(unitRows||[]).reduce((sum,row)=>sum+Math.max(0,Number(row.wounded)||0),0);
+function makeHospitalWounds(losses,unitRows,hospitalLevel,currentRows=unitRows){
+  const currentWounded=(currentRows||[]).reduce((sum,row)=>sum+Math.max(0,Number(row.wounded)||0),0);
   let capacity=Math.max(0,Math.floor(Number(hospitalLevel)||0)*100-currentWounded);
   const wounded={};
   for(const row of unitRows||[]){
@@ -443,7 +443,7 @@ async function resolvePvpMarch(env,march,attackerKingdomId,units,target){
   const [attacker,defender,attackerTroops,defenderTroops,attackerBuildings,defenderBuildings,attackerHero,defenderHero,attackerDragon,defenderDragon,attackerMilitary,defenderMilitary,attackerDefense,defenderDefense]=await Promise.all([
     env.DB.prepare("SELECT id,castle_level,protection_until FROM kingdoms WHERE id=?").bind(attackerKingdomId).first(),
     env.DB.prepare("SELECT id,castle_level,protection_until,battle_token,wall_hp,wall_max_hp,defense_power FROM kingdoms WHERE id=?").bind(defenderId).first(),
-    env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY tier,unit_type").bind(attackerKingdomId).all(),
+    env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? ORDER BY tier,unit_type").bind(attackerKingdomId).all(),
     env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY tier,unit_type").bind(defenderId).all(),
     env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='hospital'").bind(attackerKingdomId).first(),
     env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='hospital'").bind(defenderId).first(),
@@ -533,7 +533,7 @@ async function resolvePvpMarch(env,march,attackerKingdomId,units,target){
   const defenderLosses=simulation.defenderLosses||{};
   const attackerCurrent=attackerTroops.results||[];
   const defenderCurrent=defenderTroops.results||[];
-  const attackerWounded=makeHospitalWounds(attackerLosses,attackerCurrent,attackerBuildings?.level);
+  const attackerWounded=makeHospitalWounds(attackerLosses,attackerArmy,attackerBuildings?.level,attackerCurrent);
   const defenderWounded=makeHospitalWounds(defenderLosses,defenderCurrent,defenderBuildings?.level);
   const attackerWoundedTotal=Object.values(attackerWounded).reduce((sum,value)=>sum+value,0);
   const defenderWoundedTotal=Object.values(defenderWounded).reduce((sum,value)=>sum+value,0);
@@ -584,7 +584,7 @@ async function resolvePvpMarch(env,march,attackerKingdomId,units,target){
     const wounded=Math.max(0,Math.floor(Number(attackerWounded[unit+"_1"])||0));
     if(qty>0||wounded>0){
       statements.push(env.DB.prepare(
-        "INSERT INTO army_units(kingdom_id,unit_type,tier,quantity,wounded) SELECT ?,?,1,?,?,0 WHERE "+pvpGuard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity,wounded=wounded+excluded.wounded"
+        "INSERT INTO army_units(kingdom_id,unit_type,tier,quantity,wounded) SELECT ?,?,1,?,? WHERE "+pvpGuard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity,wounded=wounded+excluded.wounded"
       ).bind(attackerKingdomId,unit,qty,wounded,march.id,attackerKingdomId,resolutionToken,defenderId,battleToken));
     }
   }
@@ -643,7 +643,7 @@ async function resolvePvpMarch(env,march,attackerKingdomId,units,target){
 }
 async function processMarches(env,kingdomId){
  const now=new Date().toISOString();
- const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
+ const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id,started_at,arrives_at FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
  for(const m of due.results||[]){
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
   const resolvedAt=new Date().toISOString(),resolutionToken=crypto.randomUUID();
@@ -653,7 +653,8 @@ async function processMarches(env,kingdomId){
    env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
   ];
   if(m.march_type==="attack"){
-   const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+   const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id,territory_kind FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+   if(target?.territory_kind==="castle"&&target.owner_kingdom_id){await resolvePvpMarch(env,m,kingdomId,units,target);continue;}
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={},replayData={};
    if(target&&!target.owner_kingdom_id&&army.length){
