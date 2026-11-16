@@ -129,12 +129,14 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v15"), "Service worker não contém o cache v14 esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v16"), "Service worker não contém o cache v14 esperado.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
   assert(serviceWorker.includes("/admin.html"), "PWA não inclui o painel Master.");
   assert(serviceWorker.includes("/valhalla-admin-ui.js"), "PWA não inclui o controlador administrativo de Valhalla.");
   assert(serviceWorker.includes("/styles/valhalla-admin.css"), "PWA não inclui os estilos administrativos de Valhalla.");
+  assert(serviceWorker.includes("/valhalla-shop-ui.js"), "PWA não inclui a interface da Loja de Valhalla.");
+  assert(serviceWorker.includes("/styles/valhalla-shop.css"), "PWA não inclui os estilos da Loja de Valhalla.");
 
   return {
     baseUrl: base.origin,
