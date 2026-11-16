@@ -149,6 +149,18 @@
       const data = await response.json().catch(() => ({}));
       if (!response.ok) throw new Error(data.error || "Não foi possível iniciar a pesquisa.");
       status.textContent = "Pesquisa iniciada. O nível será ativado após a conclusão da fila.";
+      const refreshResponse = await fetch("/api/game/state", {
+        headers: { Authorization: "Bearer " + token }
+      }).catch(() => null);
+      if (refreshResponse?.ok) {
+        const refreshed = await refreshResponse.json().catch(() => ({}));
+        if (refreshed.state) {
+          state = {
+            technologies: refreshed.state.technologies || [],
+            queues: refreshed.state.queues || []
+          };
+        }
+      }
       window.dispatchEvent(new CustomEvent("coi:technology-refresh"));
     } catch (error) {
       status.textContent = error.message || "Falha ao iniciar a pesquisa.";
@@ -162,4 +174,8 @@
     state = event.detail || { technologies: [], queues: [] };
     render();
   });
+  if (window.__coiKingdomTechnologyState) {
+    state = window.__coiKingdomTechnologyState;
+    render();
+  }
 })();
