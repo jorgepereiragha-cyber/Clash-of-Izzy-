@@ -200,7 +200,8 @@ export async function runProductionSmokeTests({
       landingAssets: true,
       feedbackUiAndAnalytics: true,
       worldMapNavigation: true,
-      worldMap3D: true,\n      cinematicTrailerRecorder: true,
+      worldMap3D: true,
+      cinematicTrailerRecorder: true,
     },
   };
 }
