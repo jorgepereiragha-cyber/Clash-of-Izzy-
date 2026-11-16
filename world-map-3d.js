@@ -30,6 +30,33 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   let activeMarches = [];
   let projectionButtons = new Map();
   let lastFrameTime = 0;
+  let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
+  let valhallaAuroraLight = null;
+  let worldHemisphereLight = null;
+  let worldSunLight = null;
+
+  function setValhallaMode(active) {
+    valhallaModeActive = Boolean(active);
+    if (!scene) return;
+    scene.background = new THREE.Color(valhallaModeActive ? 0x0a0510 : 0x355d69);
+    scene.fog = valhallaModeActive
+      ? new THREE.FogExp2(0x1a0f25, 0.0025)
+      : new THREE.Fog(0x355d69, 78, 155);
+    if (worldHemisphereLight) worldHemisphereLight.intensity = valhallaModeActive ? 1.05 : 2.05;
+    if (worldSunLight) worldSunLight.intensity = valhallaModeActive ? 1.35 : 2.6;
+    if (valhallaAuroraLight) {
+      scene.remove(valhallaAuroraLight);
+      valhallaAuroraLight = null;
+    }
+    if (valhallaModeActive) {
+      valhallaAuroraLight = new THREE.DirectionalLight(0x9b59b6, 0.75);
+      valhallaAuroraLight.position.set(22, 48, -38);
+      scene.add(valhallaAuroraLight);
+    }
+  }
+  window.addEventListener("coi:valhalla-mode", event => {
+    setValhallaMode(event.detail?.active === true);
+  });
 
   const worldRoot = new THREE.Group();
   const terrainRoot = new THREE.Group();
@@ -444,12 +471,14 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       camera = new THREE.OrthographicCamera(-56, 56, 47, -47, .1, 220);
       camera.position.set(58, 78, 62);
       camera.lookAt(0, 0, 0);
-      scene.add(new THREE.HemisphereLight(0xe8f0d7, 0x43513e, 2.05));
-      const sun = new THREE.DirectionalLight(0xffe0a4, 2.6);
-      sun.position.set(-35, 62, 32);
-      sun.castShadow = quality !== "low";
-      if (sun.castShadow) sun.shadow.mapSize.set(quality === "high" ? 1024 : 512, quality === "high" ? 1024 : 512);
-      scene.add(sun);
+      worldHemisphereLight = new THREE.HemisphereLight(0xe8f0d7, 0x43513e, 2.05);
+      scene.add(worldHemisphereLight);
+      worldSunLight = new THREE.DirectionalLight(0xffe0a4, 2.6);
+      worldSunLight.position.set(-35, 62, 32);
+      worldSunLight.castShadow = quality !== "low";
+      if (worldSunLight.castShadow) worldSunLight.shadow.mapSize.set(quality === "high" ? 1024 : 512, quality === "high" ? 1024 : 512);
+      scene.add(worldSunLight);
+      setValhallaMode(valhallaModeActive);
       scene.add(worldRoot);
       worldRoot.add(terrainRoot, routeRoot, territoryRoot, armyRoot);
       createGround();
@@ -467,6 +496,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       resize();
       window.__coiWorldMap3D = {
         update: setWorldState,
+        setValhallaMode,
         setProjectionButtons(buttons) {
           projectionButtons = buttons instanceof Map ? buttons : new Map();
           projectTerritories();
