@@ -4,6 +4,15 @@ import { readFile } from "node:fs/promises";
 
 const pages = ["index.html", "kingdom.html", "alliance.html", "arena.html", "admin.html"];
 
+test("landing hero uses dedicated kingdom artwork instead of enlarging the brand icon", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const art = await readFile(new URL("../assets/art/landing-kingdom.svg", import.meta.url), "utf8");
+  assert.match(html, /class="landing-kingdom-art" src="\/assets\/art\/landing-kingdom\.svg"/);
+  assert.doesNotMatch(html, /class="landing-visual-icon" src="\/icon-512\.svg"/);
+  assert.match(art, /viewBox="0 0 900 900"/);
+  assert.match(art, /Castelo medieval|castelo/i);
+});
+
 test("todas as telas principais carregam a identidade visual compartilhada", async () => {
   for (const page of pages) {
     const html = await readFile(new URL("../" + page, import.meta.url), "utf8");

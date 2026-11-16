@@ -141,9 +141,12 @@ if (host && "WebGLRenderingContext" in window) {
   // Small, deterministic, tileable procedural albedo maps add material identity
   // without shipping large image files or creating per-building texture copies.
   function makeSurfaceTexture(base, kind, seed) {
+    const textureSize = qualityProfile?.surfaceTextureSize || 128;
+    const detailScale = textureSize / 128;
     const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 128;
+    canvas.width = canvas.height = textureSize;
     const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.setTransform(detailScale, 0, 0, detailScale, 0, 0);
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, 128, 128);
     let value = seed >>> 0;
@@ -185,7 +188,8 @@ if (host && "WebGLRenderingContext" in window) {
         ctx.fillRect(x, y, 2 + rand() * 8, 2 + rand() * 5);
       }
     }
-    for (let i = 0; i < 1200; i++) {
+    const grainCount = Math.round(1200 * detailScale * detailScale);
+    for (let i = 0; i < grainCount; i++) {
       const alpha = .025 + rand() * .07;
       ctx.fillStyle = rand() > .5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
       ctx.fillRect(rand() * 128, rand() * 128, 1 + rand() * 2, 1 + rand() * 2);

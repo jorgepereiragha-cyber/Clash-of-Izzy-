@@ -43,6 +43,13 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
   assert.ok(totalBytes < 1_000_000, "optional 3D downloads must remain under 1 MB");
 });
 
+test("the Kenney tree prop no longer duplicates the procedural forest anchor", () => {
+  const tree = manifest.props.find(item => item.id === "kenney-tree-high");
+  assert.ok(tree);
+  assert.deepEqual(tree.positions, [[6, 0, -4.5]]);
+  assert.ok(!tree.positions.some(([x, , z]) => Math.hypot(x + 6.2, z + 4.7) < 1));
+});
+
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {
   const archer = manifest.units.find(item => item.unit_type === "archer");
   assert.ok(archer);

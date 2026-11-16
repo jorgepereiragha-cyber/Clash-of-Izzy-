@@ -10,7 +10,7 @@
 | Pull Request | [#111](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/pull/111) |
 | Commit de referência | `f9b19c2344db60853cbaac6cdf595729454704a8` |
 | Abreviação do commit | `f9b19c2` |
-| Service Worker cache | `clash-of-izzy-shell-v29` |
+| Service Worker cache | `clash-of-izzy-shell-v30` |
 | CI de referência | [#828 — sucesso](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43974863714) |
 | Preview deployment | [Build Cloudflare](https://dash.cloudflare.com/ed443802b956d175409db190a0fe8d0e/workers/services/view/clash-of-izzy/production/previews/feat-pr-111-guest-account-notice/builds/e0ef5e0f-f38a-4204-85d1-bd8c3cf3cc28) |
 | URL/ID do deployment efetivamente testado | **PREENCHER** |
@@ -35,7 +35,7 @@
 
 - [ ] Confirmar no painel Cloudflare que o deployment usado corresponde ao commit `f9b19c2`.
 - [ ] Registrar a URL exata do deployment, não apenas a URL estável da branch.
-- [ ] Abrir `/sw.js` no Preview e confirmar `clash-of-izzy-shell-v29`.
+- [ ] Abrir `/sw.js` no Preview e confirmar `clash-of-izzy-shell-v30`.
 - [ ] Confirmar em DevTools → Application → Service Workers qual worker está ativo e controlando a página.
 - [ ] Fazer hard reload/atualização do worker no perfil descartável antes das capturas.
 - [ ] Confirmar que a requisição autenticada `GET /api/account/status` retorna `emailMasked` e **não** contém a propriedade `email`.

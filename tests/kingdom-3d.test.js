@@ -52,6 +52,9 @@ test("glTF and KTX2/Basis loaders are configured for production assets", () => {
   assert.match(renderer, /KTX2Loader/);
   assert.match(renderer, /setTranscoderPath/);
   assert.match(renderer, /makeSurfaceTexture/);
+  assert.match(renderer, /qualityProfile\?\.surfaceTextureSize \|\| 128/);
+  assert.match(renderer, /ctx\.setTransform\(detailScale, 0, 0, detailScale, 0, 0\)/);
+  assert.match(renderer, /1200 \* detailScale \* detailScale/);
   assert.match(renderer, /applyProceduralSurfaceMaps/);
   assert.match(renderer, /surfaceTextureCache/);
   assert.match(renderer, /surfaceMaterial\(colors\[0\], "stone"/);
@@ -135,6 +138,15 @@ test("GLB manifest accepts only bounded same-origin assets for known buildings",
   assert.match(renderer, /url\.pathname\.startsWith\("\/assets\/3d\/"\)/);
   assert.match(renderer, /pathname\.toLowerCase\(\)\.endsWith\("\.glb"\)/);
   assert.match(renderer, /indisponível; mantendo o fallback procedural/);
+});
+
+test("small mobile viewport does not downgrade a capable Android GPU profile", () => {
+  const high = selectKingdomQualityProfile({ deviceMemory: 8, hardwareConcurrency: 8, viewportWidth: 390, maxTextureSize: 8192 });
+  const balanced = selectKingdomQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, viewportWidth: 390, maxTextureSize: 8192 });
+  assert.equal(high.tier, "high");
+  assert.equal(high.surfaceTextureSize, 512);
+  assert.equal(balanced.tier, "balanced");
+  assert.equal(balanced.surfaceTextureSize, 256);
 });
 
 test("quality profiles scale conservatively across low, balanced and high capability devices", () => {

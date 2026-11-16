@@ -10,16 +10,16 @@ export function selectKingdomQualityProfile({
 } = {}) {
   const memory = Number.isFinite(Number(deviceMemory)) ? Number(deviceMemory) : 0;
   const cores = Number.isFinite(Number(hardwareConcurrency)) ? Number(hardwareConcurrency) : 4;
-  const width = Math.max(1, Number(viewportWidth) || 1);
   const textureLimit = Math.max(0, Number(maxTextureSize) || 0);
   const dataSaver = saveData === true;
 
+  // CSS viewport width is a layout measurement, not a reliable GPU capability signal.
+  // A narrow Android viewport must not downgrade a device with capable memory/GPU.
   const low = dataSaver
     || (memory > 0 && memory <= 4)
     || (cores > 0 && cores <= 4)
-    || width < 520
     || (textureLimit > 0 && textureLimit < 4096);
-  const high = !low && memory >= 8 && cores >= 8 && width >= 900 && textureLimit >= 8192;
+  const high = !low && memory >= 8 && cores >= 8 && textureLimit >= 8192;
   const tier = low ? "low" : high ? "high" : "balanced";
 
   return Object.freeze({
@@ -28,6 +28,7 @@ export function selectKingdomQualityProfile({
     shadows: !dataSaver && (tier === "high" || (tier === "balanced" && width > 1024)),
     shadowMapSize: tier === "high" ? 1536 : tier === "balanced" ? 1024 : 512,
     anisotropy: tier === "high" ? 8 : tier === "balanced" ? 4 : 2,
+    surfaceTextureSize: tier === "high" ? 512 : tier === "balanced" ? 256 : 128,
     maxBuildings: tier === "low" ? 8 : tier === "balanced" ? 12 : 16,
     maxPixelCount: tier === "low" ? 1200000 : tier === "high" ? 4200000 : 2400000,
     loadOptionalAssets: !dataSaver,

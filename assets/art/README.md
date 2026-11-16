@@ -67,3 +67,11 @@
 - O manifesto GLB existe, mas ainda está vazio; nenhum modelo artístico GLB/KTX2 real foi publicado no projeto.
 - O pipeline está preparado para GLB/Draco/KTX2, mas precisa de assets licenciados, validação de tamanho, LOD e testes visuais em Android físico.
 - Não marcar o trabalho como concluído só porque o módulo 3D ou o bundle compila.
+
+
+## Polimento visual mobile — novembro de 2026
+
+- A landing page usa a ilustração vetorial original `/assets/art/landing-kingdom.svg`, separando a arte panorâmica do brasão e dos ícones PWA.
+- Texturas procedurais do reino usam 128 px no perfil low, 256 px no balanced e 512 px no high. A escolha considera memória, núcleos, limite de textura e Data Saver; a largura CSS da tela não rebaixa sozinha um Android capaz.
+- O atlas das duas famílias de modelos Kenney permanece local em 512 × 512 px. A árvore GLB foi mantida em um único ponto do terreno para não coincidir com uma instância da floresta procedural.
+- O Service Worker inclui a ilustração da landing page no shell e passa a usar cache v30 para invalidar os recursos estáticos anteriores.
