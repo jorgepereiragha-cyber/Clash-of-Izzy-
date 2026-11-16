@@ -1,3 +1,5 @@
+import { getPetBonuses } from "./pets.js";
+
 const UNIT_POWER=Object.freeze({
  militia:2,swordsman:5,spearman:4,archer:5,cavalry:9,knight:14,
  mage:12,crossbowman:7,catapult:22,ram:20,trebuchet:30
@@ -89,7 +91,9 @@ async function createRally(env,kingdomId,body){
  const troopJson=JSON.stringify(troops),count=Object.keys(troops).length;
  const rallyId=crypto.randomUUID(),now=Math.floor(Date.now()/1000),duration=300;
  const distance=Math.hypot(Number(node.map_x),Number(node.map_y));
- const arrival=now+duration+Math.max(60,Math.ceil(distance/10));
+ const petBonuses=await getPetBonuses(env,kingdomId);
+ const travelSeconds=Math.max(60,Math.ceil((distance/10)/(1+petBonuses.marchSpeedPercent/100)));
+ const arrival=now+duration+travelSeconds;
  const withdrawal=withdrawalStatement(
   troopJson,kingdomId,
   "EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=? AND alliance_id=?) AND EXISTS(SELECT 1 FROM resource_nodes WHERE id=? AND occupied_by IS NULL AND reserved_by_rally IS NULL)",
