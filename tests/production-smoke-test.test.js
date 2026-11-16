@@ -29,7 +29,7 @@ function successfulFetch() {
       200,
       "text/html; charset=utf-8"
     );
-    if (path === "/account.html") return makeResponse('<form id="loginForm"></form><form id="registerForm"></form>', 200, "text/html; charset=utf-8");
+    if (path === "/account.html") return makeResponse('<!doctype html><html lang="pt-BR"><head><title>Conta persistente · Clash of Izzy</title></head><body><main><h1>Conta do comandante</h1><p>Gerencie o acesso e proteja o progresso do seu reino.</p><form id="loginForm"></form><form id="registerForm"></form></main></body></html>', 200, "text/html; charset=utf-8");
     if (path === "/index.html") return makeResponse(
       '<!doctype html><html lang="pt-BR"><head><title>Clash of Izzy</title></head><body><main><h1>CLASH OF IZZY</h1><p>Construa seu reino, fortaleça seu exército e dispute territórios.</p><form id="beta-signup-form"><label>Receber convite beta</label><input name="consent" type="checkbox"><button>Participar</button></form></main></body></html>',
       200,
