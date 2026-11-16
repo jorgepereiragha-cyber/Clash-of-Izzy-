@@ -47,13 +47,14 @@ A revisão abaixo foi conferida com a implementação e os testes atuais. "Não 
 | 7. Ativar webhook automático do Mercado Pago | **Não conectar o código enviado. Manter aprovação Master.** | O checkout atual usa um link fixo do Mercado Pago. A tabela `purchase_requests` não possui o `external_reference`/metadata por pagamento assumidos pelo exemplo; não há tabelas `transactions` ou `gem_packages`. Um link compartilhado não associa, por si só, o pagamento a um pedido específico. O `payment_reference` recebido do cliente não é prova de pagamento. Automatizar o crédito sem uma sessão de checkout vinculada e reconciliação idempotente permitiria crédito indevido ou duplicado. |
 | 8. Adicionar lock por KV em combate | **Não adicionar.** A proteção atual é mais apropriada. | A migração `0007_battle_token.sql` adiciona token de concorrência por reino. O Worker lê o token e o atualiza com compare-and-set em D1 antes de consumir tropas; o mesmo guard é usado no ataque do evento mundial. O lock KV sugerido não é atômico e não substitui a validação/transação D1. |
 | 9. Adicionar `public/js/config.js` | **Não adicionar outro contrato global.** | O cliente usa o fluxo de sessão e as rotas same-origin já existentes. `game-config.js` contém definições do jogo, não credenciais/API. Introduzir `clash_auth_token`, `API_BASE_URL` e helpers paralelos criaria divergência de sessão e CORS desnecessário. |
-| 10. Dividir a versão do Service Worker entre config e SW | **Não duplicar configuração.** | `sw.js` já controla o cache pela constante única `CACHE_NAME` (`clash-of-izzy-shell-v13`) e mantém a lista `CORE_ASSETS`. O validador atual do Service Worker passou no CI. A versão deve ser incrementada no próprio SW quando os assets cacheados mudarem. |
+| 10. Dividir a versão do Service Worker entre config e SW | **Não duplicar configuração.** | `sw.js` já controla o cache pela constante única `CACHE_NAME` (`clash-of-izzy-shell-v14`) e mantém a lista `CORE_ASSETS`. O validador atual do Service Worker passou no CI. A versão deve ser incrementada no próprio SW quando os assets cacheados mudarem. |
 
 ### Resultado operacional
 
 - Nenhum arquivo de entrada, identidade de jogador ou migração histórica foi apagado.
 - Nenhuma tabela produtiva foi removida, recriada ou renomeada.
-- Nenhuma migration remota, reset D1, alteração de secrets ou deploy foi executado.
+- O workflow de produção agora registra um bookmark Cloudflare D1 Time Travel antes das migrações e arquiva o comando de recuperação como artifact do GitHub Actions por 30 dias.
+- Nenhuma migração remota, reset D1, alteração de secrets ou deploy foi executado até a revisão desta branch; isso só ocorrerá após o merge aprovado e o workflow de produção iniciar.
 - O e-mail transacional da migration `0017` permanece na branch desta PR, sem afirmar que está operacional antes da configuração de Resend.
 - O controle de concorrência de combate e a busca global existentes foram reutilizados; não foi criado segundo mecanismo.
 
