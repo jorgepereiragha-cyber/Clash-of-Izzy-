@@ -29,7 +29,11 @@ function successfulFetch() {
       200,
       "text/html; charset=utf-8"
     );
-    if (path === "/account.html") return makeResponse('<!doctype html><html lang="pt-BR"><head><title>Conta persistente · Clash of Izzy</title></head><body><main><h1>Conta do comandante</h1><p>Gerencie o acesso e proteja o progresso do seu reino.</p><form id="loginForm"></form><form id="registerForm"></form></main></body></html>', 200, "text/html; charset=utf-8");
+    if (path === "/account.html") return makeResponse(
+      '<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Conta persistente · Clash of Izzy</title></head><body><header><strong>CLASH OF IZZY</strong></header><main><h1>Conta do Comandante</h1><p>Proteja seu reino com uma conta persistente. Entre com nome de usuário ou e-mail para continuar o mesmo progresso em outro dispositivo.</p><section><form id="loginForm"><label for="loginIdentifier">Usuário ou e-mail</label><input id="loginIdentifier" name="identifier"><label for="loginPassword">Senha</label><input id="loginPassword" name="password" type="password"><button>ENTRAR NO REINO</button></form></section><section><form id="registerForm"><label for="registerUsername">Nome de usuário</label><input id="registerUsername" name="username"><label for="registerEmail">E-mail</label><input id="registerEmail" name="email"><label for="registerPassword">Senha</label><input id="registerPassword" name="password" type="password"><button>CRIAR CONTA E PROTEGER REINO</button></form></section><p>O cadastro vincula a conta ao reino existente sem apagar construções, tropas, recursos, alianças ou progresso.</p></main></body></html>',
+      200,
+      "text/html; charset=utf-8"
+    );
     if (path === "/index.html") return makeResponse(
       '<!doctype html><html lang="pt-BR"><head><title>Clash of Izzy</title></head><body><main><h1>CLASH OF IZZY</h1><p>Construa seu reino, fortaleça seu exército e dispute territórios.</p><form id="beta-signup-form"><label>Receber convite beta</label><input name="consent" type="checkbox"><button>Participar</button></form></main></body></html>',
       200,
