@@ -69,8 +69,8 @@
     const header = $("div", "coi-meta-header");
     const heading = $("div");
     heading.append($("h2", "", "🏅 Centro do Comandante"), $("p", "muted", "Tarefas, recompensas, correspondência e preparação do exército."));
-    const refresh = actionButton("↻ Atualizar", () => { void refresh(); }, false, true);
-    header.append(heading, refresh);
+    const refreshControl = actionButton("↻ Atualizar", () => { void refresh(); }, false, true);
+    header.append(heading, refreshControl);
     const status = $("div", "coi-meta-status muted", "Sincronizando sistemas...");
     status.setAttribute("role", "status");
     status.setAttribute("aria-live", "polite");
