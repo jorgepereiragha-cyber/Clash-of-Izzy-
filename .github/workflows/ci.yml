@@ -24,6 +24,10 @@ jobs:
         run: npm install --ignore-scripts
       - name: Validate D1 migrations locally
         run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
+      - name: Seed and re-run local-only game fixtures
+        run: |
+          npx wrangler --config wrangler.jsonc d1 execute clash-of-izzy-db --local --file=scripts/seed-local.sql
+          npx wrangler --config wrangler.jsonc d1 execute clash-of-izzy-db --local --file=scripts/seed-local.sql
       - name: Validate service worker
         run: node --check sw.js
       - name: Validate 3D asset manifest and local GLB files
