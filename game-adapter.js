@@ -68,7 +68,7 @@ function criticalRoll(seed, round, index, side) {
 
 function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, metrics = { criticalHits: 0 }) {
   for (const unit of acting) {
-    if (!alive(unit)) continue;
+    if (!alive(unit) || unit.power <= 0) continue;
     const target = selectTarget(opposing, unit);
     if (!target) {
       unit.position = Math.min(20, unit.position + 1);
