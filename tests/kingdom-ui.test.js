@@ -31,6 +31,12 @@ test("central do reino mostra filas persistentes, treinamento e pesquisas", asyn
   assert.match(html, /submitQueue\("train"/);
   assert.match(html, /submitQueue\("research"/);
   assert.match(html, /data-completes/);
+  assert.match(html, /id="technologyTree"/);
+  assert.match(html, /id="technologyStatus"/);
+  assert.match(html, /coi:kingdom-technologies/);
+  assert.match(html, /coi:technology-refresh/);
+  assert.match(html, /technology-tree\\.js/);
+  assert.match(html, /styles\\/technology-tree\\.css/);
 });
 
 test("HUD shows server-owned gems and highlights only changed resource counters", async () => {
