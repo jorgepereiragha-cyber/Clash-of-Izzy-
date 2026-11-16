@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#142b44"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Conta do Comandante · Clash of Izzy</title>
+<style>
+:root{color-scheme:dark;--gold:#e7bd68;--panel:#14243a;--line:#80643b;--muted:#b9c5d4}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;background:radial-gradient(ellipse at 50% -20%,#395779,#101a2b 60%,#080e18);color:#f5edda;font:15px system-ui,Arial,sans-serif;padding:env(safe-area-inset-top) 14px env(safe-area-inset-bottom)}
+header{max-width:900px;margin:0 auto;padding:18px 0;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid var(--line)}
+.brand{font-weight:950;letter-spacing:.08em;color:var(--gold)}a{color:#f4dca8}
+main{max-width:900px;margin:28px auto;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}
+.panel{background:linear-gradient(145deg,#1b3049,#101d30);border:1px solid var(--line);border-radius:14px;padding:20px;box-shadow:0 8px 25px #0005}
+h1{grid-column:1/-1;margin:0;color:var(--gold);font-size:clamp(24px,5vw,34px)}h2{margin:0 0 12px;color:var(--gold);font-size:20px}
+p{color:var(--muted);line-height:1.55}
+form{display:grid;gap:10px;margin-top:16px}
+label{font-size:13px;color:#d8e2ee}
+input{width:100%;min-width:0;padding:12px;border:1px solid #71839a;border-radius:8px;background:#0e1a2a;color:#fff;font:inherit}
+button,.btn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#68451f);color:#fff;border-radius:8px;padding:11px 14px;font-weight:850;cursor:pointer;text-decoration:none;display:inline-flex;align-items:center;justify-content:center}
+button:disabled{opacity:.5;cursor:wait}
+.secondary{background:#243a55;border-color:#71839a}
+.status{grid-column:1/-1;padding:12px 14px;border-radius:9px;background:#0e1a2a;border:1px solid #40556b;color:#dbe3ec;min-height:44px;white-space:pre-wrap}
+.actions{grid-column:1/-1;display:flex;gap:10px;flex-wrap:wrap}
+.small{font-size:12px}.success{color:#b8e8c2}.error{color:#ffb4a9}
+@media(max-width:680px){main{grid-template-columns:1fr;margin:18px auto}.panel{padding:16px}h1{grid-column:auto}.status,.actions{grid-column:auto}}
+</style>
+</head>
+<body>
+<header><div class="brand">⚔ CLASH OF IZZY <div class="small">Conta persistente do comandante</div></div><a href="/kingdom.html">← Voltar ao reino</a></header>
+<main>
+<h1>Proteja seu reino e acesse de outros dispositivos</h1>
+<section class="panel">
+<h2>🔐 Entrar na minha conta</h2>
+<p>Use seu nome de usuário ou e-mail e a senha cadastrada. Seu reino existente será carregado sem criar outro.</p>
+<form id="loginForm">
+<label for="loginIdentifier">Usuário ou e-mail</label>
+<input id="loginIdentifier" name="identifier" autocomplete="username" maxlength="254" required>
+<label for="loginPassword">Senha</label>
+<input id="loginPassword" name="password" type="password" autocomplete="current-password" minlength="12" maxlength="128" required>
+<button id="loginButton" type="submit">ENTRAR NO MEU REINO</button>
+</form>
+</section>
+<section class="panel">
+<h2>🛡️ Criar conta / proteger reino</h2>
+<p id="registerIntro">Sem conta ainda? Crie uma para vincular o reino atual ou fundar um novo reino com acesso persistente.</p>
+<form id="registerForm">
+<label for="registerUsername">Nome de usuário (3–24 caracteres)</label>
+<input id="registerUsername" name="username" autocomplete="username" minlength="3" maxlength="24" pattern="[A-Za-z0-9_.-]{3,24}" required>
+<label for="registerEmail">E-mail (opcional)</label>
+<input id="registerEmail" name="email" type="email" autocomplete="email" maxlength="254" placeholder="comandante@exemplo.com">
+<label for="registerPassword">Senha (12–128 caracteres)</label>
+<input id="registerPassword" name="password" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+<label for="registerPasswordConfirm">Confirmar senha</label>
+<input id="registerPasswordConfirm" name="passwordConfirm" type="password" autocomplete="new-password" minlength="12" maxlength="128" required>
+<button id="registerButton" type="submit">CRIAR CONTA E PROTEGER REINO</button>
+</form>
+<p class="small">A senha é derivada com PBKDF2-SHA-256 e salt aleatório no servidor. O e-mail ainda não ativa recuperação automática de senha.</p>
+</section>
+<div id="accountStatus" class="status" role="status" aria-live="polite">Verificando a sessão deste dispositivo…</div>
+<div class="actions">
+<a class="btn secondary" href="/kingdom.html">🏰 Abrir meu reino</a>
+<button id="logoutButton" class="secondary" type="button" hidden>Sair deste dispositivo</button>
+</div>
+</main>
+<script>
+(() => {
+ "use strict";
+ const $ = id => document.getElementById(id);
+ let token = localStorage.getItem("coi_game_token") || sessionStorage.getItem("coi_game_token") || "";
+ let linkedAccount = false;
+ function setStatus(message, kind="") {
+  const node=$("accountStatus");node.textContent=message;node.className="status "+kind;
+ }
+ function saveToken(value) {
+  token=String(value||"");
+  if(token){localStorage.setItem("coi_game_token",token);sessionStorage.removeItem("coi_game_token");}
+ }
+ async function api(path, options={}) {
+  const response=await fetch("/api"+path,{method:options.method||"GET",headers:{
+   ...(options.headers||{}),...(options.body?{"Content-Type":"application/json"}:{}),...(token?{Authorization:"Bearer "+token}:{})
+  },body:options.body?JSON.stringify(options.body):undefined});
+  const data=await response.json().catch(()=>({}));
+  if(!response.ok)throw Object.assign(new Error(data.error||"Falha na comunicação com o servidor."),{status:response.status,code:data.code});
+  return data;
+ }
+ async function inspectSession() {
+  if(!token){setStatus("Nenhum reino está conectado neste dispositivo. Você pode entrar em uma conta existente ou criar uma conta e um novo reino.");return;}
+  try{
+   const data=await api("/account/status");
+   linkedAccount=Boolean(data.hasAccount);
+   if(linkedAccount){
+    $("registerForm").hidden=true;
+    $("registerIntro").textContent="Este reino já está protegido por uma conta persistente.";
+    $("logoutButton").hidden=false;
+    setStatus("Conta vinculada: "+data.account.username+(data.account.email?" · "+data.account.email:"")+". Seu reino está protegido. Use o login em outros dispositivos.","success");
+   }else{
+    $("logoutButton").hidden=true;
+    setStatus("Reino existente encontrado neste dispositivo. Criar uma conta agora vai protegê-lo sem apagar construções, tropas, recursos ou progresso.","success");
+   }
+  }catch(error){
+   if(error.status===401){
+    token="";localStorage.removeItem("coi_game_token");sessionStorage.removeItem("coi_game_token");
+    setStatus("A sessão salva expirou ou foi substituída. Entre com sua conta para recuperar o reino; não crie outro reino por engano.","error");
+   }else setStatus(error.message,"error");
+  }
+ }
+ $("loginForm").addEventListener("submit",async event=>{
+  event.preventDefault();const button=$("loginButton");button.disabled=true;setStatus("Validando sua conta…");
+  try{
+   const data=await api("/account/login",{method:"POST",body:{identifier:$("loginIdentifier").value.trim(),password:$("loginPassword").value}});
+   saveToken(data.token);setStatus("Login confirmado. Abrindo o reino "+(data.player?.name||"do comandante")+"…","success");
+   location.href="/kingdom.html";
+  }catch(error){setStatus(error.message,"error");}
+  finally{button.disabled=false;}
+ });
+ $("registerForm").addEventListener("submit",async event=>{
+  event.preventDefault();const button=$("registerButton");
+  const password=$("registerPassword").value;
+  if(password!==$("registerPasswordConfirm").value){setStatus("A confirmação da senha não corresponde.","error");return;}
+  button.disabled=true;setStatus(token?"Vinculando uma conta ao reino atual…":"Fundando seu reino e criando a conta persistente…");
+  try{
+   // Para novos jogadores, a fundação usa a mesma rota oficial e o mesmo modelo de reino.
+   if(!token){
+    const started=await api("/game/start",{method:"POST",body:{}});
+    saveToken(started.token);
+   }
+   const data=await api("/account/register",{method:"POST",body:{
+    username:$("registerUsername").value.trim(),email:$("registerEmail").value.trim(),password
+   }});
+   saveToken(data.token);
+   $("registerPassword").value="";$("registerPasswordConfirm").value="";
+   setStatus("Conta "+data.account.username+" criada e vinculada. Seu reino e seu progresso foram preservados.","success");
+   location.href="/kingdom.html";
+  }catch(error){setStatus(error.message,"error");}
+  finally{button.disabled=false;}
+ });
+ $("logoutButton").addEventListener("click",async()=>{
+  $("logoutButton").disabled=true;
+  try{await api("/account/logout",{method:"POST"});}catch(error){setStatus(error.message,"error");}
+  localStorage.removeItem("coi_game_token");sessionStorage.removeItem("coi_game_token");token="";linkedAccount=false;
+  $("registerForm").hidden=false;$("logoutButton").hidden=true;
+  setStatus("Sessão encerrada neste dispositivo. Entre novamente para recuperar seu reino.");
+ });
+ void inspectSession();
+ if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
+})();
+</script>
+</body></html>
