@@ -225,7 +225,6 @@ async function useSpeedup(request, env, kingdom) {
   const isMarch = queueType === "march";
   const queueTable = isMarch ? "marches" : "kingdom_queues";
   const deadlineColumn = isMarch ? "arrives_at" : "completes_at";
-  const activeStatus = isMarch ? "marching" : "running";
   const queue = await env.DB.prepare(
     "SELECT id,started_at," + deadlineColumn + " AS completes_at FROM " + queueTable + " " +
     "WHERE id=? AND kingdom_id=? AND " + (isMarch ? "status='marching'" : "queue_type=? AND status='running'") +
@@ -295,7 +294,6 @@ async function claimTask(request, env, kingdom) {
   const body = await request.json().catch(() => null);
   const taskId = String(body?.task_id || "").trim();
   if (!/^[a-z0-9_-]{2,64}$/.test(taskId)) return reply({ error: "Tarefa inválida." }, 400);
-  const period = utcDay();
   const task = await env.DB.prepare(
     "SELECT dt.reward_json,dt.target_count,dt.period_type FROM daily_tasks dt WHERE dt.id=? AND dt.active=1"
   ).bind(taskId).first();
