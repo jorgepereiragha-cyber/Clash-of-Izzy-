@@ -16,7 +16,7 @@ test("kingdom navigation opens the actual world map, not the combat arena", () =
 });
 
 test("world map page loads authenticated territory and march interface", () => {
-  for (const marker of ['id="worldMap"', 'id="territoryDetails"', 'id="troops"', 'id="marches"', 'src="/world-map.js"']) assert.ok(html.includes(marker), "missing world map marker: " + marker);
+  for (const marker of ['id="worldMap"', 'id="territoryDetails"', 'id="troops"', 'id="marches"', 'id="spyReports"', 'id="heroSkillSelection"', 'src="/world-map.js"']) assert.ok(html.includes(marker), "missing world map marker: " + marker);
 });
 
 test("world map presents an isometric 3D strategy view instead of a free-roaming arena hero", async () => {
@@ -70,6 +70,9 @@ test("world map exposes pan and zoom controls without enabling PvP", () => {
     'addEventListener("wheel"', 'changeMapZoom(0.25)', 'resetMapViewport()',
   ]) assert.ok(script.includes(marker), "missing map navigation behavior: " + marker);
   assert.ok(script.includes('Boolean(territory.owner_kingdom_id)'));
+  assert.ok(script.includes('$("scout").disabled = busy || !territory || !hasTroops;'));
+  assert.ok(script.includes("function renderSpyReports()"));
+  assert.ok(script.includes("function renderHeroSkillOptions()"));
   assert.ok(script.includes('request("/game/action"'));
 });
 
