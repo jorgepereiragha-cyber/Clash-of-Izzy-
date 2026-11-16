@@ -574,7 +574,7 @@ export async function processAllianceWars(env, now = new Date()) {
         "UPDATE alliance_wars SET score_a=score_a+?,score_b=score_b+? WHERE id=? AND status='active' AND phase='active' AND changes()>0"
       ).bind(addA, addB, war.id),
       env.DB.prepare(
-        "UPDATE alliance_war_objectives SET garrison_power=MIN(max_garrison_power,garrison_power+500) WHERE war_id=? AND garrison_power<max_garrison_power"
+        "UPDATE alliance_war_objectives SET garrison_power=MIN(max_garrison_power,garrison_power+500) WHERE war_id=? AND garrison_power<max_garrison_power AND changes()>0"
       ).bind(war.id)
     ]);
   }
@@ -582,6 +582,15 @@ export async function processAllianceWars(env, now = new Date()) {
     "SELECT * FROM alliance_wars WHERE status='active' AND phase='active' AND (score_a>=goal_points OR score_b>=goal_points OR ends_at<=?)"
   ).bind(iso).all();
   for (const war of finished.results || []) await endAllianceWar(env, war, iso);
+
+  // Reprocess reward settlements interrupted after the war status was committed.
+  const pendingSettlements = await env.DB.prepare(
+    "SELECT w.* FROM alliance_wars w WHERE w.status='finished' AND w.phase='ended' AND (EXISTS(SELECT 1 FROM alliance_war_participants p WHERE p.war_id=w.id AND NOT EXISTS(SELECT 1 FROM alliance_war_reward_claims r WHERE r.war_id=p.war_id AND r.kingdom_id=p.kingdom_id AND r.reward_type IN ('victory','defeat','draw'))) OR EXISTS(SELECT 1 FROM alliance_war_participants m WHERE m.war_id=w.id AND m.kingdom_id=(SELECT p2.kingdom_id FROM alliance_war_participants p2 WHERE p2.war_id=w.id ORDER BY p2.points DESC,p2.joined_at ASC,p2.kingdom_id ASC LIMIT 1) AND NOT EXISTS(SELECT 1 FROM alliance_war_reward_claims r WHERE r.war_id=w.id AND r.kingdom_id=m.kingdom_id AND r.reward_type='mvp')) LIMIT 50"
+  ).all();
+  for (const war of pendingSettlements.results || []) {
+    await distributeAllianceWarRewards(env, war, war.winner_alliance_id, war.end_reason || "recovered_settlement");
+    await env.DB.prepare("DELETE FROM alliance_war_slots WHERE war_id=?").bind(war.id).run();
+  }
 }
 
 
@@ -886,7 +895,7 @@ export async function handleAllianceWarAction(request, env, playerId) {
   const participantUpdate = env.DB.prepare(
     "UPDATE alliance_war_participants SET points=points+?+" + captureExpr + ",kills=kills+?,losses=losses+?,captures=captures+CASE WHEN EXISTS(SELECT 1 FROM alliance_war_objectives WHERE id=? AND last_capture_request_key=? AND owner_alliance_id=?) THEN 1 ELSE 0 END WHERE war_id=? AND kingdom_id=? AND EXISTS(SELECT 1 FROM alliance_war_battles WHERE war_id=? AND attacker_kingdom_id=? AND request_key=?)"
   ).bind(
-    killPoints, objective.id, requestId, member.alliance_id, captureBonus, killPoints, attackerLossCount,
+    killPoints, objective.id, requestId, member.alliance_id, captureBonus, defenderLossCount, attackerLossCount,
     objective.id, requestId, member.alliance_id, war.id, kingdom.kingdom_id, war.id, kingdom.kingdom_id, requestId
   );
 
