@@ -1,0 +1,117 @@
+/* Clash of Izzy — camada visual premium compatível com a identidade azul-real/dourado. */
+:root{
+ --coi-premium-gold:#e7bd68;--coi-premium-gold-hi:#f5d995;
+ --coi-premium-shadow:0 12px 32px rgba(0,0,0,.38);
+ --coi-premium-glow:0 0 18px rgba(231,189,104,.22);
+}
+.panel,.premium-panel{
+ position:relative;isolation:isolate;
+ background:linear-gradient(145deg,rgba(31,54,79,.97),rgba(12,25,42,.98));
+ border-color:rgba(231,189,104,.62);
+ box-shadow:var(--coi-premium-shadow),inset 0 1px rgba(255,255,255,.06);
+}
+.panel h2,.premium-panel-title{
+ color:var(--coi-premium-gold-hi);
+ text-shadow:0 2px 8px rgba(0,0,0,.55);
+}
+.panel h2:after,.premium-panel-title:after{
+ content:"";display:block;width:min(180px,55%);height:1px;margin:9px auto 0;
+ background:linear-gradient(90deg,transparent,var(--coi-premium-gold),transparent);
+}
+button,.linkbtn,.btn-epic{
+ transition:transform .2s ease,border-color .2s ease,filter .2s ease,box-shadow .2s ease;
+}
+button:not(:disabled):hover,.linkbtn:hover,.btn-epic:hover{
+ transform:translateY(-2px);border-color:var(--coi-premium-gold-hi);
+ filter:brightness(1.08);box-shadow:0 7px 18px rgba(0,0,0,.3),var(--coi-premium-glow);
+}
+button:active,.linkbtn:active,.btn-epic:active{transform:translateY(0)}
+.resource,.stat,.queue-card,.building-row,.event{
+ box-shadow:inset 0 1px rgba(255,255,255,.035),0 4px 12px rgba(0,0,0,.16);
+}
+.resource{border-color:rgba(231,189,104,.38)}
+.resource b{ text-shadow:0 0 10px rgba(231,189,104,.2)}
+.building{position:relative;overflow:hidden;box-shadow:0 7px 16px rgba(0,0,0,.36),inset 0 1px rgba(255,255,255,.12)}
+.building:after{
+ content:"";position:absolute;inset:0;pointer-events:none;opacity:0;
+ background:linear-gradient(115deg,transparent 25%,rgba(255,255,255,.16) 48%,transparent 70%);
+ transform:translateX(-100%);transition:opacity .2s;
+}
+.building:hover:after{opacity:1;animation:coi-card-glint .75s ease}
+@keyframes coi-card-glint{to{transform:translateX(100%)}}
+.queue-progress{border:1px solid rgba(231,189,104,.28)}
+.queue-progress span{box-shadow:0 0 10px rgba(231,189,104,.4)}
+#city{position:relative}
+#city .coi-ambient-layer{
+ position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;
+}
+#city.has-3d .coi-ambient-layer{z-index:2}
+#city .building{z-index:3}
+.premium-panel{border:1px solid var(--coi-premium-gold);border-radius:12px;padding:16px}
+@media(max-width:760px){
+ .panel,.premium-panel{box-shadow:0 7px 20px rgba(0,0,0,.3)}
+ button,.linkbtn,.btn-epic{min-height:40px}
+}
+@media(prefers-reduced-motion:reduce){
+ button,.linkbtn,.btn-epic,.building,.building:after{transition:none!important;animation:none!important}
+}
+
+
+/* ==========================================================
+   CINEMATIC TRAILER RECORDER
+   ========================================================== */
+#trailer-recorder-panel{
+  position:fixed;right:16px;bottom:16px;width:min(330px,calc(100vw - 24px));
+  z-index:9998;color:#f5edda;background:linear-gradient(145deg,rgba(27,48,73,.98),rgba(8,14,24,.99));
+  border:1px solid var(--coi-premium-gold,#e7bd68);border-radius:12px;
+  box-shadow:0 14px 38px rgba(0,0,0,.52),0 0 18px rgba(231,189,104,.16);
+  font-family:system-ui,-apple-system,"Segoe UI",sans-serif;overflow:hidden;
+}
+.coi-recorder-header{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:11px 14px;background:rgba(0,0,0,.24);border-bottom:1px solid rgba(231,189,104,.3)}
+.coi-recorder-header h2{margin:0;color:#f5d995;font:700 14px/1.3 Georgia,serif;letter-spacing:.04em}
+.coi-recorder-header button{min-width:34px;min-height:32px;padding:0;background:transparent;border:1px solid rgba(231,189,104,.36);color:#f5d995}
+.coi-recorder-body{padding:13px;display:grid;gap:10px;max-height:min(68vh,540px);overflow:auto}
+.coi-recorder-body[hidden]{display:none}
+.coi-recorder-caption,.coi-recorder-footnote{margin:0;color:#c6d1df;font-size:11px;line-height:1.45}
+.coi-recorder-presets{display:grid;gap:7px}
+.coi-recorder-preset,.coi-recorder-primary,.coi-recorder-stop,.coi-recorder-close{
+  width:100%;min-height:38px;padding:9px 10px;border:1px solid rgba(231,189,104,.55);border-radius:7px;
+  background:linear-gradient(180deg,rgba(67,83,99,.88),rgba(20,34,52,.96));color:#f5d995;
+  font-size:12px;font-weight:750;text-align:left;cursor:pointer
+}
+.coi-recorder-preset:hover,.coi-recorder-primary:hover{filter:brightness(1.12)}
+.coi-recorder-preset:disabled,.coi-recorder-primary:disabled{opacity:.48;cursor:not-allowed}
+.coi-recorder-custom{padding:10px;border:1px solid rgba(231,189,104,.22);border-radius:8px;background:rgba(0,0,0,.18)}
+.coi-recorder-custom summary{color:#f5d995;font-size:12px;font-weight:750;cursor:pointer}
+.coi-recorder-custom label{display:block;margin:10px 0 4px;color:#c6d1df;font-size:10px;text-transform:uppercase;letter-spacing:.06em}
+.coi-recorder-custom select,.coi-recorder-custom input{
+  width:100%;min-height:36px;padding:7px 9px;border:1px solid #53677e;border-radius:6px;
+  background:#0b1727;color:#f5edda;font:inherit;font-size:12px
+}
+.coi-recorder-custom .coi-recorder-primary{margin-top:12px;text-align:center;background:linear-gradient(180deg,#9a682d,#65441e);color:#fff2c9}
+.coi-recorder-stop{background:linear-gradient(180deg,#873f37,#55251f);border-color:#c77e68;color:#fff}
+.coi-recorder-stop[hidden]{display:none}
+.coi-recorder-status{display:flex;align-items:center;gap:8px;padding:8px;border-radius:6px;background:rgba(0,0,0,.25);color:#d7e0eb;font-size:11px}
+.coi-recorder-indicator{width:9px;height:9px;flex:0 0 9px;border-radius:50%;background:#67b77c}
+.coi-recorder-indicator.is-recording{background:#ed554d;box-shadow:0 0 10px rgba(237,85,77,.75);animation:coi-recorder-pulse 1s ease-in-out infinite}
+@keyframes coi-recorder-pulse{50%{opacity:.28}}
+.coi-recorder-progress-track{height:6px;overflow:hidden;border:1px solid rgba(231,189,104,.35);border-radius:99px;background:#081321}
+.coi-recorder-progress-track span{display:block;width:0;height:100%;background:linear-gradient(90deg,#9a682d,#f5d995);transition:width .12s linear}
+.coi-recorder-progress-time{display:flex;justify-content:space-between;margin-top:4px;color:#aebaca;font-size:10px;font-variant-numeric:tabular-nums}
+.coi-recorder-progress[hidden]{display:none}
+.coi-cinematic-modal{position:fixed;inset:0;z-index:10000;display:grid;place-items:center;padding:16px;background:rgba(0,0,0,.82)}
+.coi-cinematic-modal-card{width:min(760px,100%);max-height:90vh;overflow:auto;padding:18px;border:1px solid #e7bd68;border-radius:12px;background:linear-gradient(145deg,#1b3049,#080e18);box-shadow:0 20px 70px #000b}
+.coi-cinematic-modal-card h2{margin:0 0 14px;color:#f5d995;font:700 20px Georgia,serif}
+.coi-cinematic-modal-card video{display:block;width:100%;max-height:58vh;background:#000;border-radius:7px}
+.coi-cinematic-modal-card p{color:#c6d1df;font-size:12px;line-height:1.5}
+.coi-recorder-download{display:flex;margin-top:12px;justify-content:center;text-align:center;text-decoration:none;background:linear-gradient(180deg,#9a682d,#65441e);color:#fff2c9}
+.coi-recorder-close{margin-top:8px;text-align:center;background:#243a55;color:#fff}
+@media(max-width:480px){
+  #trailer-recorder-panel{right:10px;bottom:10px;width:min(310px,calc(100vw - 20px))}
+  .coi-recorder-body{max-height:58vh}
+  .coi-cinematic-modal-card{padding:13px}
+}
+@media(prefers-reduced-motion:reduce){
+  .coi-recorder-indicator.is-recording{animation:none}
+  .coi-recorder-progress-track span{transition:none}
+}

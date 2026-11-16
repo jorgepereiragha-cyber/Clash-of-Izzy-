@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 220" role="img" aria-labelledby="title desc">
+<title id="title">Clash of Izzy</title><desc id="desc">Brasão dourado com espadas cruzadas e o nome Clash of Izzy em tipografia medieval.</desc>
+<defs><linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffe7ad"/><stop offset=".52" stop-color="#e7bd68"/><stop offset="1" stop-color="#98652b"/></linearGradient><linearGradient id="night" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#203b59"/><stop offset="1" stop-color="#0b1728"/></linearGradient><filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feGaussianBlur stdDeviation="5"/></filter></defs>
+<g transform="translate(20 10)"><circle cx="100" cy="100" r="94" fill="url(#night)" stroke="#d6aa5a" stroke-width="5"/><circle cx="100" cy="100" r="82" fill="none" stroke="#d6aa5a" stroke-opacity=".55" stroke-width="1.5"/>
+<path d="M55 37h90v72c0 31-20 54-45 70-25-16-45-39-45-70z" fill="url(#gold)" stroke="#fff0c8" stroke-width="4" stroke-linejoin="round"/>
+<path d="M67 49h66v58c0 23-14 41-33 54-19-13-33-31-33-54z" fill="#142b44" stroke="#f5d58c" stroke-width="2.5"/>
+<path d="M79 70l42 48m-2-51l-42 51" stroke="#f4f7fb" stroke-width="8" stroke-linecap="round"/><path d="M100 70l14 14-14 14-14-14z" fill="#62c5f1" stroke="#e5f7ff" stroke-width="3"/>
+<path d="M40 100h-18m156 0h-18M100 6v-8m0 204v-8" stroke="#e7bd68" stroke-width="3" stroke-linecap="round"/></g>
+<g fill="#f5edda"><text x="235" y="105" font-family="Georgia, 'Times New Roman', serif" font-size="62" font-weight="700" letter-spacing="2">CLASH OF</text><text x="235" y="169" font-family="Georgia, 'Times New Roman', serif" font-size="67" font-weight="700" letter-spacing="5" fill="url(#gold)" stroke="#6e4b25" stroke-width="1">IZZY</text></g>
+<path d="M238 185H710" stroke="#d6aa5a" stroke-width="2"/><path d="M238 185l10-5v10zm472 0l-10-5v10z" fill="#d6aa5a"/>
+</svg>

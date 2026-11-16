@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-labelledby="title">
+<title id="title">Clash of Izzy</title>
+<defs><linearGradient id="gold" x2="0" y2="1"><stop stop-color="#ffe3a0"/><stop offset="1" stop-color="#b77b2f"/></linearGradient><linearGradient id="night" x2="1" y2="1"><stop stop-color="#203b59"/><stop offset="1" stop-color="#0b1728"/></linearGradient></defs>
+<rect width="64" height="64" rx="14" fill="url(#night)"/><circle cx="32" cy="32" r="27" fill="none" stroke="#d6aa5a" stroke-width="1.8"/>
+<path d="M19 14h26v22c0 8-5.5 13.5-13 18-7.5-4.5-13-10-13-18z" fill="url(#gold)" stroke="#fff0c8" stroke-width="1.5"/>
+<path d="M23 18h18v17c0 5.5-3.5 9.5-9 13-5.5-3.5-9-7.5-9-13z" fill="#142b44" stroke="#f5d58c" stroke-width="1"/>
+<path d="M26 25l12 13m0-13L26 38" stroke="#f4f7fb" stroke-width="3" stroke-linecap="round"/>
+<path d="M32 25l4 4-4 4-4-4z" fill="#62c5f1" stroke="#e5f7ff" stroke-width="1"/>
+</svg>

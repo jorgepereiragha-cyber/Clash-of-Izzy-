@@ -117,6 +117,28 @@ export async function runProductionSmokeTests({
   assert(kingdom.includes('kingdom.opened') && kingdom.includes('/game/analytics'),
     "Instrumentação de analytics não está publicada.");
 
+  assert(kingdom.includes('type="module" src="/scripts/cinematic/recorder-ui.js"'),
+    "O gravador cinematográfico não foi conectado à página do reino.");
+
+  for (const assetPath of [
+    "/scripts/cinematic/capture-system.js",
+    "/scripts/cinematic/media-recorder-support.js",
+    "/scripts/cinematic/trailer-script.js",
+    "/scripts/cinematic/recorder-ui.js"
+  ]) {
+    const assetResponse = await get(assetPath);
+    assert(assetResponse.status === 200, assetPath + " não está publicado.");
+    assert((assetResponse.headers.get("content-type") || "").includes("javascript"),
+      assetPath + " não foi servido como JavaScript.");
+    const assetBody = await assetResponse.text();
+    assert(assetBody.length > 200, assetPath + " está vazio ou incompleto.");
+  }
+
+  const premiumCssResponse = await get("/styles/premium-ui.css");
+  assert(premiumCssResponse.status === 200, "Estilos do gravador cinematográfico indisponíveis.");
+  const premiumCss = await premiumCssResponse.text();
+  assert(premiumCss.includes("CINEMATIC TRAILER RECORDER"), "Estilos do gravador não foram publicados.");
+
   const arenaResponse = await get("/arena.html");
   assert(arenaResponse.status === 200, "Página da arena respondeu HTTP " + arenaResponse.status + ".");
   const arena = await arenaResponse.text();
@@ -145,7 +167,7 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v18"), "Service worker não contém o cache v18 esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v22"), "Service worker não contém o cache v22 esperado.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
   assert(serviceWorker.includes("/admin.html"), "PWA não inclui o painel Master.");
@@ -155,6 +177,11 @@ export async function runProductionSmokeTests({
   assert(serviceWorker.includes("/landing.js"), "PWA não inclui o controlador da landing page.");
   assert(serviceWorker.includes("/valhalla-shop-ui.js"), "PWA não inclui a interface da Loja de Valhalla.");
   assert(serviceWorker.includes("/styles/valhalla-shop.css"), "PWA não inclui os estilos da Loja de Valhalla.");
+  assert(serviceWorker.includes("/scripts/cinematic/capture-system.js"), "PWA não inclui o motor de captura cinematográfica.");
+  assert(serviceWorker.includes("/scripts/cinematic/media-recorder-support.js"), "PWA não inclui a negociação de codecs e proteção de memória.");
+  assert(serviceWorker.includes("/scripts/cinematic/trailer-script.js"), "PWA não inclui o roteiro do trailer.");
+  assert(serviceWorker.includes("/scripts/cinematic/recorder-ui.js"), "PWA não inclui a interface do gravador.");
+
 
   return {
     baseUrl: base.origin,
@@ -176,6 +203,7 @@ export async function runProductionSmokeTests({
       feedbackUiAndAnalytics: true,
       worldMapNavigation: true,
       worldMap3D: true,
+      cinematicTrailerRecorder: true,
     },
   };
 }

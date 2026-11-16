@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg">
+ <defs>
+  <linearGradient id="coi-gold" x2="0" y2="1"><stop stop-color="#f8e4a8"/><stop offset=".5" stop-color="#e7bd68"/><stop offset="1" stop-color="#9a682d"/></linearGradient>
+  <linearGradient id="coi-gem" x2="0" y2="1"><stop stop-color="#b9f0ff"/><stop offset=".5" stop-color="#36a9d6"/><stop offset="1" stop-color="#17527d"/></linearGradient>
+  <linearGradient id="coi-wood" x2="0" y2="1"><stop stop-color="#d6a66c"/><stop offset="1" stop-color="#684326"/></linearGradient>
+ </defs>
+ <symbol id="icon-gem" viewBox="0 0 64 64"><path fill="url(#coi-gem)" stroke="#d7f5ff" stroke-width="1.5" d="M13 17 23 6h18l10 11-7 39H20z"/><path fill="#fff" opacity=".28" d="m23 6 9 11 9-11M13 17h38L32 56z"/></symbol>
+ <symbol id="icon-wood" viewBox="0 0 64 64"><path fill="url(#coi-wood)" stroke="#efc78f" stroke-width="2" d="M8 22h48v27H8z"/><ellipse cx="32" cy="22" rx="24" ry="12" fill="#c58c54" stroke="#efc78f" stroke-width="2"/><ellipse cx="32" cy="22" rx="16" ry="7" fill="none" stroke="#70472b" stroke-width="2"/><circle cx="32" cy="22" r="3" fill="#70472b"/></symbol>
+ <symbol id="icon-food" viewBox="0 0 64 64"><path fill="#b77a36" d="M8 38q0-20 24-24 24 4 24 24v9H8z"/><path fill="#e7bd68" d="M13 36q5-15 19-17 14 2 19 17z"/><path fill="#f5d995" d="M20 30q4-8 12-9 8 1 12 9z"/></symbol>
+ <symbol id="icon-stone" viewBox="0 0 64 64"><path fill="#7f929f" stroke="#d3dce2" stroke-width="2" d="m8 43 8-24 17-9 17 12 7 22-15 11H20z"/><path fill="#c1ccd2" opacity=".65" d="m16 19 17-9 17 12-18 4z"/></symbol>
+ <symbol id="icon-gold" viewBox="0 0 64 64"><circle cx="32" cy="32" r="25" fill="url(#coi-gold)" stroke="#fff0bd" stroke-width="2"/><path d="m32 14 13 34H36l-2-7h-7l-2 7h-9zm-3 19h4l-2-8z" fill="#765020"/></symbol>
+ <symbol id="icon-sword" viewBox="0 0 64 64"><path fill="#dbe7ed" stroke="#71899b" stroke-width="2" d="m43 5-4 34-7 8-7-8-4-34 11 8z"/><path fill="url(#coi-gold)" d="m13 40 38 0-3 7H16z"/><path fill="#80552f" d="M29 47h6v12h-6z"/></symbol>
+ <symbol id="icon-shield" viewBox="0 0 64 64"><path fill="url(#coi-gold)" stroke="#f8e4a8" stroke-width="2" d="m32 5 23 9v17q0 20-23 28Q9 51 9 31V14z"/><path fill="#24476b" d="m32 13 15 6v12q0 14-15 20-15-6-15-20V19z"/><path fill="none" stroke="#e7bd68" stroke-width="4" d="M32 17v28m-12-14h24"/></symbol>
+</svg>
