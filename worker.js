@@ -13,6 +13,8 @@ import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
 import { handleMercadoPagoRoute } from "./mercadopago-orders.js";
+import { GameRealtimeHub } from "./game-realtime.js";
+export { GameRealtimeHub };
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -183,6 +185,34 @@ const UNITS = {
   trebuchet:{label:"Trabuco",food:90,wood:75,iron:30,power:30}
 };
 function json(data,status=200,extraHeaders={}){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Cache-Control":"no-store",...extraHeaders}})}
+
+async function broadcastGameRealtime(env,region,kingdomIds,reason="gameplay_update"){
+  if(!env.GAME_REALTIME||!env.SESSION_SECRET)return 0;
+  const safeRegion=Math.floor(Number(region)||0);
+  const targets=[...new Set((Array.isArray(kingdomIds)?kingdomIds:[])
+    .map(value=>Math.floor(Number(value)||0))
+    .filter(value=>Number.isSafeInteger(value)&&value>0))];
+  if(safeRegion<1||!targets.length)return 0;
+  try{
+    const id=env.GAME_REALTIME.idFromName("region:"+safeRegion);
+    const stub=env.GAME_REALTIME.get(id);
+    const response=await stub.fetch("https://game-realtime.internal/publish",{
+      method:"POST",
+      headers:{
+        "Content-Type":"application/json",
+        "X-Realtime-Gateway":env.SESSION_SECRET
+      },
+      body:JSON.stringify({kingdomIds:targets,reason:String(reason||"gameplay_update").slice(0,64)})
+    });
+    if(!response.ok)throw new Error("Realtime hub returned "+response.status);
+    const result=await response.json().catch(()=>({}));
+    return Number(result.sent||0);
+  }catch(error){
+    console.warn("game_realtime_publish_failed",String(error?.message||error));
+    return 0;
+  }
+}
+
 function b64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 async function sign(payload,secret){
   const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["sign"]);
