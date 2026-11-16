@@ -37,5 +37,12 @@ jobs:
         env:
           PRODUCTION_DIAGNOSTIC_URL: https://clash-of-izzy.jorgepereiragha.workers.dev/api/account/status
         run: node scripts/diagnose-production-endpoint.js
+      - name: Read-only production smoke test (informational)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        timeout-minutes: 2
+        env:
+          WORKER_BASE_URL: https://clash-of-izzy.jorgepereiragha.workers.dev
+        run: node scripts/production-smoke.js
       - name: Validate Worker bundle
         run: npm run check
