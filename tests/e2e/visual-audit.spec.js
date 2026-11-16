@@ -226,9 +226,18 @@ test.describe("Mobile visual audit captures", () => {
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#kingdomName")).toHaveText("Reino de Eldoria");
     await expect(page.locator("#trainButton")).toBeVisible();
-    const recorderBox = await page.locator("#trailer-recorder-panel").boundingBox();
+    const recorder = page.locator("#trailer-recorder-panel");
+    const recorderBox = await recorder.boundingBox();
+    const cityBox = await page.locator("#city").boundingBox();
     expect(recorderBox?.width).toBeLessThanOrEqual(56);
     expect(recorderBox?.height).toBeLessThanOrEqual(56);
+    expect(await recorder.evaluate(element => element.parentElement?.matches(".hero .toolbar"))).toBe(true);
+    expect(recorderBox && cityBox && (
+      recorderBox.x + recorderBox.width <= cityBox.x ||
+      recorderBox.x >= cityBox.x + cityBox.width ||
+      recorderBox.y + recorderBox.height <= cityBox.y ||
+      recorderBox.y >= cityBox.y + cityBox.height
+    )).toBe(true);
     await expectTouchTargetsAtLeast44(page, [
       "#trainButton",
       "#researchButton",
