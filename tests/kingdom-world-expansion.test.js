@@ -32,6 +32,10 @@ test("Worker maintains per-player castle map markers and caps passive production
   assert.ok(worker.includes("const capacities={food:"));
   assert.ok(worker.includes("Math.min(produced,Math.max(0,capacities[key]-current))"));
   assert.ok(worker.includes("map_region"));
+  assert.ok(worker.includes("TROOP_CAPACITY_PER_BARRACKS_LEVEL = 500"));
+  assert.ok(worker.includes("usedCapacity+quantity>troopCapacity"));
+  assert.ok(worker.includes("armyCount,troopCapacity"));
+  assert.ok(worker.includes("json_each(m.units_json)"));
   assert.ok(worker.includes("commander_name"));
 });
 
@@ -41,6 +45,9 @@ test("construction and troop training each support two independent atomic queue 
   assert.ok(migration.includes("queue_slot BETWEEN 1 AND 2"));
   assert.ok(worker.includes("occupiedBuildSlots"));
   assert.ok(worker.includes("occupiedTrainingSlots"));
+  assert.ok(worker.includes("troopCapacity"));
+  assert.ok(worker.includes("army_units WHERE kingdom_id=?"));
+  assert.ok(worker.includes("training capacity"));
   assert.ok(worker.includes("queue_slot=? AND status='running'"));
   assert.ok(worker.includes("SELECT id,queue_type,queue_slot,target_key"));
   assert.ok(worker.includes("async function processDueKingdomQueues"));
