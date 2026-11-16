@@ -260,6 +260,33 @@ async function scaleKingdomQueueDurationSeconds(env,kingdomId,baseSeconds,queueT
   const buffs=await getValhallaBuffMultipliers(env,kingdomId);
   return Math.max(10,Math.floor(seasonal/Math.max(1,buffs.buildSpeed)));
 }
+
+const TECH_EFFECT_TO_BONUS=Object.freeze({
+  infantry_attack:"infantryAttackPercent",cavalry_attack:"cavalryAttackPercent",
+  archer_attack:"archerAttackPercent",wall_defense:"wallDefensePercent",
+  march_speed:"marchSpeedPercent",food_production:"foodProductionPercent",
+  stone_production:"stoneProductionPercent",wood_production:"woodProductionPercent"
+});
+async function ensureKingdomTechnologyRows(env,kingdomId){
+  await env.DB.prepare("INSERT OR IGNORE INTO kingdom_tech(kingdom_id,tech_id,level) SELECT ?,id,0 FROM tech_catalog")
+    .bind(kingdomId).run();
+}
+async function getKingdomTechnologyBonuses(env,kingdomId){
+  const rows=await env.DB.prepare("SELECT c.effect_json,kt.level FROM kingdom_tech kt JOIN tech_catalog c ON c.id=kt.tech_id WHERE kt.kingdom_id=? AND kt.level>0")
+    .bind(kingdomId).all();
+  const bonuses={infantryAttackPercent:0,cavalryAttackPercent:0,archerAttackPercent:0,wallDefensePercent:0,marchSpeedPercent:0,foodProductionPercent:0,stoneProductionPercent:0,woodProductionPercent:0};
+  for(const row of rows.results||[]){
+    let effect={};try{effect=JSON.parse(row.effect_json||"{}")}catch{}
+    const level=Math.max(0,Math.min(10,Number(row.level)||0));
+    for(const [effectKey,bonusKey] of Object.entries(TECH_EFFECT_TO_BONUS)){
+      const amount=Number(effect[effectKey]);
+      if(Number.isFinite(amount)&&amount>0)bonuses[bonusKey]+=amount*level*100;
+    }
+  }
+  for(const key of Object.keys(bonuses))bonuses[key]=Math.min(key==="wallDefensePercent"?30:50,Math.max(0,bonuses[key]));
+  return bonuses;
+}
+
 async function applyProduction(env,kingdomId){
   const row=await env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdomId).first();
   if(!row)return;
@@ -274,6 +301,12 @@ async function applyProduction(env,kingdomId){
     food:12*(levels.farm||1),
     iron:2*(levels.iron_mine||1),
     gold:1.5*(levels.market||1)
+  };
+  const technologyBonuses=await getKingdomTechnologyBonuses(env,kingdomId);
+  const technologyProductionRate={
+    wood:1+technologyBonuses.woodProductionPercent/100,
+    stone:1+technologyBonuses.stoneProductionPercent/100,
+    food:1+technologyBonuses.foodProductionPercent/100
   };
   await ensureEquipmentTables(env,kingdomId);
   const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first();
@@ -290,7 +323,7 @@ async function applyProduction(env,kingdomId){
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
   const gains={},nextRemainders={};
   for(const [key,rate] of Object.entries(perHour)){
-    const accumulated=rate*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
+    const accumulated=rate*(technologyProductionRate[key]||1)*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
     gains[key]=Math.floor(accumulated/3600);
     nextRemainders[key]=accumulated-gains[key]*3600;
   }
@@ -490,6 +523,7 @@ async function gameState(env,playerId){
   if(!p)return null;
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
+  await ensureKingdomTechnologyRows(env,kingdom.id);
   await syncHeroSystems(env,kingdom.id);
   await applyProduction(env,kingdom.id);
   await seedWorld(env);
@@ -538,13 +572,17 @@ async function gameState(env,playerId){
   const activeHeroId=Number((heroes.results||[]).find(hero=>hero.hero_key===activeHeroKey)?.id||0);
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
-  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops};
+  const technologyRows=await env.DB.prepare("SELECT c.id,c.name,c.description,c.category,c.max_level,c.base_cost_gold,c.base_research_time,c.prerequisite_tech,c.effect_json,COALESCE(kt.level,0) AS level,COALESCE(kt.research_end_time,0) AS research_end_time FROM tech_catalog c LEFT JOIN kingdom_tech kt ON kt.tech_id=c.id AND kt.kingdom_id=? ORDER BY CASE c.category WHEN 'military' THEN 1 WHEN 'defense' THEN 2 ELSE 3 END,c.name").bind(kingdom.id).all();
+  const technologies=(technologyRows.results||[]).map(row=>{let effect={};try{effect=JSON.parse(row.effect_json||"{}")}catch{}return {...row,effect};});
+  const technologyBonuses=await getKingdomTechnologyBonuses(env,kingdom.id);
+  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,technologies,technologyBonuses,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
   if(!p)return json({error:"Jogador não encontrado."},404);
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
+  await ensureKingdomTechnologyRows(env,k.id);
   await syncHeroSystems(env,k.id);
   await applyProduction(env,k.id);
   const type=String(body.type||"");
@@ -1286,7 +1324,7 @@ async function processDueKingdomQueues(env,kingdomId=null){
   const due=await query.all();
   for(const queue of due.results||[]){
     const completionToken=crypto.randomUUID(),completedAt=new Date().toISOString();
-    const eligible="((queue_type='construction' AND EXISTS(SELECT 1 FROM kingdom_buildings b WHERE b.kingdom_id=kingdom_queues.kingdom_id AND b.building_type=kingdom_queues.target_key AND b.level=kingdom_queues.from_level)) OR (queue_type='research' AND COALESCE((SELECT r.level FROM research r WHERE r.kingdom_id=kingdom_queues.kingdom_id AND r.research_key=kingdom_queues.target_key),0)=kingdom_queues.from_level) OR queue_type='training')";
+    const eligible="((queue_type='construction' AND EXISTS(SELECT 1 FROM kingdom_buildings b WHERE b.kingdom_id=kingdom_queues.kingdom_id AND b.building_type=kingdom_queues.target_key AND b.level=kingdom_queues.from_level)) OR (queue_type='research' AND target_key NOT LIKE 'tech:%' AND COALESCE((SELECT r.level FROM research r WHERE r.kingdom_id=kingdom_queues.kingdom_id AND r.research_key=kingdom_queues.target_key),0)=kingdom_queues.from_level) OR (queue_type='research' AND target_key LIKE 'tech:%' AND EXISTS(SELECT 1 FROM tech_catalog tc WHERE tc.id=substr(kingdom_queues.target_key,6)) AND COALESCE((SELECT kt.level FROM kingdom_tech kt WHERE kt.kingdom_id=kingdom_queues.kingdom_id AND kt.tech_id=substr(kingdom_queues.target_key,6)),0)=kingdom_queues.from_level) OR queue_type='training')";
     const statements=[env.DB.prepare("UPDATE kingdom_queues SET status='completed',completed_at=?,completion_token=? WHERE id=? AND status='running' AND completes_at<=? AND "+eligible)
       .bind(completedAt,completionToken,queue.id,now)];
     const guard="EXISTS(SELECT 1 FROM kingdom_queues WHERE id=? AND status='completed' AND completion_token=?)";
@@ -1301,19 +1339,28 @@ async function processDueKingdomQueues(env,kingdomId=null){
       statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
         .bind(queue.kingdom_id,queue.target_key,queue.quantity,queue.id,completionToken));
     }else if(queue.queue_type==="research"){
-      statements.push(env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level,completed_at) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=excluded.level,completed_at=excluded.completed_at")
-        .bind(queue.kingdom_id,queue.target_key,queue.to_level,completedAt,queue.id,completionToken));
+      if(queue.target_key.startsWith("tech:")){
+        const technologyId=queue.target_key.slice(5);
+        statements.push(env.DB.prepare("UPDATE kingdom_tech SET level=?,research_end_time=0,updated_at=unixepoch() WHERE kingdom_id=? AND tech_id=? AND level=? AND "+guard)
+          .bind(queue.to_level,queue.kingdom_id,technologyId,queue.from_level,queue.id,completionToken));
+      }else{
+        statements.push(env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level,completed_at) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=excluded.level,completed_at=excluded.completed_at")
+          .bind(queue.kingdom_id,queue.target_key,queue.to_level,completedAt,queue.id,completionToken));
+      }
     }
     if(queue.reward_item){
       statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1")
         .bind(queue.kingdom_id,queue.reward_item,queue.id,completionToken));
     }
-    const eventType=queue.queue_type==="construction"?"building_upgraded":queue.queue_type==="training"?"troops_trained":"research_upgraded";
+    const isTechnology=queue.queue_type==="research"&&queue.target_key.startsWith("tech:");
+    const eventType=queue.queue_type==="construction"?"building_upgraded":queue.queue_type==="training"?"troops_trained":isTechnology?"technology_researched":"research_upgraded";
     const eventPayload=queue.queue_type==="construction"
       ? {building:queue.target_key,level:queue.to_level,queueId:queue.id}
       : queue.queue_type==="training"
         ? {unit:queue.target_key,quantity:queue.quantity,queueId:queue.id}
-        : {research:queue.target_key,level:queue.to_level,queueId:queue.id};
+        : isTechnology
+          ? {technology:queue.target_key.slice(5),level:queue.to_level,queueId:queue.id}
+          : {research:queue.target_key,level:queue.to_level,queueId:queue.id};
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
       .bind(queue.kingdom_id,eventType,JSON.stringify(eventPayload),queue.id,completionToken));
     try{
