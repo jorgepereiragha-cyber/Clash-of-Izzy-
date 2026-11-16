@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "../game-adapter.js";
+import { simulateBattle, simulatePvpBattle, calculateMarchDuration, applyUnitLosses } from "../game-adapter.js";
 
 test("rejeita exército vazio", () => {
   assert.throws(() => simulateBattle({ army: [] }), /Exército vazio/);
@@ -89,6 +89,55 @@ test("chance crítica zero nunca registra acerto crítico", () => {
 test("críticos são reproduzíveis com a mesma semente", () => {
   const input={army:[{unit_type:"archer",tier:3,quantity:40}],defenderLevel:8,criticalChancePercent:15,criticalSeed:987654321,roll:1};
   assert.deepEqual(simulateBattle(input),simulateBattle(input));
+});
+
+
+
+test("PvP usa guarnição e muralha reais e limita as baixas aos exércitos", () => {
+  const result = simulatePvpBattle({
+    army: [
+      { unit_type: "militia", tier: 1, quantity: 30 },
+      { unit_type: "archer", tier: 1, quantity: 12 }
+    ],
+    defenderArmy: [
+      { unit_type: "militia", tier: 1, quantity: 20 },
+      { unit_type: "knight", tier: 2, quantity: 4 }
+    ],
+    attackerCastleLevel: 5,
+    defenderCastleLevel: 7,
+    attackerDefenseBonusPercent: 8,
+    defenderDefenseBonusPercent: 12,
+    wallHp: 6000,
+    roll: 1,
+    criticalSeed: 1234
+  });
+  assert.equal(typeof result.won, "boolean");
+  assert.ok(result.rounds >= 1 && result.rounds <= 30);
+  assert.ok(result.wallDamage >= 0 && result.wallDamage <= 6000);
+  assert.ok(result.wallRemainingHp >= 0 && result.wallRemainingHp <= 6000);
+  assert.equal(result.wallDamage + result.wallRemainingHp, 6000);
+  assert.ok((result.losses.militia || 0) <= 30);
+  assert.ok((result.losses.archer || 0) <= 12);
+  assert.ok((result.defenderLosses.militia || 0) <= 20);
+  assert.ok((result.defenderLosses.knight || 0) <= 4);
+  assert.equal(Object.values(result.attackerSurvivors).reduce((a,b)=>a+b,0) +
+    Object.values(result.losses).reduce((a,b)=>a+b,0), 42);
+  assert.equal(Object.values(result.defenderSurvivors).reduce((a,b)=>a+b,0) +
+    Object.values(result.defenderLosses).reduce((a,b)=>a+b,0), 24);
+});
+
+test("PvP é reproduzível com as mesmas tropas e semente", () => {
+  const input = {
+    army: [{ unit_type: "knight", tier: 2, quantity: 15 }],
+    defenderArmy: [{ unit_type: "archer", tier: 1, quantity: 20 }],
+    wallHp: 2500,
+    attackerCastleLevel: 8,
+    defenderCastleLevel: 6,
+    criticalSeed: 98765,
+    criticalChancePercent: 10,
+    roll: 1
+  };
+  assert.deepEqual(simulatePvpBattle(input), simulatePvpBattle(input));
 });
 
 test("velocidade de marcha reduz duração sem ultrapassar os limites", () => {
