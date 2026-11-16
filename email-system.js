@@ -117,7 +117,11 @@ export async function requestEmailVerification(env, externalPlayerId, rawEmail) 
       "VALUES (?,?,NULL,?,?,?) " +
       "ON CONFLICT(player_id) DO UPDATE SET email=excluded.email,email_verified_at=NULL," +
       "verification_token_hash=excluded.verification_token_hash," +
-      "verification_expires_at=excluded.verification_expires_at,updated_at=excluded.updated_at"
+      "verification_expires_at=excluded.verification_expires_at," +
+      "marketing_opt_in=CASE WHEN player_email_contacts.email<>excluded.email THEN 0 ELSE player_email_contacts.marketing_opt_in END," +
+      "event_alerts_opt_in=CASE WHEN player_email_contacts.email<>excluded.email THEN 0 ELSE player_email_contacts.event_alerts_opt_in END," +
+      "attack_alerts_opt_in=CASE WHEN player_email_contacts.email<>excluded.email THEN 0 ELSE player_email_contacts.attack_alerts_opt_in END," +
+      "updated_at=excluded.updated_at"
     ).bind(player.id, email, tokenHash, now + 1800, now).run();
   } catch (error) {
     if (String(error?.message || error).toLowerCase().includes("unique")) {
@@ -314,7 +318,7 @@ export async function processEmailQueue(env, batchSize = 10) {
 
     const current = await env.DB.prepare(
       "SELECT q.*,t.subject,t.html_template,t.text_template," +
-      "c.email_verified_at,c.marketing_opt_in,c.event_alerts_opt_in,c.attack_alerts_opt_in " +
+      "c.email,c.email_verified_at,c.marketing_opt_in,c.event_alerts_opt_in,c.attack_alerts_opt_in " +
       "FROM email_queue q JOIN email_templates t ON t.id=q.template_id " +
       "LEFT JOIN player_email_contacts c ON c.player_id=q.player_id " +
       "WHERE q.id=? AND q.status='sending'"
