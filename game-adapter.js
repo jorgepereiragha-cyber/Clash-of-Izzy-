@@ -150,6 +150,154 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   };
 }
 
+
+// Combate entre dois reinos. O servidor fornece os exércitos persistidos e a vida
+// atual da muralha; nenhuma composição de defesa é inventada pelo cliente.
+export function simulatePvpBattle({
+  army,
+  defenderArmy = [],
+  attackerCastleLevel = 1,
+  defenderCastleLevel = 1,
+  attackerDefenseBonusPercent = 0,
+  defenderDefenseBonusPercent = 0,
+  attackerAttackBonusPercent = 0,
+  defenderAttackBonusPercent = 0,
+  attackerHealthBonusPercent = 0,
+  defenderHealthBonusPercent = 0,
+  attackerFlatBonus = 0,
+  defenderFlatBonus = 0,
+  wallHp = 0,
+  roll = 1,
+  criticalChancePercent = 0,
+  criticalDamageMultiplier = 1.5,
+  criticalSeed = 1
+}) {
+  const attackers = (army || [])
+    .filter(row => Number(row.quantity) > 0)
+    .map((row, index) => makeStack(row, "attacker", index));
+  if (!attackers.length) throw new Error("Exército atacante vazio.");
+
+  const defenders = (defenderArmy || [])
+    .filter(row => Number(row.quantity) > 0)
+    .map((row, index) => makeStack(row, "defender", index + 1));
+
+  const initialWallHp = clamp(Math.floor(Number(wallHp) || 0), 0, 100000000);
+  let wall = null;
+  if (initialWallHp > 0) {
+    wall = makeStack({ unit_type: "militia", tier: 1, quantity: 1 }, "defender", 0);
+    wall.key = "wall";
+    wall.power = 0;
+    wall.range = 0;
+    wall.hpPerUnit = initialWallHp;
+    wall.hp = initialWallHp;
+    wall.initialHp = initialWallHp;
+    wall.position = 1;
+    wall.lane = "fortification";
+    defenders.unshift(wall);
+  }
+
+  const applySideBonuses = (stacks, castleLevel, attackBonus, healthBonus, defenseBonus) => {
+    const castleBonus = clamp(Number(castleLevel) || 1, 0, 30) / 100;
+    const gearAttack = clamp(Number(attackBonus) || 0, 0, 50) / 100;
+    const gearHealth = clamp(Number(healthBonus) || 0, 0, 50) / 100;
+    const mitigation = clamp(Number(defenseBonus) || 0, 0, 40);
+    for (const stack of stacks) {
+      if (stack.key === "wall") {
+        stack.defenseBonusPercent = mitigation;
+        continue;
+      }
+      stack.power *= 1 + castleBonus + gearAttack;
+      stack.hpPerUnit = Math.max(1, Math.floor(stack.hpPerUnit * (1 + castleBonus + gearHealth)));
+      stack.hp = stack.quantity * stack.hpPerUnit;
+      stack.defenseBonusPercent = mitigation;
+    }
+  };
+
+  applySideBonuses(
+    attackers,
+    attackerCastleLevel,
+    attackerAttackBonusPercent,
+    attackerHealthBonusPercent,
+    attackerDefenseBonusPercent
+  );
+  applySideBonuses(
+    defenders,
+    defenderCastleLevel,
+    defenderAttackBonusPercent,
+    defenderHealthBonusPercent,
+    defenderDefenseBonusPercent
+  );
+
+  const multiplier = clamp(Number(roll) || 1, 0.85, 1.15);
+  const critical = {
+    chance: clamp(Number(criticalChancePercent) || 0, 0, 100),
+    multiplier: clamp(Number(criticalDamageMultiplier) || 1.5, 1.25, 2.5),
+    seed: Number(criticalSeed) >>> 0
+  };
+  const log = [];
+  const metrics = { criticalHits: 0 };
+  let rounds = 0;
+
+  for (let round = 1; round <= 30; round++) {
+    rounds = round;
+    attackPhase(attackers, defenders, round, log, Math.max(0, Number(attackerFlatBonus) || 0), critical, metrics);
+    attackPhase(defenders, attackers, round, log, Math.max(0, Number(defenderFlatBonus) || 0), {}, metrics);
+    if (!attackers.some(alive) || !defenders.some(alive)) break;
+  }
+
+  const attackerPower = Math.max(1, Math.floor(
+    attackers.reduce((sum, unit) => sum + unit.initialQuantity * unit.power, 0) +
+    Math.max(0, Number(attackerFlatBonus) || 0) * 8
+  ));
+  const defenderPower = Math.max(1, Math.floor(
+    defenders.filter(unit => unit.key !== "wall").reduce((sum, unit) => sum + unit.initialQuantity * unit.power, 0) +
+    initialWallHp / 100 +
+    Math.max(0, Number(defenderFlatBonus) || 0) * 8
+  ));
+
+  const attackersAlive = attackers.some(alive);
+  const defendersAlive = defenders.some(alive);
+  const won = attackersAlive && (
+    !defendersAlive ||
+    (rounds >= 30 && attackerPower * multiplier >= defenderPower * 1.35)
+  );
+
+  const losses = {};
+  for (const unit of attackers) {
+    const lost = clamp(unit.initialQuantity - unit.quantity, 0, unit.initialQuantity);
+    losses[unit.key] = (losses[unit.key] || 0) + lost;
+  }
+  const defenderLosses = {};
+  const defenderSurvivors = {};
+  for (const unit of defenders) {
+    if (unit.key === "wall") continue;
+    const lost = clamp(unit.initialQuantity - unit.quantity, 0, unit.initialQuantity);
+    defenderLosses[unit.key] = (defenderLosses[unit.key] || 0) + lost;
+    defenderSurvivors[unit.key] = (defenderSurvivors[unit.key] || 0) + unit.quantity;
+  }
+
+  const attackerSurvivors = {};
+  for (const unit of attackers) {
+    attackerSurvivors[unit.key] = (attackerSurvivors[unit.key] || 0) + unit.quantity;
+  }
+  const wallRemainingHp = wall ? Math.max(0, wall.hp) : 0;
+  const wallDamage = Math.max(0, initialWallHp - wallRemainingHp);
+  return {
+    won,
+    rounds,
+    attackerPower: Math.floor(attackerPower * multiplier),
+    defenderPower,
+    losses,
+    defenderLosses,
+    attackerSurvivors,
+    defenderSurvivors,
+    wallDamage,
+    wallRemainingHp,
+    log,
+    criticalHits: metrics.criticalHits
+  };
+}
+
 export const COMBAT_UNIT_RULES = UNIT_RULES;
 
 
