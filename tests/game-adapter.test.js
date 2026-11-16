@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { simulateBattle, calculateMarchDuration } from "../game-adapter.js";
+import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "../game-adapter.js";
 
 test("rejeita exército vazio", () => {
   assert.throws(() => simulateBattle({ army: [] }), /Exército vazio/);
@@ -96,4 +96,31 @@ test("velocidade de marcha reduz duração sem ultrapassar os limites", () => {
   assert.equal(calculateMarchDuration(100,25),80);
   assert.equal(calculateMarchDuration(100,100),67);
   assert.equal(calculateMarchDuration(1,50),5);
+});
+
+test("baixas de batalha são descontadas e respeitam limites do exército", () => {
+  assert.deepEqual(applyUnitLosses([
+    { unit_type: "militia", quantity: 10 },
+    { unit_type: "archer", quantity: 8 }
+  ], { militia: 3, archer: 8, unknown: 99 }), {
+    militia: 7,
+    archer: 0
+  });
+});
+
+test("baixas agregadas são distribuídas sem duplicar perdas entre stacks", () => {
+  assert.deepEqual(applyUnitLosses([
+    { unit_type: "militia", tier: 1, quantity: 3 },
+    { unit_type: "militia", tier: 2, quantity: 4 }
+  ], { militia: 4 }), { militia: 3 });
+});
+
+test("perdas inválidas não criam tropas extras nem quantidades negativas", () => {
+  assert.deepEqual(applyUnitLosses([
+    { unit_type: "militia", quantity: 5 },
+    { unit_type: "archer", quantity: 2 }
+  ], { militia: -10, archer: 100 }), {
+    militia: 5,
+    archer: 0
+  });
 });
