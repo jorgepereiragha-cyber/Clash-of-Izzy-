@@ -64,8 +64,9 @@ test("Worker liga pets, produção, marcha, combate e replay com autenticação"
 
 test("alimentação tem request_key e grava a deduplicação no D1", async () => {
   const pets = await read("pets.js");
+  const migration = await read("migrations/0022_pets_and_battle_replays.sql");
   assert.match(pets, /request_key obrigatório/);
-  assert.match(pets, /UNIQUE \(kingdom_id,request_key\)/);
+  assert.match(migration, /UNIQUE \\(kingdom_id,request_key\\)/);
   assert.match(pets, /kingdom_pet_feed_requests/);
-  assert.match(pets, /changes\(\)>0/);
-});
+  assert.match(pets, /changes\\(\\)>0/);
+});;
