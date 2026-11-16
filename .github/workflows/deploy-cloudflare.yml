@@ -101,6 +101,68 @@ jobs:
           print("Token Cloudflare válido e ativo.")
           PY
 
+      - name: Capture D1 pre-deployment restore point
+        id: capture_d1
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_DATABASE_ID: 7e63af59-d9ff-4159-a9cf-b02e35b92605
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import datetime
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+
+          account_id = os.environ["CLOUDFLARE_ACCOUNT_ID"].strip()
+          database_id = os.environ["D1_DATABASE_ID"].strip()
+          token = os.environ["CLOUDFLARE_API_TOKEN"].strip()
+          url = f"https://api.cloudflare.com/client/v4/accounts/{account_id}/d1/database/{database_id}/time_travel/bookmark"
+          request = urllib.request.Request(
+              url,
+              headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+              method="GET",
+          )
+          try:
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  payload = json.loads(response.read().decode("utf-8"))
+          except urllib.error.HTTPError as error:
+              raise SystemExit(f"Não foi possível capturar o bookmark de recuperação D1 (HTTP {error.code}); migração bloqueada.")
+          except Exception as error:
+              raise SystemExit(f"Falha ao consultar Time Travel D1 ({type(error).__name__}); migração bloqueada.")
+
+          bookmark = ((payload.get("result") or {}).get("bookmark") or "").strip()
+          if not payload.get("success") or not bookmark:
+              raise SystemExit("Cloudflare não retornou bookmark D1 válido; migração bloqueada.")
+
+          record = {
+              "database_name": "clash-of-izzy-db",
+              "database_id": database_id,
+              "captured_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "bookmark": bookmark,
+              "recovery_command": "npx wrangler --config wrangler.jsonc d1 time-travel restore clash-of-izzy-db --bookmark=" + bookmark,
+              "note": "D1 Time Travel restore point captured immediately before the production migrations. Restoring overwrites current database state.",
+          }
+          output_path = os.path.join(os.environ["RUNNER_TEMP"], "clash-of-izzy-d1-pre-migration-restore-point.json")
+          with open(output_path, "w", encoding="utf-8") as output:
+              json.dump(record, output, indent=2)
+              output.write("\\n")
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write("bookmark=" + bookmark + "\\n")
+          print("D1 Time Travel restore point captured. Bookmark: " + bookmark)
+          PY
+
+      - name: Archive D1 pre-deployment restore point
+        if: steps.capture_d1.outputs.bookmark != ''
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash-of-izzy-d1-pre-migration-restore-point-${{ github.run_id }}
+          path: ${{ runner.temp }}/clash-of-izzy-d1-pre-migration-restore-point.json
+          if-no-files-found: error
+          retention-days: 30
+
       - name: Apply D1 migrations remotely
         run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --remote
         env:
