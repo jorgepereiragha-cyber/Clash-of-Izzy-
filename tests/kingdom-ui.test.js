@@ -62,7 +62,7 @@ test("central do reino envia feedback e registra analytics da sessão", async ()
 test("Playwright test tooling and diagnostics are excluded from public assets", async () => {
   const ignored = await readFile(new URL("../.assetsignore", import.meta.url), "utf8");
   for (const path of ["tests/", "playwright.config.js", "playwright-report/", "test-results/"]) {
-    assert.ok(ignored.split(/\\r?\\n/).includes(path), "public asset ignore rule missing: " + path);
+    assert.ok(ignored.split(/\r?\n/).includes(path), "public asset ignore rule missing: " + path);
   }
 });
 
