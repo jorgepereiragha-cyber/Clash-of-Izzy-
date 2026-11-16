@@ -71,6 +71,9 @@ export class CinematicCapture {
     this.originalCamera = null;
     this.originalValhallaMode = false;
     this.restored = true;
+    this.wakeLock = null;
+    this.wakeLockRequest = null;
+    this.wakeLockVisibilityHandler = null;
     this.textRenderer = new CinematicTextRenderer();
   }
 
@@ -102,6 +105,74 @@ export class CinematicCapture {
 
   _supportedMimeType() {
     return selectMediaRecorderMimeType(MediaRecorder);
+  }
+
+  _requestWakeLock() {
+    if (!this.isRecording || typeof navigator === "undefined" ||
+        typeof navigator.wakeLock?.request !== "function" ||
+        typeof document === "undefined" || document.visibilityState !== "visible") {
+      return Promise.resolve(false);
+    }
+    if (this.wakeLock && !this.wakeLock.released) return Promise.resolve(true);
+    if (this.wakeLockRequest) return this.wakeLockRequest;
+
+    const request = Promise.resolve()
+      .then(() => navigator.wakeLock.request("screen"))
+      .then(sentinel => {
+        if (!sentinel || !this.isRecording || document.visibilityState !== "visible") {
+          if (sentinel && !sentinel.released) {
+            return Promise.resolve().then(() => sentinel.release()).catch(() => {}).then(() => false);
+          }
+          return false;
+        }
+        this.wakeLock = sentinel;
+        sentinel.addEventListener?.("release", () => {
+          if (this.wakeLock === sentinel) this.wakeLock = null;
+        }, { once: true });
+        return true;
+      })
+      .catch(() => false)
+      .finally(() => {
+        if (this.wakeLockRequest === request) this.wakeLockRequest = null;
+      });
+
+    this.wakeLockRequest = request;
+    return request;
+  }
+
+  _beginWakeLockLifecycle() {
+    if (typeof document !== "undefined" && typeof document.addEventListener === "function") {
+      this.wakeLockVisibilityHandler = () => {
+        if (!this.isRecording) return;
+        if (document.visibilityState === "visible") {
+          void this._requestWakeLock();
+          return;
+        }
+
+        const sentinel = this.wakeLock;
+        this.wakeLock = null;
+        if (sentinel && !sentinel.released) {
+          Promise.resolve().then(() => sentinel.release()).catch(() => {});
+        }
+      };
+      document.addEventListener("visibilitychange", this.wakeLockVisibilityHandler);
+    }
+    void this._requestWakeLock();
+  }
+
+  _releaseWakeLock() {
+    if (typeof document !== "undefined" &&
+        typeof document.removeEventListener === "function" &&
+        this.wakeLockVisibilityHandler) {
+      document.removeEventListener("visibilitychange", this.wakeLockVisibilityHandler);
+    }
+    this.wakeLockVisibilityHandler = null;
+
+    const sentinel = this.wakeLock;
+    this.wakeLock = null;
+    if (sentinel && !sentinel.released) {
+      Promise.resolve().then(() => sentinel.release()).catch(() => {});
+    }
   }
 
   async startRecording(options = {}) {
@@ -206,6 +277,7 @@ export class CinematicCapture {
       this.recorder.start(1000);
 
       this.isRecording = true;
+      this._beginWakeLockLifecycle();
       this.startTime = performance.now();
       this.lastFrameTime = this.startTime;
       this._animateCamera(0);
@@ -326,6 +398,7 @@ export class CinematicCapture {
     this.restored = true;
     if (this.frameRequest) cancelAnimationFrame(this.frameRequest);
     this.frameRequest = 0;
+    this._releaseWakeLock();
 
     for (const track of this.stream?.getTracks?.() || []) track.stop();
 
