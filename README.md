@@ -9,6 +9,7 @@ Requisitos: Node.js 22 ou superior.
 ```bash
 npm install
 npm run db:migrate:local
+npm run db:seed:local   # opcional: dados fictícios, somente no D1 local
 npm run dev
 ```
 
@@ -20,6 +21,7 @@ Comandos úteis:
 - `npm run assets:validate`: valida o manifesto 3D v2, GLBs locais, referências de textura e orçamento de arquivos.
 - `npm run db:migrate:local`: aplica as migrações no D1 local.
 - `npm run db:migrate:remote`: aplica as migrações no D1 remoto.
+- `npm run db:seed:local`: popula o D1 local com 10 reinos fictícios; não existe comando de seed remoto.
 
 ## Deploy automático
 
@@ -139,3 +141,12 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - A busca em português expande formas comuns de singular/plural, remove diferenças de acentuação e mantém SQL parametrizado.
 - Reinos que já pertencem a alianças continuam pesquisáveis e exibem sua sigla pública; convites inválidos são bloqueados na interface.
 - O fallback é acionado por categoria quando um índice FTS falha, evitando que um índice parcialmente indisponível esconda resultados de outras categorias.
+
+
+## Plano mestre e regras de integração
+
+O documento normativo para as próximas propostas, sistemas e etapas de lançamento é [docs/plano-mestre-implementacao-lancamento.md](docs/plano-mestre-implementacao-lancamento.md). Ele registra as fontes únicas de dados, separa funcionalidades implementadas das pendentes e define como atualizar o jogo sem duplicar tabelas ou quebrar dados existentes.
+
+O seed de desenvolvimento fica em `scripts/seed-local.sql`. Ele deve ser executado somente depois das migrações locais. Nunca use esse arquivo com `--remote` ou no banco de produção: ele cria contas/reinos fictícios de teste, não credenciais de login nem pagamentos reais.
+
+A PWA usa o manifesto e os ícones existentes, cache versionado e página offline. O cache exclui `/api/*`; ações do reino continuam exigindo conexão. Push/VAPID e analytics persistente não estão ativos até haver implementação autenticada, consentimento e política de retenção.

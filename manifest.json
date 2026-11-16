@@ -2,15 +2,71 @@
   "id": "/",
   "name": "Clash of Izzy",
   "short_name": "ClashIzzy",
-  "description": "Estratégia medieval, evolução de castelos e batalhas entre reinos.",
+  "description": "Construa seu reino, evolua heróis, forme exércitos e dispute territórios em um mundo medieval persistente.",
   "start_url": "/index.html",
   "scope": "/",
   "display": "standalone",
-  "orientation": "portrait",
+  "orientation": "any",
   "background_color": "#0b1728",
   "theme_color": "#142b44",
   "icons": [
-    {"src": "/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable"},
-    {"src": "/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable"}
+    {
+      "src": "/icon-192.svg",
+      "sizes": "192x192",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.svg",
+      "sizes": "512x512",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": [
+    "games",
+    "entertainment",
+    "strategy"
+  ],
+  "shortcuts": [
+    {
+      "name": "Meu Reino",
+      "short_name": "Reino",
+      "description": "Abrir sua cidade e suas construções",
+      "url": "/kingdom.html",
+      "icons": [
+        {
+          "src": "/icon-192.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Mapa Mundial",
+      "short_name": "Mapa",
+      "description": "Explorar territórios e marchas",
+      "url": "/world.html",
+      "icons": [
+        {
+          "src": "/icon-192.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    },
+    {
+      "name": "Eventos",
+      "short_name": "Eventos",
+      "description": "Ver o Anjo da Morte e eventos do mundo",
+      "url": "/events.html",
+      "icons": [
+        {
+          "src": "/icon-192.svg",
+          "sizes": "192x192",
+          "type": "image/svg+xml"
+        }
+      ]
+    }
   ]
 }

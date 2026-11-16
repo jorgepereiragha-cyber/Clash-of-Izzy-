@@ -53,5 +53,5 @@ test("queue progress uses D1 timestamps and updates the accessible progress bar 
 
 test("PWA cache version is bumped when queue UI is changed", async () => {
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /clash-of-izzy-shell-v13/);
+  assert.match(worker, /clash-of-izzy-shell-v14/);
 });
