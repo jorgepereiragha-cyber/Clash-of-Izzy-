@@ -61,10 +61,18 @@ function makeKingdomState() {
   };
 }
 
-async function installApiFixtures(page) {
+async function installApiFixtures(page, accountStatus = { hasAccount: false, account: null }) {
   const actions = [];
   const stateRequests = [];
   const state = makeKingdomState();
+
+  await page.route("**/api/account/status", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify(accountStatus),
+    });
+  });
 
   await page.addInitScript(token => {
     window.localStorage.setItem("coi_game_token", token);
@@ -109,6 +117,9 @@ test.describe("Mobile kingdom rendering", () => {
     await page.goto("/kingdom.html");
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
+    await expect(page.locator("#guestAccountNotice")).toBeVisible();
+    await expect(page.locator("#guestAccountNotice")).toContainText("Modo Convidado");
+    await expect(page.locator("#guestAccountNotice a")).toHaveAttribute("href", "/account.html");
 
     // The expanded recorder panel used to cover upgrade/training controls on phones.
     // It now starts minimized on mobile and remains accessible through its toggle.
@@ -210,4 +221,16 @@ test.describe("Mobile kingdom rendering", () => {
     await expect.poll(() => actions.length).toBe(2);
     expect(actions[1]).toEqual({ type: "train", unit: "archer", quantity: 4 });
   });
+  test("hides the guest notice when the player account is already linked", async ({ page }) => {
+    await installApiFixtures(page, {
+      hasAccount: true,
+      account: { username: "ComandanteTeste" },
+    });
+
+    await page.goto("/kingdom.html");
+
+    await expect(page.locator("#game")).toBeVisible();
+    await expect(page.locator("#guestAccountNotice")).toBeHidden();
+  });
+
 });
