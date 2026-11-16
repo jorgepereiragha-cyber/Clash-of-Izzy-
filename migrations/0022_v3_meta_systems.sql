@@ -177,7 +177,7 @@ CREATE TRIGGER IF NOT EXISTS trg_kingdom_event_meta_progress
 AFTER INSERT ON kingdom_events
 BEGIN
   INSERT INTO kingdom_task_progress(kingdom_id,task_id,period_key,progress)
-  SELECT NEW.kingdom_id,dt.id,strftime('%Y-%m-%d','now'),
+  SELECT NEW.kingdom_id,dt.id,CASE dt.period_type WHEN 'weekly' THEN strftime('%Y-W%W','now') ELSE strftime('%Y-%m-%d','now') END,
     CASE dt.progress_field
       WHEN 'quantity' THEN MAX(0,CAST(COALESCE(json_extract(NEW.payload_json,'$.quantity'),0) AS INTEGER))
       WHEN 'amount' THEN MAX(0,CAST(COALESCE(json_extract(NEW.payload_json,'$.amount'),0) AS INTEGER))
