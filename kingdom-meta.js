@@ -34,6 +34,15 @@ function utcDay() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function utcWeek(date = new Date()) {
+  const year = date.getUTCFullYear();
+  const firstDay = new Date(Date.UTC(year, 0, 1));
+  const dayOfYear = Math.floor((Date.UTC(year, date.getUTCMonth(), date.getUTCDate()) - firstDay.getTime()) / 86400000);
+  const mondayOffset = (firstDay.getUTCDay() + 6) % 7;
+  const week = Math.floor((dayOfYear + mondayOffset) / 7) + (firstDay.getUTCDay() === 1 ? 1 : 0);
+  return year + "-W" + String(week).padStart(2, "0");
+}
+
 async function findKingdom(env, publicPlayerId) {
   return env.DB.prepare(
     "SELECT k.id,k.player_id,k.kingdom_name,k.castle_level,k.power " +
@@ -264,14 +273,15 @@ async function useSpeedup(request, env, kingdom) {
 async function getTasks(env, kingdom) {
   const period = utcDay();
   const rows = await env.DB.prepare(
-    "SELECT dt.id,dt.title,dt.description,dt.target_count,dt.reward_json," +
+    "SELECT dt.id,dt.title,dt.description,dt.period_type,dt.target_count,dt.reward_json," +
+      "CASE dt.period_type WHEN 'weekly' THEN ? ELSE ? END AS period_key," +
       "COALESCE(pt.progress,0) AS progress,COALESCE(pt.completed,0) AS completed," +
       "COALESCE(pt.claimed,0) AS claimed " +
     "FROM daily_tasks dt LEFT JOIN kingdom_task_progress pt " +
-      "ON pt.task_id=dt.id AND pt.kingdom_id=? AND pt.period_key=? " +
-    "WHERE dt.active=1 ORDER BY dt.id"
-  ).bind(kingdom.id, period).all();
-  return reply({ period, tasks: (rows.results || []).map(row => ({
+      "ON pt.task_id=dt.id AND pt.kingdom_id=? AND pt.period_key=CASE dt.period_type WHEN 'weekly' THEN ? ELSE ? END " +
+    "WHERE dt.active=1 ORDER BY dt.period_type,dt.id"
+  ).bind(utcWeek(), period, kingdom.id, utcWeek(), period).all();
+  return reply({ periods: { daily: period, weekly: utcWeek() }, tasks: (rows.results || []).map(row => ({
     ...row,
     target_count: Number(row.target_count),
     progress: Number(row.progress),
@@ -287,9 +297,10 @@ async function claimTask(request, env, kingdom) {
   if (!/^[a-z0-9_-]{2,64}$/.test(taskId)) return reply({ error: "Tarefa inválida." }, 400);
   const period = utcDay();
   const task = await env.DB.prepare(
-    "SELECT dt.reward_json,dt.target_count FROM daily_tasks dt WHERE dt.id=? AND dt.active=1"
+    "SELECT dt.reward_json,dt.target_count,dt.period_type FROM daily_tasks dt WHERE dt.id=? AND dt.active=1"
   ).bind(taskId).first();
   if (!task) return reply({ error: "Tarefa não encontrada." }, 404);
+  const periodKey = task.period_type === "weekly" ? utcWeek() : utcDay();
   const reward = parseReward(task.reward_json);
   if (!reward) return reply({ error: "Recompensa de tarefa mal configurada." }, 503);
   const statements = [
@@ -297,7 +308,7 @@ async function claimTask(request, env, kingdom) {
       "UPDATE kingdom_task_progress SET claimed=1,updated_at=unixepoch() " +
       "WHERE kingdom_id=? AND task_id=? AND period_key=? AND completed=1 AND claimed=0 " +
       "AND progress>=?"
-    ).bind(kingdom.id, taskId, period, task.target_count),
+    ).bind(kingdom.id, taskId, periodKey, task.target_count),
     ...rewardStatements(env, kingdom, reward),
   ];
   const result = await env.DB.batch(statements);
