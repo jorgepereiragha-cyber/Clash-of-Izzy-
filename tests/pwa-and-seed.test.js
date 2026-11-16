@@ -87,6 +87,10 @@ test("local seed targets the authoritative D1 schema and never creates fake purc
 
   assert.match(seed, /coi-local-seed-/);
   assert.match(seed, /TESTE/);
+  assert.match(seed, /WHERE NOT EXISTS/);
+  assert.match(seed, /battle_reports existing/);
+  assert.match(seed, /kingdom_events existing/);
+  assert.match(seed, /marches existing/);
   assert.doesNotMatch(seed, /DELETE\s+FROM/i);
   assert.doesNotMatch(seed, /UPDATE\s+players\s+SET\s+gems/i);
   assert.doesNotMatch(seed, /status\s*,\s*created_at[^;]*approved/i);
