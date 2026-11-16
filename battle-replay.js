@@ -20,7 +20,7 @@ export async function getBattleReplay(env, publicPlayerId, rawBattleId) {
   }
 
   const row = await env.DB.prepare(
-    "SELECT br.id,br.battle_type,br.attacker_power,br.defender_power,br.losses_json,br.rewards_json," +
+    "SELECT br.id,br.battle_type,br.attacker_power,br.defender_power,br.losses_json,br.wounded_json,br.wall_damage,br.rewards_json," +
     "br.battle_log,br.replay_json,br.replay_expires_at,br.created_at," +
     "ak.kingdom_name AS attacker_name,dk.kingdom_name AS defender_name " +
     "FROM battle_reports br " +
@@ -51,6 +51,8 @@ export async function getBattleReplay(env, publicPlayerId, rawBattleId) {
       attacker_power: Number(row.attacker_power || 0),
       defender_power: Number(row.defender_power || 0),
       losses: parseJson(row.losses_json, {}),
+      wounded: parseJson(row.wounded_json, {}),
+      wall_damage: Number(row.wall_damage || 0),
       rewards: parseJson(row.rewards_json, {})
     },
     replay,
