@@ -4,6 +4,14 @@
   "main": "worker.js",
   "workers_dev": true,
   "compatibility_date": "2026-11-12",
+  "durable_objects": {
+    "bindings": [
+      { "name": "GAME_REALTIME", "class_name": "GameRealtimeHub" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1-realtime-hub", "new_sqlite_classes": ["GameRealtimeHub"] }
+  ],
   "assets": {
     "directory": ".",
     "binding": "ASSETS",
