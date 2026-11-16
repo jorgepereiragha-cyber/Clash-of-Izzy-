@@ -26,8 +26,10 @@ Variáveis opcionais:
   TRAINING_QUANTITY      Quantidade de tropas (padrão: 10)
   ALLOW_GAME_MUTATIONS=YES  Segunda confirmação exigida para treinar
 
-O modo padrão é somente leitura. --mutate-training cria uma fila real
-e pode consumir recursos do reino. Não use em um reino importante.
+O modo padrão não altera o reino nem seus recursos. Se você informar usuário/senha,
+o endpoint de login poderá atualizar contadores antiautomação; use GAME_TOKEN
+para evitar essa chamada. --mutate-training cria uma fila real e pode consumir
+recursos do reino. Não use em um reino importante.
 USAGE
 }
 
