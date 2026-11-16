@@ -1,0 +1,57 @@
+/* Clash of Izzy — camada visual premium compatível com a identidade azul-real/dourado. */
+:root{
+ --coi-premium-gold:#e7bd68;--coi-premium-gold-hi:#f5d995;
+ --coi-premium-shadow:0 12px 32px rgba(0,0,0,.38);
+ --coi-premium-glow:0 0 18px rgba(231,189,104,.22);
+}
+.panel,.premium-panel{
+ position:relative;isolation:isolate;
+ background:linear-gradient(145deg,rgba(31,54,79,.97),rgba(12,25,42,.98));
+ border-color:rgba(231,189,104,.62);
+ box-shadow:var(--coi-premium-shadow),inset 0 1px rgba(255,255,255,.06);
+}
+.panel h2,.premium-panel-title{
+ color:var(--coi-premium-gold-hi);
+ text-shadow:0 2px 8px rgba(0,0,0,.55);
+}
+.panel h2:after,.premium-panel-title:after{
+ content:"";display:block;width:min(180px,55%);height:1px;margin:9px auto 0;
+ background:linear-gradient(90deg,transparent,var(--coi-premium-gold),transparent);
+}
+button,.linkbtn,.btn-epic{
+ transition:transform .2s ease,border-color .2s ease,filter .2s ease,box-shadow .2s ease;
+}
+button:not(:disabled):hover,.linkbtn:hover,.btn-epic:hover{
+ transform:translateY(-2px);border-color:var(--coi-premium-gold-hi);
+ filter:brightness(1.08);box-shadow:0 7px 18px rgba(0,0,0,.3),var(--coi-premium-glow);
+}
+button:active,.linkbtn:active,.btn-epic:active{transform:translateY(0)}
+.resource,.stat,.queue-card,.building-row,.event{
+ box-shadow:inset 0 1px rgba(255,255,255,.035),0 4px 12px rgba(0,0,0,.16);
+}
+.resource{border-color:rgba(231,189,104,.38)}
+.resource b{ text-shadow:0 0 10px rgba(231,189,104,.2)}
+.building{position:relative;overflow:hidden;box-shadow:0 7px 16px rgba(0,0,0,.36),inset 0 1px rgba(255,255,255,.12)}
+.building:after{
+ content:"";position:absolute;inset:0;pointer-events:none;opacity:0;
+ background:linear-gradient(115deg,transparent 25%,rgba(255,255,255,.16) 48%,transparent 70%);
+ transform:translateX(-100%);transition:opacity .2s;
+}
+.building:hover:after{opacity:1;animation:coi-card-glint .75s ease}
+@keyframes coi-card-glint{to{transform:translateX(100%)}}
+.queue-progress{border:1px solid rgba(231,189,104,.28)}
+.queue-progress span{box-shadow:0 0 10px rgba(231,189,104,.4)}
+#city{position:relative}
+#city .coi-ambient-layer{
+ position:absolute;inset:0;width:100%;height:100%;z-index:1;pointer-events:none;
+}
+#city.has-3d .coi-ambient-layer{z-index:2}
+#city .building{z-index:3}
+.premium-panel{border:1px solid var(--coi-premium-gold);border-radius:12px;padding:16px}
+@media(max-width:760px){
+ .panel,.premium-panel{box-shadow:0 7px 20px rgba(0,0,0,.3)}
+ button,.linkbtn,.btn-epic{min-height:40px}
+}
+@media(prefers-reduced-motion:reduce){
+ button,.linkbtn,.btn-epic,.building,.building:after{transition:none!important;animation:none!important}
+}
