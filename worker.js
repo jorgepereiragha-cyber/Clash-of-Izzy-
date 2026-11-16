@@ -546,7 +546,7 @@ async function gameState(env,playerId){
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
   const petState=await getPetsState(env,kingdom.id);
-  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops};
+  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -1047,9 +1047,10 @@ async function gameAction(env,playerId,body){
       activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,activeHero.id).all():Promise.resolve({results:[]}),
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
     ]);
-    const marchBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).marchSpeedPercent;
+    const equipmentMarchBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).marchSpeedPercent;
     const petBonuses=await getPetBonuses(env,k.id);
-    const seconds=calculateMarchDuration(baseSeconds,marchBonus+petBonuses.marchSpeedPercent);
+    const marchBonus=equipmentMarchBonus+petBonuses.marchSpeedPercent;
+    const seconds=calculateMarchDuration(baseSeconds,marchBonus);
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
