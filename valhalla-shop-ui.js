@@ -300,13 +300,17 @@
     button.disabled = true;
     button.textContent = "PROCESSANDO…";
     try {
+      const requestKey = button.dataset.requestKey || makeRequestKey();
+      button.dataset.requestKey = requestKey;
       const result = await request(API + "/buy", {
         method: "POST",
-        body: { catalog_id: item.id, request_key: makeRequestKey() },
+        body: { catalog_id: item.id, request_key: requestKey },
       });
+      delete button.dataset.requestKey;
       balanceNode.textContent = format(result.new_runes_balance);
       notify(result.message || "Compra concluída.", "success");
       setNotice(result.replayed ? "Compra anterior reconhecida; nenhuma recompensa foi duplicada." : "Recompensa entregue ao seu reino.");
+      busy = false;
       await loadCatalog();
     } catch (error) {
       setNotice(error.message, "error");
