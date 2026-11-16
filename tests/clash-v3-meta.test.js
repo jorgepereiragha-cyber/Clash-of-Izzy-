@@ -16,6 +16,8 @@ test("v3 schema keeps progression kingdom-scoped and preserves existing player i
   assert.ok(sql.includes("kingdom_id INTEGER PRIMARY KEY REFERENCES kingdoms(id)"));
   assert.ok(sql.includes("quality_level IN ('low','balanced','high')"));
   assert.ok(sql.includes("queue_type IN ('construction','training','research','march')"));
+  assert.ok(sql.includes("weekly_battle_10"));
+  assert.ok(sql.includes("strftime('%Y-W%W','now')"));
   assert.ok(!/player_id TEXT[^;]*REFERENCES players\(id\)/.test(sql));
 });
 
@@ -48,6 +50,8 @@ test("claims and speedups use conditional writes instead of client-priced reward
   const source = await read("kingdom-meta.js");
   assert.ok(source.includes("changes()>0"));
   assert.ok(source.includes("completed=1 AND claimed=0"));
+  assert.ok(source.includes("function utcWeek"));
+  assert.ok(source.includes("dt.period_type"));
   assert.ok(source.includes('queueType === "march"'));
   assert.ok(source.includes('new Set(["construction", "training", "research", "march"])'));
   assert.ok(!source.includes("gems_cost"));
