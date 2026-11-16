@@ -299,8 +299,6 @@ async function applyProduction(env,kingdomId){
     activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,activeHero.id,kingdomId).all():Promise.resolve({results:[]}),
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
   ]);
-  const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).resourcePercent/100;
-  const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus)*(1+Math.max(0,Number(vipProduction?.resource_bonus||0)));
   const [valhallaMultipliers,valhallaBuffs,vipProduction]=await Promise.all([
     getValhallaMultipliers(env),
     getValhallaBuffMultipliers(env,kingdomId),
@@ -309,6 +307,8 @@ async function applyProduction(env,kingdomId){
       "JOIN vip_benefits b ON b.vip_level=v.vip_level WHERE k.id=?"
     ).bind(kingdomId).first()
   ]);
+  const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).resourcePercent/100;
+  const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus)*(1+Math.max(0,Number(vipProduction?.resource_bonus||0)));
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
   const gains={},nextRemainders={};
@@ -369,15 +369,32 @@ async function processMarches(env,kingdomId){
      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
     ]);
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
-    const valhallaBuffs=await getValhallaBuffMultipliers(env,kingdomId);
+    const [valhallaBuffs,warfareRows,activeMount]=await Promise.all([
+     getValhallaBuffMultipliers(env,kingdomId),
+     env.DB.prepare("SELECT tech_id,level FROM kingdom_tech WHERE kingdom_id=?").bind(kingdomId).all(),
+     env.DB.prepare("SELECT mc.attack_bonus,mc.defense_bonus FROM player_mounts pm JOIN mount_catalog mc ON mc.id=pm.mount_id WHERE pm.kingdom_id=? AND pm.is_equipped=1").bind(kingdomId).first()
+    ]);
+    const warfare=Object.fromEntries((warfareRows.results||[]).map(row=>[row.tech_id,Number(row.level||0)]));
+    let weightedAttack=0,weightedTroops=0;
+    for(const unit of army){
+     const name=unit.unit_type;
+     const level=["militia","swordsman","spearman"].includes(name)?warfare.warrior_training||0:
+      ["cavalry","knight"].includes(name)?warfare.horsebreeding||0:
+      ["archer","crossbowman"].includes(name)?warfare.archery_mastery||0:0;
+     if(level>0){weightedAttack+=Number(unit.quantity)*level*5;weightedTroops+=Number(unit.quantity);}
+    }
+    const technologyAttack=weightedTroops?weightedAttack/weightedTroops:0;
+    const technologyDefense=Math.min(30,(warfare.fortification||0)*3);
+    const mountAttack=Number(activeMount?.attack_bonus||0)*100;
+    const mountDefense=Number(activeMount?.defense_bonus||0)*100;
     const castleLevel=Number(kingdom?.castle_level||1);
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      researchLevel:Number(military?.level||0),
-     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
-     equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
+     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent+technologyDefense+mountDefense)),
+     equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100)+technologyAttack+mountAttack,
      equipmentHealthBonusPercent:gear.healthPercent,
      criticalChancePercent:gear.criticalChancePercent,
      criticalDamageMultiplier:1.5,
@@ -1058,11 +1075,14 @@ async function gameAction(env,playerId,body){
     const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
     await ensureEquipmentTables(env,k.id);
     const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(k.id).first();
-    const [equippedRows,gearResearchRows]=await Promise.all([
+    const [equippedRows,gearResearchRows,warfareRows,activeMount]=await Promise.all([
       activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,activeHero.id).all():Promise.resolve({results:[]}),
-      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
+      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all(),
+      env.DB.prepare("SELECT level FROM kingdom_tech WHERE kingdom_id=? AND tech_id='logistics'").bind(k.id).first(),
+      env.DB.prepare("SELECT mc.speed_bonus FROM player_mounts pm JOIN mount_catalog mc ON mc.id=pm.mount_id WHERE pm.kingdom_id=? AND pm.is_equipped=1").bind(k.id).first()
     ]);
-    const marchBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).marchSpeedPercent;
+    const marchBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).marchSpeedPercent+
+      Number(warfareRows?.level||0)*2+Number(activeMount?.speed_bonus||0)*100;
     const seconds=calculateMarchDuration(baseSeconds,marchBonus);
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
@@ -1392,7 +1412,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET),hasEmailProvider:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.FRONTEND_URL),hasResendApiKey:Boolean(env.RESEND_API_KEY),hasEmailFrom:Boolean(env.EMAIL_FROM),hasFrontendUrl:Boolean(env.FRONTEND_URL)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog",player_visual_settings","visual_effects_log","player_vip","vip_benefits","player_speedups","daily_tasks","player_task_progress","player_mail","achievements","player_achievements","troop_formations","mount_catalog","player_mounts","city_skin_catalog","portrait_catalog",
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","player_visual_settings","visual_effects_log","player_vip","vip_benefits","player_speedups","daily_tasks","player_task_progress","player_mail","achievements","player_achievements","troop_formations","mount_catalog","player_mounts","city_skin_catalog","portrait_catalog"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
