@@ -285,7 +285,7 @@ $("zoomOut").addEventListener("click", () => changeMapZoom(-0.25));
 $("mapReset").addEventListener("click", resetMapViewport);
 
 $("worldMap").addEventListener("pointerdown", event => {
-  if (event.button !== 0 || event.target.closest(".territory-pin")) return;
+  if (event.button !== 0 || event.target.closest(".territory-pin,.resource-node-pin")) return;
   mapPointer = {
     pointerId: event.pointerId,
     startX: event.clientX,
