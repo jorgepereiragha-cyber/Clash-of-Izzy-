@@ -19,6 +19,14 @@
     p{color:#d8d1c2;line-height:1.6;margin:12px auto 24px;max-width:38ch}.secondary-mode{margin:12px 0 0;font-size:12px}.secondary-mode a{min-height:auto;padding:0;background:none;color:#c8d5e3;text-decoration:underline;font-weight:600;letter-spacing:0}
     a{display:inline-flex;justify-content:center;align-items:center;min-height:50px;padding:0 24px;border-radius:10px;background:linear-gradient(#d6ad5c,#9a682d);color:#17120a;text-decoration:none;font-weight:800;letter-spacing:.04em}
     .hint{display:block;margin-top:16px;color:#aeb9c8;font-size:12px}
+    #beta-signup-form{display:grid;gap:10px;max-width:390px;margin:24px auto 0;text-align:left}
+    #beta-signup-form>label{color:#d8d1c2;font-size:13px;line-height:1.45}
+    #beta-signup-form input[type=email]{width:100%;min-height:44px;padding:10px 12px;border:1px solid #8a744e;border-radius:8px;background:#0b1422;color:#fff;font:inherit}
+    #beta-signup-form .beta-consent{display:flex;align-items:flex-start;gap:8px}
+    #beta-signup-form input[type=checkbox]{width:18px;height:18px;min-height:18px;flex:0 0 auto;margin:1px 0 0}
+    #beta-signup-form button{min-height:44px;border:1px solid #b88b45;border-radius:9px;background:#243957;color:#f5edda;font-weight:800;cursor:pointer}
+    #beta-signup-form button:disabled{opacity:.65;cursor:wait}
+    #beta-signup-status{min-height:1.2em;margin:0;color:#c8d5e3;font-size:12px;text-align:center}
   body{display:flex;flex-direction:column;align-items:center;justify-content:center}.coi-global-nav{align-self:stretch}main{margin:auto}
   </style>
   <link rel="stylesheet" href="/styles/navigation.css">
@@ -30,7 +38,48 @@
     <p>Seu reino está esperando. Construa sua cidade, fortaleça seu exército e dispute territórios em um mundo medieval persistente.</p>
     <a href="./kingdom.html">ENTRAR NO REINO</a><p class="secondary-mode"><a href="./arena.html">Abrir modo Arena individual (secundário)</a></p>
     <span class="hint">Se o jogo não abrir automaticamente, toque no botão acima.</span>
+    <form id="beta-signup-form">
+      <label for="beta-signup-email">Quer receber um convite quando o beta abrir?</label>
+      <input id="beta-signup-email" name="email" type="email" maxlength="254" autocomplete="email" placeholder="Seu melhor e-mail" required>
+      <label class="beta-consent">
+        <input name="consent" type="checkbox" required>
+        <span>Concordo em receber convites e atualizações sobre o beta do Clash of Izzy. Posso solicitar a exclusão do meu e-mail a qualquer momento.</span>
+      </label>
+      <button type="submit">QUERO PARTICIPAR DO BETA</button>
+      <p id="beta-signup-status" role="status" aria-live="polite"></p>
+    </form>
   </main>
+<script>
+(()=> {
+  const form=document.getElementById("beta-signup-form");
+  const status=document.getElementById("beta-signup-status");
+  if(!form||!status)return;
+  form.addEventListener("submit",async event=>{
+    event.preventDefault();
+    const button=form.querySelector("button[type=submit]");
+    const email=String(form.elements.email.value||"").trim();
+    const consent=form.elements.consent.checked;
+    if(!consent){status.textContent="Confirme o consentimento para continuar.";return;}
+    button.disabled=true;
+    status.textContent="Enviando inscrição...";
+    try{
+      const response=await fetch("/api/beta/signup",{
+        method:"POST",
+        headers:{"Content-Type":"application/json"},
+        body:JSON.stringify({email,consent})
+      });
+      const result=await response.json().catch(()=>({}));
+      if(!response.ok)throw new Error(result.error||"Não foi possível concluir a inscrição.");
+      status.textContent=result.message||"Inscrição confirmada.";
+      form.reset();
+    }catch(error){
+      status.textContent=error.message||"Falha de conexão. Tente novamente.";
+    }finally{
+      button.disabled=false;
+    }
+  });
+})();
+</script>
 <script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script>
 <script src="/navigation.js" defer></script>
 </body>
