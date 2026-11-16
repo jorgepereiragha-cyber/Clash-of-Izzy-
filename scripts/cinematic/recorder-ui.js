@@ -60,7 +60,7 @@ class TrailerRecorderUI {
           <div class="coi-recorder-progress-track"><span id="coi-progress-fill"></span></div>
           <div class="coi-recorder-progress-time"><span id="coi-current-time">0:00</span><span id="coi-total-time">1:00</span></div>
         </div>
-        <p class="coi-recorder-footnote">A captura usa o mapa 3D do reino. A taxa de quadros final depende do dispositivo e do navegador.</p>
+        <p class="coi-recorder-footnote">A captura usa o mapa 3D do reino. A taxa de quadros depende do dispositivo. A gravação é mantida temporariamente na memória; durações longas podem ser bloqueadas em celulares para evitar falta de memória.</p>
       </div>
     `;
     document.body.append(this.panel);
@@ -131,7 +131,8 @@ class TrailerRecorderUI {
         width: config.width,
         height: config.height,
         fps: config.fps,
-        bitrate: config.width >= 1920 ? 8000000 : 5000000
+        bitrate: config.width >= 1920 ? 8000000 : 5000000,
+        expectedDuration: config.duration
       });
       this.showStatus(message, true);
       this.setRecordingControls(true);
