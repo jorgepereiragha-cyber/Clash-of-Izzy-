@@ -158,6 +158,16 @@ export async function runProductionSmokeTests({
   assert(serviceWorker.includes("/technology-tree.js"), "PWA não inclui a árvore de tecnologias.");
   assert(serviceWorker.includes("/styles/technology-tree.css"), "PWA não inclui os estilos da árvore tecnológica.");
   assert(serviceWorker.includes("/styles/visual-polish.css"), "PWA não inclui o polimento visual compartilhado.");
+  const technologyScriptResponse = await get("/technology-tree.js");
+  assert(technologyScriptResponse.status === 200, "Controlador da árvore de tecnologias indisponível.");
+  const technologyScript = await technologyScriptResponse.text();
+  assert(technologyScript.includes("coi:kingdom-technologies"), "Árvore de tecnologias não está conectada ao estado do reino.");
+  const technologyStylesResponse = await get("/styles/technology-tree.css");
+  assert(technologyStylesResponse.status === 200, "Estilos da árvore de tecnologias indisponíveis.");
+  const technologyStyles = await technologyStylesResponse.text();
+  assert(technologyStyles.includes(".technology-grid"), "Grade responsiva da árvore de tecnologias ausente.");
+  const visualPolishResponse = await get("/styles/visual-polish.css");
+  assert(visualPolishResponse.status === 200, "Estilos de polimento visual indisponíveis.");
 
   return {
     baseUrl: base.origin,
