@@ -47,7 +47,8 @@ test("world map renders untrusted territory labels with DOM text, not HTML injec
 });
 
 test("PWA shell includes the world map and increments its cache version", () => {
-  for (const marker of ['clash-of-izzy-shell-v17', '"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  for (const marker of ['clash-of-izzy-shell-v18', '"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  for (const asset of ["/advanced.html", "/advanced-game-ui.js", "/styles/advanced-game.css", "/visual-effects.js", "/styles/visual-effects.css"]) assert.ok(serviceWorker.includes('"' + asset + '"'), "missing v3 asset: " + asset);
   assert.ok(serviceWorker.includes('url.pathname.startsWith("/api/")'));
 });
 
