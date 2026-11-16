@@ -29,6 +29,8 @@ const BUILDINGS = {
   embassy:{label:"Embaixada",wood:220,stone:180,food:0,iron:0},
   warehouse:{label:"Armazém",wood:170,stone:100,food:0,iron:0}
 };
+const TRAINING_QUEUE_LIMIT=2;
+const TROOPS_PER_BARRACKS_LEVEL=500;
 const HERO_TEMPLATES = {
 soldado_basico:{name:"Soldado Recruta",title:"Recruta do Reino",rarity:"white",type:"infantaria",stats:{hp:500,attack:80,defense:60,speed:30},skill:"Golpe Rápido",skillDesc:"Ataque básico simples",skillPower:1.2},
 arqueiro_comum:{name:"Arqueiro da Floresta",title:"Atirador Comum",rarity:"white",type:"arqueiro",stats:{hp:400,attack:100,defense:40,speed:45},skill:"Flecha Simples",skillDesc:"Disparo básico",skillPower:1.3},
@@ -516,7 +518,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id).all()
     ,env.DB.prepare("SELECT id,event_type,payload_json FROM kingdom_events WHERE kingdom_id=? AND event_type!='__internal_action_guard' ORDER BY id DESC LIMIT 15").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,queue_type,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at,completed_at FROM kingdom_queues WHERE kingdom_id=? ORDER BY CASE WHEN status='running' THEN 0 ELSE 1 END,id DESC LIMIT 15").bind(kingdom.id).all()
+    env.DB.prepare("SELECT id,queue_type,target_key,lane_number,quantity,from_level,to_level,reward_item,status,started_at,completes_at,completed_at FROM kingdom_queues WHERE kingdom_id=? ORDER BY CASE WHEN status='running' THEN 0 ELSE 1 END,id DESC LIMIT 15").bind(kingdom.id).all()
   ]);
   const pendingInvites=await env.DB.prepare("SELECT i.id,i.created_at,a.name,a.tag FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.target_kingdom_id=? ORDER BY i.id DESC").bind(kingdom.id).all();
   const alliance=await env.DB.prepare("SELECT a.id,a.name,a.tag,a.description,a.level,a.xp,a.max_members,a.territory_count,a.shared_food,a.shared_wood,a.shared_stone,a.shared_iron,a.shared_gold,am.role,am.rank,am.contribution,(SELECT COUNT(*) FROM alliance_members x WHERE x.alliance_id=a.id) AS member_count FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=?").bind(kingdom.id).first();
@@ -976,18 +978,23 @@ async function gameAction(env,playerId,body){
     const requiredBuilding={militia:"barracks",swordsman:"barracks",spearman:"barracks",archer:"archery_range",crossbowman:"archery_range",cavalry:"stable",knight:"stable",mage:"academy",catapult:"siege_workshop",ram:"siege_workshop",trebuchet:"siege_workshop"}[unit];
     const trainingHall=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type=?").bind(k.id,requiredBuilding).first();
     if(!trainingHall||trainingHall.level<1)return json({error:"Construa o edifício de treinamento exigido."},409);
-    const activeQueue=await env.DB.prepare("SELECT id FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running'").bind(k.id).first();
-    if(activeQueue)return json({error:"Sua fila de treinamento já está ocupada. Aguarde as tropas atuais."},409);
+    const activeTraining=await env.DB.prepare("SELECT COUNT(*) AS count FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running'").bind(k.id).first();
+    if(Number(activeTraining?.count||0)>=TRAINING_QUEUE_LIMIT)return json({error:"As duas filas de treinamento já estão ocupadas. Aguarde uma delas liberar."},409);
+    const barracks=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='barracks'").bind(k.id).first();
+    const troopCapacity=Math.max(0,Number(barracks?.level||0))*TROOPS_PER_BARRACKS_LEVEL;
+    const troopTotals=await env.DB.prepare("SELECT COALESCE((SELECT SUM(quantity) FROM army_units WHERE kingdom_id=?),0) AS existing,COALESCE((SELECT SUM(quantity) FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running'),0) AS queued").bind(k.id,k.id).first();
+    const usedCapacity=Number(troopTotals?.existing||0)+Number(troopTotals?.queued||0);
+    if(usedCapacity+quantity>troopCapacity)return json({error:"Capacidade do exército excedida. Melhore o Quartel ou reduza a quantidade.",capacity:troopCapacity,used:usedCapacity,requested:quantity,available:Math.max(0,troopCapacity-usedCapacity)},409);
     const cost={food:spec.food*quantity,wood:spec.wood*quantity,iron:spec.iron*quantity};
     const valhallaMultipliers=await getValhallaMultipliers(env);
     const durationSeconds=await scaleKingdomQueueDurationSeconds(env,k.id,calculateQueueDurationSeconds("training",{targetKey:unit,quantity,facilityLevel:Number(trainingHall.level||1)}),"training",valhallaMultipliers);
     const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();
     const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
-    const debit=env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level>=1) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running')")
-      .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron,k.id,requiredBuilding,k.id);
+    const debit=env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level>=1) AND (SELECT COUNT(*) FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running')<? AND COALESCE((SELECT SUM(quantity) FROM army_units WHERE kingdom_id=?),0)+COALESCE((SELECT SUM(quantity) FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running'),0)+?<=?*COALESCE((SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='barracks'),0)")
+      .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron,k.id,requiredBuilding,k.id,TRAINING_QUEUE_LIMIT,k.id,k.id,quantity,TROOPS_PER_BARRACKS_LEVEL,k.id);
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
-    statements.push(env.DB.prepare("INSERT INTO kingdom_queues(kingdom_id,queue_type,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at) SELECT ?,?,?,?,?,?,?,'running',?,? WHERE "+guard)
-      .bind(k.id,"training",unit,quantity,0,0,"royal_blueprint",startedAt,completesAt,k.id,actionId));
+    statements.push(env.DB.prepare("INSERT INTO kingdom_queues(kingdom_id,queue_type,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at,lane_number) SELECT ?,?,?,?,?,?,?,'running',?,?,CASE WHEN NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running' AND lane_number=1) THEN 1 ELSE 2 END WHERE "+guard)
+      .bind(k.id,"training",unit,quantity,0,0,"royal_blueprint",startedAt,completesAt,k.id,k.id,actionId));
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
       .bind(k.id,"troop_training_started",JSON.stringify({unit,quantity,cost,durationSeconds,completesAt}),k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
