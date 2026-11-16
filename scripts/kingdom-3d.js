@@ -771,6 +771,19 @@ if (host && "WebGLRenderingContext" in window) {
     setKingdomValhallaMode(valhallaModeActive);
     applyProceduralSurfaceMaps();
     buildGround();
+    if (qualityProfile.tier === "high" && !qualityProfile.prefersReducedMotion) {
+      try {
+        advancedShaders = new AdvancedShaders(scene, renderer, camera, THREE);
+        waterFeature = advancedShaders.createRealisticWater(new THREE.Vector3(5.35, -.035, -4.15), 2.4);
+        waterFeature.userData.coIOptionalFeature = "premium-water";
+        scene.add(waterFeature);
+      } catch (shaderError) {
+        advancedShaders?.dispose();
+        advancedShaders = null;
+        waterFeature = null;
+        console.info("Clash of Izzy: shader premium indisponível; mantendo renderização padrão.", shaderError);
+      }
+    }
     ktx2 = new KTX2Loader();
     ktx2.setTranscoderPath("https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/basis/");
     ktx2.detectSupport(renderer);
@@ -789,7 +802,8 @@ if (host && "WebGLRenderingContext" in window) {
         textures: info.memory.textures,
         pixelRatio: renderer.getPixelRatio(),
         maxTextureSize: renderer.capabilities.maxTextureSize,
-        shadows: renderer.shadowMap.enabled
+        shadows: renderer.shadowMap.enabled,
+        premiumWater: Boolean(waterFeature)
       };
     };
     window.__coiKingdomDiagnostics = diagnostics;
@@ -848,6 +862,7 @@ if (host && "WebGLRenderingContext" in window) {
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
     else { resizeHandler = resize; window.addEventListener("resize", resizeHandler, { passive: true }); }
     resize();
+    if (advancedShaders) startArmyAnimationLoop();
   } catch (error) {
     // Initialization can fail after GPU resources or listeners were already created.
     // Run the same deterministic teardown used by the context-loss fallback.
