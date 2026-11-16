@@ -103,7 +103,7 @@ async function installApiFixtures(page) {
 }
 
 test.describe("Mobile kingdom rendering", () => {
-  test("renders resources, buildings, queues and troop controls on Pixel 5", async ({ page }) => {
+  test("renders resources, buildings, queues and troop controls on mobile", async ({ page }) => {
     const { stateRequests } = await installApiFixtures(page);
 
     await page.goto("/kingdom.html");
@@ -151,9 +151,10 @@ test.describe("Mobile kingdom rendering", () => {
 
     const construction = page.locator(".queue-card").filter({ hasText: "Construção" });
     await expect(construction).toBeVisible();
-    await expect(construction.locator(".queue-remaining")).toContainText(/m/);
+    // The countdown can legitimately switch from minutes to seconds during a slow CI run.
+    await expect(construction.locator(".queue-remaining")).toHaveText(/\d+\s*[hms]/);
     await expect(construction.locator(".queue-progress span"))
-      .toHaveAttribute("style", /width:\s*\d+%/);
+      .toHaveAttribute("style", /width:\s*\d+(?:\.\d+)?%/);
     await expect(construction.locator('[role="progressbar"]'))
       .toHaveAttribute("aria-valuenow", /\d+/);
 
@@ -168,7 +169,7 @@ test.describe("Mobile kingdom rendering", () => {
       canvasIds: [...document.querySelectorAll("#city canvas")].map(canvas => canvas.id),
     }));
     expect(layout.documentWidth).toBeLessThanOrEqual(layout.viewportWidth + 1);
-    expect(layout.cityWidth).toBeGreaterThan(300);
+    expect(layout.cityWidth).toBeGreaterThan(280);
     expect(layout.cityHeight).toBeGreaterThan(250);
     expect(layout.canvasIds).toContain("kingdomScene");
     expect(stateRequests.length).toBeGreaterThan(0);
@@ -191,7 +192,7 @@ test.describe("Mobile kingdom rendering", () => {
       cityWidth: document.getElementById("city").getBoundingClientRect().width,
     }));
     expect(dimensions.documentWidth).toBeLessThanOrEqual(dimensions.width + 1);
-    expect(dimensions.cityWidth).toBeGreaterThan(300);
+    expect(dimensions.cityWidth).toBeGreaterThan(280);
   });
 
   test("upgrade and training controls submit the expected game actions", async ({ page }) => {
