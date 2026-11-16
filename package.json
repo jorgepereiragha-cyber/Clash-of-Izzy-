@@ -10,9 +10,12 @@
     "db:migrate:remote": "wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --remote",
     "check": "wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist",
     "test": "node --test",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui",
     "assets:validate": "node scripts/validate-3d-assets.js"
   },
   "devDependencies": {
+    "@playwright/test": "1.65.1",
     "wrangler": "4.161.0"
   }
 }
