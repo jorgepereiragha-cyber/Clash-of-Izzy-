@@ -38,8 +38,8 @@ test("camera presets match their displayed durations and the actual kingdom worl
 
 test("capture negotiates browser codecs and restores the original renderer and camera", () => {
   assert.match(mediaSupport, /isTypeSupported/);
-  assert.match(capture, /video\/webm;codecs=vp9/);
-  assert.match(capture, /video\/webm;codecs=vp8/);
+  assert.match(mediaSupport, /video\/webm;codecs=vp9/);
+  assert.match(mediaSupport, /video\/webm;codecs=vp8/);
   assert.match(capture, /setCaptureActive\?\.\(true\)/);
   assert.match(capture, /setCaptureActive\?\.\(false\)/);
   assert.match(capture, /originalRendererSize/);
