@@ -83,6 +83,16 @@ class TrailerRecorderUI {
       event.currentTarget.textContent = collapsed ? "−" : "+";
     });
 
+    const trainingQuantity = document.getElementById("unitQuantity");
+    if (trainingQuantity && window.matchMedia?.("(max-width: 760px)")?.matches) {
+      trainingQuantity.addEventListener("focus", () => {
+        this.panel.classList.add("is-keyboard-open");
+      });
+      trainingQuantity.addEventListener("blur", () => {
+        this.panel.classList.remove("is-keyboard-open");
+      });
+    }
+
     this.panel.querySelectorAll("[data-preset]").forEach(button => {
       button.addEventListener("click", () => this.recordPreset(button.dataset.preset));
     });
