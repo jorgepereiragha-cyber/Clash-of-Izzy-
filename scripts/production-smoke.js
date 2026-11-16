@@ -68,6 +68,7 @@ export async function runProductionSmokeTests({
   assert(admin.hasSESSION_SECRET === true, "Painel Master sem SESSION_SECRET.");
   assert(admin.hasADMIN_EMAIL === true, "ADMIN_EMAIL não está configurado no Worker.");
   assert(admin.hasADMIN_PASSWORD === true, "ADMIN_PASSWORD não está configurado no Worker.");
+  const emailProviderConfigured = admin.hasEmailProvider === true;
 
   const stateResponse = await get("/api/game/state");
   assert(stateResponse.status === 401, "O estado do jogo deve exigir sessão; recebido HTTP " + stateResponse.status + ".");
@@ -139,6 +140,7 @@ export async function runProductionSmokeTests({
       d1: true,
       sessionSecret: true,
       adminConfiguration: true,
+      transactionalEmailProviderConfigured: emailProviderConfigured,
       unauthenticatedAccessBlocked: true,
       storeCatalog: true,
       mercadoPagoCheckout: true,
