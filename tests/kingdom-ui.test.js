@@ -51,7 +51,15 @@ test("queue progress uses D1 timestamps and updates the accessible progress bar 
   assert.match(html, /queueProgressPercent\(el\.dataset\.started,el\.dataset\.completes,now\)/);
 });
 
-test("PWA cache version is bumped when queue UI is changed", async () => {
+test("central do reino envia feedback e registra analytics da sessão", async () => {
+  const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.match(html, /id="feedbackForm"/);
+  assert.match(html, /request\("\/game\/feedback"/);
+  assert.match(html, /request\("\/game\/analytics"/);
+  assert.match(html, /kingdom\.opened/);
+});
+
+test("PWA cache version is bumped when static UI changes", async () => {
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /clash-of-izzy-shell-v13/);
+  assert.match(worker, /clash-of-izzy-shell-v14/);
 });
