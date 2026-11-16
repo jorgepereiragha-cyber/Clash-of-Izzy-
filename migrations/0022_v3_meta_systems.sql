@@ -66,6 +66,7 @@ CREATE TABLE IF NOT EXISTS daily_tasks (
   title TEXT NOT NULL,
   description TEXT NOT NULL,
   event_type TEXT NOT NULL,
+  period_type TEXT NOT NULL DEFAULT 'daily' CHECK (period_type IN ('daily','weekly')),
   progress_field TEXT NOT NULL CHECK (progress_field IN ('one','quantity','amount')),
   target_count INTEGER NOT NULL CHECK (target_count > 0),
   reward_json TEXT NOT NULL CHECK (json_valid(reward_json)),
@@ -86,18 +87,22 @@ CREATE INDEX IF NOT EXISTS idx_kingdom_tasks_period
   ON kingdom_task_progress(kingdom_id,period_key,completed,claimed);
 
 INSERT OR IGNORE INTO daily_tasks
-  (id,title,description,event_type,progress_field,target_count,reward_json)
+  (id,title,description,event_type,period_type,progress_field,target_count,reward_json)
 VALUES
-  ('daily_battle_1','Vitória do Dia','Vença 1 batalha contra um inimigo.','battle_won','one',1,
+  ('daily_battle_1','Vitória do Dia','Vença 1 batalha contra um inimigo.','battle_won','daily','one',1,
     '{"gems":50,"speedups":[{"queue_type":"training","duration_seconds":300,"quantity":1}]}'),
-  ('daily_build_2','Mãos à Obra','Conclua 2 melhorias de edifícios.','building_upgraded','one',2,
+  ('daily_build_2','Mãos à Obra','Conclua 2 melhorias de edifícios.','building_upgraded','daily','one',2,
     '{"gems":30,"resources":{"wood":1000}}'),
-  ('daily_train_500','Reforços do Reino','Treine 500 tropas.','troops_trained','quantity',500,
+  ('daily_train_500','Reforços do Reino','Treine 500 tropas.','troops_trained','daily','quantity',500,
     '{"gems":40,"resources":{"food":2000}}'),
-  ('daily_gather_10000','Coletor de Midgard','Recolha 10.000 recursos nos nós do mapa.','resources_gathered','amount',10000,
+  ('daily_gather_10000','Coletor de Midgard','Recolha 10.000 recursos nos nós do mapa.','resources_gathered','daily','amount',10000,
     '{"gems":35,"speedups":[{"queue_type":"construction","duration_seconds":3600,"quantity":1}]}'),
-  ('daily_research_1','Conhecimento Ancestral','Conclua 1 pesquisa.','research_upgraded','one',1,
-    '{"gems":60,"speedups":[{"queue_type":"research","duration_seconds":3600,"quantity":1}]}');
+  ('daily_research_1','Conhecimento Ancestral','Conclua 1 pesquisa.','research_upgraded','daily','one',1,
+    '{"gems":60,"speedups":[{"queue_type":"research","duration_seconds":3600,"quantity":1}]}'),
+  ('weekly_battle_10','Semana de Guerra','Vença 10 batalhas nesta semana.','battle_won','weekly','one',10,
+    '{"gems":300,"speedups":[{"queue_type":"training","duration_seconds":3600,"quantity":2}]}'),
+  ('weekly_gather_50000','Tributo de Midgard','Recolha 50.000 recursos nesta semana.','resources_gathered','weekly','amount',50000,
+    '{"gems":350,"resources":{"gold":1000}}');
 
 CREATE TABLE IF NOT EXISTS achievement_catalog (
   id TEXT PRIMARY KEY,
@@ -194,8 +199,9 @@ BEGIN
   UPDATE kingdom_task_progress
   SET completed=1,updated_at=unixepoch()
   WHERE kingdom_id=NEW.kingdom_id
-    AND period_key=strftime('%Y-%m-%d','now')
     AND task_id IN (SELECT id FROM daily_tasks WHERE event_type=NEW.event_type AND active=1)
+    AND period_key=(SELECT CASE period_type WHEN 'weekly' THEN strftime('%Y-W%W','now')
+      ELSE strftime('%Y-%m-%d','now') END FROM daily_tasks WHERE id=kingdom_task_progress.task_id)
     AND progress >= (SELECT target_count FROM daily_tasks WHERE id=kingdom_task_progress.task_id);
 
   INSERT INTO kingdom_achievement_progress(kingdom_id,achievement_id,progress)
