@@ -721,7 +721,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
       await action(tokenA, { type: "train", unit: "unit_invalid", quantity: 1 }, 400);
       await action(tokenA, { type: "train", unit: "mage", quantity: 1 }, 200);
-      await action(tokenA, { type: "train", unit: "archer", quantity: 1 }, 409, "segundo treinamento na mesma fila");
+      await action(tokenA, { type: "train", unit: "archer", quantity: 1 }, 200, "segundo treinamento na segunda fila");
+      await action(tokenA, { type: "train", unit: "spearman", quantity: 1 }, 409, "terceiro treinamento sem vaga de fila");
 
       await action(tokenA, { type: "research", research: "research_invalid" }, 400);
       await action(tokenA, { type: "research", research: "economy" }, 200);
@@ -735,7 +736,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       stateA = (await api("/api/game/state", { token: tokenA })).data.state;
       assert.ok(stateA.marches.some(item => item.status === "marching"), "marcha fica persistida no servidor");
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "construction"));
-      assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "training"));
+      assert.equal(stateA.queues.filter(item => item.status === "running" && item.queue_type === "training").length, 2, "duas filas de treinamento permanecem ativas");
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "research"));
     });
 
