@@ -50,7 +50,7 @@ test("active skills are server-authoritative, owned-hero restricted and cooldown
 test("map displays reports with text nodes and PWA shell version is refreshed", () => {
   assert.ok(!world.includes("innerHTML"), "untrusted report data must not be injected as HTML");
   assert.match(world, /textContent/);
-  assert.match(serviceWorker, /clash-of-izzy-shell-v18/);
+  assert.match(serviceWorker, /clash-of-izzy-shell-v19/);
 });
 
 test("worker, skill catalog and map scripts pass Node syntax checks", () => {
