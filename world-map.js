@@ -223,6 +223,7 @@ function renderDetails() {
   if (!territory) {
     root.append(make("div", "muted", "Escolha um ponto no mapa."));
     $("troops").replaceChildren();
+    renderHeroSkillOptions();
     updateActionButtons();
     return;
   }
