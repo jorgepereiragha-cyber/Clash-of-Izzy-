@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { TRAILER_SCRIPT, CINEMATIC_PRESETS, buildTrailerTimeline } from "../scripts/cinematic/trailer-script.js";
 import { MEDIA_RECORDER_MIME_TYPES, selectMediaRecorderMimeType, estimateRecordingBytes, getRecordingMemoryBudget } from "../scripts/cinematic/media-recorder-support.js";
+import { CinematicCapture } from "../scripts/cinematic/capture-system.js";
 
 const capture = await readFile(new URL("../scripts/cinematic/capture-system.js", import.meta.url), "utf8");
 const mediaSupport = await readFile(new URL("../scripts/cinematic/media-recorder-support.js", import.meta.url), "utf8");
@@ -11,6 +12,130 @@ const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
 const serviceWorker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
 const premiumCss = await readFile(new URL("../styles/premium-ui.css", import.meta.url), "utf8");
+
+function setTestGlobal(name, value) {
+  const previous = Object.getOwnPropertyDescriptor(globalThis, name);
+  Object.defineProperty(globalThis, name, {
+    configurable: true,
+    enumerable: previous?.enumerable ?? true,
+    writable: true,
+    value
+  });
+  return () => {
+    if (previous) Object.defineProperty(globalThis, name, previous);
+    else delete globalThis[name];
+  };
+}
+
+function makeVector3(x, y, z) {
+  return {
+    x, y, z,
+    set(nx, ny, nz) { this.x = nx; this.y = ny; this.z = nz; return this; },
+    copy(other) { this.x = other.x; this.y = other.y; this.z = other.z; return this; },
+    clone() { return makeVector3(this.x, this.y, this.z); }
+  };
+}
+
+function createCaptureHarness({ rejectExplicitMime = false, deviceMemory = 4 } = {}) {
+  const restores = [];
+  const events = [];
+  const constructorOptions = [];
+  let trackStopped = false;
+  let active = false;
+  let renderedFrames = 0;
+  let frameId = 0;
+
+  class FakeMediaRecorder {
+    static isTypeSupported(type) {
+      return type === "video/webm;codecs=vp8";
+    }
+    constructor(stream, options = {}) {
+      constructorOptions.push({ ...options });
+      if (rejectExplicitMime && options.mimeType) {
+        throw new Error("The mobile encoder rejected the requested codec.");
+      }
+      this.stream = stream;
+      this.mimeType = options.mimeType || "video/webm";
+      this.state = "inactive";
+    }
+    start() {
+      this.state = "recording";
+    }
+    stop() {
+      this.state = "inactive";
+      this.ondataavailable?.({ data: new Blob(["mock-video-frame"], { type: this.mimeType }) });
+      this.onstop?.();
+    }
+  }
+
+  class FakeCanvas {
+    constructor() {
+      this.width = 0;
+      this.height = 0;
+    }
+    getContext() {
+      return { drawImage() {}, save() {}, restore() {} };
+    }
+    captureStream(fps) {
+      this.fps = fps;
+      return { getTracks: () => [{ stop() { trackStopped = true; } }] };
+    }
+  }
+
+  const renderer = {
+    width: 800,
+    height: 600,
+    pixelRatio: 1.5,
+    capabilities: { maxTextureSize: 4096 },
+    domElement: {},
+    getSize(target) { return target.set(this.width, this.height); },
+    getPixelRatio() { return this.pixelRatio; },
+    setPixelRatio(value) { this.pixelRatio = value; },
+    setSize(width, height) { this.width = width; this.height = height; }
+  };
+  const originalPosition = makeVector3(1, 2, 3);
+  const camera = {
+    isOrthographicCamera: true,
+    isPerspectiveCamera: false,
+    position: originalPosition,
+    quaternion: {
+      x: 0, y: 0, z: 0, w: 1,
+      clone() { return { ...this }; },
+      copy(other) { Object.assign(this, other); }
+    },
+    zoom: 1,
+    left: -8, right: 8, top: 6, bottom: -6,
+    updateProjectionMatrix() {},
+    lookAt() {}
+  };
+  const api = {
+    getContext() { return { renderer, scene: {}, camera }; },
+    setCaptureActive(value) { active = value; return true; },
+    setCaptureViewport() { return true; },
+    renderFrame() { renderedFrames++; },
+    getValhallaMode() { return false; },
+    setValhallaMode() {}
+  };
+
+  restores.push(setTestGlobal("MediaRecorder", FakeMediaRecorder));
+  restores.push(setTestGlobal("HTMLCanvasElement", FakeCanvas));
+  restores.push(setTestGlobal("document", { createElement: () => new FakeCanvas() }));
+  restores.push(setTestGlobal("window", { dispatchEvent(event) { events.push(event); } }));
+  restores.push(setTestGlobal("CustomEvent", class {
+    constructor(type, options = {}) { this.type = type; this.detail = options.detail; }
+  }));
+  restores.push(setTestGlobal("requestAnimationFrame", () => ++frameId));
+  restores.push(setTestGlobal("cancelAnimationFrame", () => {}));
+  restores.push(setTestGlobal("navigator", { deviceMemory }));
+
+  return {
+    api, renderer, camera, events, constructorOptions,
+    get trackStopped() { return trackStopped; },
+    get active() { return active; },
+    get renderedFrames() { return renderedFrames; },
+    restore() { for (const restore of restores.reverse()) restore(); }
+  };
+}
 
 test("trailer timeline uses the duration selected in the recorder and continuous keyframes", () => {
   const timeline = buildTrailerTimeline(TRAILER_SCRIPT, 90);
@@ -98,4 +223,81 @@ test("recording preflight estimates memory and applies a conservative mobile bud
   assert.throws(() => estimateRecordingBytes(0, 60), /positivos/);
   assert.throws(() => estimateRecordingBytes(5000000, -1), /positivos/);
   assert.match(mediaSupport, /15% container/);
+});
+
+test("real capture flow uses the mobile codec and restores renderer, camera and stream", async () => {
+  const harness = createCaptureHarness();
+  try {
+    const capture = new CinematicCapture(harness.api);
+    capture.setCameraPath([
+      { time: 0, position: [4, 6, 8], lookAt: [0, 0, 0], zoom: 1 },
+      { time: 8, position: [5, 7, 9], lookAt: [0, 0, 0], zoom: 1.1 }
+    ]);
+    await capture.startRecording({ width: 1280, height: 720, fps: 30, bitrate: 2500000, expectedDuration: 8 });
+    assert.equal(capture.isRecording, true);
+    assert.equal(harness.active, true);
+    assert.equal(harness.renderer.width, 1280);
+    assert.equal(harness.renderer.height, 720);
+    assert.equal(harness.renderer.pixelRatio, 1);
+    assert.equal(harness.constructorOptions[0].mimeType, "video/webm;codecs=vp8");
+    assert.ok(harness.renderedFrames > 0);
+
+    assert.equal(capture.stopRecording(), true);
+    const completed = harness.events.find(event => event.type === "cinematic-complete");
+    assert.ok(completed?.detail.blob.size > 0);
+    assert.equal(completed.detail.mimeType, "video/webm;codecs=vp8");
+    assert.equal(harness.renderer.width, 800);
+    assert.equal(harness.renderer.height, 600);
+    assert.equal(harness.renderer.pixelRatio, 1.5);
+    assert.deepEqual(
+      [harness.camera.position.x, harness.camera.position.y, harness.camera.position.z],
+      [1, 2, 3]
+    );
+    assert.equal(harness.active, false);
+    assert.equal(harness.trackStopped, true);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("capture retries native codec selection when the mobile encoder rejects an explicit MIME", async () => {
+  const harness = createCaptureHarness({ rejectExplicitMime: true });
+  try {
+    const capture = new CinematicCapture(harness.api);
+    capture.setCameraPath([
+      { time: 0, position: [4, 6, 8], lookAt: [0, 0, 0], zoom: 1 },
+      { time: 5, position: [5, 7, 9], lookAt: [0, 0, 0], zoom: 1.1 }
+    ]);
+    await capture.startRecording({ width: 1280, height: 720, fps: 30, bitrate: 2500000, expectedDuration: 5 });
+    assert.equal(harness.constructorOptions.length, 2);
+    assert.equal(harness.constructorOptions[0].mimeType, "video/webm;codecs=vp8");
+    assert.equal("mimeType" in harness.constructorOptions[1], false);
+    capture.stopRecording();
+    const completed = harness.events.find(event => event.type === "cinematic-complete");
+    assert.equal(completed.detail.mimeType, "video/webm");
+    assert.ok(completed.detail.blob.size > 0);
+  } finally {
+    harness.restore();
+  }
+});
+
+test("low-memory devices reject unsafe recording duration before resizing the kingdom renderer", async () => {
+  const harness = createCaptureHarness({ deviceMemory: 4 });
+  try {
+    const capture = new CinematicCapture(harness.api);
+    capture.setCameraPath([
+      { time: 0, position: [4, 6, 8], lookAt: [0, 0, 0], zoom: 1 },
+      { time: 180, position: [5, 7, 9], lookAt: [0, 0, 0], zoom: 1.1 }
+    ]);
+    await assert.rejects(
+      capture.startRecording({ width: 1280, height: 720, fps: 30, bitrate: 5000000, expectedDuration: 180 }),
+      /acima do limite seguro/
+    );
+    assert.equal(harness.active, false);
+    assert.equal(harness.renderer.width, 800);
+    assert.equal(harness.renderer.height, 600);
+    assert.equal(harness.constructorOptions.length, 0);
+  } finally {
+    harness.restore();
+  }
 });
