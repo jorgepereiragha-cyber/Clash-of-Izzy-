@@ -59,7 +59,7 @@ export async function distributeValhallaDailyRunes(env, now = new Date()) {
         statements.push(
           env.DB.prepare(
             "INSERT OR IGNORE INTO valhalla_daily_rewards(kingdom_id,reward_date,rune_amount) " +
-            "SELECT ?,?,?, " +
+            "SELECT ?,?,? " +
             "WHERE EXISTS(SELECT 1 FROM game_config WHERE key='valhalla_mode_active' AND value='1') " +
             "AND CAST(COALESCE((SELECT value FROM game_config WHERE key='valhalla_start_time'),'0') AS INTEGER)<=? " +
             "AND (CAST(COALESCE((SELECT value FROM game_config WHERE key='valhalla_end_time'),'0') AS INTEGER)=0 " +
