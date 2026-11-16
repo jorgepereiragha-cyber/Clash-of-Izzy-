@@ -1,0 +1,37 @@
+/* Polimento transversal v3.0 — reforça a identidade visual já definida em coi-theme.css. */
+:root{
+  --coi-motion-fast:140ms;
+  --coi-motion-normal:200ms;
+  --coi-focus-ring:0 0 0 3px rgba(231,189,104,.24);
+}
+.panel,.rally-section,.stat,.queue-card,.event{
+  box-shadow:0 7px 20px rgba(0,0,0,.16);
+}
+.panel{
+  border-color:rgba(231,189,104,.42);
+  background:linear-gradient(145deg,rgba(27,48,73,.97),rgba(12,24,40,.98));
+}
+button,.linkbtn{
+  transition:transform var(--coi-motion-fast) ease,border-color var(--coi-motion-fast) ease,filter var(--coi-motion-fast) ease,box-shadow var(--coi-motion-fast) ease;
+}
+button:hover:not(:disabled),.linkbtn:hover{
+  filter:brightness(1.1);
+  border-color:#ffe2a0;
+  box-shadow:0 5px 14px rgba(0,0,0,.25);
+}
+button:active:not(:disabled),.linkbtn:active{transform:translateY(1px) scale(.99)}
+button:focus-visible,.linkbtn:focus-visible{
+  outline:2px solid var(--coi-gold,#e7bd68);
+  outline-offset:3px;
+  box-shadow:var(--coi-focus-ring);
+}
+.panel h2{letter-spacing:.01em;text-shadow:0 1px 12px rgba(231,189,104,.12)}
+.resource,.stat,.queue-card,.event{border-color:rgba(125,151,178,.34)}
+@media(max-width:760px){
+  .panel{padding:12px;border-radius:12px}
+  button,.linkbtn{min-height:42px}
+}
+@media(prefers-reduced-motion:reduce){
+  button,.linkbtn,.panel,.technology-card{transition:none!important}
+  button:hover:not(:disabled),.linkbtn:hover,.technology-card:hover{transform:none}
+}
