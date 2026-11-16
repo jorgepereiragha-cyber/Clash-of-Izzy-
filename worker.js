@@ -5,6 +5,7 @@ import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js
 import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
 import { processEmailQueue, requestEmailVerification, verifyEmailToken, getEmailPreferences, updateEmailPreferences, getEmailHistory, queueEmailForInternalPlayer } from "./email-system.js";
 import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaConfig } from "./valhalla-config.js";
+import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 const BUILDINGS = {
@@ -252,6 +253,12 @@ async function ensureKingdom(env,playerId){
   }
   return k.id;
 }
+async function scaleKingdomQueueDurationSeconds(env,kingdomId,baseSeconds,queueType,valhallaMultipliers){
+  const seasonal=scaleValhallaDurationSeconds(baseSeconds,valhallaMultipliers);
+  if(queueType!=="construction")return seasonal;
+  const buffs=await getValhallaBuffMultipliers(env,kingdomId);
+  return Math.max(10,Math.floor(seasonal/Math.max(1,buffs.buildSpeed)));
+}
 async function applyProduction(env,kingdomId){
   const row=await env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdomId).first();
   if(!row)return;
@@ -275,12 +282,14 @@ async function applyProduction(env,kingdomId){
   ]);
   const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).resourcePercent/100;
   const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
-  const valhallaMultipliers=await getValhallaMultipliers(env);
+  const [valhallaMultipliers,valhallaBuffs]=await Promise.all([
+    getValhallaMultipliers(env),getValhallaBuffMultipliers(env,kingdomId)
+  ]);
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
   const gains={},nextRemainders={};
   for(const [key,rate] of Object.entries(perHour)){
-    const accumulated=rate*valhallaMultipliers.resource*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
+    const accumulated=rate*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
     gains[key]=Math.floor(accumulated/3600);
     nextRemainders[key]=accumulated-gains[key]*3600;
   }
@@ -336,6 +345,7 @@ async function processMarches(env,kingdomId){
      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
     ]);
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
+    const valhallaBuffs=await getValhallaBuffMultipliers(env,kingdomId);
     const castleLevel=Number(kingdom?.castle_level||1);
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
     const simulation=simulateBattle({
@@ -343,7 +353,7 @@ async function processMarches(env,kingdomId){
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      researchLevel:Number(military?.level||0),
      defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
-     equipmentAttackBonusPercent:gear.attackPercent,
+     equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
      equipmentHealthBonusPercent:gear.healthPercent,
      criticalChancePercent:gear.criticalChancePercent,
      criticalDamageMultiplier:1.5,
@@ -458,10 +468,14 @@ function equipmentView(row){
 async function syncHeroSystems(env,kingdomId){
   // hero_inventory is canonical for collection progression; heroes is the equipment binding.
   await env.DB.prepare("INSERT OR IGNORE INTO hero_inventory(kingdom_id,hero_key,rarity,level,experience) SELECT kingdom_id,hero_key,CASE rarity WHEN 'common' THEN 'white' WHEN 'rare' THEN 'blue' WHEN 'epic' THEN 'purple' WHEN 'legendary' THEN 'purple' WHEN 'mythic' THEN 'purple' ELSE 'white' END,level,experience FROM heroes WHERE kingdom_id=?").bind(kingdomId).run();
-  const inventory=await env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY hero_key").bind(kingdomId).all();
+  const inventory=await env.DB.prepare(
+    "SELECT hi.hero_key,hi.rarity,hi.level,hi.experience,vhc.hero_name AS seasonal_hero_name,vhc.rarity AS seasonal_hero_rarity " +
+    "FROM hero_inventory hi LEFT JOIN valhalla_hero_catalog vhc ON vhc.hero_key=hi.hero_key " +
+    "WHERE hi.kingdom_id=? ORDER BY hi.hero_key"
+  ).bind(kingdomId).all();
   const statements=(inventory.results||[]).map(hero=>{
-    const rarity=hero.rarity==="white"?"common":hero.rarity==="blue"?"rare":"legendary";
-    const name=HERO_TEMPLATES[hero.hero_key]?.name||hero.hero_key;
+    const rarity=hero.seasonal_hero_rarity || (hero.rarity==="white"?"common":hero.rarity==="blue"?"rare":"legendary");
+    const name=HERO_TEMPLATES[hero.hero_key]?.name||hero.seasonal_hero_name||hero.hero_key;
     return env.DB.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) VALUES(?,?,?,?,?,?) ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET level=MAX(heroes.level,excluded.level),experience=MAX(heroes.experience,excluded.experience),rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END WHERE heroes.level<excluded.level OR heroes.experience<excluded.experience OR heroes.rarity<>excluded.rarity OR heroes.hero_name IS NULL OR heroes.hero_name=''")
       .bind(kingdomId,hero.hero_key,name,Math.max(1,Number(hero.level)||1),Math.max(0,Number(hero.experience)||0),rarity);
   });
@@ -927,7 +941,7 @@ async function gameAction(env,playerId,body){
     if(!castle)return json({error:"Castelo não encontrado."},409);
     const constructionResearch=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='construction'").bind(k.id).first();
     const valhallaMultipliers=await getValhallaMultipliers(env);
-    const durationSeconds=scaleValhallaDurationSeconds(calculateQueueDurationSeconds("construction",{level:b.level,facilityLevel:Number(castle.level||1),researchLevel:Number(constructionResearch?.level||0)}),valhallaMultipliers);
+    const durationSeconds=await scaleKingdomQueueDurationSeconds(env,k.id,calculateQueueDurationSeconds("construction",{level:b.level,facilityLevel:Number(castle.level||1),researchLevel:Number(constructionResearch?.level||0)}),"construction",valhallaMultipliers);
     const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();
     const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const materialChecks=Object.entries(materialNeeds).map(()=> " AND EXISTS(SELECT 1 FROM inventory_items WHERE kingdom_id=? AND item_key=? AND quantity>=?)").join("");
@@ -957,7 +971,7 @@ async function gameAction(env,playerId,body){
     if(activeQueue)return json({error:"Sua fila de treinamento já está ocupada. Aguarde as tropas atuais."},409);
     const cost={food:spec.food*quantity,wood:spec.wood*quantity,iron:spec.iron*quantity};
     const valhallaMultipliers=await getValhallaMultipliers(env);
-    const durationSeconds=scaleValhallaDurationSeconds(calculateQueueDurationSeconds("training",{targetKey:unit,quantity,facilityLevel:Number(trainingHall.level||1)}),valhallaMultipliers);
+    const durationSeconds=await scaleKingdomQueueDurationSeconds(env,k.id,calculateQueueDurationSeconds("training",{targetKey:unit,quantity,facilityLevel:Number(trainingHall.level||1)}),"training",valhallaMultipliers);
     const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();
     const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const debit=env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level>=1) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running')")
@@ -985,7 +999,7 @@ async function gameAction(env,playerId,body){
     if(activeQueue)return json({error:"Sua fila de pesquisa já está ocupada. Aguarde a tecnologia atual."},409);
     const c=allowed[key],factor=level+1,cost={wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
     const valhallaMultipliers=await getValhallaMultipliers(env);
-    const durationSeconds=scaleValhallaDurationSeconds(calculateQueueDurationSeconds("research",{level:level+1,facilityLevel:Math.max(1,centerLevel)}),valhallaMultipliers);
+    const durationSeconds=await scaleKingdomQueueDurationSeconds(env,k.id,calculateQueueDurationSeconds("research",{level:level+1,facilityLevel:Math.max(1,centerLevel)}),"research",valhallaMultipliers);
     const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();
     const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND (? NOT IN ('defense','gear_forging','gear_ward','gear_vitality','gear_logistics') OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running')")
@@ -1055,6 +1069,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
     ]);
     const gear=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]);
+    const valhallaBuffs=await getValhallaBuffMultipliers(env,k.id);
     const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)+gear.defensePercent));
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
@@ -1062,7 +1077,7 @@ async function gameAction(env,playerId,body){
       army:armyRows,castleLevel:Number(k.castle_level||1),
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
-      equipmentAttackBonusPercent:gear.attackPercent,equipmentHealthBonusPercent:gear.healthPercent,
+      equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),equipmentHealthBonusPercent:gear.healthPercent,
       criticalChancePercent:gear.criticalChancePercent,criticalDamageMultiplier:1.5,
       criticalSeed,
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
@@ -1458,6 +1473,26 @@ export default {
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     try{
+      if(url.pathname.startsWith("/api/game/valhalla-shop/")){
+        const method=request.method;
+        if(!["GET","POST"].includes(method))return json({error:"Método não permitido."},405);
+        if(method==="POST"&&url.pathname!=="/api/game/valhalla-shop/buy")return json({error:"Rota da loja inválida."},404);
+        if(method==="GET"&&!["/api/game/valhalla-shop/catalog","/api/game/valhalla-shop/history"].includes(url.pathname))return json({error:"Rota da loja inválida."},404);
+        const limited=await rateLimitDecision(
+          env,
+          method==="POST"?"valhalla-shop-buy-player":"valhalla-shop-read-player",
+          playerId,
+          method==="POST"?12:60,
+          60
+        );
+        if(limited)return limited;
+        let body={};
+        if(method==="POST"){
+          body=await readBody(request,4096);
+          if(body.__bodyError)return json({error:"Solicitação de compra inválida."},body.__bodyError==="payload_too_large"?413:400);
+        }
+        return await handleValhallaShop(request,env,playerId,body);
+      }
       if(url.pathname==="/api/game/email/verification"&&request.method==="POST"){
         const limited=await rateLimitDecision(env,"email-verification-player",playerId,3,3600);
         if(limited)return limited;

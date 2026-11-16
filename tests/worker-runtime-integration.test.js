@@ -90,6 +90,28 @@ function makeApi(baseUrl) {
   };
 }
 
+function rowsFromD1Json(output) {
+  let parsed;
+  try {
+    parsed = JSON.parse(String(output || "").trim());
+  } catch {
+    const raw = String(output || "");
+    const startArray = raw.indexOf("[");
+    const startObject = raw.indexOf("{");
+    const start = startArray < 0 ? startObject : startObject < 0 ? startArray : Math.min(startArray, startObject);
+    if (start < 0) throw new Error("Saída JSON do Wrangler não encontrada: " + raw.slice(0, 500));
+    parsed = JSON.parse(raw.slice(start).trim());
+  }
+  if (Array.isArray(parsed)) {
+    return parsed.flatMap(entry => Array.isArray(entry?.results) ? entry.results :
+      Array.isArray(entry?.result?.results) ? entry.result.results : []);
+  }
+  if (Array.isArray(parsed?.results)) return parsed.results;
+  if (Array.isArray(parsed?.result?.results)) return parsed.result.results;
+  if (Array.isArray(parsed?.result)) return parsed.result;
+  return [];
+}
+
 function expectStatus(result, expected, label) {
   const accepted = Array.isArray(expected) ? expected : [expected];
   assert.ok(
@@ -306,6 +328,126 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         assert.equal(Number(afterDuplicateCron.state.kingdom.destiny_runes), runesBefore + 100,
           "repetir o Cron no mesmo dia não duplica a recompensa");
 
+        // The public game identity maps through players.id to kingdoms.id; never query
+        // seasonal balances or troop ownership from players / permanent army tables.
+        expectStatus(await api("/api/game/valhalla-shop/catalog"), 401, "loja Valhalla sem sessão");
+        await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE kingdoms SET destiny_runes=30000 WHERE id=" + kingdomA + ";",
+        ]);
+
+        const shopCatalog = expectStatus(await api("/api/game/valhalla-shop/catalog", { token: tokenA }), 200, "catálogo sazonal autenticado");
+        assert.equal(shopCatalog.active, true);
+        assert.equal(shopCatalog.player_runes, 30000);
+        assert.ok(shopCatalog.catalog.some(item => item.id === "einherjar_pack_10"));
+        assert.ok(shopCatalog.catalog.some(item => item.id === "fenrir_pack_1"));
+        expectStatus(await api("/api/game/valhalla-shop/buy", {
+          method: "POST", token: tokenA, body: { catalog_id: "einherjar_pack_10" },
+        }), 400, "request_key obrigatório na compra");
+
+        const buy = (token, catalog_id, request_key) => api("/api/game/valhalla-shop/buy", {
+          method: "POST", token, body: { catalog_id, request_key },
+        });
+        const einherjarKey = "valhalla-shop-einherjar-0001";
+        const einherjar = expectStatus(await buy(tokenA, "einherjar_pack_10", einherjarKey), 201, "compra do pacote Einherjar");
+        assert.equal(einherjar.success, true);
+        assert.equal(einherjar.replayed, false);
+        assert.equal(einherjar.new_runes_balance, 29500);
+        const einherjarRetry = expectStatus(await buy(tokenA, "einherjar_pack_10", einherjarKey), 200, "retry idempotente da compra");
+        assert.equal(einherjarRetry.replayed, true);
+        assert.equal(einherjarRetry.new_runes_balance, 29500);
+        expectStatus(await buy(tokenB, "fenrir_pack_1", einherjarKey), 409, "chave de compra reutilizada por outro reino");
+
+        for (let index = 1; index <= 3; index++) {
+          const result = expectStatus(
+            await buy(tokenA, "fenrir_pack_1", "valhalla-fenrir-pack-" + index + "-0001"),
+            201,
+            "compra limitada de Fenrir " + index
+          );
+          assert.equal(result.success, true);
+        }
+        const catalogAfterFenrir = expectStatus(await api("/api/game/valhalla-shop/catalog", { token: tokenA }), 200, "estoque de Fenrir atualizado");
+        assert.equal(catalogAfterFenrir.catalog.find(item => item.id === "fenrir_pack_1").remaining_stock, 0);
+        expectStatus(await buy(tokenA, "fenrir_pack_1", "valhalla-fenrir-pack-4-0001"), 409, "limite de três Fenrir por reino");
+
+        const odin = expectStatus(await buy(tokenA, "hero_odin_awakened", "valhalla-hero-odin-0001"), 201, "compra do herói Odin");
+        assert.equal(odin.reward.hero, "odin_awakened");
+        const odinRow = await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--json",
+          "--command", "SELECT h.hero_key,h.rarity,h.level,hi.rarity AS inventory_rarity FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=" + kingdomA + " AND h.hero_key='odin_awakened';",
+        ]);
+        const odinState = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "inventário após compra de Odin");
+        const odinHero = odinState.state.heroes.find(hero => hero.hero_key === "odin_awakened");
+        const odinInventory = odinState.state.heroInventory.find(hero => hero.hero_key === "odin_awakened");
+        assert.ok(odinHero && odinInventory, "Odin deve existir nas tabelas de heróis e inventário");
+        assert.equal(odinHero.rarity, "mythic");
+        assert.equal(odinInventory.rarity, "purple");
+
+        await buy(tokenA, "buff_odin_blessing", "valhalla-buff-odin-0001").then(result => expectStatus(result, 201, "compra de buff de ataque"));
+        await buy(tokenA, "buff_freya_charm", "valhalla-buff-freya-0001").then(result => expectStatus(result, 201, "compra de buff de produção"));
+        await buy(tokenA, "skin_rune_armor", "valhalla-skin-rune-0001").then(result => expectStatus(result, 201, "compra de cosmético sazonal"));
+        await buy(tokenA, "title_valhalla_champion", "valhalla-title-champion-01").then(result => expectStatus(result, 201, "compra de título sazonal"));
+        const shopHistory = expectStatus(await api("/api/game/valhalla-shop/history", { token: tokenA }), 200, "histórico de compras Valhalla");
+        assert.equal(shopHistory.history.length, 9);
+        const postShop = expectStatus(await api("/api/game/valhalla-shop/catalog", { token: tokenA }), 200, "saldo após compras");
+        assert.equal(postShop.player_runes, 6400);
+
+        const ledger = await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--json",
+          "--command", "SELECT COUNT(*) AS purchases,COALESCE(SUM(amount),0) AS spent FROM valhalla_rune_ledger WHERE kingdom_id=" + kingdomA + " AND entry_type='debit' AND reason='shop_purchase';",
+        ]);
+        const ledgerSummary = rowsFromD1Json(ledger)[0];
+        assert.equal(Number(ledgerSummary.purchases), 9);
+        assert.equal(Number(ledgerSummary.spent), 23600);
+
+        const troopHoldings = await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--json",
+          "--command", "SELECT unit_type,quantity FROM valhalla_troops WHERE kingdom_id=" + kingdomA + " ORDER BY unit_type;",
+        ]);
+        const holdings = rowsFromD1Json(troopHoldings);
+        assert.equal(Number(holdings.find(row => row.unit_type === "einherjar")?.quantity || 0), 10);
+        assert.equal(Number(holdings.find(row => row.unit_type === "fenrir_beast")?.quantity || 0), 3);
+
+        const cosmetics = await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--json",
+          "--command", "SELECT item_id,kind FROM kingdom_cosmetics WHERE kingdom_id=" + kingdomA + " AND item_id IN ('troop_skin_rune_armor','valhalla_champion') ORDER BY item_id;",
+        ]);
+        const cosmeticRows = rowsFromD1Json(cosmetics);
+        assert.equal(cosmeticRows.length, 2);
+        const titleState = await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--json",
+          "--command", "SELECT valhalla_title FROM kingdoms WHERE id=" + kingdomA + ";",
+        ]);
+        assert.equal(rowsFromD1Json(titleState)[0]?.valhalla_title, "valhalla_champion");
+
+        const buffState = await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--json",
+          "--command", "SELECT buff_key,MAX(multiplier) AS multiplier FROM valhalla_buffs WHERE kingdom_id=" + kingdomA + " AND expires_at>unixepoch() GROUP BY buff_key ORDER BY buff_key;",
+        ]);
+        const buffRows = rowsFromD1Json(buffState);
+        assert.ok(buffRows.some(row => row.buff_key === "attack_power" && Number(row.multiplier) === 1.5));
+        assert.ok(buffRows.some(row => row.buff_key === "resource_production" && Number(row.multiplier) === 3));
+
+        await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE kingdoms SET destiny_runes=1 WHERE id=" + kingdomB + ";",
+        ]);
+        expectStatus(await buy(tokenB, "einherjar_pack_10", "valhalla-insufficient-runic-01"), 402, "bloqueio de runas insuficientes");
+        
         const woodBeforeProduction = Number(afterDuplicateCron.state.kingdom.wood || 0);
         await runCli([
           "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
@@ -314,8 +456,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         ]);
         const produced = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "produção com multiplicador Valhalla");
         const woodGained = Number(produced.state.kingdom.wood || 0) - woodBeforeProduction;
-        assert.ok(woodGained >= 40,
-          "uma hora de produção básica de madeira recebe pelo menos o multiplicador x5");
+        assert.ok(woodGained >= 120,
+          "uma hora de produção de madeira recebe o multiplicador sazonal x5 e o buff de Freya x3");
 
         expectStatus(await api("/api/game/action", { method: "POST", token: tokenC, body: { type: "upgrade", building: "castle" } }), 200, "construção acelerada Valhalla");
         expectStatus(await api("/api/game/action", { method: "POST", token: tokenC, body: { type: "train", unit: "mage", quantity: 1 } }), 200, "treinamento acelerado Valhalla");
@@ -359,6 +501,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(initial.valhalla_speed_multiplier, 0.2);
       assert.equal(initial.valhalla_daily_runes_reward, 100);
 
+      const statsBeforeGrant = expectStatus(await adminGet("/api/valhalla-admin/stats"), 200, "estatísticas antes do crédito Master");
+      const runesSpentBeforeGrant = Number(statsBeforeGrant.total_runes_spent || 0);
       const beforeGrantState = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "saldo antes da distribuição manual");
       const expectedNewBalance = Number(beforeGrantState.state.kingdom.destiny_runes || 0) + 500;
       const grantBody = {
@@ -389,7 +533,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(stats.players_with_runes >= 1);
       assert.ok(stats.total_runes_distributed >= 500);
       assert.ok(stats.total_runes_in_circulation >= expectedNewBalance);
-      assert.equal(stats.total_runes_spent, 0);
+      assert.equal(stats.total_runes_spent, runesSpentBeforeGrant);
       assert.ok(Array.isArray(stats.top_items));
 
       const leaderboard = expectStatus(await adminGet("/api/valhalla-admin/leaderboard"), 200, "leaderboard Valhalla");
