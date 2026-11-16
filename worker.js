@@ -1478,7 +1478,7 @@ export default {
           if(typeof body.data!=="object"||Array.isArray(body.data))return json({error:"Dados de analytics devem ser um objeto."},400);
           const safeData={};
           for(const [key,value] of Object.entries(body.data).slice(0,20)){
-            if(!/^[a-zA-Z][a-zA-Z0-9_]{0,31}$/.test(key)||/(email|password|token|secret|authorization|phone|address|ip)/i.test(key))continue;
+            if(!["screen","source","action","result","castle_level","rating","duration_ms","count","mode","platform","phase"].includes(key))continue;
             if(typeof value==="string")safeData[key]=value.slice(0,120);
             else if(typeof value==="number"&&Number.isFinite(value))safeData[key]=value;
             else if(typeof value==="boolean")safeData[key]=value;
