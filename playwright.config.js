@@ -38,6 +38,7 @@ export default defineConfig({
       name: "chromium-galaxy-s8",
       use: {
         ...devices["Galaxy S8"],
+        viewport: { width: 360, height: 740 },
         browserName: "chromium",
       },
     },

@@ -69,9 +69,12 @@ class TrailerRecorderUI {
       const toggle = this.panel.querySelector("#coi-recorder-toggle");
       body.hidden = true;
       toggle.setAttribute("aria-expanded", "false");
+      toggle.setAttribute("aria-label", "Expandir gravador");
       toggle.textContent = "+";
+      this.panel.classList.add("is-collapsed");
     }
-    document.body.append(this.panel);
+    const mobileRecorderHost = compactMobile ? document.querySelector(".hero .toolbar") : null;
+    (mobileRecorderHost || document.body).append(this.panel);
   }
 
   bindEvents() {
@@ -80,8 +83,20 @@ class TrailerRecorderUI {
       const collapsed = body.hidden;
       body.hidden = !collapsed;
       event.currentTarget.setAttribute("aria-expanded", String(collapsed));
+      event.currentTarget.setAttribute("aria-label", collapsed ? "Minimizar gravador" : "Expandir gravador");
       event.currentTarget.textContent = collapsed ? "−" : "+";
+      this.panel.classList.toggle("is-collapsed", !collapsed);
     });
+
+    const trainingQuantity = document.getElementById("unitQuantity");
+    if (trainingQuantity && window.matchMedia?.("(max-width: 760px)")?.matches) {
+      trainingQuantity.addEventListener("focus", () => {
+        this.panel.classList.add("is-keyboard-open");
+      });
+      trainingQuantity.addEventListener("blur", () => {
+        this.panel.classList.remove("is-keyboard-open");
+      });
+    }
 
     this.panel.querySelectorAll("[data-preset]").forEach(button => {
       button.addEventListener("click", () => this.recordPreset(button.dataset.preset));

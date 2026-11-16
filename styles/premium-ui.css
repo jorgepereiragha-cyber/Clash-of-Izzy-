@@ -50,7 +50,7 @@ button:active,.linkbtn:active,.btn-epic:active{transform:translateY(0)}
 .premium-panel{border:1px solid var(--coi-premium-gold);border-radius:12px;padding:16px}
 @media(max-width:760px){
  .panel,.premium-panel{box-shadow:0 7px 20px rgba(0,0,0,.3)}
- button,.linkbtn,.btn-epic{min-height:40px}
+ button,.linkbtn,.btn-epic{min-height:44px}
 }
 @media(prefers-reduced-motion:reduce){
  button,.linkbtn,.btn-epic,.building,.building:after{transition:none!important;animation:none!important}
@@ -106,9 +106,45 @@ button:active,.linkbtn:active,.btn-epic:active{transform:translateY(0)}
 .coi-cinematic-modal-card p{color:#c6d1df;font-size:12px;line-height:1.5}
 .coi-recorder-download{display:flex;margin-top:12px;justify-content:center;text-align:center;text-decoration:none;background:linear-gradient(180deg,#9a682d,#65441e);color:#fff2c9}
 .coi-recorder-close{margin-top:8px;text-align:center;background:#243a55;color:#fff}
+@media(max-width:760px){
+  #trailer-recorder-panel{
+    right:max(8px,env(safe-area-inset-right,0px));
+    bottom:calc(12px + env(safe-area-inset-bottom,0px));
+    width:min(220px,calc(100vw - 16px));
+    max-height:min(72vh,620px);
+    max-height:min(72dvh,620px);
+  }
+  #trailer-recorder-panel .coi-recorder-header{min-height:52px;padding:4px 8px}
+  #trailer-recorder-panel .coi-recorder-header button{min-width:44px;min-height:44px;flex:0 0 44px}
+  #trailer-recorder-panel.is-collapsed{
+    position:static;
+    width:52px;
+    height:52px;
+    min-height:52px;
+    max-height:52px;
+    flex:0 0 52px;
+    margin:12px 0 0;
+    box-shadow:none;
+  }
+  #trailer-recorder-panel.is-collapsed .coi-recorder-header{
+    width:100%;
+    height:100%;
+    min-height:52px;
+    padding:4px;
+    justify-content:center;
+    border-bottom:0;
+  }
+  #trailer-recorder-panel.is-collapsed .coi-recorder-header h2{display:none}
+  #trailer-recorder-panel .coi-recorder-body{max-height:min(56vh,440px);max-height:min(56dvh,440px)}
+  #trailer-recorder-panel.is-keyboard-open{visibility:hidden;pointer-events:none}
+}
 @media(max-width:480px){
-  #trailer-recorder-panel{right:10px;bottom:10px;width:min(310px,calc(100vw - 20px))}
-  .coi-recorder-body{max-height:58vh}
+  #trailer-recorder-panel{
+    right:8px;
+    bottom:calc(12px + env(safe-area-inset-bottom,0px));
+    width:min(210px,calc(100vw - 16px));
+  }
+  .coi-recorder-body{max-height:52vh;max-height:52dvh}
   .coi-cinematic-modal-card{padding:13px}
 }
 @media(prefers-reduced-motion:reduce){
