@@ -202,7 +202,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     }), 409, "inscrição beta duplicada");
 
     const startA = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do primeiro reino");
-    const startB = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do segundo reino");
+    const startB = expectStatus(await api("/api/game/start", { method: "POST", body: { referrer_code: startA.state.player.player_id } }), 201, "fundação do segundo reino por convite");
+    assert.equal(startB.referral_recorded, true, "o convite é atribuído apenas após criar o novo reino");
     const startC = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do terceiro reino");
     for (const [label, started] of [["A", startA], ["B", startB], ["C", startC]]) {
       assert.ok(started.token, "reino " + label + " recebeu token");
@@ -218,6 +219,11 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const kingdomB = Number(startB.state.kingdom.id);
     const kingdomC = Number(startC.state.kingdom.id);
     const playerA = stateA.player.player_id;
+    const referralSummary = expectStatus(await api("/api/game/referral/link", { token: tokenA }), 200, "link autenticado de indicação");
+    assert.equal(referralSummary.referral_code, playerA);
+    assert.equal(referralSummary.referral_count, 1);
+    assert.match(referralSummary.referral_url, /\/kingdom\.html\?ref=izzy_[a-f0-9]{32}$/);
+    expectStatus(await api("/api/game/referral/link"), 401, "link de indicação sem sessão");
 
     await t.test("estado, busca, eventos e sessão autenticada", async () => {
       const stateEnvelope = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado autenticado");
