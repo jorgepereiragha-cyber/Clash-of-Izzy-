@@ -215,6 +215,9 @@ test.describe("Mobile visual audit captures", () => {
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#kingdomName")).toHaveText("Reino de Eldoria");
     await expect(page.locator("#trainButton")).toBeVisible();
+    const recorderBox = await page.locator("#trailer-recorder-panel").boundingBox();
+    expect(recorderBox?.width).toBeLessThanOrEqual(56);
+    expect(recorderBox?.height).toBeLessThanOrEqual(56);
     await expectTouchTargetsAtLeast44(page, [
       "#trainButton",
       "#researchButton",
@@ -240,13 +243,17 @@ test.describe("Mobile visual audit captures", () => {
     await page.goto("/kingdom.html");
     await expect(page.locator("#game")).toBeVisible();
 
+    await expect(page.locator("#trailer-recorder-panel")).toBeVisible();
     await page.locator("#unitQuantity").focus();
     const viewport = page.viewportSize();
     await expect.poll(async () => {
       const box = await page.locator("#trainButton").boundingBox();
       return Boolean(box && box.y >= 0 && box.y + box.height <= viewport.height);
     }, { timeout: 5_000 }).toBe(true);
-    await expect(page.locator("#trailer-recorder-panel")).toHaveClass(/is-keyboard-open/);
+    const recorder = page.locator("#trailer-recorder-panel");
+    await expect(recorder).toHaveClass(/is-keyboard-open/);
+    await page.locator("#unitQuantity").blur();
+    await expect(recorder).not.toHaveClass(/is-keyboard-open/);
   });
 
   test("captures the world map, territory pins and side panel", async ({ page }, testInfo) => {
@@ -296,6 +303,11 @@ test.describe("Mobile visual audit captures", () => {
     await expect(page.locator("#skills .skill")).toHaveCount(4);
     await expect(page.locator("#joystick")).toBeVisible();
     await expect(page.locator("#rightActions")).toBeVisible();
+    const actionBox = await page.locator("#rightActions").boundingBox();
+    const skillsBox = await page.locator("#skills").boundingBox();
+    expect(actionBox).not.toBeNull();
+    expect(skillsBox).not.toBeNull();
+    expect(actionBox.y + actionBox.height).toBeLessThanOrEqual(skillsBox.y);
     await expectTouchTargetsAtLeast44(page, [
       "#skills .skill",
       "#attack",
@@ -306,6 +318,7 @@ test.describe("Mobile visual audit captures", () => {
     await attachLayoutMetrics(page, testInfo, "arena-mobile", [
       "#skills .skill",
       "#joystick",
+      "#rightActions",
       "#attack",
       "#openShop",
       "#hud",
