@@ -50,15 +50,6 @@ CREATE TABLE IF NOT EXISTS rally_reinforcements (
 );
 CREATE INDEX IF NOT EXISTS idx_rally_reinforcements_rally ON rally_reinforcements(rally_id);
 
-CREATE TABLE IF NOT EXISTS kingdom_tech (
-  kingdom_id INTEGER NOT NULL REFERENCES kingdoms(id) ON DELETE CASCADE,
-  tech_id TEXT NOT NULL REFERENCES tech_catalog(id),
-  level INTEGER NOT NULL DEFAULT 0 CHECK (level BETWEEN 0 AND 10),
-  research_end_time INTEGER NOT NULL DEFAULT 0,
-  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
-  PRIMARY KEY (kingdom_id,tech_id)
-);
-
 CREATE TABLE IF NOT EXISTS tech_catalog (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
@@ -69,6 +60,15 @@ CREATE TABLE IF NOT EXISTS tech_catalog (
   base_research_time INTEGER NOT NULL CHECK (base_research_time > 0),
   prerequisite_tech TEXT REFERENCES tech_catalog(id),
   effect_json TEXT NOT NULL CHECK (json_valid(effect_json))
+);
+
+CREATE TABLE IF NOT EXISTS kingdom_tech (
+  kingdom_id INTEGER NOT NULL REFERENCES kingdoms(id) ON DELETE CASCADE,
+  tech_id TEXT NOT NULL REFERENCES tech_catalog(id),
+  level INTEGER NOT NULL DEFAULT 0 CHECK (level BETWEEN 0 AND 10),
+  research_end_time INTEGER NOT NULL DEFAULT 0,
+  updated_at INTEGER NOT NULL DEFAULT (unixepoch()),
+  PRIMARY KEY (kingdom_id,tech_id)
 );
 
 INSERT OR IGNORE INTO tech_catalog
