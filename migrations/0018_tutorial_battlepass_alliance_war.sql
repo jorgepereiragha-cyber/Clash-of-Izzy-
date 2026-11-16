@@ -184,7 +184,7 @@ CREATE TABLE alliance_war_score_ticks (
 CREATE TABLE alliance_war_reward_claims (
   war_id INTEGER NOT NULL REFERENCES alliance_wars(id) ON DELETE CASCADE,
   kingdom_id INTEGER NOT NULL REFERENCES kingdoms(id) ON DELETE CASCADE,
-  reward_type TEXT NOT NULL CHECK(reward_type IN ('victory','defeat','mvp')),
+  reward_type TEXT NOT NULL CHECK(reward_type IN ('victory','defeat','draw','mvp')),
   reward_json TEXT NOT NULL,
   distributed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY(war_id,kingdom_id,reward_type)
