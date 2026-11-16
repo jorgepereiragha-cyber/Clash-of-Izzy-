@@ -97,3 +97,77 @@ test("velocidade de marcha reduz duração sem ultrapassar os limites", () => {
   assert.equal(calculateMarchDuration(100,100),67);
   assert.equal(calculateMarchDuration(1,50),5);
 });
+
+test("PvP simula a guarnição real e devolve baixas dos dois exércitos", () => {
+  const input = {
+    army: [
+      { unit_type: "knight", tier: 2, quantity: 24 },
+      { unit_type: "archer", tier: 1, quantity: 30 }
+    ],
+    defendingArmy: [
+      { unit_type: "militia", tier: 1, quantity: 60 },
+      { unit_type: "archer", tier: 2, quantity: 18 },
+      { unit_type: "mage", tier: 1, quantity: 8 }
+    ],
+    castleLevel: 8,
+    defenderCastlePowerBonusPercent: 12,
+    heroLevel: 6,
+    defenderHeroLevel: 8,
+    dragonLevel: 4,
+    defenderDragonLevel: 3,
+    researchLevel: 5,
+    defenderResearchLevel: 4,
+    defenderDefenseBonusPercent: 15,
+    equipmentAttackBonusPercent: 12,
+    defenderEquipmentAttackBonusPercent: 10,
+    equipmentHealthBonusPercent: 8,
+    defenderEquipmentHealthBonusPercent: 20,
+    criticalChancePercent: 10,
+    defenderCriticalChancePercent: 12,
+    criticalSeed: 123456,
+    defenderCriticalSeed: 654321,
+    roll: 1
+  };
+  const result = simulateBattle(input);
+  assert.equal(typeof result.won, "boolean");
+  assert.ok(result.rounds >= 1 && result.rounds <= 30);
+  assert.ok(result.defenderLosses);
+  assert.ok(result.losses.knight >= 0 && result.losses.knight <= 24);
+  assert.ok(result.losses.archer >= 0 && result.losses.archer <= 30);
+  assert.ok(result.defenderLosses.militia >= 0 && result.defenderLosses.militia <= 60);
+  assert.ok(result.defenderLosses.archer >= 0 && result.defenderLosses.archer <= 18);
+  assert.ok(result.defenderLosses.mage >= 0 && result.defenderLosses.mage <= 8);
+  assert.equal(
+    result.survivors,
+    54 - result.losses.knight - result.losses.archer
+  );
+  assert.equal(
+    result.defenderSurvivors,
+    86 - result.defenderLosses.militia - result.defenderLosses.archer - result.defenderLosses.mage
+  );
+  assert.deepEqual(result, simulateBattle(input));
+});
+
+test("buffs defensivos reais aumentam o poder da guarnição e a mitigação", () => {
+  const input = {
+    army: [{ unit_type: "knight", tier: 2, quantity: 40 }],
+    defendingArmy: [{ unit_type: "militia", tier: 2, quantity: 50 }],
+    castleLevel: 5,
+    defenderLevel: 5,
+    roll: 1,
+    criticalSeed: 100,
+    defenderCriticalSeed: 200
+  };
+  const base = simulateBattle(input);
+  const defended = simulateBattle({
+    ...input,
+    defenderCastlePowerBonusPercent: 20,
+    defenderDefenseBonusPercent: 30,
+    defenderEquipmentHealthBonusPercent: 30,
+    defenderHeroLevel: 20,
+    defenderDragonLevel: 15,
+    defenderResearchLevel: 10
+  });
+  assert.ok(defended.defenderPower > base.defenderPower);
+  assert.ok(defended.defenderSurvivors >= base.defenderSurvivors);
+});
