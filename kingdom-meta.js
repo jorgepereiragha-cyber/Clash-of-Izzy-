@@ -469,6 +469,15 @@ async function saveFormation(request, env, kingdom) {
     }
   }
   if (!total || total > 100000) return reply({ error: "A formação deve conter entre 1 e 100.000 tropas." }, 400);
+  const ownedRows = await env.DB.prepare(
+    "SELECT unit_type,SUM(quantity) AS quantity FROM army_units WHERE kingdom_id=? GROUP BY unit_type"
+  ).bind(kingdom.id).all();
+  const owned = new Map((ownedRows.results || []).map(row => [row.unit_type, Number(row.quantity || 0)]));
+  for (const [type, quantity] of Object.entries(normalized)) {
+    if (quantity > (owned.get(type) || 0)) {
+      return reply({ error: "A formação excede a quantidade disponível de " + type + "." }, 409);
+    }
+  }
   if (heroId !== null) {
     const hero = await env.DB.prepare(
       "SELECT id FROM heroes WHERE id=? AND kingdom_id=?"
