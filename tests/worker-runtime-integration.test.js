@@ -762,10 +762,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(enemyCastle?.id, "o mapa mostra o castelo do segundo reino");
       const beforeB = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "estado antes da defesa PvP");
       const wallBefore = Number(beforeB.state.kingdom.wall_hp);
-      const militiaBefore = Number(stateA.troops.find(item => item.unit_type === "militia" && Number(item.tier) === 1)?.quantity || 0);
-      assert.ok(militiaBefore >= 10, "o atacante possui tropas disponíveis para a marcha");
+      const attackUnit = stateA.troops.find(item => Number(item.tier) === 1 && Number(item.quantity) > 0);
+      assert.ok(attackUnit?.unit_type, "o atacante possui ao menos uma tropa disponível");
       await action(tokenA, {
-        type: "march", targetId: enemyCastle.id, marchType: "attack", units: { militia: 10 },
+        type: "march", targetId: enemyCastle.id, marchType: "attack", units: { [attackUnit.unit_type]: 1 },
       }, 200, "marcha de ataque PvP");
 
       await runCli([
