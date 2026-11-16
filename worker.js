@@ -3,6 +3,7 @@ import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
 import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
+import { handleTutorialRequest, handleBattlePassRequest, handleAllianceWarStatus, processAllianceWars, processBattlePassEventQueue } from "./liveops.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -1323,6 +1324,10 @@ export default {
   await processDueMarches(env);
   try{await processAngelDeathEventLifecycle(env);}
   catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
+  try{await processAllianceWars(env);}
+  catch(error){console.error("alliance_war_scheduler_failed",String(error?.message||error));}
+  try{await processBattlePassEventQueue(env);}
+  catch(error){console.error("battle_pass_event_queue_failed",String(error?.message||error));}
   try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_rate_limit_cleanup_failed",String(error?.message||error));}
  },
@@ -1333,7 +1338,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","tutorial_progress","tutorial_step_claims","battle_pass_seasons","battle_pass_rewards","battle_pass_missions","battle_pass_progress","battle_pass_mission_progress","battle_pass_mission_receipts","battle_pass_claimed","battle_pass_completion_bonuses","battle_pass_event_cursor","alliance_war_objectives","alliance_war_participants","alliance_war_score_ticks","alliance_war_reward_claims"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1421,6 +1426,21 @@ export default {
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     try{
+      if(url.pathname.startsWith("/api/game/tutorial")){
+        const limited=await rateLimitDecision(env,"tutorial-player",playerId,40,60);
+        if(limited)return limited;
+        return await handleTutorialRequest(request,env,playerId);
+      }
+      if(url.pathname.startsWith("/api/game/battle-pass/")){
+        const limited=await rateLimitDecision(env,"battle-pass-player",playerId,60,60);
+        if(limited)return limited;
+        return await handleBattlePassRequest(request,env,playerId);
+      }
+      if(url.pathname==="/api/game/alliance-war"&&request.method==="GET"){
+        const limited=await rateLimitDecision(env,"alliance-war-status-player",playerId,60,60);
+        if(limited)return limited;
+        return await handleAllianceWarStatus(env,playerId);
+      }
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"game-state-player",playerId,120,60);
         if(limited)return limited;
