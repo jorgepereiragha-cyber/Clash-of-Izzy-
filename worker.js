@@ -9,6 +9,7 @@ import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
+import { handleKingdomMeta } from "./kingdom-meta.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -1367,7 +1368,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET),hasEmailProvider:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.FRONTEND_URL),hasResendApiKey:Boolean(env.RESEND_API_KEY),hasEmailFrom:Boolean(env.EMAIL_FROM),hasFrontendUrl:Boolean(env.FRONTEND_URL)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","kingdom_visual_settings","kingdom_vip","vip_benefits","kingdom_speedups","daily_tasks","kingdom_task_progress","achievement_catalog","kingdom_achievement_progress","kingdom_mail","troop_formations"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1796,6 +1797,31 @@ export default {
         const ip=request.headers.get("CF-Connecting-IP")||"unknown";
         const networkLimit=await rateLimitDecision(env,"game-action-network",ip,600,60);
         if(networkLimit)return networkLimit;
+      }
+      if(url.pathname.startsWith("/api/game/meta/")){
+        const metaRoute=url.pathname.slice("/api/game/meta/".length);
+        const metaRoutes={
+          GET:["vip","visual-settings","speedups","tasks","mail","achievements","ranking","formations"],
+          POST:["speedups/use","tasks/claim","mail/claim","mail/read","achievements/claim","formations/save"],
+          PUT:["visual-settings"]
+        };
+        if(!Object.hasOwn(metaRoutes,request.method)||!metaRoutes[request.method].includes(metaRoute)){
+          return json({error:"Rota ou método de progressão inválido."},405);
+        }
+        const isWrite=request.method!=="GET";
+        const limited=await rateLimitDecision(
+          env,
+          isWrite?"kingdom-meta-write-player":"kingdom-meta-read-player",
+          playerId,
+          isWrite?30:120,
+          60
+        );
+        if(limited)return limited;
+        if(isWrite){
+          const metaBody=await readBody(request.clone(),8192);
+          if(metaBody.__bodyError)return json({error:"Solicitação de progressão inválida."},metaBody.__bodyError==="payload_too_large"?413:400);
+        }
+        return await handleKingdomMeta(request,env,playerId,metaRoute);
       }
       if(url.pathname.startsWith("/api/game/rally/")){
         const rallyPath=url.pathname.slice("/api/game/rally/".length);

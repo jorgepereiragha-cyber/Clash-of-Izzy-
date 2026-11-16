@@ -177,7 +177,9 @@ async function collectResources(env,kingdomId,body){
   env.DB.prepare(`UPDATE kingdoms SET ${resource}=${resource}+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()=1`)
    .bind(amount,kingdomId),
   env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE changes()=1")
-   .bind(kingdomId,resource,amount,"coleta de nó de recurso: "+nodeId)
+   .bind(kingdomId,resource,amount,"coleta de nó de recurso: "+nodeId),
+  env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,'resources_gathered',? WHERE changes()=1")
+   .bind(kingdomId,JSON.stringify({nodeId,resource,amount}))
  ]);
  if(Number(result[0]?.meta?.changes||0)!==1)return reply({error:"A coleta foi disputada por outra ação. Atualize e tente novamente."},409);
  return reply({success:true,collected:amount,resource_type:resource});
