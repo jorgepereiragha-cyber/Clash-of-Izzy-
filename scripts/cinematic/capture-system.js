@@ -1,4 +1,3 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
 import { estimateRecordingBytes, getRecordingMemoryBudget, selectMediaRecorderMimeType } from "./media-recorder-support.js";
 
 export class CinematicTextRenderer {
@@ -144,7 +143,8 @@ export class CinematicCapture {
     }
 
     this.view = view;
-    this.originalRendererSize = view.renderer.getSize(new THREE.Vector2());
+    const sizeTarget = { x: 0, y: 0, set(widthValue, heightValue) { this.x = widthValue; this.y = heightValue; return this; } };
+    this.originalRendererSize = view.renderer.getSize(sizeTarget);
     this.originalPixelRatio = view.renderer.getPixelRatio();
     this.originalCamera = {
       position: view.camera.position.clone(),
