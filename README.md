@@ -23,7 +23,7 @@ Comandos úteis:
 
 ## Deploy automático
 
-O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, páginas principais e PWA. O deploy só termina com sucesso quando esses checks passam.
+O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, captura e arquiva o bookmark de recuperação Time Travel do D1 imediatamente antes das migrações remotas, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, formulário beta, feedback, analytics, páginas principais e PWA v14. O deploy só termina com sucesso quando esses checks passam. O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação; restaurar Time Travel sobrescreve o estado atual do banco.
 
 Configure estes segredos no GitHub:
 
@@ -46,7 +46,7 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0016`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0018`. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
 
 ## Filas estratégicas persistentes
 
@@ -158,4 +158,5 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - A central do reino envia `POST /api/game/analytics` ao abrir uma sessão e ao enviar feedback. O endpoint exige token de jogo válido, aplica limite por jogador e aceita somente campos de telemetria permitidos; não armazena e-mail, senha, token, IP ou credenciais no payload.
 - O formulário de avaliação usa `POST /api/game/feedback`, exige sessão válida, nota de 1 a 5 e comentário de até 2.000 caracteres; o limite é de três envios por jogador por hora.
 - A migração `0018_feedback_analytics_beta.sql` cria somente as três tabelas consumidas por essas rotas, com índices e chaves estrangeiras para a identidade interna `players.id`. A lista de beta guarda o consentimento e sua versão.
+- O endpoint `/api/admin/health` informa apenas valores booleanos para a prontidão do provedor de e-mail (`RESEND_API_KEY`, `EMAIL_FROM`, `FRONTEND_URL`). O smoke test registra esse estado, mas não bloqueia a publicação do jogo quando o provedor opcional ainda não está configurado.
 - Execute `npm run db:migrate:local` para validar/aplicar migrações no D1 local. A migração remota só ocorre no fluxo de implantação aprovado; não foi executada nesta revisão.
