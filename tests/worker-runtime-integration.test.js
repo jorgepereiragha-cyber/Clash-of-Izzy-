@@ -760,8 +760,17 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         item.territory_kind === "castle" && Number(item.owner_kingdom_id) === kingdomB
       );
       assert.ok(enemyCastle?.id, "o mapa mostra o castelo do segundo reino");
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "INSERT INTO army_units(kingdom_id,unit_type,tier,quantity,wounded) VALUES(" + kingdomB +
+          ",'militia',2,5,0) ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+5;",
+      ]);
       const beforeB = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "estado antes da defesa PvP");
       const wallBefore = Number(beforeB.state.kingdom.wall_hp);
+      const defenderMilitiaBefore = beforeB.state.troops
+        .filter(item => item.unit_type === "militia")
+        .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
       const attackUnit = stateA.troops.find(item => Number(item.tier) === 1 && Number(item.quantity) > 0);
       assert.ok(attackUnit?.unit_type, "o atacante possui ao menos uma tropa disponível");
       await action(tokenA, {
@@ -787,6 +796,11 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(wounded.attacker && wounded.defender, "os feridos são separados por reino");
       const afterB = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "estado após defesa PvP");
       assert.ok(Number(afterB.state.kingdom.wall_hp) < wallBefore, "a vida da muralha persiste após a batalha");
+      const defenderMilitiaAfter = afterB.state.troops
+        .filter(item => item.unit_type === "militia")
+        .reduce((sum, item) => sum + Number(item.quantity || 0), 0);
+      assert.equal(defenderMilitiaBefore - defenderMilitiaAfter, Number(losses.defender.militia || 0),
+        "perdas agregadas são distribuídas uma única vez entre os tiers da mesma unidade");
 
       await runCli([
         "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
