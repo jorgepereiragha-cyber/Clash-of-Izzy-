@@ -306,17 +306,6 @@ test.describe("Mobile visual audit captures", () => {
     ]);
 
     await attachScreenshot(page, testInfo, "world-map-mobile");
-    await attachLayoutMetrics(page, testInfo, "world-map-mobile", [
-      "#worldMap",
-      "#zoomIn",
-      "#zoomOut",
-      "#mapReset",
-      ".territory-pin",
-      "#territoryDetails",
-      "#gather",
-      "#scout",
-      "#attack",
-    ]);
   });
 
   test("captures the arena HUD, skills and touch controls", async ({ page }, testInfo) => {
