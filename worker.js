@@ -3,7 +3,7 @@ import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
 import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
-import { handleTutorialRequest, handleBattlePassRequest, handleAllianceWarStatus, processAllianceWars, processBattlePassEventQueue } from "./liveops.js";
+import { handleTutorialRequest, handleBattlePassRequest, handleAllianceWarStatus, handleAllianceWarAction, processAllianceWars, processBattlePassEventQueue } from "./liveops.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -1440,6 +1440,16 @@ export default {
         const limited=await rateLimitDecision(env,"alliance-war-status-player",playerId,60,60);
         if(limited)return limited;
         return await handleAllianceWarStatus(env,playerId);
+      }
+      if(url.pathname==="/api/game/alliance-war/action"&&request.method==="POST"){
+        const limited=await rateLimitDecision(env,"alliance-war-action-player",playerId,12,60);
+        if(limited)return limited;
+        const networkLimit=await rateLimitDecision(env,"alliance-war-action-network",request.headers.get("CF-Connecting-IP")||"unknown",120,60);
+        if(networkLimit)return networkLimit;
+        const body=await readBody(request,16384);
+        if(body.__bodyError)return json({error:"Ação de guerra inválida."},body.__bodyError==="payload_too_large"?413:400);
+        const actionRequest=new Request(request.url,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+        return await handleAllianceWarAction(actionRequest,env,playerId);
       }
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"game-state-player",playerId,120,60);
