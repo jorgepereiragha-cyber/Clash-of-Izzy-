@@ -67,9 +67,14 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.feedbackUiAndAnalytics, true);
   assert.equal(result.checks.staticPages, 8);
   assert.equal(result.checks.worldMapNavigation, true);
-  assert.equal(result.checks.worldMap3D, true);\n  assert.equal(result.checks.cinematicTrailerRecorder, true);
+  assert.equal(result.checks.worldMap3D, true);
+  assert.equal(result.checks.cinematicTrailerRecorder, true);
   assert.ok(calls.includes("/world-map-viewport.js"));
-  assert.ok(calls.includes("/world-map-3d.js"));\n  assert.ok(calls.includes("/scripts/cinematic/capture-system.js"));\n  assert.ok(calls.includes("/scripts/cinematic/trailer-script.js"));\n  assert.ok(calls.includes("/scripts/cinematic/recorder-ui.js"));\n  assert.ok(calls.includes("/styles/premium-ui.css"));
+  assert.ok(calls.includes("/world-map-3d.js"));
+  assert.ok(calls.includes("/scripts/cinematic/capture-system.js"));
+  assert.ok(calls.includes("/scripts/cinematic/trailer-script.js"));
+  assert.ok(calls.includes("/scripts/cinematic/recorder-ui.js"));
+  assert.ok(calls.includes("/styles/premium-ui.css"));
   assert.ok(calls.includes("/arena.html"));
   assert.ok(calls.includes("/api/game/state"));
   assert.ok(calls.includes("/events.html"));
