@@ -1420,6 +1420,8 @@ async function processDueKingdomQueues(env,kingdomId=null){
       if(queue.target_key==="castle"){
         statements.push(env.DB.prepare("UPDATE kingdoms SET castle_level=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND "+guard)
           .bind(queue.to_level,queue.kingdom_id,queue.id,completionToken));
+        statements.push(env.DB.prepare("UPDATE world_territories SET level=?,name=(SELECT 'Castelo de '||kingdom_name FROM kingdoms WHERE id=?) WHERE territory_key=? AND "+guard)
+          .bind(queue.to_level,queue.kingdom_id,"kingdom_castle_"+queue.kingdom_id,queue.id,completionToken));
       }
     }else if(queue.queue_type==="training"){
       statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
@@ -1440,8 +1442,12 @@ async function processDueKingdomQueues(env,kingdomId=null){
         : {research:queue.target_key,level:queue.to_level,queueId:queue.id};
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
       .bind(queue.kingdom_id,eventType,JSON.stringify(eventPayload),queue.id,completionToken));
+    statements.push(env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,?,? WHERE "+guard)
+      .bind(queue.kingdom_id,queue.queue_type+"_completed",JSON.stringify(eventPayload),queue.id,completionToken));
     try{
       await env.DB.batch(statements);
+      if(queue.queue_type==="construction")await recalculateKingdomStats(env,queue.kingdom_id);
+      await recalculateKingdomPower(env,queue.kingdom_id);
     }catch(error){
       console.error("kingdom_queue_completion_failed",queue.id,String(error?.message||error));
     }
