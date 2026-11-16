@@ -30,5 +30,12 @@ jobs:
         run: npm run assets:validate
       - name: Test gameplay rules and Worker-D1 integration
         run: npm test
+      - name: Forensic diagnostic of production account endpoint (read-only)
+        if: github.event_name == 'pull_request'
+        continue-on-error: true
+        timeout-minutes: 1
+        env:
+          PRODUCTION_DIAGNOSTIC_URL: https://clash-of-izzy.jorgepereiragha.workers.dev/api/account/status
+        run: node scripts/diagnose-production-endpoint.js
       - name: Validate Worker bundle
         run: npm run check
