@@ -61,14 +61,14 @@ function makeKingdomState() {
   };
 }
 
-async function installApiFixtures(page, accountStatus = { hasAccount: false, account: null }) {
+async function installApiFixtures(page, accountStatus = { hasAccount: false, account: null }, accountStatusHttpStatus = 200) {
   const actions = [];
   const stateRequests = [];
   const state = makeKingdomState();
 
   await page.route("**/api/account/status", async route => {
     await route.fulfill({
-      status: 200,
+      status: accountStatusHttpStatus,
       contentType: "application/json",
       body: JSON.stringify(accountStatus),
     });
@@ -231,6 +231,29 @@ test.describe("Mobile kingdom rendering", () => {
 
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#guestAccountNotice")).toBeHidden();
+  });
+
+  test("keeps the guest notice hidden when the account status endpoint returns HTTP 500", async ({ page }) => {
+    await installApiFixtures(page, {
+      error: "Serviço de contas temporariamente indisponível",
+    }, 500);
+
+    await page.goto("/kingdom.html");
+
+    await expect(page.locator("#game")).toBeVisible();
+    await expect(page.locator("#guestAccountNotice")).toBeHidden();
+  });
+
+  test("opens the account protection page when the guest notice link is clicked", async ({ page }) => {
+    await installApiFixtures(page);
+
+    await page.goto("/kingdom.html");
+
+    await expect(page.locator("#guestAccountNotice")).toBeVisible();
+    await page.locator("#guestAccountNotice a").click();
+
+    await expect(page).toHaveURL(/\/account\.html$/);
+    await expect(page.getByRole("heading", { name: "Conta do Comandante" })).toBeVisible();
   });
 
 });
