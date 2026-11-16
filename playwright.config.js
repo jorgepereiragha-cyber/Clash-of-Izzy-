@@ -21,7 +21,7 @@ export default defineConfig({
     baseURL,
     trace: "retain-on-failure",
     screenshot: "only-on-failure",
-    video: "retain-on-failure",
+    video: "off",
     serviceWorkers: "block",
     actionTimeout: 10_000,
     navigationTimeout: 20_000,
