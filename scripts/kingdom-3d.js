@@ -47,6 +47,31 @@ if (host && "WebGLRenderingContext" in window) {
   const surfaceTextureCache = new Map();
   let disposed = false;
   let kingdomRenderHandler = null;
+  let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
+  let valhallaAuroraLight = null;
+  let kingdomHemisphereLight = null;
+  let kingdomSunLight = null;
+
+  function setKingdomValhallaMode(active) {
+    valhallaModeActive = Boolean(active);
+    if (!scene) return;
+    scene.background = valhallaModeActive ? new THREE.Color(0x0a0510) : null;
+    scene.fog = valhallaModeActive ? new THREE.FogExp2(0x1a0f25, 0.035) : null;
+    if (kingdomHemisphereLight) kingdomHemisphereLight.intensity = valhallaModeActive ? 0.95 : 2.05;
+    if (kingdomSunLight) kingdomSunLight.intensity = valhallaModeActive ? 1.15 : 2.4;
+    if (valhallaAuroraLight) {
+      scene.remove(valhallaAuroraLight);
+      valhallaAuroraLight = null;
+    }
+    if (valhallaModeActive) {
+      valhallaAuroraLight = new THREE.DirectionalLight(0x9b59b6, 0.7);
+      valhallaAuroraLight.position.set(5, 14, -8);
+      scene.add(valhallaAuroraLight);
+    }
+  }
+  window.addEventListener("coi:valhalla-mode", event => {
+    setKingdomValhallaMode(event.detail?.active === true);
+  });
 
   // Explicitly release GPU-backed resources on WebGL context loss. Three.js
   // resources are not reclaimed by the browser's garbage collector.
@@ -729,11 +754,14 @@ if (host && "WebGLRenderingContext" in window) {
     scene = new THREE.Scene();
     camera = new THREE.OrthographicCamera(-8.2, 8.2, 6.4, -6.4, .1, 60);
     camera.position.set(10, 13, 11); camera.lookAt(0, .2, 0);
-    scene.add(new THREE.HemisphereLight("#e6f0d6", "#43513b", 2.05));
-    const sun = new THREE.DirectionalLight("#ffe0a4", 2.4);
-    sun.position.set(-5, 10, 6); sun.castShadow = renderer.shadowMap.enabled;
-    sun.shadow.mapSize.set(qualityProfile.shadowMapSize, qualityProfile.shadowMapSize); sun.shadow.camera.left = -9; sun.shadow.camera.right = 9;
-    sun.shadow.camera.top = 9; sun.shadow.camera.bottom = -9; scene.add(sun);
+    kingdomHemisphereLight = new THREE.HemisphereLight("#e6f0d6", "#43513b", 2.05);
+    scene.add(kingdomHemisphereLight);
+    kingdomSunLight = new THREE.DirectionalLight("#ffe0a4", 2.4);
+    kingdomSunLight.position.set(-5, 10, 6); kingdomSunLight.castShadow = renderer.shadowMap.enabled;
+    kingdomSunLight.shadow.mapSize.set(qualityProfile.shadowMapSize, qualityProfile.shadowMapSize); kingdomSunLight.shadow.camera.left = -9; kingdomSunLight.shadow.camera.right = 9;
+    kingdomSunLight.shadow.camera.top = 9; kingdomSunLight.shadow.camera.bottom = -9; scene.add(kingdomSunLight);
+    window.__coiKingdomValhallaMode = setKingdomValhallaMode;
+    setKingdomValhallaMode(valhallaModeActive);
     applyProceduralSurfaceMaps();
     buildGround();
     ktx2 = new KTX2Loader();

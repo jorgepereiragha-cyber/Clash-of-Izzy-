@@ -6,6 +6,7 @@
 <meta name="theme-color" content="#142b44"><meta name="description" content="Comande seu reino, evolua construções e prepare seu exército em Clash of Izzy.">
 <link rel="manifest" href="/manifest.json"><link rel="icon" href="/icon-192.svg" type="image/svg+xml">
 <title>Clash of Izzy — Reino</title>
+<link rel="stylesheet" href="/styles/valhalla-shop.css">
 <style>
 :root{color-scheme:dark;--gold:#e7bd68;--gold2:#9a682d;--panel:#14243a;--line:#80643b;--muted:#b9c5d4}
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 50% -20%,#395779,#101a2b 60%,#080e18);color:#f5edda;font:14px system-ui,Arial,sans-serif;min-height:100vh}
@@ -337,5 +338,5 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-3d.js"></script>  <script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-3d.js"></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
 </body></html>
