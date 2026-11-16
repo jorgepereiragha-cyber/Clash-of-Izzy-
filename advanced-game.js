@@ -437,6 +437,18 @@ async function claimAchievement(env,ctx,body){
   return json({success:true,reward:safeReward(row.reward_json)});
 }
 
+async function getFormationChoices(env,kingdomId){
+  const [troops,heroes]=await Promise.all([
+    env.DB.prepare(
+      "SELECT unit_type,SUM(quantity) AS quantity FROM army_units " +
+      "WHERE kingdom_id=? AND tier=1 AND quantity>0 GROUP BY unit_type ORDER BY unit_type"
+    ).bind(kingdomId).all(),
+    env.DB.prepare(
+      "SELECT id,hero_name,level FROM heroes WHERE kingdom_id=? ORDER BY hero_name,id"
+    ).bind(kingdomId).all()
+  ]);
+  return {troops:troops.results||[],heroes:heroes.results||[]};
+}
 async function getFormations(env,kingdomId){
   const rows=await env.DB.prepare(
     "SELECT f.slot_number,f.formation_name,f.troop_data,f.hero_id,f.is_active,h.hero_name " +
@@ -593,6 +605,7 @@ export async function handleAdvancedGame(request,env,publicPlayerId,path,body={}
       if(path==="ranking")return json({ranking:await getRanking(env)});
       if(path==="queues")return json(await getQueues(env,ctx.kingdom_id));
       if(path==="formations")return json({formations:await getFormations(env,ctx.kingdom_id)});
+      if(path==="formation-choices")return json(await getFormationChoices(env,ctx.kingdom_id));
       if(path==="mounts")return json({mounts:await getMounts(env,ctx.kingdom_id)});
       if(path==="visuals")return json({settings:await getVisualSettings(env,ctx.player_id)});
       if(path==="cosmetics")return json(await getCosmeticCatalog(env,ctx.kingdom_id));
