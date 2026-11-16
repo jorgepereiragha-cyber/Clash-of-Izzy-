@@ -1364,7 +1364,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET),hasEmailProvider:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.FRONTEND_URL),hasResendApiKey:Boolean(env.RESEND_API_KEY),hasEmailFrom:Boolean(env.EMAIL_FROM),hasFrontendUrl:Boolean(env.FRONTEND_URL)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1421,10 +1421,27 @@ export default {
       const ip=request.headers.get("CF-Connecting-IP")||"unknown";
       const limited=await rateLimitDecision(env,"game-start-ip",ip,20,3600);
       if(limited)return limited;
+      const startBody=await readBody(request,4096);
+      if(startBody.__bodyError)return json({error:"Solicitação de criação de reino inválida."},startBody.__bodyError==="payload_too_large"?413:400);
       const playerId="izzy_"+crypto.randomUUID().replace(/-/g,"");
       await ensureKingdom(env,playerId);
+      let referralRecorded=false;
+      const referrerCode=String(startBody.referrer_code||"").trim();
+      if(/^izzy_[a-f0-9]{32}$/.test(referrerCode)&&referrerCode!==playerId){
+        try{
+          const tracked=await env.DB.prepare(
+            "INSERT OR IGNORE INTO referral_tracking(referrer_player_id,referred_player_id) " +
+            "SELECT referrer.id,referred.id FROM players referrer " +
+            "JOIN players referred ON referred.player_id=? " +
+            "WHERE referrer.player_id=? AND referrer.id<>referred.id"
+          ).bind(playerId,referrerCode).run();
+          referralRecorded=Number(tracked.meta?.changes||0)>0;
+        }catch(error){
+          console.error("referral_tracking_failed",String(error?.message||error));
+        }
+      }
       const token=await sign({sub:playerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365},env.SESSION_SECRET);
-      return json({token,state:await gameState(env,playerId)},201);
+      return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
   if(url.pathname==="/api/store/purchase-request"&&request.method==="POST"){
@@ -1473,6 +1490,16 @@ export default {
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     try{
+      if(url.pathname==="/api/game/referral/link"&&request.method==="GET"){
+        const limited=await rateLimitDecision(env,"referral-link-player",playerId,15,60);
+        if(limited)return limited;
+        const player=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
+        if(!player)return json({error:"Jogador não encontrado."},404);
+        const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM referral_tracking WHERE referrer_player_id=?").bind(player.id).first();
+        const invite=new URL("/kingdom.html",url.origin);
+        invite.searchParams.set("ref",playerId);
+        return json({referral_code:playerId,referral_url:invite.href,referral_count:Number(count?.total||0)});
+      }
       if(url.pathname.startsWith("/api/game/valhalla-shop/")){
         const method=request.method;
         if(!["GET","POST"].includes(method))return json({error:"Método não permitido."},405);
