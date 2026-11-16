@@ -61,12 +61,21 @@ function makeKingdomState() {
   };
 }
 
+function waitForAccountStatus(page) {
+  return page.waitForResponse(response => new URL(response.url()).pathname === "/api/account/status");
+}
+
 async function installApiFixtures(page, accountStatus = { hasAccount: false, account: null }, accountStatusHttpStatus = 200) {
   const actions = [];
   const stateRequests = [];
+  const accountStatusRequests = [];
   const state = makeKingdomState();
 
   await page.route("**/api/account/status", async route => {
+    accountStatusRequests.push({
+      method: route.request().method(),
+      authorization: route.request().headers().authorization || "",
+    });
     await route.fulfill({
       status: accountStatusHttpStatus,
       contentType: "application/json",
@@ -107,14 +116,23 @@ async function installApiFixtures(page, accountStatus = { hasAccount: false, acc
     });
   });
 
-  return { actions, stateRequests };
+  return { actions, stateRequests, accountStatusRequests };
 }
 
 test.describe("Mobile kingdom rendering", () => {
   test("renders resources, buildings, queues and troop controls on Pixel 5", async ({ page }) => {
-    const { stateRequests } = await installApiFixtures(page);
+    const { stateRequests, accountStatusRequests } = await installApiFixtures(page);
+    const accountStatusResponsePromise = waitForAccountStatus(page);
 
     await page.goto("/kingdom.html");
+    const accountStatusResponse = await accountStatusResponsePromise;
+    expect(accountStatusResponse.status()).toBe(200);
+    expect(await accountStatusResponse.json()).toMatchObject({ hasAccount: false });
+    expect(accountStatusRequests).toEqual([{
+      method: "GET",
+      authorization: "Bearer " + SESSION_TOKEN,
+    }]);
+    await page.waitForLoadState("networkidle");
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
     await expect(page.locator("#guestAccountNotice")).toBeVisible();
@@ -222,23 +240,47 @@ test.describe("Mobile kingdom rendering", () => {
     expect(actions[1]).toEqual({ type: "train", unit: "archer", quantity: 4 });
   });
   test("hides the guest notice when the player account is already linked", async ({ page }) => {
-    await installApiFixtures(page, {
+    const { accountStatusRequests } = await installApiFixtures(page, {
       hasAccount: true,
       account: { username: "ComandanteTeste" },
     });
+    const accountStatusResponsePromise = waitForAccountStatus(page);
 
     await page.goto("/kingdom.html");
+    const accountStatusResponse = await accountStatusResponsePromise;
+    expect(accountStatusResponse.status()).toBe(200);
+    expect(await accountStatusResponse.json()).toMatchObject({ hasAccount: true });
+    expect(accountStatusRequests).toEqual([{
+      method: "GET",
+      authorization: "Bearer " + SESSION_TOKEN,
+    }]);
+    await page.waitForLoadState("networkidle");
 
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#guestAccountNotice")).toBeHidden();
   });
 
   test("keeps the guest notice hidden when the account status endpoint returns HTTP 500", async ({ page }) => {
-    await installApiFixtures(page, {
+    const { accountStatusRequests } = await installApiFixtures(page, {
       error: "Serviço de contas temporariamente indisponível",
     }, 500);
+    const accountStatusResponsePromise = waitForAccountStatus(page);
+    const fallbackLogPromise = page.waitForEvent("console", message =>
+      message.type() === "debug" && message.text().includes("account_status_unavailable")
+    );
 
     await page.goto("/kingdom.html");
+    const accountStatusResponse = await accountStatusResponsePromise;
+    expect(accountStatusResponse.status()).toBe(500);
+    expect(await accountStatusResponse.json()).toMatchObject({
+      error: "Serviço de contas temporariamente indisponível",
+    });
+    expect(accountStatusRequests).toEqual([{
+      method: "GET",
+      authorization: "Bearer " + SESSION_TOKEN,
+    }]);
+    await fallbackLogPromise;
+    await page.waitForLoadState("networkidle");
 
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#guestAccountNotice")).toBeHidden();
