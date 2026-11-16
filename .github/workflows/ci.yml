@@ -32,18 +32,18 @@ jobs:
         run: npm test
       - name: Install Playwright Chromium
         run: npx playwright install --with-deps chromium
-      - name: Validate mobile kingdom UI in Chromium
+      - name: Validate mobile UI and capture visual audit
         run: npm run test:e2e
-      - name: Archive Playwright diagnostics
-        if: failure()
+      - name: Archive Playwright visual audit and diagnostics
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-mobile-kingdom-diagnostics
+          name: clash-of-izzy-playwright-visual-audit
           path: |
             test-results/
             playwright-report/
           if-no-files-found: ignore
-          retention-days: 7
+          retention-days: 14
       - name: Forensic diagnostic of production account endpoint (read-only)
         if: github.event_name == 'pull_request'
         continue-on-error: true
