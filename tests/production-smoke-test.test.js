@@ -30,7 +30,7 @@ function successfulFetch() {
       "text/html; charset=utf-8"
     );
     if (path === "/index.html") return makeResponse(
-      '<main><form id="beta-signup-form"><input name="consent" type="checkbox"></form></main>',
+      '<!doctype html><html lang="pt-BR"><head><title>Clash of Izzy</title></head><body><main><h1>CLASH OF IZZY</h1><p>Construa seu reino, fortaleça seu exército e dispute territórios.</p><form id="beta-signup-form"><label>Receber convite beta</label><input name="consent" type="checkbox"><button>Participar</button></form></main></body></html>',
       200,
       "text/html; charset=utf-8"
     );
