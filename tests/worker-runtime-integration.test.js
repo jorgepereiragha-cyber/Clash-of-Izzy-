@@ -119,6 +119,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       "--config", "wrangler.jsonc",
       "dev",
       "--local",
+      "--test-scheduled",
       "--persist-to", persistDir,
       "--ip", "127.0.0.1",
       "--port", String(port),
@@ -152,6 +153,12 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     assert.equal(adminHealth.hasSESSION_SECRET, true);
     assert.equal(adminHealth.hasADMIN_EMAIL, true);
     assert.equal(adminHealth.hasADMIN_PASSWORD, true);
+
+    const valhallaDefault = expectStatus(await api("/api/config/valhalla"), 200, "configuração pública de Valhalla");
+    assert.equal(valhallaDefault.active, false, "Ascensão de Valhalla permanece desligada por padrão");
+    assert.equal(valhallaDefault.resourceMultiplier, 5);
+    assert.equal(valhallaDefault.speedMultiplier, 0.2);
+    assert.equal(valhallaDefault.dailyRunesReward, 100);
 
     expectStatus(await api("/api/game/state"), 401, "estado sem sessão");
     expectStatus(await api("/api/game/action", { method: "POST", body: { type: "rename", name: "Sem Token" } }), 401, "ação sem sessão");
@@ -208,6 +215,11 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         body: { event: "integration.session_started", sessionId: "integration-session", data: { screen: "kingdom", source: "test", email: "must-not-be-stored" } },
       }), 201, "evento de analytics autenticado");
       assert.equal(analytics.success, true);
+      const kingdomOpened = expectStatus(await api("/api/game/analytics", {
+        method: "POST", token: tokenA,
+        body: { event: "kingdom.opened", sessionId: "valhalla-active-session", data: { screen: "kingdom", source: "integration" } },
+      }), 201, "atividade real de abertura do reino");
+      assert.equal(kingdomOpened.success, true);
       expectStatus(await api("/api/game/feedback", {
         method: "POST", token: tokenA, body: { rating: 6, text: "Nota fora do limite" },
       }), 400, "feedback rejeita nota inválida");
@@ -257,6 +269,78 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         method: "POST", token: tokenA,
         body: { kind: "invalid", itemId: 1, requestKey: "invalid-request-key-01" },
       }), 400, "pedido de compra inválido");
+    });
+
+    await t.test("Ascensão de Valhalla: configuração, x5 de produção, filas aceleradas e runas diárias idempotentes", async () => {
+      const initial = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado antes do modo Valhalla");
+      const runesBefore = Number(initial.state.kingdom.destiny_runes || 0);
+
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE game_config SET value='1' WHERE key='valhalla_mode_active';",
+      ]);
+
+      try {
+        const activeConfig = expectStatus(await api("/api/config/valhalla"), 200, "Valhalla ativado no D1 local");
+        assert.equal(activeConfig.active, true);
+        assert.equal(activeConfig.resourceMultiplier, 5);
+        assert.equal(activeConfig.speedMultiplier, 0.2);
+
+        const scheduledOnce = await fetch(baseUrl + "/cdn-cgi/local/scheduled?format=json", {
+          signal: AbortSignal.timeout(20_000),
+        });
+        assert.equal(scheduledOnce.status, 200, "Cron local deve executar o handler agendado");
+        const scheduledResult = await scheduledOnce.json();
+        assert.equal(scheduledResult.outcome, "ok");
+
+        const afterDailyReward = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado após runas diárias");
+        assert.equal(Number(afterDailyReward.state.kingdom.destiny_runes), runesBefore + 100,
+          "reino que abriu o jogo nas últimas 24 horas recebe 100 Runas do Destino");
+
+        const scheduledTwice = await fetch(baseUrl + "/cdn-cgi/local/scheduled?format=json", {
+          signal: AbortSignal.timeout(20_000),
+        });
+        assert.equal(scheduledTwice.status, 200);
+        const afterDuplicateCron = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado após repetição do Cron");
+        assert.equal(Number(afterDuplicateCron.state.kingdom.destiny_runes), runesBefore + 100,
+          "repetir o Cron no mesmo dia não duplica a recompensa");
+
+        const woodBeforeProduction = Number(afterDuplicateCron.state.kingdom.wood || 0);
+        await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE kingdoms SET last_production_at=datetime('now','-3600 seconds') WHERE id=" + kingdomA + ";",
+        ]);
+        const produced = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "produção com multiplicador Valhalla");
+        const woodGained = Number(produced.state.kingdom.wood || 0) - woodBeforeProduction;
+        assert.ok(woodGained >= 40,
+          "uma hora de produção básica de madeira recebe pelo menos o multiplicador x5");
+
+        expectStatus(await api("/api/game/action", { method: "POST", token: tokenC, body: { type: "upgrade", building: "castle" } }), 200, "construção acelerada Valhalla");
+        expectStatus(await api("/api/game/action", { method: "POST", token: tokenC, body: { type: "train", unit: "mage", quantity: 1 } }), 200, "treinamento acelerado Valhalla");
+        expectStatus(await api("/api/game/action", { method: "POST", token: tokenC, body: { type: "research", research: "economy" } }), 200, "pesquisa acelerada Valhalla");
+
+        const acceleratedState = expectStatus(await api("/api/game/state", { token: tokenC }), 200, "filas do reino de teste");
+        const running = acceleratedState.state.queues.filter(queue => queue.status === "running");
+        const secondsFor = type => {
+          const queue = running.find(item => item.queue_type === type);
+          assert.ok(queue, "fila " + type + " deve estar em andamento");
+          return Math.round((Date.parse(queue.completes_at) - Date.parse(queue.started_at)) / 1000);
+        };
+        assert.equal(secondsFor("construction"), 12, "construção de 60s vira 12s");
+        assert.equal(secondsFor("training"), 10, "treinamento respeita o piso seguro de 10s");
+        assert.equal(secondsFor("research"), 36, "pesquisa de 180s vira 36s");
+      } finally {
+        await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE game_config SET value='0' WHERE key='valhalla_mode_active';",
+        ]);
+      }
+
+      const disabledAgain = expectStatus(await api("/api/config/valhalla"), 200, "Valhalla desligado após testes locais");
+      assert.equal(disabledAgain.active, false);
     });
 
     const adminLogin = expectStatus(await api("/api/admin/login", {
