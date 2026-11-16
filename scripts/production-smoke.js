@@ -111,13 +111,20 @@ export async function runProductionSmokeTests({
   assert(manifestResponse.status === 200, "Manifest da PWA indisponível.");
   const manifest = await readJson(manifestResponse, "Manifest da PWA");
   assert(manifest.name === "Clash of Izzy", "Manifest não identifica o Clash of Izzy.");
+  const shortcutUrls = new Set((manifest.shortcuts || []).map(item => item.url));
+  for (const path of ["/kingdom.html", "/world.html", "/events.html"]) {
+    assert(shortcutUrls.has(path), "Atalho PWA ausente ou aponta para rota inexistente: " + path);
+  }
 
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v13"), "Service worker não contém o cache esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v14"), "Service worker não contém o cache esperado.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
+  assert(serviceWorker.includes("/navigation.js"), "PWA não inclui o menu compartilhado e a ação de instalação.");
+  assert(serviceWorker.includes("/offline.html"), "PWA não inclui a página de contingência offline.");
+  assert(serviceWorker.includes('url.pathname.startsWith("/api/")'), "Rotas privadas da API não estão explicitamente fora do cache.");
 
   return {
     baseUrl: base.origin,
@@ -131,7 +138,9 @@ export async function runProductionSmokeTests({
       mercadoPagoCheckout: true,
       staticPages: REQUIRED_PAGES.length,
       pwaManifest: true,
+      pwaShortcuts: true,
       serviceWorker: true,
+      offlineSafety: true,
       worldMapNavigation: true,
       worldMap3D: true,
     },
