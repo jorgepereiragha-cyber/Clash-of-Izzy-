@@ -1,11 +1,5 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
-
-const MIME_TYPES = [
-  "video/webm;codecs=vp9",
-  "video/webm;codecs=vp8",
-  "video/webm",
-  "video/mp4"
-];
+import { estimateRecordingBytes, getRecordingMemoryBudget, selectMediaRecorderMimeType } from "./media-recorder-support.js";
 
 export class CinematicTextRenderer {
   render(context, width, height, cue, elapsed) {
@@ -61,6 +55,7 @@ export class CinematicCapture {
     this.api = cinematicApi;
     this.view = null;
     this.recorder = null;
+    this.selectedMimeType = "";
     this.stream = null;
     this.captureCanvas = null;
     this.captureContext = null;
@@ -107,8 +102,7 @@ export class CinematicCapture {
   }
 
   _supportedMimeType() {
-    if (typeof MediaRecorder.isTypeSupported !== "function") return "";
-    return MIME_TYPES.find(type => MediaRecorder.isTypeSupported(type)) || "";
+    return selectMediaRecorderMimeType(MediaRecorder);
   }
 
   async startRecording(options = {}) {
@@ -123,8 +117,22 @@ export class CinematicCapture {
     const height = Math.round(Number(options.height) || 720);
     const fps = Math.round(Number(options.fps) || 30);
     const bitrate = Math.max(2500000, Math.min(12000000, Number(options.bitrate) || 5000000));
+    const expectedDuration = Math.max(1, Math.min(180, Number(options.expectedDuration) || 60));
     if (width < 640 || width > 1920 || height < 360 || height > 1080 || fps < 24 || fps > 60) {
       throw new RangeError("Use resolução entre 640×360 e 1920×1080 e frequência entre 24 e 60 FPS.");
+    }
+    const estimatedBytes = estimateRecordingBytes(bitrate, expectedDuration);
+    const memoryBudget = getRecordingMemoryBudget(
+      typeof navigator !== "undefined" ? navigator.deviceMemory : undefined
+    );
+    if (estimatedBytes > memoryBudget) {
+      const estimatedMiB = Math.ceil(estimatedBytes / (1024 * 1024));
+      const budgetMiB = Math.floor(memoryBudget / (1024 * 1024));
+      throw new Error(
+        "Esta gravação pode usar cerca de " + estimatedMiB +
+        " MB, acima do limite seguro de " + budgetMiB +
+        " MB deste dispositivo. Reduza a duração, a resolução ou o FPS."
+      );
     }
 
     const view = this.api.getContext();
@@ -171,9 +179,22 @@ export class CinematicCapture {
 
       this.stream = this.captureCanvas.captureStream(fps);
       const mimeType = this._supportedMimeType();
+      this.selectedMimeType = mimeType;
       const recorderOptions = { videoBitsPerSecond: bitrate };
       if (mimeType) recorderOptions.mimeType = mimeType;
-      this.recorder = new MediaRecorder(this.stream, recorderOptions);
+      try {
+        this.recorder = new MediaRecorder(this.stream, recorderOptions);
+      } catch (codecError) {
+        if (!mimeType) throw codecError;
+        // Some mobile browsers report a codec as supported but reject the
+        // options when the recorder is instantiated. Retry browser selection.
+        this.selectedMimeType = "";
+        try {
+          this.recorder = new MediaRecorder(this.stream, { videoBitsPerSecond: bitrate });
+        } catch {
+          throw new Error("O navegador recusou os codecs de vídeo disponíveis para esta gravação.", { cause: codecError });
+        }
+      }
       this.recorder.ondataavailable = event => {
         if (event.data?.size > 0) this.chunks.push(event.data);
       };
@@ -284,7 +305,7 @@ export class CinematicCapture {
   }
 
   _onRecordingStopped() {
-    const type = this.recorder?.mimeType || "video/webm";
+    const type = this.recorder?.mimeType || this.selectedMimeType || "video/webm";
     const blob = new Blob(this.chunks, { type });
     const elapsed = this.startTime ? Math.max(0, (performance.now() - this.startTime) / 1000) : 0;
     this._restoreEnvironment();
@@ -341,6 +362,7 @@ export class CinematicCapture {
     this.captureContext = null;
     this.stream = null;
     this.recorder = null;
+    this.selectedMimeType = "";
     this.view = null;
     this.originalRendererSize = null;
     this.originalCamera = null;
