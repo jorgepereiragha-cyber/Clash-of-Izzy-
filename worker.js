@@ -3,6 +3,7 @@ import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
 import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
+import { processEmailQueue, requestEmailVerification, verifyEmailToken, getEmailPreferences, updateEmailPreferences, getEmailHistory, queueEmailForInternalPlayer } from "./email-system.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -1325,15 +1326,18 @@ export default {
   catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
   try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_rate_limit_cleanup_failed",String(error?.message||error));}
+  try{await processEmailQueue(env,10);}
+  catch(error){console.error("scheduled_email_queue_failed",String(error?.message||error));}
  },
  async fetch(request,env){
   if(request.method==="OPTIONS")return new Response(null,{status:204});
   const url=new URL(request.url);
+  if(url.pathname==="/api/email/verify"&&request.method==="GET")return await verifyEmailToken(env,url.searchParams.get("token"));
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1421,6 +1425,20 @@ export default {
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     try{
+      if(url.pathname==="/api/game/email/verification"&&request.method==="POST"){
+        const limited=await rateLimitDecision(env,"email-verification-player",playerId,3,3600);
+        if(limited)return limited;
+        const body=await readBody(request,4096);
+        if(body.__bodyError)return json({error:"Solicitação de confirmação inválida."},400);
+        return await requestEmailVerification(env,playerId,body.email);
+      }
+      if(url.pathname==="/api/game/email/preferences"&&request.method==="GET")return await getEmailPreferences(env,playerId);
+      if(url.pathname==="/api/game/email/preferences"&&request.method==="PUT"){
+        const body=await readBody(request,4096);
+        if(body.__bodyError)return json({error:"Preferências inválidas."},400);
+        return await updateEmailPreferences(env,playerId,body);
+      }
+      if(url.pathname==="/api/game/email/history"&&request.method==="GET")return await getEmailHistory(env,playerId);
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"game-state-player",playerId,120,60);
         if(limited)return limited;
@@ -1663,7 +1681,7 @@ export default {
     if(url.pathname==="/api/admin/purchase-requests/review"){
       const id=Number(body.requestId),decision=String(body.decision||"");
       if(!Number.isSafeInteger(id)||id<1||!["approve","reject"].includes(decision))return json({error:"Pedido ou decisão inválidos."},400);
-      const pending=await env.DB.prepare("SELECT id,product_kind,product_id,player_id,gems_amount FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
+      const pending=await env.DB.prepare("SELECT id,product_kind,product_id,product_name,player_id,gems_amount FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
       if(!pending)return json({error:"Pedido já processado ou não encontrado."},409);
       let result;
       if(decision==="reject"){
@@ -1682,6 +1700,13 @@ export default {
         if(!result[0]?.meta?.changes)return json({error:"Pedido já processado."},409);
       }
       if(decision==="reject"&&!result.meta?.changes)return json({error:"Pedido já processado."},409);
+      if(decision==="approve"){
+        try{
+          await queueEmailForInternalPlayer(env,pending.player_id,"purchase_confirmation",{
+            request_id:id,product_name:pending.product_name,gems_amount:Number(pending.gems_amount||0)
+          },{category:"transactional",idempotencyKey:"purchase:"+id});
+        }catch(error){console.error("purchase_confirmation_email_queue_failed",id,String(error?.message||error));}
+      }
       return json({success:true,message:decision==="approve"?"Pedido aprovado e pacote liberado.":"Pedido recusado."});
     }
     if(url.pathname==="/api/admin/player-search"){
