@@ -317,9 +317,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         assert.ok(woodGained >= 40,
           "uma hora de produção básica de madeira recebe pelo menos o multiplicador x5");
 
-        await action(tokenC, { type: "upgrade", building: "farm" }, 200, "construção acelerada Valhalla");
-        await action(tokenC, { type: "train", unit: "mage", quantity: 1 }, 200, "treinamento acelerado Valhalla");
-        await action(tokenC, { type: "research", research: "economy" }, 200, "pesquisa acelerada Valhalla");
+        expectStatus(await api("/api/game/action", { method: "POST", token: tokenC, body: { type: "upgrade", building: "farm" } }), 200, "construção acelerada Valhalla");
+        expectStatus(await api("/api/game/action", { method: "POST", token: tokenC, body: { type: "train", unit: "mage", quantity: 1 } }), 200, "treinamento acelerado Valhalla");
+        expectStatus(await api("/api/game/action", { method: "POST", token: tokenC, body: { type: "research", research: "economy" } }), 200, "pesquisa acelerada Valhalla");
 
         const acceleratedState = expectStatus(await api("/api/game/state", { token: tokenC }), 200, "filas do reino de teste");
         const running = acceleratedState.state.queues.filter(queue => queue.status === "running");
