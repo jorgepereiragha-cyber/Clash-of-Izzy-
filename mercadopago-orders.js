@@ -19,7 +19,7 @@ function moneyToCents(value) {
   return Math.round(amount * 100);
 }
 
-async function validateWebhookSignature(request, orderId, secret) {
+export async function validateWebhookSignature(request, orderId, secret) {
   const signatureHeader = request.headers.get("x-signature") || "";
   const requestId = request.headers.get("x-request-id") || "";
   const fields = Object.fromEntries(signatureHeader.split(",").map(part => {
