@@ -37,7 +37,7 @@ async function validateWebhookSignature(request, orderId, secret) {
 }
 
 async function createCheckout(request, env, ctx) {
-  if (!env.MP_ACCESS_TOKEN) return ctx.json({ error: "Checkout automático ainda não configurado; o link Mercado Pago atual continua disponível.", code: "MP_NOT_CONFIGURED" }, 503);
+  if (!env.MP_ACCESS_TOKEN || !env.MP_WEBHOOK_SECRET) return ctx.json({ error: "Checkout automático ainda não configurado por completo; o link Mercado Pago atual continua disponível.", code: "MP_NOT_CONFIGURED" }, 503);
   const playerId = await ctx.gameIdentity(request, env);
   if (!playerId) return ctx.json({ error: "Sessão do jogador inválida." }, 401);
   const limited = await ctx.rateLimitDecision(env, "mercadopago-checkout-player", playerId, 5, 3600);
