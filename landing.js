@@ -11,6 +11,10 @@
   const playLink = document.getElementById("play-now");
   let deferredInstallPrompt = null;
 
+  function safeStorageGet(key) {
+    try { return localStorage.getItem(key); } catch { return null; }
+  }
+
   function isStandalone() {
     return window.matchMedia?.("(display-mode: standalone)").matches ||
       window.navigator.standalone === true;
@@ -95,7 +99,8 @@
 
   async function loadReferralLink() {
     if (!referralInput || !referralStatus || !referralButton) return;
-    const token = localStorage.getItem(TOKEN_KEY) || sessionStorage.getItem(TOKEN_KEY);
+    let token = safeStorageGet(TOKEN_KEY);
+    if (!token) { try { token = sessionStorage.getItem(TOKEN_KEY); } catch {} }
     if (!token) {
       referralInput.value = "Entre no reino para gerar seu convite";
       referralStatus.textContent = "Depois de criar seu reino, volte aqui para obter um link pessoal.";
@@ -196,7 +201,7 @@
   referralAwarePlayLink();
   void loadReferralLink();
 
-  if (!isStandalone() && !localStorage.getItem("coi_install_guide_dismissed")) {
+  if (!isStandalone() && !safeStorageGet("coi_install_guide_dismissed")) {
     window.setTimeout(() => {
       if (!isStandalone() && modal?.hidden !== false) showInstallGuide();
     }, 10000);
