@@ -2,9 +2,9 @@ name: Clash of Izzy CI
 
 on:
   push:
-    branches: [main]
+    branches: [main, "feat/**"]
   pull_request:
-    branches: [main]
+    branches: [main, test/mobile-playwright-hardening]
 
 concurrency:
   group: clash-of-izzy-ci-${{ github.ref }}
