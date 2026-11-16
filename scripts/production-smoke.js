@@ -168,7 +168,7 @@ export async function runProductionSmokeTests({
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
   assert(
-    /const\\s+CACHE_NAME\\s*=\\s*["']clash-of-izzy-shell-v\\d+["']/.test(serviceWorker),
+    /const\s+CACHE_NAME\s*=\s*["']clash-of-izzy-shell-v\d+["']/.test(serviceWorker),
     "Service worker não declara um nome de cache versionado."
   );
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
