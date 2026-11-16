@@ -685,9 +685,14 @@ async function resolvePvpMarch(env,march,attackerKingdomId,units,target){
     recalculateKingdomPower(env,attackerKingdomId),
     recalculateKingdomPower(env,defenderId)
   ]);
+  await Promise.all([
+    broadcastGameRealtime(env,attacker.map_region,[attackerKingdomId],"pvp_battle"),
+    broadcastGameRealtime(env,defender.map_region,[defenderId],"pvp_battle")
+  ]);
 }
 async function processMarches(env,kingdomId){
  const now=new Date().toISOString();
+ const kingdomRegion=await env.DB.prepare("SELECT map_region FROM kingdoms WHERE id=?").bind(kingdomId).first();
  const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id,started_at,arrives_at FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
  for(const m of due.results||[]){
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
@@ -776,6 +781,7 @@ async function processMarches(env,kingdomId){
     "INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'march_resolved',? WHERE EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)"
   ).bind(kingdomId,JSON.stringify({marchId:m.id,marchType:m.march_type,targetTerritoryId:m.target_territory_id}),m.id,kingdomId,resolutionToken));
   await env.DB.batch(statements);
+  await broadcastGameRealtime(env,kingdomRegion?.map_region,[kingdomId],"march_resolved");
  }
 }
 const CASTLE_MATERIALS={
@@ -1585,7 +1591,9 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("UPDATE world_territories SET name=? WHERE territory_key=? AND territory_kind='castle'").bind("Castelo de "+name,"kingdom_castle_"+k.id)
     ]);
   }else{return json({error:"Ação de jogo desconhecida."},400)}
-  return json({success:true,state:await gameState(env,playerId),...(battleOutcome?{battle:battleOutcome}:{})});
+  const updatedState=await gameState(env,playerId);
+  await broadcastGameRealtime(env,updatedState?.kingdom?.map_region,[k.id],"game_action");
+  return json({success:true,state:updatedState,...(battleOutcome?{battle:battleOutcome}:{})});
 }
 
 async function ensureAngelDeathWeekend(env,now=new Date()){
@@ -1777,6 +1785,8 @@ async function processDueKingdomQueues(env,kingdomId=null){
       await env.DB.batch(statements);
       if(queue.queue_type==="construction")await recalculateKingdomStats(env,queue.kingdom_id);
       await recalculateKingdomPower(env,queue.kingdom_id);
+      const queueRegion=await env.DB.prepare("SELECT map_region FROM kingdoms WHERE id=?").bind(queue.kingdom_id).first();
+      await broadcastGameRealtime(env,queueRegion?.map_region,[queue.kingdom_id],"queue_completed");
     }catch(error){
       console.error("kingdom_queue_completion_failed",queue.id,String(error?.message||error));
     }
