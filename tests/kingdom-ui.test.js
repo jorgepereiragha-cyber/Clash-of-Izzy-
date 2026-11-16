@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 test("entrada principal prioriza o reino e preserva a arena como modo secundário", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  assert.match(html, /href="\.\/kingdom\.html">ENTRAR NO REINO/);
+  assert.match(html, /id="play-now" href="\.\/kingdom\.html">⚔️ ENTRAR NO REINO/);
   assert.match(html, /href="\.\/arena\.html"/);
 });
 
