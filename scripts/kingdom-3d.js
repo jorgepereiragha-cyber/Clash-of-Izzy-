@@ -48,6 +48,8 @@ if (host && "WebGLRenderingContext" in window) {
   const surfaceTextureCache = new Map();
   let disposed = false;
   let kingdomRenderHandler = null;
+  let cinematicCaptureActive = false;
+  let cinematicApi = null;
   let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
   let valhallaAuroraLight = null;
   let kingdomHemisphereLight = null;
@@ -810,6 +812,9 @@ if (host && "WebGLRenderingContext" in window) {
     const restore2DFallback = () => {
       if (disposed) return;
       disposed = true;
+      cinematicCaptureActive = false;
+      if (window.__coiKingdomCinematic === cinematicApi) delete window.__coiKingdomCinematic;
+      cinematicApi = null;
       stopArmyAnimationLoop();
       host.classList.remove("has-3d");
       window.dispatchEvent(new CustomEvent("coi:kingdom-2d-fallback"));
@@ -848,7 +853,7 @@ if (host && "WebGLRenderingContext" in window) {
       loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops);
     }
     const resize = () => {
-      if (!renderer || !host.clientWidth || !host.clientHeight) return;
+      if (cinematicCaptureActive || !renderer || !host.clientWidth || !host.clientHeight) return;
       const aspect = host.clientWidth / host.clientHeight;
       const viewHeight = 12.8, viewWidth = viewHeight * aspect;
       camera.left = -viewWidth / 2; camera.right = viewWidth / 2;
@@ -859,6 +864,49 @@ if (host && "WebGLRenderingContext" in window) {
       renderer.render(scene, camera);
       publishBuildingHitTargets(latestBuildings);
     };
+    cinematicApi = Object.freeze({
+      getContext() {
+        if (disposed || !renderer || !scene || !camera) return null;
+        return { scene, camera, renderer };
+      },
+      setCaptureActive(active) {
+        if (disposed || !renderer) return false;
+        cinematicCaptureActive = Boolean(active);
+        if (cinematicCaptureActive) {
+          stopArmyAnimationLoop();
+        } else {
+          resize();
+          startArmyAnimationLoop();
+        }
+        return true;
+      },
+      setCaptureViewport(aspect) {
+        if (disposed || !renderer || !camera || !Number.isFinite(aspect) || aspect <= 0) return false;
+        if (camera.isOrthographicCamera) {
+          const halfHeight = Math.max(0.1, (camera.top - camera.bottom) / 2);
+          camera.left = -halfHeight * aspect;
+          camera.right = halfHeight * aspect;
+        } else if (camera.isPerspectiveCamera) {
+          camera.aspect = aspect;
+        }
+        camera.updateProjectionMatrix();
+        return true;
+      },
+      renderFrame(delta = 0) {
+        if (disposed || !renderer || !scene || !camera) {
+          throw new Error("A visualização 3D do reino deixou de estar disponível.");
+        }
+        const safeDelta = Math.min(0.05, Math.max(0, Number(delta) || 0));
+        for (const mixer of armyMixers) mixer.update(safeDelta);
+        advancedShaders?.update(safeDelta);
+        renderer.render(scene, camera);
+        return true;
+      },
+      setValhallaMode: setKingdomValhallaMode,
+      getValhallaMode: () => valhallaModeActive
+    });
+    window.__coiKingdomCinematic = cinematicApi;
+
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
     else { resizeHandler = resize; window.addEventListener("resize", resizeHandler, { passive: true }); }
     resize();
@@ -883,6 +931,9 @@ if (host && "WebGLRenderingContext" in window) {
       window.dispatchEvent(new CustomEvent("coi:kingdom-2d-fallback"));
     delete host.dataset.qualityTier;
     delete window.__coiKingdomDiagnostics;
+    if (window.__coiKingdomCinematic === cinematicApi) delete window.__coiKingdomCinematic;
+    cinematicApi = null;
+    cinematicCaptureActive = false;
     console.warn("Clash of Izzy: WebGL indisponível; mantendo arte procedural 2D.", error);
   }
 }
