@@ -35,8 +35,8 @@ test("central do reino mostra filas persistentes, treinamento e pesquisas", asyn
   assert.match(html, /id="technologyStatus"/);
   assert.match(html, /coi:kingdom-technologies/);
   assert.match(html, /coi:technology-refresh/);
-  assert.match(html, /technology-tree\\.js/);
-  assert.match(html, /styles\\/technology-tree\\.css/);
+  assert.ok(html.includes("technology-tree.js"));
+  assert.ok(html.includes("/styles/technology-tree.css"));
 });
 
 test("HUD shows server-owned gems and highlights only changed resource counters", async () => {
