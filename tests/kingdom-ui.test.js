@@ -61,5 +61,7 @@ test("central do reino envia feedback e registra analytics da sessão", async ()
 
 test("PWA cache version is bumped when static UI changes", async () => {
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /clash-of-izzy-shell-v14/);
+  assert.match(worker, /clash-of-izzy-shell-v15/);
+  assert.match(worker, /valhalla-admin-ui\\.js/);
+  assert.match(worker, /styles\\/valhalla-admin\\.css/);
 });
