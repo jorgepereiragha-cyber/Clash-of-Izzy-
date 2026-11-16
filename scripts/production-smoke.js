@@ -8,6 +8,7 @@ const REQUIRED_PAGES = [
   "/events.html",
   "/alliance.html",
   "/equipment-ui.html",
+  "/advanced.html",
   "/admin.html",
 ];
 
@@ -137,6 +138,34 @@ export async function runProductionSmokeTests({
   assert(map3d.includes("OrthographicCamera") && map3d.includes("createMarchFormation"),
     "Mapa 3D não contém a cena estratégica e as formações de marcha.");
 
+  const advancedPageResponse = await get("/advanced.html");
+  assert(advancedPageResponse.status === 200, "Painel Academia & Progressão indisponível.");
+  const advancedPage = await advancedPageResponse.text();
+  assert(advancedPage.includes('id="technology-list"') && advancedPage.includes('id="visual-form"'),
+    "Painel de progressão está incompleto.");
+
+  const advancedUiResponse = await get("/advanced-game-ui.js");
+  assert(advancedUiResponse.status === 200, "Controlador da Academia indisponível.");
+  const advancedUi = await advancedUiResponse.text();
+  assert(advancedUi.includes("/api/game/advanced/") && advancedUi.includes("tasks/claim"),
+    "Controlador da Academia não está conectado às rotas autenticadas.");
+
+  const advancedCssResponse = await get("/styles/advanced-game.css");
+  assert(advancedCssResponse.status === 200, "Estilos da Academia indisponíveis.");
+  const advancedCss = await advancedCssResponse.text();
+  assert(advancedCss.includes(".advanced-grid"), "Estilos da Academia estão incompletos.");
+
+  const visualEffectsResponse = await get("/visual-effects.js");
+  assert(visualEffectsResponse.status === 200, "Motor de efeitos visuais indisponível.");
+  const visualEffects = await visualEffectsResponse.text();
+  assert(visualEffects.includes("coi:vfx:damage") && visualEffects.includes("coi:visuals:day-night"),
+    "Motor visual não contém os efeitos e o ciclo dia/noite.");
+
+  const visualEffectsCssResponse = await get("/styles/visual-effects.css");
+  assert(visualEffectsCssResponse.status === 200, "Estilos dos efeitos visuais indisponíveis.");
+  const visualEffectsCss = await visualEffectsCssResponse.text();
+  assert(visualEffectsCss.includes(".coi-damage-number"), "Estilos dos efeitos visuais estão incompletos.");
+
   const manifestResponse = await get("/manifest.json");
   assert(manifestResponse.status === 200, "Manifest da PWA indisponível.");
   const manifest = await readJson(manifestResponse, "Manifest da PWA");
@@ -145,9 +174,12 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v16"), "Service worker não contém o cache v14 esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v18"), "Service worker não contém o cache v14 esperado.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
+  for (const asset of ["/advanced.html", "/advanced-game-ui.js", "/styles/advanced-game.css", "/visual-effects.js", "/styles/visual-effects.css"]) {
+    assert(serviceWorker.includes('"' + asset + '"'), "PWA não inclui o ativo v3: " + asset);
+  }
   assert(serviceWorker.includes("/admin.html"), "PWA não inclui o painel Master.");
   assert(serviceWorker.includes("/valhalla-admin-ui.js"), "PWA não inclui o controlador administrativo de Valhalla.");
   assert(serviceWorker.includes("/styles/valhalla-admin.css"), "PWA não inclui os estilos administrativos de Valhalla.");
@@ -176,6 +208,8 @@ export async function runProductionSmokeTests({
       feedbackUiAndAnalytics: true,
       worldMapNavigation: true,
       worldMap3D: true,
+      advancedProgressionUi: true,
+      visualEffects: true,
     },
   };
 }
