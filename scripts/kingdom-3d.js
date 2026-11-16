@@ -4,6 +4,7 @@ import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/
 import { KTX2Loader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/KTX2Loader.js";
 import { clone as cloneSkinned } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "./kingdom-quality.js";
+import { AdvancedShaders } from "./advanced-shaders.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -51,6 +52,8 @@ if (host && "WebGLRenderingContext" in window) {
   let valhallaAuroraLight = null;
   let kingdomHemisphereLight = null;
   let kingdomSunLight = null;
+  let advancedShaders = null;
+  let waterFeature = null;
 
   function setKingdomValhallaMode(active) {
     valhallaModeActive = Boolean(active);
@@ -129,6 +132,9 @@ if (host && "WebGLRenderingContext" in window) {
     manifestProps = [];
     manifestUnits = [];
     stopArmyAnimationLoop();
+    advancedShaders?.dispose();
+    advancedShaders = null;
+    waterFeature = null;
   }
   // Small, deterministic, tileable procedural albedo maps add material identity
   // without shipping large image files or creating per-building texture copies.
@@ -529,18 +535,19 @@ if (host && "WebGLRenderingContext" in window) {
     lastAnimationTime = 0;
   }
   function renderArmyFrame(timestamp) {
-    if (disposed || !renderer || !scene || !camera || !armyMixers.length) {
+    if (disposed || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders)) {
       animationFrame = 0;
       return;
     }
     const delta = lastAnimationTime ? Math.min(.05, Math.max(0, (timestamp - lastAnimationTime) / 1000)) : 0;
     lastAnimationTime = timestamp;
     for (const mixer of armyMixers) mixer.update(delta);
+    advancedShaders?.update(delta);
     renderer.render(scene, camera);
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
   function startArmyAnimationLoop() {
-    if (animationFrame || !armyMixers.length || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
+    if (animationFrame || (!armyMixers.length && !advancedShaders) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
     lastAnimationTime = 0;
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
