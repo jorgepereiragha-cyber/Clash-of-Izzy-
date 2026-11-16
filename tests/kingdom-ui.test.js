@@ -31,6 +31,12 @@ test("central do reino mostra filas persistentes, treinamento e pesquisas", asyn
   assert.match(html, /submitQueue\("train"/);
   assert.match(html, /submitQueue\("research"/);
   assert.match(html, /data-completes/);
+  assert.match(html, /id="technologyTree"/);
+  assert.match(html, /id="technologyStatus"/);
+  assert.match(html, /coi:kingdom-technologies/);
+  assert.match(html, /coi:technology-refresh/);
+  assert.ok(html.includes("technology-tree.js"));
+  assert.ok(html.includes("/styles/technology-tree.css"));
 });
 
 test("HUD shows server-owned gems and highlights only changed resource counters", async () => {
@@ -61,7 +67,7 @@ test("central do reino envia feedback e registra analytics da sessão", async ()
 
 test("PWA cache version is bumped when static UI changes", async () => {
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /clash-of-izzy-shell-v17/);
+  assert.match(worker, /clash-of-izzy-shell-v18/);
   assert.match(worker, /valhalla-admin-ui\.js/);
   assert.match(worker, /styles\/valhalla-admin\.css/);
   assert.match(worker, /valhalla-shop-ui\.js/);

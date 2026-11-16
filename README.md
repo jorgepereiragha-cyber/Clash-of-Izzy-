@@ -46,8 +46,15 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0021`. As migrações `0019` (temporada Valhalla), `0020` (atribuição de convites) e `0021` (nós de recursos, rallies e catálogo inicial de tecnologias) são incrementais e não substituem o schema histórico. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0022`. As migrações `0019` (temporada Valhalla), `0020` (atribuição de convites), `0021` (nós de recursos, rallies e catálogo inicial de tecnologias) e `0022` (progresso por reino na árvore tecnológica) são incrementais e não substituem o schema histórico. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
 
+## Árvore de tecnologias v3.0
+
+- A migração `0021_advanced_warfare.sql` cria o catálogo de oito tecnologias e o progresso por reino; a `0022_technology_progression.sql` faz o backfill dos reinos existentes sem reconstruir tabelas históricas.
+- Cada pesquisa usa a fila persistente de pesquisa já existente (`kingdom_queues`), debita Ouro no servidor e só libera o nível após a conclusão confirmada pelo cron.
+- A Academia libera até três níveis de tecnologia por nível da construção. Pré-requisitos, custo crescente e duração crescente são verificados no Worker.
+- Bônus por categoria entram na produção de comida, pedra e madeira, na velocidade de marcha e no dano de infantaria, cavalaria e arqueiros. Bônus de defesa de muralha ficam expostos no estado do reino para a futura camada de defesa PvP.
+- O painel da árvore usa a sessão autenticada existente e não grava progresso no navegador. Os arquivos novos são incluídos no shell PWA v18.
 ## Filas estratégicas persistentes
 
 - Construção, treinamento e pesquisa possuem filas independentes por reino e uma ordem ativa por tipo.

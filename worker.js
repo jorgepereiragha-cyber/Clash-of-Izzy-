@@ -9,6 +9,7 @@ import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
+import { calculateTechnologyBonuses, technologyLevelCap, technologyAcademyRequirement, calculateTechnologyResearchCost, calculateTechnologyResearchDuration } from "./technology-rules.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -260,6 +261,17 @@ async function scaleKingdomQueueDurationSeconds(env,kingdomId,baseSeconds,queueT
   const buffs=await getValhallaBuffMultipliers(env,kingdomId);
   return Math.max(10,Math.floor(seasonal/Math.max(1,buffs.buildSpeed)));
 }
+
+async function ensureKingdomTechnologyRows(env,kingdomId){
+  await env.DB.prepare("INSERT OR IGNORE INTO kingdom_tech(kingdom_id,tech_id,level) SELECT ?,id,0 FROM tech_catalog")
+    .bind(kingdomId).run();
+}
+async function getKingdomTechnologyBonuses(env,kingdomId){
+  const rows=await env.DB.prepare("SELECT c.effect_json,kt.level FROM kingdom_tech kt JOIN tech_catalog c ON c.id=kt.tech_id WHERE kt.kingdom_id=? AND kt.level>0")
+    .bind(kingdomId).all();
+  return calculateTechnologyBonuses(rows.results||[]);
+}
+
 async function applyProduction(env,kingdomId){
   const row=await env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdomId).first();
   if(!row)return;
@@ -274,6 +286,12 @@ async function applyProduction(env,kingdomId){
     food:12*(levels.farm||1),
     iron:2*(levels.iron_mine||1),
     gold:1.5*(levels.market||1)
+  };
+  const technologyBonuses=await getKingdomTechnologyBonuses(env,kingdomId);
+  const technologyProductionRate={
+    wood:1+technologyBonuses.woodProductionPercent/100,
+    stone:1+technologyBonuses.stoneProductionPercent/100,
+    food:1+technologyBonuses.foodProductionPercent/100
   };
   await ensureEquipmentTables(env,kingdomId);
   const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first();
@@ -290,7 +308,7 @@ async function applyProduction(env,kingdomId){
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
   const gains={},nextRemainders={};
   for(const [key,rate] of Object.entries(perHour)){
-    const accumulated=rate*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
+    const accumulated=rate*(technologyProductionRate[key]||1)*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
     gains[key]=Math.floor(accumulated/3600);
     nextRemainders[key]=accumulated-gains[key]*3600;
   }
@@ -347,6 +365,7 @@ async function processMarches(env,kingdomId){
     ]);
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
     const valhallaBuffs=await getValhallaBuffMultipliers(env,kingdomId);
+    const technologyBonuses=await getKingdomTechnologyBonuses(env,kingdomId);
     const castleLevel=Number(kingdom?.castle_level||1);
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
     const simulation=simulateBattle({
@@ -356,7 +375,7 @@ async function processMarches(env,kingdomId){
      defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
      equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
      equipmentHealthBonusPercent:gear.healthPercent,
-     criticalChancePercent:gear.criticalChancePercent,
+     technologyBonuses,criticalChancePercent:gear.criticalChancePercent,
      criticalDamageMultiplier:1.5,
      criticalSeed,
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
@@ -490,6 +509,7 @@ async function gameState(env,playerId){
   if(!p)return null;
   const kingdom=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!kingdom)return null;
+  await ensureKingdomTechnologyRows(env,kingdom.id);
   await syncHeroSystems(env,kingdom.id);
   await applyProduction(env,kingdom.id);
   await seedWorld(env);
@@ -538,13 +558,34 @@ async function gameState(env,playerId){
   const activeHeroId=Number((heroes.results||[]).find(hero=>hero.hero_key===activeHeroKey)?.id||0);
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
-  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops};
+  const technologyRows=await env.DB.prepare("SELECT c.id,c.name,c.description,c.category,c.max_level,c.base_cost_gold,c.base_research_time,c.prerequisite_tech,c.effect_json,COALESCE(kt.level,0) AS level,COALESCE(kt.research_end_time,0) AS research_end_time FROM tech_catalog c LEFT JOIN kingdom_tech kt ON kt.tech_id=c.id AND kt.kingdom_id=? ORDER BY CASE c.category WHEN 'military' THEN 1 WHEN 'defense' THEN 2 ELSE 3 END,c.name").bind(kingdom.id).all();
+  const academyLevel=Number((buildings.results||[]).find(row=>row.building_type==="academy")?.level||0);
+  const technologyLevels=new Map((technologyRows.results||[]).map(row=>[row.id,Number(row.level)||0]));
+  const technologies=(technologyRows.results||[]).map(row=>{
+    let effect={};try{effect=JSON.parse(row.effect_json||"{}")}catch{}
+    const level=Number(row.level)||0;
+    const maxLevel=Number(row.max_level)||10;
+    const prerequisiteLevel=row.prerequisite_tech?Number(technologyLevels.get(row.prerequisite_tech)||0):1;
+    return {
+      ...row,effect,
+      academy_level:academyLevel,
+      academy_required:technologyAcademyRequirement(level+1),
+      level_cap:technologyLevelCap(maxLevel,academyLevel),
+      prerequisite_met:prerequisiteLevel>=1,
+      prerequisite_level:prerequisiteLevel,
+      next_cost_gold:level<maxLevel?calculateTechnologyResearchCost(row.base_cost_gold,level):null,
+      next_research_seconds:level<maxLevel?calculateTechnologyResearchDuration(row.base_research_time,level):null
+    };
+  });
+  const technologyBonuses=await getKingdomTechnologyBonuses(env,kingdom.id);
+  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,technologies,technologyBonuses,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
   if(!p)return json({error:"Jogador não encontrado."},404);
   const k=await env.DB.prepare("SELECT * FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k)return json({error:"Reino não encontrado."},404);
+  await ensureKingdomTechnologyRows(env,k.id);
   await syncHeroSystems(env,k.id);
   await applyProduction(env,k.id);
   const type=String(body.type||"");
@@ -1013,6 +1054,50 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const result=await env.DB.batch(statements);
     if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes, pesquisa alterada ou fila de pesquisa ocupada. Atualize e tente novamente."},409);
+  }else if(type==="technology"){
+    const technologyId=String(body.technology||"").trim();
+    if(!/^[a-z][a-z0-9_]{1,63}$/i.test(technologyId))return json({error:"Tecnologia inválida."},400);
+    const definition=await env.DB.prepare("SELECT id,name,max_level,base_cost_gold,base_research_time,prerequisite_tech FROM tech_catalog WHERE id=?").bind(technologyId).first();
+    if(!definition)return json({error:"Tecnologia não encontrada."},404);
+    await env.DB.prepare("INSERT OR IGNORE INTO kingdom_tech(kingdom_id,tech_id,level) VALUES(?,?,0)").bind(k.id,technologyId).run();
+    const [current,academy]=await Promise.all([
+      env.DB.prepare("SELECT level FROM kingdom_tech WHERE kingdom_id=? AND tech_id=?").bind(k.id,technologyId).first(),
+      env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy'").bind(k.id).first()
+    ]);
+    const level=Number(current?.level||0),academyLevel=Number(academy?.level||0);
+    if(academyLevel<1)return json({error:"Construa o Centro de Pesquisa Militar para desbloquear tecnologias."},409);
+    if(level>=Number(definition.max_level||10))return json({error:"Esta tecnologia já atingiu o nível máximo."},409);
+    const technologyCap=technologyLevelCap(definition.max_level,academyLevel);
+    if(level>=technologyCap)return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear o próximo nível."},409);
+    if(definition.prerequisite_tech){
+      const prerequisite=await env.DB.prepare("SELECT level FROM kingdom_tech WHERE kingdom_id=? AND tech_id=?").bind(k.id,definition.prerequisite_tech).first();
+      if(Number(prerequisite?.level||0)<1)return json({error:"Pesquise primeiro "+definition.prerequisite_tech+" nível 1."},409);
+    }
+    const activeQueue=await env.DB.prepare("SELECT id FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running'").bind(k.id).first();
+    if(activeQueue)return json({error:"A fila de pesquisa já está ocupada. Conclua a pesquisa atual primeiro."},409);
+    const cost=calculateTechnologyResearchCost(definition.base_cost_gold,level);
+    const baseDuration=calculateTechnologyResearchDuration(definition.base_research_time,level);
+    const requiredAcademyLevel=technologyAcademyRequirement(level+1);
+    const valhallaMultipliers=await getValhallaMultipliers(env);
+    const durationSeconds=await scaleKingdomQueueDurationSeconds(env,k.id,baseDuration,"research",valhallaMultipliers);
+    const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();
+    const endTime=Math.floor(Date.now()/1000)+durationSeconds;
+    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const debit=env.DB.prepare("UPDATE kingdoms SET gold=gold-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND gold>=? AND COALESCE((SELECT level FROM kingdom_tech WHERE kingdom_id=? AND tech_id=?),0)=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?) AND (? IS NULL OR COALESCE((SELECT level FROM kingdom_tech WHERE kingdom_id=? AND tech_id=?),0)>=1) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running')")
+      .bind(cost,k.id,cost,k.id,technologyId,level,k.id,requiredAcademyLevel,definition.prerequisite_tech,k.id,definition.prerequisite_tech,k.id);
+    const statements=[
+      debit,
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId),
+      env.DB.prepare("INSERT INTO kingdom_queues(kingdom_id,queue_type,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at) SELECT ?,'research',?,1,?,?,?,'running',?,? WHERE "+guard)
+        .bind(k.id,"tech:"+technologyId,level,level+1,"",startedAt,completesAt,k.id,actionId),
+      env.DB.prepare("UPDATE kingdom_tech SET research_end_time=? WHERE kingdom_id=? AND tech_id=? AND level=? AND "+guard)
+        .bind(endTime,k.id,technologyId,level,k.id,actionId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
+        .bind(k.id,"technology_research_started",JSON.stringify({technology:technologyId,level:level+1,gold:cost,durationSeconds,completesAt}),k.id,actionId),
+      env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId)
+    ];
+    const result=await env.DB.batch(statements);
+    if(!result[1]?.meta?.changes)return json({error:"Ouro insuficiente, pré-requisito alterado ou fila de pesquisa ocupada. Atualize e tente novamente."},409);
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
@@ -1039,7 +1124,8 @@ async function gameAction(env,playerId,body){
       activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,activeHero.id).all():Promise.resolve({results:[]}),
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
     ]);
-    const marchBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).marchSpeedPercent;
+    const technologyBonuses=await getKingdomTechnologyBonuses(env,k.id);
+    const marchBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).marchSpeedPercent+technologyBonuses.marchSpeedPercent;
     const seconds=calculateMarchDuration(baseSeconds,marchBonus);
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
@@ -1071,6 +1157,7 @@ async function gameAction(env,playerId,body){
     ]);
     const gear=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]);
     const valhallaBuffs=await getValhallaBuffMultipliers(env,k.id);
+    const technologyBonuses=await getKingdomTechnologyBonuses(env,k.id);
     const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)+gear.defensePercent));
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
@@ -1079,7 +1166,7 @@ async function gameAction(env,playerId,body){
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
       equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),equipmentHealthBonusPercent:gear.healthPercent,
-      criticalChancePercent:gear.criticalChancePercent,criticalDamageMultiplier:1.5,
+      technologyBonuses,criticalChancePercent:gear.criticalChancePercent,criticalDamageMultiplier:1.5,
       criticalSeed,
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
     });
@@ -1286,7 +1373,7 @@ async function processDueKingdomQueues(env,kingdomId=null){
   const due=await query.all();
   for(const queue of due.results||[]){
     const completionToken=crypto.randomUUID(),completedAt=new Date().toISOString();
-    const eligible="((queue_type='construction' AND EXISTS(SELECT 1 FROM kingdom_buildings b WHERE b.kingdom_id=kingdom_queues.kingdom_id AND b.building_type=kingdom_queues.target_key AND b.level=kingdom_queues.from_level)) OR (queue_type='research' AND COALESCE((SELECT r.level FROM research r WHERE r.kingdom_id=kingdom_queues.kingdom_id AND r.research_key=kingdom_queues.target_key),0)=kingdom_queues.from_level) OR queue_type='training')";
+    const eligible="((queue_type='construction' AND EXISTS(SELECT 1 FROM kingdom_buildings b WHERE b.kingdom_id=kingdom_queues.kingdom_id AND b.building_type=kingdom_queues.target_key AND b.level=kingdom_queues.from_level)) OR (queue_type='research' AND target_key NOT LIKE 'tech:%' AND COALESCE((SELECT r.level FROM research r WHERE r.kingdom_id=kingdom_queues.kingdom_id AND r.research_key=kingdom_queues.target_key),0)=kingdom_queues.from_level) OR (queue_type='research' AND target_key LIKE 'tech:%' AND EXISTS(SELECT 1 FROM tech_catalog tc WHERE tc.id=substr(kingdom_queues.target_key,6)) AND COALESCE((SELECT kt.level FROM kingdom_tech kt WHERE kt.kingdom_id=kingdom_queues.kingdom_id AND kt.tech_id=substr(kingdom_queues.target_key,6)),0)=kingdom_queues.from_level) OR queue_type='training')";
     const statements=[env.DB.prepare("UPDATE kingdom_queues SET status='completed',completed_at=?,completion_token=? WHERE id=? AND status='running' AND completes_at<=? AND "+eligible)
       .bind(completedAt,completionToken,queue.id,now)];
     const guard="EXISTS(SELECT 1 FROM kingdom_queues WHERE id=? AND status='completed' AND completion_token=?)";
@@ -1301,19 +1388,28 @@ async function processDueKingdomQueues(env,kingdomId=null){
       statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
         .bind(queue.kingdom_id,queue.target_key,queue.quantity,queue.id,completionToken));
     }else if(queue.queue_type==="research"){
-      statements.push(env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level,completed_at) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=excluded.level,completed_at=excluded.completed_at")
-        .bind(queue.kingdom_id,queue.target_key,queue.to_level,completedAt,queue.id,completionToken));
+      if(queue.target_key.startsWith("tech:")){
+        const technologyId=queue.target_key.slice(5);
+        statements.push(env.DB.prepare("UPDATE kingdom_tech SET level=?,research_end_time=0,updated_at=unixepoch() WHERE kingdom_id=? AND tech_id=? AND level=? AND "+guard)
+          .bind(queue.to_level,queue.kingdom_id,technologyId,queue.from_level,queue.id,completionToken));
+      }else{
+        statements.push(env.DB.prepare("INSERT INTO research(kingdom_id,research_key,level,completed_at) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,research_key) DO UPDATE SET level=excluded.level,completed_at=excluded.completed_at")
+          .bind(queue.kingdom_id,queue.target_key,queue.to_level,completedAt,queue.id,completionToken));
+      }
     }
     if(queue.reward_item){
       statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1")
         .bind(queue.kingdom_id,queue.reward_item,queue.id,completionToken));
     }
-    const eventType=queue.queue_type==="construction"?"building_upgraded":queue.queue_type==="training"?"troops_trained":"research_upgraded";
+    const isTechnology=queue.queue_type==="research"&&queue.target_key.startsWith("tech:");
+    const eventType=queue.queue_type==="construction"?"building_upgraded":queue.queue_type==="training"?"troops_trained":isTechnology?"technology_researched":"research_upgraded";
     const eventPayload=queue.queue_type==="construction"
       ? {building:queue.target_key,level:queue.to_level,queueId:queue.id}
       : queue.queue_type==="training"
         ? {unit:queue.target_key,quantity:queue.quantity,queueId:queue.id}
-        : {research:queue.target_key,level:queue.to_level,queueId:queue.id};
+        : isTechnology
+          ? {technology:queue.target_key.slice(5),level:queue.to_level,queueId:queue.id}
+          : {research:queue.target_key,level:queue.to_level,queueId:queue.id};
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
       .bind(queue.kingdom_id,eventType,JSON.stringify(eventPayload),queue.id,completionToken));
     try{

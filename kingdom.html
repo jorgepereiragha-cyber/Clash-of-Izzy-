@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="/styles/coi-theme.css">
+<link rel="stylesheet" href="/styles/visual-polish.css">
+<link rel="stylesheet" href="/styles/technology-tree.css">
 <meta name="theme-color" content="#142b44"><meta name="description" content="Comande seu reino, evolua construções e prepare seu exército em Clash of Izzy.">
 <link rel="manifest" href="/manifest.json"><link rel="icon" href="/icon-192.svg" type="image/svg+xml">
 <title>Clash of Izzy — Reino</title>
@@ -97,6 +99,11 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <button id="researchButton" type="submit">Iniciar pesquisa</button>
 <p class="muted">Uma pesquisa por vez. O nível só aumenta depois da conclusão confirmada pelo servidor.</p>
 </form>
+</section>
+<section class="panel technology-panel">
+  <h2>🧭 Árvore de tecnologias</h2>
+  <p id="technologyStatus" role="status">Sincronizando tecnologias do reino…</p>
+  <div id="technologyTree" class="technology-grid"></div>
 </section>
 <section class="panel"><h2>🛡️ Poder do reino</h2><div class="grid2" id="army"></div><div class="toolbar"><button class="secondary" id="goMap">🌍 Explorar territórios</button></div></section>
 <section class="panel"><h2>📜 Crônicas do reino</h2><div class="events" id="events"></div></section>
@@ -220,7 +227,7 @@ window.addEventListener("coi:kingdom-2d-fallback",()=>{
  });
 });
 function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);
-const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings);if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[]}}));
+const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings);if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[]}}));window.__coiKingdomTechnologyState={technologies:state.technologies||[],technologyBonuses:state.technologyBonuses||{},kingdom:state.kingdom,queues:state.queues||[]};window.dispatchEvent(new CustomEvent("coi:kingdom-technologies",{detail:window.__coiKingdomTechnologyState}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const constructionRunning=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running");
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const blocked=maxed||constructionRunning||busy;const label=maxed?"MÁXIMO":constructionRunning?"FILA OCUPADA":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
@@ -267,6 +274,7 @@ async function refreshQueueState(){
  try{const fresh=await request("/game/state");state=fresh.state;render();}
  catch(error){setStatus(error.message,true);}
 }
+window.addEventListener("coi:technology-refresh",()=>{void refreshQueueState();});
 async function submitQueue(type,payload,message){
  if(busy)return;
  busy=true;setStatus("Enviando ordem ao servidor…");
@@ -338,5 +346,5 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-3d.js"></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
+</script><script src="/technology-tree.js" defer></script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-3d.js"></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
 </body></html>

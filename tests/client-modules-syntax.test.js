@@ -8,6 +8,7 @@ const files = [
   "../events.js",
   "../world-map.js",
   "../equipment-system.js",
+  "../technology-tree.js",
   "../scripts/kingdom-3d.js",
   "../scripts/kingdom-quality.js",
   "../engine/asset-loader.js",
