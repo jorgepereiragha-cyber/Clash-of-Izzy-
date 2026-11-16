@@ -1120,7 +1120,7 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const result=await env.DB.batch(statements);
     if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes ou fila de treinamento ocupada. Atualize e tente novamente."},409);
-  }}else if(type==="research"){
+  }else if(type==="research"){
     const key=String(body.research||"economy");
     const allowed={economy:{wood:250,stone:120,iron:0},military:{wood:300,stone:180,iron:40},construction:{wood:350,stone:250,iron:0},defense:{wood:220,stone:300,iron:25},gear_forging:{wood:500,stone:300,iron:60},gear_ward:{wood:450,stone:400,iron:70},gear_vitality:{wood:500,stone:350,iron:60},gear_logistics:{wood:600,stone:350,iron:100}};
     if(!Object.hasOwn(allowed,key))return json({error:"Pesquisa inválida."},400);
