@@ -375,3 +375,7 @@ window.setInterval(() => {
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && !busy && token) refreshState().catch(error => setStatus(error.message, true));
 });
+window.addEventListener("coi:realtime", event => {
+  if (event.detail?.type !== "state_changed" || document.hidden || busy || !token) return;
+  refreshState().catch(error => setStatus(error.message, true));
+});
