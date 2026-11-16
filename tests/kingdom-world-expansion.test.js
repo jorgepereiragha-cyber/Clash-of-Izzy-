@@ -64,4 +64,5 @@ test("world map shows player castles but does not route unsupported PvP attacks"
   assert.ok(scene.includes('territory.territory_kind === "castle"'));
   assert.ok(scene.includes('ownership === "enemy" ? "enemy" : "home"'));
   assert.ok(worker.includes("O combate PvP será habilitado na Fase 10"));
+  assert.ok(worker.includes("applyUnitLosses(army, losses)"), "PvE march resolution must return only surviving troops");
 });
