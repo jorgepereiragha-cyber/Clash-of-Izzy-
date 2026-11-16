@@ -29,8 +29,18 @@ function successfulFetch() {
       200,
       "text/html; charset=utf-8"
     );
+    if (path === "/index.html") return makeResponse(
+      '<!doctype html><html lang="pt-BR"><head><title>Clash of Izzy</title></head><body><main><h1>CLASH OF IZZY</h1><p>Construa seu reino, fortaleça seu exército e dispute territórios.</p><form id="beta-signup-form"><label>Receber convite beta</label><input name="consent" type="checkbox"><button>Participar</button></form></main></body></html>',
+      200,
+      "text/html; charset=utf-8"
+    );
+    if (path === "/kingdom.html") return makeResponse(
+      '<main><form id="feedbackForm"></form><script>trackAnalytics("kingdom.opened"); request("/game/analytics")</script></main>',
+      200,
+      "text/html; charset=utf-8"
+    );
     if (path === "/manifest.json") return makeResponse({ name: "Clash of Izzy" });
-    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v13"; const CORE_ASSETS=["/world-map-3d.js","/world-map-viewport.js"];', 200, "text/javascript");
+    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v14"; const CORE_ASSETS=["/world-map-3d.js","/world-map-viewport.js"];', 200, "text/javascript");
     if (path === "/world-map-viewport.js") return makeResponse("export function clampMapViewport(){} export function mapViewportTransform(){}", 200, "text/javascript");
     if (path === "/world-map-3d.js") return makeResponse("new THREE.OrthographicCamera(); function createMarchFormation(){}", 200, "text/javascript");
     return makeResponse("<!doctype html><html lang=\"pt-BR\"><head><title>Clash of Izzy</title></head><body><main>Clash of Izzy - estratégia medieval e reino</main></body></html>", 200, "text/html; charset=utf-8");
@@ -48,6 +58,8 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.d1, true);
   assert.equal(result.checks.adminConfiguration, true);
   assert.equal(result.checks.mercadoPagoCheckout, true);
+  assert.equal(result.checks.betaSignupUi, true);
+  assert.equal(result.checks.feedbackUiAndAnalytics, true);
   assert.equal(result.checks.staticPages, 8);
   assert.equal(result.checks.worldMapNavigation, true);
   assert.equal(result.checks.worldMap3D, true);

@@ -160,6 +160,18 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     assert.ok(Array.isArray(catalogBefore.skins));
     assert.ok(Array.isArray(catalogBefore.packages));
 
+    const betaWithoutConsent = expectStatus(await api("/api/beta/signup", {
+      method: "POST", body: { email: "beta-consent@example.invalid", consent: false },
+    }), 400, "lista beta exige consentimento explícito");
+    assert.ok(betaWithoutConsent.error);
+    const betaSignup = expectStatus(await api("/api/beta/signup", {
+      method: "POST", body: { email: "beta-integration@example.invalid", consent: true },
+    }), 201, "inscrição beta com consentimento");
+    assert.equal(betaSignup.success, true);
+    expectStatus(await api("/api/beta/signup", {
+      method: "POST", body: { email: "BETA-INTEGRATION@example.invalid", consent: true },
+    }), 409, "inscrição beta duplicada");
+
     const startA = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do primeiro reino");
     const startB = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do segundo reino");
     const startC = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do terceiro reino");
@@ -185,6 +197,24 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(Number(state.kingdom.id), kingdomA);
       assert.ok(state.equipment?.length >= 4, "equipamentos iniciais carregados");
       assert.ok(state.heroInventory?.length >= 1, "herói inicial sincronizado");
+      expectStatus(await api("/api/game/analytics", {
+        method: "POST", body: { event: "integration.session_started" },
+      }), 401, "analytics sem sessão");
+      expectStatus(await api("/api/game/feedback", {
+        method: "POST", body: { rating: 5, text: "Sem sessão" },
+      }), 401, "feedback sem sessão");
+      const analytics = expectStatus(await api("/api/game/analytics", {
+        method: "POST", token: tokenA,
+        body: { event: "integration.session_started", sessionId: "integration-session", data: { screen: "kingdom", source: "test", email: "must-not-be-stored" } },
+      }), 201, "evento de analytics autenticado");
+      assert.equal(analytics.success, true);
+      expectStatus(await api("/api/game/feedback", {
+        method: "POST", token: tokenA, body: { rating: 6, text: "Nota fora do limite" },
+      }), 400, "feedback rejeita nota inválida");
+      const feedback = expectStatus(await api("/api/game/feedback", {
+        method: "POST", token: tokenA, body: { rating: 5, text: "Integração de teste do reino." },
+      }), 201, "feedback autenticado");
+      assert.equal(feedback.success, true);
       expectStatus(await api("/api/game/players/search?q=Beta", { token: tokenA }), 200, "busca de jogadores");
       expectStatus(await api("/api/game/search?q=Eldoria&kind=all", { token: tokenA }), 200, "busca global do jogo");
       const eventState = expectStatus(await api("/api/game/event", { token: tokenA }), 200, "estado do Anjo da Morte");

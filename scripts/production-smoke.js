@@ -68,6 +68,7 @@ export async function runProductionSmokeTests({
   assert(admin.hasSESSION_SECRET === true, "Painel Master sem SESSION_SECRET.");
   assert(admin.hasADMIN_EMAIL === true, "ADMIN_EMAIL não está configurado no Worker.");
   assert(admin.hasADMIN_PASSWORD === true, "ADMIN_PASSWORD não está configurado no Worker.");
+  const emailProviderConfigured = admin.hasEmailProvider === true;
 
   const stateResponse = await get("/api/game/state");
   assert(stateResponse.status === 401, "O estado do jogo deve exigir sessão; recebido HTTP " + stateResponse.status + ".");
@@ -86,6 +87,19 @@ export async function runProductionSmokeTests({
     const body = await response.text();
     assert(body.length > 100, page + " está vazio ou incompleto.");
   }
+
+  const landingResponse = await get("/index.html");
+  assert(landingResponse.status === 200, "Landing page respondeu HTTP " + landingResponse.status + ".");
+  const landing = await landingResponse.text();
+  assert(landing.includes('id="beta-signup-form"') && landing.includes('name="consent"'),
+    "Formulário beta com consentimento não está publicado.");
+
+  const kingdomResponse = await get("/kingdom.html");
+  assert(kingdomResponse.status === 200, "Central do reino respondeu HTTP " + kingdomResponse.status + ".");
+  const kingdom = await kingdomResponse.text();
+  assert(kingdom.includes('id="feedbackForm"'), "Formulário de feedback não está publicado.");
+  assert(kingdom.includes('kingdom.opened') && kingdom.includes('/game/analytics'),
+    "Instrumentação de analytics não está publicada.");
 
   const arenaResponse = await get("/arena.html");
   assert(arenaResponse.status === 200, "Página da arena respondeu HTTP " + arenaResponse.status + ".");
@@ -115,7 +129,7 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v13"), "Service worker não contém o cache esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v14"), "Service worker não contém o cache v14 esperado.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
 
@@ -126,12 +140,15 @@ export async function runProductionSmokeTests({
       d1: true,
       sessionSecret: true,
       adminConfiguration: true,
+      transactionalEmailProviderConfigured: emailProviderConfigured,
       unauthenticatedAccessBlocked: true,
       storeCatalog: true,
       mercadoPagoCheckout: true,
       staticPages: REQUIRED_PAGES.length,
       pwaManifest: true,
       serviceWorker: true,
+      betaSignupUi: true,
+      feedbackUiAndAnalytics: true,
       worldMapNavigation: true,
       worldMap3D: true,
     },

@@ -30,7 +30,8 @@ test("LIKE fallback escapes wildcard characters and returns only public result f
   assert.ok(worker.includes("ESCAPE '!' COLLATE NOCASE"));
   assert.ok(worker.includes('engine:usedFts?"fts5+trigram":"like-fallback"'));
   assert.ok(worker.includes('game_search_fts MATCH ?'));
-  assert.ok(!worker.includes("player_email"));
+  assert.ok(!worker.includes("email:row.email"));
+  assert.ok(!worker.includes("recipient_email:row.email"));
   assert.ok(!worker.includes("password_hash"));
 });
 
@@ -96,7 +97,8 @@ test("search merges ranked matches across names, alliance tags, descriptions and
   assert.ok(worker.includes("coveredTokens===tokens.length?3:typoCount!==null?4:5"));
   assert.ok(worker.includes('engine:usedFts?"fts5+trigram":"like-fallback"'));
   assert.ok(worker.includes("limit*4"));
-  assert.ok(!worker.includes("player_email"));
+  assert.ok(!worker.includes("email:row.email"));
+  assert.ok(!worker.includes("recipient_email:row.email"));
   assert.ok(!worker.includes("password_hash"));
 });
 
