@@ -59,9 +59,16 @@ test("central do reino envia feedback e registra analytics da sessão", async ()
   assert.match(html, /kingdom\.opened/);
 });
 
+test("Playwright test tooling and diagnostics are excluded from public assets", async () => {
+  const ignored = await readFile(new URL("../.assetsignore", import.meta.url), "utf8");
+  for (const path of ["tests/", "playwright.config.js", "playwright-report/", "test-results/"]) {
+    assert.ok(ignored.split(/\r?\n/).includes(path), "public asset ignore rule missing: " + path);
+  }
+});
+
 test("PWA cache version is bumped when static UI changes", async () => {
   const worker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
-  assert.match(worker, /clash-of-izzy-shell-v25/);
+  assert.match(worker, /clash-of-izzy-shell-v26/);
   assert.match(worker, /valhalla-admin-ui\.js/);
   assert.match(worker, /styles\/valhalla-admin\.css/);
   assert.match(worker, /valhalla-shop-ui\.js/);
