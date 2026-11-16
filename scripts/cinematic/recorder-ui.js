@@ -60,7 +60,7 @@ class TrailerRecorderUI {
           <div class="coi-recorder-progress-track"><span id="coi-progress-fill"></span></div>
           <div class="coi-recorder-progress-time"><span id="coi-current-time">0:00</span><span id="coi-total-time">1:00</span></div>
         </div>
-        <p class="coi-recorder-footnote">A captura usa o mapa 3D do reino. A taxa de quadros depende do dispositivo. A gravação é mantida temporariamente na memória; durações longas podem ser bloqueadas em celulares para evitar falta de memória.</p>
+        <p class="coi-recorder-footnote">A captura usa o mapa 3D do reino. Quando disponível, o navegador tenta manter a tela acesa durante a gravação; mantenha o PWA em primeiro plano, pois o sistema pode suspender a página ao sair do app ou bloquear a tela. A taxa de quadros depende do dispositivo. A gravação é mantida temporariamente na memória; durações longas podem ser bloqueadas em celulares para evitar falta de memória.</p>
       </div>
     `;
     document.body.append(this.panel);
