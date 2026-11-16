@@ -103,18 +103,22 @@ function renderMap() {
   root.querySelectorAll(".territory-pin").forEach(pin => pin.remove());
   const buttonRefs = new Map();
   for (const territory of state.territories || []) {
-    const resource = RESOURCE[territory.resource_type] || { icon: "📍", label: "Território" };
+    const isCastle = territory.territory_kind === "castle";
+    const resource = isCastle ? { icon: "🏰", label: "Castelo de jogador" } : (RESOURCE[territory.resource_type] || { icon: "📍", label: "Território" });
     const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
     const owner = territoryOwner(territory);
     const button = make("button", "territory-pin" +
       (owner === "Seu reino" ? " owned" : owner === "Outro reino" ? " enemy" : "") +
+      (isCastle ? " castle" : "") +
       (Number(territory.id) === Number(selectedTerritoryId) ? " selected" : ""));
     button.type = "button";
     button.dataset.territoryId = String(territory.id);
     button.style.left = clamp(50 + Number(territory.x || 0) * 0.9, 9, 91) + "%";
     button.style.top = clamp(50 - Number(territory.z || 0) * 0.9, 10, 90) + "%";
-    button.setAttribute("aria-label", territory.name + ", " + terrain.label + ", " + owner);
-    button.title = territory.name + " · " + resource.label + " · " + owner;
+    button.setAttribute("aria-label", territory.name + ", " + (isCastle ? "castelo de " + (territory.commander_name || "outro comandante") : terrain.label) + ", " + owner);
+    button.title = isCastle
+      ? territory.name + " · " + (territory.commander_name || "Comandante") + " · poder " + fmt(territory.power)
+      : territory.name + " · " + resource.label + " · " + owner;
     button.append(make("span", "", resource.icon));
     button.append(make("small", "", territory.name));
     button.addEventListener("click", () => {
@@ -182,10 +186,11 @@ function renderTroops() {
 function updateActionButtons() {
   const territory = getSelectedTerritory();
   const hasTroops = Object.values(selectedUnits).some(quantity => Number(quantity) > 0);
-  const canVisit = Boolean(territory && territoryOwner(territory) !== "Outro reino");
+  const isCastle = territory?.territory_kind === "castle";
+  const canVisit = Boolean(territory && !isCastle && territoryOwner(territory) !== "Outro reino");
   $("gather").disabled = busy || !canVisit || !hasTroops;
   $("scout").disabled = busy || !canVisit || !hasTroops;
-  $("attack").disabled = busy || !territory || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  $("attack").disabled = busy || !territory || isCastle || Boolean(territory.owner_kingdom_id) || !hasTroops;
 }
 function renderDetails() {
   const root = $("territoryDetails");
@@ -202,15 +207,30 @@ function renderDetails() {
   root.append(make("div", "territory-title", resource.icon + " " + territory.name));
   root.append(make("p", "muted", territoryOwner(territory)));
   const grid = make("div", "detail-grid");
-  addStat(grid, "Terreno", terrain.label);
-  addStat(grid, "Recurso", resource.label);
-  addStat(grid, "Produção", fmt(territory.resource_rate) + " / hora");
-  addStat(grid, "Nível", fmt(territory.level || 1));
+  const isCastle = territory.territory_kind === "castle";
+  if (isCastle) {
+    addStat(grid, "Comandante", territory.commander_name || "Comandante");
+    addStat(grid, "Poder", fmt(territory.power));
+    addStat(grid, "Nível do castelo", fmt(territory.castle_level || territory.level || 1));
+    if (territory.alliance_tag) addStat(grid, "Aliança", "[" + territory.alliance_tag + "]");
+  } else {
+    addStat(grid, "Terreno", terrain.label);
+    addStat(grid, "Recurso", resource.label);
+    addStat(grid, "Produção", fmt(territory.resource_rate) + " / hora");
+    addStat(grid, "Nível", fmt(territory.level || 1));
+  }
   root.append(grid);
-  $("marchNotice").textContent = territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
-    ? "Este território pertence a outro jogador. Ações PvP ainda não estão habilitadas."
-    : "Escolha as tropas e uma ação. O servidor confirma custos, disponibilidade e resultado.";
-  renderTroops();
+  $("marchNotice").textContent = isCastle
+    ? "Castelo de outro comandante detectado. Você pode consultar comandante, poder e aliança; o envio de ataques PvP será ativado na Fase 10."
+    : territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
+      ? "Este território pertence a outro jogador e não está disponível para coleta."
+      : "Escolha as tropas e uma ação. O servidor confirma custos, disponibilidade e resultado.";
+  if (isCastle) {
+    $("troops").replaceChildren();
+    updateActionButtons();
+  } else {
+    renderTroops();
+  }
 }
 function renderMarches() {
   const root = $("marches");

@@ -150,6 +150,28 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   };
 }
 
+/**
+ * Aplica as baixas agregadas por tipo de unidade e devolve apenas sobreviventes.
+ * As perdas são distribuídas entre stacks do mesmo tipo sem subtrair duas vezes.
+ */
+export function applyUnitLosses(army = [], losses = {}) {
+  const remainingLosses = new Map();
+  const survivors = {};
+  for (const [key, raw] of Object.entries(losses || {})) {
+    remainingLosses.set(key, Math.max(0, Math.floor(Number(raw) || 0)));
+  }
+  for (const unit of Array.isArray(army) ? army : []) {
+    const key = String(unit?.unit_type || "");
+    if (!key) continue;
+    const quantity = Math.max(0, Math.floor(Number(unit.quantity) || 0));
+    const pendingLosses = remainingLosses.get(key) || 0;
+    const lost = Math.min(quantity, pendingLosses);
+    remainingLosses.set(key, pendingLosses - lost);
+    survivors[key] = (survivors[key] || 0) + quantity - lost;
+  }
+  return survivors;
+}
+
 export const COMBAT_UNIT_RULES = UNIT_RULES;
 
 

@@ -260,6 +260,11 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     const inset = makeMesh(new THREE.CylinderGeometry(2.1, 2.2, .12, 6), shared.stoneLight, parent, x, y + .31, z);
     inset.rotation.y = Math.PI / 6;
 
+    if (territory.territory_kind === "castle") {
+      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home");
+      return;
+    }
+
     if (territory.terrain === "mountain") {
       for (let i = 0; i < 3; i++) {
         const rockX = x - .9 + i * .9;
