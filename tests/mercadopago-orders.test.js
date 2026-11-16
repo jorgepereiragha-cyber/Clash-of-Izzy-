@@ -45,3 +45,59 @@ test("store frontend opens the individual checkout and keeps the shared link as 
   assert.ok(arena.includes('checkout.code===\'MP_NOT_CONFIGURED\''));
   assert.ok(arena.includes("https://link.mercadopago.com.br/pagamentosskin"));
 });
+
+
+import { webcrypto } from "node:crypto";
+import { validateWebhookSignature } from "../mercadopago-orders.js";
+
+globalThis.crypto ??= webcrypto;
+
+async function signManifest(manifest, secret) {
+  const key = await webcrypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(secret),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
+  const signature = await webcrypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
+  return Array.from(new Uint8Array(signature), byte => byte.toString(16).padStart(2, "0")).join("");
+}
+
+test("Mercado Pago webhook signature accepts the official HMAC manifest and rejects tampering", async () => {
+  const secret = "test-only-webhook-secret";
+  const orderId = "ORDER-TEST-123";
+  const requestId = "request-test-456";
+  const timestamp = "1794859200";
+  const manifest = `id:${orderId.toLowerCase()};request-id:${requestId};ts:${timestamp};`;
+  const validSignature = await signManifest(manifest, secret);
+  const request = new Request(
+    `https://example.invalid/api/webhook/mp?type=order&data.id=${encodeURIComponent(orderId)}`,
+    {
+      method: "POST",
+      headers: {
+        "x-signature": `ts=${timestamp},v1=${validSignature}`,
+        "x-request-id": requestId
+      }
+    }
+  );
+
+  assert.equal(await validateWebhookSignature(request, orderId, secret), true);
+  assert.equal(await validateWebhookSignature(request, orderId, "different-secret"), false);
+  assert.equal(await validateWebhookSignature(request, "another-order", secret), false);
+
+  const modified = new Request(request.url, {
+    method: "POST",
+    headers: {
+      "x-signature": `ts=${timestamp},v1=${"0".repeat(64)}`,
+      "x-request-id": requestId
+    }
+  });
+  assert.equal(await validateWebhookSignature(modified, orderId, secret), false);
+
+  const missingRequestId = new Request(request.url, {
+    method: "POST",
+    headers: { "x-signature": `ts=${timestamp},v1=${validSignature}` }
+  });
+  assert.equal(await validateWebhookSignature(missingRequestId, orderId, secret), false);
+});
