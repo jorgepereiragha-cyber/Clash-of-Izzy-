@@ -714,15 +714,27 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "battle" }, 200, "batalha PvE");
     });
 
-    await t.test("filas independentes, validação de tropas e marchas", async () => {
+    await t.test("duas filas simultâneas, capacidade de tropas e marchas", async () => {
       await action(tokenA, { type: "upgrade", building: "building_invalid" }, 400);
       await action(tokenA, { type: "upgrade", building: "castle" }, 200);
-      await action(tokenA, { type: "upgrade", building: "farm" }, 409, "segunda construção na mesma fila");
+
+      // Conclui o upgrade inicial localmente para liberar melhorias secundárias.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdom_queues SET completes_at=datetime('now','-1 seconds') WHERE kingdom_id=" + kingdomA + " AND queue_type='construction' AND target_key='castle' AND status='running';",
+      ]);
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      assert.ok(stateA.buildings.find(building => building.building_type === "castle")?.level >= 2,
+        "castelo conclui antes das melhorias secundárias");
+      await action(tokenA, { type: "upgrade", building: "farm" }, 200, "primeira melhoria secundária");
+      await action(tokenA, { type: "upgrade", building: "barracks" }, 200, "segunda construção simultânea");
+      await action(tokenA, { type: "upgrade", building: "quarry" }, 409, "terceira construção com as duas filas ocupadas");
 
       await action(tokenA, { type: "train", unit: "unit_invalid", quantity: 1 }, 400);
       await action(tokenA, { type: "train", unit: "mage", quantity: 1 }, 200);
-      await action(tokenA, { type: "train", unit: "archer", quantity: 1 }, 200, "segundo treinamento na segunda fila");
-      await action(tokenA, { type: "train", unit: "spearman", quantity: 1 }, 409, "terceiro treinamento sem vaga de fila");
+      await action(tokenA, { type: "train", unit: "archer", quantity: 1 }, 200, "segunda fila de treinamento simultânea");
+      await action(tokenA, { type: "train", unit: "crossbowman", quantity: 1 }, 409, "terceiro treinamento com as duas filas ocupadas");
 
       await action(tokenA, { type: "research", research: "research_invalid" }, 400);
       await action(tokenA, { type: "research", research: "economy" }, 200);
@@ -736,10 +748,12 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       stateA = (await api("/api/game/state", { token: tokenA })).data.state;
       assert.ok(stateA.marches.some(item => item.status === "marching"), "marcha fica persistida no servidor");
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "construction"));
-      assert.equal(stateA.queues.filter(item => item.status === "running" && item.queue_type === "training").length, 2, "duas filas de treinamento permanecem ativas");
+      assert.ok(stateA.queues.filter(item => item.status === "running" && item.queue_type === "construction").length === 2,
+        "duas construções simultâneas permanecem persistidas");
+      assert.ok(stateA.queues.filter(item => item.status === "running" && item.queue_type === "training").length === 2,
+        "dois treinamentos simultâneos permanecem persistidos");
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "research"));
     });
-
     await t.test("alianças: criar, convidar, entrar, promover, doar, ajudar, expulsar, guerra e território", async () => {
       await action(tokenB, { type: "rename", name: "Reino Beta" }, 200);
       await action(tokenA, { type: "alliance_create", name: "Guardioes Alfa", tag: "ALFA" }, 200);
