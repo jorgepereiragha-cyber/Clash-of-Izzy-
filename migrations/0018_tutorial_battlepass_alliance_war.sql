@@ -198,6 +198,14 @@ CREATE TABLE alliance_war_reward_claims (
   PRIMARY KEY(war_id,kingdom_id,reward_type)
 );
 
+-- Serializes alliance matchmaking: each alliance can occupy only one active war slot.
+CREATE TABLE alliance_war_slots (
+  alliance_id INTEGER PRIMARY KEY REFERENCES alliances(id) ON DELETE CASCADE,
+  war_id INTEGER NOT NULL REFERENCES alliance_wars(id) ON DELETE CASCADE,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+CREATE INDEX idx_alliance_war_slots_war ON alliance_war_slots(war_id);
+
 -- Season starts at migration time and lasts 30 days; the next season is an admin-controlled insert.
 INSERT OR IGNORE INTO battle_pass_seasons(id,name,theme,start_time,end_time,premium_price_brl,max_level,xp_per_level,status)
 VALUES('season_ragnarok_2026_11','Ragnarök: O Crepúsculo','Os deuses preparam-se para a batalha final. Prove seu valor!',
