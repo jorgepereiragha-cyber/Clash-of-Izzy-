@@ -26,6 +26,17 @@ test("production deployment is manual, confirmation-gated, and environment-prote
   assert.match(workflow, /scripts\/production-smoke\.js/);
 });
 
+test("pull-request production smoke probe is informational and read-only", async () => {
+  const workflow = await readFile(resolve(root, ".github/workflows/ci.yml"), "utf8");
+  const smoke = await readFile(resolve(root, "scripts/production-smoke.js"), "utf8");
+  assert.match(workflow, /Read-only production smoke test \(informational\)/);
+  assert.match(workflow, /continue-on-error: true/);
+  assert.match(workflow, /WORKER_BASE_URL: https:\/\/clash-of-izzy\.jorgepereiragha\.workers\.dev/);
+  assert.match(workflow, /run: node scripts\/production-smoke\.js/);
+  assert.match(smoke, /method: "GET"/);
+  assert.doesNotMatch(smoke, /method:\s*"(POST|PUT|PATCH|DELETE)"/);
+});
+
 test("Core Loop validation is read-only unless a separately confirmed training run is requested", async () => {
   const scriptPath = resolve(root, "scripts/validate-core-loop.sh");
   const script = await readFile(scriptPath, "utf8");
