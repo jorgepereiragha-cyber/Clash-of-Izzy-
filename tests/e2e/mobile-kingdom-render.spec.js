@@ -288,25 +288,29 @@ test.describe("Mobile kingdom rendering", () => {
 
   test("masks the linked account email on the account page", async ({ page }) => {
     const sensitiveEmail = "jose.silva.privado@example.com";
+    const maskedEmail = "j***@example.com";
     const { accountStatusRequests } = await installApiFixtures(page, {
       hasAccount: true,
-      account: { username: "ComandanteTeste", email: sensitiveEmail },
+      account: { username: "ComandanteTeste", emailMasked: maskedEmail },
     });
     const accountStatusResponsePromise = waitForAccountStatus(page);
 
     await page.goto("/account.html");
     const accountStatusResponse = await accountStatusResponsePromise;
     expect(accountStatusResponse.status()).toBe(200);
-    expect(await accountStatusResponse.json()).toMatchObject({
+    const accountStatusBody = await accountStatusResponse.json();
+    expect(accountStatusBody).toMatchObject({
       hasAccount: true,
-      account: { email: sensitiveEmail },
+      account: { emailMasked: maskedEmail },
     });
+    expect(accountStatusBody.account).not.toHaveProperty("email");
+    expect(JSON.stringify(accountStatusBody)).not.toContain(sensitiveEmail);
     expect(accountStatusRequests).toEqual([{
       method: "GET",
       authorization: "Bearer " + SESSION_TOKEN,
     }]);
 
-    await expect(page.locator("#accountStatus")).toContainText("E-mail: j***@example.com");
+    await expect(page.locator("#accountStatus")).toContainText("E-mail: " + maskedEmail);
     await expect(page.locator("#accountStatus")).not.toContainText(sensitiveEmail);
     expect(await page.locator("body").innerText()).not.toContain(sensitiveEmail);
     await expect(page.locator("#registerForm")).toBeHidden();
