@@ -70,7 +70,7 @@ test("loja mantém layout adaptado a telas pequenas e movimento reduzido", () =>
   assert.ok(css.includes("@media(max-width:620px)"));
   assert.ok(css.includes("@media(max-width:360px)"));
   assert.ok(css.includes("env(safe-area-inset-bottom)"));
-  assert.ok(css.includes("100dvh"));
+  assert.ok(css.includes("92dvh"));
   assert.ok(css.includes("prefers-reduced-motion:reduce"));
 });
 
