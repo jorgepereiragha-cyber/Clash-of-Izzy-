@@ -187,10 +187,15 @@ function updateActionButtons() {
   const territory = getSelectedTerritory();
   const hasTroops = Object.values(selectedUnits).some(quantity => Number(quantity) > 0);
   const isCastle = territory?.territory_kind === "castle";
-  const canVisit = Boolean(territory && !isCastle && territoryOwner(territory) !== "Outro reino");
+  const owner = territory ? territoryOwner(territory) : "";
+  const canVisit = Boolean(territory && !isCastle && owner !== "Outro reino");
+  const canAttack = Boolean(territory && (
+    (isCastle && owner === "Outro reino") ||
+    (!isCastle && !territory.owner_kingdom_id)
+  ));
   $("gather").disabled = busy || !canVisit || !hasTroops;
   $("scout").disabled = busy || !canVisit || !hasTroops;
-  $("attack").disabled = busy || !territory || isCastle || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  $("attack").disabled = busy || !canAttack || !hasTroops;
 }
 function renderDetails() {
   const root = $("territoryDetails");
@@ -212,6 +217,11 @@ function renderDetails() {
     addStat(grid, "Comandante", territory.commander_name || "Comandante");
     addStat(grid, "Poder", fmt(territory.power));
     addStat(grid, "Nível do castelo", fmt(territory.castle_level || territory.level || 1));
+    addStat(grid, "Muralha", fmt(territory.wall_hp) + " / " + fmt(territory.wall_max_hp));
+    addStat(grid, "Defesa", fmt(territory.defense_power));
+    if (territory.protection_until && Date.parse(territory.protection_until) > Date.now()) {
+      addStat(grid, "Proteção", "Escudo ativo");
+    }
     if (territory.alliance_tag) addStat(grid, "Aliança", "[" + territory.alliance_tag + "]");
   } else {
     addStat(grid, "Terreno", terrain.label);
@@ -221,16 +231,11 @@ function renderDetails() {
   }
   root.append(grid);
   $("marchNotice").textContent = isCastle
-    ? "Castelo de outro comandante detectado. Você pode consultar comandante, poder e aliança; o envio de ataques PvP será ativado na Fase 10."
+    ? "Castelo inimigo detectado. Selecione suas tropas e ataque; escudos e membros da sua aliança são protegidos pelo servidor."
     : territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
       ? "Este território pertence a outro jogador e não está disponível para coleta."
       : "Escolha as tropas e uma ação. O servidor confirma custos, disponibilidade e resultado.";
-  if (isCastle) {
-    $("troops").replaceChildren();
-    updateActionButtons();
-  } else {
-    renderTroops();
-  }
+  renderTroops();
 }
 function renderMarches() {
   const root = $("marches");
