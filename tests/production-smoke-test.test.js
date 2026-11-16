@@ -40,12 +40,17 @@ function successfulFetch() {
       "text/html; charset=utf-8"
     );
     if (path === "/manifest.json") return makeResponse({ name: "Clash of Izzy" });
-    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v16"; const CORE_ASSETS=["/styles/landing.css","/landing.js","/world-map-3d.js","/world-map-viewport.js","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css"];', 200, "text/javascript");
+    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v18"; const CORE_ASSETS=["/styles/landing.css","/landing.js","/world-map-3d.js","/world-map-viewport.js","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/advanced.html","/advanced-game-ui.js","/styles/advanced-game.css","/visual-effects.js","/styles/visual-effects.css"];', 200, "text/javascript");
     if (path === "/styles/landing.css") return makeResponse("body{color:#fff}.landing-hero{display:grid}", 200, "text/css");
     if (path === "/landing.js") return makeResponse("function showInstallGuide(){} fetch(\"/api/game/referral/link\")", 200, "text/javascript");
     if (path === "/world-map-viewport.js") return makeResponse("export function clampMapViewport(){} export function mapViewportTransform(){}", 200, "text/javascript");
     if (path === "/world-map-3d.js") return makeResponse("new THREE.OrthographicCamera(); function createMarchFormation(){}", 200, "text/javascript");
-    return makeResponse("<!doctype html><html lang=\"pt-BR\"><head><title>Clash of Izzy</title></head><body><main>Clash of Izzy - estratégia medieval e reino</main></body></html>", 200, "text/html; charset=utf-8");
+
+    if (path === "/advanced.html") return makeResponse('<main><div id="technology-list"></div><form id="visual-form"></form></main>', 200, "text/html; charset=utf-8");
+    if (path === "/advanced-game-ui.js") return makeResponse('const API="/api/game/advanced/"; api("tasks/claim");', 200, "text/javascript");
+    if (path === "/styles/advanced-game.css") return makeResponse(".advanced-grid{display:grid}", 200, "text/css");
+    if (path === "/visual-effects.js") return makeResponse('coi:vfx:damage coi:visuals:day-night', 200, "text/javascript");
+    if (path === "/styles/visual-effects.css") return makeResponse(".coi-damage-number{position:fixed}", 200, "text/css");    return makeResponse("<!doctype html><html lang=\"pt-BR\"><head><title>Clash of Izzy</title></head><body><main>Clash of Izzy - estratégia medieval e reino</main></body></html>", 200, "text/html; charset=utf-8");
   };
   return { fetchImpl, calls };
 }
@@ -62,9 +67,11 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.mercadoPagoCheckout, true);
   assert.equal(result.checks.betaSignupUi, true);
   assert.equal(result.checks.feedbackUiAndAnalytics, true);
-  assert.equal(result.checks.staticPages, 8);
+  assert.equal(result.checks.staticPages, 9);
   assert.equal(result.checks.worldMapNavigation, true);
   assert.equal(result.checks.worldMap3D, true);
+  assert.equal(result.checks.advancedProgressionUi, true);
+  assert.equal(result.checks.visualEffects, true);
   assert.ok(calls.includes("/world-map-viewport.js"));
   assert.ok(calls.includes("/world-map-3d.js"));
   assert.ok(calls.includes("/arena.html"));
