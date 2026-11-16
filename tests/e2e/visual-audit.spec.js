@@ -250,8 +250,15 @@ test.describe("Mobile visual audit captures", () => {
   });
 
   test("captures the world map, territory pins and side panel", async ({ page }, testInfo) => {
+    const configuredViewport = testInfo.project.use.viewport;
+    if (configuredViewport) await page.setViewportSize(configuredViewport);
     await installVisualFixtures(page);
     await page.goto("/world.html");
+
+    if (configuredViewport) {
+      const observedViewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+      expect(observedViewport).toEqual(configuredViewport);
+    }
 
     await expect(page.locator("#worldMap")).toBeVisible();
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
