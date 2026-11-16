@@ -34,6 +34,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   let valhallaAuroraLight = null;
   let worldHemisphereLight = null;
   let worldSunLight = null;
+  let visualDayHour = 12;
 
   function setValhallaMode(active) {
     valhallaModeActive = Boolean(active);
@@ -53,7 +54,29 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       valhallaAuroraLight.position.set(22, 48, -38);
       scene.add(valhallaAuroraLight);
     }
+    setDayNight(visualDayHour);
   }
+  function setDayNight(value) {
+    const parsed = Number(value);
+    if (Number.isFinite(parsed)) visualDayHour = ((parsed % 24) + 24) % 24;
+    if (!scene) return;
+    const daylight = Math.max(0, Math.sin(((visualDayHour - 6) / 12) * Math.PI));
+    const nightColor = new THREE.Color(valhallaModeActive ? 0x0a0510 : 0x17273b);
+    const dayColor = new THREE.Color(valhallaModeActive ? 0x2d1d3d : 0x8db6c5);
+    scene.background = nightColor.clone().lerp(dayColor, daylight);
+    scene.fog = valhallaModeActive
+      ? new THREE.FogExp2(0x1a0f25, 0.0025)
+      : new THREE.Fog(new THREE.Color(0x1d3044).lerp(new THREE.Color(0x355d69), daylight), 78, 155);
+    if (worldHemisphereLight) worldHemisphereLight.intensity = (valhallaModeActive ? 1.05 : 2.05) * (0.48 + daylight * 0.52);
+    if (worldSunLight) {
+      worldSunLight.intensity = (valhallaModeActive ? 1.35 : 2.6) * (0.28 + daylight * 0.72);
+      const angle = (visualDayHour / 24) * Math.PI * 2;
+      worldSunLight.position.set(Math.cos(angle) * 48, 24 + Math.sin(angle) * 48, 32);
+    }
+  }
+  window.addEventListener("coi:visuals:day-night", event => {
+    setDayNight(event.detail?.hour);
+  });
   window.addEventListener("coi:valhalla-mode", event => {
     setValhallaMode(event.detail?.active === true);
   });
@@ -497,6 +520,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       window.__coiWorldMap3D = {
         update: setWorldState,
         setValhallaMode,
+        setDayNight,
         setProjectionButtons(buttons) {
           projectionButtons = buttons instanceof Map ? buttons : new Map();
           projectTerritories();
