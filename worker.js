@@ -6,6 +6,7 @@ import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
 import { processEmailQueue, requestEmailVerification, verifyEmailToken, getEmailPreferences, updateEmailPreferences, getEmailHistory, queueEmailForInternalPlayer } from "./email-system.js";
 import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaConfig } from "./valhalla-config.js";
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
+import { handleValhallaAdmin } from "./valhalla-admin.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -1738,8 +1739,9 @@ export default {
       return json({error:"Rota de jogo não encontrada."},404);
     }catch(e){console.error("game_request_failed",String(e?.message||e));return json({error:"Falha ao processar o jogo. Tente novamente."},500)}
   }
-  if(request.method!=="POST")return json({error:"Método não permitido."},405);
-  const body=await readBody(request);if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);
+  const valhallaAdminPath=url.pathname.startsWith("/api/valhalla-admin/");
+  if(request.method!=="POST"&&!(request.method==="GET"&&valhallaAdminPath))return json({error:"Método não permitido."},405);
+  const body=request.method==="POST"?await readBody(request):{};if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);
   if(url.pathname==="/api/admin/login"){
     if(!env.ADMIN_EMAIL||!env.ADMIN_PASSWORD||!env.SESSION_SECRET)return json({error:"Configure ADMIN_EMAIL, ADMIN_PASSWORD e SESSION_SECRET nos segredos do Worker."},503);
     const ip=request.headers.get("CF-Connecting-IP")||"unknown";
@@ -1755,6 +1757,12 @@ export default {
   const payload=env.SESSION_SECRET?await verify(token,env.SESSION_SECRET):false;
   if(!payload||payload.scope!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
   try{
+    if(valhallaAdminPath){
+      const scope=request.method==="GET"?"valhalla-admin-read":"valhalla-admin-write";
+      const limited=await rateLimitDecision(env,scope,"master",request.method==="GET"?120:30,60);
+      if(limited)return limited;
+      return await handleValhallaAdmin(request,env,body);
+    }
     if(url.pathname==="/api/admin/purchase-requests"){
       const rows=await env.DB.prepare("SELECT r.id,r.product_kind,r.product_name,r.price_brl,r.currency,r.gems_amount,r.payment_method,r.payment_reference,r.status,r.created_at,p.player_id,p.name AS player_name,k.kingdom_name FROM purchase_requests r JOIN players p ON p.id=r.player_id JOIN kingdoms k ON k.id=r.kingdom_id WHERE r.status='pending' ORDER BY r.created_at ASC LIMIT 100").all();
       return json({requests:rows.results||[]});

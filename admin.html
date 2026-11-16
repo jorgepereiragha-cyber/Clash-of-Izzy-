@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <link rel="stylesheet" href="/styles/coi-theme.css">
+<link rel="stylesheet" href="/styles/valhalla-admin.css">
 <meta name="theme-color" content="#101a2b"><title>Clash of Izzy · Administração</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,Segoe UI,sans-serif;background:#0b1422;color:#f5edda}
@@ -34,6 +35,93 @@ footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
  <p class="sub">Novos pedidos aparecem automaticamente. Confira o recebimento do pagamento fora do jogo antes de aprovar. A aprovação libera as gemas ou a skin no reino.</p>
  <div id="purchaseRequests" class="results" aria-live="polite">Carregando pedidos…</div>
 </section>
+<section id="valhalla-admin-section" aria-labelledby="valhalla-admin-title">
+  <div class="va-header">
+    <div>
+      <h2 id="valhalla-admin-title">🔥 Ascensão de Valhalla</h2>
+      <p class="va-muted">Controle sazonal protegido pelo acesso Master. Os ajustes são aplicados pelo Worker sem novo deploy.</p>
+    </div>
+    <span id="valhalla-mode-badge" class="va-badge inactive">INATIVO</span>
+  </div>
+
+  <div class="va-grid">
+    <div class="va-stat"><span>Tempo restante</span><strong id="valhalla-time-remaining">N/A</strong></div>
+    <div class="va-stat"><span>Produção de recursos</span><strong id="valhalla-resource-mult">5x</strong></div>
+    <div class="va-stat"><span>Velocidade das filas</span><strong id="valhalla-speed-mult">0,2x</strong></div>
+    <div class="va-stat"><span>Runas diárias por reino ativo</span><strong id="valhalla-daily-runes">100</strong></div>
+  </div>
+
+  <div class="va-actions">
+    <button id="btn-toggle-valhalla" type="button">ATIVAR MODO</button>
+    <button id="btn-refresh-status" class="va-secondary" type="button">↻ ATUALIZAR PAINEL</button>
+  </div>
+
+  <div class="va-card">
+    <h3>⚙️ Configurações do evento</h3>
+    <form id="valhalla-config-form">
+      <div class="va-form-grid">
+        <label>Multiplicador de recursos (1–20x)
+          <input id="input-resource-mult" type="number" min="1" max="20" step="0.1" value="5" required>
+        </label>
+        <label>Multiplicador de duração das filas (0,05–1)
+          <input id="input-speed-mult" type="number" min="0.05" max="1" step="0.01" value="0.2" required>
+        </label>
+        <label>Runas diárias (1–100.000)
+          <input id="input-daily-runes" type="number" min="1" max="100000" step="1" value="100" required>
+        </label>
+      </div>
+      <p class="va-muted">0,2 reduz em 80% a duração das novas filas. O servidor aplica um piso de 10 segundos e não altera filas já iniciadas.</p>
+      <button type="submit">SALVAR CONFIGURAÇÕES</button>
+    </form>
+  </div>
+
+  <div class="va-card">
+    <h3>📊 Estatísticas da temporada</h3>
+    <div class="va-grid">
+      <div class="va-stat"><span>Reinos com saldo de runas</span><strong id="stat-players-runes">0</strong></div>
+      <div class="va-stat"><span>Runas concedidas (acumulado)</span><strong id="stat-total-runes">0</strong></div>
+      <div class="va-stat"><span>Runas em circulação</span><strong id="stat-runes-circulation">0</strong></div>
+      <div class="va-stat"><span>Compras realizadas</span><strong id="stat-purchases">0</strong></div>
+      <div class="va-stat"><span>Runas gastas (ledger)</span><strong id="stat-runes-spent">0</strong></div>
+      <div class="va-stat"><span>Reinos com rank</span><strong id="stat-ranked-players">0</strong></div>
+      <div class="va-stat"><span>Chefes derrotados</span><strong id="stat-hunt-defeated">0</strong></div>
+      <div class="va-stat"><span>Chefes que escaparam</span><strong id="stat-hunt-escaped">0</strong></div>
+    </div>
+    <h3>🏆 Cinco itens mais comprados</h3>
+    <ol id="top-items-list" class="va-top-items"><li>Aguardando dados…</li></ol>
+  </div>
+
+  <div class="va-card">
+    <h3>👑 Ranking por Runas gastas <span class="va-muted">· <span id="leaderboard-total">0</span> reinos</span></h3>
+    <div class="va-table-wrap">
+      <table class="va-table">
+        <thead><tr><th>#</th><th>Jogador</th><th>Reino</th><th>Saldo</th><th>Gastas</th><th>Compras</th><th>Rank</th><th>Título</th></tr></thead>
+        <tbody id="leaderboard-body"><tr><td colspan="8">Aguardando dados…</td></tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="va-card">
+    <h3>🎁 Distribuição manual de Runas do Destino</h3>
+    <form id="manual-distribute-form">
+      <div class="va-form-grid">
+        <label>Player ID público (players.player_id)
+          <input id="input-player-id" type="text" maxlength="80" placeholder="ID público do jogador" autocomplete="off" required>
+        </label>
+        <label>Quantidade de runas (1–100.000)
+          <input id="input-runes-amount" type="number" min="1" max="100000" step="1" required>
+        </label>
+        <label>Motivo registrado no ledger
+          <input id="input-reason" type="text" maxlength="200" placeholder="Ex.: compensação de evento">
+        </label>
+      </div>
+      <p class="va-muted">A distribuição é creditada ao reino do jogador e registrada como ajuste administrativo. A chave de solicitação impede crédito duplicado em uma repetição de rede.</p>
+      <button type="submit">DISTRIBUIR RUNAS</button>
+    </form>
+  </div>
+  <div id="valhalla-admin-notice" role="status" aria-live="polite"></div>
+</section>
+
 <p class="sub">Pesquise por nickname ou ID. Selecione um jogador para consultar os dados e, se necessário, creditar gemas.</p>
 <form id="searchForm" class="form"><input id="query" maxlength="64" placeholder="Digite nickname ou ID do jogador" required><button type="submit">Pesquisar</button></form>
 <div id="results" class="results"></div>
@@ -98,11 +186,13 @@ function renderPlayers(players){
  }
 }
 async function searchPlayers(query){showNotice("Consultando o reino…");const data=await api("/admin/player-search",{query});renderPlayers(data.players|| (data.player?[data.player]:[]));showNotice((data.players||[]).length+" resultado(s).")}
-$("loginForm").addEventListener("submit",async event=>{event.preventDefault();showNotice("Validando acesso…");try{const data=await api("/admin/login",{email:$("email").value,password:$("password").value},false);token=data.token;sessionStorage.setItem("coi_admin_token",token);$("password").value="";setLoggedIn(true);showNotice("Acesso administrativo liberado.");refreshPurchaseRequests().catch(e=>showNotice(e.message));if(!purchasePoll)purchasePoll=setInterval(()=>{if(!document.hidden&&token)refreshPurchaseRequests().catch(()=>{})},20000)}catch(e){showNotice(e.message)}});
+$("loginForm").addEventListener("submit",async event=>{event.preventDefault();showNotice("Validando acesso…");try{const data=await api("/admin/login",{email:$("email").value,password:$("password").value},false);token=data.token;sessionStorage.setItem("coi_admin_token",token);$("password").value="";setLoggedIn(true);document.dispatchEvent(new Event("coi:admin-session-ready"));showNotice("Acesso administrativo liberado.");refreshPurchaseRequests().catch(e=>showNotice(e.message));if(!purchasePoll)purchasePoll=setInterval(()=>{if(!document.hidden&&token)refreshPurchaseRequests().catch(()=>{})},20000)}catch(e){showNotice(e.message)}});
 $("searchForm").addEventListener("submit",async event=>{event.preventDefault();try{await searchPlayers($("query").value.trim())}catch(e){showNotice(e.message);if(/sessão/i.test(e.message)){token="";sessionStorage.removeItem("coi_admin_token");setLoggedIn(false)}}});
 $("logout").addEventListener("click",()=>{token="";sessionStorage.removeItem("coi_admin_token");if(purchasePoll){clearInterval(purchasePoll);purchasePoll=null;}$("purchaseRequests").replaceChildren();$("results").replaceChildren();showNotice("Sessão encerrada.");setLoggedIn(false)});
 setLoggedIn(Boolean(token));
 if(token){showNotice("Sessão administrativa recuperada.");refreshPurchaseRequests().catch(e=>showNotice(e.message));purchasePoll=setInterval(()=>{if(!document.hidden&&token)refreshPurchaseRequests().catch(()=>{})},20000)}
 $("refreshPurchases").addEventListener("click",()=>refreshPurchaseRequests().catch(e=>showNotice(e.message)));
-</script>  <script src="/navigation.js" defer></script>
+</script>
+<script src="/valhalla-admin-ui.js" defer></script>
+<script src="/navigation.js" defer></script>
 </body></html>

@@ -349,6 +349,100 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     assert.ok(adminLogin.token);
     const adminToken = adminLogin.token;
     const admin = (route, body) => api(route, { method: "POST", token: adminToken, body });
+    const adminGet = route => api(route, { method: "GET", token: adminToken });
+
+    await t.test("controle Master da Ascensão de Valhalla", async () => {
+      expectStatus(await api("/api/valhalla-admin/status"), 401, "Valhalla admin exige sessão Master");
+      const initial = expectStatus(await adminGet("/api/valhalla-admin/status"), 200, "status Valhalla Master");
+      assert.equal(initial.active, false, "evento começa desligado");
+      assert.equal(initial.valhalla_resource_multiplier, 5);
+      assert.equal(initial.valhalla_speed_multiplier, 0.2);
+      assert.equal(initial.valhalla_daily_runes_reward, 100);
+
+      const beforeGrantState = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "saldo antes da distribuição manual");
+      const expectedNewBalance = Number(beforeGrantState.state.kingdom.destiny_runes || 0) + 500;
+      const grantBody = {
+        player_id: playerA,
+        amount: 500,
+        reason: "Premiação de teste de integração",
+        request_key: "admin-valhalla-rune-grant-0001",
+      };
+      const grant = expectStatus(await admin("/api/valhalla-admin/distribute-runes", grantBody), 200, "distribuição manual de runas");
+      assert.equal(grant.success, true);
+      assert.equal(grant.reused, false);
+      assert.equal(grant.new_balance, expectedNewBalance);
+
+      const retry = expectStatus(await admin("/api/valhalla-admin/distribute-runes", grantBody), 200, "retry idempotente de runas");
+      assert.equal(retry.reused, true);
+      assert.equal(retry.new_balance, expectedNewBalance, "retry não credita runas novamente");
+      expectStatus(await admin("/api/valhalla-admin/distribute-runes", {
+        ...grantBody, amount: 501,
+      }), 409, "chave idempotente não pode ser reutilizada com outro valor");
+      expectStatus(await admin("/api/valhalla-admin/distribute-runes", {
+        ...grantBody, player_id: "jogador-inexistente-izzy", request_key: "admin-valhalla-missing-0001",
+      }), 404, "jogador inexistente não recebe runas");
+      expectStatus(await admin("/api/valhalla-admin/distribute-runes", {
+        ...grantBody, request_key: "x",
+      }), 400, "chave idempotente inválida");
+
+      const stats = expectStatus(await adminGet("/api/valhalla-admin/stats"), 200, "estatísticas Valhalla");
+      assert.ok(stats.players_with_runes >= 1);
+      assert.ok(stats.total_runes_distributed >= 500);
+      assert.ok(stats.total_runes_in_circulation >= expectedNewBalance);
+      assert.equal(stats.total_runes_spent, 0);
+      assert.ok(Array.isArray(stats.top_items));
+
+      const leaderboard = expectStatus(await adminGet("/api/valhalla-admin/leaderboard"), 200, "leaderboard Valhalla");
+      assert.ok(leaderboard.leaderboard.length >= 1);
+      assert.ok(leaderboard.leaderboard.some(row => Number(row.destiny_runes) === expectedNewBalance));
+
+      expectStatus(await admin("/api/valhalla-admin/update-config", {
+        resource_multiplier: 10, speed_multiplier: 0.1, daily_runes_reward: 250,
+      }), 200, "atualização de configuração Valhalla");
+      const updatedConfig = expectStatus(await adminGet("/api/valhalla-admin/status"), 200, "configuração atualizada");
+      assert.equal(updatedConfig.valhalla_resource_multiplier, 10);
+      assert.equal(updatedConfig.valhalla_speed_multiplier, 0.1);
+      assert.equal(updatedConfig.valhalla_daily_runes_reward, 250);
+
+      expectStatus(await admin("/api/valhalla-admin/update-config", {
+        resource_multiplier: 100,
+      }), 400, "multiplicador acima do limite");
+      expectStatus(await admin("/api/valhalla-admin/update-config", {
+        speed_multiplier: 0.01,
+      }), 400, "velocidade abaixo do piso do runtime");
+      expectStatus(await admin("/api/valhalla-admin/update-config", {
+        daily_runes_reward: 0,
+      }), 400, "recompensa diária fora do intervalo");
+
+      try {
+        const activated = expectStatus(await admin("/api/valhalla-admin/toggle", {
+          action: "activate",
+        }), 200, "ativação do modo Valhalla");
+        assert.equal(activated.success, true);
+        assert.equal(activated.duration_days, 14);
+        const publicConfig = expectStatus(await api("/api/config/valhalla"), 200, "modo público ativado");
+        assert.equal(publicConfig.active, true);
+        const activeStatus = expectStatus(await adminGet("/api/valhalla-admin/status"), 200, "status Valhalla ativo");
+        assert.equal(activeStatus.active, true);
+        assert.ok(activeStatus.time_remaining_seconds > 0);
+        expectStatus(await admin("/api/valhalla-admin/toggle", {
+          action: "not-an-action",
+        }), 400, "ação de alternância inválida");
+      } finally {
+        expectStatus(await admin("/api/valhalla-admin/toggle", {
+          action: "deactivate",
+        }), 200, "desativação e limpeza do modo Valhalla");
+        expectStatus(await admin("/api/valhalla-admin/update-config", {
+          resource_multiplier: 5, speed_multiplier: 0.2, daily_runes_reward: 100,
+        }), 200, "restauração da configuração padrão");
+      }
+
+      const finalStatus = expectStatus(await adminGet("/api/valhalla-admin/status"), 200, "status Valhalla restaurado");
+      assert.equal(finalStatus.active, false);
+      assert.equal(finalStatus.valhalla_resource_multiplier, 5);
+      assert.equal(finalStatus.valhalla_speed_multiplier, 0.2);
+      assert.equal(finalStatus.valhalla_daily_runes_reward, 100);
+    });
 
     await t.test("painel Master, catálogo e pedidos de compra", async () => {
       expectStatus(await admin("/api/admin/player-search", { query: playerA }), 200, "busca administrativa de jogador");
