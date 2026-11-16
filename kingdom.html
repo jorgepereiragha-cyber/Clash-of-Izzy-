@@ -100,6 +100,8 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 </section>
 <section class="panel"><h2>🛡️ Poder do reino</h2><div class="grid2" id="army"></div><div class="toolbar"><button class="secondary" id="goMap">🌍 Explorar territórios</button></div></section>
 <section class="panel"><h2>📜 Crônicas do reino</h2><div class="events" id="events"></div></section>
+<section class="panel"><h2>🐾 Companhia de mascotes</h2><p class="muted">Desbloqueie, ative e evolua um mascote. As habilidades passivas são aplicadas pelo servidor.</p><div class="events" id="petsList"></div><div class="muted" id="petStatus" role="status" aria-live="polite"></div></section>
+<section class="panel"><h2>📜 Relatórios e replays de batalha</h2><div class="events" id="battleReplayList"></div><div class="events" id="battleReplayView" aria-live="polite"></div></section>
 </div></div>
 <section class="panel" style="margin-top:14px">
 <h2>👥 Jogadores do mundo</h2>
@@ -230,9 +232,72 @@ document.getElementById("trainButton").disabled=busy||(state.queues||[]).some(q=
 document.getElementById("researchButton").disabled=busy||(state.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running");
 const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Tropas",fmt(total)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).map(e=>'<div class="event">'+esc(String(e.event_type||"Atividade").replaceAll("_"," "))+'</div>').join("")||'<div class="muted">Seu reino está começando sua história.</div>';
+renderPets();renderBattleReports();
 city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
 document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
 }
+function renderPets(){
+ const root=document.getElementById("petsList");
+ const pets=state?.pets||[];
+ const labels={march_speed:"Velocidade de marcha",infantry_attack:"Ataque da infantaria",resource_prod:"Produção de recursos"};
+ if(!pets.length){root.innerHTML='<div class="muted">Nenhum mascote disponível no catálogo.</div>';return;}
+ root.innerHTML=pets.map(p=>{
+  const skill=p.skill||{};
+  const bonus=Number(skill.value||0)*100;
+  const skillText=(labels[skill.type]||"Habilidade passiva")+" · "+(Number.isFinite(bonus)?bonus.toLocaleString("pt-BR",{maximumFractionDigits:1})+"%":"—");
+  const owned=Boolean(p.is_owned),active=Boolean(p.is_active);
+  const level=owned?" · Nível "+fmt(p.level||1)+" · EXP "+fmt(p.experience||0):"";
+  const action=owned
+   ? '<div class="toolbar" style="margin-top:8px"><button class="secondary" data-pet-activate="'+esc(p.id)+'" '+(active||busy?"disabled":"")+'>'+(active?"✓ Ativo":"Ativar")+'</button><button class="secondary" data-pet-feed="'+esc(p.id)+'" '+(busy||Number(state.petGold||0)<100?"disabled":"")+' title="Consome 100 de ouro e concede 50 EXP">🍖 Alimentar · 100 ouro</button></div>'
+   : '<div class="toolbar" style="margin-top:8px"><button data-pet-unlock="'+esc(p.id)+'" '+(busy||Number(state.petGold||0)<Number(p.unlock_cost_gold||0)?"disabled":"")+'>'+(Number(p.unlock_cost_gold||0)===0?"Resgatar gratuitamente":"Desbloquear · "+fmt(p.unlock_cost_gold)+" ouro")+'</button></div>';
+  return '<div class="event"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong>'+esc(p.icon||"🐾")+' '+esc(p.name)+'</strong><span class="muted">'+esc(p.rarity||"")+'</span></div><div>'+esc(p.description||"")+'</div><small class="muted">'+esc(skillText)+esc(level)+(active?" · Habilidade ativa":"")+'</small>'+action+'</div>';
+ }).join("");
+ root.querySelectorAll("[data-pet-unlock]").forEach(button=>button.addEventListener("click",()=>sendPetAction("unlock",{pet_id:button.dataset.petUnlock})));
+ root.querySelectorAll("[data-pet-activate]").forEach(button=>button.addEventListener("click",()=>sendPetAction("activate",{pet_id:button.dataset.petActivate})));
+ root.querySelectorAll("[data-pet-feed]").forEach(button=>button.addEventListener("click",()=>sendPetAction("feed",{pet_id:button.dataset.petFeed,food_amount:10,request_key:crypto.randomUUID()})));
+ const active=(pets.find(p=>p.is_active)||null);
+ const status=document.getElementById("petStatus");
+ status.textContent="Ouro disponível: "+fmt(state.petGold||0)+(active?" · Mascote ativo: "+active.name:" · Nenhum mascote ativo");
+}
+async function sendPetAction(action,payload){
+ if(busy)return;
+ busy=true;setStatus("Processando mascote…");
+ try{
+  const result=await request("/game/pets/"+action,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  const fresh=await request("/game/state");state=fresh.state;render();
+  setStatus(result.message||"Mascote atualizado.");
+ }catch(error){setStatus(error.message||"Não foi possível atualizar o mascote.",true);}
+ finally{busy=false;render();}
+}
+function renderBattleReports(){
+ const root=document.getElementById("battleReplayList");
+ const reports=state?.battleReports||[];
+ if(!reports.length){root.innerHTML='<div class="muted">As batalhas concluídas aparecerão aqui.</div>';return;}
+ root.innerHTML=reports.map(report=>{
+  const date=report.created_at?new Date(report.created_at).toLocaleString("pt-BR"):"";
+  const power="Força "+fmt(report.attacker_power)+" × "+fmt(report.defender_power);
+  return '<div class="event" style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span><strong>#'+fmt(report.id)+' · '+esc(report.battle_type||"Batalha")+'</strong><small class="muted" style="display:block">'+esc(date)+' · '+esc(power)+'</small></span>'+(Number(report.has_replay)===1?'<button class="secondary" data-battle-replay="'+fmt(report.id)+'">Assistir replay</button>':'<small class="muted">Replay indisponível/expirado</small>')+'</div>';
+ }).join("");
+ root.querySelectorAll("[data-battle-replay]").forEach(button=>button.addEventListener("click",()=>showBattleReplay(button.dataset.battleReplay)));
+}
+async function showBattleReplay(battleId){
+ const view=document.getElementById("battleReplayView");
+ view.innerHTML='<div class="muted">Carregando replay…</div>';
+ try{
+  const data=await request("/game/battle/replay?battle_id="+encodeURIComponent(battleId));
+  const frames=data.replay?.frames||[];
+  const result=data.replay?.outcome||data.result||{};
+  const header='<div class="event"><strong>Replay #'+fmt(data.battle_id)+' · '+esc(data.participants?.attacker||"Atacante")+' × '+esc(data.participants?.defender||"Defensor")+'</strong><div>'+((result.won===true)?"Vitória":(result.won===false)?"Derrota":"Resultado registrado")+' · '+fmt(frames.length)+' eventos de combate</div><small class="muted">Disponível até '+esc(new Date(Number(data.expires_at)*1000).toLocaleString("pt-BR"))+'</small></div>';
+  const rows=frames.map(frame=>{
+   const side=frame.side==="attacker"?"Atacante":"Defensor";
+   const action=frame.unit?esc(frame.unit)+" → "+esc(frame.target||"alvo")+" · "+fmt(frame.damage||0)+" dano":esc(frame.event||"Evento");
+   return '<div class="event"><small>Rodada '+fmt(frame.round||0)+' · '+side+'</small><div>'+action+(frame.critical?' · CRÍTICO':'')+'</div></div>';
+  }).join("");
+  view.innerHTML=header+(rows||'<div class="muted">Este replay não contém quadros detalhados.</div>');
+  view.scrollIntoView({behavior:"smooth",block:"nearest"});
+ }catch(error){view.innerHTML='<div class="event">'+esc(error.message||"Replay indisponível.")+'</div>';}
+}
+
 function formatDuration(seconds){
  const safe=Math.max(0,Math.floor(Number(seconds)||0));
  const hours=Math.floor(safe/3600),minutes=Math.floor((safe%3600)/60),rest=safe%60;
