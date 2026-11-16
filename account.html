@@ -72,6 +72,13 @@ button:disabled{opacity:.5;cursor:wait}
  function setStatus(message, kind="") {
   const node=$("accountStatus");node.textContent=message;node.className="status "+kind;
  }
+ function maskEmail(email) {
+  if(typeof email!=="string")return "";
+  const value=email.trim();
+  const separator=value.lastIndexOf("@");
+  if(separator<=0||separator===value.length-1||value.indexOf("@")!==separator)return "e-mail cadastrado";
+  return value.slice(0,1)+"***@"+value.slice(separator+1);
+ }
  function saveToken(value) {
   token=String(value||"");
   if(token){localStorage.setItem("coi_game_token",token);sessionStorage.removeItem("coi_game_token");}
@@ -93,7 +100,9 @@ button:disabled{opacity:.5;cursor:wait}
     $("registerForm").hidden=true;
     $("registerIntro").textContent="Este reino já está protegido por uma conta persistente.";
     $("logoutButton").hidden=false;
-    setStatus("Conta vinculada: "+data.account.username+(data.account.email?" · "+data.account.email:"")+". Seu reino está protegido. Use o login em outros dispositivos.","success");
+    const accountName=data.account?.username||"Comandante";
+    const emailLabel=data.account?.email?" · E-mail: "+maskEmail(data.account.email):"";
+    setStatus("Conta vinculada: "+accountName+emailLabel+". Seu reino está protegido. Use o login em outros dispositivos.","success");
    }else{
     $("logoutButton").hidden=true;
     setStatus("Reino existente encontrado neste dispositivo. Criar uma conta agora vai protegê-lo sem apagar construções, tropas, recursos ou progresso.","success");
