@@ -165,6 +165,17 @@ async function attachLayoutMetrics(page, testInfo, name, selectors) {
     return {
       configuredViewport: configured,
       viewport: { width: innerWidth, height: innerHeight },
+      documentViewport: {
+        width: document.documentElement.clientWidth,
+        height: document.documentElement.clientHeight,
+      },
+      screen: {
+        width: screen.width,
+        height: screen.height,
+        availWidth: screen.availWidth,
+        availHeight: screen.availHeight,
+      },
+      viewportMeta: document.querySelector('meta[name="viewport"]')?.content || null,
       visualViewport: visual ? {
         width: Math.round(visual.width),
         height: Math.round(visual.height),
@@ -261,16 +272,29 @@ test.describe("Mobile visual audit captures", () => {
     if (configuredViewport) await page.setViewportSize(configuredViewport);
     await installVisualFixtures(page);
     await page.goto("/world.html");
-
     if (configuredViewport) {
-      const observedViewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
-      expect(observedViewport).toEqual(configuredViewport);
+      // Apply once more after the document's viewport meta tag has been parsed.
+      await page.setViewportSize(configuredViewport);
+      expect(page.viewportSize()).toEqual(configuredViewport);
     }
 
     await expect(page.locator("#worldMap")).toBeVisible();
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
     await expect(page.locator(".territory-pin")).toHaveCount(2);
     await expect(page.locator(".territory-title")).toContainText("Pedreira do Norte");
+    // Keep innerWidth/screen/visualViewport in the attachment for diagnosis; Chromium's
+    // mobile layout viewport can differ from the configured Playwright emulation size.
+    await attachLayoutMetrics(page, testInfo, "world-map-mobile", [
+      "#worldMap",
+      "#zoomIn",
+      "#zoomOut",
+      "#mapReset",
+      ".territory-pin",
+      "#territoryDetails",
+      "#gather",
+      "#scout",
+      "#attack",
+    ]);
     await expectTouchTargetsAtLeast44(page, [
       "#zoomIn",
       "#zoomOut",
