@@ -73,7 +73,8 @@ class TrailerRecorderUI {
       toggle.textContent = "+";
       this.panel.classList.add("is-collapsed");
     }
-    document.body.append(this.panel);
+    const mobileRecorderHost = compactMobile ? document.querySelector(".hero .toolbar") : null;
+    (mobileRecorderHost || document.body).append(this.panel);
   }
 
   bindEvents() {
