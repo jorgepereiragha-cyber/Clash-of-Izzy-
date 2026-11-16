@@ -45,6 +45,9 @@ function successfulFetch() {
     if (path === "/landing.js") return makeResponse("function showInstallGuide(){} fetch(\"/api/game/referral/link\")", 200, "text/javascript");
     if (path === "/world-map-viewport.js") return makeResponse("export function clampMapViewport(){} export function mapViewportTransform(){}", 200, "text/javascript");
     if (path === "/world-map-3d.js") return makeResponse("new THREE.OrthographicCamera(); function createMarchFormation(){}", 200, "text/javascript");
+    if (path === "/technology-tree.js") return makeResponse('window.dispatchEvent(new CustomEvent("coi:kingdom-technologies"));', 200, "text/javascript");
+    if (path === "/styles/technology-tree.css") return makeResponse(".technology-grid{display:grid}", 200, "text/css");
+    if (path === "/styles/visual-polish.css") return makeResponse("button{transition:transform .1s}", 200, "text/css");
     return makeResponse("<!doctype html><html lang=\"pt-BR\"><head><title>Clash of Izzy</title></head><body><main>Clash of Izzy - estratégia medieval e reino</main></body></html>", 200, "text/html; charset=utf-8");
   };
   return { fetchImpl, calls };
