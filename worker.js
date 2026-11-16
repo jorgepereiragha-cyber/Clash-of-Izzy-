@@ -1428,6 +1428,8 @@ export default {
       if(url.pathname==="/api/game/email/verification"&&request.method==="POST"){
         const limited=await rateLimitDecision(env,"email-verification-player",playerId,3,3600);
         if(limited)return limited;
+        const networkLimit=await rateLimitDecision(env,"email-verification-network",request.headers.get("CF-Connecting-IP")||"unknown",10,3600);
+        if(networkLimit)return networkLimit;
         const body=await readBody(request,4096);
         if(body.__bodyError)return json({error:"Solicitação de confirmação inválida."},400);
         return await requestEmailVerification(env,playerId,body.email);
