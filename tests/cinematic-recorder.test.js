@@ -2,8 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import { TRAILER_SCRIPT, CINEMATIC_PRESETS, buildTrailerTimeline } from "../scripts/cinematic/trailer-script.js";
+import { MEDIA_RECORDER_MIME_TYPES, selectMediaRecorderMimeType, estimateRecordingBytes, getRecordingMemoryBudget } from "../scripts/cinematic/media-recorder-support.js";
 
 const capture = await readFile(new URL("../scripts/cinematic/capture-system.js", import.meta.url), "utf8");
+const mediaSupport = await readFile(new URL("../scripts/cinematic/media-recorder-support.js", import.meta.url), "utf8");
 const ui = await readFile(new URL("../scripts/cinematic/recorder-ui.js", import.meta.url), "utf8");
 const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
@@ -58,12 +60,42 @@ test("recorder uses the renderer API instead of an assumed window.map3d global",
 });
 
 test("PWA and shared styles include the recorder resources", () => {
-  assert.match(serviceWorker, /clash-of-izzy-shell-v21/);
+  assert.match(serviceWorker, /clash-of-izzy-shell-v22/);
   for (const path of [
     "/scripts/cinematic/capture-system.js",
+    "/scripts/cinematic/media-recorder-support.js",
     "/scripts/cinematic/trailer-script.js",
     "/scripts/cinematic/recorder-ui.js"
   ]) assert.ok(serviceWorker.includes(path), "Recurso cinematográfico ausente do cache: " + path);
   assert.match(premiumCss, /CINEMATIC TRAILER RECORDER/);
   assert.match(ui, /URL\.revokeObjectURL\(url\)/);
+});
+
+test("mobile codec negotiation prefers supported VP9/VP8 and falls back to H.264 MP4", () => {
+  const supported = type => type === "video/webm;codecs=vp8";
+  assert.equal(selectMediaRecorderMimeType({ isTypeSupported: supported }), "video/webm;codecs=vp8");
+  assert.equal(selectMediaRecorderMimeType({ isTypeSupported: type => type === "video/mp4;codecs=avc1" }), "video/mp4;codecs=avc1");
+  assert.equal(selectMediaRecorderMimeType({ isTypeSupported: () => false }), "");
+  assert.equal(selectMediaRecorderMimeType({}), "");
+  assert.ok(MEDIA_RECORDER_MIME_TYPES.includes("video/mp4;codecs=avc1.42E01E"));
+});
+
+test("codec probing tolerates browser exceptions and uses native MIME selection as a fallback", () => {
+  const mime = selectMediaRecorderMimeType({
+    isTypeSupported(type) {
+      if (type.includes("vp9")) throw new Error("codec probe failed");
+      return type === "video/mp4";
+    }
+  });
+  assert.equal(mime, "video/mp4");
+});
+
+test("recording preflight estimates memory and applies a conservative mobile budget", () => {
+  assert.equal(estimateRecordingBytes(5000000, 60), Math.ceil((5000000 * 60 / 8) * 1.15));
+  assert.equal(getRecordingMemoryBudget(4), 48 * 1024 * 1024);
+  assert.equal(getRecordingMemoryBudget(6), 64 * 1024 * 1024);
+  assert.equal(getRecordingMemoryBudget(8), 128 * 1024 * 1024);
+  assert.throws(() => estimateRecordingBytes(0, 60), /positivos/);
+  assert.throws(() => estimateRecordingBytes(5000000, -1), /positivos/);
+  assert.match(mediaSupport, /15% container/);
 });
