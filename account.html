@@ -24,6 +24,7 @@ button:disabled{opacity:.5;cursor:wait}
 .small{font-size:12px}.success{color:#b8e8c2}.error{color:#ffb4a9}
 @media(max-width:680px){main{grid-template-columns:1fr;margin:18px auto}.panel{padding:16px}h1{grid-column:auto}.status,.actions{grid-column:auto}}
 </style>
+  <link rel="stylesheet" href="/styles/navigation.css">
 </head>
 <body>
 <header><div class="brand">⚔ CLASH OF IZZY <div class="small">Conta persistente do comandante</div></div><a href="/kingdom.html">← Voltar ao reino</a></header>
@@ -145,4 +146,5 @@ button:disabled{opacity:.5;cursor:wait}
  if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
 })();
 </script>
+<script src="/navigation.js"></script>
 </body></html>
