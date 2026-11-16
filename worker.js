@@ -1337,7 +1337,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1355,6 +1355,26 @@ export default {
     return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables},ready?200:503);
   }
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
+  if(url.pathname==="/api/beta/signup"&&request.method==="POST"){
+    const ip=request.headers.get("CF-Connecting-IP")||"unknown";
+    const limited=await rateLimitDecision(env,"beta-signup-ip",ip,5,3600);
+    if(limited)return limited;
+    const body=await readBody(request,4096);
+    if(body.__bodyError)return json({error:"Inscrição inválida."},body.__bodyError==="payload_too_large"?413:400);
+    const email=String(body.email||"").trim().toLowerCase();
+    if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/u.test(email)||email.length>254)return json({error:"Informe um e-mail válido."},400);
+    if(body.consent!==true)return json({error:"É necessário consentir com o recebimento de convites e atualizações do beta."},400);
+    try{
+      const inserted=await env.DB.prepare("INSERT INTO beta_signups(email,consent_at,consent_version) VALUES(?,CURRENT_TIMESTAMP,'beta-2026-11')")
+        .bind(email).run();
+      if(!inserted.meta?.changes)return json({error:"Este e-mail já está inscrito."},409);
+      return json({success:true,message:"Inscrição confirmada. Você receberá atualizações sobre o beta."},201);
+    }catch(error){
+      if(String(error?.message||error).includes("UNIQUE"))return json({error:"Este e-mail já está inscrito."},409);
+      console.error("beta_signup_failed",String(error?.message||error));
+      return json({error:"Não foi possível concluir a inscrição."},500);
+    }
+  }
   if(url.pathname==="/api/store/catalog"&&request.method==="GET"){
     try{
       const ip=request.headers.get("CF-Connecting-IP")||"unknown";
@@ -1441,6 +1461,53 @@ export default {
         return await updateEmailPreferences(env,playerId,body);
       }
       if(url.pathname==="/api/game/email/history"&&request.method==="GET")return await getEmailHistory(env,playerId);
+      if(url.pathname==="/api/game/analytics"&&request.method==="POST"){
+        const limited=await rateLimitDecision(env,"game-analytics-player",playerId,120,60);
+        if(limited)return limited;
+        const body=await readBody(request,8192);
+        if(body.__bodyError)return json({error:"Evento de analytics inválido."},body.__bodyError==="payload_too_large"?413:400);
+        const event=String(body.event||"").trim().toLowerCase();
+        if(!/^[a-z][a-z0-9_.:-]{1,79}$/.test(event))return json({error:"Nome de evento inválido."},400);
+        let sessionId=null;
+        if(body.sessionId!==undefined&&body.sessionId!==null&&body.sessionId!==""){
+          sessionId=String(body.sessionId);
+          if(!/^[a-zA-Z0-9_-]{1,80}$/.test(sessionId))return json({error:"ID de sessão inválido."},400);
+        }
+        let dataJson=null;
+        if(body.data!==undefined&&body.data!==null){
+          if(typeof body.data!=="object"||Array.isArray(body.data))return json({error:"Dados de analytics devem ser um objeto."},400);
+          const safeData={};
+          for(const [key,value] of Object.entries(body.data).slice(0,20)){
+            if(!/^[a-zA-Z][a-zA-Z0-9_]{0,31}$/.test(key)||/(email|password|token|secret|authorization|phone|address|ip)/i.test(key))continue;
+            if(typeof value==="string")safeData[key]=value.slice(0,120);
+            else if(typeof value==="number"&&Number.isFinite(value))safeData[key]=value;
+            else if(typeof value==="boolean")safeData[key]=value;
+          }
+          dataJson=JSON.stringify(safeData);
+          if(dataJson.length>4096)return json({error:"Dados de analytics excedem o limite permitido."},413);
+        }
+        const player=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
+        if(!player)return json({error:"Jogador não encontrado."},404);
+        await env.DB.prepare("INSERT INTO analytics_events(player_id,event,session_id,data_json) VALUES(?,?,?,?)")
+          .bind(player.id,event,sessionId,dataJson).run();
+        return json({success:true},201);
+      }
+      if(url.pathname==="/api/game/feedback"&&request.method==="POST"){
+        const limited=await rateLimitDecision(env,"game-feedback-player",playerId,3,3600);
+        if(limited)return limited;
+        const body=await readBody(request,4096);
+        if(body.__bodyError)return json({error:"Feedback inválido."},body.__bodyError==="payload_too_large"?413:400);
+        const rating=Number(body.rating);
+        if(!Number.isSafeInteger(rating)||rating<1||rating>5)return json({error:"A avaliação deve ser de 1 a 5."},400);
+        if(body.text!==undefined&&typeof body.text!=="string")return json({error:"O comentário deve ser texto."},400);
+        const feedbackText=String(body.text||"").trim();
+        if(feedbackText.length>2000)return json({error:"O comentário excede 2.000 caracteres."},400);
+        const player=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
+        if(!player)return json({error:"Jogador não encontrado."},404);
+        await env.DB.prepare("INSERT INTO feedback(player_id,rating,text) VALUES(?,?,?)")
+          .bind(player.id,rating,feedbackText||null).run();
+        return json({success:true,message:"Feedback recebido. Obrigado por ajudar a melhorar o Clash of Izzy."},201);
+      }
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"game-state-player",playerId,120,60);
         if(limited)return limited;
