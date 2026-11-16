@@ -45,6 +45,11 @@ test("Worker liga pets, produção, marcha, combate e replay com autenticação"
   const worker = await read("worker.js");
   const rally = await read("rally.js");
   const replay = await read("battle-replay.js");
+  const page = await read("kingdom.html");
+  assert.match(page, /id="petsList"/);
+  assert.match(page, /id="battleReplayList"/);
+  assert.match(page, /data-pet-feed/);
+  assert.match(page, /Assistir replay/);
   assert.match(worker, /handlePetsRoute/);
   assert.match(worker, /getBattleReplay/);
   assert.match(worker, /getPetBonuses\(env,kingdomId\)/);
