@@ -1,9 +1,13 @@
 name: Deploy Clash of Izzy to Cloudflare
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: "Confirma migrações D1 remotas e publicação do Worker em produção"
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: clash-of-izzy-cloudflare-production
@@ -11,8 +15,11 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ inputs.confirm_production == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    environment:
+      name: production
     permissions:
       contents: read
     name: Validate, migrate and deploy
