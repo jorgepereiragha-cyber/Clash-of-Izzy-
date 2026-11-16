@@ -1,3 +1,5 @@
+import { simulateBattle } from "./game-adapter.js";
+
 const json = (data, status = 200) => new Response(JSON.stringify(data), {
   status,
   headers: {
@@ -521,7 +523,7 @@ async function distributeAllianceWarRewards(env, war, winnerId, reason) {
     await env.DB.batch([
       env.DB.prepare(
         "INSERT OR IGNORE INTO alliance_war_reward_claims(war_id,kingdom_id,reward_type,reward_json) VALUES(?,?,'mvp',?)"
-      ).bind(war.id, mvp.kingdom_id, JSON.stringify({ gems: 5000, title: "mvp_of_war" })),
+      ).bind(war.id, mvp.kingdom_id, JSON.stringify({ gems: 5000 })),
       env.DB.prepare(
         "UPDATE players SET gems=gems+5000 WHERE id=? AND changes()>0"
       ).bind(mvp.player_id)
@@ -542,6 +544,7 @@ async function endAllianceWar(env, war, now) {
   ).bind(winnerId, reason, war.id).run();
   if (!updated.meta?.changes) return;
   await distributeAllianceWarRewards(env, war, winnerId, reason);
+  await env.DB.prepare("DELETE FROM alliance_war_slots WHERE war_id=?").bind(war.id).run();
 }
 
 export async function processAllianceWars(env, now = new Date()) {
@@ -579,4 +582,353 @@ export async function processAllianceWars(env, now = new Date()) {
     "SELECT * FROM alliance_wars WHERE status='active' AND phase='active' AND (score_a>=goal_points OR score_b>=goal_points OR ends_at<=?)"
   ).bind(iso).all();
   for (const war of finished.results || []) await endAllianceWar(env, war, iso);
+}
+
+
+const WAR_UNIT_POWER = Object.freeze({
+  militia: 2, swordsman: 5, spearman: 4, archer: 5, cavalry: 9,
+  knight: 14, mage: 12, crossbowman: 7, catapult: 22, ram: 20, trebuchet: 30
+});
+const WAR_PREPARE_SECONDS = 24 * 60 * 60;
+const WAR_DURATION_SECONDS = 48 * 60 * 60;
+const WAR_DECLARATION_GOLD = 5000;
+const WAR_GOAL_POINTS = 5000;
+
+function validRequestId(value) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(value || ""));
+}
+
+async function getWarMembership(env, kingdomId) {
+  return env.DB.prepare(
+    "SELECT am.alliance_id,am.rank,a.name,a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=?"
+  ).bind(kingdomId).first();
+}
+
+async function getWarPower(env, allianceId) {
+  const row = await env.DB.prepare(
+    "SELECT COALESCE(SUM(k.power),0) AS power FROM alliance_members am JOIN kingdoms k ON k.id=am.kingdom_id WHERE am.alliance_id=?"
+  ).bind(allianceId).first();
+  return Number(row?.power || 0);
+}
+
+function createWarObjectives() {
+  return [
+    { type: "fortress", name: "Fortaleza Central", x: 0, y: 0, garrison: 25000, points: 30, bonus: 100 },
+    { type: "outpost", name: "Posto Norte", x: -60, y: -60, garrison: 10000, points: 10, bonus: 40 },
+    { type: "outpost", name: "Posto Sul", x: 60, y: 60, garrison: 10000, points: 10, bonus: 40 },
+    { type: "banner", name: "Estandarte Leste", x: 80, y: -30, garrison: 5000, points: 5, bonus: 20 },
+    { type: "banner", name: "Estandarte Oeste", x: -80, y: 30, garrison: 5000, points: 5, bonus: 20 }
+  ];
+}
+
+async function loadWarCombatProfile(env, kingdomId) {
+  const [kingdom, hero, dragon, military, defense] = await Promise.all([
+    env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
+    env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id LIMIT 1").bind(kingdomId).first(),
+    env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
+    env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
+    env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
+  ]);
+  if (!kingdom) return null;
+  const castleLevel = Math.max(1, Math.min(30, Number(kingdom.castle_level || 1)));
+  return {
+    castleLevel,
+    heroLevel: Math.max(1, Number(hero?.level || 1)),
+    dragonLevel: Math.max(1, Number(dragon?.level || 1)),
+    researchLevel: Math.max(0, Number(military?.level || 0)),
+    defenseBonusPercent: Math.max(0, Math.min(30, Number(defense?.level || 0))),
+    castlePowerBonusPercent: Math.max(0, Math.min(30, castleLevel))
+  };
+}
+
+function warObjectiveGarrison(power) {
+  const total = Math.max(1, Math.floor(Number(power) || 1));
+  return [
+    { unit_type: "militia", tier: 1, quantity: Math.ceil(total * 0.20 / WAR_UNIT_POWER.militia) },
+    { unit_type: "archer", tier: 1, quantity: Math.ceil(total * 0.20 / WAR_UNIT_POWER.archer) },
+    { unit_type: "knight", tier: 1, quantity: Math.ceil(total * 0.30 / WAR_UNIT_POWER.knight) },
+    { unit_type: "trebuchet", tier: 1, quantity: Math.ceil(total * 0.30 / WAR_UNIT_POWER.trebuchet) }
+  ];
+}
+
+function sumArmyPower(rows) {
+  return (rows || []).reduce((sum, row) => {
+    const power = WAR_UNIT_POWER[row.unit_type] || 0;
+    return sum + power * Math.max(1, Number(row.tier) || 1) * Math.max(0, Number(row.quantity) || 0);
+  }, 0);
+}
+
+function distributeUnitLosses(rows, losses) {
+  const remaining = { ...(losses || {}) };
+  const ordered = [...rows].sort((a, b) => String(a.unit_type).localeCompare(String(b.unit_type)) || Number(a.tier) - Number(b.tier));
+  return ordered.map(row => {
+    const key = row.unit_type;
+    const loss = Math.min(Number(row.quantity), Math.max(0, Number(remaining[key] || 0)));
+    remaining[key] = Math.max(0, Number(remaining[key] || 0) - loss);
+    return {
+      unit_type: row.unit_type,
+      tier: Number(row.tier),
+      quantity: Number(row.quantity),
+      loss: loss
+    };
+  });
+}
+
+export async function handleAllianceWarAction(request, env, playerId) {
+  if (request.method !== "POST") return json({ error: "Método não permitido." }, 405);
+  const body = await request.json().catch(() => null);
+  if (!body || typeof body !== "object" || Array.isArray(body)) return json({ error: "Solicitação inválida." }, 400);
+  const kingdom = await getKingdom(env, playerId);
+  if (!kingdom) return json({ error: "Reino não encontrado." }, 404);
+  const action = String(body.action || "");
+
+  if (action === "declare") {
+    const member = await getWarMembership(env, kingdom.kingdom_id);
+    if (!member) return json({ error: "Você não pertence a uma aliança." }, 403);
+    if (!["lider", "co_lider", "oficial"].includes(member.rank)) return json({ error: "Apenas líder, colíder ou oficial pode declarar guerra." }, 403);
+    const targetTag = String(body.targetTag || "").trim().toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, 5);
+    const targetId = Number(body.targetAllianceId);
+    const enemy = targetId > 0
+      ? await env.DB.prepare("SELECT id,name,tag FROM alliances WHERE id=?").bind(targetId).first()
+      : await env.DB.prepare("SELECT id,name,tag FROM alliances WHERE tag=?").bind(targetTag).first();
+    if (!enemy) return json({ error: "Aliança adversária não encontrada." }, 404);
+    if (Number(enemy.id) === Number(member.alliance_id)) return json({ error: "Não é possível declarar guerra contra sua própria aliança." }, 400);
+
+    const [ownPower, enemyPower, activeWar, ownSlot, enemySlot] = await Promise.all([
+      getWarPower(env, member.alliance_id),
+      getWarPower(env, enemy.id),
+      env.DB.prepare("SELECT id FROM alliance_wars WHERE status='active' AND phase IN ('preparing','active') AND (alliance_a_id IN (?,?) OR alliance_b_id IN (?,?)) LIMIT 1")
+        .bind(member.alliance_id, enemy.id, member.alliance_id, enemy.id).first(),
+      env.DB.prepare("SELECT war_id FROM alliance_war_slots WHERE alliance_id=?").bind(member.alliance_id).first(),
+      env.DB.prepare("SELECT war_id FROM alliance_war_slots WHERE alliance_id=?").bind(enemy.id).first()
+    ]);
+    const ratio = enemyPower / Math.max(1, ownPower);
+    if (ratio < 0.5 || ratio > 1.5) return json({ error: "Alvo fora da faixa de poder permitida (50% a 150%)." }, 400);
+    if (activeWar || ownSlot || enemySlot) return json({ error: "Uma das alianças já está em preparação ou em guerra." }, 409);
+
+    const now = Math.floor(Date.now() / 1000);
+    const prepareUntil = now + WAR_PREPARE_SECONDS;
+    const endTime = prepareUntil + WAR_DURATION_SECONDS;
+    const prepareIso = new Date(prepareUntil * 1000).toISOString();
+    const endIso = new Date(endTime * 1000).toISOString();
+
+    const debit = await env.DB.prepare(
+      "UPDATE alliances SET shared_gold=shared_gold-? WHERE id=? AND shared_gold>=?"
+    ).bind(WAR_DECLARATION_GOLD, member.alliance_id, WAR_DECLARATION_GOLD).run();
+    if (!debit.meta?.changes) return json({ error: "O tesouro da aliança precisa de 5.000 de ouro." }, 402);
+
+    let warId = 0;
+    try {
+      const inserted = await env.DB.prepare(
+        "INSERT INTO alliance_wars(alliance_a_id,alliance_b_id,starts_at,ends_at,status,score_a,score_b,phase,prepare_until,goal_points,declared_by_kingdom_id) VALUES(?,?,?,?,'active',0,0,'preparing',?,?,?)"
+      ).bind(member.alliance_id, enemy.id, prepareIso, endIso, prepareIso, WAR_GOAL_POINTS, kingdom.kingdom_id).run();
+      warId = Number(inserted.meta?.last_row_id || 0);
+      if (!warId) throw new Error("Não foi possível identificar a guerra criada.");
+
+      const objectiveRows = createWarObjectives();
+      const statements = [
+        env.DB.prepare("INSERT INTO alliance_war_slots(alliance_id,war_id) VALUES(?,?)").bind(member.alliance_id, warId),
+        env.DB.prepare("INSERT INTO alliance_war_slots(alliance_id,war_id) VALUES(?,?)").bind(enemy.id, warId)
+      ];
+      for (const objective of objectiveRows) {
+        statements.push(env.DB.prepare(
+          "INSERT INTO alliance_war_objectives(war_id,objective_type,name,map_x,map_y,garrison_power,max_garrison_power,points_per_tick,capture_bonus) VALUES(?,?,?,?,?,?,?,?,?)"
+        ).bind(warId, objective.type, objective.name, objective.x, objective.y, objective.garrison, objective.garrison, objective.points, objective.bonus));
+      }
+      await env.DB.batch(statements);
+    } catch (error) {
+      if (warId) {
+        await env.DB.prepare("UPDATE alliance_wars SET status='finished',phase='ended',end_reason='setup_failed' WHERE id=? AND status='active'").bind(warId).run();
+      }
+      await env.DB.prepare("UPDATE alliances SET shared_gold=shared_gold+? WHERE id=?").bind(WAR_DECLARATION_GOLD, member.alliance_id).run();
+      console.error("alliance_war_setup_failed", String(error?.message || error));
+      return json({ error: "Não foi possível preparar a guerra. O ouro foi devolvido ao tesouro." }, 503);
+    }
+
+    return json({
+      success: true,
+      war_id: warId,
+      status: "preparing",
+      prepare_until: prepareUntil,
+      start_time: prepareUntil,
+      end_time: endTime,
+      objectives: 5,
+      gold_cost: WAR_DECLARATION_GOLD
+    }, 201);
+  }
+
+  const member = await getWarMembership(env, kingdom.kingdom_id);
+  if (!member) return json({ error: "Você não pertence a uma aliança." }, 403);
+  const war = await env.DB.prepare(
+    "SELECT * FROM alliance_wars WHERE status='active' AND phase IN ('preparing','active') AND (alliance_a_id=? OR alliance_b_id=?) ORDER BY id DESC LIMIT 1"
+  ).bind(member.alliance_id, member.alliance_id).first();
+  if (!war) return json({ error: "Sua aliança não possui uma guerra ativa." }, 404);
+  const side = Number(war.alliance_a_id) === Number(member.alliance_id) ? "a" : "b";
+
+  if (action === "join") {
+    if (war.phase !== "preparing" || Date.parse(war.prepare_until || war.starts_at) <= Date.now()) {
+      return json({ error: "O período de inscrição terminou." }, 409);
+    }
+    const result = await env.DB.prepare(
+      "INSERT OR IGNORE INTO alliance_war_participants(war_id,kingdom_id,alliance_id,side) VALUES(?,?,?,?)"
+    ).bind(war.id, kingdom.kingdom_id, member.alliance_id, side).run();
+    return json({ success: true, joined: Boolean(result.meta?.changes), reused: !result.meta?.changes, war_id: war.id, side });
+  }
+
+  if (action !== "capture") return json({ error: "Ação de guerra inválida." }, 404);
+  if (war.phase !== "active" || Date.parse(war.ends_at) <= Date.now()) return json({ error: "A guerra ainda não começou ou já terminou." }, 409);
+
+  const requestId = String(body.request_id || "");
+  if (!validRequestId(requestId)) return json({ error: "Identificador de batalha inválido. Atualize a tela e tente novamente." }, 400);
+  const participant = await env.DB.prepare(
+    "SELECT 1 FROM alliance_war_participants WHERE war_id=? AND kingdom_id=?"
+  ).bind(war.id, kingdom.kingdom_id).first();
+  if (!participant) return json({ error: "Inscreva-se durante a preparação antes de lutar." }, 403);
+
+  const objectiveId = Number(body.objective_id);
+  if (!Number.isSafeInteger(objectiveId) || objectiveId < 1) return json({ error: "Objetivo inválido." }, 400);
+  const objective = await env.DB.prepare(
+    "SELECT * FROM alliance_war_objectives WHERE id=? AND war_id=?"
+  ).bind(objectiveId, war.id).first();
+  if (!objective) return json({ error: "Objetivo não encontrado nesta guerra." }, 404);
+  if (Number(objective.owner_alliance_id) === Number(member.alliance_id)) return json({ error: "Sua aliança já controla este objetivo." }, 409);
+
+  const opposingAlliance = side === "a" ? Number(war.alliance_b_id) : Number(war.alliance_a_id);
+  const defenderAllianceId = objective.owner_alliance_id == null ? opposingAlliance : Number(objective.owner_alliance_id);
+  if (defenderAllianceId !== opposingAlliance) return json({ error: "O objetivo não está sob controle de uma aliança adversária." }, 409);
+  const defender = await env.DB.prepare(
+    "SELECT leader_kingdom_id FROM alliances WHERE id=?"
+  ).bind(defenderAllianceId).first();
+  if (!defender) return json({ error: "A guarnição adversária não está disponível." }, 409);
+
+  const armyResult = await env.DB.prepare(
+    "SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY unit_type,tier"
+  ).bind(kingdom.kingdom_id).all();
+  const army = armyResult.results || [];
+  const totalTroops = army.reduce((sum, row) => sum + Number(row.quantity || 0), 0);
+  if (!army.length || totalTroops < 1) return json({ error: "Seu exército está vazio." }, 409);
+  if (totalTroops > 50000) return json({ error: "O limite por batalha é de 50.000 tropas. Ajuste seu exército." }, 400);
+
+  const attackerPower = sumArmyPower(army);
+  if (attackerPower < Number(objective.garrison_power) * 1.2) {
+    return json({ error: "Poder insuficiente: este objetivo exige pelo menos 120% do poder de sua guarnição." }, 400);
+  }
+
+  const [attackerProfile, defenderProfile] = await Promise.all([
+    loadWarCombatProfile(env, kingdom.kingdom_id),
+    loadWarCombatProfile(env, Number(defender.leader_kingdom_id))
+  ]);
+  if (!attackerProfile || !defenderProfile) return json({ error: "Perfil de combate indisponível." }, 409);
+
+  const defendingArmy = warObjectiveGarrison(objective.garrison_power);
+  const criticalSeed = crypto.getRandomValues(new Uint32Array(1))[0];
+  const defenderCriticalSeed = crypto.getRandomValues(new Uint32Array(1))[0];
+  const roll = 0.85 + crypto.getRandomValues(new Uint32Array(1))[0] / 4294967295 * 0.30;
+  const simulation = simulateBattle({
+    army,
+    defendingArmy,
+    ...attackerProfile,
+    defenderCastlePowerBonusPercent: defenderProfile.castlePowerBonusPercent,
+    defenderHeroLevel: defenderProfile.heroLevel,
+    defenderDragonLevel: defenderProfile.dragonLevel,
+    defenderResearchLevel: defenderProfile.researchLevel,
+    defenderDefenseBonusPercent: defenderProfile.defenseBonusPercent,
+    criticalSeed,
+    defenderCriticalSeed,
+    roll
+  });
+
+  const attackerLossRows = distributeUnitLosses(army, simulation.losses);
+  const expectedRows = attackerLossRows.length;
+  const lossesJson = JSON.stringify(attackerLossRows);
+  const attackerLossCount = attackerLossRows.reduce((sum, row) => sum + row.loss, 0);
+  const defenderLosses = simulation.defenderLosses || {};
+  const destroyedPower = Object.entries(defenderLosses).reduce((sum, [unit, quantity]) => {
+    return sum + Number(quantity || 0) * (WAR_UNIT_POWER[unit] || 0);
+  }, 0);
+  const killPoints = Math.min(200, Math.floor(destroyedPower / 1000));
+  const defenseBonus = simulation.won ? 0 : 15;
+  const captureBonus = simulation.won && !objective.last_capture_at ? Number(objective.capture_bonus || 0) : 0;
+  const now = new Date().toISOString();
+  const defenderLossCount = Object.values(defenderLosses).reduce((sum, value) => sum + Number(value || 0), 0);
+  const attackerWon = Boolean(simulation.won);
+
+  const armyUpdate = env.DB.prepare(
+    "UPDATE army_units SET quantity=quantity-COALESCE((SELECT CAST(json_extract(j.value,'$.loss') AS INTEGER) FROM json_each(?) j WHERE json_extract(j.value,'$.unit_type')=army_units.unit_type AND CAST(json_extract(j.value,'$.tier') AS INTEGER)=army_units.tier),0) WHERE kingdom_id=? AND EXISTS(SELECT 1 FROM json_each(?) j WHERE json_extract(j.value,'$.unit_type')=army_units.unit_type AND CAST(json_extract(j.value,'$.tier') AS INTEGER)=army_units.tier) AND NOT EXISTS(SELECT 1 FROM json_each(?) j WHERE COALESCE((SELECT u.quantity FROM army_units u WHERE u.kingdom_id=? AND u.unit_type=json_extract(j.value,'$.unit_type') AND u.tier=CAST(json_extract(j.value,'$.tier') AS INTEGER)),-1)<CAST(json_extract(j.value,'$.quantity') AS INTEGER)) AND NOT EXISTS(SELECT 1 FROM alliance_war_battles WHERE war_id=? AND attacker_kingdom_id=? AND request_key=?)"
+  ).bind(lossesJson, kingdom.kingdom_id, lossesJson, lossesJson, kingdom.kingdom_id, war.id, kingdom.kingdom_id, requestId);
+
+  const battleInsert = env.DB.prepare(
+    "INSERT INTO alliance_war_battles(war_id,attacker_kingdom_id,defender_kingdom_id,winner_kingdom_id,power_destroyed,points,objective_id,request_key) SELECT ?,?,?,?,?,?,?,? WHERE changes()=? ON CONFLICT(war_id,attacker_kingdom_id,request_key) DO NOTHING"
+  ).bind(
+    war.id, kingdom.kingdom_id, Number(defender.leader_kingdom_id), attackerWon ? kingdom.kingdom_id : Number(defender.leader_kingdom_id),
+    Math.floor(destroyedPower), killPoints, objective.id, requestId, expectedRows
+  );
+
+  const objectiveCapture = env.DB.prepare(
+    "UPDATE alliance_war_objectives SET owner_alliance_id=?,garrison_power=MAX(1,CAST(max_garrison_power/2 AS INTEGER)),last_capture_at=?,last_capture_request_key=? WHERE id=? AND war_id=? AND owner_alliance_id IS ? AND ?=1 AND EXISTS(SELECT 1 FROM alliance_war_battles WHERE war_id=? AND attacker_kingdom_id=? AND request_key=? AND winner_kingdom_id=?)"
+  ).bind(member.alliance_id, now, requestId, objective.id, war.id, objective.owner_alliance_id, attackerWon ? 1 : 0,
+    war.id, kingdom.kingdom_id, requestId, kingdom.kingdom_id);
+
+  const objectiveDamage = env.DB.prepare(
+    "UPDATE alliance_war_objectives SET garrison_power=MAX(1,garrison_power-?) WHERE id=? AND war_id=? AND owner_alliance_id IS ? AND ?=0 AND EXISTS(SELECT 1 FROM alliance_war_battles WHERE war_id=? AND attacker_kingdom_id=? AND request_key=? AND winner_kingdom_id=?)"
+  ).bind(Math.floor(destroyedPower), objective.id, war.id, objective.owner_alliance_id, attackerWon ? 1 : 0,
+    war.id, kingdom.kingdom_id, requestId, Number(defender.leader_kingdom_id));
+
+  const captureExpr = "CASE WHEN EXISTS(SELECT 1 FROM alliance_war_objectives WHERE id=? AND last_capture_request_key=? AND owner_alliance_id=?) THEN ? ELSE 0 END";
+  const warScore = env.DB.prepare(
+    "UPDATE alliance_wars SET score_a=score_a+CASE WHEN ?='a' THEN ?+" + captureExpr + " ELSE 0 END+CASE WHEN ?='b' THEN ? ELSE 0 END,score_b=score_b+CASE WHEN ?='b' THEN ?+" + captureExpr + " ELSE 0 END+CASE WHEN ?='a' THEN ? ELSE 0 END WHERE id=? AND status='active' AND EXISTS(SELECT 1 FROM alliance_war_battles WHERE war_id=? AND attacker_kingdom_id=? AND request_key=?)"
+  ).bind(
+    side, killPoints, objective.id, requestId, member.alliance_id, captureBonus, side === "a" ? "b" : "a", defenseBonus,
+    side, killPoints, objective.id, requestId, member.alliance_id, captureBonus, side === "a" ? "b" : "a", defenseBonus,
+    war.id, war.id, kingdom.kingdom_id, requestId
+  );
+
+  const participantUpdate = env.DB.prepare(
+    "UPDATE alliance_war_participants SET points=points+?+" + captureExpr + ",kills=kills+?,losses=losses+?,captures=captures+CASE WHEN EXISTS(SELECT 1 FROM alliance_war_objectives WHERE id=? AND last_capture_request_key=? AND owner_alliance_id=?) THEN 1 ELSE 0 END WHERE war_id=? AND kingdom_id=? AND EXISTS(SELECT 1 FROM alliance_war_battles WHERE war_id=? AND attacker_kingdom_id=? AND request_key=?)"
+  ).bind(
+    killPoints, objective.id, requestId, member.alliance_id, captureBonus, killPoints, attackerLossCount,
+    objective.id, requestId, member.alliance_id, war.id, kingdom.kingdom_id, war.id, kingdom.kingdom_id, requestId
+  );
+
+  const battlePointsEvent = env.DB.prepare(
+    "INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?, 'alliance_war_points', json_object('points',?+CASE WHEN EXISTS(SELECT 1 FROM alliance_war_objectives WHERE id=? AND last_capture_request_key=? AND owner_alliance_id=?) THEN ? ELSE 0 END,'warId',?,'requestId',?) WHERE EXISTS(SELECT 1 FROM alliance_war_battles WHERE war_id=? AND attacker_kingdom_id=? AND request_key=?)"
+  ).bind(kingdom.kingdom_id, killPoints, objective.id, requestId, member.alliance_id, captureBonus, war.id, requestId, war.id, kingdom.kingdom_id, requestId);
+
+  const defenseEvent = env.DB.prepare(
+    "INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?, 'alliance_war_points', json_object('points',15,'warId',?,'requestId',?) WHERE ?=15 AND EXISTS(SELECT 1 FROM alliance_war_battles WHERE war_id=? AND attacker_kingdom_id=? AND request_key=? AND winner_kingdom_id=?)"
+  ).bind(Number(defender.leader_kingdom_id), war.id, requestId, defenseBonus, war.id, kingdom.kingdom_id, requestId, Number(defender.leader_kingdom_id));
+
+  const battlePointsUpdate = env.DB.prepare(
+    "UPDATE alliance_war_battles SET points=points+? WHERE war_id=? AND attacker_kingdom_id=? AND request_key=? AND EXISTS(SELECT 1 FROM alliance_war_objectives WHERE id=? AND last_capture_request_key=? AND owner_alliance_id=?)"
+  ).bind(captureBonus, war.id, kingdom.kingdom_id, requestId, objective.id, requestId, member.alliance_id);
+
+  const result = await env.DB.batch([
+    armyUpdate,
+    battleInsert,
+    objectiveCapture,
+    objectiveDamage,
+    warScore,
+    participantUpdate,
+    battlePointsEvent,
+    defenseEvent,
+    battlePointsUpdate
+  ]);
+  if (!result[1]?.meta?.changes) return json({ error: "Seu exército mudou ou esta requisição já foi processada. Atualize o reino e tente novamente." }, 409);
+
+  const [freshWar, freshObjective] = await Promise.all([
+    env.DB.prepare("SELECT score_a,score_b,status,phase FROM alliance_wars WHERE id=?").bind(war.id).first(),
+    env.DB.prepare("SELECT owner_alliance_id,garrison_power,last_capture_at FROM alliance_war_objectives WHERE id=?").bind(objective.id).first()
+  ]);
+  return json({
+    success: true,
+    won: attackerWon,
+    captured: Number(freshObjective?.owner_alliance_id) === Number(member.alliance_id),
+    kill_points: killPoints,
+    capture_bonus: Number(freshObjective?.last_capture_request_key) === requestId ? captureBonus : 0,
+    defense_bonus: defenseBonus,
+    attacker_losses: attackerLossCount,
+    defender_losses: defenderLossCount,
+    scores: { a: Number(freshWar?.score_a || 0), b: Number(freshWar?.score_b || 0) },
+    objective: freshObjective
+  });
 }
