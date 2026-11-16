@@ -151,3 +151,11 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - Configure `RESEND_API_KEY` como secret no Worker. Configure `EMAIL_FROM` e `FRONTEND_URL` como variáveis do Worker, usando um domínio remetente previamente verificado no Resend e a URL pública real do jogo. Não invente nem use um remetente de domínio não verificado.
 - A fila e o histórico não são marketing automatizado. Digest semanal, retorno de inativos e alertas de combate/evento ainda exigem integração explícita com as respectivas rotinas do jogo; não são considerados ativos nesta entrega.
 - A migração é `0017_verified_transactional_email.sql`; nunca edite migrações anteriores já aplicadas. Testes de contrato: `tests/email-system.test.js`.
+
+
+## Lista beta, analytics e feedback (migração 0018)
+- A página inicial oferece inscrição opcional em `POST /api/beta/signup`. O cadastro normaliza o endereço, exige consentimento explícito para convites/atualizações, aplica limite por IP e rejeita endereços duplicados.
+- A central do reino envia `POST /api/game/analytics` ao abrir uma sessão e ao enviar feedback. O endpoint exige token de jogo válido, aplica limite por jogador e aceita somente campos de telemetria permitidos; não armazena e-mail, senha, token, IP ou credenciais no payload.
+- O formulário de avaliação usa `POST /api/game/feedback`, exige sessão válida, nota de 1 a 5 e comentário de até 2.000 caracteres; o limite é de três envios por jogador por hora.
+- A migração `0018_feedback_analytics_beta.sql` cria somente as três tabelas consumidas por essas rotas, com índices e chaves estrangeiras para a identidade interna `players.id`. A lista de beta guarda o consentimento e sua versão.
+- Execute `npm run db:migrate:local` para validar/aplicar migrações no D1 local. A migração remota só ocorre no fluxo de implantação aprovado; não foi executada nesta revisão.
