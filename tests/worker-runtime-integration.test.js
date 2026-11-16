@@ -721,7 +721,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
       await action(tokenA, { type: "train", unit: "unit_invalid", quantity: 1 }, 400);
       await action(tokenA, { type: "train", unit: "mage", quantity: 1 }, 200);
-      await action(tokenA, { type: "train", unit: "archer", quantity: 1 }, 409, "segundo treinamento na mesma fila");
+      await action(tokenA, { type: "train", unit: "archer", quantity: 1 }, 200, "segundo treinamento na segunda fila");
+      await action(tokenA, { type: "train", unit: "swordsman", quantity: 1 }, 409, "terceiro treinamento com duas filas ocupadas");
 
       await action(tokenA, { type: "research", research: "research_invalid" }, 400);
       await action(tokenA, { type: "research", research: "economy" }, 200);

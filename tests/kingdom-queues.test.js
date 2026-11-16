@@ -57,3 +57,27 @@ test("Worker charges resources when starting and grants results only at queue co
   assert.match(worker, /await processDueKingdomQueues\(env\)/);
   assert.match(worker, /queues:queues\.results\|\|\[\]/);
 });
+
+test("training has two durable lanes and enforces barracks troop capacity", async () => {
+  const migration = await read("migrations/0023_dual_training_lanes_and_capacity.sql");
+  const worker = await read("worker.js");
+  const kingdom = await read("kingdom.html");
+
+  assert.ok(migration.includes("lane_number INTEGER NOT NULL DEFAULT 1"));
+  assert.ok(migration.includes("idx_kingdom_queues_training_lanes"));
+  assert.ok(migration.includes("ON kingdom_queues(kingdom_id,lane_number)"));
+  assert.ok(migration.includes("queue_type='construction' AND status='running'"));
+  assert.ok(migration.includes("queue_type='research' AND status='running'"));
+
+  assert.ok(worker.includes("const TRAINING_QUEUE_LIMIT=2;"));
+  assert.ok(worker.includes("const TROOPS_PER_BARRACKS_LEVEL=500;"));
+  assert.ok(worker.includes("SELECT COUNT(*) AS count FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running'"));
+  assert.ok(worker.includes("SUM(quantity) FROM army_units WHERE kingdom_id=?"));
+  assert.ok(worker.includes("lane_number=1) THEN 1 ELSE 2 END"));
+  assert.ok(worker.includes("target_key,lane_number,quantity"));
+
+  assert.ok(kingdom.includes('id="trainingCapacity"'));
+  assert.ok(kingdom.includes("activeTraining.length>=2"));
+  assert.ok(kingdom.includes('" · Fila "+Number(q.lane_number||1)'));
+  assert.ok(kingdom.includes("barracksLevel*500"));
+});
