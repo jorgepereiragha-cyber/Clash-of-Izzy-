@@ -559,7 +559,24 @@ async function gameState(env,playerId){
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
   const technologyRows=await env.DB.prepare("SELECT c.id,c.name,c.description,c.category,c.max_level,c.base_cost_gold,c.base_research_time,c.prerequisite_tech,c.effect_json,COALESCE(kt.level,0) AS level,COALESCE(kt.research_end_time,0) AS research_end_time FROM tech_catalog c LEFT JOIN kingdom_tech kt ON kt.tech_id=c.id AND kt.kingdom_id=? ORDER BY CASE c.category WHEN 'military' THEN 1 WHEN 'defense' THEN 2 ELSE 3 END,c.name").bind(kingdom.id).all();
-  const technologies=(technologyRows.results||[]).map(row=>{let effect={};try{effect=JSON.parse(row.effect_json||"{}")}catch{}return {...row,effect};});
+  const academyLevel=Number((buildings.results||[]).find(row=>row.building_type==="academy")?.level||0);
+  const technologyLevels=new Map((technologyRows.results||[]).map(row=>[row.id,Number(row.level)||0]));
+  const technologies=(technologyRows.results||[]).map(row=>{
+    let effect={};try{effect=JSON.parse(row.effect_json||"{}")}catch{}
+    const level=Number(row.level)||0;
+    const maxLevel=Number(row.max_level)||10;
+    const prerequisiteLevel=row.prerequisite_tech?Number(technologyLevels.get(row.prerequisite_tech)||0):1;
+    return {
+      ...row,effect,
+      academy_level:academyLevel,
+      academy_required:technologyAcademyRequirement(level+1),
+      level_cap:technologyLevelCap(maxLevel,academyLevel),
+      prerequisite_met:prerequisiteLevel>=1,
+      prerequisite_level:prerequisiteLevel,
+      next_cost_gold:level<maxLevel?calculateTechnologyResearchCost(row.base_cost_gold,level):null,
+      next_research_seconds:level<maxLevel?calculateTechnologyResearchDuration(row.base_research_time,level):null
+    };
+  });
   const technologyBonuses=await getKingdomTechnologyBonuses(env,kingdom.id);
   return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,technologies,technologyBonuses,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops};
 }
