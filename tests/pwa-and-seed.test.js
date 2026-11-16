@@ -22,6 +22,18 @@ test("PWA manifest exposes only real routes and resolvable app icons", async () 
   }
 });
 
+test("all primary game screens expose the same PWA manifest", async () => {
+  for (const path of [
+    "index.html", "kingdom.html", "world.html", "arena.html",
+    "events.html", "alliance.html", "equipment-ui.html", "admin.html"
+  ]) {
+    const html = await read(path);
+    assert.ok(html.includes('rel="manifest" href="/manifest.json"'), path + " missing manifest");
+    assert.ok(html.includes('name="theme-color"'), path + " missing theme color");
+    assert.ok(html.includes('/navigation.js'), path + " missing shared navigation and registration");
+  }
+});
+
 test("PWA service worker keeps private APIs network-only and supplies offline navigation", async () => {
   const sw = await read("sw.js");
   assert.match(sw, /clash-of-izzy-shell-v14/);
