@@ -26,8 +26,9 @@ test("password records use independent random salts and PBKDF2-SHA256", async ()
   assert.notEqual(first.salt, second.salt);
   assert.notEqual(first.hash, second.hash);
   assert.equal(first.iterations, 100000);
-  assert.equal(await verifyPasswordRecord("MinhaSenhaForte2026!", first), true);
-  assert.equal(await verifyPasswordRecord("OutraSenhaMuitoForte!", first), false);
+  const firstRecord = { password_salt: first.salt, password_hash: first.hash, password_iterations: first.iterations };
+  assert.equal(await verifyPasswordRecord("MinhaSenhaForte2026!", firstRecord), true);
+  assert.equal(await verifyPasswordRecord("OutraSenhaMuitoForte!", firstRecord), false);
 });
 
 test("password derivation rejects weak or oversized passwords", async () => {
