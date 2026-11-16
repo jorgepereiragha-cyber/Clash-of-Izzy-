@@ -90,6 +90,28 @@ function makeApi(baseUrl) {
   };
 }
 
+function rowsFromD1Json(output) {
+  let parsed;
+  try {
+    parsed = JSON.parse(String(output || "").trim());
+  } catch {
+    const raw = String(output || "");
+    const startArray = raw.indexOf("[");
+    const startObject = raw.indexOf("{");
+    const start = startArray < 0 ? startObject : startObject < 0 ? startArray : Math.min(startArray, startObject);
+    if (start < 0) throw new Error("Saída JSON do Wrangler não encontrada: " + raw.slice(0, 500));
+    parsed = JSON.parse(raw.slice(start).trim());
+  }
+  if (Array.isArray(parsed)) {
+    return parsed.flatMap(entry => Array.isArray(entry?.results) ? entry.results :
+      Array.isArray(entry?.result?.results) ? entry.result.results : []);
+  }
+  if (Array.isArray(parsed?.results)) return parsed.results;
+  if (Array.isArray(parsed?.result?.results)) return parsed.result.results;
+  if (Array.isArray(parsed?.result)) return parsed.result;
+  return [];
+}
+
 function expectStatus(result, expected, label) {
   const accepted = Array.isArray(expected) ? expected : [expected];
   assert.ok(
@@ -354,11 +376,12 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           "--json",
           "--command", "SELECT h.hero_key,h.rarity,h.level,hi.rarity AS inventory_rarity FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=" + kingdomA + " AND h.hero_key='odin_awakened';",
         ]);
-        const odinData = JSON.parse(odinRow || "[]");
-        const odinRecord = odinData[0]?.results?.[0] || odinData.results?.[0];
-        assert.ok(odinRecord, "Odin deve existir nas tabelas de heróis e inventário");
-        assert.equal(odinRecord.rarity, "mythic");
-        assert.equal(odinRecord.inventory_rarity, "purple");
+        const odinState = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "inventário após compra de Odin");
+        const odinHero = odinState.state.heroes.find(hero => hero.hero_key === "odin_awakened");
+        const odinInventory = odinState.state.heroInventory.find(hero => hero.hero_key === "odin_awakened");
+        assert.ok(odinHero && odinInventory, "Odin deve existir nas tabelas de heróis e inventário");
+        assert.equal(odinHero.rarity, "mythic");
+        assert.equal(odinInventory.rarity, "purple");
 
         await buy(tokenA, "buff_odin_blessing", "valhalla-buff-odin-0001").then(result => expectStatus(result, 201, "compra de buff de ataque"));
         await buy(tokenA, "buff_freya_charm", "valhalla-buff-freya-0001").then(result => expectStatus(result, 201, "compra de buff de produção"));
@@ -375,8 +398,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           "--json",
           "--command", "SELECT COUNT(*) AS purchases,COALESCE(SUM(amount),0) AS spent FROM valhalla_rune_ledger WHERE kingdom_id=" + kingdomA + " AND entry_type='debit' AND reason='shop_purchase';",
         ]);
-        const ledgerJson = JSON.parse(ledger || "[]");
-        const ledgerSummary = ledgerJson[0]?.results?.[0] || ledgerJson.results?.[0];
+        const ledgerSummary = rowsFromD1Json(ledger)[0];
         assert.equal(Number(ledgerSummary.purchases), 9);
         assert.equal(Number(ledgerSummary.spent), 23600);
 
@@ -386,8 +408,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           "--json",
           "--command", "SELECT unit_type,quantity FROM valhalla_troops WHERE kingdom_id=" + kingdomA + " ORDER BY unit_type;",
         ]);
-        const troopJson = JSON.parse(troopHoldings || "[]");
-        const holdings = troopJson[0]?.results || troopJson.results || [];
+        const holdings = rowsFromD1Json(troopHoldings);
         assert.equal(Number(holdings.find(row => row.unit_type === "einherjar")?.quantity || 0), 10);
         assert.equal(Number(holdings.find(row => row.unit_type === "fenrir_beast")?.quantity || 0), 3);
 
@@ -397,8 +418,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           "--json",
           "--command", "SELECT item_id,kind FROM kingdom_cosmetics WHERE kingdom_id=" + kingdomA + " AND item_id IN ('troop_skin_rune_armor','valhalla_champion') ORDER BY item_id;",
         ]);
-        const cosmeticJson = JSON.parse(cosmetics || "[]");
-        const cosmeticRows = cosmeticJson[0]?.results || cosmeticJson.results || [];
+        const cosmeticRows = rowsFromD1Json(cosmetics);
         assert.equal(cosmeticRows.length, 2);
         const titleState = await runCli([
           "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
@@ -406,8 +426,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           "--json",
           "--command", "SELECT valhalla_title FROM kingdoms WHERE id=" + kingdomA + ";",
         ]);
-        const titleJson = JSON.parse(titleState || "[]");
-        assert.equal((titleJson[0]?.results?.[0] || titleJson.results?.[0]).valhalla_title, "valhalla_champion");
+        assert.equal(rowsFromD1Json(titleState)[0]?.valhalla_title, "valhalla_champion");
 
         const buffState = await runCli([
           "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
@@ -415,8 +434,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           "--json",
           "--command", "SELECT buff_key,MAX(multiplier) AS multiplier FROM valhalla_buffs WHERE kingdom_id=" + kingdomA + " AND expires_at>unixepoch() GROUP BY buff_key ORDER BY buff_key;",
         ]);
-        const buffJson = JSON.parse(buffState || "[]");
-        const buffRows = buffJson[0]?.results || buffJson.results || [];
+        const buffRows = rowsFromD1Json(buffState);
         assert.ok(buffRows.some(row => row.buff_key === "attack_power" && Number(row.multiplier) === 1.5));
         assert.ok(buffRows.some(row => row.buff_key === "resource_production" && Number(row.multiplier) === 3));
 
@@ -483,6 +501,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(initial.valhalla_speed_multiplier, 0.2);
       assert.equal(initial.valhalla_daily_runes_reward, 100);
 
+      const statsBeforeGrant = expectStatus(await adminGet("/api/valhalla-admin/stats"), 200, "estatísticas antes do crédito Master");
+      const runesSpentBeforeGrant = Number(statsBeforeGrant.total_runes_spent || 0);
       const beforeGrantState = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "saldo antes da distribuição manual");
       const expectedNewBalance = Number(beforeGrantState.state.kingdom.destiny_runes || 0) + 500;
       const grantBody = {
@@ -513,7 +533,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(stats.players_with_runes >= 1);
       assert.ok(stats.total_runes_distributed >= 500);
       assert.ok(stats.total_runes_in_circulation >= expectedNewBalance);
-      assert.equal(stats.total_runes_spent, 0);
+      assert.equal(stats.total_runes_spent, runesSpentBeforeGrant);
       assert.ok(Array.isArray(stats.top_items));
 
       const leaderboard = expectStatus(await adminGet("/api/valhalla-admin/leaderboard"), 200, "leaderboard Valhalla");
