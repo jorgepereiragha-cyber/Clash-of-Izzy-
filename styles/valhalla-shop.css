@@ -1,0 +1,65 @@
+body.valhalla-mode-active{background-image:radial-gradient(ellipse at 50% -20%,#49326a,#171327 56%,#080d18)}
+body.valhalla-mode-active header{border-bottom-color:#9b59b6;box-shadow:0 4px 22px #9b59b633}
+#valhalla-shop-btn{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:calc(88px + env(safe-area-inset-bottom));z-index:1200;display:none;align-items:center;gap:9px;min-height:48px;padding:11px 16px;border:1px solid #f6d77f;border-radius:13px;background:linear-gradient(135deg,#7544a1,#2c2445);color:#ffe69b;font:800 14px/1.1 system-ui,sans-serif;box-shadow:0 8px 28px #0009,0 0 22px #a76de966;cursor:pointer}
+#valhalla-shop-btn[hidden]{display:none}
+#valhalla-shop-btn .va-rune{font-size:21px;filter:drop-shadow(0 0 6px #f5ce66)}
+@media(prefers-reduced-motion:no-preference){#valhalla-shop-btn{animation:va-rune-pulse 2.4s ease-in-out infinite}#valhalla-shop-btn:hover{transform:translateY(-2px)}}
+@keyframes va-rune-pulse{0%,100%{box-shadow:0 8px 28px #0009,0 0 14px #a76de955}50%{box-shadow:0 8px 28px #0009,0 0 26px #e4c15b99}}
+#valhalla-shop-overlay{position:fixed;inset:0;z-index:1300;display:none;align-items:center;justify-content:center;padding:12px;background:#050711e8;backdrop-filter:blur(8px)}
+#valhalla-shop-overlay.is-open{display:flex}
+#valhalla-shop-dialog{display:flex;flex-direction:column;width:min(100%,1080px);max-height:min(92dvh,900px);overflow:hidden;border:1px solid #9b65c0;border-radius:18px;background:linear-gradient(145deg,#21152e,#101a2b 70%);box-shadow:0 26px 90px #000c,0 0 45px #9b59b633;color:#f5edda}
+.va-shop-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 18px;border-bottom:1px solid #80569c;background:linear-gradient(110deg,#3a2450,#18263b)}
+.va-shop-brand{min-width:0}
+.va-shop-brand h2{margin:0;color:#ffe09a;font-size:clamp(18px,3vw,26px);letter-spacing:.02em}
+.va-shop-brand p{margin:4px 0 0;color:#d0c4da;font-size:11px}
+.va-shop-balance{display:flex;align-items:center;gap:8px;white-space:nowrap;padding:9px 12px;border:1px solid #a77bc1;border-radius:11px;background:#130d20a8}
+.va-shop-balance strong{color:#ffe08a;font-size:20px;font-variant-numeric:tabular-nums}
+.va-shop-balance small{display:block;color:#d0c4da;font-size:9px;letter-spacing:.08em;text-transform:uppercase}
+.va-shop-close{flex:0 0 auto;width:38px;height:38px;padding:0;border:1px solid #84669b;border-radius:10px;background:#21162b;color:#ffe09a;font-size:25px;line-height:1;cursor:pointer}
+.va-shop-tabs{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid #604674;background:#12192a}
+.va-shop-tab{padding:9px 14px;border:1px solid #604674;border-radius:9px;background:#182338;color:#ddd1e7;font-weight:800;cursor:pointer}
+.va-shop-tab[aria-selected=true]{border-color:#edcf79;background:linear-gradient(135deg,#63418a,#2a2541);color:#ffe49c}
+.va-shop-notice{min-height:20px;padding:5px 18px;color:#ffe09a;font-size:12px}
+.va-shop-notice[data-kind=error]{color:#ffb4a9}
+.va-shop-body{flex:1;overflow:auto;overscroll-behavior:contain;padding:14px 16px 20px}
+.va-shop-loading,.va-shop-empty{padding:38px 16px;text-align:center;color:#d5c8e0}
+.va-shop-category{margin:0 0 24px}
+.va-shop-category h3{display:flex;align-items:center;gap:9px;margin:0 0 12px;padding:0 0 9px;border-bottom:1px solid #644978;color:#ffdf92;font-size:16px}
+.va-shop-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr));gap:12px}
+.va-shop-item{position:relative;display:flex;flex-direction:column;min-width:0;padding:14px;border:1px solid #624779;border-radius:13px;background:linear-gradient(150deg,#26324a,#171324);box-shadow:0 6px 18px #0004}
+.va-shop-item.is-featured{border-color:#e4bf65;box-shadow:0 0 17px #e4bf6522}
+.va-shop-item.is-unavailable{opacity:.58}
+.va-shop-featured{position:absolute;top:8px;right:9px;padding:4px 7px;border-radius:999px;background:#f1d27a;color:#271a2f;font-size:9px;font-weight:950;letter-spacing:.08em}
+.va-shop-icon{margin:0 0 7px;text-align:center;font-size:35px}
+.va-shop-item h4{margin:0 0 6px;color:#ffe19a;text-align:center;font-size:15px}
+.va-shop-description{flex:1;margin:0 0 10px;color:#d0c7d8;text-align:center;font-size:12px;line-height:1.45}
+.va-shop-stock{margin:0 0 10px;color:#c7a8dc;text-align:center;font-size:10px;font-weight:800}
+.va-shop-cost{display:flex;justify-content:center;align-items:center;gap:7px;margin:0 0 10px;padding:8px;border:1px solid #654780;border-radius:9px;background:#110e1d;color:#ffdf8e;font-size:17px;font-weight:900;font-variant-numeric:tabular-nums}
+.va-shop-buy{width:100%;min-height:40px;border:1px solid #f3d47c;border-radius:9px;background:linear-gradient(135deg,#8854a9,#44335c);color:#ffe69f;font-weight:900;letter-spacing:.04em;cursor:pointer}
+.va-shop-buy:disabled{opacity:.48;cursor:not-allowed}
+.va-shop-history{display:grid;gap:9px}
+.va-shop-history-item{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center;padding:12px;border:1px solid #58416b;border-radius:10px;background:#172238}
+.va-shop-history-item strong{display:block;color:#ffdf92;font-size:13px}
+.va-shop-history-item small{display:block;margin-top:4px;color:#c7bed1;font-size:10px}
+.va-shop-history-cost{color:#ffe08a;font-weight:900;white-space:nowrap;font-variant-numeric:tabular-nums}
+.va-shop-toast{position:fixed;left:50%;bottom:calc(150px + env(safe-area-inset-bottom));z-index:1400;max-width:min(92vw,440px);padding:11px 16px;border:1px solid #e6ca78;border-radius:10px;background:#181325f5;color:#ffe5a1;text-align:center;font:700 13px/1.4 system-ui,sans-serif;box-shadow:0 9px 35px #0009;transform:translateX(-50%)}
+.va-shop-toast[data-kind=error]{border-color:#c66a6a;color:#ffc1b9}
+@media(max-width:620px){
+ #valhalla-shop-overlay{align-items:flex-end;padding:0}
+ #valhalla-shop-dialog{width:100%;max-height:94dvh;border-radius:18px 18px 0 0;border-bottom:0;padding-bottom:env(safe-area-inset-bottom)}
+ .va-shop-header{padding:12px}
+ .va-shop-balance{padding:7px 9px;gap:5px}
+ .va-shop-balance strong{font-size:16px}
+ .va-shop-balance small{max-width:68px;white-space:normal;line-height:1.15}
+ .va-shop-tabs{padding:8px 10px}
+ .va-shop-body{padding:10px 10px 16px}
+ .va-shop-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+ .va-shop-item{padding:10px}
+ .va-shop-icon{font-size:28px}
+ .va-shop-item h4{font-size:13px}
+ .va-shop-description{font-size:11px}
+ .va-shop-history-item{padding:10px}
+ #valhalla-shop-btn{right:10px;bottom:calc(82px + env(safe-area-inset-bottom));min-height:44px;padding:9px 12px;font-size:12px}
+}
+@media(max-width:360px){.va-shop-grid{grid-template-columns:1fr}.va-shop-header{gap:8px}.va-shop-brand h2{font-size:17px}}
+@media(prefers-reduced-motion:reduce){#valhalla-shop-btn{animation:none}}
