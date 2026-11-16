@@ -384,7 +384,43 @@ async function processMarches(env,kingdomId){
    }
    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,CASE WHEN json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured')=1 THEN 'territory_captured' ELSE 'territory_attack_resolved' END,json_object('territoryId',?,'won',json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured'),'losses',json(?)) WHERE "+guard)
     .bind(kingdomId,kingdomId,m.target_territory_id,m.target_territory_id,kingdomId,m.target_territory_id,JSON.stringify(losses),m.id,kingdomId,resolutionToken));
+   if(activeSkill)statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(kingdomId,"hero_skill_activated",JSON.stringify({heroKey:m.hero_key,skillKey:activeSkill.key,skillName:activeSkill.name}),m.id,kingdomId,resolutionToken));
   }else{
+   if(m.march_type==="scout"){
+    const scanned=await env.DB.prepare(
+     "SELECT wt.id,wt.name,wt.level,wt.terrain,wt.owner_kingdom_id,k.kingdom_name,k.castle_level,k.power,k.food,k.wood,k.stone,k.iron,k.gold,k.protection_until " +
+     "FROM world_territories wt LEFT JOIN kingdoms k ON k.id=wt.owner_kingdom_id WHERE wt.id=?"
+    ).bind(m.target_territory_id).first();
+    if(scanned?.owner_kingdom_id&&Number(scanned.owner_kingdom_id)!==Number(kingdomId)){
+     const [enemyTroops,enemyHeroes,enemyResearch,enemyAlliance]=await Promise.all([
+      env.DB.prepare("SELECT unit_type,SUM(quantity) AS quantity FROM army_units WHERE kingdom_id=? AND quantity>0 GROUP BY unit_type ORDER BY quantity DESC,unit_type LIMIT 20").bind(scanned.owner_kingdom_id).all(),
+      env.DB.prepare(
+       "SELECT hi.hero_key,COALESCE(h.hero_name,vhc.hero_name,hi.hero_key) AS name,hi.rarity,hi.level,hi.stars,hi.skill_level " +
+       "FROM hero_inventory hi LEFT JOIN heroes h ON h.kingdom_id=hi.kingdom_id AND h.hero_key=hi.hero_key " +
+       "LEFT JOIN valhalla_hero_catalog vhc ON vhc.hero_key=hi.hero_key WHERE hi.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC LIMIT 10"
+      ).bind(scanned.owner_kingdom_id).all(),
+      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND level>0 ORDER BY level DESC,research_key LIMIT 12").bind(scanned.owner_kingdom_id).all(),
+      env.DB.prepare("SELECT a.name,a.tag,a.level FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=? LIMIT 1").bind(scanned.owner_kingdom_id).first()
+     ]);
+     const report={
+      version:1,scanned_at:resolvedAt,
+      territory:{name:scanned.name,level:Number(scanned.level||1),terrain:scanned.terrain},
+      kingdom:{name:scanned.kingdom_name,castle_level:Number(scanned.castle_level||1),power:Number(scanned.power||0),protection_until:scanned.protection_until||null},
+      resources:{food:Number(scanned.food||0),wood:Number(scanned.wood||0),stone:Number(scanned.stone||0),iron:Number(scanned.iron||0),gold:Number(scanned.gold||0)},
+      troops:(enemyTroops.results||[]).map(row=>({unit_type:row.unit_type,quantity:Number(row.quantity||0)})),
+      heroes:(enemyHeroes.results||[]).map(row=>({hero_key:row.hero_key,name:row.name,rarity:row.rarity,level:Number(row.level||1),stars:Number(row.stars||1),skill_level:Number(row.skill_level||1)})),
+      research:(enemyResearch.results||[]).map(row=>({research_key:row.research_key,level:Number(row.level||0)})),
+      alliance:enemyAlliance?{name:enemyAlliance.name,tag:enemyAlliance.tag,level:Number(enemyAlliance.level||1)}:null
+     };
+     const nowSeconds=Math.floor(Date.now()/1000);
+     statements.push(env.DB.prepare(
+      "INSERT INTO spy_reports(kingdom_id,target_kingdom_id,target_territory_id,march_id,report_json,created_at,expires_at) " +
+      "SELECT ?,?,?,?,?,?,? WHERE "+guard+" ON CONFLICT(march_id) DO NOTHING"
+     ).bind(kingdomId,scanned.owner_kingdom_id,m.target_territory_id,m.id,JSON.stringify(report),nowSeconds,nowSeconds+7*86400,m.id,kingdomId,resolutionToken));
+     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
+      .bind(kingdomId,"espionage_report_ready",JSON.stringify({territory:scanned.name,targetKingdom:scanned.kingdom_name}),m.id,kingdomId,resolutionToken));
+    }
+   }
    const marchMaterial=eventMaterialStatement(env,kingdomId,m.march_type==="gather"?"gather":"scout");
    if(marchMaterial){
     statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,m.march_type==="gather"?"power_crystal":"svip_medal",m.id,kingdomId,resolutionToken));
