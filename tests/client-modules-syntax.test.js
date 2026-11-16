@@ -9,7 +9,7 @@ const files = [
   "../world-map.js",
   "../equipment-system.js",
   "../scripts/kingdom-3d.js",
-  "../scripts/kingdom-quality.js",
+  "../scripts/kingdom-quality.js",\n  "../scripts/cinematic/capture-system.js",\n  "../scripts/cinematic/trailer-script.js",\n  "../scripts/cinematic/recorder-ui.js",
   "../engine/asset-loader.js",
   "../engine/resource-disposal.js",
   "../engine/texture-manager.js"
