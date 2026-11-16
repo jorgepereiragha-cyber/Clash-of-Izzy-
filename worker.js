@@ -9,6 +9,7 @@ import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
+import { HERO_ACTIVE_SKILLS, getHeroActiveSkill } from "./hero-active-skills.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -320,7 +321,7 @@ async function seedWorld(env){
 }
 async function processMarches(env,kingdomId){
  const now=new Date().toISOString();
- const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
+ const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id,hero_key,hero_skill_key FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
  for(const m of due.results||[]){
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
   const resolvedAt=new Date().toISOString(),resolutionToken=crypto.randomUUID();
