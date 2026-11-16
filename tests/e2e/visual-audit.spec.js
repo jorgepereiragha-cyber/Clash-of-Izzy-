@@ -146,7 +146,8 @@ async function attachScreenshot(page, testInfo, name, options = {}) {
 }
 
 async function attachLayoutMetrics(page, testInfo, name, selectors) {
-  const metrics = await page.evaluate(items => {
+  const configuredViewport = page.viewportSize();
+  const metrics = await page.evaluate(({ items, configuredViewport: configured }) => {
     const rect = element => {
       const box = element.getBoundingClientRect();
       const style = getComputedStyle(element);
@@ -159,24 +160,51 @@ async function attachLayoutMetrics(page, testInfo, name, selectors) {
         visible: style.display !== "none" && style.visibility !== "hidden" && box.width > 0 && box.height > 0,
       };
     };
+    const visual = window.visualViewport;
 
     return {
+      configuredViewport: configured,
       viewport: { width: innerWidth, height: innerHeight },
+      visualViewport: visual ? {
+        width: Math.round(visual.width),
+        height: Math.round(visual.height),
+        scale: Number(visual.scale.toFixed(3)),
+        offsetTop: Math.round(visual.offsetTop),
+      } : null,
       document: {
         width: document.documentElement.scrollWidth,
         height: document.documentElement.scrollHeight,
       },
+      devicePixelRatio: window.devicePixelRatio,
       elements: Object.fromEntries(items.map(selector => [
         selector,
         [...document.querySelectorAll(selector)].map(rect),
       ])),
     };
-  }, selectors);
+  }, { items: selectors, configuredViewport });
 
   await testInfo.attach(name + "-layout.json", {
     body: JSON.stringify(metrics, null, 2),
     contentType: "application/json",
   });
+}
+
+async function expectTouchTargetsAtLeast44(page, selectors) {
+  const undersized = await page.evaluate(items => items.flatMap(selector => {
+    return [...document.querySelectorAll(selector)].flatMap(element => {
+      const box = element.getBoundingClientRect();
+      const style = getComputedStyle(element);
+      if (style.display === "none" || style.visibility === "hidden" || box.width <= 0 || box.height <= 0) return [];
+      if (box.width >= 44 && box.height >= 44) return [];
+      return [{
+        selector,
+        width: Math.round(box.width),
+        height: Math.round(box.height),
+        text: (element.textContent || "").trim().slice(0, 60),
+      }];
+    });
+  }), selectors);
+  expect(undersized, "Interactive mobile controls must provide at least a 44x44 CSS-pixel target").toEqual([]);
 }
 
 test.describe("Mobile visual audit captures", () => {
@@ -187,6 +215,12 @@ test.describe("Mobile visual audit captures", () => {
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#kingdomName")).toHaveText("Reino de Eldoria");
     await expect(page.locator("#trainButton")).toBeVisible();
+    await expectTouchTargetsAtLeast44(page, [
+      "#trainButton",
+      "#researchButton",
+      "#buildings button[data-upgrade]",
+      "#coi-recorder-toggle",
+    ]);
 
     await attachScreenshot(page, testInfo, "kingdom-mobile", {
       mask: [page.locator(".queue-remaining")],
@@ -200,6 +234,21 @@ test.describe("Mobile visual audit captures", () => {
     ]);
   });
 
+
+  test("keeps the training submit action in view when quantity receives focus", async ({ page }) => {
+    await installVisualFixtures(page);
+    await page.goto("/kingdom.html");
+    await expect(page.locator("#game")).toBeVisible();
+
+    await page.locator("#unitQuantity").focus();
+    const viewport = page.viewportSize();
+    await expect.poll(async () => {
+      const box = await page.locator("#trainButton").boundingBox();
+      return Boolean(box && box.y >= 0 && box.y + box.height <= viewport.height);
+    }, { timeout: 5_000 }).toBe(true);
+    await expect(page.locator("#trailer-recorder-panel")).toHaveClass(/is-keyboard-open/);
+  });
+
   test("captures the world map, territory pins and side panel", async ({ page }, testInfo) => {
     await installVisualFixtures(page);
     await page.goto("/world.html");
@@ -208,6 +257,15 @@ test.describe("Mobile visual audit captures", () => {
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
     await expect(page.locator(".territory-pin")).toHaveCount(2);
     await expect(page.locator(".territory-title")).toContainText("Pedreira do Norte");
+    await expectTouchTargetsAtLeast44(page, [
+      "#zoomIn",
+      "#zoomOut",
+      "#mapReset",
+      ".territory-pin",
+      "#gather",
+      "#scout",
+      "#attack",
+    ]);
 
     await attachScreenshot(page, testInfo, "world-map-mobile");
     await attachLayoutMetrics(page, testInfo, "world-map-mobile", [
@@ -231,6 +289,11 @@ test.describe("Mobile visual audit captures", () => {
     await expect(page.locator("#skills .skill")).toHaveCount(4);
     await expect(page.locator("#joystick")).toBeVisible();
     await expect(page.locator("#rightActions")).toBeVisible();
+    await expectTouchTargetsAtLeast44(page, [
+      "#skills .skill",
+      "#attack",
+      "#openShop",
+    ]);
 
     await attachScreenshot(page, testInfo, "arena-mobile");
     await attachLayoutMetrics(page, testInfo, "arena-mobile", [
@@ -284,6 +347,10 @@ test.describe("Mobile visual audit captures", () => {
     await expect(overlay).toHaveClass(/is-open/);
     await expect(overlay.locator("article.va-shop-item")).toBeVisible();
     await expect(page.locator("#valhalla-shop-balance")).toHaveText("420");
+    await expectTouchTargetsAtLeast44(page, [
+      ".va-shop-close",
+      ".va-shop-buy",
+    ]);
 
     // Let the one-time seasonal toast leave the product area before the audit capture.
     await expect(page.locator(".va-shop-toast")).toHaveCount(0);
