@@ -1,0 +1,11 @@
+.coi-vfx-root{position:fixed;inset:0;z-index:12000;pointer-events:none;overflow:hidden}
+.coi-damage-number{position:fixed;z-index:12001;pointer-events:none;font-weight:1000;font-size:22px;color:#fff;text-shadow:0 2px 2px #000,0 0 8px #000;animation:coi-damage-rise .95s ease-out forwards}
+.coi-damage-number.critical{font-size:30px;color:#ff655d;text-shadow:0 2px 2px #000,0 0 10px #ff2418}
+.coi-vfx-particle{position:fixed;z-index:12000;width:6px;height:6px;border-radius:50%;pointer-events:none;box-shadow:0 0 9px currentColor;animation:coi-particle-burst .7s ease-out forwards}
+.coi-screen-shake{animation:coi-screen-impact .28s ease-out}
+.coi-bloom-enabled canvas{filter:drop-shadow(0 0 3px #f7cd8040)}
+.coi-night-overlay{position:fixed;inset:0;z-index:10000;pointer-events:none;background:rgba(8,15,35,0);mix-blend-mode:multiply;transition:background 2s ease}
+@keyframes coi-damage-rise{0%{opacity:0;transform:translate(-50%,0) scale(.8)}15%{opacity:1}100%{opacity:0;transform:translate(-50%,-78px) scale(1.08)}}
+@keyframes coi-particle-burst{0%{opacity:1;transform:translate(0,0) scale(1)}100%{opacity:0;transform:translate(var(--dx),var(--dy)) scale(.1)}}
+@keyframes coi-screen-impact{0%,100%{transform:translate(0,0)}20%{transform:translate(-3px,2px)}45%{transform:translate(3px,-2px)}70%{transform:translate(-2px,-1px)}}
+@media(prefers-reduced-motion:reduce){.coi-damage-number,.coi-vfx-particle,.coi-screen-shake{animation:none!important}.coi-damage-number{opacity:0}}
