@@ -57,6 +57,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   #feedbackForm textarea{resize:vertical;min-height:84px}
   #feedbackForm button{justify-self:start}
 </style>  <link rel="stylesheet" href="/styles/navigation.css">
+  <link rel="stylesheet" href="/styles/visual-effects.css">
 </head>
 <body>
 <header><div class="top"><div class="brand">⚔ CLASH OF IZZY <small>Estratégia medieval · Reino persistente</small></div><div id="status" role="status">Conectando ao reino…</div></div><div class="resources" id="resources"><div class="resource">🌾<b>—</b>Comida</div><div class="resource">🪵<b>—</b>Madeira</div><div class="resource">🪨<b>—</b>Pedra</div><div class="resource">⛓️<b>—</b>Ferro</div><div class="resource">🪙<b>—</b>Ouro</div></div></header>
@@ -338,5 +339,5 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-3d.js"></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-3d.js"></script><script src="/valhalla-shop-ui.js" defer></script><script src="/visual-effects.js" defer></script><script src="/navigation.js" defer></script>
 </body></html>
