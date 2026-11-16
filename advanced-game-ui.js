@@ -192,7 +192,7 @@
           await api("mail/claim","POST",{mail_id:mail.id});
           await refreshAfter("Anexos recebidos.");
         }):null;
-      addItem(mail.subject,desc,mail.is_claimed?"Anexos resgatados":attachment,button?{node:button}:null);
+      addItem(root,mail.subject,desc,mail.is_claimed?"Anexos resgatados":attachment,button?{node:button}:null);
     }
   }
 
