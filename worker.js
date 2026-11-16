@@ -337,7 +337,7 @@ async function processMarches(env,kingdomId){
    if(target&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
-     env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
+     env.DB.prepare("SELECT h.id,hi.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? AND (?='' OR h.hero_key=?) ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId,m.hero_key||"",m.hero_key||"").first(),
      env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
@@ -348,23 +348,25 @@ async function processMarches(env,kingdomId){
     ]);
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
     const valhallaBuffs=await getValhallaBuffMultipliers(env,kingdomId);
+    const activeSkill=m.hero_skill_key&&getHeroActiveSkill(m.hero_key)?.key===m.hero_skill_key?getHeroActiveSkill(m.hero_key):null;
+    const skillEffects=activeSkill?.effects||{};
     const castleLevel=Number(kingdom?.castle_level||1);
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      researchLevel:Number(military?.level||0),
-     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
-     equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
-     equipmentHealthBonusPercent:gear.healthPercent,
-     criticalChancePercent:gear.criticalChancePercent,
+     defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent+Number(skillEffects.defensePercent||0))),
+     equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100)+Number(skillEffects.attackPercent||0),
+     equipmentHealthBonusPercent:gear.healthPercent+Number(skillEffects.healthPercent||0),
+     criticalChancePercent:Math.min(15,gear.criticalChancePercent+Number(skillEffects.criticalChancePercent||0)),
      criticalDamageMultiplier:1.5,
      criticalSeed,
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
      roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
     });
     simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
-    losses=simulation.losses||{};battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
+    losses=simulation.losses||{};battleLog=[...(activeSkill?[{event:"hero_skill_activated",heroKey:m.hero_key,skillKey:activeSkill.key,skillName:activeSkill.name,effects:skillEffects}]:[]),{event:"combat_metadata",criticalSeed,criticalChancePercent:Math.min(15,gear.criticalChancePercent+Number(skillEffects.criticalChancePercent||0)),criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
     for(const u of army)survivors[u.unit_type]=u.quantity;
    }else{
     for(const u of army)survivors[u.unit_type]=u.quantity;
