@@ -82,7 +82,8 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <label for="unitQuantity">Quantidade (1–100)</label>
 <input id="unitQuantity" type="number" min="1" max="100" value="10" step="1" inputmode="numeric" required>
 <button id="trainButton" type="submit">Iniciar treinamento</button>
-<p class="muted">Os recursos são cobrados ao iniciar. As tropas entram no exército quando o cronômetro terminar.</p>
+<p class="muted">Os recursos são cobrados ao iniciar. As tropas entram no exército quando o cronômetro terminar. Até duas filas podem treinar ao mesmo tempo.</p>
+<p class="muted" id="trainingCapacity" role="status" aria-live="polite">Capacidade do exército: calculando…</p>
 </form>
 </section>
 <section class="panel"><h2>🔬 Academia e pesquisas</h2>
@@ -229,9 +230,21 @@ const constructionRunning=(state.queues||[]).some(q=>q.queue_type==="constructio
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const blocked=maxed||constructionRunning||busy;const label=maxed?"MÁXIMO":constructionRunning?"FILA OCUPADA":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
 renderQueues();
 document.getElementById("researchLevels").innerHTML=(state.research||[]).map(r=>'<div class="event">'+esc(String(r.research_key).replaceAll("_"," "))+' · nível '+fmt(r.level)+'</div>').join("")||'<div class="muted">Nenhuma pesquisa concluída ainda.</div>';
-document.getElementById("trainButton").disabled=busy||(state.queues||[]).some(q=>q.queue_type==="training"&&q.status==="running");
 document.getElementById("researchButton").disabled=busy||(state.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running");
-const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Tropas",fmt(total)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
+const activeTraining=(state.queues||[]).filter(q=>q.queue_type==="training"&&q.status==="running");
+const troops=state.troops||[];
+const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);
+const barracksLevel=Number(buildings.find(b=>b.building_type==="barracks")?.level||0);
+const troopCapacity=barracksLevel*500;
+const queuedTraining=activeTraining.reduce((n,q)=>n+Number(q.quantity||0),0);
+const usedCapacity=total+queuedTraining;
+const availableCapacity=Math.max(0,troopCapacity-usedCapacity);
+const quantityInput=document.getElementById("unitQuantity");
+quantityInput.max=String(Math.max(1,Math.min(100,availableCapacity)));
+if(availableCapacity>0&&Number(quantityInput.value||1)>availableCapacity)quantityInput.value=String(quantityInput.max);
+document.getElementById("trainingCapacity").textContent="Capacidade do exército: "+fmt(usedCapacity)+" / "+fmt(troopCapacity)+" · "+activeTraining.length+"/2 filas ocupadas · "+fmt(availableCapacity)+" vagas livres.";
+document.getElementById("trainButton").disabled=busy||activeTraining.length>=2||availableCapacity<1;
+document.getElementById("army").innerHTML=[["⚔️ Tropas",fmt(total)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).map(e=>'<div class="event">'+esc(String(e.event_type||"Atividade").replaceAll("_"," "))+'</div>').join("")||'<div class="muted">Seu reino está começando sua história.</div>';
 renderPets();renderBattleReports();
 city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
@@ -322,7 +335,7 @@ function renderQueues(){
    const completionTime=Date.parse(q.completes_at||"");
    const remaining=Number.isFinite(completionTime)?Math.max(0,Math.ceil((completionTime-Date.now())/1000)):0;
    const target=targets[q.target_key]||q.target_key;
-   const queueLabel=labels[q.queue_type]||q.queue_type;
+   const queueLabel=(labels[q.queue_type]||q.queue_type)+(q.queue_type==="training"?" · Fila "+Number(q.lane_number||1):"");
    const detail=q.queue_type==="construction"?"Nível "+q.to_level:q.queue_type==="training"?"Quantidade: "+fmt(q.quantity):"Nível "+q.to_level;
    const progress=queueProgressPercent(q.started_at,q.completes_at);
    return '<div class="queue-card"><strong>'+esc(queueLabel)+' · '+esc(target)+'</strong><small>'+esc(detail)+' · termina em '+new Date(q.completes_at).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})+'</small><span class="queue-remaining" data-started="'+esc(q.started_at)+'" data-completes="'+esc(q.completes_at)+'">'+formatDuration(remaining)+'</span><div class="queue-progress" role="progressbar" aria-label="Progresso: '+esc(queueLabel)+' - '+esc(target)+'" aria-valuemin="0" aria-valuemax="100" aria-valuenow="'+progress+'"><span data-progress style="width:'+progress+'%"></span></div></div>';
