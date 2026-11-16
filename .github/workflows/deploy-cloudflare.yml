@@ -1,9 +1,13 @@
 name: Deploy Clash of Izzy to Cloudflare
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: "Confirma migrações D1 remotas e publicação do Worker em produção"
+        required: true
+        default: false
+        type: boolean
 
 concurrency:
   group: clash-of-izzy-cloudflare-production
@@ -11,8 +15,11 @@ concurrency:
 
 jobs:
   deploy:
+    if: ${{ inputs.confirm_production == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
+    environment:
+      name: production
     permissions:
       contents: read
     name: Validate, migrate and deploy
@@ -174,7 +181,7 @@ jobs:
         run: |
           set -euo pipefail
           npx wrangler --config wrangler.jsonc deploy 2>&1 | tee "$RUNNER_TEMP/clash-of-izzy-deploy.log"
-          WORKER_BASE_URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\.workers\.dev' "$RUNNER_TEMP/clash-of-izzy-deploy.log" | tail -n 1 || true)"
+          WORKER_BASE_URL="$(grep -Eo 'https://[A-Za-z0-9.-]+\\.workers\\.dev' "$RUNNER_TEMP/clash-of-izzy-deploy.log" | tail -n 1 || true)"
           if [[ -z "$WORKER_BASE_URL" ]]; then
             echo "::error::Wrangler não informou a URL workers.dev; confira workers_dev no wrangler.jsonc e os domínios do Worker."
             exit 1
