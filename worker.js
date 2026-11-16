@@ -482,6 +482,9 @@ async function processMarches(env,kingdomId){
     }
    }
   }
+  statements.push(env.DB.prepare(
+    "INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'march_resolved',? WHERE EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)"
+  ).bind(kingdomId,JSON.stringify({marchId:m.id,marchType:m.march_type,targetTerritoryId:m.target_territory_id}),m.id,kingdomId,resolutionToken));
   await env.DB.batch(statements);
  }
 }
