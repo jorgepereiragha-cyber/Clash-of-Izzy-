@@ -47,7 +47,7 @@ test("construction and troop training each support two independent atomic queue 
   assert.ok(worker.includes("occupiedTrainingSlots"));
   assert.ok(worker.includes("troopCapacity"));
   assert.ok(worker.includes("army_units WHERE kingdom_id=?"));
-  assert.ok(worker.includes("training capacity"));
+  assert.ok(worker.includes("Capacidade do exército excedida"));
   assert.ok(worker.includes("queue_slot=? AND status='running'"));
   assert.ok(worker.includes("SELECT id,queue_type,queue_slot,target_key"));
   assert.ok(worker.includes("async function processDueKingdomQueues"));
