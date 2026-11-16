@@ -148,9 +148,9 @@ jobs:
           output_path = os.path.join(os.environ["RUNNER_TEMP"], "clash-of-izzy-d1-pre-migration-restore-point.json")
           with open(output_path, "w", encoding="utf-8") as output:
               json.dump(record, output, indent=2)
-              output.write("\\n")
+              output.write(chr(10))
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write("bookmark=" + bookmark + "\\n")
+              output.write("bookmark=" + bookmark + chr(10))
           print("D1 Time Travel restore point captured. Bookmark: " + bookmark)
           PY
 
