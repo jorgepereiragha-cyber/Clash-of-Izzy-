@@ -359,6 +359,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(initial.valhalla_speed_multiplier, 0.2);
       assert.equal(initial.valhalla_daily_runes_reward, 100);
 
+      const beforeGrantState = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "saldo antes da distribuição manual");
+      const expectedNewBalance = Number(beforeGrantState.state.kingdom.destiny_runes || 0) + 500;
       const grantBody = {
         player_id: playerA,
         amount: 500,
@@ -368,11 +370,11 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const grant = expectStatus(await admin("/api/valhalla-admin/distribute-runes", grantBody), 200, "distribuição manual de runas");
       assert.equal(grant.success, true);
       assert.equal(grant.reused, false);
-      assert.equal(grant.new_balance, 500);
+      assert.equal(grant.new_balance, expectedNewBalance);
 
       const retry = expectStatus(await admin("/api/valhalla-admin/distribute-runes", grantBody), 200, "retry idempotente de runas");
       assert.equal(retry.reused, true);
-      assert.equal(retry.new_balance, 500, "retry não credita runas novamente");
+      assert.equal(retry.new_balance, expectedNewBalance, "retry não credita runas novamente");
       expectStatus(await admin("/api/valhalla-admin/distribute-runes", {
         ...grantBody, amount: 501,
       }), 409, "chave idempotente não pode ser reutilizada com outro valor");
@@ -386,13 +388,13 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const stats = expectStatus(await adminGet("/api/valhalla-admin/stats"), 200, "estatísticas Valhalla");
       assert.ok(stats.players_with_runes >= 1);
       assert.ok(stats.total_runes_distributed >= 500);
-      assert.ok(stats.total_runes_in_circulation >= 500);
+      assert.ok(stats.total_runes_in_circulation >= expectedNewBalance);
       assert.equal(stats.total_runes_spent, 0);
       assert.ok(Array.isArray(stats.top_items));
 
       const leaderboard = expectStatus(await adminGet("/api/valhalla-admin/leaderboard"), 200, "leaderboard Valhalla");
       assert.ok(leaderboard.leaderboard.length >= 1);
-      assert.ok(leaderboard.leaderboard.some(row => Number(row.destiny_runes) === 500));
+      assert.ok(leaderboard.leaderboard.some(row => Number(row.destiny_runes) === expectedNewBalance));
 
       expectStatus(await admin("/api/valhalla-admin/update-config", {
         resource_multiplier: 10, speed_multiplier: 0.1, daily_runes_reward: 250,
