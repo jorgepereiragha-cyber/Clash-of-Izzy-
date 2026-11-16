@@ -33,3 +33,28 @@ A ativação real depende de configurar `RESEND_API_KEY`, `EMAIL_FROM` com domí
 ## Limite entre validação e produção
 
 O CI testa migrações locais, assets, suíte Node e bundle. A aprovação do CI/PR não significa que secrets externos foram configurados, que e-mails foram entregues, nem que o Worker/D1 remoto foi publicado e testado. A implantação só deve ser considerada concluída após configuração das secrets, migração remota, deploy e smoke test no endereço público.
+
+## Revisão dos 10 itens da auditoria enviada
+
+A revisão abaixo foi conferida com a implementação e os testes atuais. "Não aplicar" significa que o bloco proposto cria um segundo sistema ou pressupõe tabelas/identidades inexistentes; não significa apagar uma feature funcional.
+
+| Item | Decisão aplicada | Motivo técnico |
+|---|---|---|
+| 1. Substituir o banco por `schema-completo.sql` | **Não substituir.** Manter migrações incrementais e dados existentes. | `players.id` é INTEGER e `players.player_id` é o ID público. A economia e o progresso vivem em `kingdoms`. O sistema cosmético existente usa `kingdom_cosmetics`, `kingdom_cosmetic_wallet` e `kingdom_collection_claims`. A migração `0017` já cria e semeia `email_templates` com `INSERT OR IGNORE`. As tabelas de push, analytics, beta, feedback e request logs não têm consumidores/rotas atuais; criá-las isoladamente deixaria dados sem fluxo funcional. |
+| 2. Criar `src/worker.js` e um router por imports dinâmicos | **Não criar.** Preservar `worker.js` como entrypoint de `wrangler.jsonc`. | O Worker já trata health, assets, sessões, rotas do jogo, painel Master e o método `scheduled`. Não existem os módulos `src/modules/*` propostos. |
+| 3. Criar outro `auth.js` | **Não duplicar autenticação.** | O jogo usa identidade pública e token assinado/verificado com `SESSION_SECRET`. O módulo enviado introduziria KV sessions, outro modelo de conta por e-mail/senha e hash SHA-256 com salt fallback, incompatíveis com o fluxo atual. |
+| 4–6. Criar analytics, feedback e beta | **Não criar tabelas nem handlers órfãos.** | Não há interfaces nem contratos de API atuais que chamem esses handlers. Devem ser adicionados como funcionalidades completas — schema, validação, rate limit, endpoint, interface e testes — quando entrarem no escopo real. |
+| 7. Ativar webhook automático do Mercado Pago | **Não conectar o código enviado. Manter aprovação Master.** | O checkout atual usa um link fixo do Mercado Pago. A tabela `purchase_requests` não possui o `external_reference`/metadata por pagamento assumidos pelo exemplo; não há tabelas `transactions` ou `gem_packages`. Um link compartilhado não associa, por si só, o pagamento a um pedido específico. O `payment_reference` recebido do cliente não é prova de pagamento. Automatizar o crédito sem uma sessão de checkout vinculada e reconciliação idempotente permitiria crédito indevido ou duplicado. |
+| 8. Adicionar lock por KV em combate | **Não adicionar.** A proteção atual é mais apropriada. | A migração `0007_battle_token.sql` adiciona token de concorrência por reino. O Worker lê o token e o atualiza com compare-and-set em D1 antes de consumir tropas; o mesmo guard é usado no ataque do evento mundial. O lock KV sugerido não é atômico e não substitui a validação/transação D1. |
+| 9. Adicionar `public/js/config.js` | **Não adicionar outro contrato global.** | O cliente usa o fluxo de sessão e as rotas same-origin já existentes. `game-config.js` contém definições do jogo, não credenciais/API. Introduzir `clash_auth_token`, `API_BASE_URL` e helpers paralelos criaria divergência de sessão e CORS desnecessário. |
+| 10. Dividir a versão do Service Worker entre config e SW | **Não duplicar configuração.** | `sw.js` já controla o cache pela constante única `CACHE_NAME` (`clash-of-izzy-shell-v13`) e mantém a lista `CORE_ASSETS`. O validador atual do Service Worker passou no CI. A versão deve ser incrementada no próprio SW quando os assets cacheados mudarem. |
+
+### Resultado operacional
+
+- Nenhum arquivo de entrada, identidade de jogador ou migração histórica foi apagado.
+- Nenhuma tabela produtiva foi removida, recriada ou renomeada.
+- Nenhuma migration remota, reset D1, alteração de secrets ou deploy foi executado.
+- O e-mail transacional da migration `0017` permanece na branch desta PR, sem afirmar que está operacional antes da configuração de Resend.
+- O controle de concorrência de combate e a busca global existentes foram reutilizados; não foi criado segundo mecanismo.
+
+A validação GitHub Actions da revisão anterior concluiu com sucesso no commit `cb7fa5f376c6c8b6379fc9a2366a84ea051ed4e4` (run `43783494823`, job `quality`). Isso valida a suíte e o bundle no ambiente de CI; não comprova deploy, webhook, entrega de e-mail ou configuração externa.
