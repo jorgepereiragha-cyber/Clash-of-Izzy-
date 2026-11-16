@@ -737,6 +737,71 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "construction"));
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "training"));
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "research"));
+
+      await t.test("espionagem privada e habilidade ativa com cooldown persistente", async () => {
+        const scoutTarget = stateA.territories.find(item => !item.owner_kingdom_id && !item.alliance_id && Number(item.id) !== Number(neutral.id));
+        assert.ok(scoutTarget?.id, "mapa oferece um segundo território para espionagem");
+        await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE world_territories SET owner_kingdom_id=" + kingdomB + " WHERE id=" + Number(scoutTarget.id) + ";",
+        ]);
+        const scoutUnit = stateA.troops.find(unit => Number(unit.tier) === 1 && Number(unit.quantity) > 0);
+        assert.ok(scoutUnit?.unit_type, "reino possui tropas para reconhecimento");
+        await action(tokenA, {
+          type: "march", targetId: scoutTarget.id, marchType: "scout",
+          units: { [scoutUnit.unit_type]: 1 },
+        }, 200, "espionagem em território inimigo");
+        await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE marches SET arrives_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id=" + kingdomA + " AND march_type='scout' AND status='marching';",
+        ]);
+        const spyState = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado após reconhecimento").state;
+        const spyReport = spyState.spyReports?.find(item => item.report?.kingdom?.name);
+        assert.ok(spyReport, "reconhecimento concluído gera relatório");
+        assert.equal(Number(spyReport.report.version), 1);
+        assert.ok(Array.isArray(spyReport.report.troops));
+        const enemyState = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "estado do reino observado").state;
+        assert.equal((enemyState.spyReports || []).length, 0, "o relatório não é exposto ao reino espionado");
+
+        const skillTarget = spyState.territories.find(item => !item.owner_kingdom_id && !item.alliance_id && Number(item.id) !== Number(scoutTarget.id));
+        assert.ok(skillTarget?.id, "mapa oferece território neutro para testar combate");
+        const kael = spyState.heroInventory?.find(hero => hero.hero_key === "kael_sunwarden" && hero.active_skill?.key === "solar_ward");
+        assert.ok(kael, "Kael expõe a habilidade ativa do catálogo do servidor");
+        const attackUnit = spyState.troops.find(unit => Number(unit.tier) === 1 && Number(unit.quantity) > 0);
+        assert.ok(attackUnit?.unit_type, "reino possui tropas para o ataque");
+        await action(tokenA, {
+          type: "march", targetId: skillTarget.id, marchType: "attack",
+          units: { [attackUnit.unit_type]: 1 },
+          heroKey: "kael_sunwarden", heroSkillKey: "solar_ward",
+        }, 200, "ataque com habilidade ativa");
+        const cooldownState = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "cooldown da habilidade").state;
+        const kaelCooldown = cooldownState.heroInventory.find(hero => hero.hero_key === "kael_sunwarden")?.active_skill?.cooldown_until;
+        assert.ok(Number(kaelCooldown) > Math.floor(Date.now() / 1000), "cooldown fica persistido no inventário de habilidades");
+        await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE marches SET arrives_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id=" + kingdomA + " AND march_type='attack' AND hero_skill_key='solar_ward' AND status='marching';",
+        ]);
+        const afterSkillBattle = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "resolução de combate com habilidade").state;
+        const battleLogOutput = await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir, "--json",
+          "--command", "SELECT battle_log FROM battle_reports WHERE attacker_kingdom_id=" + kingdomA + " AND battle_type='territory_pve' ORDER BY id DESC LIMIT 1;",
+        ]);
+        const battleLog = rowsFromD1Json(battleLogOutput)[0]?.battle_log || "";
+        assert.match(battleLog, /hero_skill_activated/, "o relatório de batalha registra a habilidade utilizada");
+        const retryTarget = afterSkillBattle.territories.find(item => !item.owner_kingdom_id && !item.alliance_id && Number(item.id) !== Number(skillTarget.id));
+        assert.ok(retryTarget?.id, "há outro território neutro para verificar o bloqueio de recarga");
+        const retryUnit = afterSkillBattle.troops.find(unit => Number(unit.tier) === 1 && Number(unit.quantity) > 0);
+        assert.ok(retryUnit?.unit_type);
+        await action(tokenA, {
+          type: "march", targetId: retryTarget.id, marchType: "attack",
+          units: { [retryUnit.unit_type]: 1 },
+          heroKey: "kael_sunwarden", heroSkillKey: "solar_ward",
+        }, 409, "habilidade bloqueada durante o cooldown");
+      });
     });
 
     await t.test("alianças: criar, convidar, entrar, promover, doar, ajudar, expulsar, guerra e território", async () => {

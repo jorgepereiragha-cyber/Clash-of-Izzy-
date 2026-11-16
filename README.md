@@ -23,7 +23,7 @@ Comandos úteis:
 
 ## Deploy automático
 
-O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, captura e arquiva o bookmark de recuperação Time Travel do D1 imediatamente antes das migrações remotas, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, formulário beta, feedback, analytics, páginas principais e PWA v18. O deploy só termina com sucesso quando esses checks passam. O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação; restaurar Time Travel sobrescreve o estado atual do banco.
+O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, captura e arquiva o bookmark de recuperação Time Travel do D1 imediatamente antes das migrações remotas, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, formulário beta, feedback, analytics, páginas principais e PWA v19. O deploy só termina com sucesso quando esses checks passam. O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação; restaurar Time Travel sobrescreve o estado atual do banco.
 
 Configure estes segredos no GitHub:
 
@@ -46,7 +46,7 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0022`. As migrações `0019` (temporada Valhalla), `0020` (atribuição de convites), `0021` (nós de recursos, rallies e catálogo inicial de tecnologias) e `0022` (mascotes por reino e retenção de replays) são incrementais e não substituem o schema histórico. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0023`. As migrações `0019` (temporada Valhalla), `0020` (atribuição de convites), `0021` (nós de recursos, rallies e catálogo inicial de tecnologias) e `0022` (mascotes por reino e retenção de replays) são incrementais e não substituem o schema histórico. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
 
 ## Filas estratégicas persistentes
 
@@ -111,6 +111,14 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - Replays detalhados expiram após sete dias; a rotina agendada remove os quadros e o payload detalhado, preservando o resumo do relatório. A página `kingdom.html` inclui controles de mascotes e leitor de replay.
 - A migração `0022_pets_and_battle_replays.sql` é aditiva. Execute primeiro `npm run db:migrate:local`; a migração remota e o deploy acontecem apenas pelo fluxo aprovado de publicação.
 
+
+## Espionagem e habilidades ativas de heróis (migração 0023)
+- Marchas de reconhecimento contra territórios de outros reinos geram relatórios privados, associados ao reino que enviou a marcha e disponíveis por sete dias.
+- Os relatórios incluem recursos, tropas, heróis, pesquisas e aliança observados; a consulta é limitada ao reino autenticado e registros expirados são removidos pelo cron.
+- O mapa do mundo oferece a seleção de habilidades ativas de heróis pertencentes ao reino antes de ataques PvE e apresenta os relatórios de espionagem.
+- A API valida posse do herói, habilidade do catálogo do servidor e cooldown persistente por herói; efeitos entram no cálculo de combate e no relatório da batalha.
+- Ataques PvP continuam bloqueados nesta etapa. Espionagem não habilita ataques contra reinos de jogadores.
+- A migration 0023 é aditiva e reutiliza `marches`, `hero_inventory`, `kingdom_events` e `battle_reports`, sem inventários paralelos.
 
 ## Busca global do mundo
 - A navegação oferece busca local por seções e busca online autenticada por reinos públicos, alianças, territórios e skins.
