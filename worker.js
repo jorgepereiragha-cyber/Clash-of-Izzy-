@@ -1362,7 +1362,7 @@ export default {
     const body=await readBody(request,4096);
     if(body.__bodyError)return json({error:"Inscrição inválida."},body.__bodyError==="payload_too_large"?413:400);
     const email=String(body.email||"").trim().toLowerCase();
-    if(!/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/u.test(email)||email.length>254)return json({error:"Informe um e-mail válido."},400);
+    if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/u.test(email)||email.length>254)return json({error:"Informe um e-mail válido."},400);
     if(body.consent!==true)return json({error:"É necessário consentir com o recebimento de convites e atualizações do beta."},400);
     try{
       const inserted=await env.DB.prepare("INSERT INTO beta_signups(email,consent_at,consent_version) VALUES(?,CURRENT_TIMESTAMP,'beta-2026-11')")
