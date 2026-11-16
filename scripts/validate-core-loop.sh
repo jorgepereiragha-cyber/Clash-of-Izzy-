@@ -265,7 +265,7 @@ if ! TRAIN_SUCCESS="$(json_value "success")" || [[ "$TRAIN_SUCCESS" != "true" ]]
   echo "FALHA: servidor não confirmou a ordem — $(api_error)" >&2
   exit 1
 fi
-if ! QUEUE_CREATED="$(node -e '
+if ! QUEUE_CREATED="$(TRAINING_UNIT="$TRAINING_UNIT" TRAINING_QUANTITY="$TRAINING_QUANTITY" node -e '
   const fs = require("node:fs");
   const data = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
   const queues = data.state && Array.isArray(data.state.queues) ? data.state.queues : [];
