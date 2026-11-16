@@ -11,6 +11,7 @@ const files = [
   "../scripts/kingdom-3d.js",
   "../scripts/kingdom-quality.js",
   "../scripts/cinematic/capture-system.js",
+  "../scripts/cinematic/media-recorder-support.js",
   "../scripts/cinematic/trailer-script.js",
   "../scripts/cinematic/recorder-ui.js",
   "../engine/asset-loader.js",
