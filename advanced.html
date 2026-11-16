@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#101827">
+  <meta name="description" content="Academia, VIP, aceleradores, missões, conquistas, formações e montarias do Clash of Izzy.">
+  <title>Academia & Progressão — Clash of Izzy</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="stylesheet" href="/styles/coi-theme.css">
+  <link rel="stylesheet" href="/styles/navigation.css">
+  <link rel="stylesheet" href="/styles/advanced-game.css">
+  <link rel="stylesheet" href="/styles/visual-effects.css">
+</head>
+<body class="coi-advanced-page">
+<header class="advanced-header">
+  <div>
+    <p class="eyebrow">CLASH OF IZZY · REINO</p>
+    <h1>⚔ Academia & Progressão</h1>
+    <p class="muted">Tecnologias, preparação militar e recompensas do seu reino.</p>
+  </div>
+  <div class="header-actions">
+    <a class="secondary-link" href="/kingdom.html">← Meu reino</a>
+    <button id="refresh-advanced" type="button">Atualizar</button>
+  </div>
+  <p id="advanced-status" class="status-line" role="status" aria-live="polite">Conectando ao reino…</p>
+</header>
+
+<main class="advanced-grid">
+  <section class="advanced-card vip-card">
+    <div class="section-heading"><div><p class="eyebrow">PRESTÍGIO</p><h2>👑 Status VIP</h2></div><span id="vip-level" class="level-pill">VIP 0</span></div>
+    <div id="vip-summary" class="vip-summary"><p>Carregando benefícios…</p></div>
+  </section>
+
+  <section class="advanced-card technology-card">
+    <div class="section-heading"><div><p class="eyebrow">ACADEMIA</p><h2>📚 Árvore de Tecnologias</h2></div><span id="tech-status" class="muted">Fila única</span></div>
+    <p class="muted">Pesquisas usam Ouro e são concluídas pelo servidor. Logística exige Treinamento de Guerreiros nível 3.</p>
+    <div id="technology-list" class="item-list"><p>Carregando tecnologias…</p></div>
+  </section>
+
+  <section class="advanced-card">
+    <div class="section-heading"><div><p class="eyebrow">INVENTÁRIO</p><h2>⏩ Aceleradores</h2></div></div>
+    <div id="speedup-inventory" class="item-list"><p>Carregando aceleradores…</p></div>
+    <form id="speedup-form" class="compact-form">
+      <label>Tipo<select id="speedup-type" required><option value="build">Construção</option><option value="train">Treinamento</option><option value="research">Pesquisa</option><option value="march">Marcha</option></select></label>
+      <label>Duração<select id="speedup-duration" required></select></label>
+      <label>Fila ou marcha ativa<select id="speedup-target" required><option value="">Selecione o alvo</option></select></label>
+      <button type="submit">Usar acelerador</button>
+    </form>
+  </section>
+
+  <section class="advanced-card">
+    <div class="section-heading"><div><p class="eyebrow">ROTINA</p><h2>📜 Missões Diárias</h2></div></div>
+    <div id="task-list" class="item-list"><p>Carregando missões…</p></div>
+  </section>
+
+  <section class="advanced-card">
+    <div class="section-heading"><div><p class="eyebrow">COMUNICAÇÃO</p><h2>✉ Correio do Reino</h2></div></div>
+    <div id="mail-list" class="item-list"><p>Carregando mensagens…</p></div>
+  </section>
+
+  <section class="advanced-card">
+    <div class="section-heading"><div><p class="eyebrow">PROGRESSO</p><h2>🏆 Conquistas</h2></div></div>
+    <div id="achievement-list" class="item-list"><p>Carregando conquistas…</p></div>
+  </section>
+
+  <section class="advanced-card">
+    <div class="section-heading"><div><p class="eyebrow">PREPARAÇÃO</p><h2>🛡 Formações de Tropas</h2></div></div>
+    <div id="formation-list" class="item-list"><p>Carregando formações…</p></div>
+    <form id="formation-form" class="compact-form">
+      <label>Slot<select id="formation-slot"><option value="1">Formação 1</option><option value="2">Formação 2</option><option value="3">Formação 3</option><option value="4">Formação 4</option><option value="5">Formação 5</option></select></label>
+      <label>Nome<input id="formation-name" maxlength="32" value="Formação do Reino" required></label>
+      <div id="formation-units" class="formation-units"><p>Carregando seu exército…</p></div>
+      <label class="inline-check"><input id="formation-active" type="checkbox"> Ativar esta formação</label>
+      <button type="submit">Salvar formação</button>
+    </form>
+  </section>
+
+  <section class="advanced-card">
+    <div class="section-heading"><div><p class="eyebrow">MONTARIAS</p><h2>🐺 Estábulo</h2></div></div>
+    <div id="mount-list" class="item-list"><p>Carregando montarias…</p></div>
+  </section>
+
+  <section class="advanced-card">
+    <div class="section-heading"><div><p class="eyebrow">PERSONALIZAÇÃO</p><h2>🏰 Skins & Retratos</h2></div></div>
+    <div id="cosmetic-list" class="item-list"><p>Carregando catálogo…</p></div>
+    <p class="muted">A propriedade dos cosméticos continua vinculada ao inventário oficial do reino e à Loja Valhalla.</p>
+  </section>
+
+  <section class="advanced-card">
+    <div class="section-heading"><div><p class="eyebrow">DESEMPENHO</p><h2>✨ Preferências Visuais</h2></div></div>
+    <form id="visual-form" class="visual-settings">
+      <label><input type="checkbox" name="particles_enabled"> Partículas</label>
+      <label><input type="checkbox" name="screen_shake_enabled"> Tremor de tela</label>
+      <label><input type="checkbox" name="damage_numbers_enabled"> Números de dano</label>
+      <label><input type="checkbox" name="day_night_cycle_enabled"> Ciclo dia/noite</label>
+      <label><input type="checkbox" name="bloom_enabled"> Brilho de destaque</label>
+      <label>Qualidade<select name="quality_level"><option value="low">Baixa</option><option value="medium">Média</option><option value="high">Alta</option><option value="ultra">Ultra</option></select></label>
+      <button type="submit">Salvar preferências</button>
+    </form>
+  </section>
+
+  <section class="advanced-card ranking-card">
+    <div class="section-heading"><div><p class="eyebrow">MUNDO</p><h2>🌍 Ranking Global</h2></div></div>
+    <div id="ranking-list" class="ranking-list"><p>Carregando ranking…</p></div>
+  </section>
+</main>
+
+<footer class="advanced-footer">
+  <p>Os recursos, tempos, moedas e recompensas são confirmados no servidor. O navegador não pode definir níveis VIP, criar gemas ou alterar resultados de batalha.</p>
+</footer>
+<script src="/visual-effects.js" defer></script>
+<script src="/advanced-game-ui.js" defer></script>
+<script src="/navigation.js" defer></script>
+</body>
+</html>
