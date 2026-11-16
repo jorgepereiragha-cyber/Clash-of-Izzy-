@@ -122,6 +122,7 @@ export async function runProductionSmokeTests({
 
   for (const assetPath of [
     "/scripts/cinematic/capture-system.js",
+    "/scripts/cinematic/media-recorder-support.js",
     "/scripts/cinematic/trailer-script.js",
     "/scripts/cinematic/recorder-ui.js"
   ]) {
@@ -166,7 +167,7 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v21"), "Service worker não contém o cache v21 esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v22"), "Service worker não contém o cache v21 esperado.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
   assert(serviceWorker.includes("/admin.html"), "PWA não inclui o painel Master.");
@@ -177,6 +178,7 @@ export async function runProductionSmokeTests({
   assert(serviceWorker.includes("/valhalla-shop-ui.js"), "PWA não inclui a interface da Loja de Valhalla.");
   assert(serviceWorker.includes("/styles/valhalla-shop.css"), "PWA não inclui os estilos da Loja de Valhalla.");
   assert(serviceWorker.includes("/scripts/cinematic/capture-system.js"), "PWA não inclui o motor de captura cinematográfica.");
+  assert(serviceWorker.includes("/scripts/cinematic/media-recorder-support.js"), "PWA não inclui a negociação de codecs e proteção de memória.");
   assert(serviceWorker.includes("/scripts/cinematic/trailer-script.js"), "PWA não inclui o roteiro do trailer.");
   assert(serviceWorker.includes("/scripts/cinematic/recorder-ui.js"), "PWA não inclui a interface do gravador.");
 
