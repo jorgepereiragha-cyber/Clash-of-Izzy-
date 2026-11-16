@@ -141,9 +141,9 @@ test.describe("Mobile kingdom rendering", () => {
     await expect(construction).toBeVisible();
     await expect(construction.locator(".queue-remaining")).toContainText(/m/);
     await expect(construction.locator(".queue-progress span"))
-      .toHaveAttribute("style", /width:\\s*\\d+%/);
+      .toHaveAttribute("style", /width:\s*\d+%/);
     await expect(construction.locator('[role="progressbar"]'))
-      .toHaveAttribute("aria-valuenow", /\\d+/);
+      .toHaveAttribute("aria-valuenow", /\d+/);
 
     await expect(page.locator("#trainingForm")).toBeVisible();
     await expect(page.locator("#trainButton")).toBeEnabled();
