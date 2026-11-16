@@ -1847,7 +1847,7 @@ export default {
         const allowed=[
           "tech","tech/research","vip","speedups","speedups/use","tasks","tasks/claim",
           "mail","mail/claim","achievements","achievements/claim","ranking",
-          "formations","formations/save","mounts","mounts/equip","visuals","cosmetics"
+          "formations","formations/save","formation-choices","mounts","mounts/equip","visuals","cosmetics","queues"
         ];
         if(!allowed.includes(advancedPath))return json({error:"Recurso avançado não encontrado."},404);
         const method=request.method;
