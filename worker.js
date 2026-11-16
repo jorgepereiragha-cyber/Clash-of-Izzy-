@@ -454,8 +454,8 @@ async function resolvePvpMarch(env,march,attackerKingdomId,units,target){
     return;
   }
   const [attacker,defender,attackerTroops,defenderTroops,attackerBuildings,defenderBuildings,attackerHero,defenderHero,attackerDragon,defenderDragon,attackerMilitary,defenderMilitary,attackerDefense,defenderDefense]=await Promise.all([
-    env.DB.prepare("SELECT id,castle_level,protection_until FROM kingdoms WHERE id=?").bind(attackerKingdomId).first(),
-    env.DB.prepare("SELECT id,castle_level,protection_until,battle_token,wall_hp,wall_max_hp,defense_power FROM kingdoms WHERE id=?").bind(defenderId).first(),
+    env.DB.prepare("SELECT id,kingdom_name,castle_level,protection_until,map_region FROM kingdoms WHERE id=?").bind(attackerKingdomId).first(),
+    env.DB.prepare("SELECT id,kingdom_name,castle_level,protection_until,map_region,battle_token,wall_hp,wall_max_hp,defense_power FROM kingdoms WHERE id=?").bind(defenderId).first(),
     env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? ORDER BY tier,unit_type").bind(attackerKingdomId).all(),
     env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY tier,unit_type").bind(defenderId).all(),
     env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='hospital'").bind(attackerKingdomId).first(),
@@ -669,7 +669,7 @@ async function processMarches(env,kingdomId){
   ];
   if(m.march_type==="attack"){
    const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id,territory_kind FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
-   if(target?.territory_kind==="castle"&&target.owner_kingdom_id){await resolvePvpMarch(env,m,kingdomId,units,target);continue;}
+   if(target?.territory_kind==="castle"){await resolvePvpMarch(env,m,kingdomId,units,target);continue;}
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={},replayData={};
    if(target&&!target.owner_kingdom_id&&army.length){
