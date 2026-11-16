@@ -87,17 +87,19 @@ function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, met
   }
 }
 
-export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1 }) {
+export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, infantryAttackBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1 }) {
   const attackers = (army || [])
     .filter(row => Number(row.quantity) > 0)
     .map((row, index) => makeStack(row, "attacker", index));
   const defenseBonus = clamp(Number(defenseBonusPercent) || 0, 0, 30);
   const attackGearBonus = clamp(Number(equipmentAttackBonusPercent) || 0, 0, 30) / 100;
+  const infantryAttackBonus = clamp(Number(infantryAttackBonusPercent) || 0, 0, 30) / 100;
   const healthGearBonus = clamp(Number(equipmentHealthBonusPercent) || 0, 0, 30) / 100;
   const castlePowerBonus = clamp(Number(castlePowerBonusPercent ?? castleLevel) || 0, 0, 30) / 100;
   for (const stack of attackers) {
     stack.defenseBonusPercent = defenseBonus;
-    stack.power = stack.power * (1 + castlePowerBonus) * (1 + attackGearBonus);
+    const isInfantry = ["militia", "swordsman", "spearman"].includes(stack.key);
+    stack.power = stack.power * (1 + castlePowerBonus) * (1 + attackGearBonus) * (isInfantry ? (1 + infantryAttackBonus) : 1);
     stack.hpPerUnit = Math.floor(stack.hpPerUnit * (1 + castlePowerBonus) * (1 + healthGearBonus));
     stack.hp = stack.quantity * stack.hpPerUnit;
   }
