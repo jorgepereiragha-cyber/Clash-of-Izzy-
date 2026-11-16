@@ -9,7 +9,10 @@ const files = [
   "../world-map.js",
   "../equipment-system.js",
   "../scripts/kingdom-3d.js",
-  "../scripts/kingdom-quality.js",\n  "../scripts/cinematic/capture-system.js",\n  "../scripts/cinematic/trailer-script.js",\n  "../scripts/cinematic/recorder-ui.js",
+  "../scripts/kingdom-quality.js",
+  "../scripts/cinematic/capture-system.js",
+  "../scripts/cinematic/trailer-script.js",
+  "../scripts/cinematic/recorder-ui.js",
   "../engine/asset-loader.js",
   "../engine/resource-disposal.js",
   "../engine/texture-manager.js"
@@ -19,6 +22,7 @@ test("browser game modules parse before deployment", () => {
   for (const relative of files) {
     const path = fileURLToPath(new URL(relative, import.meta.url));
     const result = spawnSync(process.execPath, ["--check", path], { encoding: "utf8" });
-    assert.equal(result.status, 0, relative + " syntax error:\n" + result.stderr + result.stdout);
+    assert.equal(result.status, 0, relative + " syntax error:
+" + result.stderr + result.stdout);
   }
 });
