@@ -103,7 +103,7 @@ async function installApiFixtures(page) {
 }
 
 test.describe("Mobile kingdom rendering", () => {
-  test("renders resources, buildings, queues and troop controls on Pixel 5", async ({ page }) => {
+  test("renders resources, buildings, queues and troop controls on mobile", async ({ page }) => {
     const { stateRequests } = await installApiFixtures(page);
 
     await page.goto("/kingdom.html");
@@ -151,9 +151,9 @@ test.describe("Mobile kingdom rendering", () => {
 
     const construction = page.locator(".queue-card").filter({ hasText: "Construção" });
     await expect(construction).toBeVisible();
-    await expect(construction.locator(".queue-remaining")).toContainText(/m/);
+    await expect(construction.locator(".queue-remaining")).toHaveText(/\d+\s*[hms]/);
     await expect(construction.locator(".queue-progress span"))
-      .toHaveAttribute("style", /width:\s*\d+%/);
+      .toHaveAttribute("style", /width:\s*\d+(?:\.\d+)?%/);
     await expect(construction.locator('[role="progressbar"]'))
       .toHaveAttribute("aria-valuenow", /\d+/);
 
