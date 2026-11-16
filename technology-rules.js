@@ -37,7 +37,7 @@ export function calculateTechnologyBonuses(rows){
     }
   }
   for(const key of Object.keys(bonuses)){
-    bonuses[key]=clamp(bonuses[key],0,key==="wallDefensePercent"?30:50);
+    bonuses[key]=Math.round(clamp(bonuses[key],0,key==="wallDefensePercent"?30:50)*1e6)/1e6;
   }
   return bonuses;
 }
