@@ -65,7 +65,6 @@ function selectNode(node){
 }
 async function runNodeAction(action,node){
  if(busy)return;
- if(action!=="collect"&&action!=="recall"&&!askTroops())return;
  const troops=action==="collect"||action==="recall"?undefined:askTroops();
  if(action!=="collect"&&action!=="recall"&&!troops)return;
  busy=true;
@@ -89,10 +88,11 @@ function renderNodeList(){
   const ownership=make("p","resource-node-owner",node.occupied_by?"Ocupado":"Livre");
   card.append(head,info,ownership);
   const actions=make("div","resource-node-actions");
-  if(Number(node.occupied_by)>0){
-   // A API decide se o nó pertence ao reino autenticado.
+  if(node.is_mine){
    addAction(actions,"Coletar",()=>runNodeAction("collect",node),busy);
    addAction(actions,"Recolher tropas",()=>runNodeAction("recall",node),busy||Boolean(node.reserved_by_rally));
+  }else if(node.occupied_by){
+   addAction(actions,"Ocupado",()=>selectNode(node),true);
   }else{
    const locked=Boolean(node.reserved_by_rally);
    addAction(actions,inAlliance?"Criar rally":"Ocupar nó",()=>{
