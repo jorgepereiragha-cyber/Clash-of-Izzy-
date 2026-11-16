@@ -30,9 +30,9 @@ jobs:
         run: npm run assets:validate
       - name: Test gameplay rules and Worker-D1 integration
         run: npm test
-      - name: Install Playwright Chromium
+      - name: Install Playwright Chromium for mobile E2E
         run: npx playwright install --with-deps chromium
-      - name: Validate mobile kingdom UI in Chromium
+      - name: Validate mobile kingdom UI (Pixel 5 and Galaxy S8)
         run: npm run test:e2e
       - name: Archive Playwright diagnostics
         if: failure()
