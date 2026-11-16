@@ -6,7 +6,7 @@ const encoder = new TextEncoder();
 function toBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\\+/g, "-").replace(/\\//g, "_").replace(/=+$/g, "");
+  return btoa(binary).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function fromBase64Url(value) {
@@ -66,7 +66,7 @@ export async function verifyPasswordRecord(password, record) {
 function normalizeEmail(value) {
   const email = String(value || "").normalize("NFKC").trim().toLowerCase();
   if (!email) return { display: null, key: null };
-  if (email.length > 254 || !/^[^\\s@]+@[^\\s@]+\\.[^\\s@]{2,}$/u.test(email)) return null;
+  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/u.test(email)) return null;
   return { display: email, key: email };
 }
 
