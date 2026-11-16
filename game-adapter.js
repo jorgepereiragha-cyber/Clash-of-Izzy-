@@ -87,7 +87,7 @@ function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, met
   }
 }
 
-export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1 }) {
+export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, technologyBonuses = {}, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1 }) {
   const attackers = (army || [])
     .filter(row => Number(row.quantity) > 0)
     .map((row, index) => makeStack(row, "attacker", index));
@@ -97,7 +97,12 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   const castlePowerBonus = clamp(Number(castlePowerBonusPercent ?? castleLevel) || 0, 0, 30) / 100;
   for (const stack of attackers) {
     stack.defenseBonusPercent = defenseBonus;
-    stack.power = stack.power * (1 + castlePowerBonus) * (1 + attackGearBonus);
+    const infantry = ["militia","swordsman","spearman"].includes(stack.key);
+    const cavalry = ["cavalry","knight"].includes(stack.key);
+    const archer = ["archer","crossbowman"].includes(stack.key);
+    const technologyAttackPercent = Number(infantry ? technologyBonuses.infantryAttackPercent : cavalry ? technologyBonuses.cavalryAttackPercent : archer ? technologyBonuses.archerAttackPercent : 0) || 0;
+    const technologyAttackBonus = clamp(technologyAttackPercent, 0, 50) / 100;
+    stack.power = stack.power * (1 + castlePowerBonus) * (1 + attackGearBonus) * (1 + technologyAttackBonus);
     stack.hpPerUnit = Math.floor(stack.hpPerUnit * (1 + castlePowerBonus) * (1 + healthGearBonus));
     stack.hp = stack.quantity * stack.hpPerUnit;
   }
