@@ -253,7 +253,7 @@ test.describe("Mobile kingdom rendering", () => {
     await page.locator("#guestAccountNotice a").click();
 
     await expect(page).toHaveURL(/\/account\.html$/);
-    await expect(page.getByRole("heading", { name: "Conta do Comandante" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Proteja seu reino e acesse de outros dispositivos" })).toBeVisible();
   });
 
 });
