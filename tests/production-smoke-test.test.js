@@ -40,7 +40,7 @@ function successfulFetch() {
       "text/html; charset=utf-8"
     );
     if (path === "/manifest.json") return makeResponse({ name: "Clash of Izzy" });
-    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v21"; const CORE_ASSETS=["/styles/landing.css","/landing.js","/world-map-3d.js","/world-map-viewport.js","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/scripts/cinematic/capture-system.js","/scripts/cinematic/trailer-script.js","/scripts/cinematic/recorder-ui.js"];', 200, "text/javascript");
+    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v22"; const CORE_ASSETS=["/styles/landing.css","/landing.js","/world-map-3d.js","/world-map-viewport.js","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/scripts/cinematic/capture-system.js","/scripts/cinematic/media-recorder-support.js","/scripts/cinematic/trailer-script.js","/scripts/cinematic/recorder-ui.js"];', 200, "text/javascript");
     if (path === "/styles/landing.css") return makeResponse("body{color:#fff}.landing-hero{display:grid}", 200, "text/css");
     if (path === "/landing.js") return makeResponse("function showInstallGuide(){} fetch(\"/api/game/referral/link\")", 200, "text/javascript");
     if (path.startsWith("/scripts/cinematic/")) return makeResponse(("export class CinematicCapture {} export const TRAILER_SCRIPT = {};").repeat(12), 200, "text/javascript");
@@ -72,6 +72,7 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.ok(calls.includes("/world-map-viewport.js"));
   assert.ok(calls.includes("/world-map-3d.js"));
   assert.ok(calls.includes("/scripts/cinematic/capture-system.js"));
+  assert.ok(calls.includes("/scripts/cinematic/media-recorder-support.js"));
   assert.ok(calls.includes("/scripts/cinematic/trailer-script.js"));
   assert.ok(calls.includes("/scripts/cinematic/recorder-ui.js"));
   assert.ok(calls.includes("/styles/premium-ui.css"));
