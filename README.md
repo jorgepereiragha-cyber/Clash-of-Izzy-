@@ -139,3 +139,15 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - A busca em português expande formas comuns de singular/plural, remove diferenças de acentuação e mantém SQL parametrizado.
 - Reinos que já pertencem a alianças continuam pesquisáveis e exibem sua sigla pública; convites inválidos são bloqueados na interface.
 - O fallback é acionado por categoria quando um índice FTS falha, evitando que um índice parcialmente indisponível esconda resultados de outras categorias.
+
+
+## E-mail transacional verificado (migração 0017)
+- O projeto não possui `players.email`; os endereços ficam em `player_email_contacts`, ligados ao ID relacional `players.id`.
+- O jogador envia o endereço pela rota autenticada `POST /api/game/email/verification`. O sistema envia um link de confirmação com token aleatório, armazena apenas SHA-256 do token e expira o link em 30 minutos.
+- `GET /api/email/verify?token=...` confirma o endereço uma única vez. `GET/PUT /api/game/email/preferences` lê/altera preferências e `GET /api/game/email/history` retorna histórico sem expor o endereço completo.
+- Preferências para marketing, eventos e alertas começam desativadas. Mensagens opcionais exigem e-mail confirmado e consentimento da respectiva categoria. Mensagens transacionais, como recibo de compra, não usam o opt-in de marketing.
+- O Resend é o provedor inicial. O Worker processa até 10 itens da fila por minuto, com chave de idempotência, lease para recuperar execuções interrompidas e até três tentativas separadas por 15 minutos.
+- A aprovação de um pedido no painel Master tenta enfileirar o recibo sem interferir na liberação da compra caso o jogador ainda não tenha confirmado e-mail.
+- Configure `RESEND_API_KEY` como secret no Worker. Configure `EMAIL_FROM` e `FRONTEND_URL` como variáveis do Worker, usando um domínio remetente previamente verificado no Resend e a URL pública real do jogo. Não invente nem use um remetente de domínio não verificado.
+- A fila e o histórico não são marketing automatizado. Digest semanal, retorno de inativos e alertas de combate/evento ainda exigem integração explícita com as respectivas rotinas do jogo; não são considerados ativos nesta entrega.
+- A migração é `0017_verified_transactional_email.sql`; nunca edite migrações anteriores já aplicadas. Testes de contrato: `tests/email-system.test.js`.
