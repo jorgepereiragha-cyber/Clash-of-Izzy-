@@ -9,6 +9,7 @@ import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
+import { handleAdvancedGame, processDueKingdomTech } from "./advanced-game.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -256,9 +257,19 @@ async function ensureKingdom(env,playerId){
 }
 async function scaleKingdomQueueDurationSeconds(env,kingdomId,baseSeconds,queueType,valhallaMultipliers){
   const seasonal=scaleValhallaDurationSeconds(baseSeconds,valhallaMultipliers);
-  if(queueType!=="construction")return seasonal;
-  const buffs=await getValhallaBuffMultipliers(env,kingdomId);
-  return Math.max(10,Math.floor(seasonal/Math.max(1,buffs.buildSpeed)));
+  const [buffs,vip]=await Promise.all([
+    getValhallaBuffMultipliers(env,kingdomId),
+    env.DB.prepare(
+      "SELECT b.build_speed_bonus,b.train_speed_bonus,b.research_speed_bonus " +
+      "FROM kingdoms k JOIN player_vip v ON v.player_id=k.player_id " +
+      "JOIN vip_benefits b ON b.vip_level=v.vip_level WHERE k.id=?"
+    ).bind(kingdomId).first()
+  ]);
+  const seasonalSpeed=queueType==="construction"?Number(buffs.buildSpeed||1):1;
+  const vipSpeed=queueType==="construction"?Number(vip?.build_speed_bonus||0):
+    queueType==="training"?Number(vip?.train_speed_bonus||0):
+    queueType==="research"?Number(vip?.research_speed_bonus||0):0;
+  return Math.max(10,Math.floor(seasonal/Math.max(1,seasonalSpeed)/(1+Math.max(0,vipSpeed))));
 }
 async function applyProduction(env,kingdomId){
   const row=await env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdomId).first();
@@ -275,6 +286,13 @@ async function applyProduction(env,kingdomId){
     iron:2*(levels.iron_mine||1),
     gold:1.5*(levels.market||1)
   };
+  const techRows=await env.DB.prepare(
+    "SELECT tech_id,level FROM kingdom_tech WHERE kingdom_id=?"
+  ).bind(kingdomId).all();
+  const techLevels=Object.fromEntries((techRows.results||[]).map(item=>[item.tech_id,Number(item.level||0)]));
+  perHour.food*=1+Math.min(1,techLevels.agriculture*0.10);
+  perHour.stone*=1+Math.min(1,techLevels.mining*0.10);
+  perHour.wood*=1+Math.min(1,techLevels.lumberjack*0.10);
   await ensureEquipmentTables(env,kingdomId);
   const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first();
   const [equippedRows,gearResearchRows]=await Promise.all([
@@ -282,9 +300,14 @@ async function applyProduction(env,kingdomId){
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
   ]);
   const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).resourcePercent/100;
-  const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
-  const [valhallaMultipliers,valhallaBuffs]=await Promise.all([
-    getValhallaMultipliers(env),getValhallaBuffMultipliers(env,kingdomId)
+  const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus)*(1+Math.max(0,Number(vipProduction?.resource_bonus||0)));
+  const [valhallaMultipliers,valhallaBuffs,vipProduction]=await Promise.all([
+    getValhallaMultipliers(env),
+    getValhallaBuffMultipliers(env,kingdomId),
+    env.DB.prepare(
+      "SELECT b.resource_bonus FROM kingdoms k JOIN player_vip v ON v.player_id=k.player_id " +
+      "JOIN vip_benefits b ON b.vip_level=v.vip_level WHERE k.id=?"
+    ).bind(kingdomId).first()
   ]);
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
@@ -1352,6 +1375,8 @@ export default {
   await processDueMarches(env);
   try{await processDueRallies(env);}
   catch(error){console.error("scheduled_rally_resolution_failed",String(error?.message||error));}
+  try{await processDueKingdomTech(env);}
+  catch(error){console.error("scheduled_kingdom_tech_failed",String(error?.message||error));}
   try{await processAngelDeathEventLifecycle(env);}
   catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
   try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();}
@@ -1367,7 +1392,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET),hasEmailProvider:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.FRONTEND_URL),hasResendApiKey:Boolean(env.RESEND_API_KEY),hasEmailFrom:Boolean(env.EMAIL_FROM),hasFrontendUrl:Boolean(env.FRONTEND_URL)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog",player_visual_settings","visual_effects_log","player_vip","vip_benefits","player_speedups","daily_tasks","player_task_progress","player_mail","achievements","player_achievements","troop_formations","mount_catalog","player_mounts","city_skin_catalog","portrait_catalog",
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1796,6 +1821,33 @@ export default {
         const ip=request.headers.get("CF-Connecting-IP")||"unknown";
         const networkLimit=await rateLimitDecision(env,"game-action-network",ip,600,60);
         if(networkLimit)return networkLimit;
+      }
+      if(url.pathname.startsWith("/api/game/advanced/")){
+        const advancedPath=url.pathname.slice("/api/game/advanced/".length);
+        const allowed=[
+          "tech","tech/research","vip","speedups","speedups/use","tasks","tasks/claim",
+          "mail","mail/claim","achievements","achievements/claim","ranking",
+          "formations","formations/save","mounts","mounts/equip","visuals","cosmetics"
+        ];
+        if(!allowed.includes(advancedPath))return json({error:"Recurso avançado não encontrado."},404);
+        const method=request.method;
+        if(!["GET","POST","PUT"].includes(method))return json({error:"Método não permitido."},405);
+        if(method==="GET"&&advancedPath.includes("/"))return json({error:"Método não permitido."},405);
+        if(method==="PUT"&&advancedPath!=="visuals")return json({error:"Método não permitido."},405);
+        if(method==="POST"&&["visuals","tech","vip","speedups","tasks","mail","achievements","ranking","formations","mounts","cosmetics"].includes(advancedPath))return json({error:"Método não permitido."},405);
+        const write=method!=="GET";
+        const limited=await rateLimitDecision(env,write?"advanced-write-player":"advanced-read-player",playerId,write?30:120,60);
+        if(limited)return limited;
+        if(write){
+          const networkLimit=await rateLimitDecision(env,"advanced-write-network",request.headers.get("CF-Connecting-IP")||"unknown",120,60);
+          if(networkLimit)return networkLimit;
+        }
+        let advancedBody={};
+        if(write){
+          advancedBody=await readBody(request,8192);
+          if(advancedBody.__bodyError)return json({error:"Solicitação avançada inválida."},advancedBody.__bodyError==="payload_too_large"?413:400);
+        }
+        return await handleAdvancedGame(request,env,playerId,advancedPath,advancedBody);
       }
       if(url.pathname.startsWith("/api/game/rally/")){
         const rallyPath=url.pathname.slice("/api/game/rally/".length);
