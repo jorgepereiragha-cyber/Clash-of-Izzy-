@@ -34,6 +34,13 @@ export default defineConfig({
         browserName: "chromium",
       },
     },
+    {
+      name: "chromium-galaxy-s8",
+      use: {
+        ...devices["Galaxy S8"],
+        browserName: "chromium",
+      },
+    },
   ],
   webServer: externalBaseUrl ? undefined : {
     command: [
