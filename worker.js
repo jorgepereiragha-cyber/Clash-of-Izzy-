@@ -333,7 +333,7 @@ async function processMarches(env,kingdomId){
   if(m.march_type==="attack"){
    const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
-   let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={};
+   let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={},activeSkill=null;
    if(target&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
@@ -348,7 +348,7 @@ async function processMarches(env,kingdomId){
     ]);
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
     const valhallaBuffs=await getValhallaBuffMultipliers(env,kingdomId);
-    const activeSkill=m.hero_skill_key&&getHeroActiveSkill(m.hero_key)?.key===m.hero_skill_key?getHeroActiveSkill(m.hero_key):null;
+    activeSkill=m.hero_skill_key&&getHeroActiveSkill(m.hero_key)?.key===m.hero_skill_key?getHeroActiveSkill(m.hero_key):null;
     const skillEffects=activeSkill?.effects||{};
     const castleLevel=Number(kingdom?.castle_level||1);
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
