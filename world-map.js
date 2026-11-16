@@ -24,6 +24,7 @@ const UNIT_NAMES = {
 let state = null;
 let selectedTerritoryId = null;
 let selectedUnits = {};
+let selectedHeroSkillValue = "";
 let busy = false;
 let mapViewport = { zoom: 1, panX: 0, panY: 0 };
 let mapPointer = null;
@@ -179,13 +180,41 @@ function renderTroops() {
   }
   updateActionButtons();
 }
+function renderHeroSkillOptions() {
+  const select = $("heroSkillSelection");
+  if (!select) return;
+  const previous = selectedHeroSkillValue || select.value;
+  select.replaceChildren();
+  const empty = make("option", "", "Ataque sem habilidade ativa");
+  empty.value = "";
+  select.append(empty);
+  let preserved = false;
+  const now = Math.floor(Date.now() / 1000);
+  for (const hero of state?.heroInventory || []) {
+    const skill = hero.active_skill;
+    if (!skill?.key) continue;
+    const cooldownUntil = Number(skill.cooldown_until || 0);
+    const ready = cooldownUntil <= now;
+    const option = make("option", "", (hero.name || hero.hero_name || hero.hero_key) + " — " + skill.name + (ready ? " · Disponível" : " · Em recarga (" + Math.max(1, cooldownUntil - now) + "s)"));
+    option.value = hero.hero_key + "|" + skill.key;
+    option.disabled = !ready;
+    if (option.value === previous && ready) preserved = true;
+    select.append(option);
+  }
+  selectedHeroSkillValue = preserved ? previous : "";
+  select.value = selectedHeroSkillValue;
+  const territory = getSelectedTerritory();
+  select.disabled = busy || !territory || Boolean(territory.owner_kingdom_id);
+}
 function updateActionButtons() {
   const territory = getSelectedTerritory();
   const hasTroops = Object.values(selectedUnits).some(quantity => Number(quantity) > 0);
-  const canVisit = Boolean(territory && territoryOwner(territory) !== "Outro reino");
-  $("gather").disabled = busy || !canVisit || !hasTroops;
-  $("scout").disabled = busy || !canVisit || !hasTroops;
+  const enemy = Boolean(territory && territoryOwner(territory) === "Outro reino");
+  $("gather").disabled = busy || !territory || enemy || !hasTroops;
+  $("scout").disabled = busy || !territory || !hasTroops;
   $("attack").disabled = busy || !territory || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  const skillSelect = $("heroSkillSelection");
+  if (skillSelect) skillSelect.disabled = busy || !territory || Boolean(territory.owner_kingdom_id);
 }
 function renderDetails() {
   const root = $("territoryDetails");
@@ -208,9 +237,10 @@ function renderDetails() {
   addStat(grid, "Nível", fmt(territory.level || 1));
   root.append(grid);
   $("marchNotice").textContent = territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
-    ? "Este território pertence a outro jogador. Ações PvP ainda não estão habilitadas."
-    : "Escolha as tropas e uma ação. O servidor confirma custos, disponibilidade e resultado.";
+    ? "Território inimigo: Espionar envia uma marcha de reconhecimento e gera um relatório privado. Ataques PvP continuam bloqueados."
+    : "Escolha tropas e uma ação. A espionagem revela dados de reinos inimigos; conquistas seguem limitadas a territórios neutros.";
   renderTroops();
+  renderHeroSkillOptions();
 }
 function renderMarches() {
   const root = $("marches");
@@ -223,9 +253,40 @@ function renderMarches() {
   const territories = new Map((state.territories || []).map(item => [Number(item.id), item.name]));
   for (const march of marches.slice(0, 10)) {
     const card = make("div", "march");
-    const title = make("strong", "", (march.march_type || "Marcha").toUpperCase() + " · " + (territories.get(Number(march.target_territory_id)) || "Território"));
+    const typeLabel = march.march_type === "scout" ? "ESPIONAGEM" : (march.march_type || "Marcha").toUpperCase();
+    const title = make("strong", "", typeLabel + " · " + (territories.get(Number(march.target_territory_id)) || "Território"));
     const date = march.arrives_at ? new Date(march.arrives_at).toLocaleString("pt-BR") : "—";
     card.append(title, make("div", "muted", "Estado: " + march.status), make("div", "muted", "Chegada prevista: " + date));
+    root.append(card);
+  }
+}
+function renderSpyReports() {
+  const root = $("spyReports");
+  if (!root) return;
+  root.replaceChildren();
+  const reports = state?.spyReports || [];
+  if (!reports.length) {
+    root.append(make("div", "muted", "Nenhum relatório disponível. Espione um território de outro reino para revelar recursos, tropas, heróis e pesquisas."));
+    return;
+  }
+  for (const entry of reports) {
+    const report = entry.report || {};
+    const kingdom = report.kingdom || {};
+    const resources = report.resources || {};
+    const card = make("article", "spy-report");
+    const heading = make("strong", "", "🕵️ " + (kingdom.name || "Reino não identificado") + " · " + (report.territory?.name || "Território"));
+    const scannedAt = entry.created_at ? new Date(entry.created_at * 1000).toLocaleString("pt-BR") : "—";
+    const summary = make("div", "muted", "Castelo " + fmt(kingdom.castle_level) + " · Poder " + fmt(kingdom.power) + " · " + scannedAt);
+    const resourceLine = make("div", "spy-report-detail", "🌾 " + fmt(resources.food) + " · 🪵 " + fmt(resources.wood) + " · 🪨 " + fmt(resources.stone) + " · ⛓️ " + fmt(resources.iron) + " · 🪙 " + fmt(resources.gold));
+    const troops = (report.troops || []).slice(0, 5).map(unit => unit.unit_type + ": " + fmt(unit.quantity)).join(" · ") || "Sem tropas identificadas";
+    const troopLine = make("div", "spy-report-detail", "⚔️ " + troops);
+    const heroes = (report.heroes || []).slice(0, 4).map(hero => (hero.name || hero.hero_key) + " Nv. " + fmt(hero.level)).join(" · ") || "Nenhum herói identificado";
+    const heroLine = make("div", "spy-report-detail", "🛡️ " + heroes);
+    const research = (report.research || []).slice(0, 4).map(item => item.research_key + " Nv. " + fmt(item.level)).join(" · ") || "Sem pesquisas identificadas";
+    const researchLine = make("div", "spy-report-detail", "🔬 " + research);
+    const alliance = report.alliance ? " · Aliança " + report.alliance.name + " [" + report.alliance.tag + "]" : "";
+    const allianceLine = make("div", "muted", alliance || "Sem aliança identificada");
+    card.append(heading, summary, resourceLine, troopLine, heroLine, researchLine, allianceLine);
     root.append(card);
   }
 }
@@ -234,6 +295,7 @@ function render() {
   renderMap();
   renderDetails();
   renderMarches();
+  renderSpyReports();
 }
 async function refreshState() {
   const response = await request("/game/state");
@@ -260,10 +322,15 @@ async function sendMarch(marchType) {
   updateActionButtons();
   $("marchNotice").textContent = "Enviando ordem de marcha ao servidor…";
   try {
+    const payload = { type: "march", targetId: territory.id, marchType, units };
+    if (marchType === "attack" && selectedHeroSkillValue) {
+      const [heroKey, heroSkillKey] = selectedHeroSkillValue.split("|");
+      if (heroKey && heroSkillKey) Object.assign(payload, { heroKey, heroSkillKey });
+    }
     const result = await request("/game/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "march", targetId: territory.id, marchType, units }),
+      body: JSON.stringify(payload),
     });
     selectedUnits = {};
     await refreshState();
@@ -280,6 +347,9 @@ async function sendMarch(marchType) {
 $("gather").addEventListener("click", () => sendMarch("gather"));
 $("scout").addEventListener("click", () => sendMarch("scout"));
 $("attack").addEventListener("click", () => sendMarch("attack"));
+$("heroSkillSelection").addEventListener("change", event => {
+  selectedHeroSkillValue = event.currentTarget.value;
+});
 $("zoomIn").addEventListener("click", () => changeMapZoom(0.25));
 $("zoomOut").addEventListener("click", () => changeMapZoom(-0.25));
 $("mapReset").addEventListener("click", resetMapViewport);
