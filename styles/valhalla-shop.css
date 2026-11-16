@@ -1,5 +1,6 @@
 body.valhalla-mode-active{background-image:radial-gradient(ellipse at 50% -20%,#49326a,#171327 56%,#080d18)}
 body.valhalla-mode-active header{border-bottom-color:#9b59b6;box-shadow:0 4px 22px #9b59b633}
+body.valhalla-mode-active #valhalla-shop-btn:not([hidden]){display:flex}
 #valhalla-shop-btn{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:calc(88px + env(safe-area-inset-bottom));z-index:1200;display:none;align-items:center;gap:9px;min-height:48px;padding:11px 16px;border:1px solid #f6d77f;border-radius:13px;background:linear-gradient(135deg,#7544a1,#2c2445);color:#ffe69b;font:800 14px/1.1 system-ui,sans-serif;box-shadow:0 8px 28px #0009,0 0 22px #a76de966;cursor:pointer}
 #valhalla-shop-btn[hidden]{display:none}
 #valhalla-shop-btn .va-rune{font-size:21px;filter:drop-shadow(0 0 6px #f5ce66)}
