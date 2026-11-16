@@ -1,0 +1,26 @@
+.rally-panel{display:grid;gap:14px;margin-top:14px}
+.rally-panel h2{margin:0 0 10px;color:#ffe2a0;font-size:17px}
+.rally-section{background:#0e1a2a;border:1px solid #40556b;border-radius:9px;padding:12px}
+.rally-status{min-height:18px;margin:0 0 10px;color:#a9dcba;font-size:12px}
+.rally-status.error{color:#ffb4a9}
+.rally-active-list,.resource-node-list{display:grid;gap:8px}
+.resource-node-list{max-height:420px;overflow:auto;padding-right:4px}
+.rally-card,.resource-node-card{background:#152943;border:1px solid #52677d;border-radius:8px;padding:10px}
+.rally-heading,.resource-node-heading{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.rally-heading strong,.resource-node-heading strong{color:#ffe2a0;font-size:12px}
+.rally-heading span,.resource-node-heading span{font-size:10px;color:#c6d5e5}
+.rally-card p,.resource-node-card p{margin:6px 0;color:#c6d5e5;font-size:11px}
+.rally-state{padding:3px 7px;border-radius:10px;background:#5b4825;color:#ffe2a0!important}
+.rally-empty{margin:0;color:#aebdce;font-size:12px}
+.resource-node-owner{color:#9cd7a9!important}
+.resource-node-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+.rally-action{padding:6px 9px;background:linear-gradient(#78502e,#51351f);border:1px solid #c69d56;color:#fff1cb;border-radius:6px;font-size:10px;font-weight:800}
+.rally-action:disabled{opacity:.45}
+.resource-node-pin{position:absolute;z-index:4;transform:translate(-50%,-50%);width:22px;height:22px;min-height:22px;padding:0;border-radius:50%;display:grid;place-items:center;background:#14243aee;border:1px solid #ffe2a0;box-shadow:0 2px 6px #0009;font-size:12px;line-height:1}
+.resource-node-pin.occupied{border-color:#8ee0a6;background:#17452de8}
+.resource-node-pin.selected{outline:2px solid #fff2b5;outline-offset:2px}
+.resource-node-card.selected{border-color:#ffe2a0}
+#selected-node-title{color:#ffe2a0;font-weight:800}
+#selected-node-details{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;color:#c6d5e5;font-size:11px}
+#selected-node-details span{background:#152943;border:1px solid #40556b;border-radius:6px;padding:5px 7px}
+@media(max-width:500px){.resource-node-actions .rally-action{flex:1 1 42%}.resource-node-pin{width:20px;height:20px;min-height:20px;font-size:11px}}
