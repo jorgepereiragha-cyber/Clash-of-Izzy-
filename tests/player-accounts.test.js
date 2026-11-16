@@ -4,6 +4,7 @@ import { webcrypto } from "node:crypto";
 import {
   createPasswordRecord,
   derivePasswordHash,
+  maskAccountEmail,
   validateAccountUsername,
   verifyPasswordRecord
 } from "../player-accounts.js";
@@ -17,6 +18,14 @@ test("player accounts validate usernames without accepting ambiguous or unsafe i
   });
   for (const invalid of ["ab", "contains spaces", "with/slash", "with@symbol", ""]) {
     assert.equal(validateAccountUsername(invalid), null);
+  }
+});
+
+test("email masking preserves the domain without exposing the local part", () => {
+  assert.equal(maskAccountEmail("jose.silva.privado@example.com"), "j***@example.com");
+  assert.equal(maskAccountEmail("a@example.com"), "a***@example.com");
+  for (const invalid of [null, undefined, "", "not-an-email", "@example.com", "name@@example.com", "name@"]) {
+    assert.equal(maskAccountEmail(invalid), null);
   }
 });
 
@@ -39,8 +48,12 @@ test("password derivation rejects weak or oversized passwords", async () => {
 test("account routes bind credentials to existing public player identity and version sessions", async () => {
   const { readFile } = await import("node:fs/promises");
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const accountRoutes = await readFile(new URL("../player-accounts.js", import.meta.url), "utf8");
   const migration = await readFile(new URL("../migrations/0024_player_accounts_mercadopago_orders.sql", import.meta.url), "utf8");
   assert.match(worker, /handlePlayerAccountRoute/);
+  assert.match(accountRoutes, /emailMasked: maskAccountEmail\(account\.email\)/);
+  assert.match(accountRoutes, /emailMasked: maskAccountEmail\(email\.display\)/);
+  assert.doesNotMatch(accountRoutes, /email:\s*(?:account\.email|email\.display)/);
   assert.match(worker, /account\.session_version/);
   assert.match(worker, /Number\(p\.av\)!==Number\(account\.session_version\)/);
   assert.match(migration, /player_id INTEGER NOT NULL UNIQUE REFERENCES players\(id\)/);
