@@ -217,7 +217,15 @@ SELECT k.id, t.id, s.march_type, s.units_json, 'completed',
 FROM seed s
 JOIN players p ON p.player_id=s.player_key
 JOIN kingdoms k ON k.player_id=p.id
-JOIN world_territories t ON t.territory_key=s.territory_key;
+JOIN world_territories t ON t.territory_key=s.territory_key
+WHERE NOT EXISTS (
+  SELECT 1 FROM marches existing
+  WHERE existing.kingdom_id=k.id
+    AND existing.target_territory_id=t.id
+    AND existing.march_type=s.march_type
+    AND existing.units_json=s.units_json
+    AND existing.status='completed'
+);
 
 INSERT OR IGNORE INTO battle_reports
 (attacker_kingdom_id, defender_kingdom_id, territory_id, winner_kingdom_id, battle_type, attacker_power, defender_power, losses_json, rewards_json, battle_log)
@@ -229,7 +237,14 @@ JOIN kingdoms attacker ON attacker.player_id=pa.id
 JOIN players pd ON pd.player_id='coi-local-seed-04'
 JOIN kingdoms defender ON defender.player_id=pd.id
 JOIN world_territories t ON t.territory_key='coi-local-seed-t04'
-WHERE pa.player_id='coi-local-seed-01';
+WHERE pa.player_id='coi-local-seed-01'
+  AND NOT EXISTS (
+    SELECT 1 FROM battle_reports existing
+    WHERE existing.battle_type='seed_local_demo'
+      AND existing.attacker_kingdom_id=attacker.id
+      AND existing.defender_kingdom_id=defender.id
+      AND existing.territory_id=t.id
+  );
 
 INSERT OR IGNORE INTO battle_reports
 (attacker_kingdom_id, defender_kingdom_id, territory_id, winner_kingdom_id, battle_type, attacker_power, defender_power, losses_json, rewards_json, battle_log)
@@ -241,12 +256,25 @@ JOIN kingdoms attacker ON attacker.player_id=pa.id
 JOIN players pd ON pd.player_id='coi-local-seed-03'
 JOIN kingdoms defender ON defender.player_id=pd.id
 JOIN world_territories t ON t.territory_key='coi-local-seed-t05'
-WHERE pa.player_id='coi-local-seed-06';
+WHERE pa.player_id='coi-local-seed-06'
+  AND NOT EXISTS (
+    SELECT 1 FROM battle_reports existing
+    WHERE existing.battle_type='seed_local_demo'
+      AND existing.attacker_kingdom_id=attacker.id
+      AND existing.defender_kingdom_id=defender.id
+      AND existing.territory_id=t.id
+  );
 
 INSERT OR IGNORE INTO kingdom_events (kingdom_id, event_type, payload_json)
 SELECT k.id, 'local_seed_fixture', '{"source":"scripts/seed-local.sql","notice":"Dados fictícios de desenvolvimento; sem efeito econômico real."}'
 FROM players p JOIN kingdoms k ON k.player_id=p.id
-WHERE p.player_id LIKE 'coi-local-seed-%';
+WHERE p.player_id LIKE 'coi-local-seed-%'
+  AND NOT EXISTS (
+    SELECT 1 FROM kingdom_events existing
+    WHERE existing.kingdom_id=k.id
+      AND existing.event_type='local_seed_fixture'
+      AND existing.payload_json='{"source":"scripts/seed-local.sql","notice":"Dados fictícios de desenvolvimento; sem efeito econômico real."}'
+  );
 
 INSERT OR IGNORE INTO kingdom_cosmetic_wallet (kingdom_id, shards)
 SELECT id, 150 FROM kingdoms
