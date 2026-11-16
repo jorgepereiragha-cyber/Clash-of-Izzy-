@@ -63,6 +63,14 @@ class TrailerRecorderUI {
         <p class="coi-recorder-footnote">A captura usa o mapa 3D do reino. Quando disponível, o navegador tenta manter a tela acesa durante a gravação; mantenha o PWA em primeiro plano, pois o sistema pode suspender a página ao sair do app ou bloquear a tela. A taxa de quadros depende do dispositivo. A gravação é mantida temporariamente na memória; durações longas podem ser bloqueadas em celulares para evitar falta de memória.</p>
       </div>
     `;
+    const compactMobile = window.matchMedia?.("(max-width: 760px)")?.matches === true;
+    if (compactMobile) {
+      const body = this.panel.querySelector("#coi-recorder-body");
+      const toggle = this.panel.querySelector("#coi-recorder-toggle");
+      body.hidden = true;
+      toggle.setAttribute("aria-expanded", "false");
+      toggle.textContent = "+";
+    }
     document.body.append(this.panel);
   }
 
