@@ -9,6 +9,8 @@ import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
+import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
+import { getBattleReplay } from "./battle-replay.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -248,7 +250,8 @@ async function ensureKingdom(env,playerId){
     await env.DB.batch([
       ...buildingRows,...unitRows,
       env.DB.prepare("INSERT OR IGNORE INTO heroes(kingdom_id,hero_key,hero_name,rarity) VALUES(?,?,?,?)").bind(id,"kael_sunwarden","Kael, Guardião do Sol","rare"),
-      env.DB.prepare("INSERT OR IGNORE INTO dragons(kingdom_id,dragon_key,dragon_name) VALUES(?,?,?)").bind(id,"ember_wyrm","Brasa")
+      env.DB.prepare("INSERT OR IGNORE INTO dragons(kingdom_id,dragon_key,dragon_name) VALUES(?,?,?)").bind(id,"ember_wyrm","Brasa"),
+      env.DB.prepare("INSERT OR IGNORE INTO kingdom_pets(kingdom_id,pet_id,level,experience,is_active) SELECT ?,'pet_raven',1,0,1 WHERE EXISTS(SELECT 1 FROM pet_catalog WHERE id='pet_raven' AND active=1)").bind(id)
     ]);
     k={id};
   }
@@ -283,14 +286,14 @@ async function applyProduction(env,kingdomId){
   ]);
   const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).resourcePercent/100;
   const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
-  const [valhallaMultipliers,valhallaBuffs]=await Promise.all([
-    getValhallaMultipliers(env),getValhallaBuffMultipliers(env,kingdomId)
+  const [valhallaMultipliers,valhallaBuffs,petBonuses]=await Promise.all([
+    getValhallaMultipliers(env),getValhallaBuffMultipliers(env,kingdomId),getPetBonuses(env,kingdomId)
   ]);
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
   const gains={},nextRemainders={};
   for(const [key,rate] of Object.entries(perHour)){
-    const accumulated=rate*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
+    const accumulated=rate*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*petBonuses.resourceProductionMultiplier*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
     gains[key]=Math.floor(accumulated/3600);
     nextRemainders[key]=accumulated-gains[key]*3600;
   }
@@ -332,7 +335,7 @@ async function processMarches(env,kingdomId){
   if(m.march_type==="attack"){
    const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
-   let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={};
+   let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={},replayData={};
    if(target&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
@@ -346,9 +349,10 @@ async function processMarches(env,kingdomId){
      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
     ]);
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
-    const valhallaBuffs=await getValhallaBuffMultipliers(env,kingdomId);
+    const [valhallaBuffs,petBonuses]=await Promise.all([getValhallaBuffMultipliers(env,kingdomId),getPetBonuses(env,kingdomId)]);
     const castleLevel=Number(kingdom?.castle_level||1);
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
+    const battleRoll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const simulation=simulateBattle({
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
@@ -356,14 +360,17 @@ async function processMarches(env,kingdomId){
      defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
      equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
      equipmentHealthBonusPercent:gear.healthPercent,
+     infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
      criticalChancePercent:gear.criticalChancePercent,
      criticalDamageMultiplier:1.5,
      criticalSeed,
      castlePowerBonusPercent:Math.min(30,Math.max(0,castleLevel)),
-     roll:.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30
+     roll:battleRoll
     });
     simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
-    losses=simulation.losses||{};battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
+    losses=simulation.losses||{};
+    replayData={version:1,mode:"territory_pve",seed:{criticalSeed,roll:battleRoll},participants:{attacker:{kingdom_id:kingdomId,army:army.map(unit=>({...unit}))},defender:{territory_id:target.id,level:Math.max(1,Math.min(30,Number(target.level)||1))}},modifiers:{equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent},pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses:simulation.losses||{}},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
+    battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,pet:petBonuses,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
     for(const u of army)survivors[u.unit_type]=u.quantity;
    }else{
     for(const u of army)survivors[u.unit_type]=u.quantity;
@@ -371,8 +378,8 @@ async function processMarches(env,kingdomId){
    }
    // A captura é condicional e imediatamente seguida pelo relatório, que lê changes() da captura.
    statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
-   statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,? WHERE "+guard)
-    .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits:simulation.criticalHits||0}),JSON.stringify({territoryCaptured:false,criticalHits:simulation.criticalHits||0}),JSON.stringify(battleLog),m.id,kingdomId,resolutionToken));
+   statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log,replay_json) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,?,? WHERE "+guard)
+    .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits:simulation.criticalHits||0}),JSON.stringify({territoryCaptured:false,criticalHits:simulation.criticalHits||0}),JSON.stringify(battleLog),JSON.stringify(replayData),m.id,kingdomId,resolutionToken));
    // Uma pequena recompensa de material acompanha cada conquista válida.
    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE EXISTS(SELECT 1 FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? AND winner_kingdom_id=? ORDER BY id DESC LIMIT 1) AND "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1")
     .bind(kingdomId,"power_crystal",kingdomId,m.target_territory_id,kingdomId,m.id,kingdomId,resolutionToken));
@@ -504,7 +511,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdom.id).all(),
     env.DB.prepare("SELECT id,name,terrain,x,z,resource_type,resource_rate,owner_kingdom_id,alliance_id,level FROM world_territories ORDER BY id").all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at FROM battle_reports WHERE attacker_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
+    env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at,CASE WHEN replay_expires_at>unixepoch() AND replay_json<>'{}' THEN 1 ELSE 0 END AS has_replay FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id).all(),
     env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key").bind(kingdom.id).all(),
     env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
     env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id).all()
@@ -538,7 +545,8 @@ async function gameState(env,playerId){
   const activeHeroId=Number((heroes.results||[]).find(hero=>hero.hero_key===activeHeroKey)?.id||0);
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
-  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops};
+  const petState=await getPetsState(env,kingdom.id);
+  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -1039,7 +1047,9 @@ async function gameAction(env,playerId,body){
       activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,activeHero.id).all():Promise.resolve({results:[]}),
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
     ]);
-    const marchBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).marchSpeedPercent;
+    const equipmentMarchBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).marchSpeedPercent;
+    const petBonuses=await getPetBonuses(env,k.id);
+    const marchBonus=equipmentMarchBonus+petBonuses.marchSpeedPercent;
     const seconds=calculateMarchDuration(baseSeconds,marchBonus);
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
@@ -1070,7 +1080,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
     ]);
     const gear=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]);
-    const valhallaBuffs=await getValhallaBuffMultipliers(env,k.id);
+    const [valhallaBuffs,petBonuses]=await Promise.all([getValhallaBuffMultipliers(env,k.id),getPetBonuses(env,k.id)]);
     const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)+gear.defensePercent));
     const roll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
@@ -1079,6 +1089,7 @@ async function gameAction(env,playerId,body){
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
       equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),equipmentHealthBonusPercent:gear.healthPercent,
+      infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
       criticalChancePercent:gear.criticalChancePercent,criticalDamageMultiplier:1.5,
       criticalSeed,
       castlePowerBonusPercent:Math.min(30,Math.max(0,Number(k.castle_level||1))),roll
@@ -1092,6 +1103,7 @@ async function gameAction(env,playerId,body){
       snapshot[unit.unit_type+"_"+unit.tier]={quantity:unit.quantity,loss:lost};
     }
     const snapshotJson=JSON.stringify(snapshot),expectedRows=armyRows.length;
+    const replayData={version:1,mode:"pve",seed:{criticalSeed,roll},participants:{attacker:{kingdom_id:k.id,army:armyRows.map(unit=>({...unit}))},defender:{type:"pve",castle_level:Number(k.castle_level||1)}},modifiers:{equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent},valhalla:{attack_power:valhallaBuffs.attackPower},pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won,rounds:simulation.rounds,attacker_power:attackerPower,defender_power:defenderPower,losses},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
     const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID(),actionId=crypto.randomUUID();
     const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const battleLock=env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,k.id,previousBattleToken);
@@ -1106,8 +1118,9 @@ async function gameAction(env,playerId,body){
       statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+500,wood=wood+300,stone=stone+200,gold=gold+100 WHERE id=? AND "+guard).bind(k.id,k.id,actionId));
       statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(k.id,"royal_blueprint",k.id,actionId));
     }
-    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log) SELECT ?,?,?,?,?,?,?,? WHERE "+guard)
-      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent},{event:"combat_simulated",rounds:simulation.rounds,criticalHits:simulation.criticalHits||0,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}]),k.id,actionId));
+    const battleReportIndex=statements.length;
+    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log,replay_json) SELECT ?,?,?,?,?,?,?,?,? WHERE "+guard)
+      .bind(k.id,won?k.id:null,"pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify([{event:"battle_started"},{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,pet:petBonuses},{event:"combat_simulated",rounds:simulation.rounds,criticalHits:simulation.criticalHits||0,log:simulation.log},{event:won?"victory":"defeat"},{attackerPower,defenderPower}]),JSON.stringify(replayData),k.id,actionId));
     if(won){
       const ledgerRows=Object.entries(rewards).filter(([,amount])=>amount>0);
       if(ledgerRows.length)statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+ledgerRows.map(()=> "SELECT ?,?,?,? WHERE "+guard).join(" UNION ALL "))
@@ -1126,7 +1139,7 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const result=await env.DB.batch(statements);
     if(!result[2]?.meta?.changes)return json({error:"O exército mudou ou outra batalha foi processada. Atualize o reino e tente novamente."},409);
-    battleOutcome={won,attackerPower,defenderPower,losses,rewards,message:won?"Vitória! O reino recebeu recursos. As tropas foram preservadas.":"Derrota! As tropas foram preservadas; reorganize o exército e tente novamente."};
+    battleOutcome={battle_id:Number(result[battleReportIndex]?.meta?.last_row_id||0)||null,won,attackerPower,defenderPower,losses,rewards,message:won?"Vitória! O reino recebeu recursos. As tropas foram preservadas.":"Derrota! As tropas foram preservadas; reorganize o exército e tente novamente."};
     if(heroProgress&&result[heroUpdateIndex]?.meta?.changes)battleOutcome.heroProgress=heroProgress;
    }else if(type==="rename"){
     const name=String(body.name||"").trim().slice(0,32);if(name.length<3)return json({error:"O nome deve ter de 3 a 32 caracteres."},400);
@@ -1356,6 +1369,8 @@ export default {
   catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
   try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_rate_limit_cleanup_failed",String(error?.message||error));}
+  try{await env.DB.prepare("UPDATE battle_reports SET replay_json='{}',battle_log='[]' WHERE replay_expires_at>0 AND replay_expires_at<=? AND (replay_json<>'{}' OR battle_log<>'[]')").bind(Math.floor(Date.now()/1000)).run();}
+  catch(error){console.error("scheduled_battle_replay_expiry_failed",String(error?.message||error));}
   try{await processEmailQueue(env,10);}
   catch(error){console.error("scheduled_email_queue_failed",String(error?.message||error));}
  },
@@ -1367,7 +1382,7 @@ export default {
   if(url.pathname==="/api/admin/health"&&request.method==="GET")return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET),hasEmailProvider:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.FRONTEND_URL),hasResendApiKey:Boolean(env.RESEND_API_KEY),hasEmailFrom:Boolean(env.EMAIL_FROM),hasFrontendUrl:Boolean(env.FRONTEND_URL)});
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog"];
+    const requiredTables=["players","kingdoms","kingdom_buildings","army_units","heroes","dragons","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1502,6 +1517,23 @@ export default {
         const invite=new URL("/kingdom.html",url.origin);
         invite.searchParams.set("ref",playerId);
         return json({referral_code:playerId,referral_url:invite.href,referral_count:Number(count?.total||0)});
+      }
+      if(url.pathname==="/api/game/pets"||url.pathname.startsWith("/api/game/pets/")){
+        const petPath=url.pathname==="/api/game/pets"?"catalog":url.pathname.slice("/api/game/pets/".length);
+        const isRead=request.method==="GET"&&petPath==="catalog";
+        const isWrite=request.method==="POST"&&["unlock","feed","activate"].includes(petPath);
+        if(!isRead&&!isWrite)return json({error:"Rota ou método de mascotes inválido."},request.method==="GET"||request.method==="POST"?404:405);
+        const limited=await rateLimitDecision(env,isWrite?"pet-write-player":"pet-read-player",playerId,isWrite?20:60,60);
+        if(limited)return limited;
+        let petBody={};
+        if(isWrite){petBody=await readBody(request,4096);if(petBody.__bodyError)return json({error:"Solicitação de mascote inválida."},petBody.__bodyError==="payload_too_large"?413:400);}
+        return await handlePetsRoute(request,env,playerId,petPath,petBody);
+      }
+      if(url.pathname==="/api/game/battle/replay"){
+        if(request.method!=="GET")return json({error:"Método não permitido."},405);
+        const limited=await rateLimitDecision(env,"battle-replay-player",playerId,30,60);
+        if(limited)return limited;
+        return await getBattleReplay(env,playerId,url.searchParams.get("battle_id"));
       }
       if(url.pathname.startsWith("/api/game/valhalla-shop/")){
         const method=request.method;

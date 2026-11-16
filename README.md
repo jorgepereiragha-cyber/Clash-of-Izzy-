@@ -23,7 +23,7 @@ Comandos úteis:
 
 ## Deploy automático
 
-O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, captura e arquiva o bookmark de recuperação Time Travel do D1 imediatamente antes das migrações remotas, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, formulário beta, feedback, analytics, páginas principais e PWA v14. O deploy só termina com sucesso quando esses checks passam. O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação; restaurar Time Travel sobrescreve o estado atual do banco.
+O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, captura e arquiva o bookmark de recuperação Time Travel do D1 imediatamente antes das migrações remotas, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, formulário beta, feedback, analytics, páginas principais e PWA v18. O deploy só termina com sucesso quando esses checks passam. O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação; restaurar Time Travel sobrescreve o estado atual do banco.
 
 Configure estes segredos no GitHub:
 
@@ -46,7 +46,7 @@ O token precisa pertencer à conta correta e estar dentro do escopo do Worker e 
 
 As migrações são versionadas em `migrations/` e executadas em ordem pelo Wrangler. Não edite migrações que já foram aplicadas em produção; crie sempre um novo arquivo numerado.
 
-Migrações atuais: `0001` a `0021`. As migrações `0019` (temporada Valhalla), `0020` (atribuição de convites) e `0021` (nós de recursos, rallies e catálogo inicial de tecnologias) são incrementais e não substituem o schema histórico. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
+Migrações atuais: `0001` a `0022`. As migrações `0019` (temporada Valhalla), `0020` (atribuição de convites), `0021` (nós de recursos, rallies e catálogo inicial de tecnologias) e `0022` (mascotes por reino e retenção de replays) são incrementais e não substituem o schema histórico. A migração `0010` adiciona limites atômicos de requisições por IP, jogador e conta, armazenando somente identificadores HMAC. A migração `0005` preserva frações da produção passiva e adiciona índices; `0006` protege a resolução única de marchas; `0007` adiciona o token de concorrência das batalhas PvE.
 
 ## Filas estratégicas persistentes
 
@@ -99,6 +99,17 @@ Os equipamentos do reino são armazenados em D1. Níveis, custos em ouro e bloqu
 - A árvore `gear_forging`, `gear_ward`, `gear_vitality` e `gear_logistics` reutiliza a tabela `research` existente e exige o Centro de Pesquisa Militar. Os bônus são calculados no servidor e aplicados ao herói ativo: ataque, defesa, vida, crítico, marcha e produção.
 - Acertos críticos usam semente registrada no relatório de batalha, permitindo auditoria/reprodução do cálculo. A velocidade de marcha usa uma função determinística com limite de bônus.
 - `hero_inventory` é a fonte de progressão/estrelas/fragmentos; `heroes` é a identidade relacional usada por equipamentos. `syncHeroSystems` mantém ambos alinhados por `(kingdom_id, hero_key)` e o treinamento atualiza os dois no mesmo lote.
+
+
+
+## Mascotes e replays de batalha (migração 0022)
+- A forja continua usando o catálogo e o inventário canônicos `EQUIPMENT_CATALOG`, `kingdom_equipment` e `hero_equipment`; esta expansão não cria inventários paralelos.
+- `pet_catalog` define as passivas e `kingdom_pets` armazena posse, nível, experiência e mascote ativo. Cada reino pode ter somente um mascote ativo. O Corvo de Odin é entregue aos reinos existentes e aos novos.
+- `GET /api/game/pets/catalog` consulta mascotes e bônus; `POST /api/game/pets/unlock`, `/feed` e `/activate` alteram a progressão com validação no Worker. Alimentação exige `request_key` para que uma repetição não debite ouro nem conceda EXP duas vezes.
+- As passivas são aplicadas no servidor: o Corvo acelera marchas individuais e rallies liderados pelo reino, Fenrir amplia o ataque da infantaria e o Dragão Nórdico aumenta a produção de recursos. A progressão escala até o nível 50.
+- `battle_reports` continua sendo a fonte dos relatórios. A coluna `replay_json` grava a semente, o exército, modificadores, resultado e quadros do combate. `GET /api/game/battle/replay?battle_id=...` permite acesso apenas ao atacante ou defensor autenticado.
+- Replays detalhados expiram após sete dias; a rotina agendada remove os quadros e o payload detalhado, preservando o resumo do relatório. A página `kingdom.html` inclui controles de mascotes e leitor de replay.
+- A migração `0022_pets_and_battle_replays.sql` é aditiva. Execute primeiro `npm run db:migrate:local`; a migração remota e o deploy acontecem apenas pelo fluxo aprovado de publicação.
 
 
 ## Busca global do mundo
