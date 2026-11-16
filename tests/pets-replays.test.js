@@ -69,4 +69,4 @@ test("alimentação tem request_key e grava a deduplicação no D1", async () =>
   assert.match(migration, /UNIQUE \(kingdom_id,request_key\)/);
   assert.match(pets, /kingdom_pet_feed_requests/);
   assert.match(pets, /changes\(\)>0/);
-});;
+});
