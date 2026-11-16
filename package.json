@@ -12,7 +12,8 @@
     "test": "node --test",
     "assets:validate": "node scripts/validate-3d-assets.js",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "test:e2e:ui": "playwright test --ui"
   },
   "devDependencies": {
     "wrangler": "4.161.0",
