@@ -9,7 +9,7 @@ const reply = (data, status = 200) => Response.json(data, {
 });
 
 const RESOURCE_KEYS = new Set(["food", "wood", "stone", "iron", "gold"]);
-const SPEEDUP_TYPES = new Set(["construction", "training", "research"]);
+const SPEEDUP_TYPES = new Set(["construction", "training", "research", "march"]);
 const SPEEDUP_DURATIONS = new Set([60, 300, 900, 3600, 14400, 86400]);
 const TROOP_TYPES = new Set([
   "militia", "swordsman", "spearman", "archer", "crossbowman",
@@ -213,11 +213,17 @@ async function useSpeedup(request, env, kingdom) {
   }
 
   const now = Date.now();
+  const isMarch = queueType === "march";
+  const queueTable = isMarch ? "marches" : "kingdom_queues";
+  const deadlineColumn = isMarch ? "arrives_at" : "completes_at";
+  const activeStatus = isMarch ? "marching" : "running";
   const queue = await env.DB.prepare(
-    "SELECT id,started_at,completes_at FROM kingdom_queues " +
-    "WHERE id=? AND kingdom_id=? AND queue_type=? AND status='running' AND completes_at>?"
-  ).bind(queueId, kingdom.id, queueType, new Date(now).toISOString()).first();
-  if (!queue) return reply({ error: "Fila ativa não encontrada ou já concluída." }, 404);
+    "SELECT id,started_at," + deadlineColumn + " AS completes_at FROM " + queueTable + " " +
+    "WHERE id=? AND kingdom_id=? AND " + (isMarch ? "status='marching'" : "queue_type=? AND status='running'") +
+    " AND " + deadlineColumn + ">?"
+  ).bind(...(isMarch ? [queueId, kingdom.id, new Date(now).toISOString()] :
+    [queueId, kingdom.id, queueType, new Date(now).toISOString()])).first();
+  if (!queue) return reply({ error: isMarch ? "Marcha em andamento não encontrada." : "Fila ativa não encontrada ou já concluída." }, 404);
 
   const previousEnd = Date.parse(queue.completes_at);
   const started = Date.parse(queue.started_at);
@@ -227,13 +233,14 @@ async function useSpeedup(request, env, kingdom) {
   const nextEnd = new Date(Math.max(now + 1000, previousEnd - duration * 1000)).toISOString();
   const result = await env.DB.batch([
     env.DB.prepare(
-      "UPDATE kingdom_queues SET completes_at=? " +
-      "WHERE id=? AND kingdom_id=? AND queue_type=? AND status='running' " +
-      "AND started_at=? AND completes_at=? " +
+      "UPDATE " + queueTable + " SET " + deadlineColumn + "=? " +
+      "WHERE id=? AND kingdom_id=? AND " + (isMarch ? "status='marching'" : "queue_type=? AND status='running'") +
+      " AND started_at=? AND " + deadlineColumn + "=? " +
       "AND EXISTS(SELECT 1 FROM kingdom_speedups WHERE kingdom_id=? AND queue_type=? " +
         "AND duration_seconds=? AND quantity>0)"
-    ).bind(nextEnd, queueId, kingdom.id, queueType, queue.started_at, queue.completes_at,
-      kingdom.id, queueType, duration),
+    ).bind(...(isMarch ?
+      [nextEnd, queueId, kingdom.id, queue.started_at, queue.completes_at, kingdom.id, queueType, duration] :
+      [nextEnd, queueId, kingdom.id, queueType, queue.started_at, queue.completes_at, kingdom.id, queueType, duration])),
     env.DB.prepare(
       "UPDATE kingdom_speedups SET quantity=quantity-1 " +
       "WHERE kingdom_id=? AND queue_type=? AND duration_seconds=? AND quantity>0 AND changes()=1"
@@ -246,7 +253,12 @@ async function useSpeedup(request, env, kingdom) {
   if (Number(result[0]?.meta?.changes || 0) !== 1 || Number(result[1]?.meta?.changes || 0) !== 1) {
     return reply({ error: "Acelerador indisponível ou fila alterada. Atualize e tente novamente." }, 409);
   }
-  return reply({ success: true, completes_at: nextEnd, seconds_reduced: Math.floor((previousEnd - Date.parse(nextEnd)) / 1000) });
+  return reply({
+    success: true,
+    completes_at: nextEnd,
+    seconds_reduced: Math.floor((previousEnd - Date.parse(nextEnd)) / 1000),
+    target_type: isMarch ? "march" : "queue",
+  });
 }
 
 async function getTasks(env, kingdom) {
@@ -396,7 +408,7 @@ async function getRanking(env) {
       "RANK() OVER(ORDER BY k.castle_level DESC,k.power DESC,k.id ASC) AS castle_rank," +
       "(SELECT COUNT(*) FROM battle_reports br WHERE br.winner_kingdom_id=k.id) AS battles_won," +
       "(SELECT COALESCE(SUM(rl.amount),0) FROM resource_ledger rl " +
-        "WHERE rl.kingdom_id=k.id AND rl.amount>0 AND rl.resource IN ('food','wood','stone','iron')) AS resources_collected " +
+        "WHERE rl.kingdom_id=k.id AND rl.amount>0 AND rl.resource IN ('food','wood','stone','iron') AND rl.reason LIKE 'coleta de nó de recurso:%') AS resources_collected " +
     "FROM kingdoms k JOIN players p ON p.id=k.player_id " +
     "LEFT JOIN player_nicknames n ON n.player_id=p.id " +
     "ORDER BY k.power DESC,k.id ASC LIMIT 100"
