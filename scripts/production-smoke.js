@@ -73,6 +73,9 @@ export async function runProductionSmokeTests({
   const stateResponse = await get("/api/game/state");
   assert(stateResponse.status === 401, "O estado do jogo deve exigir sessão; recebido HTTP " + stateResponse.status + ".");
 
+  const referralResponse = await get("/api/game/referral/link");
+  assert(referralResponse.status === 401, "O link de convite deve exigir sessão; recebido HTTP " + referralResponse.status + ".");
+
   const catalogResponse = await get("/api/store/catalog");
   assert(catalogResponse.status === 200, "Catálogo público respondeu HTTP " + catalogResponse.status + ".");
   const catalog = await readJson(catalogResponse, "Catálogo");
@@ -93,6 +96,19 @@ export async function runProductionSmokeTests({
   const landing = await landingResponse.text();
   assert(landing.includes('id="beta-signup-form"') && landing.includes('name="consent"'),
     "Formulário beta com consentimento não está publicado.");
+
+  const landingCssResponse = await get("/styles/landing.css");
+  assert(landingCssResponse.status === 200, "Estilos da landing page indisponíveis.");
+  assert((landingCssResponse.headers.get("content-type") || "").includes("text/css"), "Estilos da landing não foram servidos como CSS.");
+  const landingCss = await landingCssResponse.text();
+  assert(landingCss.includes(".landing-hero"), "Estilos da landing estão incompletos.");
+
+  const landingJsResponse = await get("/landing.js");
+  assert(landingJsResponse.status === 200, "JavaScript da landing page indisponível.");
+  assert((landingJsResponse.headers.get("content-type") || "").includes("javascript"), "JavaScript da landing não foi servido com tipo correto.");
+  const landingJs = await landingJsResponse.text();
+  assert(landingJs.includes("showInstallGuide") && landingJs.includes("/api/game/referral/link"),
+    "Fluxos de instalação e indicação não estão publicados.");
 
   const kingdomResponse = await get("/kingdom.html");
   assert(kingdomResponse.status === 200, "Central do reino respondeu HTTP " + kingdomResponse.status + ".");
@@ -129,7 +145,9 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(serviceWorker.includes("clash-of-izzy-shell-v15"), "Service worker não contém o cache v14 esperado.");
+  assert(serviceWorker.includes("clash-of-izzy-shell-v16"), "Service worker não contém o cache v16 esperado.");
+  assert(serviceWorker.includes("/styles/landing.css"), "PWA não inclui os estilos da landing page.");
+  assert(serviceWorker.includes("/landing.js"), "PWA não inclui o controlador da landing page.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
   assert(serviceWorker.includes("/admin.html"), "PWA não inclui o painel Master.");
@@ -151,6 +169,8 @@ export async function runProductionSmokeTests({
       pwaManifest: true,
       serviceWorker: true,
       betaSignupUi: true,
+      referralAuthBoundary: true,
+      landingAssets: true,
       feedbackUiAndAnalytics: true,
       worldMapNavigation: true,
       worldMap3D: true,
