@@ -286,6 +286,33 @@ test.describe("Mobile kingdom rendering", () => {
     await expect(page.locator("#guestAccountNotice")).toBeHidden();
   });
 
+  test("masks the linked account email on the account page", async ({ page }) => {
+    const sensitiveEmail = "jose.silva.privado@example.com";
+    const { accountStatusRequests } = await installApiFixtures(page, {
+      hasAccount: true,
+      account: { username: "ComandanteTeste", email: sensitiveEmail },
+    });
+    const accountStatusResponsePromise = waitForAccountStatus(page);
+
+    await page.goto("/account.html");
+    const accountStatusResponse = await accountStatusResponsePromise;
+    expect(accountStatusResponse.status()).toBe(200);
+    expect(await accountStatusResponse.json()).toMatchObject({
+      hasAccount: true,
+      account: { email: sensitiveEmail },
+    });
+    expect(accountStatusRequests).toEqual([{
+      method: "GET",
+      authorization: "Bearer " + SESSION_TOKEN,
+    }]);
+
+    await expect(page.locator("#accountStatus")).toContainText("E-mail: j***@example.com");
+    await expect(page.locator("#accountStatus")).not.toContainText(sensitiveEmail);
+    expect(await page.locator("body").innerText()).not.toContain(sensitiveEmail);
+    await expect(page.locator("#registerForm")).toBeHidden();
+    await expect(page.locator("#logoutButton")).toBeVisible();
+  });
+
   test("opens the account protection page when the guest notice link is clicked", async ({ page }) => {
     await installApiFixtures(page);
 
