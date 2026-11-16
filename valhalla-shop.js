@@ -325,6 +325,7 @@ async function buyItem(env, playerId, body) {
       "AND (?=-1 OR (SELECT COUNT(*) FROM valhalla_purchases WHERE kingdom_id=? AND catalog_id=?)<?) " +
       "AND NOT EXISTS(SELECT 1 FROM valhalla_purchases WHERE request_key=?) " +
       "AND (?<>'hero' OR NOT EXISTS(SELECT 1 FROM hero_inventory WHERE kingdom_id=? AND hero_key=?)) " +
+      "AND (?<>'hero' OR NOT EXISTS(SELECT 1 FROM heroes WHERE kingdom_id=? AND hero_key=?)) " +
       "AND (?<>'cosmetic' OR NOT EXISTS(SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?)) " +
       "AND (?<>'title' OR NOT EXISTS(SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?))"
     ).bind(
@@ -333,6 +334,7 @@ async function buyItem(env, playerId, body) {
       item.id, now, now,
       item.stock_limit, kingdom.id, item.id, item.stock_limit,
       requestKey,
+      item.category, kingdom.id, delivery.hero?.hero_key || "",
       item.category, kingdom.id, delivery.hero?.hero_key || "",
       item.category, kingdom.id, delivery.cosmeticId || "",
       item.category, kingdom.id, delivery.title || ""
