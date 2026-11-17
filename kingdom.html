@@ -145,7 +145,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div id="nicknameStatus" class="muted" role="status" aria-live="polite" style="margin-top:8px"></div>
 <form id="playerSearchForm" class="toolbar">
 <label for="playerSearchInput" class="muted">Encontrar jogadores</label>
-<input id="playerSearchInput" minlength="3" maxlength="20" autocomplete="off" placeholder="Digite o início do nickname" required style="min-width:180px;flex:1;padding:10px;border-radius:8px;border:1px solid #71839a;background:#0e1a2a;color:#fff">
+<input id="playerSearchInput" minlength="3" maxlength="20" autocomplete="off" placeholder="Digite parte do nickname" required style="min-width:180px;flex:1;padding:10px;border-radius:8px;border:1px solid #71839a;background:#0e1a2a;color:#fff">
 <button type="submit" class="secondary">🔎 Buscar</button>
 </form>
 <div id="playerSearchResults" class="events" aria-live="polite" style="margin-top:10px"></div>
@@ -413,13 +413,15 @@ async function searchPlayers(event){
  results.replaceChildren();
  const loading=document.createElement("div");loading.className="event";loading.textContent="Pesquisando jogadores…";results.append(loading);
  try{
-  const data=await request("/game/players/search?q="+encodeURIComponent(query));
+  const data=await request("/game/search?q="+encodeURIComponent(query)+"&type=players&limit=10");
+  const players=(data.results||[]).filter(result=>result.type==="player");
   results.replaceChildren();
-  if(!data.players?.length){const empty=document.createElement("div");empty.className="event";empty.textContent="Nenhum jogador encontrado. A busca considera o início do nickname.";results.append(empty);return;}
-  for(const player of data.players){
+  if(!players.length){const empty=document.createElement("div");empty.className="event";empty.textContent="Nenhum jogador encontrado. Tente outra parte do nickname ou confira a grafia.";results.append(empty);return;}
+  for(const player of players){
    const row=document.createElement("div");row.className="event";
    const title=document.createElement("strong");title.textContent=player.nickname+" · "+player.kingdom_name;
-   const details=document.createElement("div");details.className="muted";details.textContent="Castelo nível "+player.castle_level+" · Poder "+Number(player.power||0).toLocaleString("pt-BR");
+   const alliance=player.allianceTag?" · Aliança ["+player.allianceTag+"]":"";
+   const details=document.createElement("div");details.className="muted";details.textContent="Castelo nível "+player.castle_level+" · Poder "+Number(player.power||0).toLocaleString("pt-BR")+alliance;
    row.append(title,details);results.append(row);
   }
  }catch(error){results.replaceChildren();const message=document.createElement("div");message.className="event";message.textContent=error.message;results.append(message);}
