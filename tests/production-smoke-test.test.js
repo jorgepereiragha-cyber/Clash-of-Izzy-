@@ -70,6 +70,7 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.mercadoPagoCheckout, true);
   assert.equal(result.checks.mercadoPagoManualFallbackAvailable, true);
   assert.equal(result.checks.mercadoPagoAutomaticCheckoutConfigured, false);
+  assert.equal(result.diagnostics.serviceWorkerCacheName, "clash-of-izzy-shell-v27");
   assert.equal(result.checks.betaSignupUi, true);
   assert.equal(result.checks.feedbackUiAndAnalytics, true);
   assert.equal(result.checks.staticPages, 9);
