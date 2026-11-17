@@ -9,6 +9,7 @@ import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
+import { getSharedWorldCoordinates } from "./shared-world-coordinates.js";
 import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
@@ -260,11 +261,9 @@ async function ensureKingdom(env,playerId){
     const created=await env.DB.prepare("INSERT INTO kingdoms(player_id,kingdom_name,food,wood,stone,iron,gold,last_production_at) VALUES(?,?,?,?,?,?,?,?)")
       .bind(p.id,"Reino de Eldoria",5000,5000,3000,1000,1000,new Date().toISOString()).run();
     const id=Number(created.meta.last_row_id);
-    const mapSlot=id-1;
-    const mapX=((mapSlot%20)-10)*5;
-    const mapZ=((Math.floor(mapSlot/20)%20)-10)*5;
-    const mapRegion=Math.floor(mapSlot/400)+1;
-    await env.DB.prepare("UPDATE kingdoms SET map_x=?,map_z=?,map_region=? WHERE id=?").bind(mapX,mapZ,mapRegion,id).run();
+    const worldPosition=getSharedWorldCoordinates(id);
+    await env.DB.prepare("UPDATE kingdoms SET map_x=?,map_z=?,map_region=? WHERE id=?")
+      .bind(worldPosition.mapX,worldPosition.mapZ,worldPosition.mapRegion,id).run();
     const buildingRows=Object.keys(BUILDINGS).map((key,i)=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_buildings(kingdom_id,building_type,level,position_x,position_z) VALUES(?,?,1,?,?)").bind(id,key,((i%4)-1.5)*7,Math.floor(i/4)*7-7));
     const unitRows=Object.keys(UNITS).map((key)=>env.DB.prepare("INSERT OR IGNORE INTO army_units(kingdom_id,unit_type,tier,quantity) VALUES(?,?,1,?)").bind(id,key,key==="militia"?30:0));
     await env.DB.batch([
@@ -604,9 +603,9 @@ async function gameState(env,playerId){
       "COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=owner.id),'') AS alliance_tag "+
       "FROM world_territories wt LEFT JOIN kingdoms owner ON owner.id=wt.owner_kingdom_id "+
       "LEFT JOIN players op ON op.id=owner.player_id LEFT JOIN player_nicknames n ON n.player_id=op.id "+
-      "WHERE wt.territory_kind='resource' OR (wt.territory_kind='castle' AND owner.map_region=? AND wt.owner_kingdom_id<>? "+
+      "WHERE wt.territory_kind='resource' OR (wt.territory_kind='castle' AND wt.owner_kingdom_id<>? "+
       "AND wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?) ORDER BY wt.territory_kind,wt.id LIMIT 250"
-    ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,Number(kingdom.map_region)||1,kingdom.id,
+    ).bind(kingdom.id,
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45).all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
