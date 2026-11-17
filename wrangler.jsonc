@@ -23,7 +23,9 @@
     "nodejs_compat"
   ],
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": [
+      "* * * * *"
+    ]
   },
   "observability": {
     "enabled": true
@@ -31,5 +33,9 @@
   "vars": {
     "ENVIRONMENT": "production"
   },
-  "previews": {}
+  "previews": {
+    "vars": {
+      "ENVIRONMENT": "preview"
+    }
+  }
 }
