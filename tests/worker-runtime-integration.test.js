@@ -865,7 +865,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       ]);
 
       const resolvedAttackerState = await api("/api/game/state", { token: tokenA });
-      assert.equal(resolvedAttackerState.status, 200, "estado após resolução PvP: " + JSON.stringify(resolvedAttackerState.data));
+      assert.equal(resolvedAttackerState.status, 200, "estado após resolução PvP: " + JSON.stringify(resolvedAttackerState.data) + "\\nWorker output: " + workerOutput);
       stateA = resolvedAttackerState.data.state;
       assert.ok(stateA?.battleReports, "Worker retorna relatório ao atacante");
       const pvpReportsA = stateA.battleReports.filter(report => report.battle_type === "territory_pvp");
