@@ -95,3 +95,12 @@ test("map viewport transform is finite and deterministic", () => {
     "translate3d(0px, 0px, 0) scale(1)"
   );
 });
+
+
+test("shared world map renders the owner's equipped castle skin without changing territory ownership", async () => {
+  const renderer = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.match(renderer, /territory\.equipped_skin_name/);
+  assert.match(renderer, /getCastleSkinStyle\(skinName, skinId\)/);
+  assert.match(worker, /owner\.equipped_skin_id,equipped_skin\.name AS equipped_skin_name/);
+});
