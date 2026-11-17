@@ -1798,9 +1798,11 @@ export default {
         return json({query:rawQuery,players,count:players.length});
       }
       if(url.pathname==="/api/game/search"&&request.method==="GET"){
-        const limited=await rateLimitDecision(env,"game-search-player",playerId,30,60);
+        const [limited,networkLimit]=await Promise.all([
+          rateLimitDecision(env,"game-search-player",playerId,30,60),
+          rateLimitDecision(env,"game-search-network",request.headers.get("CF-Connecting-IP")||"unknown",180,60)
+        ]);
         if(limited)return limited;
-        const networkLimit=await rateLimitDecision(env,"game-search-network",request.headers.get("CF-Connecting-IP")||"unknown",180,60);
         if(networkLimit)return networkLimit;
         const rawQuery=String(url.searchParams.get("q")||"").normalize("NFKC").trim();
         const queryLength=Array.from(rawQuery).length;
