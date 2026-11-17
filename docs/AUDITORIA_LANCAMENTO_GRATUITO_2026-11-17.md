@@ -1,8 +1,8 @@
 # Auditoria de prontidão — edição inicial no plano Cloudflare Gratuito
 
 Data: 17 de novembro de 2026  
-Branch de trabalho: `release/early-access-one-kingdom-six-skins`  
-PR: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/pull/118
+Branch de trabalho: `release/one-shared-realm-early-access`  
+PR de lançamento: será a nova PR de rebase sobre a main protegida.
 
 ## Decisão de arquitetura do mundo
 
@@ -15,7 +15,8 @@ Eldoria é um único reino/servidor compartilhado por todos os jogadores. A tabe
 3. **Carga do plano Gratuito:** Cron continua a cada minuto, mas processa lotes controlados: 3 filas globais, 1 grupo de reino/2 marchas no fallback global, 1 rally, 10 recompensas de evento por execução, 10 recompensas diárias de Valhalla por execução, 1 e-mail e limpeza em lotes.
 4. **Chat eficiente:** nova rota autenticada `GET /api/game/alliance/chat` retorna somente a conversa da aliança; a arena não baixa mais o estado inteiro do reino a cada atualização. A frequência do chat passou a 15 segundos e a atualização das filas do reino a 60 segundos.
 5. **Sessão do chat:** o token é lido primeiro de `localStorage` e depois de `sessionStorage`, sem ignorar o segundo quando o primeiro está vazio.
-6. **Testes adicionados:** coordenadas do mundo único, lotes do Cron, feed do chat e teste integrado Worker+D1 para ler mensagens de aliança.
+6. **Skins equipáveis:** migration `0027_castle_skin_equipment.sql`, ação autenticada `castle_skin_equip`, validação de propriedade em `player_skins`, seleção na cidade e loja, e aparência propagada aos castelos do mapa compartilhado.
+7. **Testes adicionados:** coordenadas do mundo único, lotes do Cron, feed do chat, proteção administrativa e equipagem autorizada de skins.
 
 ## Limites reais a observar no plano Gratuito
 
@@ -26,10 +27,10 @@ A redução de lotes e chamadas de chat ajuda a respeitar esses limites, mas ain
 ## Pendências obrigatórias antes de cobrar/publicar
 
 - **CI #963 aprovada no HEAD atual da PR #118:** 259/259 testes Node, Worker+D1, 3/3 cenários Playwright móveis, diagnóstico e smoke de produção somente leitura, e `wrangler deploy --dry-run`. O dry-run calculou 357,25 KiB (77,53 KiB gzip). As falhas intermediárias #947 (HTTP 503 ao fundar o primeiro reino) e #962 (asserções antigas de lote) foram tratadas antes da execução verde. Isso não equivale a benchmark real de quotas nem a deploy.
-- PR #116: CI #941 passou por migrations locais, Worker+D1, Playwright móvel, smoke read-only e bundle. A PR permanece Draft e ainda não foi integrada; a correção só protege produção depois de merge e deploy.
-- D1 de Preview: confirmar que o banco separado declarado no Wrangler existe e é acessível; aplicar migrations apenas nele e validar start/state, mapa, construção, marchas, rallies, alianças e inventário.
+- Segurança administrativa: PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab` após CI #941 verde. A proteção ainda precisa chegar à produção pelo workflow manual protegido.
+- **D1 de Preview ausente:** `wrangler.jsonc` tem `previews: {}` e não declara um banco D1 separado. Criar/confirmar um D1 descartável, adicionar `preview_database_id` sem tocar no binding de produção e validar somente nele. Não reutilizar o segundo ID antigo sem confirmar seu nome e finalidade.
 - Mercado Pago: confirmar no Worker os secrets `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`; executar compra de teste e receber webhook assinado. Sem essas credenciais, a loja usa link compartilhado e revisão manual Master.
-- Skins: a interface atual informa que as compras entram na coleção, mas ainda não há equipagem e visualização da aparência no castelo. Não anunciar as seis skins como aparência utilizável até implementar isso ou descrever explicitamente o produto como item de coleção. O trabalho foi registrado na [Issue #119](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/issues/119).
+- Skins: equipagem e visualização foram implementadas nesta branch. A validação completa Worker+D1 e Playwright precisa aprovar a migration 0027 e os fluxos de propriedade antes do merge/deploy. A Issue #119 acompanha o aceite.
 - Android físico: testar cidade/mapa 3D, toque, PWA standalone, retomada de sessão, cache e consumo de memória.
 - Capacidade: medir CPU real, consultas D1 por `/api/game/state`, linhas lidas/escritas e backlog do Cron em staging antes de fixar limite público de jogadores.
 
@@ -39,12 +40,11 @@ Nenhuma mudança foi publicada na `main`; nenhum deploy ou workflow de produçã
 
 ## Sequência de lançamento
 
-1. Revisar e integrar a PR #116 (CI #941 verde) para proteger o diagnóstico administrativo.
-2. Atualizar/rebasear a PR #118 sobre a nova `main` e repetir a CI.
-3. Validar Preview com D1 separado.
-4. Fechar a pendência comercial das skins e validar checkout/webhook ou manter a venda explicitamente em modo manual.
-5. Testar no Android físico e obter backup/bookmark de produção.
-6. Executar workflow de deploy manual protegido.
-7. Fazer smoke test público read-only e uma compra real de baixo valor, autorizada pelo dono do projeto.
+1. Concluir CI/revisão da nova PR de lançamento, já baseada na main com a segurança administrativa integrada.
+2. Criar/confirmar D1 de Preview separado e validar migrations 0026/0027, autenticação, mapa, marchas, rallies, chat e equipagem.
+3. Confirmar credenciais Mercado Pago e executar compra + webhook de teste; se não houver configuração, manter revisão manual Master com informação transparente.
+4. Testar no Android físico e obter backup/bookmark de produção.
+5. Executar workflow de deploy manual protegido após aprovação explícita.
+6. Fazer smoke test público read-only e uma compra real de baixo valor, autorizada pelo dono do projeto.
 
 **Conclusão:** a arquitetura de reino compartilhado e o perfil inicial de cargas gratuitas estão implementados na branch. O jogo ainda não está liberado para produção por esta alteração; a maior parte dos próximos bloqueios é validação remota, segurança e garantia de que os itens vendidos são utilizáveis.
