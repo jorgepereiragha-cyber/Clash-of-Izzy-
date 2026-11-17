@@ -643,7 +643,11 @@ if (host && "WebGLRenderingContext" in window) {
         if (!Array.isArray(position) || position.length !== 3 || position.some(value => !Number.isFinite(Number(value)))) continue;
         const instance = template.clone(true);
         instance.position.fromArray(position.map(Number));
-        if (Array.isArray(asset.rotation) && asset.rotation.length === 3) instance.rotation.set(...asset.rotation.map(Number));
+        const instanceRotation = Array.isArray(asset.rotations?.[index]) ? asset.rotations[index] : asset.rotation;
+        if (Array.isArray(instanceRotation) && instanceRotation.length === 3
+          && instanceRotation.every(value => Number.isFinite(Number(value)))) {
+          instance.rotation.set(...instanceRotation.map(Number));
+        }
         if (Number.isFinite(Number(asset.instanceScale))) instance.scale.multiplyScalar(Number(asset.instanceScale));
         instance.userData.coIAssetId = asset.id;
         scene.add(instance);
