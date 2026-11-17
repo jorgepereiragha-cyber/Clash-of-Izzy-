@@ -1,10 +1,10 @@
 /* Progressive Three.js kingdom renderer. Canvas art remains as offline/WebGL fallback. */
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
-import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
-import { KTX2Loader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/KTX2Loader.js";
-import { DRACOLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/DRACOLoader.js";
-import { MeshoptDecoder } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/meshopt_decoder.module.js";
-import { clone as cloneSkinned } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/utils/SkeletonUtils.js";
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "./kingdom-quality.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 
@@ -805,10 +805,10 @@ if (host && "WebGLRenderingContext" in window) {
       }
     }
     ktx2 = new KTX2Loader();
-    ktx2.setTranscoderPath("https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/basis/");
+    ktx2.setTranscoderPath("/vendor/three/examples/jsm/libs/basis/");
     ktx2.detectSupport(renderer);
     draco = new DRACOLoader();
-    draco.setDecoderPath("https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/draco/gltf/");
+    draco.setDecoderPath("/vendor/three/examples/jsm/libs/draco/gltf/");
     gltfLoader = new GLTFLoader();
     gltfLoader.setDRACOLoader(draco);
     gltfLoader.setKTX2Loader(ktx2);
