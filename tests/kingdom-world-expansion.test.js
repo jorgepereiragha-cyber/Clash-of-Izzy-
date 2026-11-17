@@ -53,16 +53,25 @@ test("construction and troop training each support two independent atomic queue 
   assert.ok(worker.includes("async function processDueKingdomQueues"));
 });
 
-test("world map shows player castles but does not route unsupported PvP attacks", async () => {
+test("world map lets players discover and compose an attack on an enemy castle", async () => {
   const page = await read("world-map.js");
   const scene = await read("world-map-3d.js");
+  const kingdom = await read("kingdom.html");
   const worker = await read("worker.js");
   assert.ok(page.includes('territory.territory_kind === "castle"'));
   assert.ok(page.includes("territory.commander_name"));
   assert.ok(page.includes("territory.alliance_tag"));
-  assert.ok(page.includes("if (isCastle)"));
+  assert.ok(page.includes("isEnemyCastle"));
+  assert.ok(page.includes('$("attack").textContent = isEnemyCastle ? "⚔ Atacar castelo"'));
+  assert.ok(page.includes("normalizeTerritorySearch(item.commander_name)"));
+  assert.ok(kingdom.includes('locate.href="/world.html?search="+encodeURIComponent(player.nickname)'));
   assert.ok(scene.includes('territory.territory_kind === "castle"'));
   assert.ok(scene.includes('ownership === "enemy" ? "enemy" : "home"'));
-  assert.ok(worker.includes("O combate PvP será habilitado na Fase 10"));
+  assert.ok(worker.includes("async function processPvpMarch"));
+  assert.ok(worker.includes("defenderArmy: defenderArmyRows"));
+  assert.ok(worker.includes("defender_kingdom_id"));
+  assert.ok(worker.includes("battle_token"));
+  assert.ok(worker.includes("Ataques contra membros da sua aliança estão bloqueados."));
+  assert.ok(worker.includes("Este reino está sob proteção e não pode ser atacado agora."));
   assert.ok(worker.includes("applyUnitLosses(army, losses)"), "PvE march resolution must return only surviving troops");
 });
