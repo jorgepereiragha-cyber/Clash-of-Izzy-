@@ -274,6 +274,20 @@ wrangler.jsonc agora define previews.vars.ENVIRONMENT = preview e mantém o D1 d
 ### CI e artefatos
 
 A CI #914 terminou com sucesso no commit `6f5fe6b`: **274/274 testes Node**, **10/10 Playwright Chromium**, Service Worker v32, primeira importação Three.js offline, decodificadores Draco/Basis same-origin, benchmark comparativo, testes Worker/D1, smoke read-only e bundle do Worker aprovados. Relatório e variantes A/B: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44049256611/artifacts/14312946574.
+## 7. Validação da revisão final da branch — CI #920
+
+A CI #920 no commit `df5a4d5` terminou com sucesso: **276/276 testes Node**, **10/10 Playwright Chromium**, migrações D1 locais, validação do Service Worker, cinco GLBs do manifesto, benchmark Draco/Meshopt, testes Worker-D1, diagnóstico e smoke test read-only e bundle Worker aprovados.
+
+Além da integração já coberta pela CI #914, esta revisão validou as alterações de renderização:
+- `createFrameTimingSampler(120)` mantém uma janela limitada de intervalos `requestAnimationFrame` e apresenta p50/p95 do intervalo entre callbacks. Não mede tempo de GPU, temperatura nem FPS sustentado.
+- A animação de tropas/shaders pausa quando a página fica oculta, a cidade sai da viewport, há redução de movimento ou captura cinematográfica ativa; retoma quando as condições permitem.
+- Os diagnósticos de mapa verificam três batches de árvore nomeados e contam instâncias/meshes por travessia da cena, com descarte na saída.
+
+CI #920: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44050185543
+Artefato do benchmark atualizado: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44050185543/artifacts/14313311704
+
+Os limites permanecem: D1 staging ainda precisa ser provisionado, Preview com DB ainda não foi validado, Android físico ainda precisa de inspeção e as variantes comprimidas ainda não foram ativadas no runtime.
+
 ### Resultado quantitativo do benchmark CI #914
 
 As variantes independentes foram geradas e validadas pela CLI glTF Transform. Nenhum GLB original ou caminho do manifesto foi substituído.
