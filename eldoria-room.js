@@ -21,9 +21,7 @@ export class EldoriaRoom {
       return new Response("Eldoria realtime capacity reached", { status: 503 });
     }
 
-    const pair = new WebSocketPair();
-    const client = pair[0];
-    const server = pair[1];
+    const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({ playerId });
     server.send(JSON.stringify({ type: "connected", room: "eldoria" }));
