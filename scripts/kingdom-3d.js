@@ -5,7 +5,7 @@ import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "./kingdom-quality.js";
+import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler } from "./kingdom-quality.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 
 const host = document.getElementById("city");
@@ -20,6 +20,7 @@ if (host && "WebGLRenderingContext" in window) {
   let armyMixers = [];
   let animationFrame = 0;
   let lastAnimationTime = 0;
+  const animationFrameTiming = createFrameTimingSampler(120);
   const glbTemplates = new Map();
   const glbPropTemplates = new Map();
   const glbUnitTemplates = new Map();
@@ -559,6 +560,7 @@ if (host && "WebGLRenderingContext" in window) {
       lastAnimationTime = 0;
       return;
     }
+    if (lastAnimationTime) animationFrameTiming.record(timestamp - lastAnimationTime);
     const delta = lastAnimationTime ? Math.min(.05, Math.max(0, (timestamp - lastAnimationTime) / 1000)) : 0;
     lastAnimationTime = timestamp;
     for (const mixer of armyMixers) mixer.update(delta);
@@ -569,6 +571,7 @@ if (host && "WebGLRenderingContext" in window) {
   function startArmyAnimationLoop() {
     if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
     lastAnimationTime = 0;
+    animationFrameTiming.reset();
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
   function normalizeGlbTemplate(gltf, asset) {
@@ -828,7 +831,11 @@ if (host && "WebGLRenderingContext" in window) {
         pixelRatio: renderer.getPixelRatio(),
         maxTextureSize: renderer.capabilities.maxTextureSize,
         shadows: renderer.shadowMap.enabled,
-        premiumWater: Boolean(waterFeature)
+        premiumWater: Boolean(waterFeature),
+        animationLoop: {
+          active: Boolean(animationFrame),
+          ...animationFrameTiming.snapshot()
+        }
       };
     };
     window.__coiKingdomDiagnostics = diagnostics;
