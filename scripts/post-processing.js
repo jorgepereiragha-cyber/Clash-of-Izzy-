@@ -1,9 +1,9 @@
 /* Optional post-processing pipeline. Caller owns the render loop and calls render(). */
-import { EffectComposer } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/postprocessing/EffectComposer.js";
-import { RenderPass } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/postprocessing/RenderPass.js";
-import { ShaderPass } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/postprocessing/ShaderPass.js";
-import { UnrealBloomPass } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/postprocessing/UnrealBloomPass.js";
-import { FXAAShader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/shaders/FXAAShader.js";
+import { EffectComposer } from "three/addons/postprocessing/EffectComposer.js";
+import { RenderPass } from "three/addons/postprocessing/RenderPass.js";
+import { ShaderPass } from "three/addons/postprocessing/ShaderPass.js";
+import { UnrealBloomPass } from "three/addons/postprocessing/UnrealBloomPass.js";
+import { FXAAShader } from "three/addons/shaders/FXAAShader.js";
 
 const NordicGrade = {
   uniforms: { tDiffuse: { value: null }, intensity: { value: .16 } },
