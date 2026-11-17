@@ -18,7 +18,7 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.ok(renderer.includes("new THREE.InstancedMesh"));
   assert.match(renderer, /addForestInstances/);
   assert.match(kingdom, /type="importmap"/);
-  assert.ok(kingdom.includes('"three":"https://cdn.jsdelivr.net'));
+  assert.ok(kingdom.includes('"three":"/vendor/three/build/three.module.js"'));
 });
 
 test("bundled CC0 models can render props and only display units present in the army", () => {
