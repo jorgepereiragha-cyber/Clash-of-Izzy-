@@ -1679,7 +1679,7 @@ export default {
     if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
     const requestedPaymentMethod=String(body.paymentMethod||"manual_whatsapp");
     if(requestedPaymentMethod!=="manual_whatsapp")return json({error:"Os pedidos desta edição são tratados manualmente pelo WhatsApp."},400);
-    const paymentMethod="manual_whatsapp";
+    const paymentMethod="manual";
     const paymentReference=null;
     const player=await env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first();
     if(!player)return json({error:"Jogador não encontrado."},404);
