@@ -26,17 +26,17 @@ A redução de lotes e chamadas de chat ajuda a respeitar esses limites, mas ain
 
 ## Pendências obrigatórias antes de cobrar/publicar
 
-- **CI #963 aprovada numa versão anterior, antes da equipagem de skins:** 259/259 testes Node, Worker+D1, 3/3 cenários Playwright móveis, diagnóstico e smoke de produção somente leitura, e `wrangler deploy --dry-run` (357,25 KiB / 77,53 KiB gzip). A nova CI #966 está validando a PR #120, incluindo migration 0027 e equipagem; ainda não considerar o HEAD atual aprovado.
-- Segurança administrativa: PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab` após CI #941 verde. A proteção ainda precisa chegar à produção pelo workflow manual protegido.
-- **D1 de Preview ausente:** `wrangler.jsonc` tem `previews: {}` e não declara um banco D1 separado. Criar/confirmar um D1 descartável, adicionar `preview_database_id` sem tocar no binding de produção e validar somente nele. Não reutilizar o segundo ID antigo sem confirmar seu nome e finalidade.
+- **CI #972 aprovada no HEAD da PR #120:** 264/264 testes Node, Worker+D1, 3/3 cenários Playwright móveis, diagnóstico e smoke de produção somente leitura, e `wrangler deploy --dry-run` (359,16 KiB / 77,96 KiB gzip). O smoke read-only reportou `adminHealthAuthBoundary: true`. Isso valida a branch e a barreira pública do Worker atual, não publica as skins nem executa migration remota.
+- Segurança administrativa: PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab` após CI #941 verde. A CI #972 verificou a barreira por smoke read-only no Worker público, com `adminHealthAuthBoundary: true`.
+- **D1 de Preview ausente:** `wrangler.jsonc` tem `previews: {}` e não declara `previews.d1_databases`. Criar um D1 descartável, adicionar a binding `DB` em `previews.d1_databases` no `wrangler.jsonc` e criar `wrangler.preview-migrations.jsonc` com binding `PREVIEW_DB` apontando para o mesmo `database_id`. Só então aplicar migrations em `PREVIEW_DB`. Não alterar o binding de produção nem reutilizar o segundo ID antigo sem confirmar nome/finalidade.
 - Mercado Pago: confirmar no Worker os secrets `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`; executar compra de teste e receber webhook assinado. Sem essas credenciais, a loja usa link compartilhado e revisão manual Master.
-- Skins: equipagem e visualização foram implementadas nesta branch. A validação Worker+D1 e Playwright da migration 0027 e dos fluxos de propriedade está na CI #966; não vender como entregue em produção antes do merge/deploy.
+- Skins: equipagem e visualização foram implementadas e passaram na CI #972. As seis skins usam paletas de materiais/cores na geometria de castelo existente, não seis malhas 3D distintas. A PR #120 continua aberta; a função ainda não está publicada.
 - Android físico: testar cidade/mapa 3D, toque, PWA standalone, retomada de sessão, cache e consumo de memória.
 - Capacidade: medir CPU real, consultas D1 por `/api/game/state`, linhas lidas/escritas e backlog do Cron em staging antes de fixar limite público de jogadores.
 
 ## Preservação
 
-A correção de segurança da PR #116 foi publicada no código da `main`, mas ainda não foi implantada na produção; nenhum deploy de produção foi iniciado; nenhuma migration remota foi aplicada; nenhum banco, token, secret, conta, progresso, tropas, compras ou inventário foi apagado. A branch e a PR permanecem como proposta revisável até os gates acima passarem.
+A correção de segurança da PR #116 está integrada na `main`; o smoke read-only da CI #972 reportou a barreira administrativa ativa no Worker público. Nenhum deploy de skins ou migration remota foi iniciado; nenhum banco, token, secret, conta, progresso, tropas, compras ou inventário foi apagado. A branch e a PR permanecem como proposta revisável até os gates acima passarem.
 
 ## Sequência de lançamento
 
