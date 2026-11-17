@@ -419,6 +419,7 @@ async function loadPvpCombatProfile(env,kingdomId){
  const castleLevel=Math.max(1,Number(kingdom?.castle_level)||1);
  const wallMax=Math.max(1,Number(kingdom?.wall_max_hp)||1);
  const wallIntegrity=Math.max(0,Math.min(1,(Number(kingdom?.wall_hp)||0)/wallMax));
+ const structureDefense=Math.max(0,Math.floor((Number(kingdom?.defense_power)||0)/100));
  const troopDefenseBonusPercent=Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent));
  const castleDefenseBonusPercent=Math.min(30,troopDefenseBonusPercent+structureDefense+Math.round(wallIntegrity*5));
  return {
