@@ -39,7 +39,7 @@ Jogo de estratégia medieval 4X, persistente e prioritariamente móvel: desenvol
 - Three.js está fixado em 0.187.0 e os módulos/addons/decoders são gerados em /vendor/three/ por npm run vendor:three; o Service Worker v32 pré-cacheia o manifesto local.
 - O pipeline npm run assets:optimize compara Draco e Meshopt em variantes independentes, valida saídas e não substitui os GLBs originais.
 - O Preview marca ENVIRONMENT=preview, mas continua sem DB até existir um ID de D1 staging diferente do ID de produção.
-- Os loaders da cidade e compartilhado agora registram Draco/KTX2/Meshopt nos caminhos efetivamente usados. Não comprimir os GLBs atuais antes de servir decodificadores pela mesma origem, produzir variantes testadas e medir os aparelhos.
+- Os dois caminhos GLTF registram Draco/KTX2/Meshopt, e os decodificadores são servidos same-origin. A CI gera e valida variantes comparativas Draco/Meshopt; os GLBs comprimidos ainda não substituem originais no runtime até revisão visual e medição em Android.
 - Não considerar IndexedDB uma garantia permanente de offline. Cache API já armazena assets GET locais; o browser pode aplicar quota/evicção tanto a Cache quanto a IndexedDB.
 - Não considerar o shell offline como jogo jogável sem rede. O servidor continua sendo a fonte de verdade de saldos, filas, batalhas, compras e recompensas.
 
@@ -107,7 +107,7 @@ Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário impl
 - npm run assets:optimize cria variantes independentes Draco/Meshopt, valida e mede tamanho, sem trocar o manifesto. A CI gera e arquiva o relatório A/B em 3d-asset-compression-report.
 - O mapa mundial usa InstancedMesh para árvores do terreno e de territórios, em três batches por grupo; os volumes são calculados após as matrizes.
 - wrangler.jsonc marca ENVIRONMENT=preview. Sem D1 staging ID, env.DB não é fornecido ao Preview; não usar produção como fallback. Teste automatizado protege contra ID igual ao banco de produção.
-- A CI #907 está pendente para esta integração. O Android físico e o Preview com D1 staging continuam como gates antes do merge.
+- **CI #914 — sucesso:** 274/274 testes Node, 10/10 Playwright, migrações locais, Worker-D1, Service Worker v32, imports/decoders offline, benchmark e Worker bundle aprovados. Android físico e Preview com D1 staging continuam como gates antes do merge.
 
 
 ## Benchmark de compressão — CI #914
