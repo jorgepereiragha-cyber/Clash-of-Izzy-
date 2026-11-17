@@ -864,7 +864,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         "--command", "UPDATE marches SET arrives_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 seconds') WHERE kingdom_id=" + kingdomA + " AND target_territory_id=" + Number(enemyCastle.id) + " AND march_type='attack' AND status='marching';",
       ]);
 
-      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const resolvedAttackerState = await api("/api/game/state", { token: tokenA });
+      assert.equal(resolvedAttackerState.status, 200, "estado após resolução PvP: " + JSON.stringify(resolvedAttackerState.data));
+      stateA = resolvedAttackerState.data.state;
+      assert.ok(stateA?.battleReports, "Worker retorna relatório ao atacante");
       const pvpReportsA = stateA.battleReports.filter(report => report.battle_type === "territory_pvp");
       assert.equal(pvpReportsA.length, 1, "uma marcha gera exatamente um relatório PvP");
       const report = pvpReportsA[0];
