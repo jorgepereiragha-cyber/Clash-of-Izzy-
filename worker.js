@@ -643,10 +643,10 @@ async function gameState(env,playerId){
   let allianceDetails=null;
   if(allianceRow){
     const [members,chat,invites,wars]=await env.DB.batch([
-      env.DB.prepare("SELECT am.kingdom_id,am.rank,am.contribution,k.kingdom_name,k.power FROM alliance_members am JOIN kingdoms k ON k.id=am.kingdom_id WHERE am.alliance_id=? ORDER BY CASE am.rank WHEN 'lider' THEN 4 WHEN 'co_lider' THEN 3 WHEN 'oficial' THEN 2 ELSE 1 END DESC,k.power DESC").bind(alliance.id).all(),
-      env.DB.prepare("SELECT c.id,c.message,c.created_at,k.kingdom_name FROM alliance_chat c JOIN kingdoms k ON k.id=c.kingdom_id WHERE c.alliance_id=? ORDER BY c.id DESC LIMIT 50").bind(alliance.id).all(),
+      env.DB.prepare("SELECT am.kingdom_id,am.rank,am.contribution,k.kingdom_name,k.power FROM alliance_members am JOIN kingdoms k ON k.id=am.kingdom_id WHERE am.alliance_id=? ORDER BY CASE am.rank WHEN 'lider' THEN 4 WHEN 'co_lider' THEN 3 WHEN 'oficial' THEN 2 ELSE 1 END DESC,k.power DESC").bind(allianceRow.id).all(),
+      env.DB.prepare("SELECT c.id,c.message,c.created_at,k.kingdom_name FROM alliance_chat c JOIN kingdoms k ON k.id=c.kingdom_id WHERE c.alliance_id=? ORDER BY c.id DESC LIMIT 50").bind(allianceRow.id).all(),
       env.DB.prepare("SELECT i.id,i.created_at,a.name,a.tag FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.target_kingdom_id=? ORDER BY i.id DESC").bind(kingdom.id).all(),
-      env.DB.prepare("SELECT w.id,w.alliance_a_id,w.alliance_b_id,w.starts_at,w.ends_at,w.status,w.score_a,w.score_b,aa.name AS alliance_a_name,aa.tag AS alliance_a_tag,ab.name AS alliance_b_name,ab.tag AS alliance_b_tag FROM alliance_wars w JOIN alliances aa ON aa.id=w.alliance_a_id JOIN alliances ab ON ab.id=w.alliance_b_id WHERE (w.alliance_a_id=? OR w.alliance_b_id=?) ORDER BY w.id DESC LIMIT 10").bind(alliance.id,alliance.id).all()
+      env.DB.prepare("SELECT w.id,w.alliance_a_id,w.alliance_b_id,w.starts_at,w.ends_at,w.status,w.score_a,w.score_b,aa.name AS alliance_a_name,aa.tag AS alliance_a_tag,ab.name AS alliance_b_name,ab.tag AS alliance_b_tag FROM alliance_wars w JOIN alliances aa ON aa.id=w.alliance_a_id JOIN alliances ab ON ab.id=w.alliance_b_id WHERE (w.alliance_a_id=? OR w.alliance_b_id=?) ORDER BY w.id DESC LIMIT 10").bind(allianceRow.id,allianceRow.id).all()
     ]);
     allianceDetails={...allianceRow,members:members.results||[],chat:(chat.results||[]).reverse(),invites:invites.results||[],wars:wars.results||[]};
   }
