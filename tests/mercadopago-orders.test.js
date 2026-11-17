@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
-test("Mercado Pago creates one Orders API checkout linked to an existing purchase request", async () => {
+test("legacy Mercado Pago checkout implementation retains idempotency protections but is disabled for new launch orders", async () => {
   const module = await read("mercadopago-orders.js");
   const migration = await read("migrations/0024_player_accounts_mercadopago_orders.sql");
   for (const snippet of [
