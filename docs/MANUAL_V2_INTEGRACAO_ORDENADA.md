@@ -78,7 +78,7 @@ Arquivos e telas existentes:
 - `alliance.html` e `arena.html`: recursos sociais e chat de aliança.
 - `events.html` e `events.js`: eventos.
 - `equipment-system.js` e telas relacionadas: forja e equipamentos.
-- `arena.html`: loja integrada com o checkout Mercado Pago.
+- `arena.html`: loja com pedido registrado, redirecionamento WhatsApp e acompanhamento da aprovação Master.
 
 Não trocar a cena 3D existente por uma caixa dourada de demonstração nem substituir a interface atual por um HUD paralelo. Os controles novos devem usar os dados retornados pela API e padrões visuais compartilhados.
 
@@ -92,21 +92,23 @@ Arquivos oficiais:
 
 O manifesto já abre o reino em `/kingdom.html`. O Service Worker usa cache versionado e exclui chamadas da API do cache offline. Ao adicionar ou alterar assets cacheados, incrementar a versão do cache e atualizar os testes/smoke test correspondentes. Não criar outro Service Worker ou outra chave de versão concorrente.
 
-### Fase 5 — Mercado Pago
+### Fase 5 — Vendas manuais pelo WhatsApp (edição inicial)
 
-**Estado atual:** a loja cria pedido individual em `purchase_requests`. O Worker contém checkout individual Mercado Pago Orders (`POST /api/store/checkout`) e webhook (`POST /api/webhook/mp`) em `mercadopago-orders.js`. Quando as credenciais não estão configuradas, a interface preserva o link hospedado compartilhado `https://link.mercadopago.com.br/pagamentosskin` e a aprovação manual Master como alternativa auditável.
+**Estado atual:** a loja apresenta os pacotes VIP e as seis skins liberadas. Ao escolher um item, o Worker valida a sessão do jogador, verifica o catálogo e registra um pedido em `purchase_requests` com o método de banco `manual`. A interface abre o WhatsApp comercial `5547996531437` com o número do pedido, ID do jogador, reino, nome do produto e o valor gravado no pedido. Quando existe pedido pendente, o sistema reutiliza os dados e o preço originais.
 
-**Webhook automático está implementado no código, mas ainda não está liberado operacionalmente.** O checkout individual gera `external_reference` opaca e chave de idempotência por pedido; o webhook valida HMAC-SHA256, consulta a Order diretamente no Mercado Pago, confere referência, valor, moeda e pagamentos processados, e só então credita/libera em lote idempotente no D1. A presença dos secrets no Worker e uma compra/webhook real ainda não foram confirmadas. O link compartilhado não oferece associação individual automática. Nunca aceitar `payment_reference` digitado pelo usuário como prova de pagamento.
+**Liberação pelo painel Master:** `admin.html` lista os pedidos pendentes e exibe o botão verde `✓ Liberar pacote`. A ação exige sessão administrativa, só processa pedidos ainda pendentes e concede as gemas do pacote VIP ou adiciona a skin ao inventário do jogador. O status é alterado no servidor; o jogador não consegue aprovar o próprio pedido. O Master deve confirmar o recebimento fora do jogo antes de clicar no botão. O WhatsApp apenas abre a conversa, não confirma pagamento.
 
-Para ativar a confirmação automática em produção, as próximas validações deverão:
-1. Configurar `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` diretamente nos secrets do Worker (nunca no Git ou em `wrangler.jsonc`).
-2. Configurar a URL oficial de notificação do Mercado Pago para `POST /api/webhook/mp`.
-3. Executar compra de teste de baixo valor e receber uma notificação assinada do ambiente real; verificar também assinatura inválida, pedido expirado e notificação duplicada.
-4. Conferir que o valor, a moeda BRL, o status `processed`, a referência externa e o ID da Order correspondem ao pedido.
-5. Confirmar que a liberação idempotente ocorre uma única vez no D1 e que nenhuma referência digitada pelo jogador altera o saldo.
-6. Manter a aprovação Master e o link compartilhado como fallback até a validação de ponta a ponta.
+**Mercado Pago desativado para novos pedidos nesta edição:** `POST /api/store/checkout` retorna `410 MANUAL_WHATSAPP_ONLY`. O webhook legado `POST /api/webhook/mp` permanece somente para compatibilidade com ordens Mercado Pago que já tivessem sido criadas antes da edição manual. Pedidos novos não recebem referência externa nem ID de Order do Mercado Pago e não podem ser liberados por esse webhook. Não configurar nem divulgar checkout automático nesta edição.
 
-Essa etapa depende de secrets reais e URL de notificação configurados no Worker. Não anunciar pagamento automático nem remover o fallback até completar o teste assinado de ponta a ponta; essa configuração ainda não foi confirmada nesta auditoria.
+Validação antes da publicação:
+1. Criar um pedido de pacote VIP e confirmar que o WhatsApp recebe o número do pedido, jogador, reino, produto e preço correto.
+2. Criar um pedido de skin e confirmar que a mensagem inclui os dados da skin.
+3. Repetir a solicitação do mesmo produto e confirmar que o pedido pendente e o preço originais são reutilizados.
+4. No painel Master, aprovar um pedido de teste e verificar que gemas ou skin foram entregues uma única vez.
+5. Tentar aprovar o mesmo pedido novamente e confirmar que o Worker rejeita a repetição.
+6. Confirmar que uma chamada direta a `/api/store/checkout` retorna `410 MANUAL_WHATSAPP_ONLY`.
+
+Não é necessário configurar `MP_ACCESS_TOKEN` nem `MP_WEBHOOK_SECRET` para vender pela edição inicial. Uma eventual reativação de pagamentos automáticos deve ser uma futura alteração separada, solicitada pelo proprietário, com sandbox, webhook e testes ponta a ponta.
 
 ### Fase 6 — Publicação e verificação
 
@@ -124,10 +126,10 @@ Bindings e segredos atuais documentados:
 - D1: binding `DB`, configurado em `wrangler.jsonc`;
 - `SESSION_SECRET`: assinatura/verificação de sessão;
 - `ADMIN_EMAIL` e `ADMIN_PASSWORD`: painel Master;
-- `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`: checkout Orders/webhook Mercado Pago (configuração em produção ainda pendente de confirmação);
+- `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`: não são necessários para vendas manuais desta edição; ficam apenas para compatibilidade do webhook com ordens antigas.
 - `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`: GitHub Actions.
 
-`JWT_SECRET` não é usado pela implementação atual: a sessão de jogo/conta usa `SESSION_SECRET`. `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` já são consumidos por `mercadopago-orders.js`, mas só devem ser marcados como configurados após conferência no Worker e teste real do webhook.
+`JWT_SECRET` não é usado pela implementação atual: a sessão de jogo/conta usa `SESSION_SECRET`. Os secrets `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` não devem ser adicionados por causa da loja desta edição; o handler de webhook só os consulta para ordens históricas que já existam.
 
 ## 4. Escopo já existente e trabalho posterior
 
@@ -139,13 +141,13 @@ Bindings e segredos atuais documentados:
 - Heróis, equipamentos, forja e bônus calculados no servidor.
 - Mascotes e efeitos passivos.
 - Evento mundial Anjo da Morte e ranking de pontuação do evento.
-- Loja de pacotes/skins com Mercado Pago por link e aprovação Master.
+- Loja de pacotes/skins com pedidos registrados, redirecionamento WhatsApp e liberação Master.
 - Cidade 3D, mapa mundial, fallback, manifesto 3D e PWA.
 - Painel Master, limites de requisição, analytics, feedback e inscrições beta.
 
 ### Próximas entregas em ordem segura
 1. **Contas de jogador:** concluir recuperação/alteração de senha e validar cadastro/login entre dispositivos com preservação do mesmo `players.id` e reino.
-2. **Mercado Pago automático:** configurar secrets e URL de notificação; validar checkout e webhook assinados no ambiente real, manter o fluxo Master como fallback.
+2. **Vendas manuais:** validar pedido VIP, pedido de skin, redirecionamento WhatsApp e aprovação Master no D1 Preview isolado e em Android físico.
 3. **Chat mundial:** canal global com limites, paginação, retenção e moderação; sem misturar mensagens globais com `alliance_chat`.
 4. **Ranking global de poder:** endpoint autenticado/público com ordenação e paginação, distinto do ranking do evento.
 5. **Push notifications:** assinatura VAPID, armazenamento de subscriptions, consentimento, remoção de endpoints inválidos e entrega acionada por eventos reais.
