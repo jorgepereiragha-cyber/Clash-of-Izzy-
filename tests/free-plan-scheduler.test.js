@@ -14,6 +14,8 @@ test("the free-plan scheduler processes bounded batches instead of unbounded bac
   assert.ok(worker.includes("ORDER BY kingdom_id LIMIT 1"));
   assert.ok(worker.includes("await processMarches(env,row.kingdom_id,2)"));
   assert.ok(worker.includes("ORDER BY ends_at LIMIT 1"));
+  assert.ok(worker.includes("ROW_NUMBER() OVER (ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC) AS final_rank"));
+  assert.ok(worker.includes("ORDER BY ranked.final_rank LIMIT 10"));
   assert.ok(worker.includes("await processEmailQueue(env,1)"));
   assert.ok(worker.includes("ORDER BY expires_at LIMIT 100"));
   assert.ok(worker.includes("ORDER BY replay_expires_at,id LIMIT 25"));
