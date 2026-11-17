@@ -75,13 +75,13 @@ test("shop, cosmetics, heroes and pets collapse independent state reads into D1 
   const worker = await read("worker.js");
   const pets = await read("pets.js");
   const shopStart = worker.indexOf("async function getShopState(env,kingdomId)");
-  const shopEnd = worker.indexOf("\\nfunction heroView", shopStart);
+  const shopEnd = worker.indexOf("function heroView", shopStart);
   const cosmeticStart = worker.indexOf("async function getCosmeticState(env,kingdomId)");
-  const cosmeticEnd = worker.indexOf("\\nconst SHOP_ITEMS", cosmeticStart);
+  const cosmeticEnd = worker.indexOf("const SHOP_ITEMS", cosmeticStart);
   const heroStart = worker.indexOf("async function syncHeroSystems(env,kingdomId)");
-  const heroEnd = worker.indexOf("\\nasync function gameState", heroStart);
+  const heroEnd = worker.indexOf("async function gameState", heroStart);
   const petsStart = pets.indexOf("export async function getPetsState(env, kingdomId)");
-  const petsEnd = pets.indexOf("\\nasync function unlockPet", petsStart);
+  const petsEnd = pets.indexOf("async function unlockPet", petsStart);
   assert.ok(shopStart >= 0 && shopEnd > shopStart);
   assert.ok(cosmeticStart >= 0 && cosmeticEnd > cosmeticStart);
   assert.ok(heroStart >= 0 && heroEnd > heroStart);
