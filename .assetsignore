@@ -1,5 +1,6 @@
 worker.js
 wrangler.jsonc
+wrangler.preview-migrations.jsonc
 .assetsignore
 README.md
 .git/**
