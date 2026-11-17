@@ -57,3 +57,14 @@ test("Core Loop validation is read-only unless a separately confirmed training r
   assert.doesNotMatch(script, /token_de_teste_ficticio/);
   assert.doesNotMatch(script, /\{\s*action:\s*"train",\s*unit_type:/);
 });
+
+
+test("README documents the manual production gate and current main cache version", async () => {
+  const readme = await readFile(resolve(root, "README.md"), "utf8");
+  assert.match(readme, /## Deploy manual protegido/);
+  assert.match(readme, /workflow_dispatch/);
+  assert.match(readme, /confirm_production/);
+  assert.match(readme, /Um push para `main` executa a CI de qualidade, não o deploy de produção/);
+  assert.match(readme, /cache atual do Service Worker nesta branch é v27/);
+  assert.doesNotMatch(readme, /## Deploy automático/);
+});
