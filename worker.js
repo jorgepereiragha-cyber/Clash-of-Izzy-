@@ -1398,13 +1398,18 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
 }
 
 async function distributeAngelDeathRewards(env,eventId,now=new Date()){
-  const participants=await env.DB.prepare("SELECT ep.kingdom_id,k.player_id,ep.score FROM world_event_participants ep JOIN kingdoms k ON k.id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0 ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC")
-    .bind(eventId).all();
+  const participants=await env.DB.prepare(
+    "SELECT ranked.kingdom_id,ranked.player_id,ranked.score,ranked.final_rank FROM ("+
+    "SELECT ep.kingdom_id,k.player_id,ep.score,ROW_NUMBER() OVER (ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC) AS final_rank "+
+    "FROM world_event_participants ep JOIN kingdoms k ON k.id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0) ranked "+
+    "LEFT JOIN world_event_rewards wr ON wr.event_id=? AND wr.kingdom_id=ranked.kingdom_id "+
+    "WHERE wr.id IS NULL OR wr.paid_at IS NULL ORDER BY ranked.final_rank LIMIT 10"
+  ).bind(eventId,eventId).all();
   const rows=participants.results||[];
-  for(let offset=0;offset<rows.length;offset+=15){
+  if(rows.length){
     const statements=[];
-    for(let index=offset;index<Math.min(rows.length,offset+15);index++){
-      const participant=rows[index],rank=index+1,reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
+    for(let index=0;index<rows.length;index++){
+      const participant=rows[index],rank=Number(participant.final_rank)||index+1,reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
       statements.push(env.DB.prepare("INSERT OR IGNORE INTO world_event_rewards(event_id,kingdom_id,rank,score,reward_json) VALUES(?,?,?,?,?)").bind(eventId,participant.kingdom_id,rank,participant.score,rewardJson));
       statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()>0").bind(reward.food,reward.wood,reward.stone,reward.iron,reward.gold,participant.kingdom_id));
       statements.push(env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()>0").bind(reward.gems,participant.player_id));
