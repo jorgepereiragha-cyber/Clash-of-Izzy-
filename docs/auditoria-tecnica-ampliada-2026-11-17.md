@@ -235,15 +235,15 @@ A redução de download de Draco não equivale automaticamente à redução prop
 
 ### Validação CI e bloqueios restantes
 
-A CI #885, no commit 3c8fd7d, passou nos passos de migração D1 local, Service Worker, manifesto 3D, testes Worker/D1 e nos nove testes Playwright anteriores. O novo teste falhou somente ao executar page.goto('/offline.html') com contexto offline (net::ERR_FAILED). O teste foi ajustado conforme descrito acima e a configuração de decodificadores foi adicionada depois. A nova revisão ainda depende de uma CI verde; não declarar essa correção validada antes dos resultados.
+A CI #888 no commit `fa9dcfa` terminou com **sucesso**: migrações D1 locais, validação do Service Worker, manifesto e GLBs, testes Worker/D1, **10/10 testes Playwright Chromium**, diagnóstico de produção somente leitura, smoke read-only e bundle do Worker aprovados. Isso valida a alteração de teste do Service Worker e a configuração dos loaders em CI. Não substitui teste de inicialização real com modelos Draco/KTX2/Meshopt, inspeção em Android físico ou gameplay offline.
 
 Para Preview Cloudflare, continua faltando um D1 de staging real. A documentação atual confirma que os bindings de Preview devem apontar para recursos de teste, e que D1 migrations devem ser aplicadas na mesma base utilizada por previews.d1_databases: https://developers.cloudflare.com/workers/previews/resources/. Sem o database_id de staging, não inserir placeholder e não reutilizar o ID de produção.
 
 ### Próxima sequência técnica
 
-1. Obter CI verde para o teste offline e para as alterações dos loaders.
+1. **Concluído:** CI #888 verde para teste offline, decodificadores registrados, Worker bundle e suíte automatizada.
 2. Provisionar D1 staging e configurar previews.d1_databases sem tocar no banco de produção.
-3. Servir módulos Three.js, addons e decodificadores same-origin; confirmar inicialização offline em Chromium e Android.
+3. Servir módulos Three.js, addons e decodificadores same-origin; confirmar inicialização 3D offline em Chromium e Android.
 4. Gerar variantes high/low e decidir LOD por tamanho em tela na câmera ortográfica; medir por perfil gráfico.
 5. Criar pipeline inspect -> transform -> validate -> compare, com rollback para os GLBs originais.
 6. Só depois de benchmark definir se existe um domínio de estado que justifique Durable Objects; manter D1 autoritativo enquanto isso.
