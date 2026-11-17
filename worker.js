@@ -605,7 +605,7 @@ async function gameState(env,playerId){
       "LEFT JOIN players op ON op.id=owner.player_id LEFT JOIN player_nicknames n ON n.player_id=op.id "+
       "WHERE wt.territory_kind='resource' OR (wt.territory_kind='castle' AND wt.owner_kingdom_id<>? "+
       "AND wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?) ORDER BY wt.territory_kind,wt.id LIMIT 250"
-    ).bind(kingdom.id,
+    ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,kingdom.id,
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45).all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
