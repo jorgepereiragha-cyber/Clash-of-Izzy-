@@ -1,8 +1,8 @@
 # Publicação do Clash of Izzy
 
-## Publicação automática
+## Publicação em produção (manual e protegida)
 
-O workflow `.github/workflows/deploy-cloudflare.yml` executa nesta ordem:
+O workflow `.github/workflows/deploy-cloudflare.yml` é acionado manualmente (`workflow_dispatch`) e exige confirmação explícita de produção. Ele executa nesta ordem:
 
 1. valida o bundle do Worker com `wrangler deploy --dry-run`;
 2. aplica todas as migrações em um D1 local descartável para detectar erros SQL antes de tocar na produção;
