@@ -34,13 +34,30 @@
           5.1,
           0,
           2.5
+        ],
+        [
+          -5.15,
+          0,
+          -2.35
         ]
       ],
       "targetFootprint": 1.9,
       "targetHeight": 2.15,
       "source": "Kenney Castle Kit",
       "sourceUrl": "https://kenney.nl/assets/castle-kit",
-      "license": "CC0-1.0"
+      "license": "CC0-1.0",
+      "rotations": [
+        [
+          0,
+          0,
+          0
+        ],
+        [
+          0,
+          3.141592653589793,
+          0
+        ]
+      ]
     },
     {
       "id": "kenney-tree-high",
@@ -51,6 +68,31 @@
           6,
           0,
           -4.5
+        ],
+        [
+          -6,
+          0,
+          4.5
+        ],
+        [
+          6.1,
+          0,
+          4.45
+        ],
+        [
+          -6.1,
+          0,
+          -4.4
+        ],
+        [
+          3.1,
+          0,
+          -4.8
+        ],
+        [
+          -3.2,
+          0,
+          4.8
         ]
       ],
       "targetFootprint": 1.25,
