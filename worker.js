@@ -115,10 +115,10 @@ async function ensureCosmeticDefaults(env,kingdomId){
 }
 async function getCosmeticState(env,kingdomId){
  await ensureCosmeticDefaults(env,kingdomId);
- const [owned,claims,wallet]=await Promise.all([
-  env.DB.prepare("SELECT item_id,kind,acquired_at FROM kingdom_cosmetics WHERE kingdom_id=? ORDER BY acquired_at").bind(kingdomId).all(),
-  env.DB.prepare("SELECT collection_id FROM kingdom_collection_claims WHERE kingdom_id=?").bind(kingdomId).all(),
-  env.DB.prepare("SELECT shards FROM kingdom_cosmetic_wallet WHERE kingdom_id=?").bind(kingdomId).first()
+ const [owned,claims,wallet]=await env.DB.batch([
+  env.DB.prepare("SELECT item_id,kind,acquired_at FROM kingdom_cosmetics WHERE kingdom_id=? ORDER BY acquired_at").bind(kingdomId),
+  env.DB.prepare("SELECT collection_id FROM kingdom_collection_claims WHERE kingdom_id=?").bind(kingdomId),
+  env.DB.prepare("SELECT shards FROM kingdom_cosmetic_wallet WHERE kingdom_id=?").bind(kingdomId)
  ]);
  return {owned:owned.results||[],claimed:(claims.results||[]).map(x=>x.collection_id),shards:wallet?.shards||0,skins:COSMETIC_SKINS,collections:COSMETIC_COLLECTIONS,seasonal:SEASONAL_COSMETICS,seasonEnd:SEASON_END,seasonActive:Date.now()<Date.parse(SEASON_END),fusions:SKIN_FUSIONS};
 }
@@ -165,9 +165,11 @@ function merchantOffers(cycle){
 }
 async function getShopState(env,kingdomId){
 const cycle=merchantCycle(),offers=merchantOffers(cycle);
- const rows=await env.DB.prepare("SELECT item_id,stock FROM merchant_stock WHERE kingdom_id=? AND cycle_id=?").bind(kingdomId,cycle).all();
+ const [rows,inventory]=await env.DB.batch([
+  env.DB.prepare("SELECT item_id,stock FROM merchant_stock WHERE kingdom_id=? AND cycle_id=?").bind(kingdomId,cycle),
+  env.DB.prepare("SELECT item_id,quantity FROM shop_inventory WHERE kingdom_id=? AND quantity>0 ORDER BY item_id").bind(kingdomId)
+ ]);
  const stock=Object.fromEntries((rows.results||[]).map(r=>[r.item_id,r.stock]));
- const inventory=await env.DB.prepare("SELECT item_id,quantity FROM shop_inventory WHERE kingdom_id=? AND quantity>0 ORDER BY item_id").bind(kingdomId).all();
  return {cycle,refreshAt:(cycle+1)*SHOP_CYCLE_MS,offers:offers.map(o=>({...SHOP_ITEMS[o.id],id:o.id,price:o.price,discount:o.discount,stock:stock[o.id]??o.stock,originalPrice:SHOP_ITEMS[o.id].price})),items:SHOP_ITEMS,inventory:inventory.results||[]};
 }
 function heroView(row){const t=HERO_TEMPLATES[row.hero_key],r=HERO_RARITY[row.rarity];if(!t||!r)return row;const stats=Object.fromEntries(Object.entries(t.stats).map(([key,value])=>[key,Math.floor(value*r.multiplier*(1+(row.level-1)*.03+(row.stars-1)*.15))]));return {...row,name:t.name,title:t.title,type:t.type,rarity_label:r.label,max_level:r.maxLevel,max_stars:r.maxStars,stats,skill:t.skill,skill_description:t.skillDesc,skill_power:t.skillPower,fragments_to_next:HERO_STAR_COST[row.stars+1]||null};}
@@ -562,20 +564,22 @@ function equipmentView(row){
 
 async function syncHeroSystems(env,kingdomId){
   // hero_inventory is canonical for collection progression; heroes is the equipment binding.
-  await env.DB.prepare("INSERT OR IGNORE INTO hero_inventory(kingdom_id,hero_key,rarity,level,experience) SELECT kingdom_id,hero_key,CASE rarity WHEN 'common' THEN 'white' WHEN 'rare' THEN 'blue' WHEN 'epic' THEN 'purple' WHEN 'legendary' THEN 'purple' WHEN 'mythic' THEN 'purple' ELSE 'white' END,level,experience FROM heroes WHERE kingdom_id=?").bind(kingdomId).run();
-  const inventory=await env.DB.prepare(
-    "SELECT hi.hero_key,hi.rarity,hi.level,hi.experience,vhc.hero_name AS seasonal_hero_name,vhc.rarity AS seasonal_hero_rarity " +
-    "FROM hero_inventory hi LEFT JOIN valhalla_hero_catalog vhc ON vhc.hero_key=hi.hero_key " +
-    "WHERE hi.kingdom_id=? ORDER BY hi.hero_key"
-  ).bind(kingdomId).all();
+  const [,inventory]=await env.DB.batch([
+    env.DB.prepare("INSERT OR IGNORE INTO hero_inventory(kingdom_id,hero_key,rarity,level,experience) SELECT kingdom_id,hero_key,CASE rarity WHEN 'common' THEN 'white' WHEN 'rare' THEN 'blue' WHEN 'epic' THEN 'purple' WHEN 'legendary' THEN 'purple' WHEN 'mythic' THEN 'purple' ELSE 'white' END,level,experience FROM heroes WHERE kingdom_id=?").bind(kingdomId),
+    env.DB.prepare(
+      "SELECT hi.hero_key,hi.rarity,hi.level,hi.experience,vhc.hero_name AS seasonal_hero_name,vhc.rarity AS seasonal_hero_rarity " +
+      "FROM hero_inventory hi LEFT JOIN valhalla_hero_catalog vhc ON vhc.hero_key=hi.hero_key " +
+      "WHERE hi.kingdom_id=? ORDER BY hi.hero_key"
+    ).bind(kingdomId)
+  ]);
   const statements=(inventory.results||[]).map(hero=>{
     const rarity=hero.seasonal_hero_rarity || (hero.rarity==="white"?"common":hero.rarity==="blue"?"rare":"legendary");
     const name=HERO_TEMPLATES[hero.hero_key]?.name||hero.seasonal_hero_name||hero.hero_key;
     return env.DB.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) VALUES(?,?,?,?,?,?) ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET level=MAX(heroes.level,excluded.level),experience=MAX(heroes.experience,excluded.experience),rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END WHERE heroes.level<excluded.level OR heroes.experience<excluded.experience OR heroes.rarity<>excluded.rarity OR heroes.hero_name IS NULL OR heroes.hero_name=''")
       .bind(kingdomId,hero.hero_key,name,Math.max(1,Number(hero.level)||1),Math.max(0,Number(hero.experience)||0),rarity);
   });
-  if(statements.length)await env.DB.batch(statements);
-  await env.DB.prepare("UPDATE hero_inventory SET level=MAX(level,COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level)),experience=MAX(experience,COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience)) WHERE kingdom_id=? AND (level<COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level) OR experience<COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience))").bind(kingdomId).run();
+  statements.push(env.DB.prepare("UPDATE hero_inventory SET level=MAX(level,COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level)),experience=MAX(experience,COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience)) WHERE kingdom_id=? AND (level<COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level) OR experience<COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience))").bind(kingdomId));
+  await env.DB.batch(statements);
 }
 
 async function gameState(env,playerId){
