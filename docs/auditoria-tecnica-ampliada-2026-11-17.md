@@ -159,7 +159,7 @@ Referências:
 
 ## 6. Evidências automatizadas e limites
 
-A CI #882 no commit `363a983` concluiu com sucesso: 266/266 testes Node, 9/9 Playwright, smoke test read-only e bundle Worker dry-run. A execução anterior #880 falhou em um caso de PvP com erro de variável não definida; o commit auditado posterior já passou. O novo teste PWA/offline foi acrescentado no commit `1c2b4fedd8ef6a2a2f353105ca1ad4e49d9e8fd1`; sua CI precisa confirmar esse teste antes de considerar a adição validada.
+A CI #882 no commit `363a983` é o baseline histórico: 266/266 testes Node, 9/9 Playwright, smoke read-only e Worker bundle dry-run. A CI #914, no commit `6f5fe6b`, é a validação atual e concluiu com **274/274 testes Node**, **10/10 Playwright**, migrações D1 locais, Service Worker v32, manifesto 3D, benchmark Draco/Meshopt, Worker-D1, first import offline dos módulos Three.js, fetch dos decodificadores, smoke read-only e bundle Worker. A falha #913 (worker não assumiu controle por README opcional que retornou 404) foi corrigida removendo esses arquivos não-runtime do manifesto de precache; a #914 passou.
 
 A aprovação de CI não comprova:
 - deployment Preview no commit atual;
@@ -273,7 +273,7 @@ wrangler.jsonc agora define previews.vars.ENVIRONMENT = preview e mantém o D1 d
 
 ### CI e artefatos
 
-A CI #914 terminou com sucesso no commit `6f5fe6b`: **266/266 testes Node**, **10/10 Playwright Chromium**, Service Worker v32, primeira importação Three.js offline, decodificadores Draco/Basis same-origin, benchmark comparativo, testes Worker/D1, smoke read-only e bundle do Worker aprovados. Relatório e variantes A/B: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44049256611/artifacts/14312946574.
+A CI #914 terminou com sucesso no commit `6f5fe6b`: **274/274 testes Node**, **10/10 Playwright Chromium**, Service Worker v32, primeira importação Three.js offline, decodificadores Draco/Basis same-origin, benchmark comparativo, testes Worker/D1, smoke read-only e bundle do Worker aprovados. Relatório e variantes A/B: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44049256611/artifacts/14312946574.
 ### Resultado quantitativo do benchmark CI #914
 
 As variantes independentes foram geradas e validadas pela CLI glTF Transform. Nenhum GLB original ou caminho do manifesto foi substituído.
