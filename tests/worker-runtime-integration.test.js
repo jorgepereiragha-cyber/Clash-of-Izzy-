@@ -149,6 +149,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       "SESSION_SECRET:" + SESSION_SECRET,
       "ADMIN_EMAIL:" + ADMIN_EMAIL,
       "ADMIN_PASSWORD:" + ADMIN_PASSWORD,
+      "--var",
+      "PVP_DEBUG:1",
       "--log-level", "error",
     ], {
       cwd: root,
