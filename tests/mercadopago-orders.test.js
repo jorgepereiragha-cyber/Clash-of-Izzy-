@@ -49,7 +49,7 @@ test("launch store registers a manual request and redirects to WhatsApp instead 
 
 
 import { webcrypto } from "node:crypto";
-import { validateWebhookSignature } from "../mercadopago-orders.js";
+import { handleMercadoPagoRoute, validateWebhookSignature } from "../mercadopago-orders.js";
 
 globalThis.crypto ??= webcrypto;
 
@@ -101,4 +101,29 @@ test("Mercado Pago webhook signature accepts the official HMAC manifest and reje
     headers: { "x-signature": `ts=${timestamp},v1=${validSignature}` }
   });
   assert.equal(await validateWebhookSignature(missingRequestId, orderId, secret), false);
+});
+
+
+test("launch edition blocks new Mercado Pago checkouts and keeps legacy webhook route", async () => {
+  const ctx = {
+    json(payload, status = 200) {
+      return new Response(JSON.stringify(payload), {
+        status,
+        headers: { "content-type": "application/json" }
+      });
+    }
+  };
+  const checkoutRequest = new Request("https://game.example/api/store/checkout", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ requestId: 1 })
+  });
+  const checkoutResponse = await handleMercadoPagoRoute(checkoutRequest, {}, ctx);
+  assert.equal(checkoutResponse.status, 410);
+  assert.equal((await checkoutResponse.json()).code, "MANUAL_WHATSAPP_ONLY");
+
+  const webhookRequest = new Request("https://game.example/api/webhook/mp?type=order&data.id=OLD-ORDER", {
+    method: "POST"
+  });
+  assert.equal(await handleMercadoPagoRoute(webhookRequest, {}, ctx), null === null ? undefined : null);
 });
