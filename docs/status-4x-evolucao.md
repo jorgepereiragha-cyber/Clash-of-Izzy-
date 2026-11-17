@@ -26,7 +26,7 @@ Jogo de estratégia medieval 4X, persistente e prioritariamente móvel: desenvol
 | Cidade 3D | Three.js 0.187.0 fixado; módulos/addons e decodificadores Draco/KTX2/Meshopt gerados same-origin; carregadores configurados; cinco GLBs no manifesto | Os GLBs originais continuam no runtime; CI compara variantes independentes Draco/Meshopt; faltam aprovação visual, profiling, LOD por cobertura em tela e Android físico |
 | Renderização do mapa 3D | Three.js same-origin, câmera isométrica; árvores do terreno e de territórios agrupadas em três InstancedMesh batches, com bounds recalculados e frustum culling | Medir draw calls, sombras, overdraw e frame time em Android; controles pan/zoom permanecem Pointer Events/CSS |
 | PWA/offline | Service Worker v32; shell, módulos Three.js/addons, Draco/Basis decoders e GETs same-origin cacheados; /api/* continua fora do cache | CI valida first import de módulos e bytes dos decodificadores offline; gameplay autenticado/D1 continua online; falta inspeção Android físico |
-| Preview Cloudflare | Wrangler 4.161.0; `previews.vars.ENVIRONMENT=preview`; teste impede que Preview reutilize o D1 de produção | `previews.d1_databases` ainda ausente por falta de ID de D1 staging; Preview fica sem `env.DB` até provisionar e migrar a base isolada |
+| Preview Cloudflare | `wrangler.jsonc` declara `previews.vars.ENVIRONMENT=preview` e binding `DB` para D1 `izzy-preview-17112026` (ID `6674c0ac-3636-4e57-bff8-23cf60ab9637`), distinto do D1 de produção; `wrangler.preview-migrations.jsonc` aponta para o mesmo staging via `PREVIEW_DB` | Configuração isolada está declarada no código, mas ainda falta executar migrações remotas no staging e validar um deployment Preview real, incluindo `env.DB` e rotas de jogo |
 | Android físico | Relatório visual parcial de 16/11 | Cidade 3D, texturas, sombras, PWA standalone, Service Worker controlador e offline ainda pendentes |
 
 ## Estado técnico e decisões de arquitetura
@@ -38,7 +38,7 @@ Jogo de estratégia medieval 4X, persistente e prioritariamente móvel: desenvol
 - Não mover a economia para Durable Objects sem benchmark e desenho de consistência. O D1 já oferece transações via `batch()` e o Worker já utiliza guardas condicionais em operações críticas.
 - Three.js está fixado em 0.187.0 e os módulos/addons/decoders são gerados em /vendor/three/ por npm run vendor:three; o Service Worker v32 pré-cacheia o manifesto local.
 - O pipeline npm run assets:optimize compara Draco e Meshopt em variantes independentes, valida saídas e não substitui os GLBs originais.
-- O Preview marca ENVIRONMENT=preview, mas continua sem DB até existir um ID de D1 staging diferente do ID de produção.
+- O Preview marca `ENVIRONMENT=preview` e declara `DB` ligado ao D1 staging `izzy-preview-17112026`; a configuração não prova, por si só, que o banco remoto já foi migrado ou que o deployment Preview está operacional.
 - Os dois caminhos GLTF registram Draco/KTX2/Meshopt, e os decodificadores são servidos same-origin. A CI gera e valida variantes comparativas Draco/Meshopt; os GLBs comprimidos ainda não substituem originais no runtime até revisão visual e medição em Android.
 - Não considerar IndexedDB uma garantia permanente de offline. Cache API já armazena assets GET locais; o browser pode aplicar quota/evicção tanto a Cache quanto a IndexedDB.
 - Não considerar o shell offline como jogo jogável sem rede. O servidor continua sendo a fonte de verdade de saldos, filas, batalhas, compras e recompensas.
