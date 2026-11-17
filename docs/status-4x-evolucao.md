@@ -1,70 +1,96 @@
 # Auditoria funcional — Clash of Izzy
 
-Atualizado em 15 nov 2026. Este documento separa o que existe no repositório, o que foi validado automaticamente e o que ainda não corresponde ao jogo 4X planejado. Código presente não é sinônimo de funcionalidade validada em produção.
+**Atualizado em 17/11/2026.** Este documento separa o que existe no código, o que foi validado automaticamente e o que ainda não corresponde ao jogo 4X planejado. Código presente não é sinônimo de funcionalidade validada em Preview, produção ou Android físico.
 
 ## Escopo do produto
 
-O objetivo continua sendo um jogo de estratégia medieval 4X, persistente e prioritariamente móvel: desenvolver um reino, produzir recursos, construir, pesquisar, treinar exércitos, explorar e disputar o mapa, cooperar em alianças, participar de eventos mundiais e progredir com heróis e cosméticos.
+Jogo de estratégia medieval 4X, persistente e prioritariamente móvel: desenvolver um reino, produzir recursos, construir, pesquisar, treinar exércitos, explorar e disputar o mapa, cooperar em alianças, participar de eventos mundiais e progredir com heróis e cosméticos.
 
 ## Estado por sistema
 
-| Sistema | Estado no código | Diferença para o resultado desejado |
+| Sistema | Estado confirmado na branch | Lacuna para o resultado desejado |
 |---|---|---|
-| Reino e economia | Estado persistente em Cloudflare D1; produção aplicada no servidor | Falta telemetria de economia e balanceamento com partidas reais |
-| Construção | Melhorias passam a usar fila persistente e conclusão agendada nesta versão | Ainda há uma única fila de construção por reino; não há cancelamento ou aceleração visível |
-| Treinamento | Fila persistente e entrega de unidades na conclusão; quantidade limitada a 100 por ordem | Não há múltiplas filas, promoção de tier ou treinamento em lote encadeado |
-| Pesquisa | Fila persistente, níveis confirmados no servidor | Árvore ainda é curta; pré-requisitos e efeitos precisam ser expandidos e balanceados |
-| Exército | Catálogo de unidades e quantidades persistentes; schema agora aceita magos | Não há formação de marcha completa, reforços entre reinos ou counters de PvP completos |
-| Marchas | Persistentes e resolvidas pelo cron | Ações ofensivas são PvE contra territórios neutros; ataques PvP estão explicitamente bloqueados |
-| Mapa mundial | Territórios com coordenadas, terreno, recursos e proprietários, seleção, pan e zoom mobile/desktop | Ainda não é um mundo de tiles extenso com névoa de guerra, exploração persistida e fronteiras dinâmicas |
-| Combate | Simulador no Worker com relatórios e regras server-authoritative | PvP, defesa de cidade, rally, reforços, cerco e balanceamento competitivo ainda não estão completos |
-| Alianças | Criação/entrada, membros, convites, chat, doações, guerras e estados persistentes | Fluxos de rally, ajuda temporizada, diplomacia e guerra de território precisam de validação ponta a ponta |
-| Heróis e equipamentos | Inventário, heróis, equipamentos e bônus validados no servidor | Faltam mais personagens, habilidades/efeitos ligados a batalhas e validação visual integrada |
-| Evento Anjo da Morte | Evento PvE mundial com vida, pontuação, ataques e recompensas persistentes | Precisa de playtest, telemetria e ajuste de dificuldade/recompensas com população real |
-| Loja | Pedidos auditáveis e aprovação Master idempotente | Ainda não há gateway PIX/cartão e confirmação automática por webhook |
-| Busca mundial | FTS5, trigramas, tolerância controlada a erros, português e busca CJK por substring | Não é crawler da Internet; falta segmentação por dicionário CJK, romanização e telemetria de relevância |
-| Cidade 3D | Renderizador Three.js isométrico progressivo, materiais procedurais e fallback | A arte final de castelo/heróis/monstros ainda precisa de GLBs aprovados e testados em Android físico |
-| PWA/offline | Shell, navegação e tela offline em cache | Batalhas e sincronização exigem Internet; offline não é modo de jogo completo |
+| Reino e economia | Estado persistente em Cloudflare D1; produção e operações econômicas executadas no servidor | Falta telemetria econômica e balanceamento com partidas reais; auditar ledger para todas as fontes e saídas |
+| Construção | Filas persistentes; conclusão calculada/resolvida pelo Worker e Cron | Uma fila por faixa; faltam cancelamento, aceleração, múltiplas filas e mais progressão visual |
+| Treinamento | Fila persistente; unidades são entregues ao concluir; ordem limitada a 100 unidades | Faltam promoção de tier, lotes encadeados e mais opções de fila |
+| Pesquisa | Fila persistente; níveis confirmados no servidor | Árvore ainda curta; pré-requisitos e efeitos precisam ser expandidos e balanceados |
+| Exército | Catálogo de unidades e quantidades persistentes | Formação completa de marchas, reforços e counters competitivos ainda incompletos |
+| Marchas | Persistentes e processadas por Cron; PvE em territórios e ataques a castelos de jogadores | Faltam retorno visual/tático completo, cerco, dano de muralha, reforços e recuperação de marcha |
+| PvP entre castelos | Implementação parcial: guarnição real, perfis de atacante/defensor, escudos, bloqueio de autoataque/aliados, resolução condicional, relatórios bilaterais e replay | Não equivale a guerra completa: captura de castelo/território, saque, transferência de recursos, cerco, reforços, rally, retorno e balanceamento precisam ser concluídos |
+| Mapa mundial | Mapa estratégico 3D isométrico, coordenadas, seleção, pan/zoom por Pointer Events e projeção de marcadores | Mundo ainda pequeno e limitado; não há mapa de tiles extenso, névoa de guerra persistida ou fronteiras dinâmicas |
+| Alianças | Criação/entrada, membros, convites, chat, doações e guerras persistentes | Rally, reforços, ajuda temporizada, diplomacia, moderação e guerra territorial precisam de validação ponta a ponta |
+| Heróis e equipamentos | Inventário, heróis, equipamentos e bônus validados no servidor | Faltam elenco, habilidades e efeitos visualmente ligados às batalhas e à progressão |
+| Evento Anjo da Morte | Evento PvE mundial com vida, pontuação, ataques e recompensas persistentes | Precisa de playtest e ajuste de dificuldade/recompensas com população real |
+| Loja | Pedidos auditáveis e aprovação Master idempotente; checkout Mercado Pago configurado | Confirmação automática por webhook e gateway operacional completo ainda pendentes |
+| Busca mundial | FTS5, trigramas, tolerância controlada a erros, português, busca CJK por substring, ranking BM25, cache de cliente e rate limit | Não é crawler da Internet; faltam benchmark de relevância/latência e telemetria sem PII |
+| Cidade 3D | Three.js isométrico, materiais procedurais, perfis de qualidade, fallback, cinco assets GLB habilitados no manifesto e diagnóstico local | A cidade usa GLTFLoader próprio com KTX2; ainda não integra DRACOLoader. Faltam LOD real, catálogo de arte completo e inspeção Android |
+| Renderização do mapa 3D | Three.js, câmera isométrica e controles de pan/zoom externos por Pointer Events/CSS | Vegetação do mapa ainda pode ser agrupada; pausa/retomada e profiling precisam ser uniformizados |
+| PWA/offline | Service Worker v31; shell e tela offline pré-cacheados; GETs same-origin são cacheados dinamicamente; APIs ficam fora do cache | Offline não é modo de jogo completo. Módulos Three.js/addons vêm de CDN e não têm garantia de disponibilidade offline; falta validação em aparelho |
+| Preview Cloudflare | Wrangler 4.161.0 e bloco `previews` presente | `previews.d1_databases` não está configurado com D1 de staging; Preview pode executar com `env.DB` ausente |
+| Android físico | Relatório visual parcial de 16/11 | Cidade 3D, texturas, sombras, PWA standalone, Service Worker controlador e offline ainda pendentes |
 
-## Evolução do mapa nesta etapa
+## Estado técnico e decisões de arquitetura
 
-- Pan por arraste com Pointer Events, zoom por botões e roda do mouse, botão de centralização e limites de deslocamento para não perder o mapa da tela.
-- O mapa mantém a seleção e os contratos de marcha existentes; a proteção contra ataques a territórios ocupados permanece ativa.
-- A PWA passa ao cache v11 e inclui o helper de viewport para uso offline da interface.
+- Não introduzir React: o frontend atual é HTML/CSS/JavaScript modular.
+- Não duplicar a busca: manter o contrato protegido `/api/game/search`, Bearer token, cancelamento, debounce, cache e limites.
+- Não criar um segundo motor de qualidade: `scripts/kingdom-quality.js` já define perfil e orçamento de pixels.
+- Não trocar o mapa para OrbitControls: o mapa atual usa Pointer Events, zoom/pan CSS e uma câmera isométrica; OrbitControls disputaria os gestos e a seleção de territórios.
+- Não mover a economia para Durable Objects sem benchmark e desenho de consistência. O D1 já oferece transações via `batch()` e o Worker já utiliza guardas condicionais em operações críticas.
+- Não comprimir os GLBs da cidade com Draco antes de ligar DRACOLoader ao carregador efetivamente usado na cidade.
+- Não considerar IndexedDB uma garantia permanente de offline. Cache API já armazena assets GET locais; o browser pode aplicar quota/evicção tanto a Cache quanto a IndexedDB.
+- Não considerar o shell offline como jogo jogável sem rede. O servidor continua sendo a fonte de verdade de saldos, filas, batalhas, compras e recompensas.
 
-## Correções nesta etapa
+A auditoria completa e as referências oficiais estão em [auditoria-tecnica-ampliada-2026-11-17.md](auditoria-tecnica-ampliada-2026-11-17.md).
 
-1. Foi criada a migração 0016_strategy_queues_and_mage.sql, sem alterar migrações históricas.
-2. A tabela de tropas é reconstruída preservando os registros e incluindo mage, já existente no catálogo de unidades do Worker.
-3. Foi criada a tabela kingdom_queues com três faixas independentes por reino: construção, treinamento e pesquisa. Cada faixa permite uma ordem ativa por vez.
-4. Os custos são debitados ao iniciar uma ordem; edifícios, unidades e níveis de pesquisa só são entregues na conclusão.
-5. O Worker resolve ordens vencidas pelo cron e também ao consultar o estado do reino. A conclusão usa token único e guarda de estado para impedir pagamento/recompensa duplicados sob concorrência.
-6. A central do reino agora apresenta filas e cronômetros, e permite iniciar treinamento e pesquisa. A PWA recebe novo identificador de cache para buscar a interface atualizada.
-7. O endpoint de saúde passa a verificar a presença da tabela de filas.
+## PvP: precisão do estado
 
-## Validação obrigatória antes da produção
+A branch auditada contém `processPvpMarch`. A rotina carrega a guarnição real do defensor, obtém os perfis dos dois reinos, valida proteção e aliança, resolve combate, devolve sobreviventes ao inventário do atacante e persiste relatório e replay para os participantes, usando compare-and-set e guarda de idempotência.
 
-- Executar a suíte npm test.
-- Aplicar todas as migrações num D1 local descartável e validar a migração 0016 em banco com dados de tropas existentes.
-- Validar npm run check e o bundle do Worker.
-- Testar duas ordens simultâneas da mesma faixa, três ordens em faixas diferentes, recursos insuficientes, falha/retry, conclusão concorrente e recompensa única.
-- Testar em Android real a interface, o service worker, a renderização 3D, o consumo de memória e o comportamento sob perda de conexão.
-- Confirmar migração remota e publicação Cloudflare separadamente; CI verde não comprova deploy remoto nem experiência testada em aparelho.
+Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário implementar e testar o ciclo de captura/saque/cerco/retorno/reforços/rally e regras competitivas. O documento antigo que dizia que ataques PvP estavam bloqueados ficou desatualizado; o estado correto é **PvP parcial, com ataques a castelos e relatórios, mas sem o loop completo de guerra**.
+
+## Evolução do mapa e da PWA
+
+- Pan, zoom e limites de viewport são geridos por `world-map.js` e `world-map-viewport.js`; não dependem de OrbitControls.
+- O canvas do mapa é isométrico e os marcadores DOM são projetados a partir da câmera.
+- O Service Worker atual é `clash-of-izzy-shell-v31`. O shell central é pré-cacheado e assets GET same-origin são guardados após download.
+- `/api/*` não é cacheado. Isso é intencional: não servir saldo, combate ou estado autoritativo obsoleto como se fosse atual.
+- A importação de Three.js e addons por jsDelivr é um bloqueio para 3D totalmente offline; os módulos e decoders essenciais precisam ser servidos pela própria origem antes de prometer essa capacidade.
+
+## Correções e verificações recentes
+
+1. As migrações D1 continuam versionadas; não alterar migrações históricas já aplicadas.
+2. `scripts/kingdom-quality.js` mantém uma única seleção de perfil e limita a resolução ao orçamento de pixels.
+3. A cidade instancia a floresta procedural com `InstancedMesh`; o mapa ainda é candidato a instancing após profiling.
+4. A busca global e a descoberta de jogadores usam o mesmo backend e os mesmos índices; não foi adicionado serviço externo de busca.
+5. A CI #880 encontrou HTTP 500 em PvP por `structureDefense is not defined`; o código foi corrigido e a CI #882 posterior passou.
+6. CI #882 no commit `363a983`: 266/266 testes Node, 9/9 testes Playwright, smoke read-only e Worker bundle dry-run aprovados.
+7. Foi adicionado `tests/e2e/pwa-offline-cache.spec.js`, um teste isolado que permite o Service Worker e verifica shell, cache runtime de um GLB e leitura offline do asset. A execução de CI do commit que adicionou esse teste ainda precisa ser confirmada antes de marcar esse novo teste como aprovado.
+8. Não foi feita migração remota de D1, alteração de segredo, publicação de produção ou inspeção física nesta atualização.
+
+## Bloqueios obrigatórios antes do merge
+
+- Criar D1 de staging isolado para Previews; nunca apontar Preview ao database ID de produção.
+- Adicionar `previews.d1_databases` com binding `DB` e database ID de staging; criar configuração própria de migração Preview apontando para o mesmo banco.
+- Executar `npx wrangler preview` (este projeto é Worker com assets, não Pages).
+- Confirmar health/API e `env.DB` no Preview exato da branch.
+- Validar o novo teste Service Worker/GLB offline na CI.
+- Inspecionar em Android físico: viewport 360 CSS px e nativo, cidade 3D, close-up das texturas, sombras/iluminação, toque, estabilidade, PWA standalone, worker ativo/controlador e reabertura offline.
+- Anexar capturas sanitizadas do deployment exato.
 
 ## Próximas prioridades reais
 
-1. Mapa e PvP: resolver ataques entre reinos com proteção, muralhas, reforços, retorno de tropas, idempotência e relatórios; depois construir mapa navegável em escala, zoom, névoa de guerra e coordenadas.
-2. Economia e progressão: auditoria transacional completa, ledger para todas as fontes/sumidouros, limites de produção/armazenamento, filas configuráveis e balanceamento.
-3. Alianças: rally e reforços, ajuda mútua temporizada, objetivos coletivos, guerra e moderação; testar em D1 com múltiplos reinos.
-4. Arte 3D: substituir progressivamente formas procedurais por GLBs autorais/licenciados com PBR, LOD, atlas e texturas comprimidas; cada asset deve ter origem/licença, tamanho e validação Android.
-5. Busca multilíngue: benchmark anotado em português, inglês, chinês, japonês e coreano; só então avaliar segmentadores ICU/dicionários e possíveis serviços externos.
-6. LiveOps e monetização: ferramentas administrativas de eventos, métricas agregadas com privacidade, gateway de pagamento e webhook assinado antes de vender itens como pagamento automático.
+1. **P0 — Preview seguro:** provisionar o D1 staging, corrigir binding de Preview, aplicar migrações e publicar Preview com `wrangler preview`.
+2. **P1 — 3D/offline:** unificar loaders, servir Three.js/addons/decoders localmente, comparar Draco/Meshopt/KTX2 e testar LOD/instancing com orçamento de GPU.
+3. **P1 — jogo 4X:** completar captura, saque, cerco, retorno, reforços e rally; ampliar testes concorrentes entre reinos.
+4. **P2 — observabilidade:** medir p50/p95 da busca, frame time, draw calls, triângulos, memória e falhas de assets; usar dados agregados e sem PII.
+5. **P2 — playtests:** balancear economia, tropas e eventos com sessões reais; não publicar números de retenção/performance sem medição.
 
 ## Regras para não regredir
 
-- Não duplicar tabelas ou sistemas de inventário que já existem.
-- Não editar migrações aplicadas; criar sempre o próximo número.
+- Não duplicar tabelas, inventário, fila, busca ou gerenciadores de qualidade existentes.
+- Não editar migrações aplicadas; criar sempre a próxima migração.
 - Não tornar o cliente autoridade de economia, batalha, progressão ou recompensa.
-- Não ativar PvP nem pagamentos reais sem testes de integração, proteção contra repetição e regras operacionais.
-- Não declarar assets finais ou performance Android antes de inspeção e teste em dispositivos reais.
-- Manter referências de jogos estrangeiros como inspiração de engenharia e UX, sem copiar IP, personagens, mapas, assets ou interfaces protegidos.
+- Não ligar Preview ao D1 de produção.
+- Não ativar monetização automática ou declarar PvP completo sem testes de integração, idempotência e operação.
+- Não declarar assets finais, 3D offline ou performance sustentada antes de teste real.
+- Usar referências de outros jogos como inspiração funcional, mantendo arte, nomes, interface e balanceamento próprios do Clash of Izzy.
