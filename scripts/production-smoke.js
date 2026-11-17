@@ -164,6 +164,53 @@ export async function runProductionSmokeTests({
   assert(map3d.includes("OrthographicCamera") && map3d.includes("createMarchFormation"),
     "Mapa 3D não contém a cena estratégica e as formações de marcha.");
 
+  // The 3D runtime is generated from pinned Three.js and must be served same-origin.
+  const threeManifestResponse = await get("/vendor/three/asset-manifest.json");
+  assert(threeManifestResponse.status === 200, "Manifesto Three.js local indisponível.");
+  const threeManifest = await readJson(threeManifestResponse, "Manifesto Three.js");
+  assert(threeManifest.format === 1 && threeManifest.threeVersion === "0.187.0",
+    "A versão do runtime Three.js local não é a versão fixada 0.187.0.");
+  assert(Array.isArray(threeManifest.assets), "Manifesto Three.js não lista os recursos runtime.");
+  const requiredThreeAssets = [
+    "/vendor/three/build/three.module.js",
+    "/vendor/three/examples/jsm/loaders/GLTFLoader.js",
+    "/vendor/three/examples/jsm/loaders/DRACOLoader.js",
+    "/vendor/three/examples/jsm/loaders/KTX2Loader.js",
+    "/vendor/three/examples/jsm/libs/meshopt_decoder.module.js",
+    "/vendor/three/examples/jsm/libs/draco/draco_decoder.js",
+    "/vendor/three/examples/jsm/libs/draco/draco_decoder.wasm",
+    "/vendor/three/examples/jsm/libs/draco/draco_wasm_wrapper.js",
+    "/vendor/three/examples/jsm/libs/basis/basis_transcoder.js",
+    "/vendor/three/examples/jsm/libs/basis/basis_transcoder.wasm"
+  ];
+  for (const assetPath of requiredThreeAssets) {
+    assert(threeManifest.assets.includes(assetPath), "Manifesto Three.js não inclui " + assetPath + ".");
+    const assetResponse = await get(assetPath);
+    assert(assetResponse.status === 200, assetPath + " não foi publicado.");
+    const assetBytes = await assetResponse.arrayBuffer();
+    assert(assetBytes.byteLength > 100, assetPath + " está vazio ou incompleto.");
+  }
+
+  for (const pagePath of ["/arena.html", "/kingdom.html", "/world.html"]) {
+    const pageResponse = await get(pagePath);
+    assert(pageResponse.status === 200, pagePath + " indisponível para verificar o import map.");
+    const html = await pageResponse.text();
+    assert(html.includes('"three":"/vendor/three/build/three.module.js"'),
+      pagePath + " ainda não resolve Three.js pelo runtime local.");
+    assert(html.includes('"three/addons/":"/vendor/three/examples/jsm/"'),
+      pagePath + " não configura o caminho local dos addons.");
+    assert(!/cdn\\.jsdelivr\\.net\\/npm\\/three/i.test(html),
+      pagePath + " ainda depende do CDN do Three.js.");
+  }
+
+  for (const modulePath of ["/engine/asset-loader.js", "/scripts/kingdom-3d.js", "/world-map-3d.js", "/scripts/post-processing.js"]) {
+    const moduleResponse = await get(modulePath);
+    assert(moduleResponse.status === 200, modulePath + " indisponível.");
+    const moduleBody = await moduleResponse.text();
+    assert(!/cdn\\.jsdelivr\\.net\\/npm\\/three/i.test(moduleBody),
+      modulePath + " ainda importa Three.js de um CDN.");
+  }
+
   const manifestResponse = await get("/manifest.json");
   assert(manifestResponse.status === 200, "Manifest da PWA indisponível.");
   const manifest = await readJson(manifestResponse, "Manifest da PWA");
@@ -211,6 +258,7 @@ export async function runProductionSmokeTests({
       feedbackUiAndAnalytics: true,
       worldMapNavigation: true,
       worldMap3D: true,
+      threeVendorRuntime: true,
       cinematicTrailerRecorder: true,
     },
   };
