@@ -25,7 +25,7 @@ A redução de lotes e chamadas de chat ajuda a respeitar esses limites, mas ain
 
 ## Pendências obrigatórias antes de cobrar/publicar
 
-- CI completa e verde no HEAD atual da PR #118. A CI #940 aprovou a versão anterior; a CI #947 falhou na integração depois de a consulta do mapa perder dois parâmetros de centralização. Esses parâmetros foram restaurados, mas a nova execução para todo o HEAD com os ajustes mais recentes ainda precisa ser confirmada.
+- CI completa e verde no HEAD atual da PR #118. A CI #940 aprovou uma versão anterior. Na CI #947, o teste integrado falhou porque `POST /api/game/start` respondeu HTTP 503 ao fundar o primeiro reino. Ao investigar a consulta do mapa, encontrei dois bindings de coordenada que haviam sido removidos junto com o filtro por região e os restaurei. A causa exata ainda precisa ser confirmada por uma nova CI; os ajustes mais recentes do scheduler e do feed compacto também aguardam validação automatizada.
 - PR #116: a correção de autenticação de `/api/admin/health` recebeu ajuste em um teste de documentação, mas ainda é necessário obter CI verde e integrar a proteção antes de lançar.
 - D1 de Preview: confirmar que o banco separado declarado no Wrangler existe e é acessível; aplicar migrations apenas nele e validar start/state, mapa, construção, marchas, rallies, alianças e inventário.
 - Mercado Pago: confirmar no Worker os secrets `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`; executar compra de teste e receber webhook assinado. Sem essas credenciais, a loja usa link compartilhado e revisão manual Master.
