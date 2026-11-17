@@ -518,6 +518,11 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const adminToken = adminLogin.token;
     const admin = (route, body) => api(route, { method: "POST", token: adminToken, body });
     const adminGet = route => api(route, { method: "GET", token: adminToken });
+    const adminHealth = expectStatus(await adminGet("/api/admin/health"), 200, "health administrativo com sessão Master");
+    assert.equal(adminHealth.hasDB, true);
+    assert.equal(adminHealth.hasSESSION_SECRET, true);
+    assert.equal(adminHealth.hasADMIN_EMAIL, true);
+    assert.equal(adminHealth.hasADMIN_PASSWORD, true);
 
     await t.test("controle Master da Ascensão de Valhalla", async () => {
       expectStatus(await api("/api/valhalla-admin/status"), 401, "Valhalla admin exige sessão Master");
