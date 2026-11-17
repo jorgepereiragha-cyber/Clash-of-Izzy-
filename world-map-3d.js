@@ -28,6 +28,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   let disposed = false;
   let worldState = null;
   let activeMarches = [];
+  let homeCastleGroup = null;
   let projectionButtons = new Map();
   let lastFrameTime = 0;
   let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
@@ -431,6 +432,11 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   function setWorldState(nextState) {
     if (!nextState || !Array.isArray(nextState.territories)) return;
     worldState = nextState;
+    if(homeCastleGroup){
+      terrainRoot.remove(homeCastleGroup);
+      homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
+    }
+    homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(worldState.castleSkinId)||0);
     rebuildTerritories();
     rebuildRoads();
     rebuildMarches();
@@ -499,7 +505,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       scene.add(worldRoot);
       worldRoot.add(terrainRoot, routeRoot, territoryRoot, armyRoot);
       createGround();
-      createCastle(terrainRoot, 0, 0, 1.4, "home");
+      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(window.__coiWorldMapState?.castleSkinId)||0);
       resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
       resizeObserver?.observe(host);
       window.addEventListener("resize", resize, { passive: true });
