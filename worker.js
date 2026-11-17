@@ -182,6 +182,7 @@ const UNITS = {
   ram:{label:"Aríete",food:60,wood:55,iron:18,power:20},
   trebuchet:{label:"Trabuco",food:90,wood:75,iron:30,power:30}
 };
+function logRequestError(event,error,request,url){console.error(event,JSON.stringify({method:request.method,path:url.pathname,ray:request.headers.get("cf-ray")||null,error:String(error?.message||error)}))}
 function json(data,status=200,extraHeaders={}){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Cache-Control":"no-store",...extraHeaders}})}
 function b64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 async function sign(payload,secret){
@@ -1763,7 +1764,7 @@ export default {
         missingTables=requiredTables.filter(name=>!existing.has(name));
         checks.schema=missingTables.length===0;
       }catch(error){
-        console.error("health_check_failed",String(error?.message||error));
+        logRequestError("health_check_failed",error,request,url);
       }
     }
     const ready=checks.database&&checks.session&&checks.schema;
@@ -1804,7 +1805,7 @@ export default {
         env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages ORDER BY price_brl,name").all()
       ]);
       return json({skins:skins.results||[],packages:packages.results||[],whatsapp:"+5547996531437"});
-    }catch(e){return json({error:"Catálogo indisponível no momento."},503)}
+    }catch(e){logRequestError("store_catalog_failed",e,request,url);return json({error:"Catálogo indisponível no momento."},503)}
   }
   if(url.pathname==="/api/game/start"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"SESSION_SECRET não configurado no Worker."},503);
@@ -1833,7 +1834,7 @@ export default {
       }
       const token=await sign({sub:playerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365},env.SESSION_SECRET);
       return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
-    }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
+    }catch(e){logRequestError("game_start_failed",e,request,url);return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
   if(url.pathname==="/api/store/purchase-request"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
@@ -2226,7 +2227,7 @@ export default {
       }
       if(url.pathname==="/api/game/action"&&request.method==="POST"){const body=await readBody(request);if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);return await gameAction(env,playerId,body);}
       return json({error:"Rota de jogo não encontrada."},404);
-    }catch(e){console.error("game_request_failed",String(e?.message||e));return json({error:"Falha ao processar o jogo. Tente novamente."},500)}
+    }catch(e){logRequestError("game_request_failed",e,request,url);return json({error:"Falha ao processar o jogo. Tente novamente."},500)}
   }
   const valhallaAdminPath=url.pathname.startsWith("/api/valhalla-admin/");
   if(request.method!=="POST"&&!(request.method==="GET"&&valhallaAdminPath))return json({error:"Método não permitido."},405);
@@ -2318,6 +2319,6 @@ export default {
       await env.DB.prepare("INSERT INTO skins(name,price_brl) VALUES(?,?)").bind(name,price).run();return json({success:true,message:"Skin cadastrada no catálogo."});
     }
     return json({error:"Rota administrativa não encontrada."},404);
-  }catch(e){console.error("admin_request_failed",String(e?.message||e));return json({error:"Erro interno ao processar a solicitação."},500)}
+  }catch(e){logRequestError("admin_request_failed",e,request,url);return json({error:"Erro interno ao processar a solicitação."},500)}
  }
 };
