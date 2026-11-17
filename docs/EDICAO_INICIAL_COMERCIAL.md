@@ -32,7 +32,7 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 
 - O Cron continua a cada minuto, mas cada execução fica limitada: até 3 filas globais de construção/treino/pesquisa, 1 reino consultado pelo processador global de marchas (até 2 marchas nesse lote), 1 rally concluído, 1 evento antigo encerrado e 1 e-mail enviado.
 - Quando o jogador abre o estado do próprio castelo, o Worker continua reconciliando as marchas e filas daquele jogador. O Cron é a rede de segurança para contas inativas, não o único mecanismo de progresso.
-- As recompensas diárias de Valhalla são distribuídas em páginas de 10 reinos por execução; o evento continua desligado por padrão.
+- As recompensas diárias de Valhalla são distribuídas em páginas de 10 reinos por execução; o evento continua desligado por padrão. O encerramento do evento de fim de semana também paga no máximo 10 participantes por execução, mantendo a classificação original e retomando a próxima página no minuto seguinte.
 - Limpeza de limites de API e expiração de replays também é feita em lotes, evitando varreduras/escritas sem limite.
 - Esses limites reduzem picos de processamento, mas não comprovam uma capacidade concorrente fixa. A conta Gratuita possui 100.000 requisições/dia, 10 ms de CPU por requisição HTTP e por Cron; o D1 gratuito limita cada invocação a 50 subrequisições, 5 milhões de linhas lidas/dia e 100 mil escritas/dia. A capacidade real precisa ser medida em Preview/staging antes de divulgar um número máximo de jogadores.
 - O mapa envia somente castelos próximos à posição do jogador. Isso mantém todos no mesmo reino sem carregar toda a população em cada resposta.
