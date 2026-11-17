@@ -44,3 +44,12 @@ test("PWA shell cache is bumped for the updated city and world renderers", async
   const sw=await read("sw.js");
   assert.ok(sw.includes('clash-of-izzy-shell-v27'));
 });
+
+
+test("owner castle appearance is carried into the center castle on the shared map", async () => {
+  const world = await read("world-map.js");
+  const renderer = await read("world-map-3d.js");
+  assert.ok(world.includes("castleSkinId: Number(state.kingdom?.equipped_skin_id || 0)"));
+  assert.ok(renderer.includes("worldState.castleSkinId"));
+  assert.ok(renderer.includes("territory.castle_skin_id"));
+});
