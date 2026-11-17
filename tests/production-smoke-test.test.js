@@ -44,6 +44,19 @@ function successfulFetch() {
       200,
       "text/html; charset=utf-8"
     );
+    if (path === "/vendor/three/asset-manifest.json") return makeResponse({
+      format: 1, threeVersion: "0.187.0",
+      assets: ["/vendor/three/build/three.module.js","/vendor/three/examples/jsm/loaders/GLTFLoader.js","/vendor/three/examples/jsm/loaders/DRACOLoader.js","/vendor/three/examples/jsm/loaders/KTX2Loader.js","/vendor/three/examples/jsm/libs/meshopt_decoder.module.js","/vendor/three/examples/jsm/libs/draco/draco_decoder.js","/vendor/three/examples/jsm/libs/draco/draco_decoder.wasm","/vendor/three/examples/jsm/libs/draco/draco_wasm_wrapper.js","/vendor/three/examples/jsm/libs/basis/basis_transcoder.js","/vendor/three/examples/jsm/libs/basis/basis_transcoder.wasm"]
+    });
+    if (path.startsWith("/vendor/three/")) return makeResponse("x".repeat(256), 200,
+      path.endsWith(".wasm") ? "application/wasm" : "text/javascript; charset=utf-8");
+    if (path === "/engine/asset-loader.js" || path === "/scripts/kingdom-3d.js" ||
+        path === "/world-map-3d.js" || path === "/scripts/post-processing.js") {
+      return makeResponse('import * as THREE from "three";', 200, "text/javascript; charset=utf-8");
+    }
+    if (path === "/arena.html" || path === "/kingdom.html" || path === "/world.html") {
+      return makeResponse('<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>', 200, "text/html; charset=utf-8");
+    }
     if (path === "/manifest.json") return makeResponse({ name: "Clash of Izzy" });
     if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v28"; const CORE_ASSETS=["/account.html","/styles/landing.css","/landing.js","/world-map-3d.js","/world-map-viewport.js","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/scripts/cinematic/capture-system.js","/scripts/cinematic/media-recorder-support.js","/scripts/cinematic/trailer-script.js","/scripts/cinematic/recorder-ui.js"];', 200, "text/javascript");
     if (path === "/styles/landing.css") return makeResponse("body{color:#fff}.landing-hero{display:grid}", 200, "text/css");
@@ -73,6 +86,7 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.staticPages, 9);
   assert.equal(result.checks.worldMapNavigation, true);
   assert.equal(result.checks.worldMap3D, true);
+  assert.equal(result.checks.threeVendorRuntime, true);
   assert.equal(result.checks.cinematicTrailerRecorder, true);
   assert.ok(calls.includes("/world-map-viewport.js"));
   assert.ok(calls.includes("/world-map-3d.js"));
