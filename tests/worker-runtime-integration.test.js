@@ -238,6 +238,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const kingdomB = Number(startB.state.kingdom.id);
     const kingdomC = Number(startC.state.kingdom.id);
     const playerA = stateA.player.player_id;
+    const playerC = startC.state.player.player_id;
     const referralSummary = expectStatus(await api("/api/game/referral/link", { token: tokenA }), 200, "link autenticado de indicação");
     assert.equal(referralSummary.referral_code, playerA);
     assert.equal(referralSummary.referral_count, 1);
