@@ -120,7 +120,7 @@ async function getCosmeticState(env,kingdomId){
   env.DB.prepare("SELECT collection_id FROM kingdom_collection_claims WHERE kingdom_id=?").bind(kingdomId),
   env.DB.prepare("SELECT shards FROM kingdom_cosmetic_wallet WHERE kingdom_id=?").bind(kingdomId)
  ]);
- return {owned:owned.results||[],claimed:(claims.results||[]).map(x=>x.collection_id),shards:wallet?.shards||0,skins:COSMETIC_SKINS,collections:COSMETIC_COLLECTIONS,seasonal:SEASONAL_COSMETICS,seasonEnd:SEASON_END,seasonActive:Date.now()<Date.parse(SEASON_END),fusions:SKIN_FUSIONS};
+ return {owned:owned.results||[],claimed:(claims.results||[]).map(x=>x.collection_id),shards:wallet?.results?.[0]?.shards||0,skins:COSMETIC_SKINS,collections:COSMETIC_COLLECTIONS,seasonal:SEASONAL_COSMETICS,seasonEnd:SEASON_END,seasonActive:Date.now()<Date.parse(SEASON_END),fusions:SKIN_FUSIONS};
 }
 
 const SHOP_ITEMS={
