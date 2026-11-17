@@ -69,3 +69,35 @@ test("derived kingdom capacity and power calculations batch their independent D1
   assert.ok(!stats.includes("Promise.all("));
   assert.ok(!power.includes("Promise.all("));
 });
+
+
+test("shop, cosmetics, heroes and pets collapse independent state reads into D1 batches", async () => {
+  const worker = await read("worker.js");
+  const pets = await read("pets.js");
+  const shopStart = worker.indexOf("async function getShopState(env,kingdomId)");
+  const shopEnd = worker.indexOf("\\nfunction heroView", shopStart);
+  const cosmeticStart = worker.indexOf("async function getCosmeticState(env,kingdomId)");
+  const cosmeticEnd = worker.indexOf("\\nconst SHOP_ITEMS", cosmeticStart);
+  const heroStart = worker.indexOf("async function syncHeroSystems(env,kingdomId)");
+  const heroEnd = worker.indexOf("\\nasync function gameState", heroStart);
+  const petsStart = pets.indexOf("export async function getPetsState(env, kingdomId)");
+  const petsEnd = pets.indexOf("\\nasync function unlockPet", petsStart);
+  assert.ok(shopStart >= 0 && shopEnd > shopStart);
+  assert.ok(cosmeticStart >= 0 && cosmeticEnd > cosmeticStart);
+  assert.ok(heroStart >= 0 && heroEnd > heroStart);
+  assert.ok(petsStart >= 0 && petsEnd > petsStart);
+  const shop = worker.slice(shopStart, shopEnd);
+  const cosmetics = worker.slice(cosmeticStart, cosmeticEnd);
+  const heroes = worker.slice(heroStart, heroEnd);
+  const petState = pets.slice(petsStart, petsEnd);
+  assert.ok(shop.includes("const [rows,inventory]=await env.DB.batch(["));
+  assert.ok(cosmetics.includes("const [owned,claims,wallet]=await env.DB.batch(["));
+  assert.ok(cosmetics.includes("wallet?.results?.[0]?.shards||0"));
+  assert.ok(heroes.includes("const [,inventory]=await env.DB.batch(["));
+  assert.ok(heroes.includes("await env.DB.batch(statements)"));
+  assert.ok(petState.includes("const reads = await env.DB.batch(["));
+  assert.ok(petState.includes("petBonusesFromRow(reads[2]?.results?.[0] || null)"));
+  assert.ok(!shop.includes("Promise.all("));
+  assert.ok(!cosmetics.includes("Promise.all("));
+  assert.ok(!petState.includes("Promise.all("));
+});
