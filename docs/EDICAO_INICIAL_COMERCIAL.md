@@ -18,7 +18,7 @@ Publicar uma versão pequena e controlada, adequada ao plano Cloudflare Workers 
 ## Loja de skins pagas
 
 - A edição inicial libera as seis primeiras skins já cadastradas, em ordem estável de ID.
-- Essas seis skins continuam sendo produtos pagos no fluxo existente de pedido, checkout/link Mercado Pago e revisão manual pelo painel Master.
+- Essas seis skins continuam sendo produtos pagos no fluxo de pedido manual: o jogo registra a solicitação, abre o WhatsApp comercial com os dados do pedido e aguarda a conferência humana.
 - A loja pública, a busca global, a criação de pedido e a liberação manual Master aceitam somente as seis skins liberadas.
 - As demais skins não são excluídas nem renomeadas: permanecem no D1 para uma futura edição.
 - Skins já pertencentes a jogadores continuam no inventário.
@@ -44,7 +44,7 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 ## Condições comerciais e de publicação que continuam abertas
 
 - **Skins:** a equipagem/retirada persistente passou na CI #991. A ação verifica a propriedade em `player_skins`, grava `kingdoms.equipped_skin_id`, mostra a seleção na cidade/loja e propaga a aparência para castelos no mapa compartilhado. As seis opções usam paletas de materiais/cores na geometria de castelo existente; não são seis modelos 3D com malhas distintas. A PR #120 ainda não foi mesclada nem publicada.
-- **Mercado Pago:** o código tem rota de checkout individual e webhook, mas dependem de `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` configurados no Worker. Quando não configurado, a interface usa o link compartilhado e a revisão manual Master. A presença real dos secrets e uma compra/webhook de teste ainda não foram confirmadas.
+- **Pagamentos manuais por WhatsApp:** a edição inicial não inicia checkout pagamento automático Mercado Pago nem usa webhook. O pedido fica pendente no D1; o jogador é encaminhado ao WhatsApp comercial `5547996531437` com número do pedido, ID do jogador, reino, produto e valor. O Master confere o recebimento e usa o botão `✓ Liberar pacote` no painel. A aprovação é autenticada, altera o status uma única vez e concede as gemas ou a skin correspondente. O WhatsApp é apenas o canal de contato; não confirma pagamento automaticamente.
 - **Segurança:** a PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab`; o smoke read-only da CI #991 reportou `adminHealthAuthBoundary: true` no Worker público.
 - **Preview:** `wrangler.jsonc` tem `previews: {}` e não declara `previews.d1_databases`. Criar/confirmar um D1 descartável distinto do D1 de produção, configurar `previews.d1_databases` com a binding `DB` e criar `wrangler.preview-migrations.jsonc` com binding `PREVIEW_DB` apontando para o mesmo `database_id`. Aplicar migrations com `npx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-migrations.jsonc`. Não usar uma Version URL como teste isolado: Version URLs usam os recursos de produção. Previews que compartilham o mesmo `database_id` compartilham os mesmos dados.
 - **Dispositivos:** o CI automatizado Chromium em viewport móvel não substitui uma verificação em Android físico, incluindo toque, instalação PWA, reabertura, cache e memória.

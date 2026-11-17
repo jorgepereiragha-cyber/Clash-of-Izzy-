@@ -65,7 +65,7 @@
  <div id="territoryList"><div class="territoryCard">Carregando territórios…</div></div>
 </section>
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
-<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Envie um pedido ao painel Master. A liberação acontece somente depois da conferência manual do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><label>Forma de pagamento<select id="purchaseMethod" disabled aria-label="Forma de pagamento ativa"><option value="mercadopago_link" selected>Mercado Pago · checkout oficial</option></select></label><p>Use o checkout do Mercado Pago para concluir o pagamento do pacote ou skin. Informe o ID da transação na referência, se disponível.</p><label>Referência do pagamento (opcional)<input id="purchaseReference" maxlength="120" placeholder="ID da transação; nunca informe senha"></label></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
+<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Envie um pedido ao painel Master. A liberação acontece somente depois da conferência manual do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><p>Escolha um pacote para registrar seu pedido e abrir uma conversa no WhatsApp. A equipe confere o pagamento e libera o item pelo painel administrativo.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'three';
 import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } from './engine/asset-loader.js';
@@ -462,7 +462,7 @@ function updateSkillHud(){document.querySelectorAll('[data-skill]').forEach(b=>{
 function toggleShop(show){document.getElementById('shop').style.display=show?'flex':'none';if(show)refreshKingdomStore()}
 document.getElementById('attack').onclick=attack;document.querySelectorAll('[data-skill]').forEach(b=>b.onclick=()=>skill(b.dataset.skill));document.getElementById('openShop').onclick=()=>toggleShop(true);document.getElementById('closeShop').onclick=()=>toggleShop(false);
 document.getElementById('buyDamage').onclick=()=>{if(gold<300)return;gold-=300;damageBonus+=25;updateHud()};document.getElementById('buyHealth').onclick=()=>{if(gold<250)return;gold-=250;healthBonus+=150;player.max+=150;player.hp=Math.min(player.max,player.hp+150);updateHud()};document.getElementById('buySpeed').onclick=()=>{if(gold<200)return;gold-=200;speedBonus+=2;updateHud()};
-document.getElementById('whatsapp').onclick=()=>window.open('https://wa.me/5547996531437?text='+encodeURIComponent('Olá! Quero consultar os pacotes e skins do Clash of Izzy.'),'_blank');
+document.getElementById('whatsapp').onclick=()=>window.open('https://wa.me/5547996531437?text='+encodeURIComponent('Olá! Quero consultar os pacotes e skins do Clash of Izzy.'),'_blank','noopener');
 function storeCard(title,description,buttonLabel,onClick,disabled=false){
  const card=document.createElement('article');card.className='storeCard';
  const heading=document.createElement('strong');heading.textContent=title;
@@ -558,55 +558,25 @@ async function refreshKingdomStore(){
 }
 async function requestOfficialPurchase(item,kind,button){
  const notice=document.getElementById('purchaseNotice');
- const paymentMethod=document.getElementById('purchaseMethod')?.value||'mercadopago_link';
- const paymentWindow=paymentMethod==='mercadopago_link'?window.open('about:blank','_blank'):null;
- if(paymentWindow)paymentWindow.opener=null;
  const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
- if(!token){if(paymentWindow)paymentWindow.close();notice.textContent='Conecte seu reino antes de solicitar uma compra.';return}
- button.disabled=true;notice.textContent='Registrando seu pedido e preparando o checkout seguro…';
+ if(!token){notice.textContent='Conecte seu reino antes de solicitar um pacote.';return}
+ button.disabled=true;notice.textContent='Registrando seu pedido…';
  try{
   const response=await fetch(API_BASE+'/store/purchase-request',{
    method:'POST',
    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-   body:JSON.stringify({
-    kind,itemId:item.id,requestKey:crypto.randomUUID(),
-    paymentMethod,
-    paymentReference:document.getElementById('purchaseReference')?.value||''
-   })
+   body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod:'manual_whatsapp'})
   });
   const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data.error||'Não foi possível enviar o pedido.');
+  if(!response.ok)throw new Error(data.error||'Não foi possível registrar o pedido.');
   const requestId=Number(data.request?.id);
   if(!Number.isSafeInteger(requestId)||requestId<1)throw new Error('O servidor não retornou um número de pedido válido.');
-  notice.textContent='Pedido #'+requestId+' registrado. Gerando checkout individual…';
-  const checkoutResponse=await fetch(API_BASE+'/store/checkout',{
-   method:'POST',
-   headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-   body:JSON.stringify({requestId})
-  });
-  const checkout=await checkoutResponse.json().catch(()=>({}));
-  if(checkoutResponse.ok&&checkout.success&&checkout.checkoutUrl){
-   const url=new URL(checkout.checkoutUrl);
-   if(url.protocol!=='https:')throw new Error('O Mercado Pago retornou um endereço de checkout inválido.');
-   notice.textContent='Pedido #'+requestId+' pronto. Conclua o pagamento no checkout seguro do Mercado Pago.';
-   button.textContent='Checkout aberto · #'+requestId;
-   if(paymentWindow)paymentWindow.location.href=url.href;
-   else window.location.assign(url.href);
-   return;
-  }
-  if(checkout.code==='MP_NOT_CONFIGURED'){
-   notice.textContent='Pedido #'+requestId+' registrado. O checkout individual ainda aguarda as credenciais do Mercado Pago; abrindo o link oficial atual como alternativa. A liberação continuará dependendo da confirmação da equipe Master.';
-   button.textContent='Pedido enviado · #'+requestId;
-   if(paymentWindow)paymentWindow.location.href='https://link.mercadopago.com.br/pagamentosskin';
-   else window.location.assign('https://link.mercadopago.com.br/pagamentosskin');
-   return;
-  }
-  throw new Error(checkout.error||'Não foi possível gerar o checkout. Seu pedido foi preservado; tente novamente.');
- }catch(error){
-  if(paymentWindow)paymentWindow.close();
-  notice.textContent=error.message;
-  button.disabled=false;
- }
+  const number=String(data.whatsappNumber||'5547996531437').replace(/\D/g,'');
+  const message='Olá! Quero adquirir um pacote no Clash of Izzy.\nPedido: #'+requestId+'\nJogador: '+(kingdomSession?.player?.name||'Jogador')+'\nID do jogador: '+(kingdomSession?.player?.player_id||'')+'\nReino: '+(kingdomSession?.kingdom?.kingdom_name||'Eldoria')+'\nProduto: '+item.name+' ('+(kind==='skin'?'Skin':'Pacote VIP')+')\nValor: R$ '+Number(item.price_brl||0).toFixed(2).replace('.',',');
+  notice.textContent='Pedido #'+requestId+' registrado. O WhatsApp será aberto para combinar o pagamento. A liberação ocorre após sua confirmação.';
+  button.textContent='Pedido enviado · #'+requestId;
+  window.open('https://wa.me/'+number+'?text='+encodeURIComponent(message),'_blank','noopener');
+ }catch(error){notice.textContent=error.message;button.disabled=false}
 }
 async function loadCatalog(){
  const box=document.getElementById('catalog');
