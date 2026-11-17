@@ -33,3 +33,7 @@ assets/art/README.md
 
 # Model documentation is not a public game asset.
 assets/models/README.md
+
+# Additional Node-only operational tools; browser modules under scripts/ remain public.
+scripts/diagnose-production-endpoint.js
+scripts/validate-core-loop.sh
