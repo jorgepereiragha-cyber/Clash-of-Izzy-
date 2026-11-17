@@ -1,4 +1,5 @@
 import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
+import { getCastleSkinStyle } from "./castle-skin-styles.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -28,6 +29,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   let disposed = false;
   let worldState = null;
   let activeMarches = [];
+  const castleSkinMaterials = new Map();
   let projectionButtons = new Map();
   let lastFrameTime = 0;
   let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
@@ -215,25 +217,42 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     box(parent, .8, .42, .06, shared.banner, x + .61, y + height + 1.82, z);
   }
 
-  function createCastle(parent, x, z, scale = 1, color = "home") {
+  function getCastleSkinMaterials(skinName, skinId) {
+    const style = getCastleSkinStyle(skinName, skinId);
+    if (!style) return null;
+    if (!castleSkinMaterials.has(style.name)) {
+      castleSkinMaterials.set(style.name, {
+        wall: new THREE.MeshStandardMaterial({ color: style.wall, roughness: .88 }),
+        roof: new THREE.MeshStandardMaterial({ color: style.roof, roughness: .76 }),
+        banner: new THREE.MeshStandardMaterial({ color: style.banner, roughness: .82, side: THREE.DoubleSide }),
+        accent: new THREE.MeshStandardMaterial({ color: style.accent, metalness: .18, roughness: .62 })
+      });
+    }
+    return castleSkinMaterials.get(style.name);
+  }
+
+  function createCastle(parent, x, z, scale = 1, color = "home", skinName = "", skinId = 0) {
     const group = new THREE.Group();
     group.position.set(x, terrainHeight(x, z), z);
     group.scale.setScalar(scale);
-    const wall = color === "enemy" ? shared.enemy : shared.stone;
-    const banner = color === "enemy" ? shared.enemy : shared.banner;
+    const skin = getCastleSkinMaterials(skinName, skinId);
+    const wall = skin?.wall || (color === "enemy" ? shared.enemy : shared.stone);
+    const banner = skin?.banner || (color === "enemy" ? shared.enemy : shared.banner);
+    const roof = skin?.roof || shared.roof;
+    const accent = skin?.accent || shared.stoneLight;
     box(group, 5.6, 1.35, 4.5, wall, 0, .76, 0);
-    box(group, 3.2, 2.8, 3.1, shared.stoneLight, 0, 2.55, 0);
+    box(group, 3.2, 2.8, 3.1, accent, 0, 2.55, 0);
     box(group, 1.15, 1.9, .18, shared.wood, 0, 1.1, 1.64);
     for (const [tx, tz] of [[-2.5, -1.9], [2.5, -1.9], [-2.5, 1.9], [2.5, 1.9]]) {
       const tower = new THREE.Group();
       tower.position.set(tx, 0, tz);
       group.add(tower);
-      box(tower, 1.25, 2.6, 1.25, shared.stone, 0, 1.3, 0);
-      box(tower, 1.42, .2, 1.42, shared.stoneLight, 0, 2.65, 0);
-      cone(tower, 1.05, 1.45, shared.roof, 0, 3.45, 0, 4);
+      box(tower, 1.25, 2.6, 1.25, wall, 0, 1.3, 0);
+      box(tower, 1.42, .2, 1.42, accent, 0, 2.65, 0);
+      cone(tower, 1.05, 1.45, roof, 0, 3.45, 0, 4);
     }
-    cone(group, 1.8, 1.25, shared.roof, 0, 4.55, 0, 4);
-    box(group, .08, 1.85, .08, shared.gold, .55, 5.45, 0);
+    cone(group, 1.8, 1.25, roof, 0, 4.55, 0, 4);
+    box(group, .08, 1.85, .08, accent, .55, 5.45, 0);
     box(group, 1.0, .48, .07, banner, 1.02, 5.83, 0);
     parent.add(group);
     return group;
@@ -261,7 +280,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     inset.rotation.y = Math.PI / 6;
 
     if (territory.territory_kind === "castle") {
-      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home");
+      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home", territory.equipped_skin_name || "", territory.equipped_skin_id || 0);
       return;
     }
 
@@ -452,6 +471,8 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       renderer.domElement.remove();
     }
     Object.values(shared).forEach(material => material.dispose());
+    for (const materials of castleSkinMaterials.values()) Object.values(materials).forEach(material => material.dispose());
+    castleSkinMaterials.clear();
   }
 
   function init() {
