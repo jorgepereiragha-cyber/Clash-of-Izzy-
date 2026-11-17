@@ -598,7 +598,7 @@ async function gameState(env,playerId){
       "CASE WHEN wt.territory_kind='castle' THEN wt.x-? ELSE wt.x END AS x,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.z-? ELSE wt.z END AS z,"+
       "wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,wt.territory_kind,"+
-      "owner.id AS kingdom_id,owner.kingdom_name,owner.castle_level,owner.power,"+
+      "owner.id AS kingdom_id,owner.kingdom_name,owner.castle_level,owner.power,owner.equipped_skin_id AS castle_skin_id,"+
       "COALESCE(n.nickname,op.name) AS commander_name,"+
       "COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=owner.id),'') AS alliance_tag "+
       "FROM world_territories wt LEFT JOIN kingdoms owner ON owner.id=wt.owner_kingdom_id "+
@@ -638,6 +638,7 @@ async function gameState(env,playerId){
   const armyCount=totalTroops+fieldTroops+queuedTraining;
   const shop=await getShopState(env,kingdom.id);
   const cosmetics=await getCosmeticState(env,kingdom.id);
+  const castleSkins=await env.DB.prepare("SELECT s.id,s.name,s.price_brl,ps.unlocked_at FROM player_skins ps JOIN skins s ON s.id=ps.skin_id WHERE ps.player_id=? ORDER BY s.id").bind(p.id).all();
   const equipmentRows=await ensureEquipmentTables(env,kingdom.id);
   const heroEquipment=(await env.DB.prepare("SELECT he.hero_id,h.hero_name,he.slot,he.item_key,he.level FROM hero_equipment he JOIN heroes h ON h.id=he.hero_id WHERE h.kingdom_id=? ORDER BY h.level DESC,h.id,he.slot").bind(kingdom.id).all()).results||[];
   const equippedByItem=new Map(heroEquipment.map(item=>[item.item_key,Number(item.hero_id)]));
@@ -651,7 +652,7 @@ async function gameState(env,playerId){
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
   const petState=await getPetsState(env,kingdom.id);
-  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
+  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,castleSkins:castleSkins.results||[],player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -674,6 +675,20 @@ async function gameAction(env,playerId,body){
       const conflict=await env.DB.prepare("SELECT player_id FROM player_nicknames WHERE nickname_key=?").bind(nicknameKey).first();
       if(conflict&&Number(conflict.player_id)!==Number(p.id))return json({error:"Este nickname já está em uso. Escolha outro."},409);
       throw error;
+    }
+  }else if(type==="castle_skin_equip"){
+    const rawSkinId=body.skinId;
+    if(rawSkinId===null||rawSkinId===undefined||rawSkinId===""){
+      if(k.equipped_skin_id!==null&&k.equipped_skin_id!==undefined){
+        await env.DB.prepare("UPDATE kingdoms SET equipped_skin_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(k.id).run();
+        await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"castle_skin_unequipped","{}").run();
+      }
+    }else{
+      const skinId=Number(rawSkinId);
+      if(!Number.isSafeInteger(skinId)||skinId<1)return json({error:"Skin de castelo inválida."},400);
+      const result=await env.DB.prepare("UPDATE kingdoms SET equipped_skin_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?)").bind(skinId,k.id,p.id,skinId).run();
+      if(!result.meta?.changes)return json({error:"Você não possui esta skin."},404);
+      await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"castle_skin_equipped",JSON.stringify({skinId})).run();
     }
   }else if(type==="equipment_craft"){
     const itemKey=String(body.itemId||""),def=EQUIPMENT_CATALOG[itemKey];
