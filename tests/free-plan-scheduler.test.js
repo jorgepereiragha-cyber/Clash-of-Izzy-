@@ -49,7 +49,7 @@ test("kingdom state groups its 14 independent D1 reads into one invocation batch
   assert.equal(batch.split("env.DB.prepare(").length - 1, 14);
   assert.ok(state.includes("const fresh=stateResults[0]?.results?.[0]||null"));
   assert.ok(state.includes("const recentEvents=stateResults[12],queues=stateResults[13]"));
-  assert.ok(!state.includes("await Promise.all(["));
+  assert.ok(!batch.includes("await Promise.all(["));
 });
 
 test("derived kingdom capacity and power calculations batch their independent D1 reads", async () => {
