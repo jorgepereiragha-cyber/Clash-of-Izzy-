@@ -45,10 +45,10 @@ Uma CI anterior (#880) encontrou HTTP 500 no cenário de PvP por `structureDefen
 
 Há dois caminhos de carregamento 3D:
 
-1. `scripts/kingdom-3d.js`: cidade isométrica, renderizador próprio, modelos GLB do manifesto, materiais procedurais, KTX2Loader, fallback procedural e diagnóstico local.
+1. `scripts/kingdom-3d.js`: cidade isométrica, renderizador próprio, modelos GLB do manifesto, materiais procedurais, GLTFLoader com Draco/KTX2/Meshopt, decodificadores locais gerados a partir de Three.js fixado, fallback procedural e diagnóstico local.
 2. `engine/asset-loader.js`: carregador compartilhado com DRACOLoader, KTX2Loader, clone de modelos esqueléticos, ciclo de vida e descarte. Ele é usado por outra cena, como a arena, mas não é o carregador utilizado pela cidade.
 
-A cidade já possui uma floresta procedural com `InstancedMesh` e limita a quantidade de edifícios/modelos apresentados. Portanto, instancing não está ausente do jogo. O mapa mundial ainda cria componentes de árvores como grupos/meshes individuais e é candidato a batching/instancing após profiling.
+A cidade já possui uma floresta procedural com `InstancedMesh` e limita a quantidade de edifícios/modelos apresentados. A arena também instancia vegetação. O mapa mundial agora agrega árvores do terreno e de territórios em três batches `InstancedMesh` por grupo (tronco, copa e topo), com bounding box/sphere recalculados para frustum culling. A redução de draw calls e o custo de sombras ainda precisam de profiling em aparelho real.
 
 O mapa não utiliza OrbitControls. `world-map.js` aplica pan/zoom por Pointer Events e `world-map-viewport.js` limita a translação/escala de uma camada que contém o canvas 3D. A câmera do `world-map-3d.js` permanece isométrica. A cidade também usa câmera ortográfica e controles HTML projetados sobre os edifícios.
 
@@ -60,7 +60,7 @@ A qualidade atual é adaptativa por capacidade declarada: memória, núcleos, li
 
 O manifesto `assets/3d/manifest.json` tem cinco assets habilitados: dois modelos, dois props e uma unidade. O pipeline de validação verifica caminhos locais, GLB 2.0, dependências, duplicidades e limites de tamanho.
 
-A cidade já configura KTX2Loader e o associa ao GLTFLoader; ainda não configura DRACOLoader. O carregador genérico já tem Draco, mas não está ligado à cidade. Assim, comprimir um GLB da cidade com Draco antes de integrar e testar o decodificador causará falha de carregamento. Não comprimir os assets atuais às cegas.
+Os dois caminhos GLTF ativos agora configuram Draco, KTX2 e Meshopt. A cidade usa o renderer efetivo em KTX2Loader.detectSupport(renderer). A configuração de decodificação está no código, mas modelos comprimidos ainda precisam de teste real de carga/decodificação.
 
 A decisão recomendada é unificar o caminho de carregamento, fixar a versão do Three.js e empacotar localmente os decodificadores/transcodificadores necessários. Depois comparar Draco e Meshopt por tamanho, tempo de decodificação e estabilidade em aparelho real. Para texturas, KTX2/Basis exige `KTX2Loader.detectSupport(renderer)` antes de carregar texturas; o WASM e os arquivos do transcoder também precisam estar disponíveis localmente para um cenário offline. Referências:
 - https://threejs.org/docs/pages/GLTFLoader.html
@@ -70,11 +70,11 @@ A decisão recomendada é unificar o caminho de carregamento, fixar a versão do
 
 ### PWA e offline
 
-O Service Worker atual usa o cache `clash-of-izzy-shell-v31`. O shell é pré-cacheado; respostas GET locais, incluindo GLBs baixados durante a navegação, são adicionadas ao Cache API. Requisições `/api/*` não são interceptadas/cacheadas, corretamente, porque o estado autoritativo precisa do servidor.
+O Service Worker atual usa o cache `clash-of-izzy-shell-v32`. O shell é pré-cacheado; respostas GET locais, incluindo GLBs baixados durante a navegação, são adicionadas ao Cache API. Requisições `/api/*` não são interceptadas/cacheadas, corretamente, porque o estado autoritativo precisa do servidor.
 
 O plano de colocar todos os GLBs no IndexedDB não é necessário como primeiro passo: o Cache API já faz cache dinâmico desses GET locais. IndexedDB não garante persistência permanente por si só; Cache API e IndexedDB são, por padrão, armazenamento best-effort sujeito a quota/evicção. `navigator.storage.estimate()` e `navigator.storage.persist()` podem ser usados para medir e solicitar persistência quando apropriado. Referência: https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria
 
-Há, contudo, um bloqueio offline real: os módulos Three.js da cidade/mapa e os arquivos do import map são carregados de jsDelivr. O Service Worker ignora URLs cross-origin, portanto não garante que esses módulos e seus addons estejam disponíveis sem rede. O cache v31 consegue servir o shell e assets locais já descarregados, mas isso **não equivale a jogo completo offline nem garante renderização 3D offline**.
+Os módulos Three.js da cidade, mapa e arena agora apontam para /vendor/three/; o gerador local copia dependências JSM e os decodificadores Draco/Basis. O Service Worker v32 lê vendor/three/asset-manifest.json e pré-cacheia esses recursos same-origin durante a instalação. Isso valida o runtime cliente em offline, mas não converte o jogo em gameplay offline: APIs e estado autoritativo continuam online.
 
 Prioridade: servir a versão fixada do Three.js, addons e decoders a partir da mesma origem. Depois, validar shell, módulos locais e GLBs previamente baixados em offline. Nunca armazenar saldo ou progresso offline como se fossem verdadeiros: construção, combate, compras e sincronização continuam server-authoritative.
 
@@ -93,7 +93,7 @@ Playwright Chromium em viewport mobile continua sendo emulação de navegador, n
 | Hook React para busca | React não faz parte da arquitetura; API exige token Bearer | Manter busca em JS existente |
 | Novo GraphicsQualityManager | Duplica `kingdom-quality.js` e não usa o orçamento de pixels | Estender o perfil único |
 | `PCFSoftShadowMap` | Não é o tipo documentado nesta versão; Three.js documenta Basic, PCF e VSM | Manter tipo suportado e comparar em dispositivo |
-| Compressão Draco imediata | A cidade não conecta DRACOLoader | Unificar loader e decodificadores antes |
+| Compressão Draco imediata | A decodificação foi ligada nos dois loaders e os decodificadores passam a ser same-origin | Gerar variantes independentes e validá-las; não trocar o manifesto em runtime sem teste visual/performance |
 | Novo Worker CityState com recursos locais | Cria uma segunda fonte da verdade em relação ao D1 e o exemplo não valida autenticação/idempotência | Não migrar a economia |
 | IndexedDB para todos os GLBs | Cache API já guarda GET locais; ambos podem sofrer evicção | Medir quota; continuar Cache API; usar IDB só se requisito específico justificar |
 | OrbitControls | Conflita com pan/zoom CSS e Pointer Events existentes | Manter controles atuais; melhorar inércia/gestos no contrato atual |
@@ -247,3 +247,30 @@ Para Preview Cloudflare, continua faltando um D1 de staging real. A documentaç�
 4. Gerar variantes high/low e decidir LOD por tamanho em tela na câmera ortográfica; medir por perfil gráfico.
 5. Criar pipeline inspect -> transform -> validate -> compare, com rollback para os GLBs originais.
 6. Só depois de benchmark definir se existe um domínio de estado que justifique Durable Objects; manter D1 autoritativo enquanto isso.
+
+## 6. Atualização de integração — runtime 3D same-origin e otimização comparativa (17/11/2026)
+
+### O que foi aplicado no repositório
+
+- Three.js está fixado em 0.187.0. O script scripts/vendor-three.mjs copia o core, os addons necessários e seu grafo de imports relativos para vendor/three/; inclui Draco WASM/JS, Basis transcoder WASM/JS, Meshopt decoder, licença e manifesto de arquivos.
+- kingdom.html, world.html e arena.html agora resolvem os imports via import maps same-origin. scripts/kingdom-3d.js, world-map-3d.js, scripts/post-processing.js e engine/asset-loader.js deixaram de depender dos URLs CDN do Three.js. Os caminhos de Draco/Basis são locais.
+- sw.js foi elevado para cache clash-of-izzy-shell-v32; o evento de instalação lê e valida o manifesto local e adiciona módulos, addons, wrappers e binários ao Cache API junto com o shell. /api/* continua fora do cache. Se o manifesto de vendor estiver faltando/incompatível, a instalação do novo worker falha em vez de ativar uma versão incompleta.
+- O teste PWA verifica o shell, um GLB previamente baixado, imports de GLTFLoader/DRACOLoader/KTX2Loader/Meshopt e os binários Draco/Basis enquanto o contexto está offline. O teste usa a página já controlada, sem navegação top-level desconectada.
+- world-map-3d.js substitui árvores individuais no terreno e em territórios por três InstancedMesh batches por grupo. As matrizes das instâncias, cores e bounding volumes são recalculadas; frustumCulled fica ligado. A floresta conserva distribuição, contagem por perfil e variação original de copas.
+- scripts/optimize-3d-assets.mjs lê os cinco GLBs habilitados no manifesto, produz Draco e Meshopt em variantes independentes, executa gltf-transform validate e mede bytes/delta sem trocar os caminhos originais. Relatórios ficam em node_modules/.cache/clash-of-izzy/3d-optimization/.
+- A CI executa npm run assets:optimize e publica o relatório como artefato. Three.js e glTF Transform estão fixados no package.json. npm run vendor:three é chamado antes de dev, preview, deploy, check, Node tests e E2E.
+
+### Limites deliberados
+
+- Variantes Draco/Meshopt são comparativos A/B e não são usadas pelo jogo até que decode, fidelidade visual, tempo de load e memória sejam avaliados em Chromium e Android físico.
+- InstancedMesh agrupa o mesh por material/geometria e habilita culling pelo bounding volume do grupo; não é culling independente por árvore e não garante 60 FPS. Sombras e overdraw ainda precisam de profiling.
+- Three.js same-origin/offline cobre o runtime cliente e decoders locais, não sincronização D1, autenticação, economia, combate ou outras APIs.
+- O diretório vendor/three/ é ignorado pelo Git e reproduzido a partir do pacote npm fixado; não editar arquivos gerados.
+
+### Preview Cloudflare
+
+wrangler.jsonc agora define previews.vars.ENVIRONMENT = preview e mantém o D1 de produção somente no binding de produção. Não existe binding previews.d1_databases até ser provisionado um D1 staging separado; o Preview fica sem env.DB e não deve ser promovido como funcional antes disso. O teste automatizado rejeita qualquer ID de Preview igual ao ID de produção. O projeto continua sendo Worker com assets na raiz (assets.directory = .), portanto usar npm run preview / npx wrangler preview, não wrangler pages deploy.
+
+### CI e artefatos
+
+A CI #888 validou a revisão anterior (266 testes Node e 10 Playwright). A execução seguinte, CI #907, está em fila para validar a integração local do runtime, instancing, novos testes e benchmark comparativo Draco/Meshopt. Não declarar esta nova etapa aprovada antes da conclusão da CI #907.
