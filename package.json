@@ -14,10 +14,14 @@
     "test": "node --test",
     "assets:validate": "node scripts/validate-3d-assets.js",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "vendor:three": "node scripts/vendor-three.mjs",
+    "pretest": "npm run vendor:three",
+    "pretest:e2e": "npm run vendor:three"
   },
   "devDependencies": {
     "wrangler": "4.161.0",
-    "@playwright/test": "1.65.1"
+    "@playwright/test": "1.65.1",
+    "three": "0.187.0"
   }
 }
