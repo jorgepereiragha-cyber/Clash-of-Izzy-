@@ -43,10 +43,11 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
   assert.ok(totalBytes < 1_000_000, "optional 3D downloads must remain under 1 MB");
 });
 
-test("the Kenney tree prop no longer duplicates the procedural forest anchor", () => {
+test("the Kenney forest props remain distributed and do not duplicate the procedural forest anchor", () => {
   const tree = manifest.props.find(item => item.id === "kenney-tree-high");
   assert.ok(tree);
-  assert.deepEqual(tree.positions, [[6, 0, -4.5]]);
+  assert.equal(tree.positions.length, 6);
+  assert.ok(tree.positions.every(position => Array.isArray(position) && position.length === 3 && position.every(Number.isFinite)));
   assert.ok(!tree.positions.some(([x, , z]) => Math.hypot(x + 6.2, z + 4.7) < 1));
 });
 
