@@ -290,3 +290,16 @@ test("failed optional GLB downloads preserve procedural models and allow later r
   assert.ok(renderer.includes("glbLoadPromises.delete(key)"));
   assert.ok(renderer.includes("manifestLoad = null"));
 });
+
+
+test("3D army and shader animation pauses while the kingdom is hidden or offscreen and resumes when visible", () => {
+  assert.match(renderer, /function canRunArmyAnimation\(\)[\s\S]*?!document\.hidden && sceneInViewport/);
+  assert.match(renderer, /function refreshArmyAnimationVisibility\(\)/);
+  assert.match(renderer, /document\.addEventListener\("visibilitychange", visibilityChangeHandler\)/);
+  assert.match(renderer, /new IntersectionObserver\(entries =>/);
+  assert.match(renderer, /sceneInViewport = entry\?\.isIntersecting === true/);
+  assert.match(renderer, /if \(!canRunArmyAnimation\(\) \|\| !renderer/);
+  assert.match(renderer, /sceneVisibilityObserver\?\.disconnect\(\)/);
+  assert.match(renderer, /document\.removeEventListener\("visibilitychange", visibilityChangeHandler\)/);
+  assert.match(renderer, /!cinematicCaptureActive/);
+});
