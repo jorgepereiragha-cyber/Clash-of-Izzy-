@@ -398,6 +398,208 @@ async function seedWorld(env){
  ];
  await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate) VALUES(?,?,?,?,?,?,?)").bind(...n,90)));
 }
+async function loadPvpCombatProfile(env,kingdomId){
+ const [kingdom,hero,dragon,military,defense]=await Promise.all([
+  env.DB.prepare("SELECT castle_level,defense_power,wall_hp,wall_max_hp FROM kingdoms WHERE id=?").bind(kingdomId).first(),
+  env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
+  env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
+  env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
+  env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
+ ]);
+ await ensureEquipmentTables(env,kingdomId);
+ const [equipmentRows,gearResearchRows]=await Promise.all([
+  hero?.id?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(kingdomId,hero.id).all():Promise.resolve({results:[]}),
+  env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
+ ]);
+ const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
+ const [valhallaBuffs,petBonuses]=await Promise.all([
+  getValhallaBuffMultipliers(env,kingdomId),
+  getPetBonuses(env,kingdomId)
+ ]);
+ const castleLevel=Math.max(1,Number(kingdom?.castle_level)||1);
+ const wallMax=Math.max(1,Number(kingdom?.wall_max_hp)||1);
+ const wallIntegrity=Math.max(0,Math.min(1,(Number(kingdom?.wall_hp)||0)/wallMax));
+ const structureDefense=Math.max(0,Math.floor((Number(kingdom?.defense_power)||0)/100));
+ return {
+  castleLevel,
+  heroLevel:Math.max(1,Number(hero?.level)||1),
+  dragonLevel:Math.max(1,Number(dragon?.level)||1),
+  researchLevel:Math.max(0,Number(military?.level)||0),
+  defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent+structureDefense+Math.round(wallIntegrity*5))),
+  attackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
+  healthBonusPercent:gear.healthPercent,
+  infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
+  criticalChancePercent:gear.criticalChancePercent,
+  pet:petBonuses,
+  gear
+ };
+}
+
+async function cancelPvpMarch(env,kingdomId,m,units,reason,now){
+ const resolvedAt=new Date().toISOString(),resolutionToken=crypto.randomUUID();
+ const guard="EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)";
+ const statements=[
+  env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
+ ];
+ for(const [unit,raw] of Object.entries(units||{})){
+  const quantity=Math.max(0,Math.floor(Number(raw)||0));
+  if(!Object.hasOwn(UNITS,unit)||quantity<1)continue;
+  statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
+   .bind(kingdomId,unit,quantity,m.id,kingdomId,resolutionToken));
+ }
+ statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,?,? WHERE "+guard)
+  .bind(kingdomId,"march_cancelled",JSON.stringify({marchId:m.id,reason}),m.id,kingdomId,resolutionToken));
+ statements.push(env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'pvp_march_cancelled',? WHERE "+guard)
+  .bind(kingdomId,JSON.stringify({marchId:m.id,targetTerritoryId:m.target_territory_id,reason}),m.id,kingdomId,resolutionToken));
+ await env.DB.batch(statements);
+}
+
+async function processPvpMarch(env,attackerKingdomId,m,units,target,now){
+ const attackerArmy=Object.entries(units||{})
+  .map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))}))
+  .filter(unit=>Object.hasOwn(UNITS,unit.unit_type)&&unit.quantity>0);
+ const defenderKingdomId=Number(target?.owner_kingdom_id)||0;
+ if(!attackerArmy.length||!target||target.territory_kind!=="castle"||!defenderKingdomId||defenderKingdomId===Number(attackerKingdomId)){
+  await cancelPvpMarch(env,attackerKingdomId,m,units,"alvo_invalido",now);
+  return;
+ }
+ const [attackerKingdom,defenderKingdom,alliance]=await Promise.all([
+  env.DB.prepare("SELECT id FROM kingdoms WHERE id=?").bind(attackerKingdomId).first(),
+  env.DB.prepare("SELECT id,castle_level,protection_until,battle_token,defense_power,wall_hp,wall_max_hp FROM kingdoms WHERE id=?").bind(defenderKingdomId).first(),
+  env.DB.prepare("SELECT 1 AS allied FROM alliance_members a JOIN alliance_members d ON d.alliance_id=a.alliance_id WHERE a.kingdom_id=? AND d.kingdom_id=? LIMIT 1").bind(attackerKingdomId,defenderKingdomId).first()
+ ]);
+ if(!attackerKingdom||!defenderKingdom||Number(target.owner_kingdom_id)!==defenderKingdomId){
+  await cancelPvpMarch(env,attackerKingdomId,m,units,"reino_destino_indisponivel",now);
+  return;
+ }
+ const nowMs=Date.parse(now);
+ const shieldMs=Date.parse(target.shield_until||"");
+ const protectionMs=Date.parse(defenderKingdom.protection_until||"");
+ if((Number.isFinite(shieldMs)&&shieldMs>nowMs)||(Number.isFinite(protectionMs)&&protectionMs>nowMs)){
+  await cancelPvpMarch(env,attackerKingdomId,m,units,"castelo_protegido",now);
+  return;
+ }
+ if(alliance){
+  await cancelPvpMarch(env,attackerKingdomId,m,units,"ataque_a_aliado_bloqueado",now);
+  return;
+ }
+ const defenderArmyRows=(await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY unit_type,tier").bind(defenderKingdomId).all()).results||[];
+ const [attackerProfile,defenderProfile]=await Promise.all([
+  loadPvpCombatProfile(env,attackerKingdomId),
+  loadPvpCombatProfile(env,defenderKingdomId)
+ ]);
+ const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
+ const defenderCriticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
+ const battleRoll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
+ const simulation=simulateBattle({
+  army:attackerArmy,
+  defenderArmy:defenderArmyRows,
+  castleLevel:attackerProfile.castleLevel,
+  defenderLevel:defenderProfile.castleLevel,
+  heroLevel:attackerProfile.heroLevel,
+  dragonLevel:attackerProfile.dragonLevel,
+  researchLevel:attackerProfile.researchLevel,
+  attackerDefenseBonusPercent:attackerProfile.defenseBonusPercent,
+  equipmentAttackBonusPercent:attackerProfile.attackBonusPercent,
+  equipmentHealthBonusPercent:attackerProfile.healthBonusPercent,
+  infantryAttackBonusPercent:attackerProfile.infantryAttackBonusPercent,
+  criticalChancePercent:attackerProfile.criticalChancePercent,
+  criticalSeed,
+  defenderCastlePowerBonusPercent:defenderProfile.castleLevel,
+  defenderDefenseBonusPercent:defenderProfile.defenseBonusPercent,
+  defenderAttackBonusPercent:defenderProfile.attackBonusPercent,
+  defenderHealthBonusPercent:defenderProfile.healthBonusPercent,
+  defenderInfantryAttackBonusPercent:defenderProfile.infantryAttackBonusPercent,
+  defenderHeroLevel:defenderProfile.heroLevel,
+  defenderDragonLevel:defenderProfile.dragonLevel,
+  defenderResearchLevel:defenderProfile.researchLevel,
+  defenderCriticalChancePercent:defenderProfile.criticalChancePercent,
+  defenderCriticalSeed,
+  castlePowerBonusPercent:attackerProfile.castleLevel,
+  roll:battleRoll
+ });
+ const attackerSurvivors=applyUnitLosses(attackerArmy,simulation.losses||{});
+ const remainingDefenderLosses={...(simulation.defenderLosses||{})};
+ const defenderSurvivorRows=defenderArmyRows.map(row=>{
+  const pending=Math.max(0,Math.floor(Number(remainingDefenderLosses[row.unit_type])||0));
+  const lost=Math.min(Number(row.quantity)||0,pending);
+  remainingDefenderLosses[row.unit_type]=Math.max(0,pending-lost);
+  return {...row,survivors:Math.max(0,Number(row.quantity)-lost),losses:lost};
+ });
+ const losses={attacker:simulation.losses||{},defender:simulation.defenderLosses||{}};
+ const winnerKingdomId=simulation.won?Number(attackerKingdomId):defenderKingdomId;
+ const rewards={loot:{},territoryCaptured:false};
+ const replayData={
+  version:1,
+  mode:"territory_pvp",
+  seed:{criticalSeed,defenderCriticalSeed,roll:battleRoll},
+  participants:{
+   attacker:{kingdom_id:Number(attackerKingdomId),army:attackerArmy.map(row=>({...row}))},
+   defender:{kingdom_id:defenderKingdomId,army:defenderArmyRows.map(row=>({...row}))}
+  },
+  modifiers:{
+   attacker:{castle:attackerProfile.castleLevel,hero:attackerProfile.heroLevel,dragon:attackerProfile.dragonLevel,research:attackerProfile.researchLevel,gear:attackerProfile.gear,pet:attackerProfile.pet},
+   defender:{castle:defenderProfile.castleLevel,hero:defenderProfile.heroLevel,dragon:defenderProfile.dragonLevel,research:defenderProfile.researchLevel,defense:defenderProfile.defenseBonusPercent,gear:defenderProfile.gear,pet:defenderProfile.pet}
+  },
+  outcome:{winner_kingdom_id:winnerKingdomId,won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses},
+  frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))
+ };
+ const battleLog=[
+  {event:"pvp_battle_started",attackerKingdomId:Number(attackerKingdomId),defenderKingdomId,territoryId:Number(target.id),criticalSeed,defenderCriticalSeed},
+  {event:"pvp_combat_metadata",attacker:attackerProfile,defender:defenderProfile,criticalHits:simulation.criticalHits||0},
+  ...(simulation.log||[]),
+  {event:simulation.won?"attacker_victory":"defender_held",winnerKingdomId,rounds:simulation.rounds}
+ ];
+ const previousBattleToken=defenderKingdom.battle_token??"";
+ const battleToken=crypto.randomUUID();
+ const guardId=crypto.randomUUID();
+ const resolvedAt=new Date().toISOString();
+ const resolutionToken=crypto.randomUUID();
+ const internalGuard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+ const resolutionGuard=internalGuard+" AND EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)";
+ const guardValues=[defenderKingdomId,guardId,m.id,Number(attackerKingdomId),resolutionToken];
+ const snapshot=JSON.stringify(Object.fromEntries(defenderArmyRows.map(row=>[row.unit_type+"_"+row.tier,{quantity:Number(row.quantity)}])));
+ const expectedRows=defenderArmyRows.length;
+ const statements=[
+  env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,defenderKingdomId,previousBattleToken),
+  env.DB.prepare(
+   "INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1 "+
+   "AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) "+
+   "AND (SELECT COUNT(*) FROM army_units WHERE kingdom_id=? AND quantity>0)=? "+
+   "AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current "+
+   "ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key "+
+   "AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=?"
+  ).bind(defenderKingdomId,"__internal_action_guard",guardId,defenderKingdomId,battleToken,defenderKingdomId,expectedRows,snapshot,defenderKingdomId,expectedRows),
+  env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=? AND "+internalGuard)
+   .bind(resolvedAt,resolutionToken,m.id,attackerKingdomId,now,defenderKingdomId,guardId)
+ ];
+ for(const row of defenderSurvivorRows){
+  statements.push(env.DB.prepare("UPDATE army_units SET quantity=? WHERE kingdom_id=? AND unit_type=? AND tier=? AND quantity=? AND "+resolutionGuard)
+   .bind(row.survivors,defenderKingdomId,row.unit_type,row.tier,row.quantity,...guardValues));
+ }
+ for(const [unit,quantity] of Object.entries(attackerSurvivors)){
+  if(quantity<1)continue;
+  statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE "+resolutionGuard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
+   .bind(attackerKingdomId,unit,quantity,...guardValues));
+ }
+ statements.push(env.DB.prepare(
+  "INSERT INTO battle_reports(attacker_kingdom_id,defender_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log,replay_json) "+
+  "SELECT ?,?,?,?,?,?,?,?,?,?,? WHERE "+resolutionGuard
+ ).bind(attackerKingdomId,defenderKingdomId,winnerKingdomId,target.id,"territory_pvp",simulation.attackerPower,simulation.defenderPower,JSON.stringify(losses),JSON.stringify(rewards),JSON.stringify(battleLog),JSON.stringify(replayData),...guardValues));
+ const attackerEvent={battleType:"territory_pvp",enemyKingdom:defenderKingdomId,won:Boolean(simulation.won),losses:losses.attacker};
+ const defenderEvent={battleType:"territory_pvp",enemyKingdom:Number(attackerKingdomId),won:!simulation.won,losses:losses.defender};
+ statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+resolutionGuard)
+  .bind(attackerKingdomId,"pvp_battle_resolved",JSON.stringify(attackerEvent),...guardValues));
+ statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+resolutionGuard)
+  .bind(defenderKingdomId,"pvp_battle_received",JSON.stringify(defenderEvent),...guardValues));
+ statements.push(env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'pvp_battle_attack',? WHERE "+resolutionGuard)
+  .bind(attackerKingdomId,JSON.stringify({targetKingdomId:defenderKingdomId,territoryId:target.id,won:Boolean(simulation.won)}),...guardValues));
+ statements.push(env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'pvp_battle_defense',? WHERE "+resolutionGuard)
+  .bind(defenderKingdomId,JSON.stringify({attackerKingdomId:Number(attackerKingdomId),territoryId:target.id,held:!simulation.won}),...guardValues));
+ statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(defenderKingdomId,guardId));
+ await env.DB.batch(statements);
+}
+
 async function processMarches(env,kingdomId){
  const now=new Date().toISOString();
  const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
@@ -410,10 +612,14 @@ async function processMarches(env,kingdomId){
    env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
   ];
   if(m.march_type==="attack"){
-   const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+   const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id,territory_kind,shield_until FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
+   if(target?.territory_kind==="castle"&&Number(target.owner_kingdom_id)>0&&Number(target.owner_kingdom_id)!==Number(kingdomId)){
+    await processPvpMarch(env,kingdomId,m,units,target,now);
+    continue;
+   }
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={},replayData={};
-   if(target&&!target.owner_kingdom_id&&army.length){
+   if(target&&!target.owner_kingdom_id&&target.territory_kind!=="castle"&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
