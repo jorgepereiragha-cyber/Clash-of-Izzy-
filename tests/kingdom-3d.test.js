@@ -9,7 +9,7 @@ const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json",
 
 test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(kingdom, /type="module" src="\/scripts\/kingdom-3d\.js"/);
-  assert.match(kingdom, /drawKingdomScene\(buildings\)/);
+  assert.match(kingdom, /drawKingdomScene\(buildings,Number\(k\.equipped_skin_id\|\|0\)\)/);
   assert.match(renderer, /new THREE\.WebGLRenderer/);
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
   assert.match(renderer, /coi:kingdom-render/);
