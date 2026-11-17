@@ -157,7 +157,7 @@ import * as THREE from "three";
       dummy.position.set(x, y + 1.2 * scale, z);
       dummy.updateMatrix();
       crowns.setMatrixAt(index, dummy.matrix);
-      crowns.setColorAt(index, Number(tree.variant) % 2 ? lightTint : neutralTint);
+      crowns.setColorAt(index, Number(tree.variant) % 2 ? neutralTint : lightTint);
 
       dummy.position.set(x, y + 1.86 * scale, z);
       dummy.updateMatrix();
