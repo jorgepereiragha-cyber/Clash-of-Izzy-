@@ -9,6 +9,9 @@ test("game search requires a valid player session and rate limits player and net
   assert.ok(worker.includes('url.pathname==="/api/game/search"&&request.method==="GET"'));
   assert.ok(worker.includes('rateLimitDecision(env,"game-search-player",playerId,30,60)'));
   assert.ok(worker.includes('rateLimitDecision(env,"game-search-network"'));
+  assert.ok(worker.includes('const [limited,networkLimit]=await Promise.all(['));
+  assert.ok(worker.includes('rateLimitDecision(env,"game-search-player",playerId,30,60),'));
+  assert.ok(worker.includes('rateLimitDecision(env,"game-search-network",request.headers.get("CF-Connecting-IP")||"unknown",180,60)'));
   assert.ok(worker.includes('queryLength<(containsCjk?1:2)'));
   assert.ok(worker.includes('queryLength>48'));
 });
