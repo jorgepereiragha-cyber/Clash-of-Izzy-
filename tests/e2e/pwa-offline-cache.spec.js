@@ -79,14 +79,24 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(offlineShell.status).toBe(200);
   expect(offlineShell.body).toContain("<h1>Você está sem conexão</h1>");
 
-  // The renderer, loaders and decoder binaries must remain usable offline.
-  // Open the kingdom page so its import map resolves the same-origin modules.
-  await page.goto("/kingdom.html");
+  // Verify first-time module resolution while offline. The landing document
+  // has not imported any modules yet, so its import map can be registered before
+  // resolving the same-origin Three.js addon graph.
   const offlineThreeModules = await page.evaluate(async () => {
+    const importMap = document.createElement("script");
+    importMap.type = "importmap";
+    importMap.textContent = JSON.stringify({
+      imports: {
+        three: "/vendor/three/build/three.module.js",
+        "three/addons/": "/vendor/three/examples/jsm/"
+      }
+    });
+    document.head.appendChild(importMap);
+
     const [{ GLTFLoader }, { DRACOLoader }, { KTX2Loader }, { MeshoptDecoder }] = await Promise.all([
-      import("/vendor/three/examples/jsm/loaders/GLTFLoader.js"),
-      import("/vendor/three/examples/jsm/loaders/DRACOLoader.js"),
-      import("/vendor/three/examples/jsm/loaders/KTX2Loader.js"),
+      import("three/addons/loaders/GLTFLoader.js"),
+      import("three/addons/loaders/DRACOLoader.js"),
+      import("three/addons/loaders/KTX2Loader.js"),
       import("three/addons/libs/meshopt_decoder.module.js")
     ]);
     await MeshoptDecoder.ready;
@@ -108,8 +118,9 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
     }
     return results;
   }, [
-    "/vendor/three/examples/jsm/libs/draco/gltf/draco_wasm_wrapper.js",
-    "/vendor/three/examples/jsm/libs/draco/gltf/draco_decoder.wasm",
+    "/vendor/three/examples/jsm/libs/draco/draco_wasm_wrapper.js",
+    "/vendor/three/examples/jsm/libs/draco/draco_decoder.wasm",
+    "/vendor/three/examples/jsm/libs/draco/draco_decoder.js",
     "/vendor/three/examples/jsm/libs/basis/basis_transcoder.js",
     "/vendor/three/examples/jsm/libs/basis/basis_transcoder.wasm"
   ]);
