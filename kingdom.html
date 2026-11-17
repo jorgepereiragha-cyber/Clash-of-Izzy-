@@ -32,7 +32,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .queue-form label{font-size:12px;color:var(--muted)}
 .queue-form button{width:100%}
 @keyframes queue-pulse{from{opacity:.55}to{opacity:1}}@media(prefers-reduced-motion:reduce){.resource.bump,.queue-progress span{animation:none;transition:none}}
-.stack{display:grid;gap:14px}.notice{padding:10px;border-radius:8px;background:#3a2d1c;border:1px solid #927344;color:#f4dca8;line-height:1.5}.events{display:grid;gap:7px}.event{background:#0e1a2a;padding:8px;border-radius:7px;color:#dbe3ec;font-size:12px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.stack{display:grid;gap:14px}.castle-skin-picker{margin-top:12px;padding:11px;border:1px solid #40556b;border-radius:9px;background:#0e1a2a}.castle-skin-picker h3{margin:0;color:var(--gold);font-size:14px}.castle-skin-picker p{margin:6px 0}.castle-skin-picker .toolbar{margin-top:8px}.castle-skin-picker button[aria-pressed="true"]{border-color:#f3cf72;box-shadow:inset 0 0 0 1px #f3cf72;color:#ffe7a8}.notice{padding:10px;border-radius:8px;background:#3a2d1c;border:1px solid #927344;color:#f4dca8;line-height:1.5}.events{display:grid;gap:7px}.event{background:#0e1a2a;padding:8px;border-radius:7px;color:#dbe3ec;font-size:12px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 #status{font-size:12px;color:#d8e2ee}#status.error{color:#ffb4a9}#loading{padding:25px;text-align:center;color:var(--muted)}
 @media(max-width:760px){.layout{grid-template-columns:1fr}.city{min-height:320px;grid-template-rows:repeat(3,minmax(78px,1fr));padding:10px;gap:7px}.resources{grid-template-columns:repeat(3,minmax(0,1fr))}.resource{font-size:10px;padding:6px 2px}.resource b{font-size:12px}.hero{align-items:start;flex-direction:column}}
 @media(max-width:390px){.city{min-height:280px}.building{padding:5px 3px}.building .emoji{font-size:22px}.building strong{font-size:9px}.building small{font-size:9px}.grid2{grid-template-columns:1fr}}
@@ -66,7 +66,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div id="loading">Carregando seu reino e sincronizando com o servidor…</div>
 <div id="game" hidden>
 <div class="layout">
-<section class="panel"><h2>🏰 Sua cidade</h2><div class="city" id="city"></div><div class="grid2" id="summary"></div></section>
+<section class="panel"><h2>🏰 Sua cidade</h2><div class="city" id="city"></div><div class="castle-skin-picker"><h3>🎨 Aparência do castelo</h3><p class="muted">Equipe somente skins que já pertencem à sua conta. A aparência também será exibida no mapa compartilhado.</p><div id="castleSkins" class="toolbar" aria-label="Skins de castelo possuídas"></div><div id="castleSkinStatus" class="muted" role="status" aria-live="polite"></div></div><div class="grid2" id="summary"></div></section>
 <div class="stack">
 <section class="panel"><h2>🏗️ Edifícios e melhorias</h2><div class="building-list" id="buildings"></div></section>
 <section class="panel"><h2>⏳ Centro de operações</h2><div id="queues" class="events"><div class="muted">Carregando filas do reino…</div></div></section>
@@ -159,7 +159,8 @@ const analyticsSessionId=globalThis.crypto?.randomUUID?.()||("session_"+Date.now
 let analyticsStarted=false;
 async function trackAnalytics(event,data={}){if(!token)return;try{await request("/game/analytics",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event,sessionId:analyticsSessionId,data})});}catch(error){console.debug("analytics_unavailable",error?.message||error);}}
 async function connect(){setStatus("Sincronizando…");try{token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");let data;if(token){data=await request("/game/state");}else{const referrerCode=new URLSearchParams(location.search).get("ref")||"";data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(referrerCode?{referrer_code:referrerCode}:{})});if(data.token){token=data.token;localStorage.setItem("coi_game_token",token);if(referrerCode){const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete("ref");history.replaceState({}, "", cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);}}}state=data.state||data;if(!state.kingdom)throw new Error("O servidor não retornou os dados do reino.");render();document.getElementById("loading").hidden=true;document.getElementById("game").hidden=false;setStatus("● Reino sincronizado");if(!analyticsStarted){analyticsStarted=true;void trackAnalytics("kingdom.opened",{castle_level:Number(state.kingdom.castle_level||1)});}}catch(error){setStatus(error.message,true);const loading=document.getElementById("loading");loading.textContent=error.message+" Seu acesso salvo foi preservado. Tente novamente após verificar a conexão. ";let retry=document.getElementById("retryConnection");if(!retry){retry=document.createElement("button");retry.id="retryConnection";retry.type="button";retry.className="secondary";retry.textContent="↻ Tentar novamente";retry.style.marginTop="12px";retry.addEventListener("click",connect);loading.append(retry);}retry.disabled=false;}}
-function drawKingdomScene(buildings){
+function equippedCastleSkinName(){const id=Number(state?.kingdom?.equipped_skin_id||0);return (state?.ownedCastleSkins||[]).find(item=>Number(item.id)===id)?.name||"";}
+function drawKingdomScene(buildings,castleSkinName=""){
  const host=document.getElementById("city");if(!host)return;
  let canvas=document.getElementById("kingdomScene");
  if(!canvas){canvas=document.createElement("canvas");canvas.id="kingdomScene";canvas.setAttribute("aria-hidden","true");host.prepend(canvas);}
@@ -182,6 +183,15 @@ function drawKingdomScene(buildings){
  // Trees and shrubs decorate the outer tiles.
  for(let n=0;n<12;n++){const col=n%3,row=Math.floor(n/3),x=col*cw+((n*43+17)%(Math.max(1,cw-28)))+14,y=row*ch+((n*29+13)%(Math.max(1,ch-26)))+13;if(n===4)continue;ctx.fillStyle="#172e20aa";ctx.beginPath();ctx.ellipse(x+3,y+5,8,4,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=n%2?"#315f3b":"#477747";ctx.beginPath();ctx.arc(x,y,7+(n%3),0,Math.PI*2);ctx.fill();ctx.fillStyle="#8eaa65";ctx.beginPath();ctx.arc(x-2,y-3,3,0,Math.PI*2);ctx.fill();}
  const palette={castle:["#9b805c","#d6b777","#5a5362"],barracks:["#8e6447","#b18a5d","#4e3940"],farm:["#8c9b59","#c4bd75","#637a45"],quarry:["#858b8a","#c5c9bd","#59646a"],lumber_mill:["#795b3e","#b58a56","#493a31"],iron_mine:["#66727c","#a4aeb1","#394954"],market:["#a27a50","#d4b36c","#9a4f3d"],academy:["#6c7190","#c2b5a0","#4d4b6e"],wall:["#8d9695","#c6c4b3","#626d75"],hospital:["#d0c8b2","#e4d9b8","#a65a50"],watchtower:["#7d827b","#c3b58e","#5b4d3d"],stable:["#946a48","#c4a36d","#51403a"],archery_range:["#a18a58","#d0bd7b","#657c4c"],siege_workshop:["#6f6255","#a58d70","#51433c"],embassy:["#9b8a70","#d7c7a1","#536d81"],warehouse:["#8a7759","#c3a775","#5c4a3a"]};
+ const castleSkinPalette={
+  "Fortaleza do Dragão Dourado":["#b88743","#76291f","#6a3826"],
+  "Fortaleza do Dragão Imperial":["#9a5260","#3e294f","#6b3447"],
+  "Fortaleza do Dragão Ancestral":["#596575","#293b56","#435063"],
+  "Fortaleza do Dragão Místico":["#8876ad","#33275d","#514078"],
+  "Fortaleza do Dragão Lunar":["#95b0c4","#2e587c","#496b86"],
+  "Fortaleza do Dragão Solar":["#c69a4b","#a63c22","#81502c"]
+}[String(castleSkinName||"")];
+ if(castleSkinPalette)palette.castle=castleSkinPalette;
  const order=buildings.slice(0,9);
  order.forEach((b,i)=>{const col=i%3,row=Math.floor(i/3),cx=col*cw+cw*.5,base=row*ch+ch*.73,scale=Math.min(cw,ch)/100,colors=palette[b.building_type]||palette.warehouse,level=Math.max(1,Number(b.level)||1),height=(22+Math.min(level,20)*1.35)*scale;
   ctx.fillStyle="#07170f88";ctx.beginPath();ctx.ellipse(cx,base+3,Math.min(cw,ch)*.31,7*scale,0,0,Math.PI*2);ctx.fill();
@@ -200,8 +210,8 @@ function watchKingdomScene(){
  const host=document.getElementById("city");if(!host)return;
  if(kingdomResizeObserver)kingdomResizeObserver.disconnect();
  if(kingdomResizeHandler)window.removeEventListener("resize",kingdomResizeHandler);
- if("ResizeObserver" in window){kingdomResizeObserver=new ResizeObserver(()=>drawKingdomScene(state?.buildings||[]));kingdomResizeObserver.observe(host);}
- else{kingdomResizeHandler=()=>drawKingdomScene(state?.buildings||[]);window.addEventListener("resize",kingdomResizeHandler,{passive:true});}
+ if("ResizeObserver" in window){kingdomResizeObserver=new ResizeObserver(()=>drawKingdomScene(state?.buildings||[],equippedCastleSkinName()));kingdomResizeObserver.observe(host);}
+ else{kingdomResizeHandler=()=>drawKingdomScene(state?.buildings||[],equippedCastleSkinName());window.addEventListener("resize",kingdomResizeHandler,{passive:true});}
 }
 window.addEventListener("coi:kingdom-projection",event=>{
  const city=document.getElementById("city");if(!city)return;
@@ -222,8 +232,43 @@ window.addEventListener("coi:kingdom-2d-fallback",()=>{
   button.style.top="";
  });
 });
-function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);
-const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings);if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[]}}));
+let castleSkinBusy=false;
+function renderCastleSkins(){
+ const root=document.getElementById("castleSkins");
+ if(!root)return;
+ root.replaceChildren();
+ const owned=Array.isArray(state?.ownedCastleSkins)?state.ownedCastleSkins:[];
+ const equippedId=Number(state?.kingdom?.equipped_skin_id||0);
+ if(!owned.length){
+  const empty=document.createElement("span");empty.className="muted";empty.textContent="Nenhuma skin de castelo foi liberada para esta conta ainda.";root.append(empty);return;
+ }
+ const addOption=(skinId,label,pressed)=>{
+  const button=document.createElement("button");
+  button.type="button";button.className="secondary";button.dataset.skinId=skinId===null?"":String(skinId);
+  button.textContent=label;button.setAttribute("aria-pressed",pressed?"true":"false");
+  button.disabled=castleSkinBusy||pressed;
+  root.append(button);
+ };
+ if(equippedId)addOption(null,"Usar aparência padrão",false);
+ for(const skin of owned){
+  const selected=Number(skin.id)===equippedId;
+  addOption(Number(skin.id),(selected?"✓ ":"")+skin.name,selected);
+ }
+}
+async function equipCastleSkin(skinId){
+ if(castleSkinBusy)return;
+ castleSkinBusy=true;renderCastleSkins();
+ const status=document.getElementById("castleSkinStatus");
+ status.textContent="Salvando aparência no servidor…";
+ try{
+  const result=await request("/game/skin/equip",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({skinId})});
+  state=result.state;render();setStatus(skinId===null?"A aparência padrão foi restaurada.":"Skin equipada no seu castelo e no mapa compartilhado.");
+  status.textContent="Aparência salva.";
+ }catch(error){status.textContent=error.message;setStatus(error.message,true);}
+ finally{castleSkinBusy=false;renderCastleSkins();}
+}
+function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();
+const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings,equippedCastleSkinName());if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiCastleSkinId=Number(k.equipped_skin_id||0);window.__coiCastleSkinName=equippedCastleSkinName();window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],castleSkinId:window.__coiCastleSkinId,castleSkinName:window.__coiCastleSkinName}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const blocked=maxed||activeConstructionCount>=2||alreadyQueued||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
@@ -395,6 +440,7 @@ async function submitFeedback(event){
  finally{button.disabled=false;}
 }
 document.getElementById("feedbackForm").addEventListener("submit",submitFeedback);
+document.getElementById("castleSkins").addEventListener("click",event=>{const button=event.target.closest("button[data-skin-id]");if(!button)return;const raw=button.dataset.skinId;void equipCastleSkin(raw===""?null:Number(raw));});
 document.getElementById("nicknameForm").addEventListener("submit",setNickname);
 document.getElementById("trainingForm").addEventListener("submit",startTraining);
 document.getElementById("researchForm").addEventListener("submit",startResearch);
