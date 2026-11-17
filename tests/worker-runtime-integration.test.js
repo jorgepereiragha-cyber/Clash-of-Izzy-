@@ -170,11 +170,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     assert.deepEqual(healthData.missingTables, []);
     assert.equal(health.headers.get("x-frame-options"), "DENY");
 
-    const adminHealth = expectStatus(await api("/api/admin/health"), 200, "health administrativo");
-    assert.equal(adminHealth.hasDB, true);
-    assert.equal(adminHealth.hasSESSION_SECRET, true);
-    assert.equal(adminHealth.hasADMIN_EMAIL, true);
-    assert.equal(adminHealth.hasADMIN_PASSWORD, true);
+    expectStatus(await api("/api/admin/health"), 401, "health administrativo sem sessão");
+    expectStatus(await api("/api/admin/health", { token: tokenA }), 401, "token de jogador não acessa health Master");
+    expectStatus(await api("/api/admin/health", { method: "POST" }), 405, "health administrativo aceita somente GET");
 
     const valhallaDefault = expectStatus(await api("/api/config/valhalla"), 200, "configuração pública de Valhalla");
     assert.equal(valhallaDefault.active, false, "Ascensão de Valhalla permanece desligada por padrão");
@@ -510,6 +508,11 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const adminToken = adminLogin.token;
     const admin = (route, body) => api(route, { method: "POST", token: adminToken, body });
     const adminGet = route => api(route, { method: "GET", token: adminToken });
+    const adminHealth = expectStatus(await adminGet("/api/admin/health"), 200, "health administrativo com sessão Master");
+    assert.equal(adminHealth.hasDB, true);
+    assert.equal(adminHealth.hasSESSION_SECRET, true);
+    assert.equal(adminHealth.hasADMIN_EMAIL, true);
+    assert.equal(adminHealth.hasADMIN_PASSWORD, true);
 
     await t.test("controle Master da Ascensão de Valhalla", async () => {
       expectStatus(await api("/api/valhalla-admin/status"), 401, "Valhalla admin exige sessão Master");
