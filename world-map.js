@@ -188,10 +188,16 @@ function updateActionButtons() {
   const territory = getSelectedTerritory();
   const hasTroops = Object.values(selectedUnits).some(quantity => Number(quantity) > 0);
   const isCastle = territory?.territory_kind === "castle";
+  const isEnemyCastle = Boolean(isCastle && territory.owner_kingdom_id
+    && Number(territory.owner_kingdom_id) !== Number(state?.kingdom?.id));
   const canVisit = Boolean(territory && !isCastle && territoryOwner(territory) !== "Outro reino");
+  const canAttack = Boolean(territory && hasTroops && (
+    isEnemyCastle || (!isCastle && !territory.owner_kingdom_id)
+  ));
   $("gather").disabled = busy || !canVisit || !hasTroops;
   $("scout").disabled = busy || !canVisit || !hasTroops;
-  $("attack").disabled = busy || !territory || isCastle || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  $("attack").textContent = isEnemyCastle ? "⚔ Atacar castelo" : "⚔ Conquistar";
+  $("attack").disabled = busy || !canAttack;
 }
 function renderDetails() {
   const root = $("territoryDetails");
@@ -221,12 +227,16 @@ function renderDetails() {
     addStat(grid, "Nível", fmt(territory.level || 1));
   }
   root.append(grid);
-  $("marchNotice").textContent = isCastle
-    ? "Castelo de outro comandante detectado. Você pode consultar comandante, poder e aliança; o envio de ataques PvP será ativado na Fase 10."
-    : territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
-      ? "Este território pertence a outro jogador e não está disponível para coleta."
-      : "Escolha as tropas e uma ação. O servidor confirma custos, disponibilidade e resultado.";
-  if (isCastle) {
+  const isEnemyCastle = Boolean(isCastle && territory.owner_kingdom_id
+    && Number(territory.owner_kingdom_id) !== Number(state?.kingdom?.id));
+  $("marchNotice").textContent = isEnemyCastle
+    ? "Alvo PvP selecionado. Escolha seu exército; o servidor revalidará proteção, aliança e tropas na chegada."
+    : isCastle
+      ? "Este é um castelo do seu reino."
+      : territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
+        ? "Este território pertence a outro jogador e não está disponível para coleta."
+        : "Escolha as tropas e uma ação. O servidor confirma custos, disponibilidade e resultado.";
+  if (isCastle && !isEnemyCastle) {
     $("troops").replaceChildren();
     updateActionButtons();
   } else {
@@ -270,9 +280,12 @@ async function refreshState({ afterMutation = false } = {}) {
     if (!requestedTerritoryApplied && requestedTerritorySearch) {
       const query = normalizeTerritorySearch(requestedTerritorySearch);
       const territories = state.territories || [];
-      const match = territories.find(item => normalizeTerritorySearch(item.name) === query)
-        || territories.find(item => normalizeTerritorySearch(item.name).startsWith(query))
-        || territories.find(item => normalizeTerritorySearch(item.name).includes(query));
+      const match = territories.find(item => normalizeTerritorySearch(item.name) === query
+          || normalizeTerritorySearch(item.commander_name) === query)
+        || territories.find(item => normalizeTerritorySearch(item.name).startsWith(query)
+          || normalizeTerritorySearch(item.commander_name).startsWith(query))
+        || territories.find(item => normalizeTerritorySearch(item.name).includes(query)
+          || normalizeTerritorySearch(item.commander_name).includes(query));
       if (match) selectedTerritoryId = match.id;
       requestedTerritoryApplied = true;
     }
