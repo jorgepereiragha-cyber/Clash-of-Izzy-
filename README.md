@@ -11,7 +11,7 @@ Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e p
 - ⚙️ **Deploy final validado:** [GitHub Actions — run #43872671573](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671573)
 - ✅ **CI final validada:** [GitHub Actions — run #43872671700](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671700)
 
-Release Visual Premium e Gravador Cinematográfico publicada em 16/11/2026. O deploy final aprovou 224 testes automatizados, publicação do Worker/assets e smoke test de produção. O cache atual do Service Worker é v23. A validação automática confirma que os módulos do gravador estão publicados; a gravação física pós-deploy no Android continua sendo uma conferência recomendada.
+Release Visual Premium e Gravador Cinematográfico publicada em 16/11/2026. O deploy final aprovou 224 testes automatizados, publicação do Worker/assets e smoke test de produção. O cache incluído nesta branch é v27. A validação automática confirma que os módulos do gravador estão publicados; a gravação física pós-deploy no Android continua sendo uma conferência recomendada.
 
 ## Desenvolvimento local
 
@@ -32,9 +32,13 @@ Comandos úteis:
 - `npm run db:migrate:local`: aplica as migrações no D1 local.
 - `npm run db:migrate:remote`: aplica as migrações no D1 remoto.
 
-## Deploy automático
+## Deploy manual protegido
 
-O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, captura e arquiva o bookmark de recuperação Time Travel do D1 imediatamente antes das migrações remotas, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, formulário beta, feedback, analytics, páginas principais, Service Worker com cache v23 e os módulos do gravador cinematográfico. O deploy só termina com sucesso quando esses checks passam. O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação; restaurar Time Travel sobrescreve o estado atual do banco.
+O workflow `.github/workflows/deploy-cloudflare.yml` **não publica automaticamente em um push para `main`**. A publicação só pode ser iniciada manualmente em GitHub Actions (`workflow_dispatch`) e exige marcar `confirm_production` como `true`, além do ambiente protegido `production`. O fluxo executa testes, validação do bundle, migrações D1 locais, captura e arquivamento de um bookmark Time Travel, migrações D1 remotas, publicação do Worker/assets e smoke test de produção somente de leitura. Um push para `main` executa a CI de qualidade, não o deploy de produção.
+
+O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação. **Restaurar Time Travel sobrescreve o estado atual do banco**; não execute uma restauração sem plano de recuperação e autorização.
+
+Atenção: `npm run db:migrate:remote` aponta para o D1 configurado em `wrangler.jsonc`, que na `main` auditada é o banco de produção. Não execute esse comando como teste.
 
 Configure estes segredos no GitHub:
 
@@ -43,7 +47,7 @@ Configure estes segredos no GitHub:
 
 Configure também o segredo `SESSION_SECRET` diretamente no Worker Cloudflare (por exemplo, com `npx wrangler secret put SESSION_SECRET`). Use um valor aleatório forte e não o coloque no GitHub, no código ou no `wrangler.jsonc`; sem ele, a criação de reinos retorna erro 503.
 
-Para acessar `admin.html`, configure também `ADMIN_EMAIL` e `ADMIN_PASSWORD` como secrets do Worker Cloudflare. Use uma senha exclusiva e forte. O endpoint `/api/admin/health` informa apenas se as variáveis estão configuradas, nunca seus valores.
+Para acessar `admin.html`, configure também `ADMIN_EMAIL` e `ADMIN_PASSWORD` como secrets do Worker Cloudflare. Use uma senha exclusiva e forte. O endpoint administrativo `/api/admin/health` exige uma sessão Master válida; sem autenticação deve responder HTTP 401. Para diagnóstico público de disponibilidade, use `/api/health`, que não revela valores de segredos.
 
 Permissões mínimas do token para este workflow:
 
