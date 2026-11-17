@@ -23,10 +23,10 @@ Jogo de estratégia medieval 4X, persistente e prioritariamente móvel: desenvol
 | Evento Anjo da Morte | Evento PvE mundial com vida, pontuação, ataques e recompensas persistentes | Precisa de playtest e ajuste de dificuldade/recompensas com população real |
 | Loja | Pedidos auditáveis e aprovação Master idempotente; checkout Mercado Pago configurado | Confirmação automática por webhook e gateway operacional completo ainda pendentes |
 | Busca mundial | FTS5, trigramas, tolerância controlada a erros, português, busca CJK por substring, ranking BM25, cache de cliente e rate limit | Não é crawler da Internet; faltam benchmark de relevância/latência e telemetria sem PII |
-| Cidade 3D | Three.js isométrico, materiais procedurais, perfis de qualidade, fallback, cinco assets GLB habilitados no manifesto e diagnóstico local; os loaders da cidade e compartilhado registram Draco/KTX2/Meshopt quando o GLB exigir | Os GLBs atuais não foram recomprimidos; faltam variantes low e LOD por tamanho em tela, servir addons/decoders same-origin, benchmark e inspeção Android |
-| Renderização do mapa 3D | Three.js, câmera isométrica e controles de pan/zoom externos por Pointer Events/CSS | Vegetação do mapa ainda pode ser agrupada; pausa/retomada e profiling precisam ser uniformizados |
-| PWA/offline | Service Worker v31; shell e tela offline pré-cacheados; GETs same-origin são cacheados dinamicamente; APIs ficam fora do cache | Offline não é modo de jogo completo. Módulos Three.js/addons vêm de CDN e não têm garantia de disponibilidade offline; falta validação em aparelho |
-| Preview Cloudflare | Wrangler 4.161.0 e bloco `previews` presente | `previews.d1_databases` não está configurado com D1 de staging; Preview pode executar com `env.DB` ausente |
+| Cidade 3D | Three.js 0.187.0 fixado; módulos/addons e decodificadores Draco/KTX2/Meshopt gerados same-origin; carregadores configurados; cinco GLBs no manifesto | Os GLBs originais continuam no runtime; CI compara variantes independentes Draco/Meshopt; faltam aprovação visual, profiling, LOD por cobertura em tela e Android físico |
+| Renderização do mapa 3D | Three.js same-origin, câmera isométrica; árvores do terreno e de territórios agrupadas em três InstancedMesh batches, com bounds recalculados e frustum culling | Medir draw calls, sombras, overdraw e frame time em Android; controles pan/zoom permanecem Pointer Events/CSS |
+| PWA/offline | Service Worker v32; shell, módulos Three.js/addons, Draco/Basis decoders e GETs same-origin cacheados; /api/* continua fora do cache | CI valida first import de módulos e bytes dos decodificadores offline; gameplay autenticado/D1 continua online; falta inspeção Android físico |
+| Preview Cloudflare | Wrangler 4.161.0; `previews.vars.ENVIRONMENT=preview`; teste impede que Preview reutilize o D1 de produção | `previews.d1_databases` ainda ausente por falta de ID de D1 staging; Preview fica sem `env.DB` até provisionar e migrar a base isolada |
 | Android físico | Relatório visual parcial de 16/11 | Cidade 3D, texturas, sombras, PWA standalone, Service Worker controlador e offline ainda pendentes |
 
 ## Estado técnico e decisões de arquitetura
@@ -36,6 +36,9 @@ Jogo de estratégia medieval 4X, persistente e prioritariamente móvel: desenvol
 - Não criar um segundo motor de qualidade: `scripts/kingdom-quality.js` já define perfil e orçamento de pixels.
 - Não trocar o mapa para OrbitControls: o mapa atual usa Pointer Events, zoom/pan CSS e uma câmera isométrica; OrbitControls disputaria os gestos e a seleção de territórios.
 - Não mover a economia para Durable Objects sem benchmark e desenho de consistência. O D1 já oferece transações via `batch()` e o Worker já utiliza guardas condicionais em operações críticas.
+- Three.js está fixado em 0.187.0 e os módulos/addons/decoders são gerados em /vendor/three/ por npm run vendor:three; o Service Worker v32 pré-cacheia o manifesto local.
+- O pipeline npm run assets:optimize compara Draco e Meshopt em variantes independentes, valida saídas e não substitui os GLBs originais.
+- O Preview marca ENVIRONMENT=preview, mas continua sem DB até existir um ID de D1 staging diferente do ID de produção.
 - Os loaders da cidade e compartilhado agora registram Draco/KTX2/Meshopt nos caminhos efetivamente usados. Não comprimir os GLBs atuais antes de servir decodificadores pela mesma origem, produzir variantes testadas e medir os aparelhos.
 - Não considerar IndexedDB uma garantia permanente de offline. Cache API já armazena assets GET locais; o browser pode aplicar quota/evicção tanto a Cache quanto a IndexedDB.
 - Não considerar o shell offline como jogo jogável sem rede. O servidor continua sendo a fonte de verdade de saldos, filas, batalhas, compras e recompensas.
@@ -94,3 +97,14 @@ Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário impl
 - Não ativar monetização automática ou declarar PvP completo sem testes de integração, idempotência e operação.
 - Não declarar assets finais, 3D offline ou performance sustentada antes de teste real.
 - Usar referências de outros jogos como inspiração funcional, mantendo arte, nomes, interface e balanceamento próprios do Clash of Izzy.
+ 
+
+## Integração 3D e segurança de Preview — revisão atual
+
+- O package.json fixa Three.js 0.187.0 e @gltf-transform/cli 4.5.1. npm run vendor:three gera vendor/three/ e o manifesto de módulos, addons, Draco WASM/JS e Basis WASM/JS.
+- Import maps de kingdom.html, world.html e arena.html usam /vendor/three/; os módulos da cidade, mapa, post-processing e loader compartilhado não carregam Three.js de CDN.
+- sw.js usa clash-of-izzy-shell-v32; valida o manifesto local e cacheia os arquivos na instalação. As APIs permanecem fora do cache.
+- npm run assets:optimize cria variantes independentes Draco/Meshopt, valida e mede tamanho, sem trocar o manifesto. A CI gera e arquiva o relatório A/B em 3d-asset-compression-report.
+- O mapa mundial usa InstancedMesh para árvores do terreno e de territórios, em três batches por grupo; os volumes são calculados após as matrizes.
+- wrangler.jsonc marca ENVIRONMENT=preview. Sem D1 staging ID, env.DB não é fornecido ao Preview; não usar produção como fallback. Teste automatizado protege contra ID igual ao banco de produção.
+- A CI #907 está pendente para esta integração. O Android físico e o Preview com D1 staging continuam como gates antes do merge.
