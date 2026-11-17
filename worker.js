@@ -419,13 +419,15 @@ async function loadPvpCombatProfile(env,kingdomId){
  const castleLevel=Math.max(1,Number(kingdom?.castle_level)||1);
  const wallMax=Math.max(1,Number(kingdom?.wall_max_hp)||1);
  const wallIntegrity=Math.max(0,Math.min(1,(Number(kingdom?.wall_hp)||0)/wallMax));
- const structureDefense=Math.max(0,Math.floor((Number(kingdom?.defense_power)||0)/100));
+ const troopDefenseBonusPercent=Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent));
+ const castleDefenseBonusPercent=Math.min(30,troopDefenseBonusPercent+structureDefense+Math.round(wallIntegrity*5));
  return {
   castleLevel,
   heroLevel:Math.max(1,Number(hero?.level)||1),
   dragonLevel:Math.max(1,Number(dragon?.level)||1),
   researchLevel:Math.max(0,Number(military?.level)||0),
-  defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent+structureDefense+Math.round(wallIntegrity*5))),
+  defenseBonusPercent:troopDefenseBonusPercent,
+  castleDefenseBonusPercent,
   attackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
   healthBonusPercent:gear.healthPercent,
   infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
@@ -506,7 +508,7 @@ async function processPvpMarch(env,attackerKingdomId,m,units,target,now){
   criticalChancePercent:attackerProfile.criticalChancePercent,
   criticalSeed,
   defenderCastlePowerBonusPercent:defenderProfile.castleLevel,
-  defenderDefenseBonusPercent:defenderProfile.defenseBonusPercent,
+  defenderDefenseBonusPercent:defenderProfile.castleDefenseBonusPercent,
   defenderAttackBonusPercent:defenderProfile.attackBonusPercent,
   defenderHealthBonusPercent:defenderProfile.healthBonusPercent,
   defenderInfantryAttackBonusPercent:defenderProfile.infantryAttackBonusPercent,
@@ -539,7 +541,7 @@ async function processPvpMarch(env,attackerKingdomId,m,units,target,now){
   },
   modifiers:{
    attacker:{castle:attackerProfile.castleLevel,hero:attackerProfile.heroLevel,dragon:attackerProfile.dragonLevel,research:attackerProfile.researchLevel,gear:attackerProfile.gear,pet:attackerProfile.pet},
-   defender:{castle:defenderProfile.castleLevel,hero:defenderProfile.heroLevel,dragon:defenderProfile.dragonLevel,research:defenderProfile.researchLevel,defense:defenderProfile.defenseBonusPercent,gear:defenderProfile.gear,pet:defenderProfile.pet}
+   defender:{castle:defenderProfile.castleLevel,hero:defenderProfile.heroLevel,dragon:defenderProfile.dragonLevel,research:defenderProfile.researchLevel,defense:defenderProfile.castleDefenseBonusPercent,gear:defenderProfile.gear,pet:defenderProfile.pet}
   },
   outcome:{winner_kingdom_id:winnerKingdomId,won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses},
   frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))
@@ -1379,8 +1381,8 @@ async function gameAction(env,playerId,body){
       const nowMs=Date.now(),shieldMs=Date.parse(target.shield_until||""),protectionMs=Date.parse(defender.protection_until||"");
       if((Number.isFinite(shieldMs)&&shieldMs>nowMs)||(Number.isFinite(protectionMs)&&protectionMs>nowMs))
         return json({error:"Este reino está sob proteção e não pode ser atacado agora."},409);
-    }else if(marchType==="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id)){
-      return json({error:"Só é permitido atacar castelos de jogadores ou territórios neutros."},409);
+    }else if(marchType==="attack"&&target.owner_kingdom_id){
+      return json({error:"Só é permitido atacar castelos inimigos ou territórios neutros."},409);
     }
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
     const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
