@@ -19,6 +19,7 @@ test("Three.js runtime is vendored from the exact pinned npm version", async () 
     "/vendor/three/examples/jsm/loaders/DRACOLoader.js",
     "/vendor/three/examples/jsm/loaders/KTX2Loader.js",
     "/vendor/three/examples/jsm/libs/meshopt_decoder.module.js",
+    "/vendor/three/examples/jsm/libs/draco/draco_decoder.js",
     "/vendor/three/examples/jsm/libs/draco/draco_decoder.wasm",
     "/vendor/three/examples/jsm/libs/draco/draco_wasm_wrapper.js",
     "/vendor/three/examples/jsm/libs/basis/basis_transcoder.wasm",
@@ -49,7 +50,7 @@ test("3D entry points and page import maps no longer depend on a Three.js CDN", 
   }
   assert.match(kingdom, /from "three"/);
   assert.match(kingdom, /from "three\/addons\/loaders\/DRACOLoader\.js"/);
-  assert.match(kingdom, /setDecoderPath\("\/vendor\/three\/examples\/jsm\/libs\/draco\/gltf\/"/);
+  assert.match(kingdom, /setDecoderPath\("\/vendor\/three\/examples\/jsm\/libs\/draco\/"\)/);
   assert.match(kingdom, /setTranscoderPath\("\/vendor\/three\/examples\/jsm\/libs\/basis\/"/);
   assert.match(world, /from "three"/);
   assert.match(postProcessing, /from "three\/addons\/postprocessing\/EffectComposer\.js"/);
@@ -61,4 +62,15 @@ test("the Service Worker precaches all vendored Three.js modules and decoder bin
   assert.match(sw, /manifest\.assets/);
   assert.match(sw, /clash-of-izzy-shell-v32/);
   assert.match(sw, /url\.pathname\.startsWith\("\/api\/"\)/);
+});
+
+test("Worker Preview is marked as preview and never reuses the production D1 id", async () => {
+  const config = JSON.parse(await read("wrangler.jsonc"));
+  const productionIds = new Set((config.d1_databases || []).map(database => database.database_id));
+  assert.equal(config.previews?.vars?.ENVIRONMENT, "preview");
+  for (const database of config.previews?.d1_databases || []) {
+    assert.equal(database.binding, "DB");
+    assert.ok(database.database_id, "Preview D1 precisa de um ID real.");
+    assert.ok(!productionIds.has(database.database_id), "Preview não pode reutilizar o D1 de produção.");
+  }
 });
