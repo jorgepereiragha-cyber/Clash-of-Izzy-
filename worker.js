@@ -598,11 +598,12 @@ async function gameState(env,playerId){
       "CASE WHEN wt.territory_kind='castle' THEN wt.x-? ELSE wt.x END AS x,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.z-? ELSE wt.z END AS z,"+
       "wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,wt.territory_kind,"+
-      "owner.id AS kingdom_id,owner.kingdom_name,owner.castle_level,owner.power,"+
+      "owner.id AS kingdom_id,owner.kingdom_name,owner.castle_level,owner.power,owner.equipped_skin_id,equipped_skin.name AS equipped_skin_name,"+
       "COALESCE(n.nickname,op.name) AS commander_name,"+
       "COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=owner.id),'') AS alliance_tag "+
       "FROM world_territories wt LEFT JOIN kingdoms owner ON owner.id=wt.owner_kingdom_id "+
       "LEFT JOIN players op ON op.id=owner.player_id LEFT JOIN player_nicknames n ON n.player_id=op.id "+
+      "LEFT JOIN skins equipped_skin ON equipped_skin.id=owner.equipped_skin_id "+
       "WHERE wt.territory_kind='resource' OR (wt.territory_kind='castle' AND wt.owner_kingdom_id<>? "+
       "AND wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?) ORDER BY wt.territory_kind,wt.id LIMIT 250"
     ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,kingdom.id,
@@ -616,6 +617,7 @@ async function gameState(env,playerId){
     ,env.DB.prepare("SELECT id,event_type,payload_json FROM kingdom_events WHERE kingdom_id=? AND event_type!='__internal_action_guard' ORDER BY id DESC LIMIT 15").bind(kingdom.id).all(),
     env.DB.prepare("SELECT id,queue_type,queue_slot,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at,completed_at FROM kingdom_queues WHERE kingdom_id=? ORDER BY CASE WHEN status='running' THEN 0 ELSE 1 END,queue_type,queue_slot,id DESC LIMIT 20").bind(kingdom.id).all()
   ]);
+  const ownedCastleSkins=(await env.DB.prepare("SELECT s.id,s.name,s.price_brl FROM player_skins ps JOIN skins s ON s.id=ps.skin_id WHERE ps.player_id=? ORDER BY s.id").bind(p.id).all()).results||[];
   const pendingInvites=await env.DB.prepare("SELECT i.id,i.created_at,a.name,a.tag FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.target_kingdom_id=? ORDER BY i.id DESC").bind(kingdom.id).all();
   const alliance=await env.DB.prepare("SELECT a.id,a.name,a.tag,a.description,a.level,a.xp,a.max_members,a.territory_count,a.shared_food,a.shared_wood,a.shared_stone,a.shared_iron,a.shared_gold,am.role,am.rank,am.contribution,(SELECT COUNT(*) FROM alliance_members x WHERE x.alliance_id=a.id) AS member_count FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=?").bind(kingdom.id).first();
   let allianceDetails=null;
@@ -651,7 +653,7 @@ async function gameState(env,playerId){
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
   const petState=await getPetsState(env,kingdom.id);
-  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
+  return {ownedCastleSkins,equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -1584,6 +1586,35 @@ export default {
       ]);
       return json({skins:skins.results||[],packages:packages.results||[],skin_edition:"initial",skin_limit:INITIAL_PAID_SKIN_LIMIT,whatsapp:"+5547996531437"});
     }catch(e){return json({error:"Catálogo indisponível no momento."},503)}
+  }
+  if(url.pathname==="/api/game/skin/equip"){
+    if(request.method!=="POST")return json({error:"Método não permitido."},405);
+    const playerId=await gameIdentity(request,env);
+    if(!playerId)return json({error:"Sessão do jogador inválida."},401);
+    const limited=await rateLimitDecision(env,"castle-skin-equip-player",playerId,10,60);
+    if(limited)return limited;
+    const body=await readBody(request,2048);
+    if(body.__bodyError)return json({error:"Solicitação de aparência inválida."},400);
+    if(!Object.hasOwn(body,"skinId"))return json({error:"Informe uma skin possuída ou null para retirar a aparência."},400);
+
+    let skinId=null;
+    if(body.skinId!==null){
+      skinId=Number(body.skinId);
+      if(!Number.isSafeInteger(skinId)||skinId<1)return json({error:"Skin inválida."},400);
+      const owned=await env.DB.prepare(
+        "SELECT 1 FROM player_skins ps JOIN players p ON p.id=ps.player_id WHERE p.player_id=? AND ps.skin_id=?"
+      ).bind(playerId,skinId).first();
+      if(!owned)return json({error:"Você não possui esta skin."},404);
+    }
+
+    const kingdom=await env.DB.prepare(
+      "SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?"
+    ).bind(playerId).first();
+    if(!kingdom)return json({error:"Castelo não encontrado."},404);
+    await env.DB.prepare(
+      "UPDATE kingdoms SET equipped_skin_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=?"
+    ).bind(skinId,kingdom.id).run();
+    return json({success:true,state:await gameState(env,playerId)});
   }
   if(url.pathname==="/api/game/start"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"SESSION_SECRET não configurado no Worker."},503);
