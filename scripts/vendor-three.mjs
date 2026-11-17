@@ -29,10 +29,6 @@ const RUNTIME_FILES = [
   "examples/jsm/libs/basis/basis_transcoder.wasm"
 ];
 
-const OPTIONAL_NOTICES = [
-  "examples/jsm/libs/draco/README.md",
-  "examples/jsm/libs/basis/README.md"
-];
 
 const copied = new Set();
 const pending = [];
@@ -109,7 +105,6 @@ async function main() {
     if (!copied.has(dependency)) await copyFileIntoVendor(dependency);
   }
   for (const file of RUNTIME_FILES) await copyRuntimeFile(file);
-  for (const file of OPTIONAL_NOTICES) await copyRuntimeFile(file, true);
 
   await copyFile(path.join(THREE_ROOT, "LICENSE"), path.join(VENDOR_ROOT, "LICENSE"));
   const assets = [...copied].sort().map(file => "/vendor/three/" + file.replaceAll(path.sep, "/"));
