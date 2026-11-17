@@ -34,3 +34,20 @@ test("active players still reconcile their own queues and marches when loading t
   assert.ok(worker.includes("await processMarches(env,kingdom.id)"));
   assert.ok(worker.includes("await processDueKingdomQueues(env,kingdom.id)"));
 });
+
+
+test("kingdom state groups its 14 independent D1 reads into one invocation batch", async () => {
+  const worker = await read("worker.js");
+  const start = worker.indexOf("async function gameState(env,playerId)");
+  const end = worker.indexOf("\\nasync function gameAction", start);
+  assert.ok(start >= 0 && end > start, "gameState function boundaries must exist");
+  const state = worker.slice(start, end);
+  const batchStart = state.indexOf("const stateResults=await env.DB.batch([");
+  const batchEnd = state.indexOf("]);", batchStart);
+  assert.ok(batchStart >= 0 && batchEnd > batchStart, "game state reads must be grouped in one D1 batch");
+  const batch = state.slice(batchStart, batchEnd);
+  assert.equal((batch.match(/env\\.DB\\.prepare\\(/g) || []).length, 14);
+  assert.match(state, /const fresh=stateResults\\[0\\]\\?\\.results\\?\\.\\[0\\]\\|\\|null/);
+  assert.match(state, /const recentEvents=stateResults\\[12\\],queues=stateResults\\[13\\]/);
+  assert.doesNotMatch(state, /fresh,buildings,troops,heroes,dragon,research,territories,marches,reports,heroInventory,heroHistory,inventoryItems,recentEvents,queues\\]=await Promise\\.all/);
+});
