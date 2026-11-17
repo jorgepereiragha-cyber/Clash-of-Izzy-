@@ -1992,6 +1992,23 @@ export default {
         const networkLimit=await rateLimitDecision(env,"game-action-network",ip,600,60);
         if(networkLimit)return networkLimit;
       }
+      if(url.pathname==="/api/game/alliance/chat"){
+        if(request.method!=="GET")return json({error:"Método não permitido."},405);
+        const playerLimit=await rateLimitDecision(env,"alliance-chat-read-player",playerId,60,60);
+        if(playerLimit)return playerLimit;
+        const rows=await env.DB.prepare(
+          "SELECT a.id AS alliance_id,a.name AS alliance_name,a.tag AS alliance_tag,c.id,c.message,c.created_at,author.kingdom_name "+
+          "FROM kingdoms own JOIN alliance_members am ON am.kingdom_id=own.id JOIN alliances a ON a.id=am.alliance_id "+
+          "LEFT JOIN alliance_chat c ON c.alliance_id=a.id LEFT JOIN kingdoms author ON author.id=c.kingdom_id "+
+          "WHERE own.player_id=(SELECT id FROM players WHERE player_id=?) ORDER BY c.id DESC LIMIT 50"
+        ).bind(playerId).all();
+        const messages=(rows.results||[]).filter(row=>row.id!==null).reverse().map(row=>({
+          id:row.id,message:row.message,created_at:row.created_at,kingdom_name:row.kingdom_name
+        }));
+        const first=(rows.results||[])[0];
+        const alliance=first?{id:first.alliance_id,name:first.alliance_name,tag:first.alliance_tag}:null;
+        return json({alliance,chat:messages});
+      }
       if(url.pathname.startsWith("/api/game/rally/")){
         const rallyPath=url.pathname.slice("/api/game/rally/".length);
         if(!["active","nodes","create","join","occupy","collect","recall"].includes(rallyPath))return json({error:"Rota de guerra não encontrada."},404);
