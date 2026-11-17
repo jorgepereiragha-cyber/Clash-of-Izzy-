@@ -586,13 +586,16 @@ async function gameState(env,playerId){
   await processDueKingdomQueues(env,kingdom.id);
   await recalculateKingdomStats(env,kingdom.id);
   await recalculateKingdomPower(env,kingdom.id);
-  const [fresh,buildings,troops,heroes,dragon,research,territories,marches,reports,heroInventory,heroHistory,inventoryItems,recentEvents,queues]=await Promise.all([
-    env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdom.id).first(),
-    env.DB.prepare("SELECT building_type,level,position_x,position_z FROM kingdom_buildings WHERE kingdom_id=? ORDER BY id").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? ORDER BY tier,unit_type").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,hero_key,hero_name,level,experience,rarity,assigned_to FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT dragon_key,dragon_name,level,experience,bond FROM dragons WHERE kingdom_id=?").bind(kingdom.id).first(),
-    env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdom.id).all(),
+  // One D1 batch keeps the state response under the Free-plan per-invocation
+  // query ceiling. A batch counts as one query; each statement still consumes
+  // its normal daily row-read quota.
+  const stateResults=await env.DB.batch([
+    env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdom.id),
+    env.DB.prepare("SELECT building_type,level,position_x,position_z FROM kingdom_buildings WHERE kingdom_id=? ORDER BY id").bind(kingdom.id),
+    env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? ORDER BY tier,unit_type").bind(kingdom.id),
+    env.DB.prepare("SELECT id,hero_key,hero_name,level,experience,rarity,assigned_to FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id").bind(kingdom.id),
+    env.DB.prepare("SELECT dragon_key,dragon_name,level,experience,bond FROM dragons WHERE kingdom_id=?").bind(kingdom.id),
+    env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdom.id),
     env.DB.prepare(
       "SELECT wt.id,wt.name,wt.terrain,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.x-? ELSE wt.x END AS x,"+
@@ -607,15 +610,21 @@ async function gameState(env,playerId){
       "AND wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?) ORDER BY wt.territory_kind,wt.id LIMIT 250"
     ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,kingdom.id,
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
-      (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45).all(),
-    env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at,CASE WHEN replay_expires_at>unixepoch() AND replay_json<>'{}' THEN 1 ELSE 0 END AS has_replay FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id).all(),
-    env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id).all()
-    ,env.DB.prepare("SELECT id,event_type,payload_json FROM kingdom_events WHERE kingdom_id=? AND event_type!='__internal_action_guard' ORDER BY id DESC LIMIT 15").bind(kingdom.id).all(),
-    env.DB.prepare("SELECT id,queue_type,queue_slot,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at,completed_at FROM kingdom_queues WHERE kingdom_id=? ORDER BY CASE WHEN status='running' THEN 0 ELSE 1 END,queue_type,queue_slot,id DESC LIMIT 20").bind(kingdom.id).all()
+      (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45),
+    env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id),
+    env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at,CASE WHEN replay_expires_at>unixepoch() AND replay_json<>'{}' THEN 1 ELSE 0 END AS has_replay FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id),
+    env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key").bind(kingdom.id),
+    env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id),
+    env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id),
+    env.DB.prepare("SELECT id,event_type,payload_json FROM kingdom_events WHERE kingdom_id=? AND event_type!='__internal_action_guard' ORDER BY id DESC LIMIT 15").bind(kingdom.id),
+    env.DB.prepare("SELECT id,queue_type,queue_slot,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at,completed_at FROM kingdom_queues WHERE kingdom_id=? ORDER BY CASE WHEN status='running' THEN 0 ELSE 1 END,queue_type,queue_slot,id DESC LIMIT 20").bind(kingdom.id)
   ]);
+  const fresh=stateResults[0]?.results?.[0]||null;
+  const buildings=stateResults[1],troops=stateResults[2],heroes=stateResults[3];
+  const dragon=stateResults[4]?.results?.[0]||null,research=stateResults[5];
+  const territories=stateResults[6],marches=stateResults[7],reports=stateResults[8];
+  const heroInventory=stateResults[9],heroHistory=stateResults[10],inventoryItems=stateResults[11];
+  const recentEvents=stateResults[12],queues=stateResults[13];
   const pendingInvites=await env.DB.prepare("SELECT i.id,i.created_at,a.name,a.tag FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.target_kingdom_id=? ORDER BY i.id DESC").bind(kingdom.id).all();
   const alliance=await env.DB.prepare("SELECT a.id,a.name,a.tag,a.description,a.level,a.xp,a.max_members,a.territory_count,a.shared_food,a.shared_wood,a.shared_stone,a.shared_iron,a.shared_gold,am.role,am.rank,am.contribution,(SELECT COUNT(*) FROM alliance_members x WHERE x.alliance_id=a.id) AS member_count FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=?").bind(kingdom.id).first();
   let allianceDetails=null;
