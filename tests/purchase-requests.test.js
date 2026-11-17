@@ -40,6 +40,7 @@ test("official store submits an auditable payment request instead of opening Wha
   assert.ok(arena.includes('id="purchaseMethod"'));
   assert.ok(arena.includes('id="purchaseReference"'));
   assert.ok(arena.includes("https://link.mercadopago.com.br/pagamentosskin"));
+  assert.ok(arena.includes("Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis."));
   assert.ok(arena.includes("mercadopago_link"));
   assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i);
   assert.ok(arena.includes('id="whatsapp"'));
