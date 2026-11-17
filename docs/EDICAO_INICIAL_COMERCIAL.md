@@ -43,9 +43,9 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 
 ## Condições comerciais e de publicação que continuam abertas
 
-- **Skins:** a equipagem persistente passou na CI #972. A ação verifica a propriedade em `player_skins`, grava `kingdoms.equipped_skin_id`, mostra a seleção na cidade/loja e propaga a aparência para castelos no mapa compartilhado. As seis opções usam paletas de materiais/cores na geometria de castelo existente; não são seis modelos 3D com malhas distintas. A PR #120 ainda não foi mesclada nem publicada.
+- **Skins:** a equipagem/retirada persistente passou na CI #991. A ação verifica a propriedade em `player_skins`, grava `kingdoms.equipped_skin_id`, mostra a seleção na cidade/loja e propaga a aparência para castelos no mapa compartilhado. As seis opções usam paletas de materiais/cores na geometria de castelo existente; não são seis modelos 3D com malhas distintas. A PR #120 ainda não foi mesclada nem publicada.
 - **Mercado Pago:** o código tem rota de checkout individual e webhook, mas dependem de `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` configurados no Worker. Quando não configurado, a interface usa o link compartilhado e a revisão manual Master. A presença real dos secrets e uma compra/webhook de teste ainda não foram confirmadas.
-- **Segurança:** a PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab`; o smoke read-only da CI #972 reportou `adminHealthAuthBoundary: true` no Worker público.
+- **Segurança:** a PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab`; o smoke read-only da CI #991 reportou `adminHealthAuthBoundary: true` no Worker público.
 - **Preview:** `wrangler.jsonc` tem `previews: {}` e não declara `previews.d1_databases`. Criar/confirmar um D1 descartável distinto do D1 de produção, configurar `previews.d1_databases` com a binding `DB` e criar `wrangler.preview-migrations.jsonc` com binding `PREVIEW_DB` apontando para o mesmo `database_id`. Aplicar migrations com `npx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-migrations.jsonc`. Não usar uma Version URL como teste isolado: Version URLs usam os recursos de produção. Previews que compartilham o mesmo `database_id` compartilham os mesmos dados.
 - **Dispositivos:** o CI automatizado Chromium em viewport móvel não substitui uma verificação em Android físico, incluindo toque, instalação PWA, reabertura, cache e memória.
 - **Capacidade:** nenhum número máximo de jogadores é prometido sem benchmark. O plano Gratuito limita CPU e D1 por invocação e por dia; os limites de lote reduzem picos, mas não comprovam capacidade simultânea.
@@ -67,3 +67,17 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 - **Cron em Preview:** Cloudflare direciona Cron Triggers à produção; Previews não recebem invocações agendadas. O fluxo agendado deve ser validado com testes locais/Worker-D1 e, se necessário, uma rotina de teste isolada e protegida, nunca acionando dados de produção.
 
 A quota de linhas D1 é aplicada: ao exceder leituras ou escritas diárias no Free, as queries falham até o reset em 00:00 UTC. Não existe garantia de disponibilidade após esgotar a quota.
+## Validação final do código — CI #991
+
+- 271/271 testes Node aprovados, incluindo Worker+D1 e criação/leitura de aliança.
+- 3/3 cenários Playwright móveis aprovados.
+- Diagnóstico e smoke de produção somente de leitura aprovados.
+- Wrangler `deploy --dry-run`: 359,95 KiB (78,13 KiB gzip).
+- A execução não aplicou migrations remotas, não publicou Worker/assets e não realizou compra. A PR #120 permanece aberta aguardando D1 Preview isolado, pagamento real e validação em Android físico.
+- [Execução da CI #991](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44134854021).
+
+## Batch D1 para reduzir subconsultas
+
+- Estado principal: 15 leituras independentes agrupadas num batch; consultas de convite/aliança e detalhes da aliança também agrupadas.
+- Capacidade/defesa, poder, loja, cosméticos, heróis e mascotes usam batches de leitura.
+- O número de linhas lidas/escritas continua sujeito às quotas diárias; ainda é necessário medir `/api/game/state` no staging descartável para provar CPU, subconsultas e consumo real.
