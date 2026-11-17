@@ -11,7 +11,7 @@ const CASTLE_SKINS = Object.freeze([
 
 const normalizeSkinName = value => String(value || "")
   .normalize("NFKD")
-  .replace(/[\\u0300-\\u036f]/g, "")
+  .replace(/\p{M}/gu, "")
   .toLocaleLowerCase("pt-BR")
   .trim();
 
