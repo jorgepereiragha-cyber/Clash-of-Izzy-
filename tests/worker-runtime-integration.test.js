@@ -645,6 +645,13 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(await admin("/api/admin/unlock-skin", {
         playerId: playerA, skin: skin.name,
       }), 200, "desbloqueio Master de skin");
+      expectStatus(await api("/api/game/action",{method:"POST",token:tokenB,body:{type:"castle_skin_equip",skinId:skin.id}}),404,"outro jogador não equipa skin alheia");
+      expectStatus(await api("/api/game/action",{method:"POST",token:tokenA,body:{type:"castle_skin_equip",skinId:skin.id}}),200,"dono equipa skin liberada");
+      const equippedState=expectStatus(await api("/api/game/state",{token:tokenA}),200,"estado após equipar skin").state;
+      assert.equal(Number(equippedState.kingdom.equipped_skin_id),Number(skin.id));
+      assert.ok(equippedState.castleSkins.some(item=>Number(item.id)===Number(skin.id)));
+      expectStatus(await api("/api/game/action",{method:"POST",token:tokenA,body:{type:"castle_skin_equip",skinId:999999}}),404,"skin inexistente não pode ser equipada");
+      expectStatus(await api("/api/game/action",{method:"POST",token:tokenA,body:{type:"castle_skin_equip",skinId:null}}),200,"remover aparência equipada");
       expectStatus(await admin("/api/admin/unlock-skin", {
         playerId: playerA, skin: "Skin inexistente",
       }), 404, "skin inexistente não é liberada");
