@@ -45,6 +45,7 @@ test("chat da arena usa feed autenticado compacto em vez de consultar o estado i
 
   assert.ok(arena.includes("localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token')||''"));
   assert.ok(refresh.includes("chatApi('/game/alliance/chat')"));
+  assert.ok(refresh.includes("chat:data.chat||[]"));
   assert.ok(!refresh.includes("chatApi('/game/state')"));
   assert.ok(arena.includes("setInterval(refreshAllianceChat,15000)"));
   assert.ok(worker.includes('url.pathname==="/api/game/alliance/chat"'));
