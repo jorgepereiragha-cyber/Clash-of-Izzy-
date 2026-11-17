@@ -5,12 +5,15 @@ import { KTX2Loader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/
 import { clone as cloneSkinned } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "./kingdom-quality.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
+import { getCastleSkinStyle } from "../castle-skin-styles.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
   let renderer, scene, camera, resizeObserver, ktx2, gltfLoader, resizeHandler, qualityProfile;
   let latestBuildings = [];
   let latestTroops = [];
+  let latestCastleSkinId = 0;
+  let latestCastleSkinName = "";
   let activeModels = [];
   let activeProps = [];
   let activeTroops = [];
@@ -279,12 +282,13 @@ if (host && "WebGLRenderingContext" in window) {
     parent.add(wheel);
     addCylinder(parent, .055, .055, .18, mats.darkStone, x, y, z, 8).rotation.z = Math.PI / 2;
   }
-  function createBuilding(type, level, x, z) {
+  function createBuilding(type, level, x, z, castleSkinId = 0, castleSkinName = "") {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.userData.coIType = type;
     group.userData.coIProcedural = true;
-    const colors = palettes[type] || palettes.warehouse;
+    const castleSkin = type === "castle" ? getCastleSkinStyle(castleSkinName, castleSkinId) : null;
+    const colors = castleSkin ? [castleSkin.wall, castleSkin.roof] : (palettes[type] || palettes.warehouse);
     const seed = [...String(type)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
     const wall = surfaceMaterial(colors[0], "stone", seed);
     const roof = surfaceMaterial(colors[1], "roof", seed + 101);
@@ -312,33 +316,35 @@ if (host && "WebGLRenderingContext" in window) {
 
     if (type === "castle") {
       // Four corner keeps, crenellated parapet, royal standards and a heraldic seal.
+      const castleAccent = castleSkin ? surfaceMaterial(castleSkin.accent, "stone", seed + 203) : mats.stone;
+      const castleBanner = castleSkin ? material(castleSkin.banner, .82) : mats.gold;
       for (const tx of [-.56, .56]) for (const tz of [-.43, .43]) {
-        box(group, .36, 1.5, .36, mats.stone, tx, .75, tz);
-        const turret = new THREE.Mesh(new THREE.ConeGeometry(.27, .54, 4), mats.roof);
+        box(group, .36, 1.5, .36, wall, tx, .75, tz);
+        const turret = new THREE.Mesh(new THREE.ConeGeometry(.27, .54, 4), roof);
         turret.position.set(tx, 1.78, tz);
         turret.rotation.y = Math.PI / 4;
         turret.castShadow = true;
         group.add(turret);
-        box(group, .4, .09, .4, mats.gold, tx, 1.51, tz);
+        box(group, .4, .09, .4, castleAccent, tx, 1.51, tz);
       }
       for (let i = -2; i <= 2; i++) {
-        box(group, .18, .22, .18, mats.stone, i * .24, height + .16, -.58);
-        box(group, .18, .22, .18, mats.stone, i * .24, height + .16, .58);
+        box(group, .18, .22, .18, wall, i * .24, height + .16, -.58);
+        box(group, .18, .22, .18, wall, i * .24, height + .16, .58);
       }
       for (const tx of [-.56, .56]) {
-        box(group, .045, .52, .045, mats.gold, tx, 1.92, .49);
+        box(group, .045, .52, .045, castleAccent, tx, 1.92, .49);
         const banner = new THREE.Mesh(new THREE.PlaneGeometry(.34, .42), new THREE.MeshStandardMaterial({
-          color: "#E7BD68", roughness: .82, side: THREE.DoubleSide
+          color: castleSkin?.banner || "#E7BD68", roughness: .82, side: THREE.DoubleSide
         }));
         banner.position.set(tx + .18, 1.86, .515);
         banner.castShadow = true;
         group.add(banner);
       }
-      const seal = new THREE.Mesh(new THREE.CircleGeometry(.2, 8), mats.gold);
+      const seal = new THREE.Mesh(new THREE.CircleGeometry(.2, 8), castleAccent);
       seal.position.set(0, 1.02, .66);
       seal.castShadow = true;
       group.add(seal);
-      const sealCore = new THREE.Mesh(new THREE.CircleGeometry(.12, 8), material("#24476B", .58));
+      const sealCore = new THREE.Mesh(new THREE.CircleGeometry(.12, 8), material(castleSkin?.banner || "#24476B", .58));
       sealCore.position.set(0, 1.02, .668);
       group.add(sealCore);
       box(group, .62, .24, .24, mats.gold, 0, height + .08, .76);
@@ -502,8 +508,10 @@ if (host && "WebGLRenderingContext" in window) {
     });
     window.dispatchEvent(new CustomEvent("coi:kingdom-projection", { detail: { positions } }));
   }
-  function renderBuildings(buildings) {
+  function renderBuildings(buildings, castleSkinId = latestCastleSkinId, castleSkinName = latestCastleSkinName) {
     latestBuildings = Array.isArray(buildings) ? buildings : [];
+    latestCastleSkinId = Number(castleSkinId) || 0;
+    latestCastleSkinName = String(castleSkinName || "");
     if (!renderer || !scene || !camera) return;
     for (const item of activeModels) {
       scene.remove(item);
@@ -521,8 +529,8 @@ if (host && "WebGLRenderingContext" in window) {
     list.forEach((b, i) => {
       const col = i % 3, row = Math.floor(i / 3);
       const x = (col - 1) * 4.15, z = (row - 1) * 3.15;
-      const template = glbTemplates.get(b.building_type);
-      const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z);
+      const template = b.building_type === "castle" && latestCastleSkinId ? null : glbTemplates.get(b.building_type);
+      const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, b.building_type === "castle" ? latestCastleSkinId : 0, b.building_type === "castle" ? latestCastleSkinName : "");
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       scene.add(group);
@@ -839,7 +847,9 @@ if (host && "WebGLRenderingContext" in window) {
       const detail = event.detail || {};
       const list = detail.buildings || [];
       latestTroops = Array.isArray(detail.troops) ? detail.troops : [];
-      renderBuildings(list);
+      latestCastleSkinId = Number(detail.castleSkinId) || 0;
+      latestCastleSkinName = String(detail.castleSkinName || "");
+      renderBuildings(list, latestCastleSkinId, latestCastleSkinName);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
@@ -847,7 +857,9 @@ if (host && "WebGLRenderingContext" in window) {
     window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
     if (Array.isArray(window.__coiKingdomBuildings)) {
       latestTroops = Array.isArray(window.__coiKingdomTroops) ? window.__coiKingdomTroops : [];
-      renderBuildings(window.__coiKingdomBuildings);
+      latestCastleSkinId = Number(window.__coiCastleSkinId) || 0;
+      latestCastleSkinName = String(window.__coiCastleSkinName || "");
+      renderBuildings(window.__coiKingdomBuildings, latestCastleSkinId, latestCastleSkinName);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops);
