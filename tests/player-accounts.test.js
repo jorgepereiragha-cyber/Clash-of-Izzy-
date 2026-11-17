@@ -51,9 +51,9 @@ test("account routes bind credentials to existing public player identity and ver
   const migration = await readFile(new URL("../migrations/0024_player_accounts_mercadopago_orders.sql", import.meta.url), "utf8");
   assert.match(worker, /handlePlayerAccountRoute/);
   const accountRoutes = await readFile(new URL("../player-accounts.js", import.meta.url), "utf8");
-  assert.match(accountRoutes, /emailMasked: maskAccountEmail\\(account\\.email\\)/);
-  assert.match(accountRoutes, /emailMasked: maskAccountEmail\\(email\\.display\\)/);
-  assert.doesNotMatch(accountRoutes, /email:\\s*(?:account\\.email|email\\.display)/);
+  assert.match(accountRoutes, /emailMasked: maskAccountEmail\(account\.email\)/);
+  assert.match(accountRoutes, /emailMasked: maskAccountEmail\(email\.display\)/);
+  assert.doesNotMatch(accountRoutes, /email:\s*(?:account\.email|email\.display)/);
   assert.match(worker, /account\.session_version/);
   assert.match(worker, /Number\(p\.av\)!==Number\(account\.session_version\)/);
   assert.match(migration, /player_id INTEGER NOT NULL UNIQUE REFERENCES players\(id\)/);
