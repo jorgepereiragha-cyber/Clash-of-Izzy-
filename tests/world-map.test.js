@@ -95,3 +95,13 @@ test("map viewport transform is finite and deterministic", () => {
     "translate3d(0px, 0px, 0) scale(1)"
   );
 });
+
+
+test("world map coalesces overlapping state reads and forces a fresh snapshot after a march mutation", () => {
+  assert.match(script, /let stateRefreshPromise = null/);
+  assert.match(script, /if \(stateRefreshPromise\) \{[\s\S]*?if \(!afterMutation\) return stateRefreshPromise/);
+  assert.match(script, /await stateRefreshPromise\.catch\(\(\) => \{\}\)/);
+  assert.match(script, /if \(stateRefreshPromise\) return stateRefreshPromise/);
+  assert.match(script, /if \(stateRefreshPromise === currentRefresh\) stateRefreshPromise = null/);
+  assert.match(script, /await refreshState\(\{ afterMutation: true \}\)/);
+});
