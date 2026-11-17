@@ -13,7 +13,7 @@ test("purchase requests require a valid player session and a stable idempotency 
   assert.ok(worker.includes("requestKey"));
   assert.ok(worker.includes("payment_method,payment_reference,request_key"));
   assert.ok(worker.includes('requestedPaymentMethod!=="manual_whatsapp"'));
-  assert.ok(worker.includes('const paymentMethod="manual_whatsapp"'));
+  assert.ok(worker.includes('const paymentMethod="manual"'));
 });
 
 test("Master approval queue is protected by admin session and grants packages only once", async () => {
