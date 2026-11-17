@@ -574,7 +574,9 @@ async function requestOfficialPurchase(item,kind,button){
   const requestId=Number(data.request?.id);
   if(!Number.isSafeInteger(requestId)||requestId<1)throw new Error('O servidor não retornou um número de pedido válido.');
   const number=String(data.whatsappNumber||'5547996531437').replace(/\D/g,'');
-  const orderName=data.request?.product_name||item.name;\n  const orderPrice=Number(data.request?.price_brl??item.price_brl??0);\n  const message='Olá! Quero adquirir um pacote no Clash of Izzy.\nPedido: #'+requestId+'\nJogador: '+(kingdomSession?.player?.name||'Jogador')+'\nID do jogador: '+(kingdomSession?.player?.player_id||'')+'\nReino: '+(kingdomSession?.kingdom?.kingdom_name||'Eldoria')+'\nProduto: '+orderName+' ('+(kind==='skin'?'Skin':'Pacote VIP')+')\nValor: R$ '+orderPrice.toFixed(2).replace('.',',');
+  const orderName=data.request?.product_name||item.name;
+  const orderPrice=Number(data.request?.price_brl??item.price_brl??0);
+  const message='Olá! Quero adquirir um pacote no Clash of Izzy.\nPedido: #'+requestId+'\nJogador: '+(kingdomSession?.player?.name||'Jogador')+'\nID do jogador: '+(kingdomSession?.player?.player_id||'')+'\nReino: '+(kingdomSession?.kingdom?.kingdom_name||'Eldoria')+'\nProduto: '+orderName+' ('+(kind==='skin'?'Skin':'Pacote VIP')+')\nValor: R$ '+orderPrice.toFixed(2).replace('.',',');
   notice.textContent='Pedido #'+requestId+' registrado. O WhatsApp será aberto para combinar o pagamento. A liberação ocorre após sua confirmação.';
   button.textContent='Pedido enviado · #'+requestId;
   const whatsappUrl='https://wa.me/'+number+'?text='+encodeURIComponent(message);
