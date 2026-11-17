@@ -189,10 +189,13 @@ if (host && "WebGLRenderingContext" in window) {
       }
     }
     const grainCount = Math.round(1200 * detailScale * detailScale);
+    // Draw fine grain in physical texture pixels: do not scale 1–2 px speckles
+    // with the 128 px logical canvas, or the high tier becomes coarse and noisy.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     for (let i = 0; i < grainCount; i++) {
       const alpha = .025 + rand() * .07;
       ctx.fillStyle = rand() > .5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
-      ctx.fillRect(rand() * 128, rand() * 128, 1 + rand() * 2, 1 + rand() * 2);
+      ctx.fillRect(rand() * textureSize, rand() * textureSize, 1 + rand() * 2, 1 + rand() * 2);
     }
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
