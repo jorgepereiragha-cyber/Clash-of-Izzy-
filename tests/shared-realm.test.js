@@ -16,8 +16,7 @@ test("all player castles stay in one shared realm, including beyond the first 40
   ]);
 
   for (const [id, position] of expected) {
-    const actual = getSharedWorldCoordinates(id);
-    assert.deepEqual(actual, { ...position, mapRegion: 1 });
+    assert.deepEqual(getSharedWorldCoordinates(id), { ...position, mapRegion: 1 });
   }
 
   const unique = new Set();
@@ -38,17 +37,18 @@ test("shared-world coordinates reject invalid kingdom IDs", () => {
 
 test("migration consolidates existing castles without deleting player or progression data", async () => {
   const migration = await read("migrations/0026_single_shared_realm.sql");
-  assert.match(migration, /DROP INDEX IF EXISTS idx_kingdoms_map_position/);
-  assert.match(migration, /UPDATE kingdoms[\\s\\S]*?map_region = 1/);
-  assert.match(migration, /UPDATE world_territories[\\s\\S]*?owner_kingdom_id/);
-  assert.match(migration, /CREATE UNIQUE INDEX IF NOT EXISTS idx_kingdoms_map_position/);
+  assert.ok(migration.includes("DROP INDEX IF EXISTS idx_kingdoms_map_position"));
+  assert.ok(migration.includes("map_region = 1"));
+  assert.ok(migration.includes("UPDATE world_territories"));
+  assert.ok(migration.includes("owner_kingdom_id IS NOT NULL"));
+  assert.ok(migration.includes("CREATE UNIQUE INDEX IF NOT EXISTS idx_kingdoms_map_position"));
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM (players|kingdoms|world_territories)/i);
 });
 
 test("new castles use the shared coordinate policy and map lookup no longer partitions by region", async () => {
   const worker = await read("worker.js");
-  assert.match(worker, /getSharedWorldCoordinates\\(id\\)/);
-  assert.doesNotMatch(worker, /mapRegion=Math\\.floor\\(mapSlot\\/400\\)\\+1/);
-  assert.doesNotMatch(worker, /owner\\.map_region=/);
-  assert.match(worker, /wt\\.x BETWEEN \\? AND \\? AND wt\\.z BETWEEN \\? AND \\?/);
+  assert.ok(worker.includes("getSharedWorldCoordinates(id)"));
+  assert.ok(!worker.includes("mapRegion=Math.floor(mapSlot/400)+1"));
+  assert.ok(!worker.includes("owner.map_region=?"));
+  assert.ok(worker.includes("wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?"));
 });
