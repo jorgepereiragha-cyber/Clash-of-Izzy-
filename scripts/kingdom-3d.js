@@ -8,7 +8,8 @@ import { AdvancedShaders } from "./advanced-shaders.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
-  let renderer, scene, camera, resizeObserver, ktx2, gltfLoader, resizeHandler, qualityProfile;
+  let renderer, scene, camera, resizeObserver, sceneVisibilityObserver, visibilityChangeHandler, ktx2, gltfLoader, resizeHandler, qualityProfile;
+  let sceneInViewport = true;
   let latestBuildings = [];
   let latestTroops = [];
   let activeModels = [];
@@ -538,14 +539,22 @@ if (host && "WebGLRenderingContext" in window) {
     renderer.render(scene, camera);
     publishBuildingHitTargets(list);
   }
+  function canRunArmyAnimation() {
+    return !disposed && !cinematicCaptureActive && !document.hidden && sceneInViewport;
+  }
+  function refreshArmyAnimationVisibility() {
+    if (canRunArmyAnimation()) startArmyAnimationLoop();
+    else stopArmyAnimationLoop();
+  }
   function stopArmyAnimationLoop() {
     if (animationFrame) cancelAnimationFrame(animationFrame);
     animationFrame = 0;
     lastAnimationTime = 0;
   }
   function renderArmyFrame(timestamp) {
-    if (disposed || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders)) {
+    if (!canRunArmyAnimation() || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders)) {
       animationFrame = 0;
+      lastAnimationTime = 0;
       return;
     }
     const delta = lastAnimationTime ? Math.min(.05, Math.max(0, (timestamp - lastAnimationTime) / 1000)) : 0;
@@ -556,7 +565,7 @@ if (host && "WebGLRenderingContext" in window) {
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
   function startArmyAnimationLoop() {
-    if (animationFrame || (!armyMixers.length && !advancedShaders) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
+    if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
     lastAnimationTime = 0;
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
@@ -829,6 +838,10 @@ if (host && "WebGLRenderingContext" in window) {
       if (window.__coiKingdomDiagnostics === diagnostics) delete window.__coiKingdomDiagnostics;
       resizeObserver?.disconnect();
       resizeObserver = null;
+      sceneVisibilityObserver?.disconnect();
+      sceneVisibilityObserver = null;
+      if (visibilityChangeHandler) document.removeEventListener("visibilitychange", visibilityChangeHandler);
+      visibilityChangeHandler = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
       disposeSceneResources();
@@ -916,6 +929,16 @@ if (host && "WebGLRenderingContext" in window) {
 
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
     else { resizeHandler = resize; window.addEventListener("resize", resizeHandler, { passive: true }); }
+    visibilityChangeHandler = refreshArmyAnimationVisibility;
+    document.addEventListener("visibilitychange", visibilityChangeHandler);
+    if ("IntersectionObserver" in window) {
+      sceneVisibilityObserver = new IntersectionObserver(entries => {
+        const entry = entries[entries.length - 1];
+        sceneInViewport = entry?.isIntersecting === true;
+        refreshArmyAnimationVisibility();
+      }, { threshold: 0.01 });
+      sceneVisibilityObserver.observe(host);
+    }
     resize();
     if (advancedShaders) startArmyAnimationLoop();
   } catch (error) {
@@ -925,6 +948,10 @@ if (host && "WebGLRenderingContext" in window) {
     stopArmyAnimationLoop();
     resizeObserver?.disconnect();
     resizeObserver = null;
+    sceneVisibilityObserver?.disconnect();
+    sceneVisibilityObserver = null;
+    if (visibilityChangeHandler) document.removeEventListener("visibilitychange", visibilityChangeHandler);
+    visibilityChangeHandler = null;
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
     disposeSceneResources();
