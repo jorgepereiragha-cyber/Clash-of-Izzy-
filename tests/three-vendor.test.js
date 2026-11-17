@@ -53,6 +53,9 @@ test("3D entry points and page import maps no longer depend on a Three.js CDN", 
   assert.match(kingdom, /from "three\/addons\/loaders\/DRACOLoader\.js"/);
   assert.match(kingdom, /setDecoderPath\("\/vendor\/three\/examples\/jsm\/libs\/draco\/"\)/);
   assert.match(kingdom, /setTranscoderPath\("\/vendor\/three\/examples\/jsm\/libs\/basis\/"/);
+  const engine = await read("engine/asset-loader.js");
+  assert.ok(engine.includes("dracoLoader.setDecoderPath(options.dracoPath || `${THREE_VENDOR_PATH}draco/`)"));
+  assert.match(engine, /setMeshoptDecoder\(MeshoptDecoder\)/);
   assert.match(world, /from "three"/);
   assert.match(postProcessing, /from "three\/addons\/postprocessing\/EffectComposer\.js"/);
 });
