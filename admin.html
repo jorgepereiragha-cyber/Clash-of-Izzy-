@@ -32,7 +32,7 @@ footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
 <div class="toolbar"><h2>👑 Jogadores do reino</h2><button class="secondary" id="logout" type="button">Sair</button></div>
 <section id="purchaseQueue" style="margin:18px 0;padding:16px;border:1px solid #a98245;border-radius:12px;background:#0b1728">
  <div class="toolbar"><h2>🔔 Pedidos de compra <span id="pendingCount">0</span></h2><button class="secondary" id="refreshPurchases" type="button">Atualizar</button></div>
- <p class="sub">Novos pedidos aparecem automaticamente. Confira o recebimento do pagamento fora do jogo antes de aprovar. A aprovação libera as gemas ou a skin no reino.</p>
+ <p class="sub">Novos pedidos aparecem automaticamente. Os pedidos abrem uma conversa no WhatsApp. Confira o recebimento por fora e toque em ✓ Liberar pacote para entregar as gemas ou a skin ao jogador.</p>
  <div id="purchaseRequests" class="results" aria-live="polite">Carregando pedidos…</div>
 </section>
 <section id="valhalla-admin-section" aria-labelledby="valhalla-admin-title">
@@ -149,10 +149,10 @@ function renderPurchaseRequests(requests){
   const card=document.createElement("article");card.className="player";
   const info=document.createElement("div"),name=document.createElement("strong"),meta=document.createElement("small");
   name.textContent="#"+request.id+" · "+request.product_name;
-  meta.textContent=(request.player_name||"Jogador")+" · "+(request.kingdom_name||"Reino")+" · ID "+request.player_id+" · R$ "+Number(request.price_brl).toFixed(2).replace(".",",")+(request.product_kind==="vip_package"?" · "+Number(request.gems_amount||0).toLocaleString("pt-BR")+" gemas":" · Skin")+" · Pagamento: "+(request.payment_method||"manual")+" · Referência: "+(request.payment_reference||"não informada");
+  meta.textContent=(request.player_name||"Jogador")+" · "+(request.kingdom_name||"Reino")+" · ID "+request.player_id+" · R$ "+Number(request.price_brl).toFixed(2).replace(".",",")+(request.product_kind==="vip_package"?" · "+Number(request.gems_amount||0).toLocaleString("pt-BR")+" gemas":" · Skin")+" · Canal: WhatsApp · Status: aguardando sua confirmação;
   info.append(name,meta);
   const actions=document.createElement("div");actions.className="actions";
-  const approve=document.createElement("button");approve.type="button";approve.textContent="Confirmar pagamento e liberar";
+  const approve=document.createElement("button");approve.type="button";approve.className="approve";approve.textContent="✓ Liberar pacote";
   approve.addEventListener("click",()=>reviewPurchase(request.id,"approve",approve));
   const reject=document.createElement("button");reject.type="button";reject.className="secondary";reject.textContent="Recusar";
   reject.addEventListener("click",()=>reviewPurchase(request.id,"reject",reject));
@@ -164,7 +164,7 @@ async function refreshPurchaseRequests(){
  renderPurchaseRequests(data.requests||[]);
 }
 async function reviewPurchase(id,decision,button){
- if(decision==="approve"&&!confirm("Confirma que o pagamento foi recebido e deseja liberar este pacote agora?"))return;
+ if(decision==="approve"&&!confirm("Você confirmou o recebimento do pagamento e deseja liberar este pacote agora?"))return;
  if(decision==="reject"&&!confirm("Deseja recusar este pedido?"))return;
  button.disabled=true;
  try{const result=await api("/admin/purchase-requests/review",{requestId:id,decision});showNotice(result.message);await refreshPurchaseRequests()}
