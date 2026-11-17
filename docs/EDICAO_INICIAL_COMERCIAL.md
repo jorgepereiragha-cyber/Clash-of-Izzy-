@@ -43,10 +43,10 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 
 ## Condições comerciais e de publicação que continuam abertas
 
-- **Skins:** a branch inclui equipagem persistente e visualização de skins adquiridas. A ação verifica a propriedade em `player_skins`, grava `kingdoms.equipped_skin_id`, mostra a seleção na cidade/loja e propaga a aparência para castelos no mapa compartilhado. A migration 0027 e os testes precisam passar antes da liberação comercial.
+- **Skins:** a equipagem persistente passou na CI #972. A ação verifica a propriedade em `player_skins`, grava `kingdoms.equipped_skin_id`, mostra a seleção na cidade/loja e propaga a aparência para castelos no mapa compartilhado. As seis opções usam paletas de materiais/cores na geometria de castelo existente; não são seis modelos 3D com malhas distintas. A PR #120 ainda não foi mesclada nem publicada.
 - **Mercado Pago:** o código tem rota de checkout individual e webhook, mas dependem de `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` configurados no Worker. Quando não configurado, a interface usa o link compartilhado e a revisão manual Master. A presença real dos secrets e uma compra/webhook de teste ainda não foram confirmadas.
-- **Segurança:** a PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab` após CI #941. A produção só receberá a proteção após deploy manual protegido.
-- **Preview:** `wrangler.jsonc` tem `previews: {}` e não declara um D1 separado. É necessário criar/confirmar um banco descartável e configurar `preview_database_id` antes de executar migrations remotamente.
+- **Segurança:** a PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab`; o smoke read-only da CI #972 reportou `adminHealthAuthBoundary: true` no Worker público.
+- **Preview:** `wrangler.jsonc` tem `previews: {}` e não declara `previews.d1_databases`. Criar um D1 descartável, configurar `previews.d1_databases` com a binding `DB` e criar `wrangler.preview-migrations.jsonc` com binding `PREVIEW_DB` para o mesmo ID. Aplicar migrations com `npx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-migrations.jsonc`. Não apontar para o D1 de produção.
 - **Dispositivos:** o CI automatizado Chromium em viewport móvel não substitui uma verificação em Android físico, incluindo toque, instalação PWA, reabertura, cache e memória.
 - **Capacidade:** nenhum número máximo de jogadores é prometido sem benchmark. O plano Gratuito limita CPU e D1 por invocação e por dia; os limites de lote reduzem picos, mas não comprovam capacidade simultânea.
 
