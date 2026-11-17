@@ -22,6 +22,7 @@ const UNIT_NAMES = {
   ram: "Aríete", trebuchet: "Trabuquete",
 };
 let state = null;
+let stateRefreshPromise = null;
 let selectedTerritoryId = null;
 let selectedUnits = {};
 let busy = false;
@@ -255,21 +256,35 @@ function render() {
   renderDetails();
   renderMarches();
 }
-async function refreshState() {
-  const response = await request("/game/state");
-  state = response.state || response;
-  if (!state.kingdom) throw new Error("O servidor não retornou o reino.");
-  if (!requestedTerritoryApplied && requestedTerritorySearch) {
-    const query = normalizeTerritorySearch(requestedTerritorySearch);
-    const territories = state.territories || [];
-    const match = territories.find(item => normalizeTerritorySearch(item.name) === query)
-      || territories.find(item => normalizeTerritorySearch(item.name).startsWith(query))
-      || territories.find(item => normalizeTerritorySearch(item.name).includes(query));
-    if (match) selectedTerritoryId = match.id;
-    requestedTerritoryApplied = true;
+async function refreshState({ afterMutation = false } = {}) {
+  if (stateRefreshPromise) {
+    if (!afterMutation) return stateRefreshPromise;
+    // A mutation must not reuse a snapshot that may have started before the write.
+    await stateRefreshPromise.catch(() => {});
+    if (stateRefreshPromise) return stateRefreshPromise;
   }
-  if (!getSelectedTerritory() && state.territories?.length) selectedTerritoryId = state.territories[0].id;
-  render();
+  const currentRefresh = (async () => {
+    const response = await request("/game/state");
+    state = response.state || response;
+    if (!state.kingdom) throw new Error("O servidor não retornou o reino.");
+    if (!requestedTerritoryApplied && requestedTerritorySearch) {
+      const query = normalizeTerritorySearch(requestedTerritorySearch);
+      const territories = state.territories || [];
+      const match = territories.find(item => normalizeTerritorySearch(item.name) === query)
+        || territories.find(item => normalizeTerritorySearch(item.name).startsWith(query))
+        || territories.find(item => normalizeTerritorySearch(item.name).includes(query));
+      if (match) selectedTerritoryId = match.id;
+      requestedTerritoryApplied = true;
+    }
+    if (!getSelectedTerritory() && state.territories?.length) selectedTerritoryId = state.territories[0].id;
+    render();
+  })();
+  stateRefreshPromise = currentRefresh;
+  try {
+    await currentRefresh;
+  } finally {
+    if (stateRefreshPromise === currentRefresh) stateRefreshPromise = null;
+  }
 }
 async function sendMarch(marchType) {
   if (busy) return;
@@ -286,7 +301,7 @@ async function sendMarch(marchType) {
       body: JSON.stringify({ type: "march", targetId: territory.id, marchType, units }),
     });
     selectedUnits = {};
-    await refreshState();
+    await refreshState({ afterMutation: true });
     $("marchNotice").textContent = result.message || "Marcha registrada pelo servidor.";
     setStatus("● Reino sincronizado");
   } catch (error) {
