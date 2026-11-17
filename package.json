@@ -12,10 +12,21 @@
     "test": "node --test",
     "assets:validate": "node scripts/validate-3d-assets.js",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "vendor:three": "node scripts/vendor-three.mjs",
+    "predev": "npm run vendor:three",
+    "prepreview": "npm run vendor:three",
+    "preview": "wrangler --config wrangler.jsonc preview",
+    "predeploy": "npm run vendor:three",
+    "precheck": "npm run vendor:three",
+    "pretest": "npm run vendor:three",
+    "pretest:e2e": "npm run vendor:three",
+    "assets:optimize": "node scripts/optimize-3d-assets.mjs"
   },
   "devDependencies": {
     "wrangler": "4.161.0",
-    "@playwright/test": "1.65.1"
+    "@playwright/test": "1.65.1",
+    "three": "0.187.0",
+    "@gltf-transform/cli": "4.5.1"
   }
 }
