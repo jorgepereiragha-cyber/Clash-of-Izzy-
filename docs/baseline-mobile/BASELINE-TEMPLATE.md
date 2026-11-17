@@ -2,7 +2,7 @@
 
 > **Estado: TEMPLATE — NÃO APROVADO.** Este documento não representa uma aprovação visual. Marque um critério como aprovado somente depois de executar o teste no dispositivo indicado e anexar a evidência correspondente.
 >
-> **Atenção:** o Preview `b1448e2` registrado no histórico é anterior à correção da Landing e não valida esta revisão. Atualize commit, CI e URL do Preview após a nova implantação; não use o deployment histórico como evidência do patch atual.
+> **Referência de software atualizada em 16/11/2026:** o commit de aplicação `b7671b000859a17c72abda92d87f3a1e0268fed5` passou no CI #836 e possui Preview Cloudflare com Build e Deployment concluídos. Esta referência comprova a versão publicada para teste, mas **não** comprova renderização no Android físico. O baseline visual permanece NÃO APROVADO até a inspeção manual e o envio das capturas.
 
 ## 1. Identificação da captura
 
@@ -10,14 +10,14 @@
 |---|---|
 | Projeto | Clash of Izzy (PWA) |
 | Pull Request | [#112](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/pull/112) |
-| Commit de referência | **PREENCHER após a criação do commit desta correção** |
-| Abreviação do commit | **PREENCHER** |
+| Commit de referência (código do Preview) | `b7671b000859a17c72abda92d87f3a1e0268fed5` |
+| Abreviação do commit | `b7671b0` |
 | Service Worker cache | `clash-of-izzy-shell-v31` |
-| CI desta revisão | **PENDENTE — executar após o patch** |
-| Preview desta revisão | **PENDENTE — registrar o deployment gerado para o novo commit** |
-| URL do Preview desta revisão | **PREENCHER após deployment** |
-| Deployment ID (Cloudflare) | **PREENCHER após deployment** |
-| Build ID (Cloudflare) | **PREENCHER após build** |
+| CI do commit de aplicação | [#836 — sucesso](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43990408450) |
+| Preview do commit de aplicação | **Build e Deployment concluídos com sucesso** |
+| URL do Preview (deployment exato) | [https://bbda5d65-clash-of-izzy.jorgepereiragha.workers.dev](https://bbda5d65-clash-of-izzy.jorgepereiragha.workers.dev) |
+| Deployment ID (Cloudflare) | `bbda5d65-c753-4652-b9a8-962ccc832143` |
+| Build ID (Cloudflare) | **Não informado no comentário automático; conferir no painel se necessário** |
 | URL/ID do deployment efetivamente aberto no aparelho | **PREENCHER após inspeção Android** |
 | Data e hora da inspeção (UTC) | **PREENCHER** |
 | Responsável pela inspeção | **PREENCHER** |
@@ -69,7 +69,7 @@ Use uma conta descartável, criada especificamente para este teste. Não use con
 | Conta vinculada | viewport nativo, Chrome | Mostra e-mail mascarado; formulário de cadastro ausente do layout; ação de sair visível | PENDENTE | `screenshots/linked-masked-email.png` |
 | Conta vinculada | viewport nativo, Chrome | Não há salto de layout após resposta de status | PENDENTE | `screenshots/linked-settled.png` |
 | Fallback HTTP 500 | viewport nativo, Chrome | Banner permanece oculto; reino continua utilizável; sem erro técnico exposto na interface | PENDENTE | `screenshots/status-500.png` |
-| PWA standalone | resolução nativa | Abre em standalone; sessão persiste; worker ativo usa cache v30 | PENDENTE | `screenshots/pwa-standalone.png` |
+| PWA standalone | resolução nativa | Abre em standalone; sessão persiste; worker ativo usa cache v31 | PENDENTE | `screenshots/pwa-standalone.png` |
 
 ### 3.1 Estado de convidado
 
@@ -103,7 +103,7 @@ Use uma conta descartável, criada especificamente para este teste. Não use con
 - [ ] Abrir no modo standalone e confirmar ausência da UI do navegador.
 - [ ] Fechar completamente o app e reabri-lo.
 - [ ] Confirmar sessão e navegação persistentes.
-- [ ] Confirmar worker ativo/controlador com shell cache v30.
+- [ ] Confirmar worker ativo/controlador com shell cache v31.
 - [ ] Repetir a abertura online e, quando aplicável, o cenário offline sem fazer ações que alterem dados reais.
 
 ## 4. Não regressão para PRs futuras
@@ -150,9 +150,9 @@ docs/baseline-mobile/
 
 | Área | Resultado |
 |---|---|
-| CI automatizada | PENDENTE — CI da revisão atual |
+| CI automatizada | APROVADO — [CI #836](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43990408450) no commit de aplicação `b7671b0` |
 | Contrato da API sem e-mail bruto | APROVADO — teste automatizado |
-| Build Cloudflare do commit desta revisão | PENDENTE |
+| Build/Deployment Cloudflare do commit de aplicação `b7671b0` | APROVADO — ambos concluídos no Preview registrado pelo bot |
 | Runtime do Preview no deployment exato | PENDENTE |
 | Inspeção física Android | PENDENTE |
 | Ciclo de vida PWA standalone | PENDENTE |
@@ -160,7 +160,7 @@ docs/baseline-mobile/
 
 **Histórico anterior (não usar como evidência do patch atual):** commit `b1448e2`, Preview `https://ace8a938-clash-of-izzy.jorgepereiragha.workers.dev`, Deployment ID `ace8a938-635b-4a5d-9de9-290ca31e0934`, Build ID `8af9306c-e010-4b9f-b70d-6c7d822f2516` e CI #833.
 
-**Bloqueios conhecidos:** registrar o novo deployment/commit; confirmar no aparelho que a URL aberta corresponde a ele; executar e registrar a inspeção visual Android e do Service Worker v31.
+**Bloqueios conhecidos:** abrir no Android o Preview exato acima; comprovar que o dispositivo carregou o deployment `bbda5d65-c753-4652-b9a8-962ccc832143`; executar a inspeção visual e o ciclo PWA standalone; confirmar o Service Worker v31 ativo/controlando a página; anexar capturas sanitizadas. O job CI #836 executou Playwright Chromium com fixtures/mock e não substitui a inspeção em aparelho físico.
 
 **Aprovador técnico:** **PREENCHER**  
 **Data da aprovação:** **PREENCHER**  
