@@ -62,7 +62,7 @@ O manifesto `assets/3d/manifest.json` tem cinco assets habilitados: dois modelos
 
 Os dois caminhos GLTF ativos agora configuram Draco, KTX2 e Meshopt. A cidade usa o renderer efetivo em KTX2Loader.detectSupport(renderer). A configuração de decodificação está no código, mas modelos comprimidos ainda precisam de teste real de carga/decodificação.
 
-A decisão recomendada é unificar o caminho de carregamento, fixar a versão do Three.js e empacotar localmente os decodificadores/transcodificadores necessários. Depois comparar Draco e Meshopt por tamanho, tempo de decodificação e estabilidade em aparelho real. Para texturas, KTX2/Basis exige `KTX2Loader.detectSupport(renderer)` antes de carregar texturas; o WASM e os arquivos do transcoder também precisam estar disponíveis localmente para um cenário offline. Referências:
+Three.js está fixado em `0.187.0`, com core/addons e decodificadores Draco/Basis/Meshopt gerados localmente por `npm run vendor:three`. Os imports da cidade, mapa, arena e post-processing usam `/vendor/three/`; o Service Worker v32 pré-cacheia o manifesto gerado. O KTX2 da cidade chama `detectSupport(renderer)` no renderer real. A CI #914 validou first import offline. O pipeline comparativo Draco/Meshopt também passou; os arquivos comprimidos continuam fora do runtime até revisão visual e benchmark de decodificação em Android. Referências:
 - https://threejs.org/docs/pages/GLTFLoader.html
 - https://threejs.org/docs/pages/KTX2Loader.html
 - https://threejs.org/docs/pages/DRACOLoader.html
@@ -76,13 +76,13 @@ O plano de colocar todos os GLBs no IndexedDB não é necessário como primeiro 
 
 Os módulos Three.js da cidade, mapa e arena agora apontam para /vendor/three/; o gerador local copia dependências JSM e os decodificadores Draco/Basis. O Service Worker v32 lê vendor/three/asset-manifest.json e pré-cacheia esses recursos same-origin durante a instalação. Isso valida o runtime cliente em offline, mas não converte o jogo em gameplay offline: APIs e estado autoritativo continuam online.
 
-Prioridade: servir a versão fixada do Three.js, addons e decoders a partir da mesma origem. Depois, validar shell, módulos locais e GLBs previamente baixados em offline. Nunca armazenar saldo ou progresso offline como se fossem verdadeiros: construção, combate, compras e sincronização continuam server-authoritative.
+Os módulos Three.js, addons e decodificadores essenciais agora são servidos same-origin e o teste Playwright verifica a primeira importação offline. Isso cobre o runtime cliente e assets armazenados, não jogabilidade offline. Nunca armazenar saldo ou progresso offline como se fossem verdadeiros: construção, combate, compras e sincronização continuam server-authoritative.
 
 ### Playwright
 
 `playwright.config.js` define `serviceWorkers: "block"` para tornar os testes com mocking previsíveis. Isso é válido para a suíte geral, mas impede validar o Service Worker real.
 
-Foi adicionado o teste isolado `tests/e2e/pwa-offline-cache.spec.js`, que substitui essa opção por `serviceWorkers: "allow"` somente nesse arquivo. Ele verifica ativação/controle do worker, shell, cache runtime de um GLB e entrega do asset previamente baixado em offline. O teste declara expressamente que não valida jogabilidade autenticada offline.
+Foi adicionado o teste isolado `tests/e2e/pwa-offline-cache.spec.js`, que substitui essa opção por `serviceWorkers: "allow"` somente nesse arquivo. A CI #914 verifica ativação/controle do worker, shell, GLB previamente baixado, primeira importação offline de GLTFLoader/DRACOLoader/KTX2Loader/MeshoptDecoder e fetch dos binários Draco/Basis. O teste não valida jogabilidade autenticada offline.
 
 Playwright Chromium em viewport mobile continua sendo emulação de navegador, não inspeção em Android físico. A documentação Playwright recomenda habilitar Service Workers nos testes que precisam validar seu ciclo de vida: https://playwright.dev/docs/service-workers
 
@@ -118,7 +118,7 @@ npx wrangler preview
 
 Não usar `wrangler pages deploy` para este Worker.
 
-O `wrangler.jsonc` atual tem `previews: {}` e declara D1 somente na configuração de produção. Cloudflare documenta que Previews não herdam automaticamente bindings de storage/DB de produção. Assim, o Preview pode existir e ainda assim ter `env.DB` ausente. Não apontar o Preview para o database ID de produção.
+O `wrangler.jsonc` agora define `previews.vars.ENVIRONMENT = "preview"`, mantendo o D1 de produção apenas na configuração de produção. `previews.d1_databases` continua ausente até existir o ID real de uma base D1 staging. Assim, o Preview permanece sem `env.DB` (fail-closed) e não pode ser tratado como ambiente de jogo funcional. Não apontar o Preview para o database ID de produção.
 
 Caminho seguro:
 1. Criar um D1 de staging/Preview isolado e guardar o ID real retornado pela Cloudflare.
@@ -142,9 +142,9 @@ Referências:
 - Manter a PR Draft até a inspeção física Android.
 
 ### P1 — fechar o caminho 3D/offline
-- Unificar os loaders da cidade e das cenas; remover dependência de CDN para módulos e decoders essenciais.
-- Validar Draco/Meshopt e KTX2/Basis por benchmark; não converter todos os modelos automaticamente.
-- Acrescentar LOD real para objetos distantes, instancing para vegetação repetitiva do mapa e descarte de recursos em troca de cena.
+- **Concluído no código e validado em CI:** imports e decodificadores Three.js same-origin; Service Worker v32 pré-cacheia o runtime.
+- **Concluído como comparação A/B:** pipeline Draco/Meshopt gera variantes independentes, valida GLBs e mede tamanho sem trocar os originais.
+- **Concluído:** batching `InstancedMesh` para árvores do mapa e frustum culling por bounding volume do grupo. Ainda falta medir draw calls/frame time e sombras em aparelho real; LOD por cobertura de tela permanece futuro e depende de variantes visuais.
 - Medir frame time e GPU no perfil low/balanced/high, com degradação gradual e histerese.
 
 ### P1 — completar os loops de jogo
@@ -182,14 +182,14 @@ O código proposto não deve ser aplicado como está.
 - Criar um novo THREE.WebGLRenderer dentro de setupOptimizedLoaders() abre um segundo contexto WebGL apenas para consultar capacidades de textura. Isso desperdiça recursos e pode esgotar o limite de contextos. KTX2 deve receber o renderer que já desenha a cena; a cidade já fazia corretamente ktx2.detectSupport(renderer).
 - O carregador da cidade era o caminho efetivo para os GLBs do manifesto, mas só registrava KTX2. Foi atualizado para registrar DRACOLoader, KTX2Loader e MeshoptDecoder; o carregador compartilhado também registra Meshopt e já tinha Draco/KTX2. O Draco loader é descartado junto com os recursos da cena.
 - Meshopt não substitui Draco; são formatos de compressão distintos. GLTFLoader exige que cada decodificador correspondente seja configurado para a extensão presente no GLB. Documentação: https://threejs.org/docs/pages/GLTFLoader.html.
-- KTX2 precisa de detectSupport(renderer) antes de carregar as texturas, e o transcoder WASM/JS precisa estar acessível. O projeto ainda aponta esses arquivos para CDN; portanto, a inicialização 3D não está garantida em modo offline. Documentação: https://threejs.org/docs/pages/KTX2Loader.html.
+- KTX2 precisa de detectSupport(renderer) antes de carregar as texturas. O transcoder WASM/JS agora está em `/vendor/three/examples/jsm/libs/basis/` e é incluído no pré-cache v32. A CI #914 verificou os arquivos em offline; permanece pendente a inspeção Android física com texturas KTX2 reais. Documentação: https://threejs.org/docs/pages/KTX2Loader.html.
 - Não foi aplicado matrixAutoUpdate = false globalmente. Isso pode quebrar nós animados e hierarquias de esqueleto; o projeto tem unidades com animações e usa SkeletonUtils.clone() para clonar rigs.
 - Não foi criado THREE.LOD baseado apenas na distância. A cidade usa câmera ortográfica: a distância ao olho não corresponde diretamente ao tamanho em pixels do edifício. A solução correta é LOD por cobertura/tamanho em tela ou variantes de qualidade calibradas para a projeção. Hoje não há pares de GLBs high/low no manifesto.
 - O clone() comum não substitui o clone de esqueleto usado pelo projeto; geometria, materiais e texturas também precisam de uma política explícita de compartilhamento e descarte. O exemplo proposto não implementa essa gestão.
 - O exemplo não deduplica Promises de carregamento, armazena no cache somente a URL alta (ignorando a variante/limite LOD), e falha toda a operação se o arquivo low não carregar, mesmo quando o high já foi carregado.
-- As URLs de Draco/Basis em CDN não resolvem o objetivo offline. Os arquivos dos decodificadores/transcodificadores devem ser versionados e servidos pela mesma origem antes de declarar 3D offline.
+- Os decodificadores Draco/Basis agora são gerados de `three@0.187.0` e servidos same-origin; o teste offline confirma wrappers/wasm. A CI #913 falhou na instalação do worker porque dois README opcionais do pacote deram 404; esses arquivos foram removidos do manifesto obrigatório. A CI #914 confirmou a instalação/controle do worker e a leitura offline dos decodificadores.
 
-Decisão aplicada: suporte de decodificação foi ligado nos dois caminhos GLTF ativos, sem recomprimir os arquivos existentes. A ativação de LOD e compressão física dos GLBs continua condicionada à geração de variantes, inspeção visual e benchmark de tamanho, decodificação, VRAM e frame time.
+Decisão aplicada: suporte Draco/KTX2/Meshopt está ligado nos dois caminhos GLTF ativos, e todos os módulos/decoders necessários são same-origin. A comparação A/B gerou variantes separadas sem alterar o manifesto nem substituir os originais. LOD por tamanho em tela e ativação de variantes comprimidas permanecem condicionados à inspeção visual e benchmark de decodificação/memória/frame time.
 
 ### Pilar 2 — Durable Objects e estado atômico
 
@@ -216,7 +216,7 @@ O Service Worker atual já pré-cacheia o shell e adiciona GETs same-origin bem-
 - Chavear só por url.pathname pode colidir entre query/versionamentos; a DB também não fecha conexões e não administra quota/erro/aborto.
 - Se o navegador já guarda os mesmos bytes no Cache API e no IndexedDB, o custo de armazenamento pode ser duplicado. Os dois mecanismos compartilham limites de quota por origem.
 
-Decisão: manter Cache API para respostas HTTP de assets locais. Avaliar IndexedDB apenas para catálogo/versionamento, downloads offline selecionados ou metadados que precisem de consulta indexada. Medir navigator.storage.estimate() e pedir navigator.storage.persist() quando apropriado, sem prometer que o navegador sempre aprovará. Primeiro, servir Three.js, addons, Basis e Draco pela própria origem para resolver o bloqueio atual de 3D offline.
+Decisão: manter Cache API para respostas HTTP de assets locais e para o manifesto runtime same-origin. Avaliar IndexedDB apenas para catálogo/versionamento, downloads offline selecionados ou metadados que precisem de consulta indexada. Medir navigator.storage.estimate() e pedir navigator.storage.persist() quando apropriado, sem prometer que o navegador sempre aprovará. Os módulos Three.js/addons e decodificadores já são servidos pela própria origem.
 
 ### Pilar 4 — Pipeline de otimização
 
@@ -235,18 +235,18 @@ A redução de download de Draco não equivale automaticamente à redução prop
 
 ### Validação CI e bloqueios restantes
 
-A CI #888 no commit `fa9dcfa` terminou com **sucesso**: migrações D1 locais, validação do Service Worker, manifesto e GLBs, testes Worker/D1, **10/10 testes Playwright Chromium**, diagnóstico de produção somente leitura, smoke read-only e bundle do Worker aprovados. Isso valida a alteração de teste do Service Worker e a configuração dos loaders em CI. Não substitui teste de inicialização real com modelos Draco/KTX2/Meshopt, inspeção em Android físico ou gameplay offline.
+A CI #914 no commit `6f5fe6b` terminou com **sucesso**: migrações D1 locais, validação do Service Worker, manifesto e GLBs, benchmark Draco/Meshopt, testes Worker/D1, **10/10 testes Playwright Chromium**, importação do runtime Three.js e fetch de decodificadores em offline, diagnóstico read-only, smoke test informativo e bundle do Worker aprovados. A CI valida o runtime cliente local e cache offline, mas não substitui inspeção Android físico, teste visual dos GLBs comprimidos nem gameplay offline.
 
 Para Preview Cloudflare, continua faltando um D1 de staging real. A documentação atual confirma que os bindings de Preview devem apontar para recursos de teste, e que D1 migrations devem ser aplicadas na mesma base utilizada por previews.d1_databases: https://developers.cloudflare.com/workers/previews/resources/. Sem o database_id de staging, não inserir placeholder e não reutilizar o ID de produção.
 
 ### Próxima sequência técnica
 
-1. **Concluído:** CI #888 verde para teste offline, decodificadores registrados, Worker bundle e suíte automatizada.
-2. Provisionar D1 staging e configurar previews.d1_databases sem tocar no banco de produção.
-3. Servir módulos Three.js, addons e decodificadores same-origin; confirmar inicialização 3D offline em Chromium e Android.
-4. Gerar variantes high/low e decidir LOD por tamanho em tela na câmera ortográfica; medir por perfil gráfico.
-5. Criar pipeline inspect -> transform -> validate -> compare, com rollback para os GLBs originais.
-6. Só depois de benchmark definir se existe um domínio de estado que justifique Durable Objects; manter D1 autoritativo enquanto isso.
+1. **Concluído:** CI #914 verde; runtime Three.js same-origin, Service Worker v32, 10/10 Playwright e pipeline comparativo Draco/Meshopt validados.
+2. Provisionar D1 staging e configurar `previews.d1_databases` sem tocar no banco de produção.
+3. Testar Preview com `env.DB` de staging, migrações e ações reais de teste.
+4. Inspecionar Android físico/PWA standalone: câmera 3D, texturas, sombras, estabilidade, first launch e reabertura offline.
+5. Rever visualmente e medir decodificação das variantes Draco/Meshopt; só então decidir se alguma entra no manifesto runtime.
+6. Estudar LOD por cobertura em tela caso o profiling mostre necessidade; manter D1 autoritativo e adiar Durable Objects até existir domínio de coordenação mensurável.
 
 ## 6. Atualização de integração — runtime 3D same-origin e otimização comparativa (17/11/2026)
 
@@ -273,4 +273,18 @@ wrangler.jsonc agora define previews.vars.ENVIRONMENT = preview e mantém o D1 d
 
 ### CI e artefatos
 
-A CI #888 validou a revisão anterior (266 testes Node e 10 Playwright). A execução seguinte, CI #907, está em fila para validar a integração local do runtime, instancing, novos testes e benchmark comparativo Draco/Meshopt. Não declarar esta nova etapa aprovada antes da conclusão da CI #907.
+A CI #914 terminou com sucesso no commit `6f5fe6b`: **266/266 testes Node**, **10/10 Playwright Chromium**, Service Worker v32, primeira importação Three.js offline, decodificadores Draco/Basis same-origin, benchmark comparativo, testes Worker/D1, smoke read-only e bundle do Worker aprovados. Relatório e variantes A/B: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44049256611/artifacts/14312946574.
+### Resultado quantitativo do benchmark CI #914
+
+As variantes independentes foram geradas e validadas pela CLI glTF Transform. Nenhum GLB original ou caminho do manifesto foi substituído.
+
+| Asset | Original | Draco | Redução Draco | Meshopt | Redução Meshopt |
+|---|---:|---:|---:|---:|---:|
+| Watchtower | 16.564 B | 10.060 B | 39,27% | 13.340 B | 19,46% |
+| Wall | 16.552 B | 10.132 B | 38,79% | 13.456 B | 18,70% |
+| Trebuchet | 139.848 B | 29.380 B | 78,99% | 54.004 B | 61,38% |
+| Tree | 31.176 B | 17.008 B | 45,45% | 24.852 B | 20,28% |
+| Archer | 239.124 B | 121.648 B | 49,13% | 86.164 B | 63,97% |
+| **Total** | **443.264 B** | **188.228 B** | **57,54%** | **191.816 B** | **56,73%** |
+
+Draco é menor em quatro dos cinco assets; Meshopt produz a menor variante para o arqueiro. O resultado representa redução de bytes transferidos, não redução equivalente de VRAM nem garantia de FPS. A escolha por asset depende também de qualidade visual, tempo de decodificação e memória em aparelho.
