@@ -19,8 +19,8 @@ test("Three.js runtime is vendored from the exact pinned npm version", async () 
     "/vendor/three/examples/jsm/loaders/DRACOLoader.js",
     "/vendor/three/examples/jsm/loaders/KTX2Loader.js",
     "/vendor/three/examples/jsm/libs/meshopt_decoder.module.js",
-    "/vendor/three/examples/jsm/libs/draco/gltf/draco_decoder.wasm",
-    "/vendor/three/examples/jsm/libs/draco/gltf/draco_wasm_wrapper.js",
+    "/vendor/three/examples/jsm/libs/draco/draco_decoder.wasm",
+    "/vendor/three/examples/jsm/libs/draco/draco_wasm_wrapper.js",
     "/vendor/three/examples/jsm/libs/basis/basis_transcoder.wasm",
     "/vendor/three/examples/jsm/libs/basis/basis_transcoder.js"
   ];
