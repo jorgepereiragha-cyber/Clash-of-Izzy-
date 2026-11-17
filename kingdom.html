@@ -422,7 +422,8 @@ async function searchPlayers(event){
    const title=document.createElement("strong");title.textContent=player.nickname+" · "+player.kingdom_name;
    const alliance=player.allianceTag?" · Aliança ["+player.allianceTag+"]":"";
    const details=document.createElement("div");details.className="muted";details.textContent="Castelo nível "+player.castle_level+" · Poder "+Number(player.power||0).toLocaleString("pt-BR")+alliance;
-   row.append(title,details);results.append(row);
+   const locate=document.createElement("a");locate.href="/world.html?search="+encodeURIComponent(player.nickname);locate.textContent="Localizar no mapa";locate.className="muted";
+   row.append(title,details,locate);results.append(row);
   }
  }catch(error){results.replaceChildren();const message=document.createElement("div");message.className="event";message.textContent=error.message;results.append(message);}
 }
