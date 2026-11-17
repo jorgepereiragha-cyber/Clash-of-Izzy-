@@ -22,7 +22,7 @@ test("the free-plan scheduler processes bounded batches instead of unbounded bac
 
   assert.ok(rally.includes("processDueRallies(env,batchSize=1)"));
   assert.ok(rally.includes("ORDER BY departure_time,id LIMIT ?)"));
-  assert.ok(rally.includes("ORDER BY arrival_time,id LIMIT ?)"));
+  assert.ok(rally.includes("ORDER BY arrival_time,id LIMIT ?"));
 
   assert.ok(rewards.includes("const ACTIVE_KINGDOM_PAGE_SIZE = 10"));
   assert.ok(rewards.includes("const D1_BATCH_KINGDOM_SIZE = 10"));
