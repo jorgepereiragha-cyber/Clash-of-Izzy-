@@ -28,7 +28,7 @@ test("skin selection migration stores only the selected reference and preserves 
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   assert.match(migration, /ADD COLUMN equipped_skin_id INTEGER REFERENCES skins\(id\)/);
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM (players|kingdoms|player_skins)/i);
-  assert.match(worker, /JOIN player_skins ps JOIN players p ON p.id=ps.player_id/);
+  assert.match(worker, /FROM player_skins ps JOIN players p ON p.id=ps.player_id/);
   assert.match(worker, /UPDATE kingdoms SET equipped_skin_id=/);
   assert.match(worker, /Você não possui esta skin/);
 });
