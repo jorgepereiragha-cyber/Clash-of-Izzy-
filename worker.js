@@ -1782,9 +1782,11 @@ export default {
         return await angelDeathEventAttack(env,playerId,body);
       }
       if(url.pathname==="/api/game/players/search"&&request.method==="GET"){
-        const limited=await rateLimitDecision(env,"player-search-player",playerId,20,60);
+        const [limited,networkLimit]=await Promise.all([
+          rateLimitDecision(env,"player-search-player",playerId,20,60),
+          rateLimitDecision(env,"player-search-network",request.headers.get("CF-Connecting-IP")||"unknown",120,60)
+        ]);
         if(limited)return limited;
-        const networkLimit=await rateLimitDecision(env,"player-search-network",request.headers.get("CF-Connecting-IP")||"unknown",120,60);
         if(networkLimit)return networkLimit;
         const rawQuery=String(url.searchParams.get("q")||"").normalize("NFKC").trim();
         if(!/^[\p{L}\p{N}_-]{3,20}$/u.test(rawQuery))return json({error:"Digite ao menos 3 caracteres válidos para pesquisar jogadores.",players:[]},400);
