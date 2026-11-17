@@ -38,7 +38,7 @@ O Wrangler solicita o valor de cada segredo sem colocá-lo no repositório. Nunc
 
 ## Verificação após a publicação
 
-1. Abra `/api/admin/health` no domínio do Worker e confirme `hasDB`, `hasSESSION_SECRET`, `hasADMIN_EMAIL` e `hasADMIN_PASSWORD` como `true`.
+1. Faça login administrativo em `POST /api/admin/login`; use o token retornado no cabeçalho `Authorization: Bearer <token>` ao consultar `GET /api/admin/health`. Confirme `hasDB`, `hasSESSION_SECRET`, `hasADMIN_EMAIL` e `hasADMIN_PASSWORD` como `true`. Sem sessão administrativa, o endpoint deve responder HTTP 401.
 2. Abra o jogo e confirme que o status do reino não mostra “Modo demonstração”.
 3. Confirme que o endpoint `POST /api/game/start` cria um reino e que `GET /api/game/state`, com o token retornado, carrega o estado.
 4. Teste uma ação de jogo e o painel administrativo.
@@ -88,7 +88,7 @@ Worker Previews não devem reutilizar segredos de produção. Configure credenci
 ### 4. Validar o ambiente isolado
 
 1. No painel Cloudflare, confirme que o Preview usa `izzy-preview-17112026` pelo binding `DB`, nunca o D1 de produção.
-2. Abra `/api/admin/health` no URL do Preview e confirme `hasDB`, `hasSESSION_SECRET`, `hasADMIN_EMAIL` e `hasADMIN_PASSWORD` como `true`. O endpoint informa presença, não valores.
+2. Faça login com a conta administrativa descartável do Preview e consulte `/api/admin/health` com o token Bearer dessa sessão. Confirme `hasDB`, `hasSESSION_SECRET`, `hasADMIN_EMAIL` e `hasADMIN_PASSWORD` como `true`; sem autenticação, o endpoint deve responder HTTP 401. Nunca reutilize credenciais de produção.
 3. Use contas descartáveis para testar criação de reino, leitura de estado, construção, marcha, aliança e busca.
 4. Valide PWA standalone, carregamento 3D e reabertura offline em Android físico; guarde apenas evidências sanitizadas.
 5. Mantenha a PR em Draft até concluir essas verificações e anexar as evidências.

@@ -19,9 +19,9 @@ function successfulFetch() {
       checks: { database: true, session: true, schema: true },
       missingTables: [],
     });
-    if (path === "/api/admin/health") return makeResponse({
-      hasDB: true, hasSESSION_SECRET: true, hasADMIN_EMAIL: true, hasADMIN_PASSWORD: true,
-    });
+    if (path === "/api/admin/health") return makeResponse(
+      { error: "Sessão administrativa inválida ou expirada." }, 401
+    );
     if (path === "/api/game/state" || path === "/api/game/referral/link" || path === "/api/account/status") return makeResponse({ error: "Sessão inválida." }, 401);
     if (path === "/api/store/catalog") return makeResponse({ skins: [], packages: [] });
     if (path === "/arena.html") return makeResponse(
@@ -58,7 +58,7 @@ function successfulFetch() {
   return { fetchImpl, calls };
 }
 
-test("production smoke validates D1, secrets, game auth, store, core screens and PWA", async () => {
+test("production smoke validates D1, game auth, admin health boundary, store and PWA", async () => {
   const { fetchImpl, calls } = successfulFetch();
   const result = await runProductionSmokeTests({
     baseUrl: "https://clash-of-izzy.example.workers.dev",
@@ -66,7 +66,7 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   });
   assert.equal(result.checks.apiHealth, true);
   assert.equal(result.checks.d1, true);
-  assert.equal(result.checks.adminConfiguration, true);
+  assert.equal(result.checks.adminHealthAuthBoundary, true);
   assert.equal(result.checks.mercadoPagoCheckout, true);
   assert.equal(result.checks.betaSignupUi, true);
   assert.equal(result.checks.feedbackUiAndAnalytics, true);
@@ -106,19 +106,19 @@ test("production smoke fails closed when D1 schema or session is not ready", asy
   );
 });
 
-test("production smoke refuses to report an active Master panel without its secrets", async () => {
+test("production smoke fails if the admin health endpoint is publicly exposed", async () => {
   const { fetchImpl } = successfulFetch();
-  const brokenFetch = async url => {
+  const exposedFetch = async url => {
     if (new URL(url).pathname === "/api/admin/health") {
       return makeResponse({
-        hasDB: true, hasSESSION_SECRET: true, hasADMIN_EMAIL: false, hasADMIN_PASSWORD: false,
+        hasDB: true, hasSESSION_SECRET: true, hasADMIN_EMAIL: true, hasADMIN_PASSWORD: true,
       });
     }
     return fetchImpl(url);
   };
   await assert.rejects(
-    runProductionSmokeTests({ baseUrl: "https://clash-of-izzy.example.workers.dev", fetchImpl: brokenFetch }),
-    /ADMIN_EMAIL não está configurado/
+    runProductionSmokeTests({ baseUrl: "https://clash-of-izzy.example.workers.dev", fetchImpl: exposedFetch }),
+    /Health administrativo deve exigir autenticação/
   );
 });
 
