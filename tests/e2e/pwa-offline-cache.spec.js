@@ -64,6 +64,18 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(offlineModel.ok).toBe(true);
   expect(offlineModel.size).toBe(onlineModel.size);
 
-  await page.goto("/offline.html");
-  await expect(page.getByRole("heading", { name: "Você está sem conexão" })).toBeVisible();
+  // Fetch the pre-cached offline document through the controlled page. This
+  // exercises the Service Worker's Cache-First branch without asking Playwright
+  // to start a second top-level navigation while its browser context is offline.
+  const offlineShell = await page.evaluate(async () => {
+    const response = await fetch("/offline.html");
+    return {
+      ok: response.ok,
+      status: response.status,
+      body: await response.text()
+    };
+  });
+  expect(offlineShell.ok).toBe(true);
+  expect(offlineShell.status).toBe(200);
+  expect(offlineShell.body).toContain("<h1>Você está sem conexão</h1>");
 });
