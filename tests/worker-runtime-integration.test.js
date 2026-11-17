@@ -807,6 +807,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const invite = stateB.pendingInvites?.[0];
       assert.ok(invite?.id, "convite chegou ao reino destinatário");
       await action(tokenB, { type: "alliance_accept_invite", inviteId: invite.id }, 200);
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const alliedCastle = stateA.territories.find(item => item.territory_kind === "castle" && Number(item.owner_kingdom_id) === kingdomB);
+      assert.ok(alliedCastle?.id, "o castelo do aliado aparece no mapa regional");
+      await action(tokenA, { type: "march", targetId: alliedCastle.id, marchType: "attack", units: { militia: 1 } }, 409, "bloqueio de ataque ao aliado");
       await action(tokenA, { type: "alliance_promote", targetKingdomId: kingdomB, rank: "oficial" }, 200);
       await action(tokenB, { type: "alliance_chat", message: "Teste de comunicação entre aliados" }, 200);
       await action(tokenA, { type: "alliance_donate", resource: "food", amount: 1000 }, 200);
@@ -825,6 +829,78 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenC, { type: "alliance_join", tag: "ALFA" }, 200);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomC }, 200);
       await action(tokenC, { type: "alliance_leave" }, 200);
+    });
+
+    await t.test("PvP real entre dois reinos: escudo, guarnição, idempotência e relatórios bilaterais", async () => {
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      let stateB = (await api("/api/game/state", { token: tokenB })).data.state;
+      const enemyCastle = stateA.territories.find(item =>
+        item.territory_kind === "castle" && Number(item.owner_kingdom_id) === kingdomB
+      );
+      assert.ok(enemyCastle?.id, "o castelo do adversário é localizável pelo mapa");
+      const militiaBefore = stateA.troops
+        .filter(unit => unit.unit_type === "militia" && Number(unit.tier) === 1)
+        .reduce((sum, unit) => sum + Number(unit.quantity || 0), 0);
+      assert.ok(militiaBefore >= 1, "o atacante possui milícia disponível");
+      const defenderTotalBefore = stateB.troops.reduce((sum, unit) => sum + Number(unit.quantity || 0), 0);
+      assert.ok(defenderTotalBefore > 0, "o defensor tem guarnição real");
+
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdoms SET protection_until=datetime('now','+1 day') WHERE id=" + kingdomB + ";",
+      ]);
+      await action(tokenA, { type: "march", targetId: enemyCastle.id, marchType: "attack", units: { militia: 1 } }, 409, "bloqueio de ataque protegido");
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdoms SET protection_until=NULL WHERE id=" + kingdomB + ";",
+      ]);
+
+      await action(tokenA, { type: "march", targetId: enemyCastle.id, marchType: "attack", units: { militia: 1 } }, 200, "marcha PvP válida");
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE marches SET arrives_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 seconds') WHERE kingdom_id=" + kingdomA + " AND target_territory_id=" + Number(enemyCastle.id) + " AND march_type='attack' AND status='marching';",
+      ]);
+
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const pvpReportsA = stateA.battleReports.filter(report => report.battle_type === "territory_pvp");
+      assert.equal(pvpReportsA.length, 1, "uma marcha gera exatamente um relatório PvP");
+      const report = pvpReportsA[0];
+      assert.ok(report.id > 0);
+      assert.equal(report.has_replay, 1, "replay é persistido por sete dias");
+
+      stateB = (await api("/api/game/state", { token: tokenB })).data.state;
+      const pvpReportsB = stateB.battleReports.filter(item => item.battle_type === "territory_pvp");
+      assert.equal(pvpReportsB.length, 1, "o defensor recebe o mesmo relatório sem estar online");
+      assert.equal(Number(pvpReportsB[0].id), Number(report.id));
+
+      const replayA = expectStatus(await api("/api/game/battle/replay?battle_id=" + report.id, { token: tokenA }), 200, "replay PvP do atacante");
+      const replayB = expectStatus(await api("/api/game/battle/replay?battle_id=" + report.id, { token: tokenB }), 200, "replay PvP do defensor");
+      assert.equal(replayA.battle_type, "territory_pvp");
+      assert.equal(replayB.battle_id, replayA.battle_id);
+      assert.equal(replayA.participants.attacker, "Reino Alfa");
+      assert.equal(replayA.participants.defender, "Reino Beta");
+      expectStatus(await api("/api/game/battle/replay?battle_id=" + report.id, { token: tokenC }), 404, "terceiro reino não pode ler replay alheio");
+
+      const losses = JSON.parse(report.losses_json);
+      const defenderLosses = Object.values(losses.defender || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+      const attackerLosses = Object.values(losses.attacker || {}).reduce((sum, value) => sum + Number(value || 0), 0);
+      const defenderTotalAfter = stateB.troops.reduce((sum, unit) => sum + Number(unit.quantity || 0), 0);
+      assert.equal(defenderTotalBefore - defenderTotalAfter, defenderLosses, "a guarnição defensora perde somente as unidades calculadas");
+      const attackerTotalAfter = stateA.troops.reduce((sum, unit) => sum + Number(unit.quantity || 0), 0);
+      assert.equal(militiaBefore - attackerTotalAfter + (stateA.troops
+        .filter(unit => unit.unit_type !== "militia" || Number(unit.tier) !== 1)
+        .reduce((sum, unit) => sum + Number(unit.quantity || 0), 0)), attackerLosses,
+        "o atacante retorna somente com sobreviventes, sem duplicar tropas");
+
+      const stateAAgain = (await api("/api/game/state", { token: tokenA })).data.state;
+      const stateBAgain = (await api("/api/game/state", { token: tokenB })).data.state;
+      assert.equal(stateAAgain.battleReports.filter(item => item.battle_type === "territory_pvp").length, 1,
+        "consultas repetidas não geram outra batalha");
+      assert.equal(stateBAgain.battleReports.filter(item => item.battle_type === "territory_pvp").length, 1,
+        "consultas repetidas não duplicam o relatório defensor");
     });
 
     await t.test("todas as rotas de administração rejeitam dados inválidos sem erro interno", async () => {
