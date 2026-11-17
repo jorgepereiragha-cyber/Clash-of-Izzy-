@@ -149,7 +149,7 @@ function renderPurchaseRequests(requests){
   const card=document.createElement("article");card.className="player";
   const info=document.createElement("div"),name=document.createElement("strong"),meta=document.createElement("small");
   name.textContent="#"+request.id+" · "+request.product_name;
-  meta.textContent=(request.player_name||"Jogador")+" · "+(request.kingdom_name||"Reino")+" · ID "+request.player_id+" · R$ "+Number(request.price_brl).toFixed(2).replace(".",",")+(request.product_kind==="vip_package"?" · "+Number(request.gems_amount||0).toLocaleString("pt-BR")+" gemas":" · Skin")+" · Canal: WhatsApp · Status: aguardando sua confirmação;
+  meta.textContent=(request.player_name||"Jogador")+" · "+(request.kingdom_name||"Reino")+" · ID "+request.player_id+" · R$ "+Number(request.price_brl).toFixed(2).replace(".",",")+(request.product_kind==="vip_package"?" · "+Number(request.gems_amount||0).toLocaleString("pt-BR")+" gemas":" · Skin")+" · Canal: WhatsApp · Status: aguardando sua confirmação";
   info.append(name,meta);
   const actions=document.createElement("div");actions.className="actions";
   const approve=document.createElement("button");approve.type="button";approve.className="approve";approve.textContent="✓ Liberar pacote";
