@@ -23,7 +23,9 @@
     "nodejs_compat"
   ],
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": [
+      "* * * * *"
+    ]
   },
   "observability": {
     "enabled": true
@@ -31,5 +33,21 @@
   "vars": {
     "ENVIRONMENT": "production"
   },
-  "previews": {}
+  "previews": {},
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ELDORIA_ROOM",
+        "class_name": "EldoriaRoom"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1-eldoria-room",
+      "new_sqlite_classes": [
+        "EldoriaRoom"
+      ]
+    }
+  ]
 }
