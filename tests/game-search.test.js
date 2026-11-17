@@ -20,7 +20,7 @@ test("search accepts only public categories and builds a parameterized FTS query
   assert.ok(worker.includes("\\p{L}"));
   assert.ok(worker.includes('game_search_fts MATCH ?'));
   assert.ok(worker.includes('entityType=({kingdoms:"kingdom",alliances:"alliance",territories:"territory",skins:"skin"})[kind]||""'));
-  assert.ok(worker.includes('.bind(ftsQuery,kind,entityType,playerId,limit*4)'));
+  assert.ok(worker.includes('.bind(ftsQuery,kind,entityType,playerId,INITIAL_PAID_SKIN_LIMIT,limit*4)'));
   assert.ok(worker.includes('Math.min(20,Math.max(1,Math.floor(Number(url.searchParams.get("limit"))||10)))'));
 });
 
