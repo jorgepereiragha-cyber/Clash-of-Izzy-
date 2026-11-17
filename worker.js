@@ -447,7 +447,7 @@ async function cancelPvpMarch(env,kingdomId,m,units,reason,now){
   statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity")
    .bind(kingdomId,unit,quantity,m.id,kingdomId,resolutionToken));
  }
- statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,?,? WHERE "+guard)
+ statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
   .bind(kingdomId,"march_cancelled",JSON.stringify({marchId:m.id,reason}),m.id,kingdomId,resolutionToken));
  statements.push(env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'pvp_march_cancelled',? WHERE "+guard)
   .bind(kingdomId,JSON.stringify({marchId:m.id,targetTerritoryId:m.target_territory_id,reason}),m.id,kingdomId,resolutionToken));
@@ -614,8 +614,12 @@ async function processMarches(env,kingdomId){
   if(m.march_type==="attack"){
    const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id,territory_kind,shield_until FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
-   if(target?.territory_kind==="castle"&&Number(target.owner_kingdom_id)>0&&Number(target.owner_kingdom_id)!==Number(kingdomId)){
-    await processPvpMarch(env,kingdomId,m,units,target,now);
+   if(m.march_type==="attack"&&(!target||target.territory_kind==="castle"||target.owner_kingdom_id)){
+    if(target?.territory_kind==="castle"){
+     await processPvpMarch(env,kingdomId,m,units,target,now);
+    }else{
+     await cancelPvpMarch(env,kingdomId,m,units,"alvo_indisponivel",now);
+    }
     continue;
    }
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={},replayData={};
@@ -1357,12 +1361,27 @@ async function gameAction(env,playerId,body){
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
-    const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id,territory_kind FROM world_territories WHERE id=?").bind(targetId).first();
+    const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id,territory_kind,shield_until FROM world_territories WHERE id=?").bind(targetId).first();
     if(!target)return json({error:"Território não encontrado."},404);
     const marchType=String(body.marchType||"gather");
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
-    if(marchType==="attack"&&(target.owner_kingdom_id||target.territory_kind==="castle"))return json({error:"O castelo de outro comandante está visível no mapa. O combate PvP será habilitado na Fase 10; por enquanto, ataque apenas territórios neutros."},409);
     if(target.territory_kind==="castle"&&marchType!=="attack")return json({error:"Castelos de jogadores não podem ser coletados nem usados como ponto de exploração."},409);
+    if(marchType==="attack"&&target.territory_kind==="castle"){
+      const defenderKingdomId=Number(target.owner_kingdom_id)||0;
+      if(!defenderKingdomId)return json({error:"Este castelo não possui um reino ativo."},409);
+      if(defenderKingdomId===Number(k.id))return json({error:"Você não pode atacar seu próprio castelo."},409);
+      const [defender,alliance]=await Promise.all([
+        env.DB.prepare("SELECT protection_until FROM kingdoms WHERE id=?").bind(defenderKingdomId).first(),
+        env.DB.prepare("SELECT 1 AS allied FROM alliance_members a JOIN alliance_members d ON d.alliance_id=a.alliance_id WHERE a.kingdom_id=? AND d.kingdom_id=? LIMIT 1").bind(k.id,defenderKingdomId).first()
+      ]);
+      if(!defender)return json({error:"Reino defensor não encontrado."},404);
+      if(alliance)return json({error:"Ataques contra membros da sua aliança estão bloqueados."},409);
+      const nowMs=Date.now(),shieldMs=Date.parse(target.shield_until||""),protectionMs=Date.parse(defender.protection_until||"");
+      if((Number.isFinite(shieldMs)&&shieldMs>nowMs)||(Number.isFinite(protectionMs)&&protectionMs>nowMs))
+        return json({error:"Este reino está sob proteção e não pode ser atacado agora."},409);
+    }else if(marchType==="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id)){
+      return json({error:"Só é permitido atacar castelos de jogadores ou territórios neutros."},409);
+    }
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
     const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
     const selected={};
