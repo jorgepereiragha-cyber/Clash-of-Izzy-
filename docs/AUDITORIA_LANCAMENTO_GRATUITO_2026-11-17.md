@@ -25,11 +25,11 @@ A redução de lotes e chamadas de chat ajuda a respeitar esses limites, mas ain
 
 ## Pendências obrigatórias antes de cobrar/publicar
 
-- CI completa e verde no HEAD atual da PR #118. A CI #940 aprovou uma versão anterior. Na CI #947, o teste integrado falhou porque `POST /api/game/start` respondeu HTTP 503 ao fundar o primeiro reino. Ao investigar a consulta do mapa, encontrei dois bindings de coordenada que haviam sido removidos junto com o filtro por região e os restaurei. A causa exata ainda precisa ser confirmada por uma nova CI; os ajustes mais recentes do scheduler e do feed compacto também aguardam validação automatizada.
+- **CI #963 aprovada no HEAD atual da PR #118:** 259/259 testes Node, Worker+D1, 3/3 cenários Playwright móveis, diagnóstico e smoke de produção somente leitura, e `wrangler deploy --dry-run`. O dry-run calculou 357,25 KiB (77,53 KiB gzip). As falhas intermediárias #947 (HTTP 503 ao fundar o primeiro reino) e #962 (asserções antigas de lote) foram tratadas antes da execução verde. Isso não equivale a benchmark real de quotas nem a deploy.
 - PR #116: CI #941 passou por migrations locais, Worker+D1, Playwright móvel, smoke read-only e bundle. A PR permanece Draft e ainda não foi integrada; a correção só protege produção depois de merge e deploy.
 - D1 de Preview: confirmar que o banco separado declarado no Wrangler existe e é acessível; aplicar migrations apenas nele e validar start/state, mapa, construção, marchas, rallies, alianças e inventário.
 - Mercado Pago: confirmar no Worker os secrets `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`; executar compra de teste e receber webhook assinado. Sem essas credenciais, a loja usa link compartilhado e revisão manual Master.
-- Skins: a interface atual informa que as compras entram na coleção, mas ainda não há equipagem e visualização da aparência no castelo. Não anunciar as seis skins como aparência utilizável até implementar isso ou descrever explicitamente o produto como item de coleção.
+- Skins: a interface atual informa que as compras entram na coleção, mas ainda não há equipagem e visualização da aparência no castelo. Não anunciar as seis skins como aparência utilizável até implementar isso ou descrever explicitamente o produto como item de coleção. O trabalho foi registrado na [Issue #119](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/issues/119).
 - Android físico: testar cidade/mapa 3D, toque, PWA standalone, retomada de sessão, cache e consumo de memória.
 - Capacidade: medir CPU real, consultas D1 por `/api/game/state`, linhas lidas/escritas e backlog do Cron em staging antes de fixar limite público de jogadores.
 
@@ -39,13 +39,12 @@ Nenhuma mudança foi publicada na `main`; nenhum deploy ou workflow de produçã
 
 ## Sequência de lançamento
 
-1. CI verde e revisão da PR #116.
-2. Integrar a proteção de diagnóstico administrativo.
-3. Rebase/atualização da PR #118 sobre a nova main e CI verde.
-4. Validar Preview com D1 separado.
-5. Fechar a pendência comercial das skins e validar checkout/webhook ou manter a venda explicitamente em modo manual.
-6. Testar no Android físico e obter backup/bookmark de produção.
-7. Executar workflow de deploy manual protegido.
-8. Fazer smoke test público read-only e uma compra real de baixo valor, autorizada pelo dono do projeto.
+1. Revisar e integrar a PR #116 (CI #941 verde) para proteger o diagnóstico administrativo.
+2. Atualizar/rebasear a PR #118 sobre a nova `main` e repetir a CI.
+3. Validar Preview com D1 separado.
+4. Fechar a pendência comercial das skins e validar checkout/webhook ou manter a venda explicitamente em modo manual.
+5. Testar no Android físico e obter backup/bookmark de produção.
+6. Executar workflow de deploy manual protegido.
+7. Fazer smoke test público read-only e uma compra real de baixo valor, autorizada pelo dono do projeto.
 
 **Conclusão:** a arquitetura de reino compartilhado e o perfil inicial de cargas gratuitas estão implementados na branch. O jogo ainda não está liberado para produção por esta alteração; a maior parte dos próximos bloqueios é validação remota, segurança e garantia de que os itens vendidos são utilizáveis.
