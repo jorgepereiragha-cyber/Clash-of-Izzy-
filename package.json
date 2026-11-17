@@ -21,7 +21,9 @@
     "precheck": "npm run vendor:three",
     "pretest": "npm run vendor:three",
     "pretest:e2e": "npm run vendor:three",
-    "assets:optimize": "node scripts/optimize-3d-assets.mjs"
+    "assets:optimize": "node scripts/optimize-3d-assets.mjs",
+    "db:migrate:preview:local": "wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --local",
+    "db:migrate:preview:remote": "wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --remote"
   },
   "devDependencies": {
     "wrangler": "4.161.0",
