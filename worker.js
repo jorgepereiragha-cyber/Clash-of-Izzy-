@@ -289,10 +289,12 @@ async function scaleKingdomQueueDurationSeconds(env,kingdomId,baseSeconds,queueT
   return Math.max(10,Math.floor(seasonal/Math.max(1,buffs.buildSpeed)));
 }
 async function recalculateKingdomStats(env,kingdomId){
-  const [kingdom,rows]=await Promise.all([
-    env.DB.prepare("SELECT food,wood,stone,iron,gold,wall_hp FROM kingdoms WHERE id=?").bind(kingdomId).first(),
-    env.DB.prepare("SELECT building_type,level FROM kingdom_buildings WHERE kingdom_id=?").bind(kingdomId).all()
+  const reads=await env.DB.batch([
+    env.DB.prepare("SELECT food,wood,stone,iron,gold,wall_hp,castle_level FROM kingdoms WHERE id=?").bind(kingdomId),
+    env.DB.prepare("SELECT building_type,level FROM kingdom_buildings WHERE kingdom_id=?").bind(kingdomId)
   ]);
+  const kingdom=reads[0]?.results?.[0]||null;
+  const rows=reads[1];
   if(!kingdom)return null;
   const levels=Object.fromEntries((rows.results||[]).map(row=>[row.building_type,Math.max(0,Number(row.level)||0)]));
   const warehouse=levels.warehouse||1;
@@ -304,21 +306,24 @@ async function recalculateKingdomStats(env,kingdomId){
     gold:20000+warehouse*8000+(levels.market||1)*500
   };
   const wallMax=5000+(levels.wall||1)*5000;
-  const defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number((await env.DB.prepare("SELECT castle_level FROM kingdoms WHERE id=?").bind(kingdomId).first())?.castle_level)||1)*10;
+  const defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number(kingdom.castle_level)||1)*10;
   await env.DB.prepare(
     "UPDATE kingdoms SET food_capacity=MAX(?,food),wood_capacity=MAX(?,wood),stone_capacity=MAX(?,stone),iron_capacity=MAX(?,iron),gold_capacity=MAX(?,gold),wall_max_hp=?,wall_hp=MIN(wall_hp,?),defense_power=? WHERE id=?"
   ).bind(capacities.food,capacities.wood,capacities.stone,capacities.iron,capacities.gold,wallMax,wallMax,defense,kingdomId).run();
   return {capacities,wallMax,defense};
 }
 async function recalculateKingdomPower(env,kingdomId){
-  const [buildings,troops,research,heroes,dragon,kingdom]=await Promise.all([
-    env.DB.prepare("SELECT building_type,level FROM kingdom_buildings WHERE kingdom_id=?").bind(kingdomId).all(),
-    env.DB.prepare("SELECT unit_type,quantity FROM army_units WHERE kingdom_id=?").bind(kingdomId).all(),
-    env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdomId).all(),
-    env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=?").bind(kingdomId).all(),
-    env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
-    env.DB.prepare("SELECT prestige FROM kingdoms WHERE id=?").bind(kingdomId).first()
+  const reads=await env.DB.batch([
+    env.DB.prepare("SELECT building_type,level FROM kingdom_buildings WHERE kingdom_id=?").bind(kingdomId),
+    env.DB.prepare("SELECT unit_type,quantity FROM army_units WHERE kingdom_id=?").bind(kingdomId),
+    env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdomId),
+    env.DB.prepare("SELECT level FROM heroes WHERE kingdom_id=?").bind(kingdomId),
+    env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId),
+    env.DB.prepare("SELECT prestige FROM kingdoms WHERE id=?").bind(kingdomId)
   ]);
+  const [buildings,troops,research,heroes]=reads;
+  const dragon=reads[4]?.results?.[0]||null;
+  const kingdom=reads[5]?.results?.[0]||null;
   const weights={castle:100,barracks:30,farm:10,quarry:15,lumber_mill:10,iron_mine:15,market:12,academy:20,wall:50,hospital:15,watchtower:25,stable:30,archery_range:25,siege_workshop:40,embassy:15,warehouse:12};
   let power=0;
   for(const row of buildings.results||[])power+=Math.pow(Number(row.level)||0,2)*(weights[row.building_type]||10);
