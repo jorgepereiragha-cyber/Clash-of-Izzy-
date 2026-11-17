@@ -62,14 +62,9 @@ export async function runProductionSmokeTests({
   assert(Array.isArray(health.missingTables) && health.missingTables.length === 0,
     "Tabelas ausentes: " + (health.missingTables || []).join(", "));
 
-  const adminResponse = await get("/api/admin/health");
-  assert(adminResponse.status === 200, "Health administrativo respondeu HTTP " + adminResponse.status + ".");
-  const admin = await readJson(adminResponse, "Health administrativo");
-  assert(admin.hasDB === true, "Painel Master sem conexão com D1.");
-  assert(admin.hasSESSION_SECRET === true, "Painel Master sem SESSION_SECRET.");
-  assert(admin.hasADMIN_EMAIL === true, "ADMIN_EMAIL não está configurado no Worker.");
-  assert(admin.hasADMIN_PASSWORD === true, "ADMIN_PASSWORD não está configurado no Worker.");
-  const emailProviderConfigured = admin.hasEmailProvider === true;
+  const adminHealthResponse = await get("/api/admin/health");
+  assert(adminHealthResponse.status === 401,
+    "Health administrativo deve exigir autenticação; recebido HTTP " + adminHealthResponse.status + ".");
 
   const accountStatusResponse = await get("/api/account/status");
   assert(accountStatusResponse.status === 401, "O status da conta deve exigir sessão; recebido HTTP " + accountStatusResponse.status + ".");
@@ -202,8 +197,7 @@ export async function runProductionSmokeTests({
       apiHealth: true,
       d1: true,
       sessionSecret: true,
-      adminConfiguration: true,
-      transactionalEmailProviderConfigured: emailProviderConfigured,
+      adminHealthAuthBoundary: true,
       unauthenticatedAccessBlocked: true,
       storeCatalog: true,
       mercadoPagoCheckout: true,
