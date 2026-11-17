@@ -8,7 +8,7 @@ test("kingdom scene renders original procedural terrain and building silhouettes
   assert.match(kingdom, /function drawKingdomScene\(buildings,castleSkinId=0\)/);
   assert.match(kingdom, /createLinearGradient/);
   assert.match(kingdom, /const palette=/);
-  assert.match(kingdom, /drawKingdomScene\(buildings\)/);
+  assert.match(kingdom, /drawKingdomScene\(buildings,Number\(k\.equipped_skin_id\|\|0\)\)/);
   assert.match(kingdom, /canvas\.id="kingdomScene"/);
 });
 
