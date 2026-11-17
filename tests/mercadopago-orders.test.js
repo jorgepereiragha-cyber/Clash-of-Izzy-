@@ -44,7 +44,7 @@ test("launch store registers a manual request and redirects to WhatsApp instead 
   assert.ok(arena.includes("paymentMethod:'manual_whatsapp'"));
   assert.ok(arena.includes("https://wa.me/"));
   assert.ok(arena.includes("window.open('about:blank'"));
-  assert.doesNotMatch(arena, /store\\/checkout|link\\.mercadopago/i);
+  assert.doesNotMatch(arena, /store\/checkout|link\.mercadopago/i);
 });
 
 
