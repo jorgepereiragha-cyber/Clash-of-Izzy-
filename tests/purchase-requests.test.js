@@ -42,6 +42,11 @@ test("official store submits an auditable payment request and opens WhatsApp", a
   assert.ok(arena.includes("requestOfficialPurchase"));
   assert.ok(arena.includes("Pedido #"));
   assert.ok(arena.includes("manual_whatsapp"));
+  assert.ok(arena.includes("const orderName=data.request?.product_name||item.name;\\n  const orderPrice=") === false,
+    "escaped literal line break must not corrupt the purchase handler");
+  assert.ok(arena.includes("const orderName=data.request?.product_name||item.name;\\n  const orderPrice=") === false);
+  assert.ok(arena.includes("const orderName=data.request?.product_name||item.name;\n  const orderPrice="),
+    "purchase handler must contain a real line break between declarations");
   assert.doesNotMatch(arena, /mercadopago|purchaseReference|purchaseMethod/i);
   assert.ok(arena.includes("https://wa.me/"));
   assert.ok(arena.includes("Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis."));
