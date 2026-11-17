@@ -1,4 +1,4 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
+import * as THREE from "three";
 
 /*
  * Strategic world map for Clash of Izzy.
