@@ -642,6 +642,33 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(await admin("/api/admin/unlock-skin", {
         playerId: playerA, skin: skin.name,
       }), 200, "desbloqueio Master de skin");
+      const initialCastleState = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado antes de equipar skin");
+      assert.ok(initialCastleState.ownedCastleSkins.some(item => Number(item.id) === Number(skin.id)), "skin liberada aparece no inventário oficial");
+      assert.equal(initialCastleState.kingdom.equipped_skin_id, null, "nenhuma aparência é equipada automaticamente");
+      expectStatus(await api("/api/game/skin/equip", { method: "GET", token: tokenA }), 405, "equipagem aceita somente POST");
+
+      const equippedCastle = expectStatus(await api("/api/game/skin/equip", {
+        method: "POST", token: tokenA, body: { skinId: skin.id },
+      }), 200, "equipar skin possuída");
+      assert.equal(Number(equippedCastle.state.kingdom.equipped_skin_id), Number(skin.id));
+      assert.ok(equippedCastle.state.ownedCastleSkins.some(item => Number(item.id) === Number(skin.id)));
+
+      const otherPlayerView = expectStatus(await api("/api/game/state", { token: tokenB }), 200, "mapa visto por outro jogador");
+      const visibleOwnedCastle = (otherPlayerView.territories || []).find(item => Number(item.kingdom_id) === kingdomA);
+      assert.equal(Number(visibleOwnedCastle?.equipped_skin_id), Number(skin.id), "a aparência equipada aparece no mapa de outros jogadores");
+      assert.equal(visibleOwnedCastle?.equipped_skin_name, skin.name);
+
+      expectStatus(await api("/api/game/skin/equip", {
+        method: "POST", token: tokenB, body: { skinId: skin.id },
+      }), 404, "outro jogador não pode equipar skin alheia");
+      expectStatus(await api("/api/game/skin/equip", {
+        method: "POST", token: tokenA, body: { skinId: 999999 },
+      }), 404, "skin inexistente ou não possuída é recusada");
+
+      const restoredCastle = expectStatus(await api("/api/game/skin/equip", {
+        method: "POST", token: tokenA, body: { skinId: null },
+      }), 200, "retirar skin equipada");
+      assert.equal(restoredCastle.state.kingdom.equipped_skin_id, null);
       expectStatus(await admin("/api/admin/unlock-skin", {
         playerId: playerA, skin: "Skin inexistente",
       }), 404, "skin inexistente não é liberada");
