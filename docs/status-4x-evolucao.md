@@ -107,9 +107,16 @@ Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário impl
 - npm run assets:optimize cria variantes independentes Draco/Meshopt, valida e mede tamanho, sem trocar o manifesto. A CI gera e arquiva o relatório A/B em 3d-asset-compression-report.
 - O mapa mundial usa InstancedMesh para árvores do terreno e de territórios, em três batches por grupo; os volumes são calculados após as matrizes.
 - wrangler.jsonc marca ENVIRONMENT=preview. Sem D1 staging ID, env.DB não é fornecido ao Preview; não usar produção como fallback. Teste automatizado protege contra ID igual ao banco de produção.
-- **CI #914 — sucesso:** 274/274 testes Node, 10/10 Playwright, migrações locais, Worker-D1, Service Worker v32, imports/decoders offline, benchmark e Worker bundle aprovados. Android físico e Preview com D1 staging continuam como gates antes do merge.
+- **CI #920 — sucesso no HEAD atual:** 276/276 testes Node, 10/10 Playwright Chromium, migrações locais, Worker-D1, Service Worker v32, imports/decoders offline, benchmark, sampler p50/p95 de callbacks e pausa/retomada offscreen, diagnósticos read-only e Worker bundle aprovados. Android físico e Preview com D1 staging continuam como gates antes do merge.
 
 
-## Benchmark de compressão — CI #914
+## Benchmark de compressão — CI #920
 
-Variantes independentes Draco/Meshopt geradas e validadas, sem substituir os originais. Os cinco GLBs habilitados somam 443.264 B; Draco soma 188.228 B (-57,54%); Meshopt soma 191.816 B (-56,73%). Draco é menor em quatro assets; Meshopt é menor no arqueiro. São reduções de transferência; VRAM, tempo de decodificação e FPS ainda precisam de medição em Android. [Relatório e arquivos A/B da CI #914](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44049256611/artifacts/14312946574).
+Variantes independentes Draco/Meshopt geradas e validadas, sem substituir os originais. Os cinco GLBs habilitados somam 443.264 B; Draco soma 188.228 B (-57,54%); Meshopt soma 191.816 B (-56,73%). Draco é menor em quatro assets; Meshopt é menor no arqueiro. São reduções de transferência; VRAM, tempo de decodificação e FPS ainda precisam de medição em Android. [Relatório e arquivos A/B da CI #914](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44050185543/artifacts/14313311704).
+
+
+## Medição de renderização e pausa fora da viewport — CI #920
+
+- A cidade mede intervalos entre callbacks `requestAnimationFrame` numa janela limitada a 120 amostras e expõe p50/p95 no diagnóstico local. São intervalos de callback, não tempo de GPU, temperatura ou FPS sustentado.
+- O loop de tropas/shaders respeita página oculta, cidade fora da viewport, preferência de movimento reduzido e captura cinematográfica; pausa e retoma conforme visibilidade.
+- A CI #920 passou 276/276 testes Node e 10/10 testes Playwright Chromium. [Execução completa](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44050185543).
