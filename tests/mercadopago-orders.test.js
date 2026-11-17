@@ -125,5 +125,7 @@ test("launch edition blocks new Mercado Pago checkouts and keeps legacy webhook 
   const webhookRequest = new Request("https://game.example/api/webhook/mp?type=order&data.id=OLD-ORDER", {
     method: "POST"
   });
-  assert.equal(await handleMercadoPagoRoute(webhookRequest, {}, ctx), null === null ? undefined : null);
+  const legacyWebhookResponse = await handleMercadoPagoRoute(webhookRequest, {}, ctx);
+  assert.equal(legacyWebhookResponse.status, 503);
+  assert.equal((await legacyWebhookResponse.json()).error, "Webhook de pagamento não configurado.");
 });
