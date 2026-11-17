@@ -53,8 +53,8 @@ test("late texture responses are disposed instead of repopulating a closed scene
 
 test("arena and shared loaders use the same pinned local Three.js runtime and page teardown cleanup", () => {
   assert.equal(packageJson.devDependencies.three, "0.187.0");
-  assert.match(arena, /"three":"\\/vendor\\/three\\/build\\/three\\.module\\.js"/);
-  assert.match(assetLoader, /THREE_VENDOR_PATH = '\\/vendor\\/three\\/examples\\/jsm\\/libs\\//);
+  assert.ok(arena.includes('"three":"/vendor/three/build/three.module.js"'));
+  assert.ok(assetLoader.includes("THREE_VENDOR_PATH = '/vendor/three/examples/jsm/libs/'"));
   assert.match(arena, /pagehide/);
   assert.match(arena, /window\.COI_ASSETS\.dispose\(\)/);
 });
