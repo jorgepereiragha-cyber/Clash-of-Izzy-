@@ -34,6 +34,8 @@ import * as THREE from "three";
   let valhallaAuroraLight = null;
   let worldHemisphereLight = null;
   let worldSunLight = null;
+  let worldTreeInstanceCount = 0;
+  let worldTreeBatchCount = 0;
 
   function setValhallaMode(active) {
     valhallaModeActive = Boolean(active);
@@ -128,6 +130,8 @@ import * as THREE from "three";
     if (!Array.isArray(trees) || !trees.length) return;
 
     const count = trees.length;
+    worldTreeInstanceCount = count;
+    worldTreeBatchCount = 3;
     const trunkGeometry = new THREE.CylinderGeometry(.13, .18, .85, 5);
     const crownGeometry = new THREE.ConeGeometry(.72, 1.35, 6);
     const crownTopGeometry = new THREE.ConeGeometry(.48, .95, 6);
@@ -444,6 +448,20 @@ import * as THREE from "three";
     }
   }
 
+  function getDiagnostics() {
+    if (!renderer) return null;
+    const info = renderer.info;
+    return {
+      drawCalls: info.render.calls,
+      triangles: info.render.triangles,
+      geometries: info.memory.geometries,
+      textures: info.memory.textures,
+      treeInstances: worldTreeInstanceCount,
+      treeBatches: worldTreeBatchCount,
+      quality
+    };
+  }
+
   function draw() {
     if (disposed || !renderer || !scene || !camera) return;
     renderer.render(scene, camera);
@@ -494,12 +512,29 @@ import * as THREE from "three";
     disposed = true;
     if (frame) cancelAnimationFrame(frame);
     resizeObserver?.disconnect();
+
+    // Release per-scene geometry and InstancedMesh buffers before the renderer.
+    const geometries = new Set();
+    const sharedMaterials = new Set(Object.values(shared));
+    const localMaterials = new Set();
+    worldRoot.traverse(node => {
+      if (node.geometry) geometries.add(node.geometry);
+      const materials = Array.isArray(node.material) ? node.material : [node.material];
+      for (const material of materials) {
+        if (material && !sharedMaterials.has(material)) localMaterials.add(material);
+      }
+      if (node.isInstancedMesh) node.dispose();
+    });
+    geometries.forEach(geometry => geometry.dispose());
+    localMaterials.forEach(material => material.dispose());
+
     if (renderer) {
       renderer.setAnimationLoop(null);
       renderer.dispose();
       renderer.domElement.remove();
+      renderer = null;
     }
-    Object.values(shared).forEach(material => material.dispose());
+    sharedMaterials.forEach(material => material.dispose());
   }
 
   function init() {
@@ -554,7 +589,8 @@ import * as THREE from "three";
           projectionButtons = buttons instanceof Map ? buttons : new Map();
           projectTerritories();
         },
-        project: projectTerritories
+        project: projectTerritories,
+        diagnostics: getDiagnostics
       };
       window.dispatchEvent(new CustomEvent("coi:world-map-3d-ready"));
       if (window.__coiWorldMapState) setWorldState(window.__coiWorldMapState);
