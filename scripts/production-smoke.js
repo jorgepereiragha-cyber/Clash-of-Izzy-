@@ -70,6 +70,7 @@ export async function runProductionSmokeTests({
   assert(admin.hasADMIN_EMAIL === true, "ADMIN_EMAIL não está configurado no Worker.");
   assert(admin.hasADMIN_PASSWORD === true, "ADMIN_PASSWORD não está configurado no Worker.");
   const emailProviderConfigured = admin.hasEmailProvider === true;
+  const mercadoPagoAutomaticCheckoutConfigured = admin.hasMercadoPagoAutomaticCheckout === true;
 
   const accountStatusResponse = await get("/api/account/status");
   assert(accountStatusResponse.status === 401, "O status da conta deve exigir sessão; recebido HTTP " + accountStatusResponse.status + ".");
@@ -207,6 +208,8 @@ export async function runProductionSmokeTests({
       unauthenticatedAccessBlocked: true,
       storeCatalog: true,
       mercadoPagoCheckout: true,
+      mercadoPagoManualFallbackAvailable: true,
+      mercadoPagoAutomaticCheckoutConfigured,
       staticPages: REQUIRED_PAGES.length,
       pwaManifest: true,
       serviceWorker: true,
