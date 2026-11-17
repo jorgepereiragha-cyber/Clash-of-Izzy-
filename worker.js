@@ -1531,7 +1531,7 @@ export default {
     const headers=new Headers(request.headers);
     headers.set("X-COI-Player-Id",playerId);
     const roomId=env.ELDORIA_ROOM.idFromName("eldoria");
-    return await env.ELDORIA_ROOM.get(roomId).fetch(new Request("https://eldoria-room/connect",{method:"GET",headers}));
+    return await env.ELDORIA_ROOM.get(roomId).fetch(new Request(request,{headers}));
   }
   if(url.pathname==="/api/email/verify"&&request.method==="GET")return await verifyEmailToken(env,url.searchParams.get("token"));
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
