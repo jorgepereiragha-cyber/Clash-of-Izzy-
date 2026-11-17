@@ -177,10 +177,9 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(
-    /const\s+CACHE_NAME\s*=\s*["']clash-of-izzy-shell-v\d+["']/.test(serviceWorker),
-    "Service worker não declara um nome de cache versionado."
-  );
+  const serviceWorkerCacheMatch = serviceWorker.match(/const\s+CACHE_NAME\s*=\s*["'](clash-of-izzy-shell-v\d+)["']/);
+  assert(serviceWorkerCacheMatch, "Service worker não declara um nome de cache versionado.");
+  const serviceWorkerCacheName = serviceWorkerCacheMatch[1];
   assert(serviceWorker.includes("/account.html"), "PWA não inclui a página de conta persistente.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
@@ -220,6 +219,9 @@ export async function runProductionSmokeTests({
       worldMapNavigation: true,
       worldMap3D: true,
       cinematicTrailerRecorder: true,
+    },
+    diagnostics: {
+      serviceWorkerCacheName,
     },
   };
 }
