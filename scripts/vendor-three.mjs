@@ -22,9 +22,9 @@ const ENTRYPOINTS = [
 ];
 
 const RUNTIME_FILES = [
-  "examples/jsm/libs/draco/gltf/draco_decoder.js",
-  "examples/jsm/libs/draco/gltf/draco_decoder.wasm",
-  "examples/jsm/libs/draco/gltf/draco_wasm_wrapper.js",
+  "examples/jsm/libs/draco/draco_decoder.js",
+  "examples/jsm/libs/draco/draco_decoder.wasm",
+  "examples/jsm/libs/draco/draco_wasm_wrapper.js",
   "examples/jsm/libs/basis/basis_transcoder.js",
   "examples/jsm/libs/basis/basis_transcoder.wasm"
 ];
