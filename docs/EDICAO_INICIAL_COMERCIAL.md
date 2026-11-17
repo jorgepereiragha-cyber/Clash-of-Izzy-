@@ -43,17 +43,17 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 
 ## Condições comerciais e de publicação que continuam abertas
 
-- **Skins:** a tela atual registra a skin na coleção; ela ainda não altera visualmente o castelo nem pode ser equipada. Antes de cobrar, implementar equipagem/visualização ou apresentar e vender explicitamente como item de coleção sem efeito visual. Não prometer aparência de castelo ativa.
+- **Skins:** a branch inclui equipagem persistente e visualização de skins adquiridas. A ação verifica a propriedade em `player_skins`, grava `kingdoms.equipped_skin_id`, mostra a seleção na cidade/loja e propaga a aparência para castelos no mapa compartilhado. A migration 0027 e os testes precisam passar antes da liberação comercial.
 - **Mercado Pago:** o código tem rota de checkout individual e webhook, mas dependem de `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` configurados no Worker. Quando não configurado, a interface usa o link compartilhado e a revisão manual Master. A presença real dos secrets e uma compra/webhook de teste ainda não foram confirmadas.
-- **Segurança:** a PR #116 protege `/api/admin/health` e passou na CI #941, mas segue Draft e ainda precisa ser integrada e publicada. A `main` atual continua com o endpoint de diagnóstico público até esse deploy.
+- **Segurança:** a PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab` após CI #941. A produção só receberá a proteção após deploy manual protegido.
 - **Preview:** `wrangler.jsonc` declara um D1 de Preview separado do banco de produção, mas a existência e acessibilidade real desse recurso precisam ser conferidas antes de executar a migration 0026 remotamente.
 - **Dispositivos:** o CI automatizado Chromium em viewport móvel não substitui uma verificação em Android físico, incluindo toque, instalação PWA, reabertura, cache e memória.
 - **Capacidade:** nenhum número máximo de jogadores é prometido sem benchmark. O plano Gratuito limita CPU e D1 por invocação e por dia; os limites de lote reduzem picos, mas não comprovam capacidade simultânea.
 
 ## Dados e implantação
 
-- A migration 0026 é aditiva quanto ao schema e só atualiza coordenadas e marcadores dos castelos para unificar o mapa; não remove registros de jogadores ou progresso.
+- A migration 0026 consolida coordenadas e marcadores do mapa compartilhado; a migration 0027 adiciona a skin equipada ao castelo. Nenhuma apaga registros de jogadores ou progresso.
 - Nenhuma migration antiga é reescrita.
 - Nenhuma mudança no identificador de jogadores, tokens, economia, combate, alianças, marchas ou rallies.
-- A alteração permanece nesta branch/PR para CI e revisão.
+- As alterações permanecem na branch de release para CI e revisão.
 - Não executar deploy nem migrações remotas como parte desta alteração. A publicação de produção continua no fluxo manual protegido.
