@@ -156,3 +156,19 @@ test("kingdom scene manifest expands defensive props and supports per-instance o
   assert.match(renderer, /asset\.rotations\?\.\[index\]/);
   assert.match(renderer, /instanceRotation\.every\(value => Number\.isFinite\(Number\(value\)\)\)/);
 });
+
+test("rejects per-instance prop rotations that do not match positions", async () => {
+  const root = await fixture({
+    props: [{
+      ...baseAsset("prop-tree", "/assets/3d/models/tree.glb"),
+      positions: [[0, 0, 0], [1, 0, 1]],
+      rotations: [[0, 0, 0]],
+    }],
+    files: { "models/tree.glb": glb() },
+  });
+  try {
+    await assert.rejects(validateAssetManifest(root), /rotations deve conter uma rotação/);
+  } finally {
+    await rm(root, { recursive: true, force: true });
+  }
+});
