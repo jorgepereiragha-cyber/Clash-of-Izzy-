@@ -1591,7 +1591,10 @@ export default {
       if(existingPlayerId){
         const existingKingdom=await env.DB.prepare("SELECT 1 FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?").bind(existingPlayerId).first();
         if(existingKingdom){
-          const token=await sign({sub:existingPlayerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365},env.SESSION_SECRET);
+          const account=await env.DB.prepare("SELECT a.session_version FROM player_accounts a JOIN players p ON p.id=a.player_id WHERE p.player_id=?").bind(existingPlayerId).first();
+          const payload={sub:existingPlayerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365};
+          if(account)payload.av=Number(account.session_version);
+          const token=await sign(payload,env.SESSION_SECRET);
           return json({token,state:await gameState(env,existingPlayerId),referral_recorded:false,resumed:true},200);
         }
       }
