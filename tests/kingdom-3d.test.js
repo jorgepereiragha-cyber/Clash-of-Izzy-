@@ -55,6 +55,8 @@ test("glTF and KTX2/Basis loaders are configured for production assets", () => {
   assert.match(renderer, /qualityProfile\?\.surfaceTextureSize \|\| 128/);
   assert.match(renderer, /ctx\.setTransform\(detailScale, 0, 0, detailScale, 0, 0\)/);
   assert.match(renderer, /1200 \* detailScale \* detailScale/);
+  assert.match(renderer, /ctx\.setTransform\(1, 0, 0, 1, 0, 0\)/);
+  assert.match(renderer, /ctx\.fillRect\(rand\(\) \* textureSize, rand\(\) \* textureSize, 1 \+ rand\(\) \* 2, 1 \+ rand\(\) \* 2\)/);
   assert.match(renderer, /applyProceduralSurfaceMaps/);
   assert.match(renderer, /surfaceTextureCache/);
   assert.match(renderer, /surfaceMaterial\(colors\[0\], "stone"/);
