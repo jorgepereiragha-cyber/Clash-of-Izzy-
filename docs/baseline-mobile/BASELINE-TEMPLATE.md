@@ -8,12 +8,15 @@
 |---|---|
 | Projeto | Clash of Izzy (PWA) |
 | Pull Request | [#112](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/pull/112) |
-| Commit de referência | `76af1483252b85e8772cdd05539759ba25644087` |
-| Abreviação do commit | `76af148` |
+| Commit de referência | `b1448e2030dfe9133a2d72df35c518e6d73db51f` |
+| Abreviação do commit | `b1448e2` |
 | Service Worker cache | `clash-of-izzy-shell-v30` |
-| CI de referência | [#831 — sucesso](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43983540858) |
-| Build Cloudflare (build aprovado; URL pública de Preview não confirmada) | [Build Cloudflare](https://dash.cloudflare.com/ed443802b956d175409db190a0fe8d0e/workers/services/view/clash-of-izzy/production/previews/feat-visual-quality-mobile-3d/builds/1ad210ca-78dc-4128-b545-597b4f1fd87c) |
-| URL/ID do deployment efetivamente testado | **PREENCHER** |
+| CI de referência | [#833 — sucesso](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43984784123) |
+| Preview do commit `b1448e2` | [Abrir Preview](https://ace8a938-clash-of-izzy.jorgepereiragha.workers.dev) · [Deployment Cloudflare](https://dash.cloudflare.com/?to=/ed443802b956d175409db190a0fe8d0e/workers/services/view/clash-of-izzy/production/previews/feat-visual-quality-mobile-3d/deployments/ace8a938-635b-4a5d-9de9-290ca31e0934) |
+| URL do Preview vinculado ao commit | `https://ace8a938-clash-of-izzy.jorgepereiragha.workers.dev` |
+| Deployment ID (Cloudflare) | `ace8a938-635b-4a5d-9de9-290ca31e0934` |
+| Build ID (Cloudflare) | `8af9306c-e010-4b9f-b70d-6c7d822f2516` |
+| URL/ID do deployment efetivamente aberto no aparelho | **PREENCHER após inspeção Android** |
 | Data e hora da inspeção (UTC) | **PREENCHER** |
 | Responsável pela inspeção | **PREENCHER** |
 
@@ -33,7 +36,8 @@
 
 ## 2. Pré-condições e proveniência
 
-- [ ] Confirmar no painel Cloudflare que o build/Preview efetivamente usado corresponde ao commit `76af148`.
+- [x] Identificar no comentário automático do Cloudflare o Preview vinculado ao commit `b1448e2` e registrar URL/Deployment ID acima.
+- [ ] Confirmar no aparelho que a URL aberta é exatamente o deployment de `b1448e2`.
 - [ ] Registrar a URL exata do deployment, não apenas a URL estável da branch.
 - [ ] Abrir `/sw.js` no Preview e confirmar `clash-of-izzy-shell-v30`.
 - [ ] Confirmar em DevTools → Application → Service Workers qual worker está ativo e controlando a página.
@@ -43,8 +47,8 @@
 
 **Prova de versão (preencher):**
 
-- Commit/build visto no painel: **PREENCHER**
-- URL do deployment: **PREENCHER**
+- Commit/build visto no painel: `b1448e2` / build `8af9306c-e010-4b9f-b70d-6c7d822f2516` (deployment criado com sucesso; runtime no aparelho ainda não conferido)
+- URL do Preview: `https://ace8a938-clash-of-izzy.jorgepereiragha.workers.dev` (confirmar que foi essa a URL aberta no Android)
 - Cache name visto em `sw.js`: **PREENCHER**
 - Worker ativo/controlador: **PREENCHER**
 - Resposta de status validada sem PII bruta: **PREENCHER**
@@ -144,7 +148,7 @@ docs/baseline-mobile/
 
 | Área | Resultado |
 |---|---|
-| CI automatizada | APROVADA — CI #831 |
+| CI automatizada | APROVADA — CI #833 |
 | Contrato da API sem e-mail bruto | APROVADO — teste automatizado |
 | Build Cloudflare do commit de referência | APROVADO |
 | Runtime do Preview no deployment exato | PENDENTE |
