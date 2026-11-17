@@ -491,6 +491,17 @@ function renderKingdomStore(){
  const cosmetics=kingdomSession.cosmetics||{},shop=kingdomSession.shop||{},player=kingdomSession.player||{},kingdom=kingdomSession.kingdom||{};
  status.textContent='💎 '+Number(player.gems||0).toLocaleString('pt-BR')+' gemas · 🪙 '+Number(kingdom.gold||0).toLocaleString('pt-BR')+' ouro · ✨ '+Number(cosmetics.shards||0).toLocaleString('pt-BR')+' fragmentos';
  root.append(status);
+ const castleSkins=Array.isArray(kingdomSession.castleSkins)?kingdomSession.castleSkins:[];
+ const equippedCastleSkinId=Number(kingdom.equipped_skin_id||0);
+ const castleSkinTitle=document.createElement('h3');castleSkinTitle.textContent='👑 Aparências do castelo';root.append(castleSkinTitle);
+ const castleSkinGrid=document.createElement('div');castleSkinGrid.className='storeGrid';
+ if(!castleSkins.length){const empty=document.createElement('p');empty.className='storeMuted';empty.textContent='As skins adquiridas aparecem aqui. Somente o proprietário pode equipá-las.';castleSkinGrid.append(empty);}
+ for(const skin of castleSkins){
+  const equipped=Number(skin.id)===equippedCastleSkinId;
+  castleSkinGrid.append(storeCard(skin.name,'Skin de castelo · Aparência visual no reino compartilhado',equipped?'✓ Equipada':'Equipar',()=>runStoreAction({type:'castle_skin_equip',skinId:Number(skin.id)}),equipped));
+ }
+ root.append(castleSkinGrid);
+ if(equippedCastleSkinId)root.append(storeCard('Aparência original','Retira a skin e restaura o castelo padrão','Restaurar',()=>runStoreAction({type:'castle_skin_equip',skinId:null}),false));
  const owned=new Set((cosmetics.owned||[]).map(x=>x.item_id));
  const collections=cosmetics.collections||[];
  const collectionTitle=document.createElement('h3');collectionTitle.textContent='🎖️ Recompensas de coleção';root.append(collectionTitle);
@@ -538,7 +549,7 @@ function renderKingdomStore(){
   }
   root.append(merchantGrid);
  }
- const note=document.createElement('p');note.className='storeMuted';note.textContent='As skins ficam registradas na coleção. A opção de equipar e visualizar cada aparência no castelo será integrada ao sistema visual em uma etapa própria; esta tela não promete equipagem ainda.';
+ const note=document.createElement('p');note.className='storeMuted';note.textContent='As skins de castelo pertencentes ao jogador podem ser equipadas. A aparência selecionada também aparece para os demais no mapa compartilhado.';
  root.append(note);
 }
 async function refreshKingdomStore(){
