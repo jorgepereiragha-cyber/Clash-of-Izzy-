@@ -29,7 +29,7 @@ test("Master approval queue is protected by admin session and grants packages on
   assert.ok(worker.includes("INSERT OR IGNORE INTO player_skins"));
   assert.ok(admin.includes("refreshPurchaseRequests"));
   assert.ok(admin.includes("✓ Liberar pacote"));
-  assert.ok(admin.includes("payment_reference"));
+  assert.ok(worker.includes("r.payment_reference"));
   assert.ok(admin.includes("setInterval(()=>"));
   const adminScript=admin.split("<script>")[1]?.split("</script>")[0];
   assert.ok(adminScript, "admin inline script must exist");
