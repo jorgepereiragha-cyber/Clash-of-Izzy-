@@ -45,92 +45,59 @@ O Wrangler solicita o valor de cada segredo sem colocá-lo no repositório. Nunc
 
 O endpoint de saúde informa somente a presença das configurações; ele não revela os valores dos segredos.
 
-
 ## Preview do Cloudflare Worker com D1 de staging isolado
 
-O projeto usa **Cloudflare Workers** (`main: "worker.js"`) e `wrangler.jsonc`, não Cloudflare Pages. Não use `wrangler pages deploy`, `[env.preview]` de Pages ou um `wrangler.toml` paralelo. Para testar uma branch, use `wrangler preview`; para produção, o comando separado continua sendo `wrangler deploy`.
+O projeto usa **Cloudflare Workers** (`main: "worker.js"`) e `wrangler.jsonc`, não Cloudflare Pages. Não use `wrangler pages deploy`, configuração de Pages ou um `wrangler.toml` paralelo. Para testar uma branch, use Worker Previews; para produção, o comando separado continua sendo `wrangler deploy`.
 
-O projeto já fixa Wrangler 4.161.0, versão que atende ao requisito mínimo 4.135.0 de Worker Previews. O bloco `previews.vars.ENVIRONMENT` deve permanecer como `"preview"`.
+O projeto fixa Wrangler 4.161.0. O bloco `previews.vars.ENVIRONMENT` deve permanecer como `"preview"`.
 
-### 1. Criar o banco D1 de staging
+### 1. Banco D1 de staging provisionado e configurado
 
-Em um terminal autenticado na conta Cloudflare correta:
+A branch `feat/visual-quality-mobile-3d` já contém a configuração de staging nos dois arquivos:
 
-```sh
-npx wrangler --config wrangler.jsonc d1 create clash-of-izzy-preview
-```
+- `wrangler.jsonc`: binding `DB` em `previews.d1_databases`;
+- `wrangler.preview-migrations.jsonc`: binding de migração `PREVIEW_DB`;
+- Nome do banco: `izzy-preview-17112026`;
+- ID do staging: `6674c0ac-3636-4e57-bff8-23cf60ab9637`;
+- ID de produção, mantido separado: `7e63af59-d9ff-4159-a9cf-b02e35b92605`.
 
-Guarde o `database_id` real retornado. Ele precisa ser diferente do ID do D1 de produção (`7e63af59-d9ff-4159-a9cf-b02e35b92605`). Não use o banco de produção, não reutilize UUIDs e não preencha o exemplo com um valor fictício.
+Os dois arquivos de Preview apontam para o mesmo ID de staging. Não altere o binding D1 de produção para executar testes. A presença da configuração comprova o isolamento declarado no código, mas não comprova por si só que as migrações remotas foram aplicadas ou que o Worker Preview consegue executar consultas.
 
-### 2. Vincular o banco somente ao Worker Preview
+### 2. Aplicar migrações exclusivamente no staging
 
-No `wrangler.jsonc`, mantenha o `d1_databases` do topo inalterado e acrescente `d1_databases` dentro do bloco `previews`, com o UUID real:
-
-```jsonc
-"previews": {
-  "vars": {
-    "ENVIRONMENT": "preview"
-  },
-  "d1_databases": [
-    {
-      "binding": "DB",
-      "database_name": "clash-of-izzy-preview",
-      "database_id": "COLE_AQUI_O_UUID_REAL_DO_STAGING",
-      "migrations_dir": "migrations"
-    }
-  ]
-}
-```
-
-O binding permanece `DB` porque o Worker acessa o banco como `env.DB`. O banco referenciado em `previews.d1_databases` deve ser o mesmo usado pela configuração de migrações abaixo.
-
-### 3. Criar o arquivo de migrações de Preview
-
-Crie `wrangler.preview-migrations.jsonc` na raiz com o mesmo ID do D1 de staging:
-
-```jsonc
-{
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "d1_databases": [
-    {
-      "binding": "PREVIEW_DB",
-      "database_name": "clash-of-izzy-preview",
-      "database_id": "COLE_AQUI_O_MESMO_UUID_REAL_DO_STAGING",
-      "migrations_dir": "migrations"
-    }
-  ]
-}
-```
-
-Esse arquivo de migração deve apontar para exatamente o mesmo banco que o binding `DB` do Preview. Nunca aplique migrações remotas do Preview pelo arquivo principal de produção.
-
-### 4. Aplicar migrações e publicar a branch
+O script versionado no `package.json` é:
 
 ```sh
-npx wrangler d1 migrations apply PREVIEW_DB --remote --config wrangler.preview-migrations.jsonc
-npx wrangler --config wrangler.jsonc preview --name feat-visual-quality-mobile-3d
+npm run db:migrate:preview:remote
 ```
 
-Execute a publicação do Preview somente depois de as migrações de staging terminarem com sucesso.
+Ele usa `wrangler.preview-migrations.jsonc` e o binding `PREVIEW_DB`. Antes de executar, confirme que o terminal está autenticado na conta Cloudflare correta e confira novamente o ID do banco. Nunca use `db:migrate:remote` para preparar o Preview: esse script aponta para a configuração principal de produção.
 
-### 5. Configurar segredos exclusivos do Preview
+A CI valida as migrações de Preview em D1 local descartável. Essa validação automatizada não equivale à aplicação remota no banco de staging.
 
-Worker Previews não herdam automaticamente os segredos de produção. Depois de criar o Preview, cadastre segredos próprios para ele (o Wrangler solicita cada valor sem gravá-lo no repositório):
+### 3. Preview e segredos exclusivos
 
-```sh
-npx wrangler preview secret put SESSION_SECRET --name feat-visual-quality-mobile-3d
-npx wrangler preview secret put ADMIN_EMAIL --name feat-visual-quality-mobile-3d
-npx wrangler preview secret put ADMIN_PASSWORD --name feat-visual-quality-mobile-3d
-```
+O Preview publicado pela branch está disponível em:
 
-Use um `SESSION_SECRET` aleatório e credenciais administrativas descartáveis, exclusivos do Preview. Não copie os segredos de produção.
+`https://feat-visual-quality-mobile-3d-clash-of-izzy.jorgepereiragha.workers.dev`
 
-### 6. Validar o ambiente isolado
+O comentário automático do Cloudflare na PR identifica o Preview mais recente como commit `bae6e0b`. Confirme sempre o commit associado à implantação antes de registrar evidências.
 
-1. Confirme no painel que o Preview usa o D1 `clash-of-izzy-preview` através do binding `DB`, nunca o D1 `clash-of-izzy-db`.
-2. Abra `/api/admin/health` no URL do Preview e confirme `hasDB`, `hasSESSION_SECRET`, `hasADMIN_EMAIL` e `hasADMIN_PASSWORD` como `true`.
-3. Faça testes com contas descartáveis: criação de reino, leitura de estado, construção, marcha, aliança e busca.
-4. Valide PWA standalone, carregamento 3D e offline em Android físico; guarde apenas evidências sanitizadas.
-5. Mantenha a PR em Draft até concluir essas verificações.
+Worker Previews não devem reutilizar segredos de produção. Configure credenciais descartáveis e exclusivas no ambiente Preview, sem gravá-las no repositório. Não copie `SESSION_SECRET`, `ADMIN_EMAIL` ou `ADMIN_PASSWORD` da produção.
 
-**Estado verificado nesta branch:** `wrangler.jsonc` já define `ENVIRONMENT="preview"`, mas ainda não contém um binding D1 de staging. O banco precisa ser criado na conta Cloudflare e seu ID real inserido nos dois arquivos. Nenhum banco, segredo, migração remota ou deploy é criado por esta documentação.
+### 4. Validar o ambiente isolado
+
+1. No painel Cloudflare, confirme que o Preview usa `izzy-preview-17112026` pelo binding `DB`, nunca o D1 de produção.
+2. Abra `/api/admin/health` no URL do Preview e confirme `hasDB`, `hasSESSION_SECRET`, `hasADMIN_EMAIL` e `hasADMIN_PASSWORD` como `true`. O endpoint informa presença, não valores.
+3. Use contas descartáveis para testar criação de reino, leitura de estado, construção, marcha, aliança e busca.
+4. Valide PWA standalone, carregamento 3D e reabertura offline em Android físico; guarde apenas evidências sanitizadas.
+5. Mantenha a PR em Draft até concluir essas verificações e anexar as evidências.
+
+### 5. Estado de validação em 17/11/2026
+
+- **Configurado no repositório:** binding D1 de Preview e arquivo separado de migrações apontam para o mesmo ID de staging.
+- **CI #932:** sucesso; inclui validação local das migrações D1 de produção e Preview, testes do Worker/D1, Chromium, assets 3D e bundle.
+- **Ainda não comprovado por essa CI:** aplicação das migrações no D1 remoto de staging, presença dos segredos exclusivos no Preview, respostas funcionais das rotas autenticadas e inspeção Android física.
+- **Android:** a landing foi aprovada no registro de inspeção; a modal requer reteste cosmético do foco; cidade 3D, texturas, sombras/iluminação e PWA standalone/offline continuam pendentes de evidência física.
+
+Não declare o Preview operacional para gameplay autenticado apenas porque o deploy terminou com sucesso ou porque os testes locais passaram. Não mescle a PR enquanto os gates remotos e físicos acima permanecerem pendentes. Nenhuma instrução deste documento autoriza migração no banco de produção, alteração de segredos ou modificação de dados de jogadores.
