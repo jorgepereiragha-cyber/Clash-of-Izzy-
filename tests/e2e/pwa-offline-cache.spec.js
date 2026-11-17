@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 // This isolated spec opts in so it can validate the real PWA lifecycle.
 test.use({ serviceWorkers: "allow" });
 
-const SHELL_CACHE = "clash-of-izzy-shell-v31";
+const SHELL_CACHE = "clash-of-izzy-shell-v32";
 const CACHED_MODEL = "/assets/3d/kenney/castle-kit/Models/GLB%20format/tower-square.glb";
 
 test("PWA activates its Service Worker and serves previously cached shell and GLB offline", async ({ page, context }) => {
@@ -78,4 +78,40 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(offlineShell.ok).toBe(true);
   expect(offlineShell.status).toBe(200);
   expect(offlineShell.body).toContain("<h1>Você está sem conexão</h1>");
+
+  // The renderer, loaders and decoder binaries must remain usable offline.
+  // Open the kingdom page so its import map resolves the same-origin modules.
+  await page.goto("/kingdom.html");
+  const offlineThreeModules = await page.evaluate(async () => {
+    const [{ GLTFLoader }, { DRACOLoader }, { KTX2Loader }, { MeshoptDecoder }] = await Promise.all([
+      import("/vendor/three/examples/jsm/loaders/GLTFLoader.js"),
+      import("/vendor/three/examples/jsm/loaders/DRACOLoader.js"),
+      import("/vendor/three/examples/jsm/loaders/KTX2Loader.js"),
+      import("three/addons/libs/meshopt_decoder.module.js")
+    ]);
+    await MeshoptDecoder.ready;
+    return {
+      gltf: typeof GLTFLoader === "function",
+      draco: typeof DRACOLoader === "function",
+      ktx2: typeof KTX2Loader === "function",
+      meshopt: typeof MeshoptDecoder.decodeGltfBuffer === "function"
+    };
+  });
+  expect(offlineThreeModules).toEqual({ gltf: true, draco: true, ktx2: true, meshopt: true });
+
+  const offlineDecoders = await page.evaluate(async paths => {
+    const results = [];
+    for (const path of paths) {
+      const response = await fetch(path);
+      const bytes = await response.arrayBuffer();
+      results.push({ path, ok: response.ok, size: bytes.byteLength });
+    }
+    return results;
+  }, [
+    "/vendor/three/examples/jsm/libs/draco/gltf/draco_wasm_wrapper.js",
+    "/vendor/three/examples/jsm/libs/draco/gltf/draco_decoder.wasm",
+    "/vendor/three/examples/jsm/libs/basis/basis_transcoder.js",
+    "/vendor/three/examples/jsm/libs/basis/basis_transcoder.wasm"
+  ]);
+  expect(offlineDecoders.every(item => item.ok && item.size > 100)).toBe(true);
 });
