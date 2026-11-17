@@ -7,12 +7,12 @@
 | Campo | Valor |
 |---|---|
 | Projeto | Clash of Izzy (PWA) |
-| Pull Request | [#111](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/pull/111) |
-| Commit de referência | `f9b19c2344db60853cbaac6cdf595729454704a8` |
-| Abreviação do commit | `f9b19c2` |
+| Pull Request | [#112](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/pull/112) |
+| Commit de referência | `76af1483252b85e8772cdd05539759ba25644087` |
+| Abreviação do commit | `76af148` |
 | Service Worker cache | `clash-of-izzy-shell-v30` |
-| CI de referência | [#828 — sucesso](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43974863714) |
-| Preview deployment | [Build Cloudflare](https://dash.cloudflare.com/ed443802b956d175409db190a0fe8d0e/workers/services/view/clash-of-izzy/production/previews/feat-pr-111-guest-account-notice/builds/e0ef5e0f-f38a-4204-85d1-bd8c3cf3cc28) |
+| CI de referência | [#831 — sucesso](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43983540858) |
+| Build Cloudflare (build aprovado; URL pública de Preview não confirmada) | [Build Cloudflare](https://dash.cloudflare.com/ed443802b956d175409db190a0fe8d0e/workers/services/view/clash-of-izzy/production/previews/feat-visual-quality-mobile-3d/builds/1ad210ca-78dc-4128-b545-597b4f1fd87c) |
 | URL/ID do deployment efetivamente testado | **PREENCHER** |
 | Data e hora da inspeção (UTC) | **PREENCHER** |
 | Responsável pela inspeção | **PREENCHER** |
@@ -33,7 +33,7 @@
 
 ## 2. Pré-condições e proveniência
 
-- [ ] Confirmar no painel Cloudflare que o deployment usado corresponde ao commit `f9b19c2`.
+- [ ] Confirmar no painel Cloudflare que o build/Preview efetivamente usado corresponde ao commit `76af148`.
 - [ ] Registrar a URL exata do deployment, não apenas a URL estável da branch.
 - [ ] Abrir `/sw.js` no Preview e confirmar `clash-of-izzy-shell-v30`.
 - [ ] Confirmar em DevTools → Application → Service Workers qual worker está ativo e controlando a página.
@@ -63,7 +63,7 @@ Use uma conta descartável, criada especificamente para este teste. Não use con
 | Conta vinculada | viewport nativo, Chrome | Mostra e-mail mascarado; formulário de cadastro ausente do layout; ação de sair visível | PENDENTE | `screenshots/linked-masked-email.png` |
 | Conta vinculada | viewport nativo, Chrome | Não há salto de layout após resposta de status | PENDENTE | `screenshots/linked-settled.png` |
 | Fallback HTTP 500 | viewport nativo, Chrome | Banner permanece oculto; reino continua utilizável; sem erro técnico exposto na interface | PENDENTE | `screenshots/status-500.png` |
-| PWA standalone | resolução nativa | Abre em standalone; sessão persiste; worker ativo usa cache v29 | PENDENTE | `screenshots/pwa-standalone.png` |
+| PWA standalone | resolução nativa | Abre em standalone; sessão persiste; worker ativo usa cache v30 | PENDENTE | `screenshots/pwa-standalone.png` |
 
 ### 3.1 Estado de convidado
 
@@ -97,7 +97,7 @@ Use uma conta descartável, criada especificamente para este teste. Não use con
 - [ ] Abrir no modo standalone e confirmar ausência da UI do navegador.
 - [ ] Fechar completamente o app e reabri-lo.
 - [ ] Confirmar sessão e navegação persistentes.
-- [ ] Confirmar worker ativo/controlador com shell cache v29.
+- [ ] Confirmar worker ativo/controlador com shell cache v30.
 - [ ] Repetir a abertura online e, quando aplicável, o cenário offline sem fazer ações que alterem dados reais.
 
 ## 4. Não regressão para PRs futuras
@@ -144,7 +144,7 @@ docs/baseline-mobile/
 
 | Área | Resultado |
 |---|---|
-| CI automatizada | APROVADA — CI #828 |
+| CI automatizada | APROVADA — CI #831 |
 | Contrato da API sem e-mail bruto | APROVADO — teste automatizado |
 | Build Cloudflare do commit de referência | APROVADO |
 | Runtime do Preview no deployment exato | PENDENTE |
