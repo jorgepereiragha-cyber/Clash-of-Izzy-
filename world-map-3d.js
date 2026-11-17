@@ -121,18 +121,60 @@ import * as THREE from "three";
     return makeMesh(new THREE.ConeGeometry(radius, height, sides), material, parent, x, y, z);
   }
 
-  function addTree(parent, x, z, scale = 1, variant = 0) {
-    const group = new THREE.Group();
-    group.position.set(x, terrainHeight(x, z), z);
-    group.scale.setScalar(scale);
-    const trunk = makeMesh(new THREE.CylinderGeometry(.13, .18, .85, 5), shared.trunk, group, 0, .4, 0);
-    trunk.castShadow = quality !== "low";
-    const crownA = cone(group, .72, 1.35, variant % 2 ? shared.forest : shared.forestLight, 0, 1.2, 0, 6);
-    crownA.castShadow = quality !== "low";
-    const crownB = cone(group, .48, .95, shared.forest, 0, 1.86, 0, 6);
-    crownB.castShadow = quality !== "low";
-    parent.add(group);
-    return group;
+  // Repeated map vegetation shares three geometries/materials and is rendered
+  // in three instanced batches. Explicit bounds keep the orthographic frustum
+  // culling correct after instance transforms are populated.
+  function addTreeInstances(parent, trees) {
+    if (!Array.isArray(trees) || !trees.length) return;
+
+    const count = trees.length;
+    const trunkGeometry = new THREE.CylinderGeometry(.13, .18, .85, 5);
+    const crownGeometry = new THREE.ConeGeometry(.72, 1.35, 6);
+    const crownTopGeometry = new THREE.ConeGeometry(.48, .95, 6);
+    const trunks = new THREE.InstancedMesh(trunkGeometry, shared.trunk, count);
+    const crowns = new THREE.InstancedMesh(crownGeometry, shared.forest, count);
+    const crownTops = new THREE.InstancedMesh(crownTopGeometry, shared.forestLight, count);
+    const dummy = new THREE.Object3D();
+    const neutralTint = new THREE.Color(1, 1, 1);
+    const lightTint = new THREE.Color().setRGB(
+      shared.forestLight.color.r / Math.max(.001, shared.forest.color.r),
+      shared.forestLight.color.g / Math.max(.001, shared.forest.color.g),
+      shared.forestLight.color.b / Math.max(.001, shared.forest.color.b)
+    );
+
+    for (let index = 0; index < count; index++) {
+      const tree = trees[index];
+      const x = Number(tree.x) || 0;
+      const z = Number(tree.z) || 0;
+      const scale = Math.max(.1, Number(tree.scale) || 1);
+      const y = terrainHeight(x, z);
+
+      dummy.position.set(x, y + .4 * scale, z);
+      dummy.scale.setScalar(scale);
+      dummy.updateMatrix();
+      trunks.setMatrixAt(index, dummy.matrix);
+
+      dummy.position.set(x, y + 1.2 * scale, z);
+      dummy.updateMatrix();
+      crowns.setMatrixAt(index, dummy.matrix);
+      crowns.setColorAt(index, Number(tree.variant) % 2 ? lightTint : neutralTint);
+
+      dummy.position.set(x, y + 1.86 * scale, z);
+      dummy.updateMatrix();
+      crownTops.setMatrixAt(index, dummy.matrix);
+    }
+
+    for (const mesh of [trunks, crowns, crownTops]) {
+      mesh.count = count;
+      mesh.castShadow = quality !== "low";
+      mesh.receiveShadow = true;
+      mesh.frustumCulled = true;
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingBox();
+      mesh.computeBoundingSphere();
+      parent.add(mesh);
+    }
+    if (crowns.instanceColor) crowns.instanceColor.needsUpdate = true;
   }
 
   function clearGroup(group) {
@@ -187,14 +229,16 @@ import * as THREE from "three";
 
     const random = seeded(27011);
     const treeCount = quality === "low" ? 38 : quality === "high" ? 105 : 68;
+    const terrainTrees = [];
     for (let i = 0; i < treeCount; i++) {
       const x = (random() - .5) * 96;
       const z = (random() - .5) * 72;
       // Keep the main roads and central settlement readable.
       if (Math.abs(x) < 9 && Math.abs(z) < 9) continue;
       if (Math.abs(z + 10) < 3 && x > -52 && x < 52) continue;
-      addTree(terrainRoot, x, z, .62 + random() * .58, i);
+      terrainTrees.push({ x, z, scale: .62 + random() * .58, variant: i });
     }
+    addTreeInstances(terrainRoot, terrainTrees);
 
     // A few ridges make the mountain belt visible even before a territory is selected.
     for (const [x, z, scale] of [[-42, -31, 1.5], [-30, 34, 1.25], [43, 28, 1.65], [47, -36, 1.15], [0, 37, .9]]) {
@@ -247,7 +291,7 @@ import * as THREE from "three";
     box(parent, .65, 1.05, .12, material, x + .5, y + .62, z + 1.1);
   }
 
-  function createTerritoryFeature(parent, territory) {
+  function createTerritoryFeature(parent, territory, forestTrees) {
     const x = Number(territory.x) || 0;
     const z = Number(territory.z) || 0;
     const y = terrainHeight(x, z);
@@ -272,9 +316,11 @@ import * as THREE from "three";
         cone(parent, .72 + i * .09, 1.55 + i * .25, shared.stone, rockX, y + 1.1 + i * .1, rockZ, 5);
       }
     } else if (territory.terrain === "forest") {
-      addTree(parent, x - .9, z - .1, .74, 2);
-      addTree(parent, x + .95, z + .45, .68, 3);
-      addTree(parent, x, z - 1.05, .62, 4);
+      forestTrees.push(
+        { x: x - .9, z: z - .1, scale: .74, variant: 2 },
+        { x: x + .95, z: z + .45, scale: .68, variant: 3 },
+        { x, z: z - 1.05, scale: .62, variant: 4 }
+      );
     } else {
       box(parent, 1.25, .58, 1.15, shared.food, x, y + .78, z);
       cone(parent, .9, .55, shared.roof, x, y + 1.32, z, 4);
@@ -291,7 +337,9 @@ import * as THREE from "three";
   function rebuildTerritories() {
     clearGroup(territoryRoot);
     const rows = Array.isArray(worldState?.territories) ? worldState.territories : [];
-    for (const territory of rows) createTerritoryFeature(territoryRoot, territory);
+    const forestTrees = [];
+    for (const territory of rows) createTerritoryFeature(territoryRoot, territory, forestTrees);
+    addTreeInstances(territoryRoot, forestTrees);
   }
 
   function rebuildRoads() {
