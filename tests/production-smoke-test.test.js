@@ -25,7 +25,7 @@ function successfulFetch() {
     if (path === "/api/game/state" || path === "/api/game/referral/link" || path === "/api/account/status") return makeResponse({ error: "Sessão inválida." }, 401);
     if (path === "/api/store/catalog") return makeResponse({ skins: [], packages: [] });
     if (path === "/arena.html") return makeResponse(
-      '<p>purchase-request manual_whatsapp https://wa.me/</p>',
+      '<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><p>purchase-request manual_whatsapp https://wa.me/</p>',
       200,
       "text/html; charset=utf-8"
     );
@@ -40,7 +40,7 @@ function successfulFetch() {
       "text/html; charset=utf-8"
     );
     if (path === "/kingdom.html") return makeResponse(
-      '<main><form id="feedbackForm"></form><script>trackAnalytics("kingdom.opened"); request("/game/analytics")</script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script></main>',
+      '<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><main><form id="feedbackForm"></form><script>trackAnalytics("kingdom.opened"); request("/game/analytics")</script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script></main>',
       200,
       "text/html; charset=utf-8"
     );
