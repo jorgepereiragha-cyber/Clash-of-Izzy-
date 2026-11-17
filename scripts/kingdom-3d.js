@@ -808,7 +808,7 @@ if (host && "WebGLRenderingContext" in window) {
     ktx2.setTranscoderPath("/vendor/three/examples/jsm/libs/basis/");
     ktx2.detectSupport(renderer);
     draco = new DRACOLoader();
-    draco.setDecoderPath("/vendor/three/examples/jsm/libs/draco/gltf/");
+    draco.setDecoderPath("/vendor/three/examples/jsm/libs/draco/");
     gltfLoader = new GLTFLoader();
     gltfLoader.setDRACOLoader(draco);
     gltfLoader.setKTX2Loader(ktx2);
