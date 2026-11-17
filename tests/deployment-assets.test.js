@@ -12,7 +12,7 @@ test("Cloudflare public assets exclude local tooling, tests, and database artifa
 });
 
 test("Cloudflare public assets exclude Node-only production and asset validation scripts", () => {
-  for (const pattern of ["scripts/production-smoke.js", "scripts/validate-3d-assets.js"]) {
+  for (const pattern of ["scripts/production-smoke.js", "scripts/validate-3d-assets.js", "scripts/diagnose-production-endpoint.js", "scripts/validate-core-loop.sh"]) {
     assert.ok(patterns.has(pattern), "missing assets exclusion: " + pattern);
   }
 });
