@@ -38,9 +38,10 @@ O Wrangler solicita o valor de cada segredo sem colocá-lo no repositório. Nunc
 
 ## Verificação após a publicação
 
-1. Abra `/api/admin/health` no domínio do Worker e confirme `hasDB`, `hasSESSION_SECRET`, `hasADMIN_EMAIL` e `hasADMIN_PASSWORD` como `true`.
-2. Abra o jogo e confirme que o status do reino não mostra “Modo demonstração”.
-3. Confirme que o endpoint `POST /api/game/start` cria um reino e que `GET /api/game/state`, com o token retornado, carrega o estado.
-4. Teste uma ação de jogo e o painel administrativo.
+1. Consulte `GET /api/health` e confirme que a API retorna `status: "ready"`, D1 conectado e schema completo.
+2. Confirme que `GET /api/admin/health` sem sessão retorna **HTTP 401**. Um token de jogador também deve receber 401.
+3. Faça login no painel Master por `POST /api/admin/login`; somente o Bearer token administrativo válido pode consultar `GET /api/admin/health` (HTTP 200).
+4. Abra o jogo, confirme que o status do reino não mostra “Modo demonstração” e valide uma ação de jogo.
+5. Teste o painel administrativo com a sessão Master. Não copie tokens para logs, issues ou mensagens públicas.
 
-O endpoint de saúde informa somente a presença das configurações; ele não revela os valores dos segredos.
+O endpoint administrativo informa apenas indicadores de configuração e exige autenticação Master; ele nunca deve ser usado como diagnóstico público.
