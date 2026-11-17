@@ -149,3 +149,21 @@ test("skin results are highlighted in the equipment catalog after navigation", a
   assert.ok(equipment.includes("matches[0].scrollIntoView"));
   assert.ok(equipment.includes("normalizeSearch(card.textContent).includes(needle)"));
 });
+
+
+test("global navigation caches successful searches briefly per session with bounded LRU memory", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes("const SEARCH_CACHE_TTL_MS = 10_000;"));
+  assert.ok(nav.includes("const SEARCH_CACHE_MAX_ENTRIES = 24;"));
+  assert.ok(nav.includes("const onlineSearchCache = new Map();"));
+  assert.ok(nav.includes("function getCachedOnlineResults(query, token)"));
+  assert.ok(nav.includes("if (cacheSessionToken !== token)"));
+  assert.ok(nav.includes("entry.expiresAt <= Date.now()"));
+  assert.ok(nav.includes("function cacheOnlineResults(query, token, items)"));
+  assert.ok(nav.includes("while (onlineSearchCache.size > SEARCH_CACHE_MAX_ENTRIES)"));
+  assert.ok(nav.includes("onlineSearchCache.keys().next().value"));
+  assert.ok(nav.includes("const cachedResults = getCachedOnlineResults(query,token)"));
+  assert.ok(nav.includes("if (cachedResults !== null)"));
+  assert.ok(nav.includes("cacheOnlineResults(query,token,items)"));
+  assert.ok(nav.includes("onlineSearchCache.clear()"));
+});
