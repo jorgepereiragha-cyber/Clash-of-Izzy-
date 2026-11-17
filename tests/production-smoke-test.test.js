@@ -20,7 +20,7 @@ function successfulFetch() {
       missingTables: [],
     });
     if (path === "/api/admin/health") return makeResponse({
-      hasDB: true, hasSESSION_SECRET: true, hasADMIN_EMAIL: true, hasADMIN_PASSWORD: true,
+      hasDB: true, hasSESSION_SECRET: true, hasADMIN_EMAIL: true, hasADMIN_PASSWORD: true, hasMercadoPagoAutomaticCheckout: false,
     });
     if (path === "/api/game/state" || path === "/api/game/referral/link" || path === "/api/account/status") return makeResponse({ error: "Sessão inválida." }, 401);
     if (path === "/api/store/catalog") return makeResponse({ skins: [], packages: [] });
@@ -45,7 +45,7 @@ function successfulFetch() {
       "text/html; charset=utf-8"
     );
     if (path === "/manifest.json") return makeResponse({ name: "Clash of Izzy" });
-    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v26"; const CORE_ASSETS=["/account.html","/styles/landing.css","/landing.js","/world-map-3d.js","/world-map-viewport.js","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/scripts/cinematic/capture-system.js","/scripts/cinematic/media-recorder-support.js","/scripts/cinematic/trailer-script.js","/scripts/cinematic/recorder-ui.js"];', 200, "text/javascript");
+    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v28"; const CORE_ASSETS=["/account.html","/styles/landing.css","/landing.js","/world-map-3d.js","/world-map-viewport.js","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/scripts/cinematic/capture-system.js","/scripts/cinematic/media-recorder-support.js","/scripts/cinematic/trailer-script.js","/scripts/cinematic/recorder-ui.js"];', 200, "text/javascript");
     if (path === "/styles/landing.css") return makeResponse("body{color:#fff}.landing-hero{display:grid}", 200, "text/css");
     if (path === "/landing.js") return makeResponse("function showInstallGuide(){} fetch(\"/api/game/referral/link\")", 200, "text/javascript");
     if (path.startsWith("/scripts/cinematic/")) return makeResponse(("export class CinematicCapture {} export const TRAILER_SCRIPT = {};").repeat(12), 200, "text/javascript");
@@ -68,6 +68,9 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.d1, true);
   assert.equal(result.checks.adminConfiguration, true);
   assert.equal(result.checks.mercadoPagoCheckout, true);
+  assert.equal(result.checks.mercadoPagoManualFallbackAvailable, true);
+  assert.equal(result.checks.mercadoPagoAutomaticCheckoutConfigured, false);
+  assert.equal(result.diagnostics.serviceWorkerCacheName, "clash-of-izzy-shell-v28");
   assert.equal(result.checks.betaSignupUi, true);
   assert.equal(result.checks.feedbackUiAndAnalytics, true);
   assert.equal(result.checks.staticPages, 9);

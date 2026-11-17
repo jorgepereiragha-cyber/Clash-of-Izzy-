@@ -114,7 +114,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div id="nicknameStatus" class="muted" role="status" aria-live="polite" style="margin-top:8px"></div>
 <form id="playerSearchForm" class="toolbar">
 <label for="playerSearchInput" class="muted">Encontrar jogadores</label>
-<input id="playerSearchInput" minlength="3" maxlength="20" autocomplete="off" placeholder="Digite o início do nickname" required style="min-width:180px;flex:1;padding:10px;border-radius:8px;border:1px solid #71839a;background:#0e1a2a;color:#fff">
+<input id="playerSearchInput" minlength="2" maxlength="48" autocomplete="off" placeholder="Digite o início do nickname" required style="min-width:180px;flex:1;padding:10px;border-radius:8px;border:1px solid #71839a;background:#0e1a2a;color:#fff">
 <button type="submit" class="secondary">🔎 Buscar</button>
 </form>
 <div id="playerSearchResults" class="events" aria-live="polite" style="margin-top:10px"></div>
@@ -368,15 +368,21 @@ async function searchPlayers(event){
  event.preventDefault();
  const query=document.getElementById("playerSearchInput").value.trim(),results=document.getElementById("playerSearchResults");
  results.replaceChildren();
+ if(Array.from(query).length<2){const hint=document.createElement("div");hint.className="event";hint.textContent="Digite pelo menos 2 caracteres para pesquisar.";results.append(hint);return;}
  const loading=document.createElement("div");loading.className="event";loading.textContent="Pesquisando jogadores…";results.append(loading);
  try{
-  const data=await request("/game/players/search?q="+encodeURIComponent(query));
+  const params=new URLSearchParams({q:query,type:"players",limit:"10"});
+  const data=await request("/game/search?"+params.toString());
+  const players=(data.results||[]).filter(item=>item.type==="player");
   results.replaceChildren();
-  if(!data.players?.length){const empty=document.createElement("div");empty.className="event";empty.textContent="Nenhum jogador encontrado. A busca considera o início do nickname.";results.append(empty);return;}
-  for(const player of data.players){
+  if(!players.length){const empty=document.createElement("div");empty.className="event";empty.textContent="Nenhum jogador encontrado. A busca considera prefixos, partes do nickname e pequenas variações de digitação.";results.append(empty);return;}
+  const summary=document.createElement("div");summary.className="muted";summary.textContent=players.length+" jogador(es) encontrado(s).";results.append(summary);
+  for(const player of players){
+   const nickname=String(player.nickname||player.name||"Jogador");
    const row=document.createElement("div");row.className="event";
-   const title=document.createElement("strong");title.textContent=player.nickname+" · "+player.kingdom_name;
-   const details=document.createElement("div");details.className="muted";details.textContent="Castelo nível "+player.castle_level+" · Poder "+Number(player.power||0).toLocaleString("pt-BR");
+   const title=document.createElement("strong");title.textContent=nickname+" · "+(player.kingdom_name||"Reino");
+   const allianceLabel=player.allianceTag?" · Aliança ["+player.allianceTag+"]":" · Sem aliança";
+   const details=document.createElement("div");details.className="muted";details.textContent="Castelo nível "+Number(player.castle_level||1)+" · Poder "+Number(player.power||0).toLocaleString("pt-BR")+allianceLabel;
    row.append(title,details);results.append(row);
   }
  }catch(error){results.replaceChildren();const message=document.createElement("div");message.className="event";message.textContent=error.message;results.append(message);}

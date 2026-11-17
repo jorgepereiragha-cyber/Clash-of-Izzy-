@@ -70,6 +70,7 @@ export async function runProductionSmokeTests({
   assert(admin.hasADMIN_EMAIL === true, "ADMIN_EMAIL não está configurado no Worker.");
   assert(admin.hasADMIN_PASSWORD === true, "ADMIN_PASSWORD não está configurado no Worker.");
   const emailProviderConfigured = admin.hasEmailProvider === true;
+  const mercadoPagoAutomaticCheckoutConfigured = admin.hasMercadoPagoAutomaticCheckout === true;
 
   const accountStatusResponse = await get("/api/account/status");
   assert(accountStatusResponse.status === 401, "O status da conta deve exigir sessão; recebido HTTP " + accountStatusResponse.status + ".");
@@ -176,10 +177,9 @@ export async function runProductionSmokeTests({
   const serviceWorkerResponse = await get("/sw.js");
   assert(serviceWorkerResponse.status === 200, "Service worker indisponível.");
   const serviceWorker = await serviceWorkerResponse.text();
-  assert(
-    /const\s+CACHE_NAME\s*=\s*["']clash-of-izzy-shell-v\d+["']/.test(serviceWorker),
-    "Service worker não declara um nome de cache versionado."
-  );
+  const serviceWorkerCacheMatch = serviceWorker.match(/const\s+CACHE_NAME\s*=\s*["'](clash-of-izzy-shell-v\d+)["']/);
+  assert(serviceWorkerCacheMatch, "Service worker não declara um nome de cache versionado.");
+  const serviceWorkerCacheName = serviceWorkerCacheMatch[1];
   assert(serviceWorker.includes("/account.html"), "PWA não inclui a página de conta persistente.");
   assert(serviceWorker.includes("/world-map-viewport.js"), "PWA não inclui o módulo de navegação do mapa.");
   assert(serviceWorker.includes("/world-map-3d.js"), "PWA não inclui o renderizador estratégico 3D.");
@@ -207,6 +207,8 @@ export async function runProductionSmokeTests({
       unauthenticatedAccessBlocked: true,
       storeCatalog: true,
       mercadoPagoCheckout: true,
+      mercadoPagoManualFallbackAvailable: true,
+      mercadoPagoAutomaticCheckoutConfigured,
       staticPages: REQUIRED_PAGES.length,
       pwaManifest: true,
       serviceWorker: true,
@@ -217,6 +219,9 @@ export async function runProductionSmokeTests({
       worldMapNavigation: true,
       worldMap3D: true,
       cinematicTrailerRecorder: true,
+    },
+    diagnostics: {
+      serviceWorkerCacheName,
     },
   };
 }

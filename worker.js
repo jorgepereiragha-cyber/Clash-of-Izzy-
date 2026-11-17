@@ -13,6 +13,7 @@ import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
 import { handleMercadoPagoRoute } from "./mercadopago-orders.js";
+import { handleLeaderboardRoute } from "./leaderboard.js";
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -1542,6 +1543,8 @@ export default {
     return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables},ready?200:503);
   }
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
+  // Ranking público, somente leitura; não cria sessão nem altera o estado dos reinos.
+  if(url.pathname==="/api/leaderboard")return await handleLeaderboardRoute(request,env,{json,rateLimitDecision});
   if(url.pathname.startsWith("/api/account/"))return await handlePlayerAccountRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   const mpRouteResponse=await handleMercadoPagoRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   if(mpRouteResponse)return mpRouteResponse;

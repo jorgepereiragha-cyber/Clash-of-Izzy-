@@ -23,24 +23,25 @@ A integração deve seguir estas regras:
 
 | Requisito do manual | Implementação a reutilizar | Estado verificado na `main` |
 |---|---|---|
-| Jogadores | `players` e identidade pública `player_id` | Existe; criação de reino usa sessão assinada. Não há conta persistente por senha. |
+| Jogadores | `players`, `player_accounts`, `player-accounts.js`, `account.html` | Conta persistente por senha já implementada e vinculada ao `players.id` existente; sessões continuam assinadas por `SESSION_SECRET`. O provedor de e-mail transacional ainda não está configurado na última verificação. |
 | Castelos e recursos | `kingdoms` | Existe; recursos, poder, nível e produção pertencem ao reino. |
 | Edifícios e upgrades | `kingdom_buildings` + `kingdom_queues` | Existe; filas persistentes e conclusão pelo Worker/Cron. |
 | Tropas | `army_units` | Existe; treinamento e consumo são validados no servidor. |
 | Alianças | `alliances`, `alliance_members`, convites e guerras | Existe; criação, ingresso, membros e operações sociais. |
 | Chat | `alliance_chat` | Existe como chat de aliança; não equivale a um chat global. |
-| Loja e pedidos | `purchase_requests` | Existe; pedido idempotente e aprovação pelo painel Master. |
+| Loja e pedidos | `purchase_requests`, `mercadopago_orders`, `mercadopago-orders.js` | Fallback manual e estrutura de checkout individual/webhook idempotente implementados no código. Na última verificação, `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` estavam ausentes; checkout automático não estava operacional em produção. |
 | Eventos | `kingdom_events`, `world_events` e módulos específicos | Existe; o Anjo da Morte está implementado em `angel-death-event.js`. |
 | Mapa mundial | `world_territories`, `marches`, rallies e UI do mapa | Existe; usa o mapa próprio, não um alerta “em breve”. |
 | Cena medieval 3D | `kingdom.html`, `scripts/kingdom-3d.js`, manifesto de assets | Existe; renderer Three.js com fallback e carregamento progressivo. |
-| PWA | `manifest.json` e `sw.js` | Existe; shell atual usa cache v23. |
+| PWA | `manifest.json` e `sw.js` | Existe. Último smoke público: cache v26. Branch candidata deste PR: cache v28, incluindo Salão da Coroa; só passa a produção após merge, deploy e novo smoke test. |
 | Deploy | `wrangler.jsonc` e workflows em `.github/workflows/` | Existe; pipeline aplica migrações, publica Worker/assets e executa smoke test. |
+| Ranking global | `leaderboard.js`, `ranking.html`, `ranking.js` | Branch candidata: API pública somente de leitura, paginada e limitada por IP, com ranking de reinos e alianças. Não requer nova tabela D1. |
 
 ## 3. Ordem de aplicação
 
 ### Fase 1 — Banco de dados D1
 
-**Aplicado na arquitetura existente:** o banco usa migrações em `migrations/`, atualmente documentadas até `0022` na branch `main`.
+**Aplicado na arquitetura existente:** o banco usa migrações incrementais numeradas em `migrations/`, incluindo as entregas posteriores de contas e pedidos Mercado Pago. Consulte os arquivos do repositório e `wrangler d1 migrations list` para o estado exato; não presuma que o maior número no Git prova a aplicação no D1 remoto.
 
 Correspondência dos nomes do exemplo:
 
@@ -67,7 +68,7 @@ Rotas e contratos já existentes:
 
 Ações de construção, treinamento, pesquisa, marchas, alianças, combate e evento devem continuar integradas ao contrato de ação existente. Não criar uma segunda API simplificada para alterar diretamente recursos ou níveis.
 
-**Pendência funcional identificada:** o início atual cria uma sessão de jogo persistente no dispositivo, mas não é um sistema de conta com nome de usuário e senha. Uma camada de conta deve ser adicionada como migração e rotas incrementais, vinculando a conta à identidade `players.id` existente. O cadastro/login deve permitir recuperar o mesmo reino em outro dispositivo e não pode gerar uma segunda identidade para uma conta já cadastrada.
+**Estado corrigido:** cadastro/login persistente já está implementado em `player-accounts.js`, com migração própria e vínculo à identidade existente `players.id`; `/api/account/register`, `/api/account/login` e `/api/account/status` reutilizam o token assinado do jogo e a versão de sessão da conta. Recuperação e verificação por e-mail dependem de um provedor transacional, que estava ausente na última verificação. Não criar uma segunda identidade ou outro sistema de sessão.
 
 ### Fase 3 — Interface do jogo
 
@@ -82,7 +83,7 @@ Arquivos e telas existentes:
 
 Não trocar a cena 3D existente por uma caixa dourada de demonstração nem substituir a interface atual por um HUD paralelo. Os controles novos devem usar os dados retornados pela API e padrões visuais compartilhados.
 
-**Pendências de interface:** adicionar telas de cadastro/login quando a camada de conta estiver pronta; avaliar um canal de chat mundial separado do chat de aliança; manter os estados “carregando”, “sem conexão”, “erro” e “tentativa novamente”.
+**Estado e pendências de interface:** as telas de cadastro/login já existem. O chat atual é de aliança; ainda falta um canal mundial separado. Esta branch candidata adiciona o Salão da Coroa, com ranking de reinos e alianças. Manter os estados “carregando”, “sem conexão”, “erro” e “tentar novamente” nas novas telas.
 
 ### Fase 4 — PWA
 
@@ -94,19 +95,18 @@ O manifesto já abre o reino em `/kingdom.html`. O Service Worker usa cache vers
 
 ### Fase 5 — Mercado Pago
 
-**Estado atual:** a loja abre o link hospedado compartilhado `https://link.mercadopago.com.br/pagamentosskin`. O pedido é gravado em `purchase_requests`; o painel Master confere o recebimento e aprova a liberação de gemas/skins uma única vez.
+**Estado do código:** `mercadopago-orders.js` já implementa checkout individual pela API Orders, referência externa do pedido, idempotência, verificação da assinatura do webhook e consulta do pedido na API antes da liberação. O fluxo Master/link manual permanece disponível como fallback operacional.
 
-**Webhook automático ainda não está implementado.** O exemplo enviado pressupõe que cada pagamento tenha `external_reference` vinculado ao jogador, mas o link compartilhado não fornece essa associação individual. Não aceitar `payment_reference` digitado pelo usuário como prova de pagamento e não creditar gemas apenas porque o navegador informou que pagou.
+**Estado da produção na última verificação:** `mercadoPagoManualFallbackAvailable=true` e `mercadoPagoAutomaticCheckoutConfigured=false`. Portanto, a presença do módulo no repositório não significa que o checkout automático esteja ativo no Worker publicado.
 
-Para ativar confirmação automática com segurança, a próxima implementação deverá:
-1. Criar uma preferência/checkout individual pela API do Mercado Pago para cada `purchase_requests.id`.
-2. Enviar identificador opaco e não adivinhável como referência externa do pedido.
-3. Validar a assinatura oficial do webhook e buscar o pagamento diretamente na API do Mercado Pago.
-4. Conferir valor, moeda, status, referência externa e pedido ainda elegível.
-5. Aplicar crédito/liberação com idempotência no D1, de modo que notificações repetidas não dupliquem recompensas.
-6. Manter a aprovação Master como fallback administrativo auditável até validar o fluxo automático de ponta a ponta.
+Para ativar a confirmação automática:
+1. Configurar `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` diretamente como secrets do Worker Cloudflare.
+2. Configurar a URL oficial do webhook no painel Mercado Pago para o endpoint implementado.
+3. Validar em ambiente de teste uma compra individual, assinatura, status, moeda, valor e referência externa.
+4. Confirmar que o D1 registra o pedido e só libera o item uma vez, inclusive com webhook repetido.
+5. Executar smoke test e conferir o indicador `hasMercadoPagoAutomaticCheckout` no endpoint administrativo sem expor os valores dos secrets.
 
-Essa etapa depende de secrets reais configurados diretamente no Worker, nunca gravados no Git ou em arquivos públicos. Não substituir o link atual antes de o checkout individual, webhook e testes estarem funcionais.
+Nunca grave secrets em Git, HTML, logs ou mensagens. Não desligue o fallback Master antes de confirmar o ciclo completo com uma compra controlada.
 
 ### Fase 6 — Publicação e verificação
 
@@ -126,7 +126,7 @@ Bindings e segredos atuais documentados:
 - `ADMIN_EMAIL` e `ADMIN_PASSWORD`: painel Master;
 - `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`: GitHub Actions.
 
-Os nomes `JWT_SECRET`, `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` do exemplo não devem ser declarados como se já estivessem configurados. Só serão adicionados quando a implementação de conta/JWT ou o checkout/webhook correspondente os consumir.
+`MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` são consumidos pelo módulo de checkout Mercado Pago, mas estavam ausentes na última verificação de produção. O provedor transacional também estava ausente. Configure somente no painel de secrets do serviço correspondente; nunca os adicione ao repositório.
 
 ## 4. Escopo já existente e trabalho posterior
 
@@ -138,15 +138,15 @@ Os nomes `JWT_SECRET`, `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` do exemplo não d
 - Heróis, equipamentos, forja e bônus calculados no servidor.
 - Mascotes e efeitos passivos.
 - Evento mundial Anjo da Morte e ranking de pontuação do evento.
-- Loja de pacotes/skins com Mercado Pago por link e aprovação Master.
+- Loja de pacotes/skins com fallback Mercado Pago por link/aprovação Master e código de checkout individual/webhook automático, ainda sem secrets de produção.
 - Cidade 3D, mapa mundial, fallback, manifesto 3D e PWA.
 - Painel Master, limites de requisição, analytics, feedback e inscrições beta.
 
 ### Próximas entregas em ordem segura
-1. **Contas de jogador:** cadastro/login por senha vinculado a `players.id`, com recuperação de conta e testes de sessão entre dispositivos.
-2. **Mercado Pago automático:** checkout individual, webhook validado e crédito idempotente; manter o fluxo Master como fallback.
+1. **Finalizar contas de jogador:** validar recuperação e envio real de e-mail depois de configurar o provedor transacional; cadastro/login persistente já está implementado.
+2. **Ativar Mercado Pago automático:** configurar secrets e validar compra/webhook; o código existe e o fallback Master deve ser mantido.
 3. **Chat mundial:** canal global com limites, paginação, retenção e moderação; sem misturar mensagens globais com `alliance_chat`.
-4. **Ranking global de poder:** endpoint autenticado/público com ordenação e paginação, distinto do ranking do evento.
+4. **Validar ranking competitivo:** a branch candidata já inclui ranking público paginado de reinos e alianças; conferir dados reais depois de deploy.
 5. **Push notifications:** assinatura VAPID, armazenamento de subscriptions, consentimento, remoção de endpoints inválidos e entrega acionada por eventos reais.
 6. **Arte 3D final:** ampliar e validar modelos de edifícios, tropas e heróis em dispositivos móveis; os GLBs atuais são base, não o catálogo artístico final.
 7. **Teste de lançamento:** smoke test de produção, cadastro/recuperação de conta, construção, treino, aliança, evento, loja e instalação PWA em Android e desktop.
