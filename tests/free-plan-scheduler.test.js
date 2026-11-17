@@ -46,10 +46,12 @@ test("kingdom state groups its 14 independent D1 reads into one invocation batch
   const batchEnd = state.indexOf("]);", batchStart);
   assert.ok(batchStart >= 0 && batchEnd > batchStart, "game state reads must be grouped in one D1 batch");
   const batch = state.slice(batchStart, batchEnd);
-  assert.equal(batch.split("env.DB.prepare(").length - 1, 14);
+  assert.equal(batch.split("env.DB.prepare(").length - 1, 15);
   assert.ok(state.includes("const fresh=stateResults[0]?.results?.[0]||null"));
-  assert.ok(state.includes("const recentEvents=stateResults[12],queues=stateResults[13]"));
+  assert.ok(state.includes("const recentEvents=stateResults[12],queues=stateResults[13],castleSkins=stateResults[14]"));
   assert.ok(!batch.includes("await Promise.all(["));
+  assert.ok(state.includes("const [pendingInvites,alliance]=await env.DB.batch(["));
+  assert.ok(state.includes("const [members,chat,invites,wars]=await env.DB.batch(["));
 });
 
 test("derived kingdom capacity and power calculations batch their independent D1 reads", async () => {
