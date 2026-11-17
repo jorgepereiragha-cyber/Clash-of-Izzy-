@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "../scripts/kingdom-quality.js";
+import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler } from "../scripts/kingdom-quality.js";
 
 const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
@@ -302,4 +302,24 @@ test("3D army and shader animation pauses while the kingdom is hidden or offscre
   assert.match(renderer, /sceneVisibilityObserver\?\.disconnect\(\)/);
   assert.match(renderer, /document\.removeEventListener\("visibilitychange", visibilityChangeHandler\)/);
   assert.match(renderer, /!cinematicCaptureActive/);
+});
+
+
+test("animation frame sampler keeps a bounded p50/p95 window and ignores invalid samples", () => {
+  const sampler = createFrameTimingSampler(3);
+  for (const interval of [16, 18, 17, 40]) sampler.record(interval);
+  assert.deepEqual(sampler.snapshot(), { sampleCount: 3, p50Ms: 18, p95Ms: 40 });
+
+  sampler.record(Number.NaN);
+  sampler.record(-5);
+  assert.deepEqual(sampler.snapshot(), { sampleCount: 3, p50Ms: 18, p95Ms: 40 });
+
+  sampler.reset();
+  assert.deepEqual(sampler.snapshot(), { sampleCount: 0, p50Ms: null, p95Ms: null });
+});
+
+test("kingdom diagnostics expose bounded requestAnimationFrame intervals, not a GPU FPS claim", () => {
+  assert.match(renderer, /animationFrameTiming\.record\(timestamp - lastAnimationTime\)/);
+  assert.match(renderer, /animationLoop: \{[\s\S]*?active: Boolean\(animationFrame\),[\s\S]*?\.\.\.animationFrameTiming\.snapshot\(\)/);
+  assert.match(renderer, /const animationFrameTiming = createFrameTimingSampler\(120\)/);
 });
