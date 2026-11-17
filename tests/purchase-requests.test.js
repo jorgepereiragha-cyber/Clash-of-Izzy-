@@ -12,8 +12,8 @@ test("purchase requests require a valid player session and a stable idempotency 
   assert.ok(worker.includes("purchase-request-player"));
   assert.ok(worker.includes("requestKey"));
   assert.ok(worker.includes("payment_method,payment_reference,request_key"));
-  assert.ok(worker.includes('requestedPaymentMethod!=="mercadopago_link"'));
-  assert.ok(worker.includes('const paymentMethod="mercadopago_link"'));
+  assert.ok(worker.includes('requestedPaymentMethod!=="manual_whatsapp"'));
+  assert.ok(worker.includes('const paymentMethod="manual_whatsapp"'));
 });
 
 test("Master approval queue is protected by admin session and grants packages only once", async () => {
@@ -27,21 +27,21 @@ test("Master approval queue is protected by admin session and grants packages on
   assert.ok(worker.includes("changes()=1 AND EXISTS(SELECT 1 FROM purchase_requests"));
   assert.ok(worker.includes("INSERT OR IGNORE INTO player_skins"));
   assert.ok(admin.includes("refreshPurchaseRequests"));
-  assert.ok(admin.includes("Confirmar pagamento e liberar"));
+  assert.ok(admin.includes("✓ Liberar pacote"));
   assert.ok(admin.includes("payment_reference"));
   assert.ok(admin.includes("setInterval(()=>"));
 });
 
-test("official store submits an auditable payment request instead of opening WhatsApp", async () => {
+test("official store submits an auditable payment request and opens WhatsApp", async () => {
   const arena = await read("arena.html");
   assert.ok(arena.includes("/store/purchase-request"));
   assert.ok(arena.includes("requestOfficialPurchase"));
   assert.ok(arena.includes("Pedido #"));
-  assert.ok(arena.includes('id="purchaseMethod"'));
-  assert.ok(arena.includes('id="purchaseReference"'));
-  assert.ok(arena.includes("https://link.mercadopago.com.br/pagamentosskin"));
+  assert.ok(arena.includes('id="manual_whatsapp"'));
+  assert.ok(arena.includes('id="manual_whatsapp"'));
+  assert.ok(arena.includes("https://wa.me/"));
   assert.ok(arena.includes("Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis."));
-  assert.ok(arena.includes("mercadopago_link"));
+  assert.ok(arena.includes("manual_whatsapp"));
   assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i);
   assert.ok(arena.includes('id="whatsapp"'));
 });
