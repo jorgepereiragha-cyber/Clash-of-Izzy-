@@ -149,8 +149,6 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       "SESSION_SECRET:" + SESSION_SECRET,
       "ADMIN_EMAIL:" + ADMIN_EMAIL,
       "ADMIN_PASSWORD:" + ADMIN_PASSWORD,
-      "--var",
-      "PVP_DEBUG:1",
       "--log-level", "error",
     ], {
       cwd: root,
@@ -840,6 +838,13 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         item.territory_kind === "castle" && Number(item.owner_kingdom_id) === kingdomB
       );
       assert.ok(enemyCastle?.id, "o castelo do adversário é localizável pelo mapa");
+      const ownCastleRows = rowsFromD1Json(await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir, "--json",
+        "--command", "SELECT id FROM world_territories WHERE territory_kind='castle' AND owner_kingdom_id=" + kingdomA + " LIMIT 1;",
+      ]));
+      const ownCastleId = Number(ownCastleRows[0]?.id);
+      assert.ok(ownCastleId > 0, "castelo próprio existe no mapa persistido");
       const militiaBefore = stateA.troops
         .filter(unit => unit.unit_type === "militia" && Number(unit.tier) === 1)
         .reduce((sum, unit) => sum + Number(unit.quantity || 0), 0);
@@ -847,6 +852,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const defenderTotalBefore = stateB.troops.reduce((sum, unit) => sum + Number(unit.quantity || 0), 0);
       assert.ok(defenderTotalBefore > 0, "o defensor tem guarnição real");
 
+      await action(tokenA, { type: "march", targetId: ownCastleId, marchType: "attack", units: { militia: 1 } }, 409, "bloqueio de autoataque");
       await runCli([
         "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
         "--local", "--persist-to", persistDir,
@@ -859,15 +865,40 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         "--command", "UPDATE kingdoms SET protection_until=NULL WHERE id=" + kingdomB + ";",
       ]);
 
+      await action(tokenA, { type: "march", targetId: enemyCastle.id, marchType: "attack", units: { militia: 1 } }, 200, "marcha PvP emitida antes da proteção");
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdoms SET protection_until=datetime('now','+1 day') WHERE id=" + kingdomB + ";",
+      ]);
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE marches SET arrives_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 seconds') WHERE id=(SELECT MAX(id) FROM marches WHERE kingdom_id=" + kingdomA + " AND target_territory_id=" + Number(enemyCastle.id) + " AND march_type='attack' AND status='marching');",
+      ]);
+      const protectedArrivalState = await api("/api/game/state", { token: tokenA });
+      assert.equal(protectedArrivalState.status, 200, "cancelamento PvP sob proteção: " + JSON.stringify(protectedArrivalState.data));
+      const protectedMilitia = protectedArrivalState.data.state.troops
+        .filter(unit => unit.unit_type === "militia" && Number(unit.tier) === 1)
+        .reduce((sum, unit) => sum + Number(unit.quantity || 0), 0);
+      assert.equal(protectedMilitia, militiaBefore, "tropas são devolvidas quando a proteção é ativada durante a marcha");
+      assert.equal(protectedArrivalState.data.state.battleReports.filter(report => report.battle_type === "territory_pvp").length, 0,
+        "uma marcha cancelada por proteção não cria relatório de combate");
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdoms SET protection_until=NULL WHERE id=" + kingdomB + ";",
+      ]);
+
       await action(tokenA, { type: "march", targetId: enemyCastle.id, marchType: "attack", units: { militia: 1 } }, 200, "marcha PvP válida");
       await runCli([
         "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
         "--local", "--persist-to", persistDir,
-        "--command", "UPDATE marches SET arrives_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 seconds') WHERE kingdom_id=" + kingdomA + " AND target_territory_id=" + Number(enemyCastle.id) + " AND march_type='attack' AND status='marching';",
+        "--command", "UPDATE marches SET arrives_at=strftime('%Y-%m-%dT%H:%M:%fZ','now','-1 seconds') WHERE id=(SELECT MAX(id) FROM marches WHERE kingdom_id=" + kingdomA + " AND target_territory_id=" + Number(enemyCastle.id) + " AND march_type='attack' AND status='marching');",
       ]);
 
       const resolvedAttackerState = await api("/api/game/state", { token: tokenA });
-      assert.equal(resolvedAttackerState.status, 200, "estado após resolução PvP: " + JSON.stringify(resolvedAttackerState.data) + "\\nWorker output: " + workerOutput);
+      assert.equal(resolvedAttackerState.status, 200, "estado após resolução PvP: " + JSON.stringify(resolvedAttackerState.data));
       stateA = resolvedAttackerState.data.state;
       assert.ok(stateA?.battleReports, "Worker retorna relatório ao atacante");
       const pvpReportsA = stateA.battleReports.filter(report => report.battle_type === "territory_pvp");
