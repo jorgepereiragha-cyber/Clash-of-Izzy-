@@ -87,15 +87,20 @@ function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, met
   }
 }
 
-export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, infantryAttackBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1 }) {
+export function simulateBattle({ army, defenderArmy, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, attackerDefenseBonusPercent, defenderDefenseBonusPercent = 0, defenderAttackBonusPercent = 0, defenderHealthBonusPercent = 0, defenderInfantryAttackBonusPercent = 0, defenderHeroLevel = 1, defenderDragonLevel = 1, defenderResearchLevel = 0, defenderCriticalChancePercent = 0, defenderCriticalSeed = 1, defenderCriticalDamageMultiplier = 1.5, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, infantryAttackBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, defenderCastlePowerBonusPercent = 0, roll = 1 }) {
   const attackers = (army || [])
     .filter(row => Number(row.quantity) > 0)
     .map((row, index) => makeStack(row, "attacker", index));
-  const defenseBonus = clamp(Number(defenseBonusPercent) || 0, 0, 30);
+  const defenseBonus = clamp(Number(attackerDefenseBonusPercent ?? defenseBonusPercent) || 0, 0, 30);
+  const defenderDefenseBonus = clamp(Number(defenderDefenseBonusPercent) || 0, 0, 30);
   const attackGearBonus = clamp(Number(equipmentAttackBonusPercent) || 0, 0, 30) / 100;
   const infantryAttackBonus = clamp(Number(infantryAttackBonusPercent) || 0, 0, 30) / 100;
   const healthGearBonus = clamp(Number(equipmentHealthBonusPercent) || 0, 0, 30) / 100;
   const castlePowerBonus = clamp(Number(castlePowerBonusPercent ?? castleLevel) || 0, 0, 30) / 100;
+  const defenderCastleBonus = clamp(Number(defenderCastlePowerBonusPercent) || 0, 0, 30) / 100;
+  const defenderAttackBonus = clamp(Number(defenderAttackBonusPercent) || 0, 0, 30) / 100;
+  const defenderHealthBonus = clamp(Number(defenderHealthBonusPercent) || 0, 0, 30) / 100;
+  const defenderInfantryBonus = clamp(Number(defenderInfantryAttackBonusPercent) || 0, 0, 30) / 100;
   for (const stack of attackers) {
     stack.defenseBonusPercent = defenseBonus;
     const isInfantry = ["militia", "swordsman", "spearman"].includes(stack.key);
@@ -106,15 +111,29 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   if (!attackers.length) throw new Error("Exército vazio.");
 
   const level = clamp(Math.floor(Number(defenderLevel) || 1), 1, 30);
-  const defenders = [
-    makeStack({ unit_type: "militia", tier: Math.max(1, Math.ceil(level / 8)), quantity: 18 + level * 7 }, "defender", 0),
-    makeStack({ unit_type: "archer", tier: Math.max(1, Math.ceil(level / 10)), quantity: 5 + level * 3 }, "defender", 1),
-    ...(level >= 10 ? [makeStack({ unit_type: "knight", tier: Math.max(1, Math.ceil(level / 12)), quantity: Math.floor(level / 2) }, "defender", 2)] : [])
-  ];
+  const defenders = Array.isArray(defenderArmy)
+    ? defenderArmy
+      .filter(row => Number(row?.quantity) > 0)
+      .map((row, index) => makeStack(row, "defender", index))
+    : [
+      makeStack({ unit_type: "militia", tier: Math.max(1, Math.ceil(level / 8)), quantity: 18 + level * 7 }, "defender", 0),
+      makeStack({ unit_type: "archer", tier: Math.max(1, Math.ceil(level / 10)), quantity: 5 + level * 3 }, "defender", 1),
+      ...(level >= 10 ? [makeStack({ unit_type: "knight", tier: Math.max(1, Math.ceil(level / 12)), quantity: Math.floor(level / 2) }, "defender", 2)] : [])
+    ];
+  for (const stack of defenders) {
+    stack.defenseBonusPercent = defenderDefenseBonus;
+    const isInfantry = ["militia", "swordsman", "spearman"].includes(stack.key);
+    stack.power = stack.power * (1 + defenderCastleBonus) * (1 + defenderAttackBonus) * (isInfantry ? (1 + defenderInfantryBonus) : 1);
+    stack.hpPerUnit = Math.floor(stack.hpPerUnit * (1 + defenderCastleBonus) * (1 + defenderHealthBonus));
+    stack.hp = stack.quantity * stack.hpPerUnit;
+  }
 
   const heroBonus = clamp(Number(heroLevel) || 1, 1, 100) * 1.5;
   const dragonBonus = clamp(Number(dragonLevel) || 1, 1, 100) * 2;
   const techBonus = clamp(Number(researchLevel) || 0, 0, 30) * 2.5;
+  const defenderHeroBonus = Math.max(0, clamp(Number(defenderHeroLevel) || 1, 1, 100) - 1) * 1.5;
+  const defenderDragonBonus = Math.max(0, clamp(Number(defenderDragonLevel) || 1, 1, 100) - 1) * 2;
+  const defenderTechBonus = clamp(Number(defenderResearchLevel) || 0, 0, 30) * 2.5;
   const multiplier = clamp(Number(roll) || 1, 0.85, 1.15);
   const log = [];
   const metrics = { criticalHits: 0 };
@@ -123,18 +142,23 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
     multiplier: clamp(Number(criticalDamageMultiplier) || 1.5, 1.25, 2.5),
     seed: Number(criticalSeed) >>> 0
   };
+  const defenderCritical = {
+    chance: clamp(Number(defenderCriticalChancePercent) || 0, 0, 100),
+    multiplier: clamp(Number(defenderCriticalDamageMultiplier) || 1.5, 1.25, 2.5),
+    seed: Number(defenderCriticalSeed) >>> 0
+  };
   let rounds = 0;
 
   for (let round = 1; round <= 30; round++) {
     rounds = round;
     attackPhase(attackers, defenders, round, log, heroBonus + dragonBonus + techBonus, critical, metrics);
-    attackPhase(defenders, attackers, round, log, 0, {}, metrics);
+    attackPhase(defenders, attackers, round, log, defenderHeroBonus + defenderDragonBonus + defenderTechBonus, defenderCritical, metrics);
     if (!attackers.some(alive) || !defenders.some(alive)) break;
   }
 
   // Aplica uma pequena variação de campanha ao relatório, sem alterar HP persistido.
   const attackerPower = Math.max(1, Math.floor(attackers.reduce((sum, u) => sum + u.initialQuantity * u.power, 0) + heroBonus * 8 + dragonBonus * 8 + techBonus * 8));
-  const defenderPower = Math.max(1, Math.floor(defenders.reduce((sum, u) => sum + (u.initialQuantity * u.power), 0)));
+  const defenderPower = Math.max(1, Math.floor(defenders.reduce((sum, u) => sum + (u.initialQuantity * u.power), 0) + defenderHeroBonus * 8 + defenderDragonBonus * 8 + defenderTechBonus * 8));
   const attackersAlive = attackers.some(alive);
   const defendersAlive = defenders.some(alive);
   const won = attackersAlive && (!defendersAlive || (rounds >= 30 && attackerPower * multiplier >= defenderPower * 1.35));
@@ -144,9 +168,16 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
     const lost = clamp(unit.initialQuantity - unit.quantity, 0, unit.initialQuantity);
     losses[unit.key] = (losses[unit.key] || 0) + lost;
   }
+  const defenderLosses = {};
+  for (const unit of defenders) {
+    const lost = clamp(unit.initialQuantity - unit.quantity, 0, unit.initialQuantity);
+    defenderLosses[unit.key] = (defenderLosses[unit.key] || 0) + lost;
+  }
   return {
     won, rounds, attackerPower: Math.floor(attackerPower * multiplier), defenderPower,
-    losses, log, criticalHits: metrics.criticalHits, survivors: attackers.reduce((sum, unit) => sum + unit.quantity, 0)
+    losses, defenderLosses, log, criticalHits: metrics.criticalHits,
+    survivors: attackers.reduce((sum, unit) => sum + unit.quantity, 0),
+    defenderSurvivors: defenders.reduce((sum, unit) => sum + unit.quantity, 0)
   };
 }
 
