@@ -17,7 +17,6 @@ test("launch keeps one kingdom per player and resumes an authenticated kingdom",
 test("the launch store exposes only six paid skins and blocks new requests for unreleased skins", async () => {
   const worker = await read("worker.js");
   assert.ok(worker.includes("const INITIAL_PAID_SKIN_LIMIT = 6"));
-  assert.ok(worker.includes("ORDER BY id LIMIT ?").includes === undefined ? true : true);
   assert.ok(worker.includes("skin_edition:\"initial\",skin_limit:INITIAL_PAID_SKIN_LIMIT"));
   assert.ok(worker.includes("WHERE id=? AND id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
   assert.ok(worker.includes("WHERE name=? AND id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
@@ -27,6 +26,7 @@ test("the launch store exposes only six paid skins and blocks new requests for u
 
 test("global search filters unreleased paid skins from FTS and fallback queries", async () => {
   const worker = await read("worker.js");
-  assert.equal((worker.match(/d\\.entity_type<>'skin' OR CAST\\(d\\.entity_key AS INTEGER\\) IN \\(SELECT id FROM skins ORDER BY id LIMIT \\?\\)/g) || []).length, 3);
+  const filter = "d.entity_type<>'skin' OR CAST(d.entity_key AS INTEGER) IN (SELECT id FROM skins ORDER BY id LIMIT ?)";
+  assert.equal(worker.split(filter).length - 1, 3);
   assert.ok(worker.includes("SELECT name FROM skins WHERE id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
 });
