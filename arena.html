@@ -602,6 +602,11 @@ async function loadCatalog(){
  try{
   const res=await fetch('/api/store/catalog');if(!res.ok)throw new Error('Catálogo indisponível');
   const data=await res.json();box.replaceChildren();
+  if(data.skin_edition==="initial"&&Number(data.skin_limit)>0){
+   const note=document.createElement('p');note.className='muted';
+   note.textContent='Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis. Novas coleções serão liberadas em futuras atualizações.';
+   box.appendChild(note);
+  }
   const entries=[...(data.packages||[]).map(x=>({...x,kind:'Pacote VIP',productKind:'vip_package'})),...(data.skins||[]).map(x=>({...x,kind:'Skin',productKind:'skin'}))];
   if(!entries.length){box.textContent='Nenhum item cadastrado no catálogo neste momento.';return}
   for(const item of entries){
