@@ -28,6 +28,16 @@ jobs:
         run: node --check sw.js
       - name: Validate 3D asset manifest and local GLB files
         run: npm run assets:validate
+      - name: Benchmark Draco and Meshopt variants without replacing originals
+        run: npm run assets:optimize
+      - name: Archive 3D optimization comparison
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: 3d-asset-compression-report
+          path: node_modules/.cache/clash-of-izzy/3d-optimization/
+          if-no-files-found: ignore
+          retention-days: 14
       - name: Test gameplay rules and Worker-D1 integration
         run: npm test
       - name: Install Playwright Chromium
