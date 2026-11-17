@@ -133,7 +133,7 @@ import * as THREE from "three";
     const crownTopGeometry = new THREE.ConeGeometry(.48, .95, 6);
     const trunks = new THREE.InstancedMesh(trunkGeometry, shared.trunk, count);
     const crowns = new THREE.InstancedMesh(crownGeometry, shared.forest, count);
-    const crownTops = new THREE.InstancedMesh(crownTopGeometry, shared.forestLight, count);
+    const crownTops = new THREE.InstancedMesh(crownTopGeometry, shared.forest, count);
     const dummy = new THREE.Object3D();
     const neutralTint = new THREE.Color(1, 1, 1);
     const lightTint = new THREE.Color().setRGB(
