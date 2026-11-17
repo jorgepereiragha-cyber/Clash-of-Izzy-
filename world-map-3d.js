@@ -34,8 +34,6 @@ import * as THREE from "three";
   let valhallaAuroraLight = null;
   let worldHemisphereLight = null;
   let worldSunLight = null;
-  let worldTreeInstanceCount = 0;
-  let worldTreeBatchCount = 0;
 
   function setValhallaMode(active) {
     valhallaModeActive = Boolean(active);
@@ -130,14 +128,15 @@ import * as THREE from "three";
     if (!Array.isArray(trees) || !trees.length) return;
 
     const count = trees.length;
-    worldTreeInstanceCount = count;
-    worldTreeBatchCount = 3;
     const trunkGeometry = new THREE.CylinderGeometry(.13, .18, .85, 5);
     const crownGeometry = new THREE.ConeGeometry(.72, 1.35, 6);
     const crownTopGeometry = new THREE.ConeGeometry(.48, .95, 6);
     const trunks = new THREE.InstancedMesh(trunkGeometry, shared.trunk, count);
     const crowns = new THREE.InstancedMesh(crownGeometry, shared.forest, count);
     const crownTops = new THREE.InstancedMesh(crownTopGeometry, shared.forest, count);
+    trunks.name = "world-tree-trunks";
+    crowns.name = "world-tree-crowns";
+    crownTops.name = "world-tree-crown-tops";
     const dummy = new THREE.Object3D();
     const neutralTint = new THREE.Color(1, 1, 1);
     const lightTint = new THREE.Color().setRGB(
@@ -451,13 +450,22 @@ import * as THREE from "three";
   function getDiagnostics() {
     if (!renderer) return null;
     const info = renderer.info;
+    let treeInstances = 0;
+    let treeBatches = 0;
+    worldRoot.traverse(node => {
+      if (!node.isInstancedMesh || !node.name.startsWith("world-tree-")) return;
+      treeBatches++;
+      // Each forest group has exactly one trunk batch, whose count is the
+      // number of logical trees. Crown batches must not be double-counted.
+      if (node.name === "world-tree-trunks") treeInstances += node.count;
+    });
     return {
       drawCalls: info.render.calls,
       triangles: info.render.triangles,
       geometries: info.memory.geometries,
       textures: info.memory.textures,
-      treeInstances: worldTreeInstanceCount,
-      treeBatches: worldTreeBatchCount,
+      treeInstances,
+      treeBatches,
       quality
     };
   }
