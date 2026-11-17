@@ -146,9 +146,10 @@ export async function runProductionSmokeTests({
   const arenaResponse = await get("/arena.html");
   assert(arenaResponse.status === 200, "Página da arena respondeu HTTP " + arenaResponse.status + ".");
   const arena = await arenaResponse.text();
-  assert(arena.includes('value="mercadopago_link"'), "A opção Mercado Pago não está ativa na loja publicada.");
-  assert(arena.includes("https://link.mercadopago.com.br/pagamentosskin"), "O link Mercado Pago não está presente na loja publicada.");
-  assert(arena.includes("paymentWindow"), "O fluxo de abertura do checkout Mercado Pago não está disponível.");
+  assert(arena.includes("purchase-request"), "A loja não registra pedidos manuais.");
+  assert(arena.includes("manual_whatsapp"), "A loja não usa o fluxo manual por WhatsApp.");
+  assert(arena.includes("https://wa.me/"), "O redirecionamento para o WhatsApp não está disponível.");
+  assert(!/store\/checkout|link\.mercadopago/i.test(arena), "A loja ainda oferece checkout Mercado Pago.");
   assert(!/<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i.test(arena), "A loja ainda oferece um método de pagamento desativado.");
 
   const mapHelperResponse = await get("/world-map-viewport.js");
@@ -200,7 +201,7 @@ export async function runProductionSmokeTests({
       adminHealthAuthBoundary: true,
       unauthenticatedAccessBlocked: true,
       storeCatalog: true,
-      mercadoPagoCheckout: true,
+      manualWhatsAppPurchaseFlow: true,
       staticPages: REQUIRED_PAGES.length,
       pwaManifest: true,
       serviceWorker: true,
