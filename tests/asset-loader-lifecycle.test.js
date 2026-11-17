@@ -10,6 +10,7 @@ import {
 const assetLoader = await readFile(new URL("../engine/asset-loader.js", import.meta.url), "utf8");
 const textureManager = await readFile(new URL("../engine/texture-manager.js", import.meta.url), "utf8");
 const arena = await readFile(new URL("../arena.html", import.meta.url), "utf8");
+const packageJson = JSON.parse(await readFile(new URL("../package.json", import.meta.url), "utf8"));
 
 test("shared geometry, material, texture and ImageBitmap resources are disposed exactly once", () => {
   const calls = { geometry: 0, material: 0, texture: 0, bitmap: 0 };
@@ -50,9 +51,10 @@ test("late texture responses are disposed instead of repopulating a closed scene
   assert.match(textureManager, /textureGeneration \+= 1/);
 });
 
-test("arena and shared loaders use the same pinned Three.js version and page teardown cleanup", () => {
-  assert.match(arena, /three@0\.187\.0/);
-  assert.match(assetLoader, /three@0\.187\.0/);
+test("arena and shared loaders use the same pinned local Three.js runtime and page teardown cleanup", () => {
+  assert.equal(packageJson.devDependencies.three, "0.187.0");
+  assert.match(arena, /"three":"\\/vendor\\/three\\/build\\/three\\.module\\.js"/);
+  assert.match(assetLoader, /THREE_VENDOR_PATH = '\\/vendor\\/three\\/examples\\/jsm\\/libs\\//);
   assert.match(arena, /pagehide/);
   assert.match(arena, /window\.COI_ASSETS\.dispose\(\)/);
 });
