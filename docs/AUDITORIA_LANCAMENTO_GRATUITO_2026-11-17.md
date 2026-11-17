@@ -1,7 +1,7 @@
 # Auditoria de prontidão — edição inicial no plano Cloudflare Gratuito
 
 Data: 17 de novembro de 2026  
-Branch de trabalho: `release/early-access-one-kingdom-six-skins`  
+Branch de trabalho: `feat/equip-owned-castle-skins`  
 PR: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/pull/118
 
 ## Decisão de arquitetura do mundo
@@ -26,10 +26,10 @@ A redução de lotes e chamadas de chat ajuda a respeitar esses limites, mas ain
 ## Pendências obrigatórias antes de cobrar/publicar
 
 - **CI #963 aprovada no HEAD atual da PR #118:** 259/259 testes Node, Worker+D1, 3/3 cenários Playwright móveis, diagnóstico e smoke de produção somente leitura, e `wrangler deploy --dry-run`. O dry-run calculou 357,25 KiB (77,53 KiB gzip). As falhas intermediárias #947 (HTTP 503 ao fundar o primeiro reino) e #962 (asserções antigas de lote) foram tratadas antes da execução verde. Isso não equivale a benchmark real de quotas nem a deploy.
-- PR #116: CI #941 passou por migrations locais, Worker+D1, Playwright móvel, smoke read-only e bundle. A PR permanece Draft e ainda não foi integrada; a correção só protege produção depois de merge e deploy.
-- D1 de Preview: confirmar que o banco separado declarado no Wrangler existe e é acessível; aplicar migrations apenas nele e validar start/state, mapa, construção, marchas, rallies, alianças e inventário.
+- PR #116 foi integrada à `main` em 17/11/2026 (commit `d94849f`); a CI #965 da `main` concluiu com sucesso. A correção do diagnóstico administrativo deve ser preservada nesta branch.
+- D1 de Preview: `wrangler.jsonc` nesta branch está com `previews` vazio. Não testar migrations `0026`/`0027` no banco de produção; configurar e comprovar um D1 de staging separado antes.
 - Mercado Pago: confirmar no Worker os secrets `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`; executar compra de teste e receber webhook assinado. Sem essas credenciais, a loja usa link compartilhado e revisão manual Master.
-- Skins: a interface atual informa que as compras entram na coleção, mas ainda não há equipagem e visualização da aparência no castelo. Não anunciar as seis skins como aparência utilizável até implementar isso ou descrever explicitamente o produto como item de coleção. O trabalho foi registrado na [Issue #119](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/issues/119).
+- Skins: esta branch implementa equipagem persistente, validação de propriedade por `player_skins`, seleção em `kingdoms.equipped_skin_id` e aplicação de paleta na cidade/mapa. A nova migration é `0027_equipped_castle_skins.sql`. Falta CI atualizada, teste em Preview D1 separado e Android físico antes de cobrar.
 - Android físico: testar cidade/mapa 3D, toque, PWA standalone, retomada de sessão, cache e consumo de memória.
 - Capacidade: medir CPU real, consultas D1 por `/api/game/state`, linhas lidas/escritas e backlog do Cron em staging antes de fixar limite público de jogadores.
 
@@ -39,12 +39,12 @@ Nenhuma mudança foi publicada na `main`; nenhum deploy ou workflow de produçã
 
 ## Sequência de lançamento
 
-1. Revisar e integrar a PR #116 (CI #941 verde) para proteger o diagnóstico administrativo.
-2. Atualizar/rebasear a PR #118 sobre a nova `main` e repetir a CI.
-3. Validar Preview com D1 separado.
-4. Fechar a pendência comercial das skins e validar checkout/webhook ou manter a venda explicitamente em modo manual.
-5. Testar no Android físico e obter backup/bookmark de produção.
-6. Executar workflow de deploy manual protegido.
-7. Fazer smoke test público read-only e uma compra real de baixo valor, autorizada pelo dono do projeto.
+1. Incorporar a segurança da `main` e repetir a CI completa da edição de lançamento.
+2. Configurar e validar um D1 Preview separado; aplicar nele as migrations `0026` e `0027`.
+3. Testar autenticação, reino compartilhado, equipagem/retirada de skin, mapa, construções, tropas, marchas, alianças e compras em Preview.
+4. Confirmar checkout/webhook assinado do Mercado Pago ou publicar somente com o fluxo manual claramente descrito.
+5. Inspecionar o jogo em Android físico e realizar backup/bookmark de produção.
+6. Executar workflow de deploy manual protegido somente após aprovação de todos os gates.
+7. Fazer smoke test público somente de leitura e validar compra de baixo valor autorizada pelo proprietário.
 
 **Conclusão:** a arquitetura de reino compartilhado e o perfil inicial de cargas gratuitas estão implementados na branch. O jogo ainda não está liberado para produção por esta alteração; a maior parte dos próximos bloqueios é validação remota, segurança e garantia de que os itens vendidos são utilizáveis.
