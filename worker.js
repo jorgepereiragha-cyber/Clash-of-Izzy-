@@ -1693,15 +1693,15 @@ export default {
       const owned=await env.DB.prepare("SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?").bind(player.id,item.id).first();
       if(owned)return json({error:"Você já possui esta skin."},409);
     }
-    const pending=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
+    const pending=await env.DB.prepare("SELECT id,status,product_name,price_brl FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
     if(pending)return json({success:true,request:pending,reused:true,whatsappNumber:"5547996531437",message:"Você já possui um pedido aguardando análise."},200);
     try{
       await env.DB.prepare("INSERT INTO purchase_requests(player_id,kingdom_id,product_kind,product_id,product_name,price_brl,currency,gems_amount,payment_method,payment_reference,request_key) VALUES(?,?,?,?,?,?,'BRL',?,?,?,?)")
         .bind(player.id,kingdom.id,kind,item.id,item.name,item.price_brl,kind==="vip_package"?Number(item.gems||0):0,paymentMethod,paymentReference,requestKey).run();
     }catch(error){
-      const existing=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
+      const existing=await env.DB.prepare("SELECT id,status,product_name,price_brl FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
       if(existing)return json({success:true,request:existing,reused:true,whatsappNumber:"5547996531437"},200);
-      const duplicate=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
+      const duplicate=await env.DB.prepare("SELECT id,status,product_name,price_brl FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
       if(duplicate)return json({success:true,request:duplicate,reused:true,whatsappNumber:"5547996531437",message:"Você já possui um pedido aguardando análise."},200);
       throw error;
     }
