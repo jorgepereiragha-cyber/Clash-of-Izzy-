@@ -43,6 +43,10 @@
   let searchTimer = 0;
   let requestController = null;
   let requestSequence = 0;
+  const SEARCH_CACHE_TTL_MS = 10_000;
+  const SEARCH_CACHE_MAX_ENTRIES = 24;
+  const onlineSearchCache = new Map();
+  let cacheSessionToken = "";
 
   toggle.addEventListener("click",() => {
     const open = toggle.getAttribute("aria-expanded") !== "true";
@@ -120,11 +124,60 @@
     return a;
   }
 
+  function getCachedOnlineResults(query, token) {
+    if (cacheSessionToken !== token) {
+      onlineSearchCache.clear();
+      cacheSessionToken = token;
+    }
+    const key = normalizeSearch(query);
+    const entry = onlineSearchCache.get(key);
+    if (!entry) return null;
+    if (entry.expiresAt <= Date.now()) {
+      onlineSearchCache.delete(key);
+      return null;
+    }
+    // Refresh insertion order so the Map also acts as a small LRU cache.
+    onlineSearchCache.delete(key);
+    onlineSearchCache.set(key,entry);
+    return entry.items;
+  }
+
+  function cacheOnlineResults(query, token, items) {
+    if (cacheSessionToken !== token) {
+      onlineSearchCache.clear();
+      cacheSessionToken = token;
+    }
+    const key = normalizeSearch(query);
+    onlineSearchCache.delete(key);
+    onlineSearchCache.set(key,{expiresAt:Date.now()+SEARCH_CACHE_TTL_MS,items});
+    while (onlineSearchCache.size > SEARCH_CACHE_MAX_ENTRIES) {
+      onlineSearchCache.delete(onlineSearchCache.keys().next().value);
+    }
+  }
+
+  function renderOnlineResults(items, query) {
+    if (items.length) {
+      addGroupLabel("Conteúdo do mundo");
+      for (const item of items) results.append(gameResultLink(item,query));
+    } else if (!results.querySelector("a")) {
+      addEmpty("Nenhuma seção ou conteúdo encontrado.");
+    }
+  }
+
   async function onlineResults(query, sequence) {
     if (!queryEligible(query) || sequence !== requestSequence) return;
     const token = getGameToken();
     if (!token) {
+      if (cacheSessionToken) {
+        onlineSearchCache.clear();
+        cacheSessionToken = "";
+      }
       if (sequence === requestSequence) addEmpty("Entre no reino para pesquisar conteúdo do mundo.");
+      return;
+    }
+    const cachedResults = getCachedOnlineResults(query,token);
+    if (cachedResults !== null) {
+      if (sequence === requestSequence && query === input.value.trim()) renderOnlineResults(cachedResults,query);
       return;
     }
     requestController = new AbortController();
@@ -138,17 +191,17 @@
       const data = await response.json().catch(()=>({}));
       if (sequence !== requestSequence || query !== input.value.trim()) return;
       if (!response.ok) {
-        if (response.status === 401) addEmpty("Sua sessão expirou. Entre novamente no reino para pesquisar.");
-        else if (response.status === 429) addEmpty("Muitas pesquisas em sequência. Aguarde alguns segundos.");
+        if (response.status === 401) {
+          onlineSearchCache.clear();
+          cacheSessionToken = "";
+          addEmpty("Sua sessão expirou. Entre novamente no reino para pesquisar.");
+        } else if (response.status === 429) addEmpty("Muitas pesquisas em sequência. Aguarde alguns segundos.");
         else addEmpty(data.error || "A busca online não respondeu. Tente novamente.");
         return;
       }
-      if (data.results?.length) {
-        addGroupLabel("Conteúdo do mundo");
-        for (const item of data.results) results.append(gameResultLink(item,query));
-      } else if (!results.querySelector("a")) {
-        addEmpty("Nenhuma seção ou conteúdo encontrado.");
-      }
+      const items = Array.isArray(data.results) ? data.results : [];
+      cacheOnlineResults(query,token,items);
+      renderOnlineResults(items,query);
     } catch (error) {
       if (error?.name !== "AbortError" && sequence === requestSequence) addEmpty("Busca online indisponível. Tente novamente.");
     } finally {
