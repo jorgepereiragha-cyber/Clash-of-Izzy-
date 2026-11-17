@@ -8,7 +8,7 @@ test("GET /api/account/status returns a masked email and never the stored addres
   const env = {
     DB: {
       prepare(query) {
-        assert.match(query, /SELECT a\\.username,a\\.email,a\\.created_at/);
+        assert.match(query, /SELECT a\.username,a\.email,a\.created_at/);
         return {
           bind(playerId) {
             assert.equal(playerId, "player-status-001");
