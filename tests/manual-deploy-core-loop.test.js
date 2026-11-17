@@ -65,6 +65,6 @@ test("README documents the manual production gate and current main cache version
   assert.match(readme, /workflow_dispatch/);
   assert.match(readme, /confirm_production/);
   assert.match(readme, /Um push para `main` executa a CI de qualidade, não o deploy de produção/);
-  assert.match(readme, /cache atual do Service Worker nesta branch é v27/);
+  assert.match(readme, /cache incluído nesta branch é v27/);
   assert.doesNotMatch(readme, /## Deploy automático/);
 });
