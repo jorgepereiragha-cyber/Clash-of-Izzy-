@@ -20,7 +20,7 @@ function successfulFetch() {
       missingTables: [],
     });
     if (path === "/api/admin/health") return makeResponse({
-      hasDB: true, hasSESSION_SECRET: true, hasADMIN_EMAIL: true, hasADMIN_PASSWORD: true,
+      hasDB: true, hasSESSION_SECRET: true, hasADMIN_EMAIL: true, hasADMIN_PASSWORD: true, hasMercadoPagoAutomaticCheckout: false,
     });
     if (path === "/api/game/state" || path === "/api/game/referral/link" || path === "/api/account/status") return makeResponse({ error: "Sessão inválida." }, 401);
     if (path === "/api/store/catalog") return makeResponse({ skins: [], packages: [] });
@@ -68,6 +68,8 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.d1, true);
   assert.equal(result.checks.adminConfiguration, true);
   assert.equal(result.checks.mercadoPagoCheckout, true);
+  assert.equal(result.checks.mercadoPagoManualFallbackAvailable, true);
+  assert.equal(result.checks.mercadoPagoAutomaticCheckoutConfigured, false);
   assert.equal(result.checks.betaSignupUi, true);
   assert.equal(result.checks.feedbackUiAndAnalytics, true);
   assert.equal(result.checks.staticPages, 9);
