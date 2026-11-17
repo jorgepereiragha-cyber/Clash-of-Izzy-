@@ -117,8 +117,12 @@ test("world map batches forest geometry and exposes measurable renderer counters
   assert.match(scene, /mesh\.computeBoundingSphere\(\)/);
   assert.match(scene, /diagnostics: getDiagnostics/);
   assert.match(scene, /drawCalls: info\.render\.calls/);
-  assert.match(scene, /treeInstances: worldTreeInstanceCount/);
-  assert.match(scene, /treeBatches: worldTreeBatchCount/);
+  assert.match(scene, /trunks\.name = "world-tree-trunks"/);
+  assert.match(scene, /crowns\.name = "world-tree-crowns"/);
+  assert.match(scene, /crownTops\.name = "world-tree-crown-tops"/);
+  assert.match(scene, /worldRoot\.traverse\(node =>/);
+  assert.match(scene, /treeInstances \+= node\.count/);
+  assert.match(scene, /treeBatches\+\+/);
 });
 
 test("world map releases InstancedMesh GPU buffers and scene geometry on page exit", async () => {
