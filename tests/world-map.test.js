@@ -105,3 +105,30 @@ test("world map coalesces overlapping state reads and forces a fresh snapshot af
   assert.match(script, /if \(stateRefreshPromise === currentRefresh\) stateRefreshPromise = null/);
   assert.match(script, /await refreshState\(\{ afterMutation: true \}\)/);
 });
+
+
+test("world map batches forest geometry and exposes measurable renderer counters", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  assert.match(scene, /function addTreeInstances\(parent, trees\)/);
+  assert.equal((scene.match(/new THREE\.InstancedMesh\(/g) || []).length >= 3, true);
+  assert.match(scene, /trunks\.setMatrixAt\(index, dummy\.matrix\)/);
+  assert.match(scene, /crowns\.setColorAt\(index,/);
+  assert.match(scene, /mesh\.computeBoundingBox\(\)/);
+  assert.match(scene, /mesh\.computeBoundingSphere\(\)/);
+  assert.match(scene, /diagnostics: getDiagnostics/);
+  assert.match(scene, /drawCalls: info\.render\.calls/);
+  assert.match(scene, /treeInstances: worldTreeInstanceCount/);
+  assert.match(scene, /treeBatches: worldTreeBatchCount/);
+});
+
+test("world map releases InstancedMesh GPU buffers and scene geometry on page exit", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  const start = scene.indexOf("function dispose()");
+  const end = scene.indexOf("function init()", start);
+  assert.ok(start >= 0 && end > start);
+  const cleanup = scene.slice(start, end);
+  assert.match(cleanup, /worldRoot\.traverse\(node =>/);
+  assert.match(cleanup, /if \(node\.isInstancedMesh\) node\.dispose\(\)/);
+  assert.match(cleanup, /geometries\.forEach\(geometry => geometry\.dispose\(\)\)/);
+  assert.match(cleanup, /localMaterials\.forEach\(material => material\.dispose\(\)\)/);
+});
