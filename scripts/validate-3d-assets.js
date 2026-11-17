@@ -79,6 +79,13 @@ function validateManifestEntry(asset, category, index) {
   if (category === "props" && (!Array.isArray(asset.positions) || asset.positions.some(position =>
     !Array.isArray(position) || position.length !== 3 || position.some(value => !Number.isFinite(Number(value)))
   ))) fail(label + ".positions deve conter coordenadas [x, y, z].");
+  if (category === "props" && asset.rotations !== undefined && (
+    !Array.isArray(asset.rotations)
+    || asset.rotations.length !== asset.positions.length
+    || asset.rotations.some(rotation =>
+      !Array.isArray(rotation) || rotation.length !== 3 || rotation.some(value => !Number.isFinite(Number(value)))
+    )
+  )) fail(label + ".rotations deve conter uma rotação [x, y, z] para cada posição.");
 }
 
 export async function validateAssetManifest(root = process.cwd()) {
