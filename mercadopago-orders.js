@@ -205,7 +205,7 @@ async function handleWebhook(request, env, ctx) {
 
 export async function handleMercadoPagoRoute(request, env, ctx) {
   const url = new URL(request.url);
-  if (url.pathname === "/api/store/checkout" && request.method === "POST") return await createCheckout(request, env, ctx);
+  if (url.pathname === "/api/store/checkout" && request.method === "POST") return ctx.json({ error: "Checkout automático desativado nesta edição. Faça seu pedido pelo WhatsApp.", code: "MANUAL_WHATSAPP_ONLY" }, 410);
   if (url.pathname === "/api/webhook/mp" && request.method === "POST") return await handleWebhook(request, env, ctx);
   return null;
 }
