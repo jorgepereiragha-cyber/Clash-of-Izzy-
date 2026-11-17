@@ -67,14 +67,16 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 - **Cron em Preview:** Cloudflare direciona Cron Triggers à produção; Previews não recebem invocações agendadas. O fluxo agendado deve ser validado com testes locais/Worker-D1 e, se necessário, uma rotina de teste isolada e protegida, nunca acionando dados de produção.
 
 A quota de linhas D1 é aplicada: ao exceder leituras ou escritas diárias no Free, as queries falham até o reset em 00:00 UTC. Não existe garantia de disponibilidade após esgotar a quota.
-## Validação final do código — CI #991
+## Validação final do código — CI #1021
 
-- 271/271 testes Node aprovados, incluindo Worker+D1 e criação/leitura de aliança.
-- 3/3 cenários Playwright móveis aprovados.
-- Diagnóstico e smoke de produção somente de leitura aprovados.
-- Wrangler `deploy --dry-run`: 359,95 KiB (78,13 KiB gzip).
-- A execução não aplicou migrations remotas, não publicou Worker/assets e não realizou compra. A PR #120 permanece aberta aguardando confirmação remota do D1 Preview, pagamento real e validação em Android físico.
-- [Execução da CI #991](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44134854021).
+- 274/274 testes Node aprovados, incluindo Worker+D1, isolamento do D1 Preview e contratos da loja manual.
+- As migrations foram validadas localmente nos perfis de produção e Preview isolado.
+- 3/3 cenários Playwright móveis aprovados (Pixel 5 emulado e viewport de 360 CSS px).
+- Wrangler `deploy --dry-run`: 354,61 KiB (77,00 KiB gzip).
+- O Workers Build do Preview da branch passou. Ainda não comprova que o D1 de staging exista ou esteja migrado remotamente.
+- O smoke read-only da produção ainda falha na verificação do fluxo manual WhatsApp porque a produção mantém a loja antiga; a etapa é informativa e não fez deploy.
+- Nenhuma migration remota foi aplicada, nenhum deploy de produção foi realizado e nenhuma compra real foi iniciada. A PR #120 permanece aberta aguardando a validação do D1 Preview, teste do fluxo de aprovação em staging e Android físico.
+- [Execução da CI #1021](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44157977051).
 
 ## Batch D1 para reduzir subconsultas
 
