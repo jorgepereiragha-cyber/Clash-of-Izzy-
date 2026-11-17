@@ -43,10 +43,10 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 
 ## Condições comerciais e de publicação que continuam abertas
 
-- **Skins:** a tela atual registra a skin na coleção; ela ainda não altera visualmente o castelo nem pode ser equipada. Antes de cobrar, implementar equipagem/visualização ou apresentar e vender explicitamente como item de coleção sem efeito visual. Não prometer aparência de castelo ativa.
+- **Skins:** a branch `feat/equip-owned-castle-skins` implementa a equipagem persistente usando `player_skins` como fonte de propriedade e `kingdoms.equipped_skin_id` como seleção. O endpoint autenticado recusa skins de outra conta e permite retirar a aparência; a cidade 3D, o fallback 2D e os castelos vistos no mapa compartilham seis paletas visuais. A função ainda precisa passar pela CI atualizada, ser aplicada e exercitada em um D1 Preview separado e ser conferida em Android físico antes de anunciar/cobrar as aparências.
 - **Mercado Pago:** o código tem rota de checkout individual e webhook, mas dependem de `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` configurados no Worker. Quando não configurado, a interface usa o link compartilhado e a revisão manual Master. A presença real dos secrets e uma compra/webhook de teste ainda não foram confirmadas.
-- **Segurança:** a PR #116 protege `/api/admin/health` e passou na CI #941, mas segue Draft e ainda precisa ser integrada e publicada. A `main` atual continua com o endpoint de diagnóstico público até esse deploy.
-- **Preview:** `wrangler.jsonc` declara um D1 de Preview separado do banco de produção, mas a existência e acessibilidade real desse recurso precisam ser conferidas antes de executar a migration 0026 remotamente.
+- **Segurança:** a proteção de `GET /api/admin/health` já foi integrada à `main` pela PR #116 (commit `d94849f`). A branch de lançamento também precisa manter o JWT Master, 401 sem sessão, 405 para método inválido e 200 apenas com sessão administrativa.
+- **Preview:** nesta branch `wrangler.jsonc` declara `previews: {}`; não há binding D1 de staging pronto. Não aplicar as migrations `0026` e `0027` no banco de produção para testar. É necessário configurar e comprovar um D1 Preview separado primeiro.
 - **Dispositivos:** o CI automatizado Chromium em viewport móvel não substitui uma verificação em Android físico, incluindo toque, instalação PWA, reabertura, cache e memória.
 - **Capacidade:** nenhum número máximo de jogadores é prometido sem benchmark. O plano Gratuito limita CPU e D1 por invocação e por dia; os limites de lote reduzem picos, mas não comprovam capacidade simultânea.
 
