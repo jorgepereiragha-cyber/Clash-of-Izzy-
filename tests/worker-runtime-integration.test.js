@@ -187,6 +187,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
     const catalogBefore = expectStatus(await api("/api/store/catalog"), 200, "catálogo público");
     assert.ok(Array.isArray(catalogBefore.skins));
+    assert.equal(catalogBefore.skins.length, 6, "a loja libera somente seis skins na edição inicial");
+    assert.equal(catalogBefore.skin_edition, "initial");
+    assert.equal(catalogBefore.skin_limit, 6);
     assert.ok(Array.isArray(catalogBefore.packages));
 
     const betaWithoutConsent = expectStatus(await api("/api/beta/signup", {
@@ -202,6 +205,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     }), 409, "inscrição beta duplicada");
 
     const startA = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do primeiro reino");
+    const resumedA = expectStatus(await api("/api/game/start", { method: "POST", token: startA.token, body: {} }), 200, "reentrada não cria um segundo reino");
+    assert.equal(resumedA.resumed, true);
+    assert.equal(resumedA.state.kingdom.id, startA.state.kingdom.id, "o mesmo jogador mantém o mesmo único reino");
+    assert.equal(resumedA.state.player.player_id, startA.state.player.player_id);
     const startB = expectStatus(await api("/api/game/start", { method: "POST", body: { referrer_code: startA.state.player.player_id } }), 201, "fundação do segundo reino por convite");
     assert.equal(startB.referral_recorded, true, "o convite é atribuído apenas após criar o novo reino");
     const startC = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do terceiro reino");
@@ -627,6 +634,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const catalog = expectStatus(await api("/api/store/catalog"), 200, "catálogo atualizado");
       const vip = catalog.packages.find(item => item.name === "Pacote de integração");
       const skin = catalog.skins[0];
+      assert.equal(catalog.skins.length, 6, "catálogo de lançamento permanece limitado a seis skins");
       assert.ok(vip?.id, "pacote VIP aparece no catálogo");
       assert.ok(skin?.id && skin?.name, "skin existente aparece no catálogo");
 
@@ -667,6 +675,25 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(await admin("/api/admin/purchase-requests/review", {
         requestId: purchase.request.id, decision: "approve",
       }), 409, "bloqueio de aprovação duplicada");
+
+      const hiddenSkinRows = rowsFromD1Json(await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "SELECT id,name FROM skins ORDER BY id LIMIT 1 OFFSET 6;",
+      ]));
+      if (hiddenSkinRows.length) {
+        expectStatus(await api("/api/store/purchase-request", {
+          method: "POST", token: tokenC,
+          body: {
+            kind: "skin", itemId: hiddenSkinRows[0].id,
+            requestKey: "integration-locked-skin-01",
+            paymentMethod: "mercadopago_link",
+          },
+        }), 404, "skin fora das seis liberadas não pode gerar pedido");
+        expectStatus(await admin("/api/admin/unlock-skin", {
+          playerId: playerC, skin: hiddenSkinRows[0].name,
+        }), 404, "painel Master não libera skin ainda bloqueada");
+      }
 
       const skinPurchase = expectStatus(await api("/api/store/purchase-request", {
         method: "POST", token: tokenB,
