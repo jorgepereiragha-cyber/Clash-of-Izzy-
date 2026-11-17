@@ -68,7 +68,7 @@ test("world map lets players discover and compose an attack on an enemy castle",
   assert.ok(scene.includes('territory.territory_kind === "castle"'));
   assert.ok(scene.includes('ownership === "enemy" ? "enemy" : "home"'));
   assert.ok(worker.includes("async function processPvpMarch"));
-  assert.ok(worker.includes("defenderArmy: defenderArmyRows"));
+  assert.ok(worker.includes("defenderArmy:defenderArmyRows"));
   assert.ok(worker.includes("defender_kingdom_id"));
   assert.ok(worker.includes("battle_token"));
   assert.ok(worker.includes("Ataques contra membros da sua aliança estão bloqueados."));
