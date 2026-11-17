@@ -26,7 +26,7 @@ A redução de lotes e chamadas de chat ajuda a respeitar esses limites, mas ain
 ## Pendências obrigatórias antes de cobrar/publicar
 
 - CI completa e verde no HEAD atual da PR #118. A CI #940 aprovou uma versão anterior. Na CI #947, o teste integrado falhou porque `POST /api/game/start` respondeu HTTP 503 ao fundar o primeiro reino. Ao investigar a consulta do mapa, encontrei dois bindings de coordenada que haviam sido removidos junto com o filtro por região e os restaurei. A causa exata ainda precisa ser confirmada por uma nova CI; os ajustes mais recentes do scheduler e do feed compacto também aguardam validação automatizada.
-- PR #116: a correção de autenticação de `/api/admin/health` recebeu ajuste em um teste de documentação, mas ainda é necessário obter CI verde e integrar a proteção antes de lançar.
+- PR #116: CI #941 passou por migrations locais, Worker+D1, Playwright móvel, smoke read-only e bundle. A PR permanece Draft e ainda não foi integrada; a correção só protege produção depois de merge e deploy.
 - D1 de Preview: confirmar que o banco separado declarado no Wrangler existe e é acessível; aplicar migrations apenas nele e validar start/state, mapa, construção, marchas, rallies, alianças e inventário.
 - Mercado Pago: confirmar no Worker os secrets `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`; executar compra de teste e receber webhook assinado. Sem essas credenciais, a loja usa link compartilhado e revisão manual Master.
 - Skins: a interface atual informa que as compras entram na coleção, mas ainda não há equipagem e visualização da aparência no castelo. Não anunciar as seis skins como aparência utilizável até implementar isso ou descrever explicitamente o produto como item de coleção.
