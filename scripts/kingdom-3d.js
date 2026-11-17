@@ -1,14 +1,16 @@
 /* Progressive Three.js kingdom renderer. Canvas art remains as offline/WebGL fallback. */
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
-import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
-import { KTX2Loader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/KTX2Loader.js";
-import { clone as cloneSkinned } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/utils/SkeletonUtils.js";
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "./kingdom-quality.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
-  let renderer, scene, camera, resizeObserver, ktx2, gltfLoader, resizeHandler, qualityProfile;
+  let renderer, scene, camera, resizeObserver, ktx2, draco, gltfLoader, resizeHandler, qualityProfile;
   let latestBuildings = [];
   let latestTroops = [];
   let latestCastleSkinId = 0;
@@ -801,9 +803,14 @@ if (host && "WebGLRenderingContext" in window) {
       }
     }
     ktx2 = new KTX2Loader();
-    ktx2.setTranscoderPath("https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/basis/");
+    ktx2.setTranscoderPath("/vendor/three/examples/jsm/libs/basis/");
     ktx2.detectSupport(renderer);
-    gltfLoader = new GLTFLoader(); gltfLoader.setKTX2Loader(ktx2);
+    draco = new DRACOLoader();
+    draco.setDecoderPath("/vendor/three/examples/jsm/libs/draco/");
+    gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(draco);
+    gltfLoader.setKTX2Loader(ktx2);
+    gltfLoader.setMeshoptDecoder(MeshoptDecoder);
     host.classList.add("has-3d");
     host.dataset.qualityTier = qualityProfile.tier;
     const diagnostics = () => {
@@ -840,6 +847,7 @@ if (host && "WebGLRenderingContext" in window) {
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
       disposeSceneResources();
       ktx2?.dispose();
+      draco?.dispose();
       renderer?.domElement.remove();
       renderer?.dispose();
       renderer = null;
@@ -938,6 +946,7 @@ if (host && "WebGLRenderingContext" in window) {
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
     disposeSceneResources();
     ktx2?.dispose();
+      draco?.dispose();
     renderer?.domElement.remove();
     renderer?.dispose();
     renderer = null;
