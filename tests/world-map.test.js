@@ -95,3 +95,11 @@ test("map viewport transform is finite and deterministic", () => {
     "translate3d(0px, 0px, 0) scale(1)"
   );
 });
+
+
+test("shared world map applies the local player's equipped skin to the central castle", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  assert.ok(script.includes("castleSkinId: Number(state.kingdom?.equipped_skin_id || 0)"));
+  assert.ok(scene.includes("homeCastleGroup=createCastle(terrainRoot,0,0,1.4,\"home\",Number(worldState.castleSkinId)||0)"));
+  assert.ok(scene.includes("Number(window.__coiWorldMapState?.castleSkinId)||0"));
+});
