@@ -30,7 +30,7 @@ test("Master approval queue is protected by admin session and grants packages on
   assert.ok(admin.includes("✓ Liberar pacote"));
   assert.ok(admin.includes("payment_reference"));
   assert.ok(admin.includes("setInterval(()=>"));
-  const adminScript=admin.match(/<script>([\\s\\S]*?)<\\/script>/i)?.[1];
+  const adminScript=admin.split("<script>")[1]?.split("</script>")[0];
   assert.ok(adminScript, "admin inline script must exist");
   assert.doesNotThrow(()=>new Function(adminScript), "admin inline script must parse");
 });
