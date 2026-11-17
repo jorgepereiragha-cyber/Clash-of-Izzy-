@@ -11,7 +11,7 @@ Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e p
 - ⚙️ **Deploy final validado:** [GitHub Actions — run #43872671573](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671573)
 - ✅ **CI final validada:** [GitHub Actions — run #43872671700](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671700)
 
-Release Visual Premium e Gravador Cinematográfico publicada em 16/11/2026. O deploy final aprovou 224 testes automatizados, publicação do Worker/assets e smoke test de produção. O cache atual do Service Worker é v23. A validação automática confirma que os módulos do gravador estão publicados; a gravação física pós-deploy no Android continua sendo uma conferência recomendada.
+A base já inclui contas persistentes vinculadas ao jogador, integração de pedidos Mercado Pago, sistemas de aliança, mapa, eventos, heróis, equipamentos, mascotes e renderização 3D. O último smoke test público registrado em 17/11/2026 confirmou Worker, D1 e schema obrigatórios; naquele momento, o Service Worker de produção ainda era v26. A branch de integração deste PR evolui a busca global e adiciona o Salão da Coroa (ranking público de reinos e alianças), com cache candidato v28. Nada desta branch é considerado publicado até merge, deploy e smoke test posteriores.
 
 ## Desenvolvimento local
 
@@ -34,7 +34,7 @@ Comandos úteis:
 
 ## Deploy automático
 
-O workflow `.github/workflows/deploy-cloudflare.yml` valida o bundle, captura e arquiva o bookmark de recuperação Time Travel do D1 imediatamente antes das migrações remotas, aplica as migrações e publica o Worker e os arquivos estáticos quando há push na branch `main`. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, formulário beta, feedback, analytics, páginas principais, Service Worker com cache v23 e os módulos do gravador cinematográfico. O deploy só termina com sucesso quando esses checks passam. O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação; restaurar Time Travel sobrescreve o estado atual do banco.
+O workflow `.github/workflows/deploy-cloudflare.yml` é acionado manualmente (`workflow_dispatch`), valida o bundle, captura e arquiva o bookmark de recuperação Time Travel do D1 imediatamente antes das migrações remotas, aplica as migrações e publica o Worker e os arquivos estáticos. Após a publicação, executa um smoke test somente de leitura no endereço público para confirmar D1, schema, sessão, painel Master, catálogo, autenticação, formulário beta, feedback, analytics, páginas principais, Service Worker com cache v26 na última verificação pública registrada e os módulos do gravador cinematográfico. O deploy só termina com sucesso quando esses checks passam. O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação; restaurar Time Travel sobrescreve o estado atual do banco.
 
 Configure estes segredos no GitHub:
 
