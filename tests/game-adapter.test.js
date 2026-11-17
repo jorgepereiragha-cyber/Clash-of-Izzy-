@@ -124,3 +124,53 @@ test("perdas inválidas não criam tropas extras nem quantidades negativas", () 
     archer: 0
   });
 });
+
+
+test("PvP simulator uses the real defender garrison instead of synthetic PvE defenders", () => {
+  const result = simulateBattle({
+    army: [{ unit_type: "knight", tier: 5, quantity: 100 }],
+    defenderArmy: [{ unit_type: "militia", tier: 1, quantity: 1 }],
+    castleLevel: 20,
+    defenderLevel: 1,
+    defenderCastlePowerBonusPercent: 0,
+    roll: 1,
+    criticalSeed: 7,
+    defenderCriticalSeed: 9
+  });
+  assert.equal(result.defenderLosses.militia, 1);
+  assert.equal(Object.hasOwn(result.defenderLosses, "archer"), false);
+  assert.equal(result.defenderSurvivors, 0);
+  assert.equal(result.won, true);
+});
+
+test("empty real garrison is not silently replaced by artificial defenders", () => {
+  const result = simulateBattle({
+    army: [{ unit_type: "knight", tier: 2, quantity: 1 }],
+    defenderArmy: [],
+    defenderLevel: 30,
+    roll: 1
+  });
+  assert.equal(result.defenderPower, 1);
+  assert.deepEqual(result.defenderLosses, {});
+  assert.equal(result.defenderSurvivors, 0);
+  assert.equal(result.won, true);
+});
+
+test("PvP defender modifiers are deterministic and bounded independently", () => {
+  const input = {
+    army: [{ unit_type: "swordsman", tier: 2, quantity: 30 }],
+    defenderArmy: [{ unit_type: "archer", tier: 2, quantity: 12 }],
+    castleLevel: 5,
+    defenderLevel: 8,
+    defenderCastlePowerBonusPercent: 30,
+    defenderDefenseBonusPercent: 25,
+    defenderAttackBonusPercent: 20,
+    defenderHealthBonusPercent: 20,
+    defenderCriticalChancePercent: 15,
+    defenderCriticalSeed: 1234,
+    criticalSeed: 5678,
+    roll: 1
+  };
+  assert.deepEqual(simulateBattle(input), simulateBattle(input));
+  assert.ok(simulateBattle(input).defenderPower >= 1);
+});
