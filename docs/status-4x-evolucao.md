@@ -64,7 +64,7 @@ Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário impl
 4. A busca global e a descoberta de jogadores usam o mesmo backend e os mesmos índices; não foi adicionado serviço externo de busca.
 5. A CI #880 encontrou HTTP 500 em PvP por `structureDefense is not defined`; o código foi corrigido e a CI #882 posterior passou.
 6. CI #882 no commit `363a983`: 266/266 testes Node, 9/9 testes Playwright, smoke read-only e Worker bundle dry-run aprovados.
-7. Foi adicionado `tests/e2e/pwa-offline-cache.spec.js`, isolado com Service Worker permitido. A CI #885 confirmou os nove testes anteriores e falhou apenas na navegação top-level de `/offline.html` após ficar offline (`net::ERR_FAILED`). O teste foi ajustado para buscar a página offline pela página controlada e validar resposta/conteúdo; essa nova versão ainda aguarda CI.
+7. Foi adicionado `tests/e2e/pwa-offline-cache.spec.js`, isolado com Service Worker permitido. A primeira versão falhou ao navegar top-level com o navegador offline; foi ajustada para buscar a página offline pela página controlada e verificar resposta 200/conteúdo. A CI #888 aprovou esse teste e os outros nove testes Playwright.
 8. Não foi feita migração remota de D1, alteração de segredo, publicação de produção ou inspeção física nesta atualização.
 
 ## Bloqueios obrigatórios antes do merge
@@ -73,7 +73,7 @@ Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário impl
 - Adicionar `previews.d1_databases` com binding `DB` e database ID de staging; criar configuração própria de migração Preview apontando para o mesmo banco.
 - Executar `npx wrangler preview` (este projeto é Worker com assets, não Pages).
 - Confirmar health/API e `env.DB` no Preview exato da branch.
-- Validar o novo teste Service Worker/GLB offline na CI.
+- A CI #888 já validou o teste Service Worker/GLB offline; permanece necessária a verificação no Android físico.
 - Inspecionar em Android físico: viewport 360 CSS px e nativo, cidade 3D, close-up das texturas, sombras/iluminação, toque, estabilidade, PWA standalone, worker ativo/controlador e reabertura offline.
 - Anexar capturas sanitizadas do deployment exato.
 
