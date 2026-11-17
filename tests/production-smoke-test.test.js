@@ -66,7 +66,7 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   });
   assert.equal(result.checks.apiHealth, true);
   assert.equal(result.checks.d1, true);
-  assert.equal(result.checks.adminConfiguration, true);
+  assert.equal(result.checks.adminHealthAuthBoundary, true);
   assert.equal(result.checks.mercadoPagoCheckout, true);
   assert.equal(result.checks.betaSignupUi, true);
   assert.equal(result.checks.feedbackUiAndAnalytics, true);
