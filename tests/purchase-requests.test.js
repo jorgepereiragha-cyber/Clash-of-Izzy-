@@ -48,6 +48,8 @@ test("official store submits an auditable payment request and opens WhatsApp", a
     "purchase handler must contain a real line break between declarations");
   assert.doesNotMatch(arena, /mercadopago|purchaseReference|purchaseMethod/i);
   assert.ok(arena.includes("https://wa.me/"));
+  assert.ok(arena.includes("Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação'"));
+  assert.ok(arena.includes("Aparência cosmética para seu castelo"));
   assert.ok(arena.includes("Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis."));
   assert.ok(arena.includes("manual_whatsapp"));
   assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i);
