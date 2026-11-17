@@ -20,7 +20,10 @@ test("ciência da forja usa a tabela research existente e exige academia", async
   const worker = await read("worker.js");
   for (const id of ["gear_forging","gear_ward","gear_vitality","gear_logistics"]) assert.ok(worker.includes(id));
   assert.ok(worker.includes('type==="research"'));
-  assert.ok(worker.includes("key.startsWith(\"gear_\")"));
+  assert.ok(worker.includes("const RESEARCH_CATALOG=Object.freeze({"));
+  assert.ok(worker.includes("requiresAcademy:true"));
+  assert.ok(worker.includes("RESEARCH_CATALOG[key].requiresAcademy&&centerLevel<1"));
+  assert.ok(worker.includes("RESEARCH_CATALOG[key].requiresAcademy&&level>=Math.min(maxLevel,centerLevel*3)"));
   assert.ok(worker.includes("building_type='academy'"));
   assert.ok(worker.includes("Math.min(maxLevel,centerLevel*3)"));
 });
