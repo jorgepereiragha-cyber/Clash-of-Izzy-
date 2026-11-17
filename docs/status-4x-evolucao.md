@@ -55,19 +55,19 @@ Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário impl
 
 - Pan, zoom e limites de viewport são geridos por `world-map.js` e `world-map-viewport.js`; não dependem de OrbitControls.
 - O canvas do mapa é isométrico e os marcadores DOM são projetados a partir da câmera.
-- O Service Worker atual é `clash-of-izzy-shell-v31`. O shell central é pré-cacheado e assets GET same-origin são guardados após download.
+- O Service Worker atual é `clash-of-izzy-shell-v32`. O shell, o manifesto e os módulos/addons/decodificadores Three.js same-origin são pré-cacheados; assets GET same-origin são guardados após download.
 - `/api/*` não é cacheado. Isso é intencional: não servir saldo, combate ou estado autoritativo obsoleto como se fosse atual.
-- A importação de Three.js e addons por jsDelivr é um bloqueio para 3D totalmente offline; os módulos e decoders essenciais precisam ser servidos pela própria origem antes de prometer essa capacidade.
+- Os módulos Three.js/addons e decodificadores Draco/Basis são servidos same-origin e pré-cacheados pelo v32; CI #914 validou primeira importação e fetch dos binários offline. Isso não torna APIs, economia ou combate jogáveis offline.
 
 ## Correções e verificações recentes
 
 1. As migrações D1 continuam versionadas; não alterar migrações históricas já aplicadas.
 2. `scripts/kingdom-quality.js` mantém uma única seleção de perfil e limita a resolução ao orçamento de pixels.
-3. A cidade instancia a floresta procedural com `InstancedMesh`; o mapa ainda é candidato a instancing após profiling.
+3. A cidade e a arena já instanciavam vegetação; o mapa mundial agora agrupa árvores de terreno e territórios em três `InstancedMesh` batches por grupo, com bounding volumes calculados e frustum culling.
 4. A busca global e a descoberta de jogadores usam o mesmo backend e os mesmos índices; não foi adicionado serviço externo de busca.
 5. A CI #880 encontrou HTTP 500 em PvP por `structureDefense is not defined`; o código foi corrigido e a CI #882 posterior passou.
-6. CI #882 no commit `363a983`: 266/266 testes Node, 9/9 testes Playwright, smoke read-only e Worker bundle dry-run aprovados.
-7. Foi adicionado `tests/e2e/pwa-offline-cache.spec.js`, isolado com Service Worker permitido. A primeira versão falhou ao navegar top-level com o navegador offline; foi ajustada para buscar a página offline pela página controlada e verificar resposta 200/conteúdo. A CI #888 aprovou esse teste e os outros nove testes Playwright.
+6. CI #882 no commit `363a983`: baseline anterior aprovado (266/266 testes Node e 9/9 Playwright). A nova revisão foi validada pela CI #914.
+7. `tests/e2e/pwa-offline-cache.spec.js` testa shell, GLB e first import do runtime Three.js/decodificadores em offline. A CI #913 identificou dois README opcionais com resposta 404 no manifesto; removidos esses itens não-runtime, a CI #914 aprovou instalação/controle do SW, todos os 10 testes Playwright e imports/decoders offline.
 8. Não foi feita migração remota de D1, alteração de segredo, publicação de produção ou inspeção física nesta atualização.
 
 ## Bloqueios obrigatórios antes do merge
@@ -76,14 +76,14 @@ Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário impl
 - Adicionar `previews.d1_databases` com binding `DB` e database ID de staging; criar configuração própria de migração Preview apontando para o mesmo banco.
 - Executar `npx wrangler preview` (este projeto é Worker com assets, não Pages).
 - Confirmar health/API e `env.DB` no Preview exato da branch.
-- A CI #888 já validou o teste Service Worker/GLB offline; permanece necessária a verificação no Android físico.
+- A CI #914 validou Service Worker v32, GLB e imports/decoders offline em Chromium; permanece necessária a verificação no Android físico.
 - Inspecionar em Android físico: viewport 360 CSS px e nativo, cidade 3D, close-up das texturas, sombras/iluminação, toque, estabilidade, PWA standalone, worker ativo/controlador e reabertura offline.
 - Anexar capturas sanitizadas do deployment exato.
 
 ## Próximas prioridades reais
 
-1. **P0 — Preview seguro:** provisionar o D1 staging, corrigir binding de Preview, aplicar migrações e publicar Preview com `wrangler preview`.
-2. **P1 — 3D/offline:** unificar loaders, servir Three.js/addons/decoders localmente, comparar Draco/Meshopt/KTX2 e testar LOD/instancing com orçamento de GPU.
+1. **P0 — Preview seguro:** provisionar o D1 staging, configurar `previews.d1_databases`, aplicar migrações remotas no staging e validar o Worker com `env.DB`.
+2. **P1 — 3D/offline:** runtime Three.js same-origin e instancing já estão integrados e validados na CI; revisar variantes Draco/Meshopt visualmente, medir decode/frame time em Android e implementar LOD por tamanho em tela somente se profiling justificar.
 3. **P1 — jogo 4X:** completar captura, saque, cerco, retorno, reforços e rally; ampliar testes concorrentes entre reinos.
 4. **P2 — observabilidade:** medir p50/p95 da busca, frame time, draw calls, triângulos, memória e falhas de assets; usar dados agregados e sem PII.
 5. **P2 — playtests:** balancear economia, tropas e eventos com sessões reais; não publicar números de retenção/performance sem medição.
@@ -108,3 +108,8 @@ Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário impl
 - O mapa mundial usa InstancedMesh para árvores do terreno e de territórios, em três batches por grupo; os volumes são calculados após as matrizes.
 - wrangler.jsonc marca ENVIRONMENT=preview. Sem D1 staging ID, env.DB não é fornecido ao Preview; não usar produção como fallback. Teste automatizado protege contra ID igual ao banco de produção.
 - A CI #907 está pendente para esta integração. O Android físico e o Preview com D1 staging continuam como gates antes do merge.
+
+
+## Benchmark de compressão — CI #914
+
+Variantes independentes Draco/Meshopt geradas e validadas, sem substituir os originais. Os cinco GLBs habilitados somam 443.264 B; Draco soma 188.228 B (-57,54%); Meshopt soma 191.816 B (-56,73%). Draco é menor em quatro assets; Meshopt é menor no arqueiro. São reduções de transferência; VRAM, tempo de decodificação e FPS ainda precisam de medição em Android. [Relatório e arquivos A/B da CI #914](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44049256611/artifacts/14312946574).
