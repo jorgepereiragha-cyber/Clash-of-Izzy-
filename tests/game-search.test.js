@@ -62,11 +62,15 @@ test("player discovery uses a unique normalized nickname and never exposes priva
   assert.ok(!worker.includes("email:row.email"));
 });
 
-test("player discovery UI renders server data as text and uses the authenticated game adapter", async () => {
+test("kingdom player discovery uses the same authenticated FTS5 search as global navigation", async () => {
   const kingdom = await read("kingdom.html");
-  assert.ok(kingdom.includes('request("/game/players/search?q="+encodeURIComponent(query))'));
-  assert.ok(kingdom.includes('title.textContent=player.nickname'));
-  assert.ok(kingdom.includes('details.textContent="Castelo nível "+player.castle_level'));
+  assert.ok(kingdom.includes('new URLSearchParams({q:query,type:"players",limit:"10"})'));
+  assert.ok(kingdom.includes('request("/game/search?"+params.toString())'));
+  assert.ok(kingdom.includes('filter(item=>item.type==="player")'));
+  assert.ok(kingdom.includes('player.nickname||player.name'));
+  assert.ok(kingdom.includes('player.allianceTag'));
+  assert.ok(kingdom.includes('title.textContent=nickname'));
+  assert.ok(!kingdom.includes('request("/game/players/search?q="+encodeURIComponent(query))'));
   assert.ok(!kingdom.includes('row.innerHTML=player.nickname'));
 });
 
