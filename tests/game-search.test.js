@@ -58,8 +58,9 @@ test("player discovery uses a unique normalized nickname and never exposes priva
   assert.ok(worker.includes('type==="set_nickname"'));
   assert.ok(worker.includes('ON CONFLICT(player_id) DO UPDATE SET nickname=excluded.nickname,nickname_key=excluded.nickname_key'));
   assert.ok(worker.includes('url.pathname==="/api/game/players/search"&&request.method==="GET"'));
-  assert.ok(worker.includes('rateLimitDecision(env,"player-search-player"'));
-  assert.ok(worker.includes('rateLimitDecision(env,"player-search-network"'));
+  assert.ok(worker.includes('const [limited,networkLimit]=await Promise.all(['));
+  assert.ok(worker.includes('rateLimitDecision(env,"player-search-player",playerId,20,60),'));
+  assert.ok(worker.includes('rateLimitDecision(env,"player-search-network",request.headers.get("CF-Connecting-IP")||"unknown",120,60)'));
   assert.ok(worker.includes('n.player_id<>(SELECT id FROM players WHERE player_id=?)'));
   assert.ok(worker.includes("nickname:row.nickname,kingdom_name:row.kingdom_name,castle_level:Number(row.castle_level||1),power:Number(row.power||0)"));
   assert.ok(!worker.includes("email:row.email"));
@@ -67,9 +68,12 @@ test("player discovery uses a unique normalized nickname and never exposes priva
 
 test("player discovery UI renders server data as text and uses the authenticated game adapter", async () => {
   const kingdom = await read("kingdom.html");
-  assert.ok(kingdom.includes('request("/game/players/search?q="+encodeURIComponent(query))'));
-  assert.ok(kingdom.includes('title.textContent=player.nickname'));
+  assert.ok(kingdom.includes('request("/game/search?q="+encodeURIComponent(query)+"&type=players&limit=10")'));
+  assert.ok(kingdom.includes('result.type==="player"'));
+  assert.ok(kingdom.includes('title.textContent=player.nickname+" · "+player.kingdom_name'));
+  assert.ok(kingdom.includes('allianceTag'));
   assert.ok(kingdom.includes('details.textContent="Castelo nível "+player.castle_level'));
+  assert.ok(!kingdom.includes('request("/game/players/search?q="+encodeURIComponent(query))'));
   assert.ok(!kingdom.includes('row.innerHTML=player.nickname'));
 });
 
