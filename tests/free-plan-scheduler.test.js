@@ -51,3 +51,21 @@ test("kingdom state groups its 14 independent D1 reads into one invocation batch
   assert.match(state, /const recentEvents=stateResults\\[12\\],queues=stateResults\\[13\\]/);
   assert.doesNotMatch(state, /fresh,buildings,troops,heroes,dragon,research,territories,marches,reports,heroInventory,heroHistory,inventoryItems,recentEvents,queues\\]=await Promise\\.all/);
 });
+
+
+test("derived kingdom capacity and power calculations batch their independent D1 reads", async () => {
+  const worker = await read("worker.js");
+  const statsStart = worker.indexOf("async function recalculateKingdomStats(env,kingdomId)");
+  const powerStart = worker.indexOf("async function recalculateKingdomPower(env,kingdomId)", statsStart);
+  const logStart = worker.indexOf("async function logKingdomAction(env", powerStart);
+  assert.ok(statsStart >= 0 && powerStart > statsStart && logStart > powerStart);
+  const stats = worker.slice(statsStart, powerStart);
+  const power = worker.slice(powerStart, logStart);
+  assert.match(stats, /const reads=await env\\.DB\\.batch\\(\\[/);
+  assert.match(stats, /SELECT food,wood,stone,iron,gold,wall_hp,castle_level FROM kingdoms/);
+  assert.match(stats, /const defense=.*kingdom\\.castle_level/);
+  assert.match(power, /const reads=await env\\.DB\\.batch\\(\\[/);
+  assert.match(power, /const dragon=reads\\[4\\]\\?\\.results\\?\\.\\[0\\]/);
+  assert.match(power, /const kingdom=reads\\[5\\]\\?\\.results\\?\\.\\[0\\]/);
+  assert.doesNotMatch(stats+power, /Promise\\.all\\(/);
+});
