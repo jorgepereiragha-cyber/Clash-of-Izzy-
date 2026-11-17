@@ -23,7 +23,7 @@ Jogo de estratégia medieval 4X, persistente e prioritariamente móvel: desenvol
 | Evento Anjo da Morte | Evento PvE mundial com vida, pontuação, ataques e recompensas persistentes | Precisa de playtest e ajuste de dificuldade/recompensas com população real |
 | Loja | Pedidos auditáveis e aprovação Master idempotente; checkout Mercado Pago configurado | Confirmação automática por webhook e gateway operacional completo ainda pendentes |
 | Busca mundial | FTS5, trigramas, tolerância controlada a erros, português, busca CJK por substring, ranking BM25, cache de cliente e rate limit | Não é crawler da Internet; faltam benchmark de relevância/latência e telemetria sem PII |
-| Cidade 3D | Three.js isométrico, materiais procedurais, perfis de qualidade, fallback, cinco assets GLB habilitados no manifesto e diagnóstico local | A cidade usa GLTFLoader próprio com KTX2; ainda não integra DRACOLoader. Faltam LOD real, catálogo de arte completo e inspeção Android |
+| Cidade 3D | Three.js isométrico, materiais procedurais, perfis de qualidade, fallback, cinco assets GLB habilitados no manifesto e diagnóstico local; os loaders da cidade e compartilhado registram Draco/KTX2/Meshopt quando o GLB exigir | Os GLBs atuais não foram recomprimidos; faltam variantes low e LOD por tamanho em tela, servir addons/decoders same-origin, benchmark e inspeção Android |
 | Renderização do mapa 3D | Three.js, câmera isométrica e controles de pan/zoom externos por Pointer Events/CSS | Vegetação do mapa ainda pode ser agrupada; pausa/retomada e profiling precisam ser uniformizados |
 | PWA/offline | Service Worker v31; shell e tela offline pré-cacheados; GETs same-origin são cacheados dinamicamente; APIs ficam fora do cache | Offline não é modo de jogo completo. Módulos Three.js/addons vêm de CDN e não têm garantia de disponibilidade offline; falta validação em aparelho |
 | Preview Cloudflare | Wrangler 4.161.0 e bloco `previews` presente | `previews.d1_databases` não está configurado com D1 de staging; Preview pode executar com `env.DB` ausente |
@@ -36,7 +36,7 @@ Jogo de estratégia medieval 4X, persistente e prioritariamente móvel: desenvol
 - Não criar um segundo motor de qualidade: `scripts/kingdom-quality.js` já define perfil e orçamento de pixels.
 - Não trocar o mapa para OrbitControls: o mapa atual usa Pointer Events, zoom/pan CSS e uma câmera isométrica; OrbitControls disputaria os gestos e a seleção de territórios.
 - Não mover a economia para Durable Objects sem benchmark e desenho de consistência. O D1 já oferece transações via `batch()` e o Worker já utiliza guardas condicionais em operações críticas.
-- Não comprimir os GLBs da cidade com Draco antes de ligar DRACOLoader ao carregador efetivamente usado na cidade.
+- Os loaders da cidade e compartilhado agora registram Draco/KTX2/Meshopt nos caminhos efetivamente usados. Não comprimir os GLBs atuais antes de servir decodificadores pela mesma origem, produzir variantes testadas e medir os aparelhos.
 - Não considerar IndexedDB uma garantia permanente de offline. Cache API já armazena assets GET locais; o browser pode aplicar quota/evicção tanto a Cache quanto a IndexedDB.
 - Não considerar o shell offline como jogo jogável sem rede. O servidor continua sendo a fonte de verdade de saldos, filas, batalhas, compras e recompensas.
 
@@ -64,7 +64,7 @@ Isso **não** autoriza marcar guerra 4X como completa. Ainda é necessário impl
 4. A busca global e a descoberta de jogadores usam o mesmo backend e os mesmos índices; não foi adicionado serviço externo de busca.
 5. A CI #880 encontrou HTTP 500 em PvP por `structureDefense is not defined`; o código foi corrigido e a CI #882 posterior passou.
 6. CI #882 no commit `363a983`: 266/266 testes Node, 9/9 testes Playwright, smoke read-only e Worker bundle dry-run aprovados.
-7. Foi adicionado `tests/e2e/pwa-offline-cache.spec.js`, um teste isolado que permite o Service Worker e verifica shell, cache runtime de um GLB e leitura offline do asset. A execução de CI do commit que adicionou esse teste ainda precisa ser confirmada antes de marcar esse novo teste como aprovado.
+7. Foi adicionado `tests/e2e/pwa-offline-cache.spec.js`, isolado com Service Worker permitido. A CI #885 confirmou os nove testes anteriores e falhou apenas na navegação top-level de `/offline.html` após ficar offline (`net::ERR_FAILED`). O teste foi ajustado para buscar a página offline pela página controlada e validar resposta/conteúdo; essa nova versão ainda aguarda CI.
 8. Não foi feita migração remota de D1, alteração de segredo, publicação de produção ou inspeção física nesta atualização.
 
 ## Bloqueios obrigatórios antes do merge
