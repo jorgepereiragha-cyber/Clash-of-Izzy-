@@ -18,6 +18,9 @@ const files = [
   "../scripts/kingdom-3d.js",
   "../world-map-3d.js",
   "../scripts/post-processing.js",
+  "../scripts/kingdom-3d.js",
+  "../world-map-3d.js",
+  "../scripts/post-processing.js",
   "../engine/resource-disposal.js",
   "../engine/texture-manager.js"
 ];
