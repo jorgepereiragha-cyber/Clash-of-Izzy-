@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const MANIFEST_PATH = path.join(ROOT, "assets", "3d", "manifest.json");
-const OUTPUT_DIR = path.join(ROOT, "artifacts", "3d-optimization");
+const OUTPUT_DIR = path.join(ROOT, "node_modules", ".cache", "clash-of-izzy", "3d-optimization");
 
 function runTransform(args, label) {
   const result = spawnSync("gltf-transform", args, {
@@ -108,7 +108,7 @@ async function main() {
     "Compression variants must pass a visual and device benchmark before the runtime manifest is changed."
   ].join("\n") + "\n";
   await writeFile(path.join(OUTPUT_DIR, "report.md"), markdown);
-  console.log("Comparação concluída. Relatórios: artifacts/3d-optimization/report.{json,md}");
+  console.log("Comparação concluída. Relatórios: node_modules/.cache/clash-of-izzy/3d-optimization/report.{json,md}");
 }
 
 main().catch(error => {
