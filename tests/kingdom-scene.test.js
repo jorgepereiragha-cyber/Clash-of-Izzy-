@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
 
 test("kingdom scene renders original procedural terrain and building silhouettes", () => {
-  assert.match(kingdom, /function drawKingdomScene\(buildings\)/);
+  assert.match(kingdom, /function drawKingdomScene\(buildings,castleSkinId=0\)/);
   assert.match(kingdom, /createLinearGradient/);
   assert.match(kingdom, /const palette=/);
   assert.match(kingdom, /drawKingdomScene\(buildings\)/);
