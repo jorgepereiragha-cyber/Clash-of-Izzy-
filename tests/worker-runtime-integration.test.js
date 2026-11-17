@@ -171,7 +171,6 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     assert.equal(health.headers.get("x-frame-options"), "DENY");
 
     expectStatus(await api("/api/admin/health"), 401, "health administrativo sem sessão");
-    expectStatus(await api("/api/admin/health", { token: tokenA }), 401, "token de jogador não acessa health Master");
     expectStatus(await api("/api/admin/health", { method: "POST" }), 405, "health administrativo aceita somente GET");
 
     const valhallaDefault = expectStatus(await api("/api/config/valhalla"), 200, "configuração pública de Valhalla");
@@ -212,6 +211,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(Array.isArray(started.state?.queues));
     }
     const tokenA = startA.token, tokenB = startB.token, tokenC = startC.token;
+    expectStatus(await api("/api/admin/health", { token: tokenA }), 401, "token de jogador não acessa health Master");
     let stateA = startA.state;
     const kingdomA = Number(stateA.kingdom.id);
     const coreResourceKeys = ["food", "wood", "stone", "iron", "gold"];
