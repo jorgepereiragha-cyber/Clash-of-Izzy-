@@ -93,7 +93,7 @@ button:disabled{opacity:.5;cursor:wait}
     $("registerForm").hidden=true;
     $("registerIntro").textContent="Este reino já está protegido por uma conta persistente.";
     $("logoutButton").hidden=false;
-    setStatus("Conta vinculada: "+data.account.username+(data.account.email?" · "+data.account.email:"")+". Seu reino está protegido. Use o login em outros dispositivos.","success");
+    setStatus("Conta vinculada: "+data.account.username+(data.account.emailMasked?" · "+data.account.emailMasked:"")+". Seu reino está protegido. Use o login em outros dispositivos.","success");
    }else{
     $("logoutButton").hidden=true;
     setStatus("Reino existente encontrado neste dispositivo. Criar uma conta agora vai protegê-lo sem apagar construções, tropas, recursos ou progresso.","success");
