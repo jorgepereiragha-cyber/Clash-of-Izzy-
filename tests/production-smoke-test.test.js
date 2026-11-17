@@ -25,7 +25,7 @@ function successfulFetch() {
     if (path === "/api/game/state" || path === "/api/game/referral/link" || path === "/api/account/status") return makeResponse({ error: "Sessão inválida." }, 401);
     if (path === "/api/store/catalog") return makeResponse({ skins: [], packages: [] });
     if (path === "/arena.html") return makeResponse(
-      '<select id="purchaseMethod"><option value="mercadopago_link" selected>Mercado Pago</option></select> https://link.mercadopago.com.br/pagamentosskin paymentWindow',
+      '<p>purchase-request manual_whatsapp https://wa.me/</p>',
       200,
       "text/html; charset=utf-8"
     );
@@ -67,7 +67,7 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.apiHealth, true);
   assert.equal(result.checks.d1, true);
   assert.equal(result.checks.adminHealthAuthBoundary, true);
-  assert.equal(result.checks.mercadoPagoCheckout, true);
+  assert.equal(result.checks.manualWhatsAppPurchaseFlow, true);
   assert.equal(result.checks.betaSignupUi, true);
   assert.equal(result.checks.feedbackUiAndAnalytics, true);
   assert.equal(result.checks.staticPages, 9);
