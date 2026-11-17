@@ -560,6 +560,8 @@ async function requestOfficialPurchase(item,kind,button){
  const notice=document.getElementById('purchaseNotice');
  const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
  if(!token){notice.textContent='Conecte seu reino antes de solicitar um pacote.';return}
+ const whatsappWindow=window.open('about:blank','_blank');
+ if(whatsappWindow)whatsappWindow.opener=null;
  button.disabled=true;notice.textContent='Registrando seu pedido…';
  try{
   const response=await fetch(API_BASE+'/store/purchase-request',{
@@ -575,8 +577,10 @@ async function requestOfficialPurchase(item,kind,button){
   const message='Olá! Quero adquirir um pacote no Clash of Izzy.\nPedido: #'+requestId+'\nJogador: '+(kingdomSession?.player?.name||'Jogador')+'\nID do jogador: '+(kingdomSession?.player?.player_id||'')+'\nReino: '+(kingdomSession?.kingdom?.kingdom_name||'Eldoria')+'\nProduto: '+item.name+' ('+(kind==='skin'?'Skin':'Pacote VIP')+')\nValor: R$ '+Number(item.price_brl||0).toFixed(2).replace('.',',');
   notice.textContent='Pedido #'+requestId+' registrado. O WhatsApp será aberto para combinar o pagamento. A liberação ocorre após sua confirmação.';
   button.textContent='Pedido enviado · #'+requestId;
-  window.open('https://wa.me/'+number+'?text='+encodeURIComponent(message),'_blank','noopener');
- }catch(error){notice.textContent=error.message;button.disabled=false}
+  const whatsappUrl='https://wa.me/'+number+'?text='+encodeURIComponent(message);
+  if(whatsappWindow)whatsappWindow.location.href=whatsappUrl;
+  else window.location.assign(whatsappUrl);
+ }catch(error){if(whatsappWindow)whatsappWindow.close();notice.textContent=error.message;button.disabled=false}
 }
 async function loadCatalog(){
  const box=document.getElementById('catalog');
