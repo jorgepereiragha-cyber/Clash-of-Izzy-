@@ -2,7 +2,7 @@
 
 Data: 17 de novembro de 2026  
 Branch de trabalho: `release/one-shared-realm-early-access`  
-PR de lançamento: será a nova PR de rebase sobre a main protegida.
+PR de lançamento: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/pull/120
 
 ## Decisão de arquitetura do mundo
 
@@ -26,17 +26,17 @@ A redução de lotes e chamadas de chat ajuda a respeitar esses limites, mas ain
 
 ## Pendências obrigatórias antes de cobrar/publicar
 
-- **CI #963 aprovada no HEAD atual da PR #118:** 259/259 testes Node, Worker+D1, 3/3 cenários Playwright móveis, diagnóstico e smoke de produção somente leitura, e `wrangler deploy --dry-run`. O dry-run calculou 357,25 KiB (77,53 KiB gzip). As falhas intermediárias #947 (HTTP 503 ao fundar o primeiro reino) e #962 (asserções antigas de lote) foram tratadas antes da execução verde. Isso não equivale a benchmark real de quotas nem a deploy.
+- **CI #963 aprovada numa versão anterior, antes da equipagem de skins:** 259/259 testes Node, Worker+D1, 3/3 cenários Playwright móveis, diagnóstico e smoke de produção somente leitura, e `wrangler deploy --dry-run` (357,25 KiB / 77,53 KiB gzip). A nova CI #966 está validando a PR #120, incluindo migration 0027 e equipagem; ainda não considerar o HEAD atual aprovado.
 - Segurança administrativa: PR #116 foi integrada à `main` no commit `d94849fa38617dc8668cf8ab2dfed88984c094ab` após CI #941 verde. A proteção ainda precisa chegar à produção pelo workflow manual protegido.
 - **D1 de Preview ausente:** `wrangler.jsonc` tem `previews: {}` e não declara um banco D1 separado. Criar/confirmar um D1 descartável, adicionar `preview_database_id` sem tocar no binding de produção e validar somente nele. Não reutilizar o segundo ID antigo sem confirmar seu nome e finalidade.
 - Mercado Pago: confirmar no Worker os secrets `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`; executar compra de teste e receber webhook assinado. Sem essas credenciais, a loja usa link compartilhado e revisão manual Master.
-- Skins: equipagem e visualização foram implementadas nesta branch. A validação completa Worker+D1 e Playwright precisa aprovar a migration 0027 e os fluxos de propriedade antes do merge/deploy. A Issue #119 acompanha o aceite.
+- Skins: equipagem e visualização foram implementadas nesta branch. A validação Worker+D1 e Playwright da migration 0027 e dos fluxos de propriedade está na CI #966; não vender como entregue em produção antes do merge/deploy.
 - Android físico: testar cidade/mapa 3D, toque, PWA standalone, retomada de sessão, cache e consumo de memória.
 - Capacidade: medir CPU real, consultas D1 por `/api/game/state`, linhas lidas/escritas e backlog do Cron em staging antes de fixar limite público de jogadores.
 
 ## Preservação
 
-Nenhuma mudança foi publicada na `main`; nenhum deploy ou workflow de produção foi iniciado; nenhuma migration remota foi aplicada; nenhum banco, token, secret, conta, progresso, tropas, compras ou inventário foi apagado. A branch e a PR permanecem como proposta revisável até os gates acima passarem.
+A correção de segurança da PR #116 foi publicada no código da `main`, mas ainda não foi implantada na produção; nenhum deploy de produção foi iniciado; nenhuma migration remota foi aplicada; nenhum banco, token, secret, conta, progresso, tropas, compras ou inventário foi apagado. A branch e a PR permanecem como proposta revisável até os gates acima passarem.
 
 ## Sequência de lançamento
 
