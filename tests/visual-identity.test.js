@@ -4,6 +4,17 @@ import { readFile } from "node:fs/promises";
 
 const pages = ["index.html", "kingdom.html", "alliance.html", "arena.html", "admin.html"];
 
+test("landing has one central brand lockup and no gameplay navigation", async () => {
+  const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  assert.ok(!html.includes("/navigation.js"));
+  assert.ok(!html.includes("/styles/navigation.css"));
+  assert.ok(!html.includes("landing-footer-brand"));
+  assert.ok(html.includes('<h1>CLASH OF IZZY</h1>'));
+  assert.ok(html.includes('class="landing-crest"'));
+  assert.ok(html.includes('aria-label="Navegação da Landing"'));
+  for (const route of ["/world.html", "/alliance.html", "/arena.html", "/events.html"]) assert.ok(!html.includes(`href="${route}"`));
+});
+
 test("landing hero uses dedicated kingdom artwork instead of enlarging the brand icon", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
   const art = await readFile(new URL("../assets/art/landing-kingdom.svg", import.meta.url), "utf8");

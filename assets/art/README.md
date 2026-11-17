@@ -74,4 +74,4 @@
 - A landing page usa a ilustração vetorial original `/assets/art/landing-kingdom.svg`, separando a arte panorâmica do brasão e dos ícones PWA.
 - Texturas procedurais do reino usam 128 px no perfil low, 256 px no balanced e 512 px no high. A escolha considera memória, núcleos, limite de textura e Data Saver; a largura CSS da tela não rebaixa sozinha um Android capaz.
 - O atlas das duas famílias de modelos Kenney permanece local em 512 × 512 px. A árvore GLB foi mantida em um único ponto do terreno para não coincidir com uma instância da floresta procedural.
-- O Service Worker inclui a ilustração da landing page no shell e passa a usar cache v30 para invalidar os recursos estáticos anteriores.
+- O Service Worker inclui a ilustração da landing page no shell e passa a usar cache v31 para invalidar os recursos estáticos anteriores e entregar a Landing sem navegação de gameplay.

@@ -1,6 +1,7 @@
 /* Clash of Izzy — navegação compartilhada e busca local + online. */
 (() => {
   "use strict";
+  if (document.body?.classList.contains("landing-page")) return;
   if (window.__COI_NAV__) return;
   window.__COI_NAV__ = true;
 

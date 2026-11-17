@@ -19,14 +19,26 @@ test("shared navigation exposes the real game sections and a responsive search",
 });
 
 test("core management pages load one shared navigation without duplicating their local menu links", async () => {
-  for (const path of ["index.html","account.html","alliance.html","kingdom.html","world.html","admin.html","equipment-ui.html"]) {
+  for (const path of ["account.html","alliance.html","kingdom.html","world.html","admin.html","equipment-ui.html"]) {
     const html = await read(path);
     assert.ok(html.includes('/styles/navigation.css'), path + " must load shared navigation styles");
     assert.ok(html.includes('/navigation.js'), path + " must load shared navigation script");
   }
+  const landing = await read("index.html");
+  assert.ok(!landing.includes("/styles/navigation.css"));
+  assert.ok(!landing.includes("/navigation.js"));
+  for (const route of ["/world.html", "/alliance.html", "/arena.html", "/events.html"]) assert.ok(!landing.includes(`href="${route}"`));
+  for (const anchor of ['href="#sobre"', 'href="#eventos"', 'href="#beta"', 'href="#convites"', 'href="#play-now"']) assert.ok(landing.includes(anchor));
+  assert.ok(landing.includes('aria-label="Navegação da Landing"'));
+
   const kingdom = await read("kingdom.html");
   assert.ok(kingdom.includes('href="/alliance.html">🤝 Alianças') === false);
   assert.ok(kingdom.includes('href="/equipment-ui.html">⚒️ Equipamentos') === false);
+});
+
+test("shared navigation skips the landing page if accidentally loaded", async () => {
+  const nav = await read("navigation.js");
+  assert.ok(nav.includes('document.body?.classList.contains("landing-page")'));
 });
 
 test("navigation is a static section search, not an unsafe HTML search result renderer", async () => {

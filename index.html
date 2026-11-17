@@ -18,7 +18,6 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="Clash of Izzy">
   <link rel="stylesheet" href="/styles/coi-theme.css">
-  <link rel="stylesheet" href="/styles/navigation.css">
   <link rel="stylesheet" href="/styles/landing.css">
   <title>Clash of Izzy — Jogo Medieval de Estratégia</title>
 </head>
@@ -52,7 +51,7 @@
   </header>
 
   <main>
-    <section class="landing-shell landing-section" aria-labelledby="features-title">
+    <section id="sobre" class="landing-shell landing-section" aria-labelledby="features-title">
       <div class="landing-section-heading">
         <span class="eyebrow">Forje sua estratégia</span>
         <h2 id="features-title">Um reino. Muitas decisões.</h2>
@@ -82,17 +81,17 @@
       </div>
     </section>
 
-    <section class="landing-shell landing-section" aria-labelledby="valhalla-title">
+    <section id="eventos" class="landing-shell landing-section" aria-labelledby="valhalla-title">
       <div class="landing-callout">
         <div>
           <h2 id="valhalla-title">A lenda de Valhalla continua.</h2>
           <p>Descubra os recursos sazonais e as novidades de Valhalla quando o evento estiver habilitado no jogo. A disponibilidade é controlada pelo servidor.</p>
         </div>
-        <a class="landing-button secondary" href="/events.html">Ver eventos</a>
+        <a class="landing-button secondary" href="./kingdom.html">Entrar no reino para ver eventos</a>
       </div>
     </section>
 
-    <section class="landing-shell landing-section" aria-labelledby="beta-title">
+    <section id="beta" class="landing-shell landing-section" aria-labelledby="beta-title">
       <div class="landing-section-heading">
         <span class="eyebrow">Receba novidades</span>
         <h2 id="beta-title">Acompanhe o beta de Clash of Izzy</h2>
@@ -109,7 +108,7 @@
       </div>
     </section>
 
-    <section class="landing-shell landing-section" aria-labelledby="referral-title">
+    <section id="convites" class="landing-shell landing-section" aria-labelledby="referral-title">
       <div class="landing-referral">
         <h2 id="referral-title">🎁 Convide seus amigos</h2>
         <p>Seu link pessoal registra novos reinos criados por indicação. Entre no jogo para gerar e copiar seu convite.</p>
@@ -123,13 +122,12 @@
   </main>
 
   <footer class="landing-footer">
-    <div class="landing-footer-brand"><img src="/icon-192.svg" alt="" width="30" height="30"> <span>CLASH OF IZZY</span></div>
-    <nav class="landing-footer-links" aria-label="Links do jogo">
-      <a href="/kingdom.html">Entrar no reino</a>
-      <a href="/world.html">Mapa mundial</a>
-      <a href="/events.html">Eventos</a>
-      <a href="/alliance.html">Alianças</a>
-      <a href="./arena.html">Arena individual</a>
+    <nav class="landing-footer-links" aria-label="Navegação da Landing">
+      <a href="#sobre">Sobre</a>
+      <a href="#eventos">Eventos</a>
+      <a href="#beta">Beta</a>
+      <a href="#convites">Convites</a>
+      <a href="#play-now">Entrar no reino</a>
     </nav>
     <p class="landing-copyright">© 2026 Clash of Izzy. Todos os direitos reservados.</p>
   </footer>
@@ -142,6 +140,5 @@
   </div>
 
   <script src="/landing.js" defer></script>
-  <script src="/navigation.js" defer></script>
 </body>
 </html>
