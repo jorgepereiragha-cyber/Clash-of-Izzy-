@@ -40,7 +40,7 @@ test("public health and Core Loop validators fail closed when D1 schema or sessi
   const smoke = await read("scripts/production-smoke.js");
   const validator = await read("scripts/validate-core-loop.sh");
 
-  assert.match(worker, /checks\.session=Boolean\(env\.SESSION_SECRET\)/);
+  assert.match(worker, /const checks=\{database:false,session:Boolean\(env\.SESSION_SECRET\),schema:false\}/);
   assert.match(worker, /checks\.schema=missingTables\.length===0/);
   assert.match(smoke, /health\.checks\?\.database\s*===\s*true/);
   assert.match(smoke, /health\.checks\?\.schema\s*===\s*true/);
@@ -76,7 +76,7 @@ test("every frontend player-discovery surface uses the shared global search endp
   const alliance = await read("alliance.html");
 
   assert.match(kingdom, /type:"players"/);
-  assert.match(kingdom, /request\("\/game\/search\?\+params\.toString\(\)"/);
+  assert.match(kingdom, /request\("\/game\/search\?"\+params\.toString\(\)\)/);
   assert.match(navigation, /type:"all",limit:"8"/);
-  assert.match(alliance, /request\("\/game\/search\?\+params\.toString\(\)"/);
+  assert.match(alliance, /request\("\/game\/search\?"\+params\.toString\(\)\)/);
 });
