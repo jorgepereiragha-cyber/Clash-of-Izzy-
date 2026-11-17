@@ -199,7 +199,7 @@ export async function runProductionSmokeTests({
       pagePath + " ainda não resolve Three.js pelo runtime local.");
     assert(html.includes('"three/addons/":"/vendor/three/examples/jsm/"'),
       pagePath + " não configura o caminho local dos addons.");
-    assert(!/cdn\\.jsdelivr\\.net\\/npm\\/three/i.test(html),
+    assert(!/cdn\.jsdelivr\.net\/npm\/three/i.test(html),
       pagePath + " ainda depende do CDN do Three.js.");
   }
 
@@ -207,7 +207,7 @@ export async function runProductionSmokeTests({
     const moduleResponse = await get(modulePath);
     assert(moduleResponse.status === 200, modulePath + " indisponível.");
     const moduleBody = await moduleResponse.text();
-    assert(!/cdn\\.jsdelivr\\.net\\/npm\\/three/i.test(moduleBody),
+    assert(!/cdn\.jsdelivr\.net\/npm\/three/i.test(moduleBody),
       modulePath + " ainda importa Three.js de um CDN.");
   }
 
