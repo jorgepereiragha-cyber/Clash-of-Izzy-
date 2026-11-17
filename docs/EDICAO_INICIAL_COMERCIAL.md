@@ -4,14 +4,16 @@
 
 Publicar uma versão pequena e controlada, adequada ao plano Cloudflare Workers Gratuito, sem apagar a evolução já armazenada no projeto.
 
-## Reinos e jogadores
+## Um único reino compartilhado: Eldoria
 
-- O jogo mantém um único mundo compartilhado.
-- Cada identidade de jogador possui um único reino. A tabela `kingdoms` já impõe `UNIQUE(player_id)`.
-- Uma chamada autenticada a `POST /api/game/start` com um token que já possui reino retoma esse reino e não cria outro.
-- Jogadores diferentes continuam podendo entrar no mesmo mundo e criar seu próprio reino.
-- Não existe nesta versão um sistema de múltiplos mundos/servidores independentes; novos mundos ficam fora da edição inicial.
-- O limite atual de criação por IP (20 por hora) continua sendo proteção contra abuso, não um limite global de população. Não bloquear clientes legítimos por compartilharem a mesma rede.
+- Existe somente um mundo/reino público nesta edição: **Eldoria**. Todos os jogadores entram no mesmo servidor e interagem no mesmo mapa estratégico.
+- A tabela legada `kingdoms` guarda a cidade/castelo controlado por cada jogador; ela não representa um servidor privado nem um mundo separado.
+- Cada jogador recebe uma cidade/castelo no reino comum. A restrição `UNIQUE(player_id)` impede a criação de assentamentos duplicados pela mesma identidade, mas não divide jogadores em mundos diferentes.
+- A coluna antiga `map_region` é mantida por compatibilidade, mas todos os castelos passam a usar `map_region = 1`. Não haverá criação automática de outro mundo após 400 jogadores.
+- O mapa usa coordenadas persistentes em uma grade compartilhada de 20 colunas que cresce por novas linhas. Cada jogador vê os castelos próximos à sua posição; isso limita consultas e dados enviados ao celular sem criar outro reino.
+- A migração `0026_single_shared_realm.sql` reposiciona os marcadores dos castelos antigos para reunir regiões anteriores. Preserva IDs, contas, recursos, construções, tropas, pesquisas, alianças, marchas, batalhas e inventários.
+- Uma chamada autenticada a `POST /api/game/start` com uma identidade que já possui cidade retoma o estado existente, sem criar outra.
+- O limite atual de criação por IP (20 por hora) continua sendo proteção contra abuso, não um limite global de população. Não bloquear clientes legítimos apenas por compartilharem a mesma rede.
 
 ## Loja de skins pagas
 
@@ -28,8 +30,8 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 
 ## Dados e implantação
 
-- Nenhuma migration nova.
-- Nenhuma exclusão, atualização ou limpeza de dados D1.
+- A migration 0026 é aditiva quanto ao schema e só atualiza coordenadas e marcadores dos castelos para unificar o mapa; não remove registros de jogadores ou progresso.
+- Nenhuma migration antiga é reescrita.
 - Nenhuma mudança no identificador de jogadores, tokens, economia, combate, alianças, marchas ou rallies.
 - A alteração permanece nesta branch/PR para CI e revisão.
 - Não executar deploy nem migrações remotas como parte desta alteração. A publicação de produção continua no fluxo manual protegido.
