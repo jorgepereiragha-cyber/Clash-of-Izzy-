@@ -140,3 +140,19 @@ test("rejects an enabled GLB whose external texture or buffer path escapes the a
   try { await assert.rejects(validateAssetManifest(escaping), /traversal|escapa/); }
   finally { await rm(escaping, { recursive: true, force: true }); }
 });
+
+test("kingdom scene manifest expands defensive props and supports per-instance orientation", async () => {
+  const manifest = JSON.parse(await (await import("node:fs/promises")).readFile(
+    new URL("../assets/3d/manifest.json", import.meta.url), "utf8"
+  ));
+  const renderer = await (await import("node:fs/promises")).readFile(
+    new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8"
+  );
+  const trebuchet = manifest.props.find(item => item.id === "kenney-siege-trebuchet");
+  const trees = manifest.props.find(item => item.id === "kenney-tree-high");
+  assert.equal(trebuchet.positions.length, 2);
+  assert.equal(trebuchet.rotations.length, 2);
+  assert.equal(trees.positions.length, 6);
+  assert.match(renderer, /asset\.rotations\?\.\[index\]/);
+  assert.match(renderer, /instanceRotation\.every\(value => Number\.isFinite\(Number\(value\)\)\)/);
+});
