@@ -50,8 +50,11 @@ function successfulFetch() {
     });
     if (path.startsWith("/vendor/three/")) return makeResponse("x".repeat(256), 200,
       path.endsWith(".wasm") ? "application/wasm" : "text/javascript; charset=utf-8");
+    if (path === "/world-map-3d.js") {
+      return makeResponse('import * as THREE from "three"; new THREE.OrthographicCamera(); function createMarchFormation(){}', 200, "text/javascript; charset=utf-8");
+    }
     if (path === "/engine/asset-loader.js" || path === "/scripts/kingdom-3d.js" ||
-        path === "/world-map-3d.js" || path === "/scripts/post-processing.js") {
+        path === "/scripts/post-processing.js") {
       return makeResponse('import * as THREE from "three";', 200, "text/javascript; charset=utf-8");
     }
     if (path === "/arena.html" || path === "/kingdom.html" || path === "/world.html") {
@@ -65,7 +68,6 @@ function successfulFetch() {
     if (path === "/styles/premium-ui.css") return makeResponse("/* CINEMATIC TRAILER RECORDER */", 200, "text/css");
 
     if (path === "/world-map-viewport.js") return makeResponse("export function clampMapViewport(){} export function mapViewportTransform(){}", 200, "text/javascript");
-    if (path === "/world-map-3d.js") return makeResponse("new THREE.OrthographicCamera(); function createMarchFormation(){}", 200, "text/javascript");
     return makeResponse("<!doctype html><html lang=\"pt-BR\"><head><title>Clash of Izzy</title></head><body><main>Clash of Izzy - estratégia medieval e reino</main></body></html>", 200, "text/html; charset=utf-8");
   };
   return { fetchImpl, calls };
