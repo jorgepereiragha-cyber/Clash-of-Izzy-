@@ -9,10 +9,14 @@ import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
+import { getSharedWorldCoordinates } from "./shared-world-coordinates.js";
 import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
 import { handleMercadoPagoRoute } from "./mercadopago-orders.js";
+
+// Launch edition: keep the full catalog in D1, but expose only six paid skins.
+const INITIAL_PAID_SKIN_LIMIT = 6;
 const BUILDINGS = {
   castle:{label:"Castelo",wood:300,stone:200,food:0,iron:0},
   barracks:{label:"Quartel",wood:180,stone:90,food:0,iron:0},
@@ -257,11 +261,9 @@ async function ensureKingdom(env,playerId){
     const created=await env.DB.prepare("INSERT INTO kingdoms(player_id,kingdom_name,food,wood,stone,iron,gold,last_production_at) VALUES(?,?,?,?,?,?,?,?)")
       .bind(p.id,"Reino de Eldoria",5000,5000,3000,1000,1000,new Date().toISOString()).run();
     const id=Number(created.meta.last_row_id);
-    const mapSlot=id-1;
-    const mapX=((mapSlot%20)-10)*5;
-    const mapZ=((Math.floor(mapSlot/20)%20)-10)*5;
-    const mapRegion=Math.floor(mapSlot/400)+1;
-    await env.DB.prepare("UPDATE kingdoms SET map_x=?,map_z=?,map_region=? WHERE id=?").bind(mapX,mapZ,mapRegion,id).run();
+    const worldPosition=getSharedWorldCoordinates(id);
+    await env.DB.prepare("UPDATE kingdoms SET map_x=?,map_z=?,map_region=? WHERE id=?")
+      .bind(worldPosition.mapX,worldPosition.mapZ,worldPosition.mapRegion,id).run();
     const buildingRows=Object.keys(BUILDINGS).map((key,i)=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_buildings(kingdom_id,building_type,level,position_x,position_z) VALUES(?,?,1,?,?)").bind(id,key,((i%4)-1.5)*7,Math.floor(i/4)*7-7));
     const unitRows=Object.keys(UNITS).map((key)=>env.DB.prepare("INSERT OR IGNORE INTO army_units(kingdom_id,unit_type,tier,quantity) VALUES(?,?,1,?)").bind(id,key,key==="militia"?30:0));
     await env.DB.batch([
@@ -398,9 +400,9 @@ async function seedWorld(env){
  ];
  await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate) VALUES(?,?,?,?,?,?,?)").bind(...n,90)));
 }
-async function processMarches(env,kingdomId){
+async function processMarches(env,kingdomId,batchSize=50){
  const now=new Date().toISOString();
- const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
+ const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT ?").bind(kingdomId,now,Math.max(1,Math.min(50,Math.floor(Number(batchSize)||50)))).all();
  for(const m of due.results||[]){
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
   const resolvedAt=new Date().toISOString(),resolutionToken=crypto.randomUUID();
@@ -596,14 +598,14 @@ async function gameState(env,playerId){
       "CASE WHEN wt.territory_kind='castle' THEN wt.x-? ELSE wt.x END AS x,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.z-? ELSE wt.z END AS z,"+
       "wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,wt.territory_kind,"+
-      "owner.id AS kingdom_id,owner.kingdom_name,owner.castle_level,owner.power,"+
+      "owner.id AS kingdom_id,owner.kingdom_name,owner.castle_level,owner.power,owner.equipped_skin_id AS castle_skin_id,"+
       "COALESCE(n.nickname,op.name) AS commander_name,"+
       "COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=owner.id),'') AS alliance_tag "+
       "FROM world_territories wt LEFT JOIN kingdoms owner ON owner.id=wt.owner_kingdom_id "+
       "LEFT JOIN players op ON op.id=owner.player_id LEFT JOIN player_nicknames n ON n.player_id=op.id "+
-      "WHERE wt.territory_kind='resource' OR (wt.territory_kind='castle' AND owner.map_region=? AND wt.owner_kingdom_id<>? "+
+      "WHERE wt.territory_kind='resource' OR (wt.territory_kind='castle' AND wt.owner_kingdom_id<>? "+
       "AND wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?) ORDER BY wt.territory_kind,wt.id LIMIT 250"
-    ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,Number(kingdom.map_region)||1,kingdom.id,
+    ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,kingdom.id,
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45).all(),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id).all(),
@@ -636,6 +638,7 @@ async function gameState(env,playerId){
   const armyCount=totalTroops+fieldTroops+queuedTraining;
   const shop=await getShopState(env,kingdom.id);
   const cosmetics=await getCosmeticState(env,kingdom.id);
+  const castleSkins=await env.DB.prepare("SELECT s.id,s.name,s.price_brl,ps.unlocked_at FROM player_skins ps JOIN skins s ON s.id=ps.skin_id WHERE ps.player_id=? ORDER BY s.id").bind(p.id).all();
   const equipmentRows=await ensureEquipmentTables(env,kingdom.id);
   const heroEquipment=(await env.DB.prepare("SELECT he.hero_id,h.hero_name,he.slot,he.item_key,he.level FROM hero_equipment he JOIN heroes h ON h.id=he.hero_id WHERE h.kingdom_id=? ORDER BY h.level DESC,h.id,he.slot").bind(kingdom.id).all()).results||[];
   const equippedByItem=new Map(heroEquipment.map(item=>[item.item_key,Number(item.hero_id)]));
@@ -649,7 +652,7 @@ async function gameState(env,playerId){
   const activeGearRows=heroEquipment.filter(item=>Number(item.hero_id)===activeHeroId).map(item=>equipmentRows.find(row=>row.item_key===item.item_key)).filter(Boolean);
   const activeGear=equipmentBonuses(activeGearRows,research.results||[]);
   const petState=await getPetsState(env,kingdom.id);
-  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
+  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentBonuses:activeGear,cosmetics,castleSkins:castleSkins.results||[],player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1)))},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -672,6 +675,20 @@ async function gameAction(env,playerId,body){
       const conflict=await env.DB.prepare("SELECT player_id FROM player_nicknames WHERE nickname_key=?").bind(nicknameKey).first();
       if(conflict&&Number(conflict.player_id)!==Number(p.id))return json({error:"Este nickname já está em uso. Escolha outro."},409);
       throw error;
+    }
+  }else if(type==="castle_skin_equip"){
+    const rawSkinId=body.skinId;
+    if(rawSkinId===null||rawSkinId===undefined||rawSkinId===""){
+      if(k.equipped_skin_id!==null&&k.equipped_skin_id!==undefined){
+        await env.DB.prepare("UPDATE kingdoms SET equipped_skin_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(k.id).run();
+        await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"castle_skin_unequipped","{}").run();
+      }
+    }else{
+      const skinId=Number(rawSkinId);
+      if(!Number.isSafeInteger(skinId)||skinId<1)return json({error:"Skin de castelo inválida."},400);
+      const result=await env.DB.prepare("UPDATE kingdoms SET equipped_skin_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?)").bind(skinId,k.id,p.id,skinId).run();
+      if(!result.meta?.changes)return json({error:"Você não possui esta skin."},404);
+      await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"castle_skin_equipped",JSON.stringify({skinId})).run();
     }
   }else if(type==="equipment_craft"){
     const itemKey=String(body.itemId||""),def=EQUIPMENT_CATALOG[itemKey];
@@ -1396,13 +1413,18 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
 }
 
 async function distributeAngelDeathRewards(env,eventId,now=new Date()){
-  const participants=await env.DB.prepare("SELECT ep.kingdom_id,k.player_id,ep.score FROM world_event_participants ep JOIN kingdoms k ON k.id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0 ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC")
-    .bind(eventId).all();
+  const participants=await env.DB.prepare(
+    "SELECT ranked.kingdom_id,ranked.player_id,ranked.score,ranked.final_rank FROM ("+
+    "SELECT ep.kingdom_id,k.player_id,ep.score,ROW_NUMBER() OVER (ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC) AS final_rank "+
+    "FROM world_event_participants ep JOIN kingdoms k ON k.id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0) ranked "+
+    "LEFT JOIN world_event_rewards wr ON wr.event_id=? AND wr.kingdom_id=ranked.kingdom_id "+
+    "WHERE wr.id IS NULL OR wr.paid_at IS NULL ORDER BY ranked.final_rank LIMIT 10"
+  ).bind(eventId,eventId).all();
   const rows=participants.results||[];
-  for(let offset=0;offset<rows.length;offset+=15){
+  if(rows.length){
     const statements=[];
-    for(let index=offset;index<Math.min(rows.length,offset+15);index++){
-      const participant=rows[index],rank=index+1,reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
+    for(let index=0;index<rows.length;index++){
+      const participant=rows[index],rank=Number(participant.final_rank)||index+1,reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
       statements.push(env.DB.prepare("INSERT OR IGNORE INTO world_event_rewards(event_id,kingdom_id,rank,score,reward_json) VALUES(?,?,?,?,?)").bind(eventId,participant.kingdom_id,rank,participant.score,rewardJson));
       statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()>0").bind(reward.food,reward.wood,reward.stone,reward.iron,reward.gold,participant.kingdom_id));
       statements.push(env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()>0").bind(reward.gems,participant.player_id));
@@ -1418,7 +1440,7 @@ async function distributeAngelDeathRewards(env,eventId,now=new Date()){
 async function processAngelDeathEventLifecycle(env,now=new Date()){
   if(!env.DB)return;
   await ensureAngelDeathWeekend(env,now);
-  const due=await env.DB.prepare("SELECT id FROM world_events WHERE event_key=? AND status IN ('scheduled','active') AND ends_at<=? ORDER BY ends_at LIMIT 10")
+  const due=await env.DB.prepare("SELECT id FROM world_events WHERE event_key=? AND status IN ('scheduled','active') AND ends_at<=? ORDER BY ends_at LIMIT 1")
     .bind(ANGEL_DEATH_EVENT.key,now.toISOString()).all();
   for(const row of due.results||[]){
     try{await distributeAngelDeathRewards(env,row.id,now);}
@@ -1431,7 +1453,7 @@ async function processDueKingdomQueues(env,kingdomId=null){
   const now=new Date().toISOString();
   const query=kingdomId
     ? env.DB.prepare("SELECT * FROM kingdom_queues WHERE kingdom_id=? AND status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT 25").bind(kingdomId,now)
-    : env.DB.prepare("SELECT * FROM kingdom_queues WHERE status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT 200").bind(now);
+    : env.DB.prepare("SELECT * FROM kingdom_queues WHERE status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT 3").bind(now);
   const due=await query.all();
   for(const queue of due.results||[]){
     const completionToken=crypto.randomUUID(),completedAt=new Date().toISOString();
@@ -1483,11 +1505,11 @@ async function processDueMarches(env){
   if(!env.DB)return;
   const now=new Date().toISOString();
   const dueKingdoms=await env.DB.prepare(
-    "SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 100"
+    "SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 1"
   ).bind(now).all();
   for(const row of dueKingdoms.results||[]){
     try{
-      await processMarches(env,row.kingdom_id);
+      await processMarches(env,row.kingdom_id,2);
     }catch(error){
       // Uma falha num reino não impede a resolução das marchas dos demais.
       console.error("scheduled_march_resolution_failed",row.kingdom_id,String(error?.message||error));
@@ -1509,11 +1531,11 @@ export default {
   catch(error){console.error("scheduled_rally_resolution_failed",String(error?.message||error));}
   try{await processAngelDeathEventLifecycle(env);}
   catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
-  try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();}
+  try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE rate_key IN (SELECT rate_key FROM api_rate_limits WHERE expires_at<=? ORDER BY expires_at LIMIT 100)").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_rate_limit_cleanup_failed",String(error?.message||error));}
-  try{await env.DB.prepare("UPDATE battle_reports SET replay_json='{}',battle_log='[]' WHERE replay_expires_at>0 AND replay_expires_at<=? AND (replay_json<>'{}' OR battle_log<>'[]')").bind(Math.floor(Date.now()/1000)).run();}
+  try{await env.DB.prepare("UPDATE battle_reports SET replay_json='{}',battle_log='[]' WHERE id IN (SELECT id FROM battle_reports WHERE replay_expires_at>0 AND replay_expires_at<=? AND (replay_json<>'{}' OR battle_log<>'[]') ORDER BY replay_expires_at,id LIMIT 25)").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_battle_replay_expiry_failed",String(error?.message||error));}
-  try{await processEmailQueue(env,10);}
+  try{await processEmailQueue(env,1);}
   catch(error){console.error("scheduled_email_queue_failed",String(error?.message||error));}
  },
  async fetch(request,env){
@@ -1578,10 +1600,10 @@ export default {
       const limited=await rateLimitDecision(env,"store-catalog-ip",ip,60,60);
       if(limited)return limited;
       const [skins,packages]=await Promise.all([
-        env.DB.prepare("SELECT id,name,price_brl FROM skins ORDER BY price_brl,name").all(),
+        env.DB.prepare("SELECT id,name,price_brl FROM skins ORDER BY id LIMIT ?").bind(INITIAL_PAID_SKIN_LIMIT).all(),
         env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages ORDER BY price_brl,name").all()
       ]);
-      return json({skins:skins.results||[],packages:packages.results||[],whatsapp:"+5547996531437"});
+      return json({skins:skins.results||[],packages:packages.results||[],skin_edition:"initial",skin_limit:INITIAL_PAID_SKIN_LIMIT,whatsapp:"+5547996531437"});
     }catch(e){return json({error:"Catálogo indisponível no momento."},503)}
   }
   if(url.pathname==="/api/game/start"&&request.method==="POST"){
@@ -1590,6 +1612,17 @@ export default {
       const ip=request.headers.get("CF-Connecting-IP")||"unknown";
       const limited=await rateLimitDecision(env,"game-start-ip",ip,20,3600);
       if(limited)return limited;
+      const existingPlayerId=await gameIdentity(request,env);
+      if(existingPlayerId){
+        const existingKingdom=await env.DB.prepare("SELECT 1 FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?").bind(existingPlayerId).first();
+        if(existingKingdom){
+          const account=await env.DB.prepare("SELECT a.session_version FROM player_accounts a JOIN players p ON p.id=a.player_id WHERE p.player_id=?").bind(existingPlayerId).first();
+          const payload={sub:existingPlayerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365};
+          if(account)payload.av=Number(account.session_version);
+          const token=await sign(payload,env.SESSION_SECRET);
+          return json({token,state:await gameState(env,existingPlayerId),referral_recorded:false,resumed:true},200);
+        }
+      }
       const startBody=await readBody(request,4096);
       if(startBody.__bodyError)return json({error:"Solicitação de criação de reino inválida."},startBody.__bodyError==="payload_too_large"?413:400);
       const playerId="izzy_"+crypto.randomUUID().replace(/-/g,"");
@@ -1633,8 +1666,8 @@ export default {
     if(!kingdom)return json({error:"Reino não encontrado."},404);
     const item=kind==="vip_package"
       ?await env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages WHERE id=?").bind(itemId).first()
-      :await env.DB.prepare("SELECT id,name,price_brl FROM skins WHERE id=?").bind(itemId).first();
-    if(!item)return json({error:"Produto não encontrado no catálogo."},404);
+      :await env.DB.prepare("SELECT id,name,price_brl FROM skins WHERE id=? AND id IN (SELECT id FROM skins ORDER BY id LIMIT ?)").bind(itemId,INITIAL_PAID_SKIN_LIMIT).first();
+    if(!item)return json({error:kind==="skin"?"Esta skin está bloqueada para uma atualização futura.":"Produto não encontrado no catálogo."},404);
     if(kind==="skin"){
       const owned=await env.DB.prepare("SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?").bind(player.id,item.id).first();
       if(owned)return json({error:"Você já possui esta skin."},409);
@@ -1875,8 +1908,8 @@ export default {
         if(wantsEntities){
           try{
             const indexed=await env.DB.prepare(
-              "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)), '') AS kingdom_alliance_tag,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,f.rank AS search_rank FROM game_search_fts f JOIN game_search_documents d ON d.id=f.rowid WHERE game_search_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1))) ORDER BY f.rank LIMIT ?"
-            ).bind(ftsQuery,kind,entityType,playerId,limit*4).all();
+              "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)), '') AS kingdom_alliance_tag,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,f.rank AS search_rank FROM game_search_fts f JOIN game_search_documents d ON d.id=f.rowid WHERE game_search_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1))) AND (d.entity_type<>'skin' OR CAST(d.entity_key AS INTEGER) IN (SELECT id FROM skins ORDER BY id LIMIT ?)) ORDER BY f.rank LIMIT ?"
+            ).bind(ftsQuery,kind,entityType,playerId,INITIAL_PAID_SKIN_LIMIT,limit*4).all();
             if((indexed.results||[]).length)usedFts=true;
             for(const row of indexed.results||[]){
               if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0),allianceTag:row.kingdom_alliance_tag||""},row.search_rank);
@@ -1888,8 +1921,8 @@ export default {
           if(queryLength>=3){
             try{
               const partial=await env.DB.prepare(
-                "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)), '') AS kingdom_alliance_tag,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,s.rank AS search_rank FROM game_search_substring_fts s JOIN game_search_documents d ON d.id=s.rowid WHERE game_search_substring_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1))) ORDER BY s.rank LIMIT ?"
-              ).bind(substringQuery,kind,entityType,playerId,limit*4).all();
+                "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)), '') AS kingdom_alliance_tag,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,s.rank AS search_rank FROM game_search_substring_fts s JOIN game_search_documents d ON d.id=s.rowid WHERE game_search_substring_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1))) AND (d.entity_type<>'skin' OR CAST(d.entity_key AS INTEGER) IN (SELECT id FROM skins ORDER BY id LIMIT ?)) ORDER BY s.rank LIMIT ?"
+              ).bind(substringQuery,kind,entityType,playerId,INITIAL_PAID_SKIN_LIMIT,limit*4).all();
               entitySubstringAvailable=true;
               if((partial.results||[]).length)usedFts=true;
               for(const row of partial.results||[]){
@@ -1905,8 +1938,8 @@ export default {
           if(fuzzyQuery){
             try{
               const fuzzy=await env.DB.prepare(
-                "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)), '') AS kingdom_alliance_tag,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,s.rank AS search_rank FROM game_search_substring_fts s JOIN game_search_documents d ON d.id=s.rowid WHERE game_search_substring_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1))) ORDER BY s.rank LIMIT ?"
-              ).bind(fuzzyQuery,kind,entityType,playerId,Math.min(160,limit*8)).all();
+                "SELECT d.entity_type,d.entity_key,d.title,d.subtitle,COALESCE((SELECT tag FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)), '') AS alliance_tag,COALESCE((SELECT terrain FROM world_territories WHERE id=CAST(d.entity_key AS INTEGER)), '') AS territory_terrain,COALESCE((SELECT power FROM kingdoms WHERE id=CAST(d.entity_key AS INTEGER)),0) AS power,COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=CAST(d.entity_key AS INTEGER)), '') AS kingdom_alliance_tag,COALESCE((SELECT level FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),1) AS alliance_level,COALESCE((SELECT COUNT(*) FROM alliance_members WHERE alliance_id=CAST(d.entity_key AS INTEGER)),0) AS member_count,COALESCE((SELECT territory_count FROM alliances WHERE id=CAST(d.entity_key AS INTEGER)),0) AS territory_count,s.rank AS search_rank FROM game_search_substring_fts s JOIN game_search_documents d ON d.id=s.rowid WHERE game_search_substring_fts MATCH ? AND (?='all' OR d.entity_type=?) AND (d.entity_type<>'kingdom' OR (CAST(d.entity_key AS INTEGER)<>COALESCE((SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?),-1))) AND (d.entity_type<>'skin' OR CAST(d.entity_key AS INTEGER) IN (SELECT id FROM skins ORDER BY id LIMIT ?)) ORDER BY s.rank LIMIT ?"
+              ).bind(fuzzyQuery,kind,entityType,playerId,INITIAL_PAID_SKIN_LIMIT,Math.min(160,limit*8)).all();
               if((fuzzy.results||[]).length)usedFts=true;
               for(const row of fuzzy.results||[]){
                 if(row.entity_type==="kingdom")addResult({type:"kingdom",name:row.title,power:Number(row.power||0),allianceTag:row.kingdom_alliance_tag||""},row.search_rank,true);
@@ -1932,7 +1965,7 @@ export default {
               for(const row of rows.results||[])addResult({type:"territory",name:row.name,terrain:row.terrain});
             }
           if((kind==="all"||kind==="skins")&&(!hasType("skin")||!entitySubstringAvailable||needsShortUnicodeFallback)){
-              const rows=await env.DB.prepare("SELECT name FROM skins WHERE name LIKE ? ESCAPE '!' COLLATE NOCASE ORDER BY name LIMIT ?").bind(pattern,categoryLimit).all();
+              const rows=await env.DB.prepare("SELECT name FROM skins WHERE id IN (SELECT id FROM skins ORDER BY id LIMIT ?) AND name LIKE ? ESCAPE '!' COLLATE NOCASE ORDER BY id LIMIT ?").bind(INITIAL_PAID_SKIN_LIMIT,pattern,categoryLimit).all();
               for(const row of rows.results||[])addResult({type:"skin",name:row.name,description:"Skin cosmética"});
             }
         }
@@ -1979,6 +2012,23 @@ export default {
         const ip=request.headers.get("CF-Connecting-IP")||"unknown";
         const networkLimit=await rateLimitDecision(env,"game-action-network",ip,600,60);
         if(networkLimit)return networkLimit;
+      }
+      if(url.pathname==="/api/game/alliance/chat"){
+        if(request.method!=="GET")return json({error:"Método não permitido."},405);
+        const playerLimit=await rateLimitDecision(env,"alliance-chat-read-player",playerId,60,60);
+        if(playerLimit)return playerLimit;
+        const rows=await env.DB.prepare(
+          "SELECT a.id AS alliance_id,a.name AS alliance_name,a.tag AS alliance_tag,c.id,c.message,c.created_at,author.kingdom_name "+
+          "FROM kingdoms own JOIN alliance_members am ON am.kingdom_id=own.id JOIN alliances a ON a.id=am.alliance_id "+
+          "LEFT JOIN alliance_chat c ON c.alliance_id=a.id LEFT JOIN kingdoms author ON author.id=c.kingdom_id "+
+          "WHERE own.player_id=(SELECT id FROM players WHERE player_id=?) ORDER BY c.id DESC LIMIT 50"
+        ).bind(playerId).all();
+        const messages=(rows.results||[]).filter(row=>row.id!==null).reverse().map(row=>({
+          id:row.id,message:row.message,created_at:row.created_at,kingdom_name:row.kingdom_name
+        }));
+        const first=(rows.results||[])[0];
+        const alliance=first?{id:first.alliance_id,name:first.alliance_name,tag:first.alliance_tag}:null;
+        return json({alliance,chat:messages});
       }
       if(url.pathname.startsWith("/api/game/rally/")){
         const rallyPath=url.pathname.slice("/api/game/rally/".length);
@@ -2078,7 +2128,7 @@ export default {
     if(url.pathname==="/api/admin/unlock-skin"){
       const id=String(body.playerId||"").trim(),name=String(body.skin||"").trim();if(!id||!name)return json({error:"Informe o ID do jogador e a skin."},400);
       const player=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(id).first();if(!player)return json({error:"Jogador não encontrado."},404);
-      const skin=await env.DB.prepare("SELECT id FROM skins WHERE name=?").bind(name).first();if(!skin)return json({error:"Skin não cadastrada no catálogo."},404);
+      const skin=await env.DB.prepare("SELECT id FROM skins WHERE name=? AND id IN (SELECT id FROM skins ORDER BY id LIMIT ?)").bind(name,INITIAL_PAID_SKIN_LIMIT).first();if(!skin)return json({error:"Skin não cadastrada ou bloqueada na edição inicial."},404);
       await env.DB.prepare("INSERT OR IGNORE INTO player_skins(player_id,skin_id) VALUES(?,?)").bind(player.id,skin.id).run();return json({success:true,message:"Skin liberada para o jogador."});
     }
     if(url.pathname==="/api/admin/vip-packages"){

@@ -35,3 +35,20 @@ test("entrada por sigla respeita o limite de membros da aliança", async () => {
   assert.ok(worker.includes("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT ?,?,'member' WHERE (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=?) < ?"));
   assert.ok(worker.includes("A aliança atingiu o limite de membros."));
 });
+
+test("chat da arena usa feed autenticado compacto em vez de consultar o estado inteiro do reino", async () => {
+  const arena = await readFile(new URL("../arena.html", import.meta.url), "utf8");
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const refreshStart = arena.indexOf("async function refreshAllianceChat");
+  const refreshEnd = arena.indexOf("document.getElementById('openChat')", refreshStart);
+  const refresh = arena.slice(refreshStart, refreshEnd);
+
+  assert.ok(arena.includes("localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token')||''"));
+  assert.ok(refresh.includes("chatApi('/game/alliance/chat')"));
+  assert.ok(refresh.includes("chat:data.chat||[]"));
+  assert.ok(!refresh.includes("chatApi('/game/state')"));
+  assert.ok(arena.includes("setInterval(refreshAllianceChat,15000)"));
+  assert.ok(worker.includes('url.pathname==="/api/game/alliance/chat"'));
+  assert.ok(worker.includes("LEFT JOIN alliance_chat c ON c.alliance_id=a.id"));
+  assert.ok(worker.includes('rateLimitDecision(env,"alliance-chat-read-player",playerId,60,60)'));
+});

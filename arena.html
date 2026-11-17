@@ -192,14 +192,14 @@ document.getElementById('refreshTerritories').addEventListener('click',refreshTe
 // Chat persistente da aliança + tradução automática das mensagens recebidas.
 const chatPanel=document.getElementById('allianceChat'),chatList=document.getElementById('chatMessages'),chatLanguage=document.getElementById('chatLanguage'),chatAuto=document.getElementById('chatAutoTranslate');
 const translatedCache=new Map();let chatBusy=false,chatLastId=0;
-function chatToken(){return localStorage.getItem('coi_game_token')??sessionStorage.getItem('coi_game_token')}
+function chatToken(){return localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token')||''}
 async function chatApi(path,options={}){const token=chatToken();if(!token)throw new Error('Conecte seu reino primeiro.');const response=await fetch(API_BASE+path,{...options,headers:{...(options.headers||{}),Authorization:'Bearer '+token}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Falha na comunicação com o servidor.');return data}
 async function translateChatText(text,target){const key=target+'|'+text;if(translatedCache.has(key))return translatedCache.get(key);const url='https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl='+encodeURIComponent(target)+'&dt=t&q='+encodeURIComponent(text);const response=await fetch(url);if(!response.ok)throw new Error('Serviço de tradução indisponível.');const data=await response.json();const translated=(data[0]||[]).map(part=>part[0]||'').join('');if(!translated)throw new Error('Não foi possível traduzir esta mensagem.');translatedCache.set(key,translated);return translated}
 async function renderAllianceChat(state){const alliance=state?.alliance;if(!alliance){chatList.replaceChildren();const hint=document.createElement('div');hint.id='chatHint';hint.textContent='Você ainda não pertence a uma aliança. Entre ou crie uma para usar o chat.';chatList.append(hint);return}const messages=alliance.chat||[];if(!messages.length){chatList.replaceChildren();const hint=document.createElement('div');hint.id='chatHint';hint.textContent='Aliança '+alliance.name+' · Seja o primeiro a conversar!';chatList.append(hint);return}if(messages[messages.length-1]?.id===chatLastId&&chatList.children.length)return;chatLastId=messages[messages.length-1]?.id||0;chatList.replaceChildren();for(const msg of messages){const card=document.createElement('article');card.className='chatMsg';const author=document.createElement('b');author.textContent=msg.kingdom_name||'Jogador';const original=document.createElement('div');original.className='chatOriginal';original.textContent=msg.message;const translated=document.createElement('div');translated.className='chatTranslation';const meta=document.createElement('div');meta.className='chatMeta';meta.textContent=new Date(String(msg.created_at||'').replace(' ','T')+'Z').toLocaleString();card.append(author,original,translated,meta);chatList.append(card);if(chatAuto.checked){translated.textContent='Traduzindo…';translateChatText(msg.message,chatLanguage.value).then(value=>{translated.textContent='🌐 '+value}).catch(()=>{translated.textContent='Tradução indisponível · mensagem original preservada'})}}chatList.scrollTop=chatList.scrollHeight}
-async function refreshAllianceChat(){if(chatBusy||!chatPanel.classList.contains('open'))return;chatBusy=true;try{const data=await chatApi('/game/state');kingdomSession=data.state;await renderAllianceChat(data.state)}catch(error){if(!chatList.children.length){const hint=document.createElement('div');hint.id='chatHint';hint.textContent=error.message;chatList.append(hint)}}finally{chatBusy=false}}
+async function refreshAllianceChat(){if(chatBusy||!chatPanel.classList.contains('open'))return;chatBusy=true;try{const data=await chatApi('/game/alliance/chat');await renderAllianceChat({alliance:data.alliance?{...data.alliance,chat:data.chat||[]}:null})}catch(error){if(!chatList.children.length){const hint=document.createElement('div');hint.id='chatHint';hint.textContent=error.message;chatList.append(hint)}}finally{chatBusy=false}}
 document.getElementById('openChat').addEventListener('click',()=>{chatPanel.classList.add('open');refreshAllianceChat()});document.getElementById('closeChat').addEventListener('click',()=>chatPanel.classList.remove('open'));
-document.getElementById('chatComposer').addEventListener('submit',async event=>{event.preventDefault();const input=document.getElementById('chatInput'),message=input.value.trim();if(!message)return;const send=document.getElementById('chatSend');send.disabled=true;try{const data=await chatApi('/game/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'alliance_chat',message})});input.value='';kingdomSession=data.state;chatLastId=0;await renderAllianceChat(data.state)}catch(error){const hint=document.createElement('div');hint.className='chatMeta';hint.textContent=error.message;chatList.append(hint)}finally{send.disabled=false;input.focus()}});
-chatLanguage.addEventListener('change',()=>{translatedCache.clear();chatLastId=0;refreshAllianceChat()});chatAuto.addEventListener('change',()=>{chatLastId=0;refreshAllianceChat()});setInterval(refreshAllianceChat,9000);
+document.getElementById('chatComposer').addEventListener('submit',async event=>{event.preventDefault();const input=document.getElementById('chatInput'),message=input.value.trim();if(!message)return;const send=document.getElementById('chatSend');send.disabled=true;try{const data=await chatApi('/game/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'alliance_chat',message})});input.value='';kingdomSession=data.state;chatLastId=0;await refreshAllianceChat()}catch(error){const hint=document.createElement('div');hint.className='chatMeta';hint.textContent=error.message;chatList.append(hint)}finally{send.disabled=false;input.focus()}});
+chatLanguage.addEventListener('change',()=>{translatedCache.clear();chatLastId=0;refreshAllianceChat()});chatAuto.addEventListener('change',()=>{chatLastId=0;refreshAllianceChat()});setInterval(refreshAllianceChat,15000);
 
 const scene=new THREE.Scene();scene.background=new THREE.Color(0x92a8b4);scene.fog=new THREE.Fog(0x92a8b4,65,125);
 const camera=new THREE.PerspectiveCamera(48,innerWidth/innerHeight,.1,220);
@@ -491,6 +491,17 @@ function renderKingdomStore(){
  const cosmetics=kingdomSession.cosmetics||{},shop=kingdomSession.shop||{},player=kingdomSession.player||{},kingdom=kingdomSession.kingdom||{};
  status.textContent='💎 '+Number(player.gems||0).toLocaleString('pt-BR')+' gemas · 🪙 '+Number(kingdom.gold||0).toLocaleString('pt-BR')+' ouro · ✨ '+Number(cosmetics.shards||0).toLocaleString('pt-BR')+' fragmentos';
  root.append(status);
+ const castleSkins=Array.isArray(kingdomSession.castleSkins)?kingdomSession.castleSkins:[];
+ const equippedCastleSkinId=Number(kingdom.equipped_skin_id||0);
+ const castleSkinTitle=document.createElement('h3');castleSkinTitle.textContent='👑 Aparências do castelo';root.append(castleSkinTitle);
+ const castleSkinGrid=document.createElement('div');castleSkinGrid.className='storeGrid';
+ if(!castleSkins.length){const empty=document.createElement('p');empty.className='storeMuted';empty.textContent='As skins adquiridas aparecem aqui. Somente o proprietário pode equipá-las.';castleSkinGrid.append(empty);}
+ for(const skin of castleSkins){
+  const equipped=Number(skin.id)===equippedCastleSkinId;
+  castleSkinGrid.append(storeCard(skin.name,'Skin de castelo · Aparência visual no reino compartilhado',equipped?'✓ Equipada':'Equipar',()=>runStoreAction({type:'castle_skin_equip',skinId:Number(skin.id)}),equipped));
+ }
+ root.append(castleSkinGrid);
+ if(equippedCastleSkinId)root.append(storeCard('Aparência original','Retira a skin e restaura o castelo padrão','Restaurar',()=>runStoreAction({type:'castle_skin_equip',skinId:null}),false));
  const owned=new Set((cosmetics.owned||[]).map(x=>x.item_id));
  const collections=cosmetics.collections||[];
  const collectionTitle=document.createElement('h3');collectionTitle.textContent='🎖️ Recompensas de coleção';root.append(collectionTitle);
@@ -538,7 +549,7 @@ function renderKingdomStore(){
   }
   root.append(merchantGrid);
  }
- const note=document.createElement('p');note.className='storeMuted';note.textContent='As skins ficam registradas na coleção. A opção de equipar e visualizar cada aparência no castelo será integrada ao sistema visual em uma etapa própria; esta tela não promete equipagem ainda.';
+ const note=document.createElement('p');note.className='storeMuted';note.textContent='As skins de castelo pertencentes ao jogador podem ser equipadas. A aparência selecionada também aparece para os demais no mapa compartilhado.';
  root.append(note);
 }
 async function refreshKingdomStore(){
@@ -602,6 +613,11 @@ async function loadCatalog(){
  try{
   const res=await fetch('/api/store/catalog');if(!res.ok)throw new Error('Catálogo indisponível');
   const data=await res.json();box.replaceChildren();
+  if(data.skin_edition==="initial"&&Number(data.skin_limit)>0){
+   const note=document.createElement('p');note.className='muted';
+   note.textContent='Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis. Novas coleções serão liberadas em futuras atualizações.';
+   box.appendChild(note);
+  }
   const entries=[...(data.packages||[]).map(x=>({...x,kind:'Pacote VIP',productKind:'vip_package'})),...(data.skins||[]).map(x=>({...x,kind:'Skin',productKind:'skin'}))];
   if(!entries.length){box.textContent='Nenhum item cadastrado no catálogo neste momento.';return}
   for(const item of entries){

@@ -40,6 +40,7 @@ test("official store submits an auditable payment request instead of opening Wha
   assert.ok(arena.includes('id="purchaseMethod"'));
   assert.ok(arena.includes('id="purchaseReference"'));
   assert.ok(arena.includes("https://link.mercadopago.com.br/pagamentosskin"));
+  assert.ok(arena.includes("Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis."));
   assert.ok(arena.includes("mercadopago_link"));
   assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i);
   assert.ok(arena.includes('id="whatsapp"'));
@@ -54,4 +55,14 @@ test("purchase schema restricts products, states, payment methods and duplicate 
   assert.ok(migration.includes("UNIQUE (player_id, request_key)"));
   assert.ok(migration.includes("idx_purchase_requests_status_created"));
   assert.ok(migration.includes("idx_purchase_requests_one_pending_product"));
+});
+
+
+test("paid skin launch catalog exposes and accepts only the first six retained catalog entries", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("INITIAL_PAID_SKIN_LIMIT = 6"));
+  assert.ok(worker.includes('skin_edition:"initial",skin_limit:INITIAL_PAID_SKIN_LIMIT'));
+  assert.ok(worker.includes("WHERE id=? AND id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
+  assert.ok(worker.includes("WHERE name=? AND id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
+  assert.ok(worker.includes("Esta skin está bloqueada para uma atualização futura."));
 });
