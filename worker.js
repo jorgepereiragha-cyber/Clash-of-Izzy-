@@ -400,9 +400,9 @@ async function seedWorld(env){
  ];
  await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate) VALUES(?,?,?,?,?,?,?)").bind(...n,90)));
 }
-async function processMarches(env,kingdomId){
+async function processMarches(env,kingdomId,batchSize=50){
  const now=new Date().toISOString();
- const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT 50").bind(kingdomId,now).all();
+ const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT ?").bind(kingdomId,now,Math.max(1,Math.min(50,Math.floor(Number(batchSize)||50)))).all();
  for(const m of due.results||[]){
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
   const resolvedAt=new Date().toISOString(),resolutionToken=crypto.randomUUID();
@@ -1420,7 +1420,7 @@ async function distributeAngelDeathRewards(env,eventId,now=new Date()){
 async function processAngelDeathEventLifecycle(env,now=new Date()){
   if(!env.DB)return;
   await ensureAngelDeathWeekend(env,now);
-  const due=await env.DB.prepare("SELECT id FROM world_events WHERE event_key=? AND status IN ('scheduled','active') AND ends_at<=? ORDER BY ends_at LIMIT 10")
+  const due=await env.DB.prepare("SELECT id FROM world_events WHERE event_key=? AND status IN ('scheduled','active') AND ends_at<=? ORDER BY ends_at LIMIT 1")
     .bind(ANGEL_DEATH_EVENT.key,now.toISOString()).all();
   for(const row of due.results||[]){
     try{await distributeAngelDeathRewards(env,row.id,now);}
@@ -1433,7 +1433,7 @@ async function processDueKingdomQueues(env,kingdomId=null){
   const now=new Date().toISOString();
   const query=kingdomId
     ? env.DB.prepare("SELECT * FROM kingdom_queues WHERE kingdom_id=? AND status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT 25").bind(kingdomId,now)
-    : env.DB.prepare("SELECT * FROM kingdom_queues WHERE status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT 200").bind(now);
+    : env.DB.prepare("SELECT * FROM kingdom_queues WHERE status='running' AND completes_at<=? ORDER BY completes_at,id LIMIT 3").bind(now);
   const due=await query.all();
   for(const queue of due.results||[]){
     const completionToken=crypto.randomUUID(),completedAt=new Date().toISOString();
@@ -1485,11 +1485,11 @@ async function processDueMarches(env){
   if(!env.DB)return;
   const now=new Date().toISOString();
   const dueKingdoms=await env.DB.prepare(
-    "SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 100"
+    "SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 1"
   ).bind(now).all();
   for(const row of dueKingdoms.results||[]){
     try{
-      await processMarches(env,row.kingdom_id);
+      await processMarches(env,row.kingdom_id,2);
     }catch(error){
       // Uma falha num reino não impede a resolução das marchas dos demais.
       console.error("scheduled_march_resolution_failed",row.kingdom_id,String(error?.message||error));
@@ -1511,11 +1511,11 @@ export default {
   catch(error){console.error("scheduled_rally_resolution_failed",String(error?.message||error));}
   try{await processAngelDeathEventLifecycle(env);}
   catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
-  try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE expires_at<=?").bind(Math.floor(Date.now()/1000)).run();}
+  try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE rate_key IN (SELECT rate_key FROM api_rate_limits WHERE expires_at<=? ORDER BY expires_at LIMIT 100)").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_rate_limit_cleanup_failed",String(error?.message||error));}
-  try{await env.DB.prepare("UPDATE battle_reports SET replay_json='{}',battle_log='[]' WHERE replay_expires_at>0 AND replay_expires_at<=? AND (replay_json<>'{}' OR battle_log<>'[]')").bind(Math.floor(Date.now()/1000)).run();}
+  try{await env.DB.prepare("UPDATE battle_reports SET replay_json='{}',battle_log='[]' WHERE id IN (SELECT id FROM battle_reports WHERE replay_expires_at>0 AND replay_expires_at<=? AND (replay_json<>'{}' OR battle_log<>'[]') ORDER BY replay_expires_at,id LIMIT 25)").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_battle_replay_expiry_failed",String(error?.message||error));}
-  try{await processEmailQueue(env,10);}
+  try{await processEmailQueue(env,1);}
   catch(error){console.error("scheduled_email_queue_failed",String(error?.message||error));}
  },
  async fetch(request,env){
