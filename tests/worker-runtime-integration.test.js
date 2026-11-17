@@ -670,12 +670,12 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         body: {
           kind: "vip_package", itemId: vip.id,
           requestKey: "integration-vip-request-01",
-          paymentMethod: "mercadopago_link", paymentReference: "TESTE-NAO-PAGO",
+          paymentMethod: "manual_whatsapp",
         },
       }), 201, "criação de pedido VIP");
       assert.ok(purchase.request?.id);
       assert.equal(purchase.request.status, "pending");
-      assert.equal(purchase.request.payment_method, "mercadopago_link");
+      assert.equal(purchase.request.payment_method, "manual");
 
       const pending = expectStatus(await admin("/api/admin/purchase-requests", {}), 200, "fila Master de pedidos");
       assert.ok(pending.requests.some(item => Number(item.id) === Number(purchase.request.id)));
@@ -698,7 +698,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           body: {
             kind: "skin", itemId: hiddenSkinRows[0].id,
             requestKey: "integration-locked-skin-01",
-            paymentMethod: "mercadopago_link",
+            paymentMethod: "manual_whatsapp",
           },
         }), 404, "skin fora das seis liberadas não pode gerar pedido");
         expectStatus(await admin("/api/admin/unlock-skin", {
@@ -711,7 +711,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         body: {
           kind: "skin", itemId: skin.id,
           requestKey: "integration-skin-request-01",
-          paymentMethod: "mercadopago_link",
+          paymentMethod: "manual_whatsapp",
         },
       }), 201, "pedido de skin de outro jogador");
       expectStatus(await admin("/api/admin/purchase-requests/review", {
