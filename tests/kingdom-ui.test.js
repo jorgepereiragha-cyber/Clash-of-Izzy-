@@ -2,10 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("entrada principal prioriza o reino e preserva a arena como modo secundário", async () => {
+test("landing prioriza a entrada no reino e mantém somente navegação institucional", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  assert.match(html, /id="play-now" href="\.\/kingdom\.html">⚔️ ENTRAR NO REINO/);
-  assert.match(html, /href="\.\/arena\.html"/);
+  assert.ok(html.includes('id="play-now" href="./kingdom.html">⚔️ ENTRAR NO REINO'));
+  assert.ok(html.includes('aria-label="Navegação da Landing"'));
+  for (const anchor of ['href="#sobre"', 'href="#eventos"', 'href="#beta"', 'href="#convites"']) assert.ok(html.includes(anchor));
+  for (const route of ["/world.html", "/alliance.html", "/arena.html", "/events.html"]) assert.ok(!html.includes(`href="${route}"`));
 });
 
 test("central do reino consome estado e melhorias pela API autenticada", async () => {
