@@ -197,3 +197,11 @@ test("FTS5 ranks primary titles above secondary descriptions in prefix and subst
   assert.ok(migration.includes("INSERT INTO game_search_fts(game_search_fts, rank) VALUES('rank', 'bm25(6.0, 1.0)')"));
   assert.ok(migration.includes("INSERT INTO game_search_substring_fts(game_search_substring_fts, rank) VALUES('rank', 'bm25(6.0, 1.0)')"));
 });
+
+
+test("global search hides paid skins outside the six-item launch edition", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("const INITIAL_PAID_SKIN_LIMIT = 6"));
+  assert.ok(worker.includes("d.entity_type<>'skin' OR CAST(d.entity_key AS INTEGER) IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
+  assert.ok(worker.includes("SELECT name FROM skins WHERE id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
+});
