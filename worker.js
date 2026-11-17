@@ -2226,7 +2226,7 @@ export default {
       }
       if(url.pathname==="/api/game/action"&&request.method==="POST"){const body=await readBody(request);if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);return await gameAction(env,playerId,body);}
       return json({error:"Rota de jogo não encontrada."},404);
-    }catch(e){const diagnostic=String(e?.message||e);console.error("game_request_failed",diagnostic);return json(env.PVP_DEBUG==="1"?{error:"Falha ao processar o jogo. Tente novamente.",diagnostic}:{error:"Falha ao processar o jogo. Tente novamente."},500)}
+    }catch(e){console.error("game_request_failed",String(e?.message||e));return json({error:"Falha ao processar o jogo. Tente novamente."},500)}
   }
   const valhallaAdminPath=url.pathname.startsWith("/api/valhalla-admin/");
   if(request.method!=="POST"&&!(request.method==="GET"&&valhallaAdminPath))return json({error:"Método não permitido."},405);
