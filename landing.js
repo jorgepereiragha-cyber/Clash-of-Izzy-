@@ -72,7 +72,9 @@
       "<button class=\"landing-button\" id=\"install-confirm\" type=\"button\">Entendi</button>";
     modal.hidden = false;
     modal.setAttribute("aria-hidden", "false");
-    modal.querySelector(".install-close")?.focus();
+    // Focus the dialog container, not the close control: pointer-opened
+    // help must not leave a keyboard focus ring on the close button.
+    modal.focus({ preventScroll: true });
     document.getElementById("install-confirm")?.addEventListener("click", closeInstallGuide);
   }
 
