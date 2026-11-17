@@ -837,6 +837,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenB, { type: "alliance_accept_invite", inviteId: invite.id }, 200);
       await action(tokenA, { type: "alliance_promote", targetKingdomId: kingdomB, rank: "oficial" }, 200);
       await action(tokenB, { type: "alliance_chat", message: "Teste de comunicação entre aliados" }, 200);
+      const chatFeed = await api("/api/game/alliance/chat", { token: tokenB });
+      expectStatus(chatFeed, 200, "feed compacto do chat da aliança");
+      assert.equal(chatFeed.data.alliance?.name, "Guardioes Alfa");
+      assert.ok(chatFeed.data.chat?.some(message => message.message === "Teste de comunicação entre aliados"));
       await action(tokenA, { type: "alliance_donate", resource: "food", amount: 1000 }, 200);
       await action(tokenA, { type: "alliance_donate", resource: "wood", amount: 1000 }, 200);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomB }, 200);
