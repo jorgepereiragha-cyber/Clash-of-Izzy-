@@ -171,3 +171,79 @@ A aprovação de CI não comprova:
 - balanceamento com população real.
 
 **Nenhuma alteração no banco remoto, segredo, produção ou estado de jogadores foi feita nesta auditoria.**
+
+
+## 5. Revisão aprofundada do código externo enviado — 17/11/2026
+
+### Pilar 1 — Draco, KTX2, Meshopt e LOD
+
+O código proposto não deve ser aplicado como está.
+
+- Criar um novo THREE.WebGLRenderer dentro de setupOptimizedLoaders() abre um segundo contexto WebGL apenas para consultar capacidades de textura. Isso desperdiça recursos e pode esgotar o limite de contextos. KTX2 deve receber o renderer que já desenha a cena; a cidade já fazia corretamente ktx2.detectSupport(renderer).
+- O carregador da cidade era o caminho efetivo para os GLBs do manifesto, mas só registrava KTX2. Foi atualizado para registrar DRACOLoader, KTX2Loader e MeshoptDecoder; o carregador compartilhado também registra Meshopt e já tinha Draco/KTX2. O Draco loader é descartado junto com os recursos da cena.
+- Meshopt não substitui Draco; são formatos de compressão distintos. GLTFLoader exige que cada decodificador correspondente seja configurado para a extensão presente no GLB. Documentação: https://threejs.org/docs/pages/GLTFLoader.html.
+- KTX2 precisa de detectSupport(renderer) antes de carregar as texturas, e o transcoder WASM/JS precisa estar acessível. O projeto ainda aponta esses arquivos para CDN; portanto, a inicialização 3D não está garantida em modo offline. Documentação: https://threejs.org/docs/pages/KTX2Loader.html.
+- Não foi aplicado matrixAutoUpdate = false globalmente. Isso pode quebrar nós animados e hierarquias de esqueleto; o projeto tem unidades com animações e usa SkeletonUtils.clone() para clonar rigs.
+- Não foi criado THREE.LOD baseado apenas na distância. A cidade usa câmera ortográfica: a distância ao olho não corresponde diretamente ao tamanho em pixels do edifício. A solução correta é LOD por cobertura/tamanho em tela ou variantes de qualidade calibradas para a projeção. Hoje não há pares de GLBs high/low no manifesto.
+- O clone() comum não substitui o clone de esqueleto usado pelo projeto; geometria, materiais e texturas também precisam de uma política explícita de compartilhamento e descarte. O exemplo proposto não implementa essa gestão.
+- O exemplo não deduplica Promises de carregamento, armazena no cache somente a URL alta (ignorando a variante/limite LOD), e falha toda a operação se o arquivo low não carregar, mesmo quando o high já foi carregado.
+- As URLs de Draco/Basis em CDN não resolvem o objetivo offline. Os arquivos dos decodificadores/transcodificadores devem ser versionados e servidos pela mesma origem antes de declarar 3D offline.
+
+Decisão aplicada: suporte de decodificação foi ligado nos dois caminhos GLTF ativos, sem recomprimir os arquivos existentes. A ativação de LOD e compressão física dos GLBs continua condicionada à geração de variantes, inspeção visual e benchmark de tamanho, decodificação, VRAM e frame time.
+
+### Pilar 2 — Durable Objects e estado atômico
+
+A ideia de serializar ações concorrentes em uma unidade de coordenação é válida, mas o exemplo recebido abre uma vulnerabilidade de economia:
+
+- O cliente controla action.cost, buildingId e o tipo de ação; um atacante pode mandar custo zero, custo negativo ou IDs arbitrários.
+- Não existe autenticação do jogador, autorização de propriedade da cidade, validação de catálogo/requisitos, limite de corpo, rate limit ou idempotência por actionId.
+- A operação grava um segundo estado (gold, wood, buildings) fora da fonte de verdade D1. Isso permite divergência entre Worker/D1 e DO, mesmo que a transação dentro do DO seja atômica.
+- O exemplo não implementa WebSocket; portanto, não fornece atualização em tempo real só por declarar uma classe Durable Object.
+
+A documentação Cloudflare recomenda transaction() para read-modify-write atômico dentro do Storage do próprio Durable Object e recomenda usar blockConcurrencyWhile() com parcimônia. Isso não torna atômicas operações que atravessam D1, DO e serviços externos. Referências: https://developers.cloudflare.com/durable-objects/best-practices/rules-of-durable-objects/ e https://developers.cloudflare.com/durable-objects/best-practices/access-durable-objects-storage/.
+
+Decisão: manter D1 como autoridade da economia e estado persistente. Um DO pode ser introduzido em uma etapa própria para presença, chat, WebSocket, coordenação de rally/evento ou serialização de uma entidade concorrida, com identidade derivada no servidor e teste de carga. Não registrar bindings/migrations de uma classe que ainda não tem contrato de autenticação, estado e reconciliação definido.
+
+### Pilar 3 — Cache API, IndexedDB e Service Worker
+
+A premissa de que Cache API falha por ser GLB grande não é uma regra da plataforma. Cache API foi feita para pares Request/Response e está disponível dentro de Service Workers. Como outros armazenamentos do navegador, usa quota e está sujeito a evicção. IndexedDB também é armazenamento best-effort por padrão; não garante persistência permanente. Referências: https://developer.mozilla.org/en-US/docs/Web/API/Cache e https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria.
+
+O Service Worker atual já pré-cacheia o shell e adiciona GETs same-origin bem-sucedidos ao cache em runtime, incluindo GLBs locais. Ele ignora /api/*, métodos que não sejam GET e origens externas. Substituí-lo pelo exemplo proposto quebraria esse contrato:
+
+- O caminho real é /sw.js e o projeto serve assets a partir da raiz; public/sw.js, /src/main.js e /src/style.css não correspondem à estrutura atual.
+- O fetch proposto intercepta métodos e origens sem exclusões de segurança; isso pode interferir em POSTs de API e requisições cross-origin.
+- await store.get(...) e await objectStore.put(...) não aguardam o resultado de IndexedDB: ambos retornam IDBRequest, não Promises. É necessário aguardar request.onsuccess/onerror e transaction.oncomplete/onabort.
+- Chavear só por url.pathname pode colidir entre query/versionamentos; a DB também não fecha conexões e não administra quota/erro/aborto.
+- Se o navegador já guarda os mesmos bytes no Cache API e no IndexedDB, o custo de armazenamento pode ser duplicado. Os dois mecanismos compartilham limites de quota por origem.
+
+Decisão: manter Cache API para respostas HTTP de assets locais. Avaliar IndexedDB apenas para catálogo/versionamento, downloads offline selecionados ou metadados que precisem de consulta indexada. Medir navigator.storage.estimate() e pedir navigator.storage.persist() quando apropriado, sem prometer que o navegador sempre aprovará. Primeiro, servir Three.js, addons, Basis e Draco pela própria origem para resolver o bloqueio atual de 3D offline.
+
+### Pilar 4 — Pipeline de otimização
+
+O script enviado depende de instalação global não versionada, pressupõe pastas public/assets/raw que não existem no projeto, não lê o manifesto real, não gera LOD, não verifica a saída e captura erros sem terminar com código de falha. Isso pode produzir um build aparentemente verde com assets ausentes ou inválidos.
+
+A ferramenta recomendada para estudar um pipeline reproduzível é glTF Transform, cuja CLI documenta inspect, validate, compressão Draco, Meshopt e texturas KTX2/Basis: https://gltf-transform.dev/cli. O transform deve operar sobre uma cópia de entrada, gerar saídas separadas por variante, validar cada saída, comparar tamanho e preservar fallback original. Não aplicar compressão em lote sem revisar os GLBs no renderer e testar dispositivo real.
+
+A redução de download de Draco não equivale automaticamente à redução proporcional de memória GPU. KTX2/Basis pode permitir texturas comprimidas nativamente, dependendo dos formatos suportados pelo aparelho; o tempo de decodificação e a qualidade visual também importam. Nenhum desses formatos garante 60 FPS por si só.
+
+### Mudanças feitas nesta atualização
+
+1. scripts/kingdom-3d.js: registrou DRACOLoader e MeshoptDecoder no GLTFLoader da cidade, mantendo KTX2Loader.detectSupport(renderer) com o renderer existente; acrescentou descarte do loader Draco nos dois caminhos de limpeza.
+2. engine/asset-loader.js: registrou MeshoptDecoder no GLTFLoader compartilhado, que já tinha Draco e KTX2.
+3. tests/e2e/pwa-offline-cache.spec.js: trocou a navegação top-level que falhava após context.setOffline(true) por um fetch feito pela página já controlada, verificando HTTP 200 e conteúdo da página offline, além de continuar verificando o GLB offline.
+4. Não foram convertidos GLBs, adicionados assets LOD, criada classe Durable Object, criada base IndexedDB, alterada economia, executadas migrations remotas, alterados secrets ou feito deploy de produção.
+
+### Validação CI e bloqueios restantes
+
+A CI #885, no commit 3c8fd7d, passou nos passos de migração D1 local, Service Worker, manifesto 3D, testes Worker/D1 e nos nove testes Playwright anteriores. O novo teste falhou somente ao executar page.goto('/offline.html') com contexto offline (net::ERR_FAILED). O teste foi ajustado conforme descrito acima e a configuração de decodificadores foi adicionada depois. A nova revisão ainda depende de uma CI verde; não declarar essa correção validada antes dos resultados.
+
+Para Preview Cloudflare, continua faltando um D1 de staging real. A documentação atual confirma que os bindings de Preview devem apontar para recursos de teste, e que D1 migrations devem ser aplicadas na mesma base utilizada por previews.d1_databases: https://developers.cloudflare.com/workers/previews/resources/. Sem o database_id de staging, não inserir placeholder e não reutilizar o ID de produção.
+
+### Próxima sequência técnica
+
+1. Obter CI verde para o teste offline e para as alterações dos loaders.
+2. Provisionar D1 staging e configurar previews.d1_databases sem tocar no banco de produção.
+3. Servir módulos Three.js, addons e decodificadores same-origin; confirmar inicialização offline em Chromium e Android.
+4. Gerar variantes high/low e decidir LOD por tamanho em tela na câmera ortográfica; medir por perfil gráfico.
+5. Criar pipeline inspect -> transform -> validate -> compare, com rollback para os GLBs originais.
+6. Só depois de benchmark definir se existe um domínio de estado que justifique Durable Objects; manter D1 autoritativo enquanto isso.
