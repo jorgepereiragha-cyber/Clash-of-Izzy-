@@ -36,7 +36,19 @@ O limite único da edição está em `INITIAL_PAID_SKIN_LIMIT` no `worker.js`. A
 - Limpeza de limites de API e expiração de replays também é feita em lotes, evitando varreduras/escritas sem limite.
 - Esses limites reduzem picos de processamento, mas não comprovam uma capacidade concorrente fixa. A conta Gratuita possui 100.000 requisições/dia, 10 ms de CPU por requisição HTTP e por Cron; o D1 gratuito limita cada invocação a 50 subrequisições, 5 milhões de linhas lidas/dia e 100 mil escritas/dia. A capacidade real precisa ser medida em Preview/staging antes de divulgar um número máximo de jogadores.
 - O mapa envia somente castelos próximos à posição do jogador. Isso mantém todos no mesmo reino sem carregar toda a população em cada resposta.
+- O chat da aliança usa `GET /api/game/alliance/chat`, uma consulta compacta autenticada; a arena deixou de baixar `/api/game/state` inteiro a cada atualização do chat. A atualização passa a ocorrer a cada 15 segundos apenas enquanto o painel está aberto.
+- O painel do reino atualiza filas no servidor a cada 60 segundos; os cronômetros visuais continuam avançando localmente a cada segundo.
 - A resolução de marchas e rallies usa o Cron de um minuto como processamento de retaguarda; não é combate em tempo real com precisão de milissegundos.
+
+
+## Condições comerciais e de publicação que continuam abertas
+
+- **Skins:** a tela atual registra a skin na coleção; ela ainda não altera visualmente o castelo nem pode ser equipada. Antes de cobrar, implementar equipagem/visualização ou apresentar e vender explicitamente como item de coleção sem efeito visual. Não prometer aparência de castelo ativa.
+- **Mercado Pago:** o código tem rota de checkout individual e webhook, mas dependem de `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` configurados no Worker. Quando não configurado, a interface usa o link compartilhado e a revisão manual Master. A presença real dos secrets e uma compra/webhook de teste ainda não foram confirmadas.
+- **Segurança:** a PR #116 protege `/api/admin/health`; ela precisa de CI verde e integração antes da edição comercial, porque a `main` auditada ainda tem o endpoint de diagnóstico público.
+- **Preview:** `wrangler.jsonc` declara um D1 de Preview separado do banco de produção, mas a existência e acessibilidade real desse recurso precisam ser conferidas antes de executar a migration 0026 remotamente.
+- **Dispositivos:** o CI automatizado Chromium em viewport móvel não substitui uma verificação em Android físico, incluindo toque, instalação PWA, reabertura, cache e memória.
+- **Capacidade:** nenhum número máximo de jogadores é prometido sem benchmark. O plano Gratuito limita CPU e D1 por invocação e por dia; os limites de lote reduzem picos, mas não comprovam capacidade simultânea.
 
 ## Dados e implantação
 
