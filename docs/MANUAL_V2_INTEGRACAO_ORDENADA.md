@@ -40,7 +40,7 @@ A integração deve seguir estas regras:
 
 ### Fase 1 — Banco de dados D1
 
-**Aplicado na arquitetura existente:** o banco usa migrações em `migrations/`, atualmente documentadas até `0022` na branch `main`.
+**Aplicado na arquitetura existente:** o banco usa migrações em `migrations/`; a `main` desta auditoria contém migrations até `0025`. A PR #120 propõe migrations aditivas `0026_single_shared_realm.sql` e `0027_castle_skin_equipment.sql`; elas só devem ser aplicadas em D1 de Preview isolado antes de qualquer migração de produção.
 
 Correspondência dos nomes do exemplo:
 
@@ -60,14 +60,14 @@ Correspondência dos nomes do exemplo:
 **Configuração correta:** `wrangler.jsonc`.
 
 Rotas e contratos já existentes:
-- `POST /api/game/start`: cria um reino e entrega token assinado.
+- `POST /api/game/start`: cria um reino e entrega token assinado; com uma sessão válida já vinculada a um reino, retoma esse mesmo estado, sem criar uma segunda cidade.
 - `GET /api/game/state`: carrega o estado autenticado do reino.
 - `POST /api/game/action`: recebe ações de jogo e aplica regras no servidor.
 - O método `scheduled` do Worker processa filas e tarefas recorrentes.
 
 Ações de construção, treinamento, pesquisa, marchas, alianças, combate e evento devem continuar integradas ao contrato de ação existente. Não criar uma segunda API simplificada para alterar diretamente recursos ou níveis.
 
-**Pendência funcional identificada:** o início atual cria uma sessão de jogo persistente no dispositivo, mas não é um sistema de conta com nome de usuário e senha. Uma camada de conta deve ser adicionada como migração e rotas incrementais, vinculando a conta à identidade `players.id` existente. O cadastro/login deve permitir recuperar o mesmo reino em outro dispositivo e não pode gerar uma segunda identidade para uma conta já cadastrada.
+**Contas de jogador — parcialmente implementadas:** `account.html` oferece cadastro e login por usuário/e-mail e senha; `player-accounts.js` vincula a conta à identidade `players.id`, deriva senha com PBKDF2-SHA-256 e salt aleatório, limita tentativas e invalida sessões antigas por `session_version`. O login pode recuperar o mesmo reino em outro dispositivo. **Ainda falta recuperação/alteração de senha**, verificação de e-mail e validação prática de sessão entre dispositivos; o e-mail opcional não ativa recuperação automática.
 
 ### Fase 3 — Interface do jogo
 
@@ -82,7 +82,7 @@ Arquivos e telas existentes:
 
 Não trocar a cena 3D existente por uma caixa dourada de demonstração nem substituir a interface atual por um HUD paralelo. Os controles novos devem usar os dados retornados pela API e padrões visuais compartilhados.
 
-**Pendências de interface:** adicionar telas de cadastro/login quando a camada de conta estiver pronta; avaliar um canal de chat mundial separado do chat de aliança; manter os estados “carregando”, “sem conexão”, “erro” e “tentativa novamente”.
+**Pendências de interface:** a tela de cadastro/login existe em `account.html`; falta completar recuperação/alteração de senha e validar o fluxo em outro dispositivo. O chat implementado nesta edição é o chat de aliança (`alliance_chat`); chat mundial separado, paginação, retenção e moderação continuam pendentes. Preservar os estados “carregando”, “sem conexão”, “erro” e “tentativa novamente”.
 
 ### Fase 4 — PWA
 
@@ -94,19 +94,19 @@ O manifesto já abre o reino em `/kingdom.html`. O Service Worker usa cache vers
 
 ### Fase 5 — Mercado Pago
 
-**Estado atual:** a loja abre o link hospedado compartilhado `https://link.mercadopago.com.br/pagamentosskin`. O pedido é gravado em `purchase_requests`; o painel Master confere o recebimento e aprova a liberação de gemas/skins uma única vez.
+**Estado atual:** a loja cria pedido individual em `purchase_requests`. O Worker contém checkout individual Mercado Pago Orders (`POST /api/store/checkout`) e webhook (`POST /api/webhook/mp`) em `mercadopago-orders.js`. Quando as credenciais não estão configuradas, a interface preserva o link hospedado compartilhado `https://link.mercadopago.com.br/pagamentosskin` e a aprovação manual Master como alternativa auditável.
 
-**Webhook automático ainda não está implementado.** O exemplo enviado pressupõe que cada pagamento tenha `external_reference` vinculado ao jogador, mas o link compartilhado não fornece essa associação individual. Não aceitar `payment_reference` digitado pelo usuário como prova de pagamento e não creditar gemas apenas porque o navegador informou que pagou.
+**Webhook automático está implementado no código, mas ainda não está liberado operacionalmente.** O checkout individual gera `external_reference` opaca e chave de idempotência por pedido; o webhook valida HMAC-SHA256, consulta a Order diretamente no Mercado Pago, confere referência, valor, moeda e pagamentos processados, e só então credita/libera em lote idempotente no D1. A presença dos secrets no Worker e uma compra/webhook real ainda não foram confirmadas. O link compartilhado não oferece associação individual automática. Nunca aceitar `payment_reference` digitado pelo usuário como prova de pagamento.
 
-Para ativar confirmação automática com segurança, a próxima implementação deverá:
-1. Criar uma preferência/checkout individual pela API do Mercado Pago para cada `purchase_requests.id`.
-2. Enviar identificador opaco e não adivinhável como referência externa do pedido.
-3. Validar a assinatura oficial do webhook e buscar o pagamento diretamente na API do Mercado Pago.
-4. Conferir valor, moeda, status, referência externa e pedido ainda elegível.
-5. Aplicar crédito/liberação com idempotência no D1, de modo que notificações repetidas não dupliquem recompensas.
-6. Manter a aprovação Master como fallback administrativo auditável até validar o fluxo automático de ponta a ponta.
+Para ativar a confirmação automática em produção, as próximas validações deverão:
+1. Configurar `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` diretamente nos secrets do Worker (nunca no Git ou em `wrangler.jsonc`).
+2. Configurar a URL oficial de notificação do Mercado Pago para `POST /api/webhook/mp`.
+3. Executar compra de teste de baixo valor e receber uma notificação assinada do ambiente real; verificar também assinatura inválida, pedido expirado e notificação duplicada.
+4. Conferir que o valor, a moeda BRL, o status `processed`, a referência externa e o ID da Order correspondem ao pedido.
+5. Confirmar que a liberação idempotente ocorre uma única vez no D1 e que nenhuma referência digitada pelo jogador altera o saldo.
+6. Manter a aprovação Master e o link compartilhado como fallback até a validação de ponta a ponta.
 
-Essa etapa depende de secrets reais configurados diretamente no Worker, nunca gravados no Git ou em arquivos públicos. Não substituir o link atual antes de o checkout individual, webhook e testes estarem funcionais.
+Essa etapa depende de secrets reais e URL de notificação configurados no Worker. Não anunciar pagamento automático nem remover o fallback até completar o teste assinado de ponta a ponta; essa configuração ainda não foi confirmada nesta auditoria.
 
 ### Fase 6 — Publicação e verificação
 
@@ -124,9 +124,10 @@ Bindings e segredos atuais documentados:
 - D1: binding `DB`, configurado em `wrangler.jsonc`;
 - `SESSION_SECRET`: assinatura/verificação de sessão;
 - `ADMIN_EMAIL` e `ADMIN_PASSWORD`: painel Master;
+- `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET`: checkout Orders/webhook Mercado Pago (configuração em produção ainda pendente de confirmação);
 - `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID`: GitHub Actions.
 
-Os nomes `JWT_SECRET`, `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` do exemplo não devem ser declarados como se já estivessem configurados. Só serão adicionados quando a implementação de conta/JWT ou o checkout/webhook correspondente os consumir.
+`JWT_SECRET` não é usado pela implementação atual: a sessão de jogo/conta usa `SESSION_SECRET`. `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` já são consumidos por `mercadopago-orders.js`, mas só devem ser marcados como configurados após conferência no Worker e teste real do webhook.
 
 ## 4. Escopo já existente e trabalho posterior
 
@@ -143,8 +144,8 @@ Os nomes `JWT_SECRET`, `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` do exemplo não d
 - Painel Master, limites de requisição, analytics, feedback e inscrições beta.
 
 ### Próximas entregas em ordem segura
-1. **Contas de jogador:** cadastro/login por senha vinculado a `players.id`, com recuperação de conta e testes de sessão entre dispositivos.
-2. **Mercado Pago automático:** checkout individual, webhook validado e crédito idempotente; manter o fluxo Master como fallback.
+1. **Contas de jogador:** concluir recuperação/alteração de senha e validar cadastro/login entre dispositivos com preservação do mesmo `players.id` e reino.
+2. **Mercado Pago automático:** configurar secrets e URL de notificação; validar checkout e webhook assinados no ambiente real, manter o fluxo Master como fallback.
 3. **Chat mundial:** canal global com limites, paginação, retenção e moderação; sem misturar mensagens globais com `alliance_chat`.
 4. **Ranking global de poder:** endpoint autenticado/público com ordenação e paginação, distinto do ranking do evento.
 5. **Push notifications:** assinatura VAPID, armazenamento de subscriptions, consentimento, remoção de endpoints inválidos e entrega acionada por eventos reais.
