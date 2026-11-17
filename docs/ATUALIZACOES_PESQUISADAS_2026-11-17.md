@@ -24,6 +24,25 @@ PR: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/pull/120
 - O manifesto/ficheiros gerados ficam fora do Git por `.gitignore`, mas continuam disponíveis como assets públicos do Worker. O script Node que gera o vendor é excluído dos assets públicos por `.assetsignore`.
 - Foi acrescentado teste de integração Playwright para ativação do Service Worker e primeira resolução dos módulos/decodificadores com a rede desligada. Isso prova o cache do shell, GLB e runtime 3D; não promete gameplay autenticado ou sincronização D1 offline.
 
+### 3. Armazenamento de assets: decisão sobre R2
+
+- O Cloudflare R2 Standard oferece franquia mensal de 10 GB-mês, 1 milhão de operações Classe A e 10 milhões Classe B, sem cobrança de egress para a Internet. Fora da franquia, há custo de armazenamento e operações.
+- O R2 exige ativação da assinatura/serviço na conta Cloudflare e um bucket separado. Nenhum bucket foi criado nem binding adicionada nesta rodada.
+- Os cinco modelos GLB atuais somam aproximadamente 443 KB. Para esse volume, manter os assets locais do Worker é mais simples e evita acrescentar outro recurso/configuração. Reavaliar R2 quando o jogo receber pacotes grandes de mapas, vídeos/trailers, uploads de jogador ou coleções 3D extensas.
+- D1 continua sendo a fonte de verdade para economia e progressão; R2 seria somente para objetos/binários, nunca para saldos, propriedade ou estado do jogador.
+
+### 4. Proteção anti-bot: decisão sobre Turnstile
+
+- Turnstile Free permite até 20 widgets por conta, desafios/verificações ilimitados e até 10 hostnames por widget.
+- É indicado para os pontos públicos que podem sofrer abuso: criação de jogador, cadastro de conta, inscrição beta e formulários abertos.
+- Ainda não está ativo. É necessário o proprietário criar o widget para o domínio real e configurar a chave pública e o segredo; a validação deve ocorrer no Worker, não só no navegador.
+- O rate limit atual permanece ativo. Não exigir CAPTCHA visual para todos os logins ou ações de jogo: aplicar apenas aos fluxos públicos de criação/inscrição ou quando sinais de abuso justificarem.
+
+### 5. Entrada e saída de e-mail
+
+- Cloudflare Email Routing pode encaminhar mensagens recebidas para um destino verificado ou Worker, mas isso não substitui automaticamente um provedor transacional de envio.
+- O sistema atual de e-mail transacional permanece como está. Não alterei o provedor, remetentes, templates nem segredos.
+
 ### 3. Verificação de implantação
 
 - O smoke read-only agora valida o manifesto Three.js, os decodificadores, os import maps e a ausência de dependência direta do CDN nas telas e módulos principais.
