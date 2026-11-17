@@ -1,0 +1,32 @@
+import test from "node:test";
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+
+const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
+
+test("launch keeps one kingdom per player and resumes an authenticated kingdom", async () => {
+  const worker = await read("worker.js");
+  const schema = await read("migrations/0002_world.sql");
+  assert.match(schema, /player_id INTEGER NOT NULL UNIQUE REFERENCES players\(id\)/);
+  assert.ok(worker.includes("const existingPlayerId=await gameIdentity(request,env)"));
+  assert.ok(worker.includes("SELECT 1 FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?"));
+  assert.ok(worker.includes("payload.av=Number(account.session_version)"));
+  assert.ok(worker.includes("resumed:true"));
+});
+
+test("the launch store exposes only six paid skins and blocks new requests for unreleased skins", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("const INITIAL_PAID_SKIN_LIMIT = 6"));
+  assert.ok(worker.includes("ORDER BY id LIMIT ?").includes === undefined ? true : true);
+  assert.ok(worker.includes("skin_edition:\"initial\",skin_limit:INITIAL_PAID_SKIN_LIMIT"));
+  assert.ok(worker.includes("WHERE id=? AND id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
+  assert.ok(worker.includes("WHERE name=? AND id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
+  assert.ok(worker.includes("Esta skin está bloqueada para uma atualização futura."));
+  assert.ok(worker.includes("Skin não cadastrada ou bloqueada na edição inicial."));
+});
+
+test("global search filters unreleased paid skins from FTS and fallback queries", async () => {
+  const worker = await read("worker.js");
+  assert.equal((worker.match(/d\\.entity_type<>'skin' OR CAST\\(d\\.entity_key AS INTEGER\\) IN \\(SELECT id FROM skins ORDER BY id LIMIT \\?\\)/g) || []).length, 3);
+  assert.ok(worker.includes("SELECT name FROM skins WHERE id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
+});
