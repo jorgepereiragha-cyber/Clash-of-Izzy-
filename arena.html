@@ -597,9 +597,11 @@ async function loadCatalog(){
   const entries=[...(data.packages||[]).map(x=>({...x,kind:'Pacote VIP',productKind:'vip_package'})),...(data.skins||[]).map(x=>({...x,kind:'Skin',productKind:'skin'}))];
   if(!entries.length){box.textContent='Nenhum item cadastrado no catálogo neste momento.';return}
   for(const item of entries){
-   const b=document.createElement('button');const label=document.createElement('span');const price=document.createElement('b');
-   label.textContent=item.kind+' · '+item.name;price.textContent='R$ '+Number(item.price_brl).toFixed(2).replace('.',',');
-   b.append(label,price);b.addEventListener('click',()=>requestOfficialPurchase(item,item.productKind,b));
+   const b=document.createElement('button');const label=document.createElement('span');const detail=document.createElement('small');const price=document.createElement('b');
+   label.textContent=item.kind+' · '+item.name;
+   detail.textContent=item.productKind==='vip_package'?Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação':'Aparência cosmética para seu castelo';
+   price.textContent='R$ '+Number(item.price_brl).toFixed(2).replace('.',',');
+   b.append(label,detail,price);b.addEventListener('click',()=>requestOfficialPurchase(item,item.productKind,b));
    box.appendChild(b);
   }
  }catch(error){box.textContent='Não foi possível carregar o catálogo agora. Tente novamente mais tarde.'}
