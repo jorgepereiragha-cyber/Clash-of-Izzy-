@@ -276,3 +276,16 @@ test("failed optional GLB downloads preserve procedural models and allow later r
   assert.ok(renderer.includes("glbLoadPromises.delete(key)"));
   assert.ok(renderer.includes("manifestLoad = null"));
 });
+
+
+test("owned castle skins are selected by the server-provided identity and applied to the castle model", async () => {
+  const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
+  const styles = await readFile(new URL("../castle-skin-styles.js", import.meta.url), "utf8");
+  const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.match(renderer, /getCastleSkinStyle\(castleSkinName, castleSkinId\)/);
+  assert.match(renderer, /latestCastleSkinId = Number\(detail\.castleSkinId\)/);
+  assert.match(renderer, /b\.building_type === "castle" \? latestCastleSkinId : 0/);
+  assert.match(styles, /Fortaleza do Dragão Dourado/);
+  assert.match(styles, /Fortaleza do Dragão Solar/);
+  assert.match(kingdom, /equippedCastleSkinName\(\)/);
+});
