@@ -1,3 +1,4 @@
+export { EldoriaRoom } from "./eldoria-room.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "./game-adapter.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
@@ -1519,6 +1520,19 @@ export default {
  async fetch(request,env){
   if(request.method==="OPTIONS")return new Response(null,{status:204});
   const url=new URL(request.url);
+  if(url.pathname==="/api/realtime/eldoria"){
+    if(request.method!=="GET")return json({error:"Método não permitido."},405);
+    if(!env.ELDORIA_ROOM)return json({error:"Sala realtime ainda não implantada."},503);
+    const playerId=await gameIdentity(request,env);
+    if(!playerId)return json({error:"Sessão do jogador inválida."},401);
+    const limited=await rateLimitDecision(env,"eldoria-realtime-connect",playerId,20,60);
+    if(limited)return limited;
+    if(request.headers.get("Upgrade")?.toLowerCase()!=="websocket")return json({error:"Conexão WebSocket necessária."},426);
+    const headers=new Headers(request.headers);
+    headers.set("X-COI-Player-Id",playerId);
+    const roomId=env.ELDORIA_ROOM.idFromName("eldoria");
+    return await env.ELDORIA_ROOM.get(roomId).fetch(new Request("https://eldoria-room/connect",{method:"GET",headers}));
+  }
   if(url.pathname==="/api/email/verify"&&request.method==="GET")return await verifyEmailToken(env,url.searchParams.get("token"));
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
   if(url.pathname==="/api/admin/health"){
