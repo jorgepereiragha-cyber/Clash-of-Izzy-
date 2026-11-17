@@ -49,3 +49,33 @@ export function calculateKingdomPixelRatio({ width, height, devicePixelRatio = 1
   // Do not impose a 0.5 floor: on extreme high-density viewports it can break the pixel budget.
   return Math.min(requested, cap, pixelBudgetCap);
 }
+
+
+// A bounded sampler for requestAnimationFrame cadence. Values describe callback
+// intervals only; they are not GPU execution time or a sustained-FPS guarantee.
+export function createFrameTimingSampler(maxSamples = 120) {
+  const limit = Math.max(1, Math.min(600, Math.floor(Number(maxSamples) || 120)));
+  const samples = [];
+
+  return Object.freeze({
+    record(intervalMs) {
+      const value = Number(intervalMs);
+      if (!Number.isFinite(value) || value <= 0) return;
+      samples.push(value);
+      if (samples.length > limit) samples.shift();
+    },
+    reset() {
+      samples.length = 0;
+    },
+    snapshot() {
+      if (!samples.length) return { sampleCount: 0, p50Ms: null, p95Ms: null };
+      const sorted = [...samples].sort((a, b) => a - b);
+      const at = percentile => sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * percentile) - 1)];
+      return {
+        sampleCount: sorted.length,
+        p50Ms: Number(at(0.5).toFixed(2)),
+        p95Ms: Number(at(0.95).toFixed(2))
+      };
+    }
+  });
+}
