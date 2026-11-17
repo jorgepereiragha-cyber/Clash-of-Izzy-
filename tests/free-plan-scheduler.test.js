@@ -39,19 +39,18 @@ test("active players still reconcile their own queues and marches when loading t
 test("kingdom state groups its 14 independent D1 reads into one invocation batch", async () => {
   const worker = await read("worker.js");
   const start = worker.indexOf("async function gameState(env,playerId)");
-  const end = worker.indexOf("\\nasync function gameAction", start);
+  const end = worker.indexOf("\nasync function gameAction", start);
   assert.ok(start >= 0 && end > start, "gameState function boundaries must exist");
   const state = worker.slice(start, end);
   const batchStart = state.indexOf("const stateResults=await env.DB.batch([");
   const batchEnd = state.indexOf("]);", batchStart);
   assert.ok(batchStart >= 0 && batchEnd > batchStart, "game state reads must be grouped in one D1 batch");
   const batch = state.slice(batchStart, batchEnd);
-  assert.equal((batch.match(/env\\.DB\\.prepare\\(/g) || []).length, 14);
-  assert.match(state, /const fresh=stateResults\\[0\\]\\?\\.results\\?\\.\\[0\\]\\|\\|null/);
-  assert.match(state, /const recentEvents=stateResults\\[12\\],queues=stateResults\\[13\\]/);
-  assert.doesNotMatch(state, /fresh,buildings,troops,heroes,dragon,research,territories,marches,reports,heroInventory,heroHistory,inventoryItems,recentEvents,queues\\]=await Promise\\.all/);
+  assert.equal(batch.split("env.DB.prepare(").length - 1, 14);
+  assert.ok(state.includes("const fresh=stateResults[0]?.results?.[0]||null"));
+  assert.ok(state.includes("const recentEvents=stateResults[12],queues=stateResults[13]"));
+  assert.ok(!state.includes("await Promise.all(["));
 });
-
 
 test("derived kingdom capacity and power calculations batch their independent D1 reads", async () => {
   const worker = await read("worker.js");
@@ -61,11 +60,12 @@ test("derived kingdom capacity and power calculations batch their independent D1
   assert.ok(statsStart >= 0 && powerStart > statsStart && logStart > powerStart);
   const stats = worker.slice(statsStart, powerStart);
   const power = worker.slice(powerStart, logStart);
-  assert.match(stats, /const reads=await env\\.DB\\.batch\\(\\[/);
-  assert.match(stats, /SELECT food,wood,stone,iron,gold,wall_hp,castle_level FROM kingdoms/);
-  assert.match(stats, /const defense=.*kingdom\\.castle_level/);
-  assert.match(power, /const reads=await env\\.DB\\.batch\\(\\[/);
-  assert.match(power, /const dragon=reads\\[4\\]\\?\\.results\\?\\.\\[0\\]/);
-  assert.match(power, /const kingdom=reads\\[5\\]\\?\\.results\\?\\.\\[0\\]/);
-  assert.doesNotMatch(stats+power, /Promise\\.all\\(/);
+  assert.ok(stats.includes("const reads=await env.DB.batch(["));
+  assert.ok(stats.includes("SELECT food,wood,stone,iron,gold,wall_hp,castle_level FROM kingdoms"));
+  assert.ok(stats.includes("const defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number(kingdom.castle_level)||1)*10"));
+  assert.ok(power.includes("const reads=await env.DB.batch(["));
+  assert.ok(power.includes("const dragon=reads[4]?.results?.[0]||null"));
+  assert.ok(power.includes("const kingdom=reads[5]?.results?.[0]||null"));
+  assert.ok(!stats.includes("Promise.all("));
+  assert.ok(!power.includes("Promise.all("));
 });
