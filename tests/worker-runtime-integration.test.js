@@ -251,6 +251,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(Number(kingdomStatus.resources.gems) >= 0);
       assert.equal(Number(kingdomStatus.researchCenterLevel), Number(state.buildings.find(item => item.building_type === "academy")?.level || 0));
       assert.ok(kingdomStatus.researches.some(item => item.id === "economy" && item.unlocked), "economia fica disponível sem requisito de Academia");
+      assert.ok(kingdomStatus.researches.some(item => item.id === "economy" && item.canAfford && item.canStart), "pesquisa informa elegibilidade e recursos suficientes para começar");
       assert.ok(kingdomStatus.researches.some(item => item.id === "defense" && item.requiredAcademyLevel === 1), "defesa expõe o requisito real da Academia");
       assert.ok(kingdomStatus.researches.every(item => Number.isInteger(item.level) && Number.isInteger(item.maxLevel)));
       expectStatus(await api("/api/kingdom/status", { method: "POST", token: tokenA }), 405, "resumo do reino aceita apenas GET");
