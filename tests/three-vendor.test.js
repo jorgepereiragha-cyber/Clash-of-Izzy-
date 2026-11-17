@@ -12,6 +12,7 @@ test("Three.js runtime is vendored from the exact pinned npm version", async () 
   const manifest = JSON.parse(await read("vendor/three/asset-manifest.json"));
   assert.equal(packageJson.devDependencies.three, "0.187.0");
   assert.equal(manifest.threeVersion, packageJson.devDependencies.three);
+  assert.ok(!manifest.assets.some(url => url.endsWith("/README.md")), "non-runtime README files must not block atomic Service Worker precache");
 
   const required = [
     "/vendor/three/build/three.module.js",
