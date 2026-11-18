@@ -435,9 +435,36 @@ document.getElementById("feedbackForm").addEventListener("submit",submitFeedback
 document.getElementById("nicknameForm").addEventListener("submit",setNickname);
 document.getElementById("trainingForm").addEventListener("submit",startTraining);
 document.getElementById("researchForm").addEventListener("submit",startResearch);
-window.setInterval(()=>{if(document.hidden)return;const now=Date.now();document.querySelectorAll("[data-completes]").forEach(el=>{const completionTime=Date.parse(el.dataset.completes||"");const remaining=Number.isFinite(completionTime)?Math.max(0,Math.ceil((completionTime-now)/1000)):0;el.textContent=formatDuration(remaining);const progress=queueProgressPercent(el.dataset.started,el.dataset.completes,now);const bar=el.closest(".queue-card")?.querySelector("[data-progress]");if(bar)bar.style.width=progress+"%";if(bar?.parentElement)bar.parentElement.setAttribute("aria-valuenow",String(progress));});},1000);
-window.setInterval(()=>{if(!document.hidden)refreshQueueState();},60000);
-document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshQueueState();});
+let queueClockTimer = null;
+let queueRefreshTimer = null;
+
+function updateQueueClock() {
+ if (document.hidden) return;
+ const now=Date.now();
+ document.querySelectorAll("[data-completes]").forEach(el=>{
+  const completionTime=Date.parse(el.dataset.completes||"");
+  const remaining=Number.isFinite(completionTime)?Math.max(0,Math.ceil((completionTime-now)/1000)):0;
+  el.textContent=formatDuration(remaining);
+  const progress=queueProgressPercent(el.dataset.started,el.dataset.completes,now);
+  const bar=el.closest(".queue-card")?.querySelector("[data-progress]");
+  if(bar)bar.style.width=progress+"%";
+  if(bar?.parentElement)bar.parentElement.setAttribute("aria-valuenow",String(progress));
+ });
+}
+function stopQueueTimers() {
+ if(queueClockTimer!==null){window.clearInterval(queueClockTimer);queueClockTimer=null;}
+ if(queueRefreshTimer!==null){window.clearInterval(queueRefreshTimer);queueRefreshTimer=null;}
+}
+function startQueueTimers() {
+ if(document.hidden)return;
+ if(queueClockTimer===null)queueClockTimer=window.setInterval(updateQueueClock,1000);
+ if(queueRefreshTimer===null)queueRefreshTimer=window.setInterval(refreshQueueState,60000);
+}
+document.addEventListener("visibilitychange",()=>{
+ if(document.hidden)stopQueueTimers();
+ else{updateQueueClock();refreshQueueState();startQueueTimers();}
+});
+startQueueTimers();
 window.addEventListener("coi:app-resume",event=>{if(event.detail?.reason==="online")connect();});
 document.getElementById("playerSearchForm").addEventListener("submit",searchPlayers);
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
