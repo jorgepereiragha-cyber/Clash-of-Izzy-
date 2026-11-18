@@ -67,7 +67,7 @@ Fontes oficiais:
 5. D1 Time Travel confirmado (é automático no backend novo; até 30 dias no Paid) e procedimento de recuperação revisado. Exportação externa é opcional para retenção maior ou cópia independente.
 6. Workflow de produção manual, com confirmação explícita, backup/check de migrations, deploy e smoke test somente de leitura.
 
-**Atenção ao spending limit:** quando alcançado, novas invocações de Workers podem ser rejeitadas, incluindo HTTP, Cron e consumers de Queue. Assets estáticos que não passam pelo Worker podem continuar disponíveis; rotas dinâmicas podem falhar. Definir limite que proteja a conta sem interromper o jogo inadvertidamente.
+**Atenção ao spending limit:** o limite de Workers é compartilhado na conta e, quando alcançado, novas invocações podem ser rejeitadas, incluindo HTTP, Cron e consumers de Queue. Assets estáticos que não passam pelo Worker podem continuar disponíveis; rotas dinâmicas podem falhar. Ele não é um teto de fatura: não cobre a assinatura base, D1 armazenado, Durable Objects, R2, Queues ou outros produtos; medição atrasada e operações em curso podem ultrapassá-lo. Configure também alertas para os outros produtos e evite um limite que interrompa o jogo inadvertidamente.
 
 ### P1 — processamento assíncrono
 Criar Queue somente quando houver producer e consumer reais, idempotentes e testados. Primeiros candidatos:
