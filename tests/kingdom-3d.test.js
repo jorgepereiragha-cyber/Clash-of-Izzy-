@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "../scripts/kingdom-quality.js";
+import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler } from "../scripts/kingdom-quality.js";
 
 const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
@@ -275,4 +275,51 @@ test("failed optional GLB downloads preserve procedural models and allow later r
   assert.ok(renderer.includes("GLB assets not ready; procedural models remain active"));
   assert.ok(renderer.includes("glbLoadPromises.delete(key)"));
   assert.ok(renderer.includes("manifestLoad = null"));
+});
+
+
+test("a narrow Android viewport does not downgrade capable GPU hardware", () => {
+  const high = selectKingdomQualityProfile({ deviceMemory: 8, hardwareConcurrency: 8, viewportWidth: 390, maxTextureSize: 8192 });
+  const balanced = selectKingdomQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, viewportWidth: 390, maxTextureSize: 8192 });
+  assert.equal(high.tier, "high");
+  assert.equal(high.surfaceTextureSize, 512);
+  assert.equal(balanced.tier, "balanced");
+  assert.equal(balanced.surfaceTextureSize, 256);
+});
+
+test("procedural material texels scale from 128 to 256 and 512 without coarse high-tier grain", () => {
+  const low = selectKingdomQualityProfile({ deviceMemory: 4, hardwareConcurrency: 4, viewportWidth: 390, maxTextureSize: 4096 });
+  const balanced = selectKingdomQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, viewportWidth: 390, maxTextureSize: 8192 });
+  const high = selectKingdomQualityProfile({ deviceMemory: 8, hardwareConcurrency: 8, viewportWidth: 390, maxTextureSize: 8192 });
+  assert.equal(low.surfaceTextureSize, 128);
+  assert.equal(balanced.surfaceTextureSize, 256);
+  assert.equal(high.surfaceTextureSize, 512);
+  assert.match(renderer, /const textureSize = qualityProfile\?\.surfaceTextureSize \|\| 128/);
+  assert.match(renderer, /ctx\.setTransform\(detailScale, 0, 0, detailScale, 0, 0\)/);
+  assert.match(renderer, /const grainCount = Math\.round\(1200 \* detailScale \* detailScale\)/);
+  assert.match(renderer, /ctx\.setTransform\(1, 0, 0, 1, 0, 0\)/);
+  assert.match(renderer, /rand\(\) \* textureSize/);
+});
+
+test("the requestAnimationFrame sampler is bounded and reports callback intervals", () => {
+  const sampler = createFrameTimingSampler(3);
+  assert.deepEqual(sampler.snapshot(), { sampleCount: 0, p50Ms: null, p95Ms: null });
+  sampler.record(16.67);
+  sampler.record(20);
+  sampler.record(33.33);
+  sampler.record(10);
+  sampler.record(-2);
+  assert.deepEqual(sampler.snapshot(), { sampleCount: 3, p50Ms: 20, p95Ms: 33.33 });
+  sampler.reset();
+  assert.equal(sampler.snapshot().sampleCount, 0);
+});
+
+test("army and optional shader animation pause when hidden or outside the viewport", () => {
+  assert.match(renderer, /function canRunArmyAnimation\(\)/);
+  assert.match(renderer, /!document\.hidden && sceneInViewport/);
+  assert.match(renderer, /new IntersectionObserver\(/);
+  assert.match(renderer, /document\.addEventListener\("visibilitychange", visibilityChangeHandler\)/);
+  assert.match(renderer, /sceneVisibilityObserver\?\.disconnect\(\)/);
+  assert.match(renderer, /animationLoop: \{ active: Boolean\(animationFrame\)/);
+  assert.match(renderer, /animationFrameTiming\.snapshot\(\)/);
 });
