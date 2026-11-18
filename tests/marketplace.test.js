@@ -33,6 +33,8 @@ test("Loja de Heróis só vende fragmentos para heróis pertencentes ao reino", 
   assert.match(worker, /UPDATE hero_inventory SET fragments=fragments\+\?/);
   assert.match(migration, /PRIMARY KEY \(kingdom_id, hero_key\)/);
   assert.match(page, /id="hero-offers"/);
+  assert.match(page, /id="hero-recruitment"/);
+  assert.match(ui, /type:"hero_summon"/);
   assert.match(ui, /type:"hero_shop_buy"/);
 });
 
