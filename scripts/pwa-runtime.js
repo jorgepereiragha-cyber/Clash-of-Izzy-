@@ -76,9 +76,6 @@
     });
     const register = () => {
       navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" })
-        .then(registration => {
-          if (navigator.onLine) registration.update().catch(() => {});
-        })
         .catch(error => console.warn("Clash of Izzy: registro PWA indisponível.", error));
     };
     if (document.readyState === "complete") register();
