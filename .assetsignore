@@ -34,3 +34,7 @@ assets/art/README.md
 
 # Model documentation is not a public game asset.
 assets/models/README.md
+
+# Keep asset provenance and licence texts in Git, not in the public static asset directory.
+assets/3d/README.md
+assets/3d/licenses/
