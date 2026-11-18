@@ -61,13 +61,13 @@ Fontes oficiais:
 
 ### P0 — necessários para operar com segurança
 1. Workers Paid no account onde `clash-of-izzy` já está publicado.
-2. Spending limit para uso variável de Workers, separado da assinatura.
+2. Spending limits separados para Workers e Durable Objects, com alertas de orçamento da conta e notificação antes de atingir o limite.
 3. Métricas de Worker, D1 e Durable Objects com alertas.
 4. Segredos de produção e Preview isolados; nenhum valor sensível em `vars`, GitHub, HTML ou logs.
 5. D1 Time Travel confirmado (é automático no backend novo; até 30 dias no Paid) e procedimento de recuperação revisado. Exportação externa é opcional para retenção maior ou cópia independente.
 6. Workflow de produção manual, com confirmação explícita, backup/check de migrations, deploy e smoke test somente de leitura.
 
-**Atenção ao spending limit:** o limite de Workers é compartilhado na conta e, quando alcançado, novas invocações podem ser rejeitadas, incluindo HTTP, Cron e consumers de Queue. Assets estáticos que não passam pelo Worker podem continuar disponíveis; rotas dinâmicas podem falhar. Ele não é um teto de fatura: não cobre a assinatura base, D1 armazenado, Durable Objects, R2, Queues ou outros produtos; medição atrasada e operações em curso podem ultrapassá-lo. Configure também alertas para os outros produtos e evite um limite que interrompa o jogo inadvertidamente.
+**Atenção aos controles de gastos:** Workers e Durable Objects possuem limites de gasto separados, cada um compartilhado entre os recursos daquele produto na conta. Ao atingir o limite de Workers, novas invocações podem ser rejeitadas, incluindo HTTP, Cron e consumers de Queue; ao atingir o limite de Durable Objects, as operações suportadas desse produto podem ser pausadas. Assets estáticos sem execução do Worker podem continuar disponíveis. Nenhum desses limites é um teto de fatura: não cobre a assinatura base nem todos os demais produtos/armazenamento; medição atrasada e operações em curso podem ultrapassá-los. O Budget Alert da conta envia aviso sem pausar produtos. Defina limites e alertas conscientemente, pois um limite baixo pode interromper o jogo.
 
 ### P1 — processamento assíncrono
 Criar Queue somente quando houver producer e consumer reais, idempotentes e testados. Primeiros candidatos:
@@ -139,10 +139,10 @@ Documentação:
 
 ## 7. Recuperação e limites financeiros revisados
 
-- D1 Time Travel não exige habilitação ou tarefa de backup Cron: no backend D1 atual é sempre ativo, com até 30 dias no Workers Paid e 7 dias no Free. Conferir `wrangler d1 info` para garantir que o banco usa `version: production`; bancos antigos alpha têm mecanismo legado.
+- D1 Time Travel não exige habilitação ou tarefa de backup Cron: é sempre ativo em bancos no novo storage backend, com até 30 dias no Workers Paid e 7 dias no Free. Conferir `wrangler d1 info`: bancos no backend novo são identificados como `version: beta`; bancos antigos `alpha` usam o mecanismo legado e não suportam a mesma API.
 - Restaurar um bookmark sobrescreve o banco no local e cancela queries/transações em andamento. A restauração é operação destrutiva e deve ter aprovação, bookmark anterior anotado e plano de reversão.
 - Exportações para R2/armazenamento externo são complementares para retenção maior que 30 dias ou cópia fora da conta; não são requisito para o D1 ter Time Travel.
-- Workers spending limit é somente para uso variável do produto Workers, é compartilhado entre todos os Workers na conta e pode interromper a produção inteira. Não cobre D1 storage, Durable Objects, R2, Queues ou assinatura base; atrasos de medição podem permitir ultrapassar o limite. Alertas separados são necessários.
+- Workers e Durable Objects têm controles de spending limit separados, ambos compartilhados entre os recursos do respectivo produto na conta. O limite de Workers pode interromper novas invocações de todos os Workers; o limite de Durable Objects pode pausar operações suportadas de todos os DOs. Nenhum cobre assinatura base, D1 storage, R2, Queues ou outros produtos. Budget Alerts da conta notificam sem bloquear; atrasos de medição podem permitir ultrapassar limites.
 - Durable Objects têm billing próprio: requests, duração e SQLite rows/storage. Mensagens WebSocket recebidas aplicam proporção 20:1 para requests; envios/pings não contam como requests. Ativar Hibernation API para conexões ociosas reduz duration; o código atual ainda precisa de revisão para confirmar que usa a API de Hibernation, não apenas `acceptWebSocket()` padrão.
 
 ## 8. O que NÃO ativar agora
@@ -158,7 +158,7 @@ Documentação:
 ## 9. Critérios de liberação da infraestrutura paga
 
 - [ ] Workers Paid ativado pelo proprietário da conta e orçamento máximo registrado.
-- [ ] Workers spending limit e alertas configurados; limites/alertas separados avaliados para DO e demais produtos; consequência de limite atingido aceita conscientemente.
+- [ ] Workers e Durable Objects spending limits e alertas configurados; Budget Alert da conta avaliado; consequência de limite atingido aceita conscientemente.
 - [ ] D1 Preview remoto validado por UUID, com migrations aplicadas exclusivamente na base isolada.
 - [ ] Credenciais Master e sessão de QA exclusivas de Preview.
 - [ ] Fluxo de compra manual WhatsApp + liberação Master validado com conta descartável.
