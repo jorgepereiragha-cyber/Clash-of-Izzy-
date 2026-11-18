@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 // This isolated spec opts in so it can validate the real PWA lifecycle.
 test.use({ serviceWorkers: "allow" });
 
-const SHELL_CACHE = "clash-of-izzy-shell-v33";
+const SHELL_CACHE = "clash-of-izzy-shell-v34";
 const CACHED_MODEL = "/assets/3d/kenney/castle-kit/Models/GLB%20format/tower-square.glb";
 
 test("PWA activates its Service Worker and serves previously cached shell and GLB offline", async ({ page, context }) => {
@@ -30,6 +30,8 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
       offlinePage: Boolean(await cache.match("/offline.html")),
       manifest: Boolean(await cache.match("/manifest.json")),
       kingdomArtwork: Boolean(await cache.match("/assets/art/landing-kingdom.svg")),
+      androidRuntime: Boolean(await cache.match("/scripts/pwa-runtime.js")),
+      androidStyles: Boolean(await cache.match("/styles/android-experience.css")),
     };
   }, SHELL_CACHE);
 
@@ -37,6 +39,8 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(shellState.offlinePage).toBe(true);
   expect(shellState.manifest).toBe(true);
   expect(shellState.kingdomArtwork).toBe(true);
+  expect(shellState.androidRuntime).toBe(true);
+  expect(shellState.androidStyles).toBe(true);
 
   const landingArtwork = await page.locator(".landing-kingdom-art").evaluate(image => ({ complete: image.complete, naturalWidth: image.naturalWidth }));
   expect(landingArtwork).toEqual({ complete: true, naturalWidth: 900 });
