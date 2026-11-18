@@ -1,0 +1,121 @@
+name: Cloudflare Paid Readiness (read-only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Branch do código que será validada sem publicar"
+        required: true
+        default: release/one-shared-realm-early-access
+        type: string
+      owner_confirmed_paid_plan:
+        description: "Confirme no Dashboard que Workers Paid está ativo e os limites de gastos/alertas foram revisados"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clash-of-izzy-cloudflare-paid-readiness
+  cancel-in-progress: false
+
+jobs:
+  readiness:
+    if: ${{ inputs.owner_confirmed_paid_plan == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout selected release branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run complete automated test suite
+        run: npm test
+
+      - name: Validate production Worker bundle without publishing
+        run: npx wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist
+
+      - name: Normalize Cloudflare token
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          token = os.environ.get("RAW_CLOUDFLARE_API_TOKEN", "").strip()
+          if token[:7].lower() == "bearer ":
+              token = token[7:].strip()
+          if len(token) >= 2 and token[0] == token[-1] and token[0] in ("'", '"'):
+              token = token[1:-1].strip()
+          if not token or any(ch.isspace() for ch in token):
+              raise SystemExit("CLOUDFLARE_API_TOKEN ausente ou inválido.")
+          print("::add-mask::" + token)
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+              output.write("CLOUDFLARE_API_TOKEN=" + token + "\n")
+          PY
+
+      - name: Validate Cloudflare account access
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo "::error::CLOUDFLARE_ACCOUNT_ID ausente." && exit 1)
+          npx wrangler whoami --account "$CLOUDFLARE_ACCOUNT_ID" --json
+
+      - name: Inspect production D1 metadata (read-only)
+        run: npx wrangler --config wrangler.jsonc d1 info clash-of-izzy-db --json
+
+      - name: Inspect isolated Preview D1 metadata (read-only)
+        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 info PREVIEW_DB --json
+
+      - name: Verify production and Preview D1 UUID isolation
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler --config wrangler.jsonc d1 info clash-of-izzy-db --json > "$RUNNER_TEMP/coi-prod-d1.json"
+          npx wrangler --config wrangler.preview-migrations.jsonc d1 info PREVIEW_DB --json > "$RUNNER_TEMP/coi-preview-d1.json"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          prod = Path(os.environ["RUNNER_TEMP"], "coi-prod-d1.json").read_text()
+          preview = Path(os.environ["RUNNER_TEMP"], "coi-preview-d1.json").read_text()
+          prod_id = "7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          preview_id = "6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          if prod_id not in prod:
+              raise SystemExit("O D1 de produção consultado não corresponde ao UUID declarado no projeto.")
+          if preview_id not in preview:
+              raise SystemExit("O D1 de Preview não existe/não foi localizado com o UUID esperado. Não execute migrations.")
+          if prod_id == preview_id:
+              raise SystemExit("ERRO: Preview e produção apontam para o mesmo D1.")
+          print("D1 produção e Preview encontrados e com UUIDs diferentes.")
+          PY
+
+      - name: Inspect production migration status (read-only)
+        run: npx wrangler --config wrangler.jsonc d1 migrations list clash-of-izzy-db --remote
+
+      - name: Inspect Preview migration status (read-only)
+        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations list PREVIEW_DB --remote
+
+      - name: Inspect D1 Time Travel availability (read-only)
+        run: npx wrangler --config wrangler.jsonc d1 time-travel info clash-of-izzy-db --json
+
+      - name: Report deployment gate
+        run: |
+          echo "Read-only readiness checks completed."
+          echo "This workflow did not create resources, change secrets, apply migrations, or deploy the Worker."
+          echo "Paid-plan status is an owner confirmation from Cloudflare Billing; Wrangler whoami does not prove the subscription tier."
+          echo "Production release still requires the separate protected deploy-cloudflare workflow."
