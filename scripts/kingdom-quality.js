@@ -29,6 +29,7 @@ export function selectKingdomQualityProfile({
     shadowMapSize: tier === "high" ? 1536 : tier === "balanced" ? 1024 : 512,
     anisotropy: tier === "high" ? 8 : tier === "balanced" ? 4 : 2,
     surfaceTextureSize: tier === "high" ? 512 : tier === "balanced" ? 256 : 128,
+    pbrMaps: tier !== "low",
     maxBuildings: tier === "low" ? 8 : tier === "balanced" ? 12 : 16,
     maxPixelCount: tier === "low" ? 1200000 : tier === "high" ? 4200000 : 2400000,
     loadOptionalAssets: !dataSaver,
