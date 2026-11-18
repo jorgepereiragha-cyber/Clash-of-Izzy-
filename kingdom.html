@@ -57,6 +57,30 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   #feedbackForm select,#feedbackForm textarea{width:100%;padding:10px;border:1px solid #71839a;border-radius:8px;background:#0e1a2a;color:#fff;font:inherit}
   #feedbackForm textarea{resize:vertical;min-height:84px}
   #feedbackForm button{justify-self:start}
+
+.account-notice {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 0 0 14px;
+  padding: 13px;
+  border: 1px solid #927344;
+  border-radius: 10px;
+  background: #3a2d1c;
+  color: #f4dca8;
+  line-height: 1.5;
+}
+.account-notice[hidden] { display: none !important; }
+.account-notice-content { flex: 1; min-width: 0; }
+.account-notice-content p { margin: 4px 0 0; font-size: 0.95rem; }
+.account-notice .linkbtn { white-space: nowrap; text-decoration: none; }
+@media (max-width: 480px) {
+  .account-notice { align-items: stretch; flex-direction: column; text-align: center; }
+  .account-notice .linkbtn { width: 100%; text-align: center; }
+}
+
 </style>  <link rel="stylesheet" href="/styles/navigation.css">
 </head>
 <body>
@@ -65,6 +89,13 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div class="hero"><div><h1 id="kingdomName">Seu Reino</h1><div class="muted" id="playerName">Carregando comandante…</div></div><div class="toolbar"><button class="secondary" id="refresh">↻ Atualizar</button></div></div>
 <div id="loading">Carregando seu reino e sincronizando com o servidor…</div>
 <div id="game" hidden>
+<section id="guestAccountNotice" class="account-notice" hidden aria-labelledby="guestAccountTitle">
+  <div class="account-notice-content">
+    <strong id="guestAccountTitle">⚠️ Modo Convidado</strong>
+    <p>Seu reino está salvo no servidor, mas o acesso ainda depende da sessão deste navegador. Crie uma conta para acessar seu progresso em outros dispositivos.</p>
+  </div>
+  <a class="linkbtn" href="/account.html">🛡️ Proteger meu reino</a>
+</section>
 <div class="layout">
 <section class="panel"><h2>🏰 Sua cidade</h2><div class="city" id="city"></div><div class="grid2" id="summary"></div></section>
 <div class="stack">
@@ -155,10 +186,22 @@ const fmt=n=>Number(n||0).toLocaleString("pt-BR");
 const esc=value=>String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll(String.fromCharCode(34),"&quot;").replaceAll(String.fromCharCode(39),"&#39;");
 function setStatus(message,error=false){const el=document.getElementById("status");el.textContent=message;el.classList.toggle("error",error)}
 async function request(path,options={}){const response=await fetch(API+path,{...options,headers:{...(options.headers||{}),...(token?{Authorization:"Bearer "+token}:{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Falha na comunicação com o servidor.");return data}
+
+async function refreshGuestAccountNotice(){
+ const notice=document.getElementById("guestAccountNotice");
+ if(!notice||!token)return;
+ try{
+  const account=await request("/account/status");
+  notice.hidden=account.hasAccount!==false;
+ }catch(error){
+  notice.hidden=true;
+  console.debug("account_status_unavailable",error?.message||error);
+ }
+}
 const analyticsSessionId=globalThis.crypto?.randomUUID?.()||("session_"+Date.now()+"_"+Math.random().toString(36).slice(2,10));
 let analyticsStarted=false;
 async function trackAnalytics(event,data={}){if(!token)return;try{await request("/game/analytics",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event,sessionId:analyticsSessionId,data})});}catch(error){console.debug("analytics_unavailable",error?.message||error);}}
-async function connect(){setStatus("Sincronizando…");try{token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");let data;if(token){data=await request("/game/state");}else{const referrerCode=new URLSearchParams(location.search).get("ref")||"";data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(referrerCode?{referrer_code:referrerCode}:{})});if(data.token){token=data.token;localStorage.setItem("coi_game_token",token);if(referrerCode){const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete("ref");history.replaceState({}, "", cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);}}}state=data.state||data;if(!state.kingdom)throw new Error("O servidor não retornou os dados do reino.");render();document.getElementById("loading").hidden=true;document.getElementById("game").hidden=false;setStatus("● Reino sincronizado");if(!analyticsStarted){analyticsStarted=true;void trackAnalytics("kingdom.opened",{castle_level:Number(state.kingdom.castle_level||1)});}}catch(error){setStatus(error.message,true);const loading=document.getElementById("loading");loading.textContent=error.message+" Seu acesso salvo foi preservado. Tente novamente após verificar a conexão. ";let retry=document.getElementById("retryConnection");if(!retry){retry=document.createElement("button");retry.id="retryConnection";retry.type="button";retry.className="secondary";retry.textContent="↻ Tentar novamente";retry.style.marginTop="12px";retry.addEventListener("click",connect);loading.append(retry);}retry.disabled=false;}}
+async function connect(){setStatus("Sincronizando…");try{token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");let data;if(token){data=await request("/game/state");}else{const referrerCode=new URLSearchParams(location.search).get("ref")||"";data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(referrerCode?{referrer_code:referrerCode}:{})});if(data.token){token=data.token;localStorage.setItem("coi_game_token",token);if(referrerCode){const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete("ref");history.replaceState({}, "", cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);}}}state=data.state||data;if(!state.kingdom)throw new Error("O servidor não retornou os dados do reino.");render();document.getElementById("loading").hidden=true;document.getElementById("game").hidden=false;setStatus("● Reino sincronizado");void refreshGuestAccountNotice();if(!analyticsStarted){analyticsStarted=true;void trackAnalytics("kingdom.opened",{castle_level:Number(state.kingdom.castle_level||1)});}}catch(error){setStatus(error.message,true);const loading=document.getElementById("loading");loading.textContent=error.message+" Seu acesso salvo foi preservado. Tente novamente após verificar a conexão. ";let retry=document.getElementById("retryConnection");if(!retry){retry=document.createElement("button");retry.id="retryConnection";retry.type="button";retry.className="secondary";retry.textContent="↻ Tentar novamente";retry.style.marginTop="12px";retry.addEventListener("click",connect);loading.append(retry);}retry.disabled=false;}}
 function drawKingdomScene(buildings){
  const host=document.getElementById("city");if(!host)return;
  let canvas=document.getElementById("kingdomScene");
