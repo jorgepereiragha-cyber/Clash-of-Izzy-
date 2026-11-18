@@ -64,7 +64,7 @@ test("the Service Worker precaches all vendored Three.js modules and decoder bin
   const sw = await read("sw.js");
   assert.match(sw, /vendor\/three\/asset-manifest\.json/);
   assert.match(sw, /manifest\.assets/);
-  assert.match(sw, /clash-of-izzy-shell-v28/);
+  assert.match(sw, /clash-of-izzy-shell-v33/);
   assert.match(sw, /url\.pathname\.startsWith\("\/api\/"\)/);
 });
 
