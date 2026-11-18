@@ -43,6 +43,9 @@ Referências oficiais:
 - Layouts testados em preparação para larguras de 360, 390, 600, 768, 844 em paisagem e 1280 px; o teste automatizado é Chromium, ainda não substitui aparelhos Android reais.
 - Aviso acessível de perda/retorno de conexão; a interface deixa claro que o jogo precisa de internet para sincronizar.
 - Atualização do Service Worker sem recarregar automaticamente uma sessão em andamento; o jogador escolhe quando aplicar uma nova versão.
+- Temporizadores visuais do Reino, polling da Loja de Valhalla e atualizações do Evento Mundial são suspensos em segundo plano; ao retornar, o cliente consulta o estado oficial do Worker/D1.
+- Partículas decorativas da cidade usam Canvas 2D a cerca de 30 fps, com menos partículas em dispositivos modestos; respeitam Economia de dados, movimento reduzido e visibilidade e não interceptam toques.
+- Ferramentas de CI (diagnóstico, smoke test e validação de assets) são mantidas no Git, mas excluídas dos assets públicos pelo `.assetsignore`.
 - Evento comum de retomada para sincronizar de novo o estado de Reino/Mapa quando a rede volta.
 - Mapa mundial com gesto de arrasto e pinça de dois dedos; animações de marchas pausam quando o app fica em segundo plano ou o mapa sai da área visível.
 - Limite de pixels do buffer gráfico do mapa e retomada compatível com o ciclo de vida/back-forward cache.
