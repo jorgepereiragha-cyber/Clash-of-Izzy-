@@ -7,6 +7,7 @@
   const links = [
     {label:"Início",href:"/index.html",icon:"⌂",keywords:"home início principal"},
     {label:"Meu reino",href:"/kingdom.html",icon:"🏰",keywords:"cidade castelo construções recursos edifícios reino"},
+    {label:"Mercador & Heróis",href:"/market.html",icon:"⚖️",keywords:"mercador mercado loja trocas aceleradores fragmentos heróis recursos oferta estoque"},
     {label:"Minha conta",href:"/account.html",icon:"👤",keywords:"login cadastro senha acesso persistente conta comandante"} ,
     {label:"Mapa mundial",href:"/world.html",icon:"🌍",keywords:"territórios exploração marchas mapa mundo"},
     {label:"Eventos",href:"/events.html",icon:"💀",keywords:"anjo da morte ceifador monstros chefes evento mundial fim de semana recompensas ranking valhalla ascensão runas caçada selvagem fenrir shiva khali cerco de eldoria torneio dos campeões"},
