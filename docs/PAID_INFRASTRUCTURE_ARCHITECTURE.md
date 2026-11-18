@@ -35,11 +35,11 @@ O Durable Object atual em `feature/eldoria-realtime-free` é apenas um piloto de
 ## 3. Plano Workers Paid e orçamento
 
 Referência oficial atual:
-- Workers Paid: assinatura base de US$ 5/mês, incluindo 10 milhões de requisições dinâmicas e 30 milhões de milissegundos de CPU por mês; excedentes de requisição e CPU são cobrados por milhão.
+- Workers Paid: assinatura base de US$ 5/mês, incluindo 10 milhões de requisições dinâmicas e 30 milhões de milissegundos de CPU por mês; excedentes: US$ 0,30 por milhão de requisições e US$ 0,02 por milhão de milissegundos de CPU. CPU máxima por invocação é 5 minutos (o padrão é 30 segundos); isso não aumenta a franquia mensal.
 - Limite de CPU por invocação: até 5 minutos no Paid, sujeito a configuração e limites específicos.
 - D1 Paid: 25 bilhões de linhas lidas/mês e 50 milhões escritas/mês incluídas; acima disso há cobrança por milhão. Os primeiros 5 GB de armazenamento estão incluídos.
 - D1 SQLite: máximo de 10 GB por banco individual; Time Travel de até 30 dias no Paid.
-- Durable Objects Paid: 1 milhão de requests/mês e 400.000 GB-s incluídos, com cobrança acima da franquia. Mensagens WebSocket contam com proporção de 1 request faturável por 20 mensagens.
+- Durable Objects Paid: 1 milhão de requests/mês e 400.000 GB-s de duração incluídos. Excedentes de requests: US$ 0,15 por milhão; duração: US$ 12,50 por milhão de GB-s. Para fins de faturamento, mensagens WebSocket recebidas são agrupadas na proporção de 20 mensagens para 1 request; mensagens enviadas e pings de protocolo não são cobrados como requests. WebSocket Hibernation reduz a duração faturável enquanto o objeto está ocioso, mantendo clientes conectados.
 - Queues Paid: 1 milhão de operações/mês incluídas; operação adicional é cobrada. Em geral, consumir mensagem gera write + read + delete.
 - R2 Standard: franquia de 10 GB-mês, 1 milhão de operações A e 10 milhões B; egress para Internet sem custo. Fora da franquia, storage/operations são cobrados.
 
@@ -137,7 +137,15 @@ Documentação:
 - https://developers.cloudflare.com/workers/previews/configuration/
 - https://developers.cloudflare.com/workers/previews/resources/
 
-## 7. O que NÃO ativar agora
+## 7. Recuperação e limites financeiros revisados
+
+- D1 Time Travel não exige habilitação ou tarefa de backup Cron: no backend D1 atual é sempre ativo, com até 30 dias no Workers Paid e 7 dias no Free. Conferir `wrangler d1 info` para garantir que o banco usa `version: production`; bancos antigos alpha têm mecanismo legado.
+- Restaurar um bookmark sobrescreve o banco no local e cancela queries/transações em andamento. A restauração é operação destrutiva e deve ter aprovação, bookmark anterior anotado e plano de reversão.
+- Exportações para R2/armazenamento externo são complementares para retenção maior que 30 dias ou cópia fora da conta; não são requisito para o D1 ter Time Travel.
+- Workers spending limit é somente para uso variável do produto Workers, é compartilhado entre todos os Workers na conta e pode interromper a produção inteira. Não cobre D1 storage, Durable Objects, R2, Queues ou assinatura base; atrasos de medição podem permitir ultrapassar o limite. Alertas separados são necessários.
+- Durable Objects têm billing próprio: requests, duração e SQLite rows/storage. Mensagens WebSocket recebidas aplicam proporção 20:1 para requests; envios/pings não contam como requests. Ativar Hibernation API para conexões ociosas reduz duration; o código atual ainda precisa de revisão para confirmar que usa a API de Hibernation, não apenas `acceptWebSocket()` padrão.
+
+## 8. O que NÃO ativar agora
 
 - Não contratar ou provisionar Containers só para executar o jogo; a arquitetura atual não precisa de um processo Node persistente.
 - Não configurar Redis externo nem PostgreSQL paralelo antes de provar limitação do D1.
@@ -147,17 +155,17 @@ Documentação:
 - Não mover combate/economia para o cliente.
 - Não executar carga, migration remota, secret update ou deploy sem Preview validado, backup e aprovação.
 
-## 8. Critérios de liberação da infraestrutura paga
+## 9. Critérios de liberação da infraestrutura paga
 
 - [ ] Workers Paid ativado pelo proprietário da conta e orçamento máximo registrado.
-- [ ] Spending limit e alertas configurados; consequência de limite atingido aceita conscientemente.
+- [ ] Workers spending limit e alertas configurados; limites/alertas separados avaliados para DO e demais produtos; consequência de limite atingido aceita conscientemente.
 - [ ] D1 Preview remoto validado por UUID, com migrations aplicadas exclusivamente na base isolada.
 - [ ] Credenciais Master e sessão de QA exclusivas de Preview.
 - [ ] Fluxo de compra manual WhatsApp + liberação Master validado com conta descartável.
 - [ ] Realtime usa ticket single-use e teste de cliente real antes de produção.
 - [ ] Sharding regional aprovado por benchmark e custo.
 - [ ] Teste Android físico (PWA, toque, memória, rede, retomada) anexado.
-- [ ] Backup/Time Travel e recuperação testados.
+- [ ] Time Travel conferido (backend production/30 dias) e procedimento de recuperação ensaiado; exportação externa se retenção/cópia independente for necessária.
 - [ ] Workflow manual protegido e smoke test read-only aprovados.
 
 **Estado em 18/11/2026:** plano e arquitetura preparados; não foi ativado plano pago, criado Queue/R2, aplicado migration remota, alterado segredo, executada carga ou feito deploy de produção.
