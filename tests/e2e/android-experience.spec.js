@@ -14,13 +14,14 @@ test("Android layouts stay within the screen and keep primary touch targets at 4
     await page.setViewportSize(viewport);
     await page.goto("/kingdom.html");
     const metrics = await page.evaluate(() => {
-      const button = document.querySelector("button");
-      const field = document.querySelector('input:not([type="checkbox"]):not([type="radio"])');
+      const button = document.querySelector(".coi-nav-search button");
+      const field = document.querySelector("#coi-nav-query");
       return {
         viewportWidth: window.innerWidth,
         documentWidth: document.documentElement.scrollWidth,
         buttonHeight: button ? button.getBoundingClientRect().height : 0,
         fieldHeight: field ? field.getBoundingClientRect().height : 0,
+        navMounted: Boolean(document.querySelector(".coi-global-nav")),
         androidCss: [...document.styleSheets].some(sheet => sheet.href?.includes("/styles/android-experience.css")),
         runtimeScript: Boolean(document.querySelector('script[src="/scripts/pwa-runtime.js"]')),
       };
@@ -28,6 +29,7 @@ test("Android layouts stay within the screen and keep primary touch targets at 4
     expect(metrics.documentWidth).toBeLessThanOrEqual(metrics.viewportWidth + 1);
     expect(metrics.buttonHeight).toBeGreaterThanOrEqual(48);
     expect(metrics.fieldHeight).toBeGreaterThanOrEqual(48);
+    expect(metrics.navMounted).toBe(true);
     expect(metrics.androidCss).toBe(true);
     expect(metrics.runtimeScript).toBe(true);
   }
