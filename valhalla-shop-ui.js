@@ -354,8 +354,14 @@
   function init() {
     createUI();
     void checkModeStatus();
-    if (!pollHandle) pollHandle = window.setInterval(checkModeStatus, 60000);
+    if (!pollHandle) pollHandle = window.setInterval(() => {
+      if (!document.hidden) void checkModeStatus();
+    }, 60000);
   }
+
+  document.addEventListener("visibilitychange", () => {
+    if (!document.hidden) void checkModeStatus();
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init, { once: true });
