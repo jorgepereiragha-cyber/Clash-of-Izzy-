@@ -98,10 +98,13 @@ test("kingdom, events and Valhalla pause visual timers and network polling while
   const events = await readFile(new URL("../events.js", import.meta.url), "utf8");
   const shop = await readFile(new URL("../valhalla-shop-ui.js", import.meta.url), "utf8");
 
-  assert.match(kingdom, /setInterval\(\(\)=>\{if\(document\.hidden\)return/);
-  assert.match(kingdom, /setInterval\(\(\)=>\{if\(!document\.hidden\)refreshQueueState\(\)/);
-  assert.match(events, /setInterval\(\(\)=>\{if\(!document\.hidden\)renderCountdown\(\)/);
-  assert.match(events, /setInterval\(\(\)=>\{if\(!document\.hidden\)refresh\(\)/);
-  assert.match(shop, /if \(!document\.hidden\) void checkModeStatus\(\)/);
+  assert.match(kingdom, /function stopQueueTimers\(\)/);
+  assert.match(kingdom, /window\.clearInterval\(queueClockTimer\)/);
+  assert.match(kingdom, /window\.clearInterval\(queueRefreshTimer\)/);
+  assert.match(events, /function stopEventTimers\(\)/);
+  assert.match(events, /clearInterval\(countdownTimer\)/);
+  assert.match(events, /clearInterval\(eventRefreshTimer\)/);
+  assert.match(shop, /function stopPolling\(\)/);
+  assert.match(shop, /window\.clearInterval\(pollHandle\)/);
   assert.match(shop, /document\.addEventListener\("visibilitychange"/);
 });
