@@ -3,6 +3,11 @@ name: Cloudflare Paid Readiness (read-only)
 on:
   workflow_dispatch:
     inputs:
+      target_branch:
+        description: "Branch do código que será validada sem publicar"
+        required: true
+        default: release/one-shared-realm-early-access
+        type: string
       owner_confirmed_paid_plan:
         description: "Confirme no Dashboard que Workers Paid está ativo e os limites de gastos/alertas foram revisados"
         required: true
@@ -22,8 +27,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Checkout
+      - name: Checkout selected release branch
         uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
