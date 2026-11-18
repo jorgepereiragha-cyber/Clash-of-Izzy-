@@ -15,7 +15,7 @@ test("production deployment is manual, confirmation-gated, and environment-prote
   assert.match(workflow, /inputs\.confirm_paid_plan == true && inputs\.confirm_production == true/);
   assert.doesNotMatch(workflow, /^\s+push:/m);
   assert.match(workflow, /confirm_production:[\s\S]*?required: true[\s\S]*?default: false[\s\S]*?type: boolean/);
-  assert.match(workflow, /if:\s*\$\{\{\s*inputs\.confirm_production == true\s*\}\}/);
+  assert.match(workflow, /if:\s*\$\{\{\s*inputs\.confirm_paid_plan == true && inputs\.confirm_production == true\s*\}\}/);
   assert.match(workflow, /environment:\s*\n\s+name:\s*production/);
 
   // Preserve the existing preflight, authenticated Time Travel bookmark,
