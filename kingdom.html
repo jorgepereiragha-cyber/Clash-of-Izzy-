@@ -464,6 +464,10 @@ document.addEventListener("visibilitychange",()=>{
  if(document.hidden)stopQueueTimers();
  else{updateQueueClock();refreshQueueState();startQueueTimers();}
 });
+window.addEventListener("pagehide",stopQueueTimers);
+window.addEventListener("pageshow",event=>{
+ if(event.persisted&&!document.hidden){updateQueueClock();refreshQueueState();startQueueTimers();}
+});
 startQueueTimers();
 window.addEventListener("coi:app-resume",event=>{if(event.detail?.reason==="online")connect();});
 document.getElementById("playerSearchForm").addEventListener("submit",searchPlayers);
