@@ -66,3 +66,28 @@ test("entrada do jogo apresenta arte prÃ³pria do reino em vez de ampliar o brasÃ
   assert.match(artwork, /Castelo medieval de pedra com telhados azul-real/);
   assert.match(artwork, /id="river"/);
 });
+
+
+test("PBR map derivation wraps samples at texture edges and emits bounded linear data", async () => {
+  const { derivePbrTextureData } = await import("../scripts/kingdom-materials.js");
+  const width = 8, height = 8;
+  const luminance = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    luminance[y * width + x] = ((x + y) % 2) ? 220 : 35;
+  }
+  const result = derivePbrTextureData({ luminance, width, height, kind: "stone" });
+  assert.equal(result.normalData.length, width * height * 4);
+  assert.equal(result.roughnessData.length, width * height * 4);
+  assert.ok(result.normalData.every(value => Number.isFinite(value) && value >= 0 && value <= 255));
+  assert.ok(result.roughnessData.every(value => Number.isFinite(value) && value >= 0 && value <= 255));
+  assert.ok(result.normalData.some((value, index) => index % 4 === 0 && value !== 128));
+  assert.equal(result.normalData[3], 255);
+  assert.equal(result.roughnessData[3], 255);
+});
+
+test("PBR map generation rejects malformed or excessive image dimensions", async () => {
+  const { derivePbrTextureData } = await import("../scripts/kingdom-materials.js");
+  assert.throws(() => derivePbrTextureData({ width: 1, height: 4, luminance: new Uint8Array(4) }), RangeError);
+  assert.throws(() => derivePbrTextureData({ width: 4, height: 4, luminance: new Uint8Array(8) }), TypeError);
+  assert.throws(() => derivePbrTextureData({ width: 4096, height: 4096, luminance: new Uint8Array(1) }), RangeError);
+});
