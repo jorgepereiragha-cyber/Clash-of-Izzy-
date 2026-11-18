@@ -351,4 +351,6 @@ test("the city ambient layer is loaded and respects Android power and lifecycle 
   assert.match(ambient, /if \(event\.persisted\)/);
   assert.match(ambient, /setAttribute\("aria-hidden", "true"\)/);
   assert.doesNotMatch(ambient, /new THREE\.WebGLRenderer/);
+  assert.match(ambient, /FRAME_INTERVAL_MS = 1000 \/ 30/);
+  assert.match(ambient, /timestamp - lastFrame < FRAME_INTERVAL_MS/);
 });
