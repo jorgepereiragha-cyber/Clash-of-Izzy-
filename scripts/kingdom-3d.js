@@ -234,9 +234,16 @@ if (host && "WebGLRenderingContext" in window) {
     if (qualityProfile?.pbrMaps) {
       const pixels = ctx.getImageData(0, 0, textureSize, textureSize).data;
       const luminance = new Uint8Array(textureSize * textureSize);
+      const srgbToLinear = channel => {
+        const value = channel / 255;
+        return value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4;
+      };
       for (let i = 0; i < luminance.length; i++) {
         const offset = i * 4;
-        luminance[i] = Math.round(pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722);
+        const red = srgbToLinear(pixels[offset]);
+        const green = srgbToLinear(pixels[offset + 1]);
+        const blue = srgbToLinear(pixels[offset + 2]);
+        luminance[i] = Math.round((red * 0.2126 + green * 0.7152 + blue * 0.0722) * 255);
       }
       const derived = derivePbrTextureData({ luminance, width: textureSize, height: textureSize, kind });
       const createLinearMap = data => {
