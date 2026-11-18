@@ -5,12 +5,12 @@ import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "./kingdom-quality.js";
+import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler } from "./kingdom-quality.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
-  let renderer, scene, camera, resizeObserver, ktx2, draco, gltfLoader, resizeHandler, qualityProfile;
+  let renderer, scene, camera, resizeObserver, sceneVisibilityObserver, visibilityChangeHandler, ktx2, draco, gltfLoader, resizeHandler, qualityProfile;
   let latestBuildings = [];
   let latestTroops = [];
   let latestCastleSkinId = 0;
@@ -20,6 +20,8 @@ if (host && "WebGLRenderingContext" in window) {
   let armyMixers = [];
   let animationFrame = 0;
   let lastAnimationTime = 0;
+  let sceneInViewport = true;
+  const animationFrameTiming = createFrameTimingSampler(120);
   const glbTemplates = new Map();
   const glbPropTemplates = new Map();
   const glbUnitTemplates = new Map();
@@ -153,8 +155,11 @@ if (host && "WebGLRenderingContext" in window) {
   // without shipping large image files or creating per-building texture copies.
   function makeSurfaceTexture(base, kind, seed) {
     const canvas = document.createElement("canvas");
-    canvas.width = canvas.height = 128;
+    const textureSize = qualityProfile?.surfaceTextureSize || 128;
+    const detailScale = textureSize / 128;
+    canvas.width = canvas.height = textureSize;
     const ctx = canvas.getContext("2d", { alpha: false });
+    ctx.setTransform(detailScale, 0, 0, detailScale, 0, 0);
     ctx.fillStyle = base;
     ctx.fillRect(0, 0, 128, 128);
     let value = seed >>> 0;
@@ -196,10 +201,13 @@ if (host && "WebGLRenderingContext" in window) {
         ctx.fillRect(x, y, 2 + rand() * 8, 2 + rand() * 5);
       }
     }
-    for (let i = 0; i < 1200; i++) {
+    const grainCount = Math.round(1200 * detailScale * detailScale);
+    // O grão é desenhado em pixels físicos para continuar fino em 256/512 px.
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    for (let i = 0; i < grainCount; i++) {
       const alpha = .025 + rand() * .07;
       ctx.fillStyle = rand() > .5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
-      ctx.fillRect(rand() * 128, rand() * 128, 1 + rand() * 2, 1 + rand() * 2);
+      ctx.fillRect(rand() * textureSize, rand() * textureSize, 1 + rand() * 2, 1 + rand() * 2);
     }
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
@@ -547,16 +555,25 @@ if (host && "WebGLRenderingContext" in window) {
     renderer.render(scene, camera);
     publishBuildingHitTargets(list);
   }
+  function canRunArmyAnimation() {
+    return !disposed && !cinematicCaptureActive && !document.hidden && sceneInViewport;
+  }
+  function refreshArmyAnimationVisibility() {
+    if (canRunArmyAnimation()) startArmyAnimationLoop();
+    else stopArmyAnimationLoop();
+  }
   function stopArmyAnimationLoop() {
     if (animationFrame) cancelAnimationFrame(animationFrame);
     animationFrame = 0;
     lastAnimationTime = 0;
   }
   function renderArmyFrame(timestamp) {
-    if (disposed || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders)) {
+    if (!canRunArmyAnimation() || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders)) {
       animationFrame = 0;
+      lastAnimationTime = 0;
       return;
     }
+    if (lastAnimationTime) animationFrameTiming.record(timestamp - lastAnimationTime);
     const delta = lastAnimationTime ? Math.min(.05, Math.max(0, (timestamp - lastAnimationTime) / 1000)) : 0;
     lastAnimationTime = timestamp;
     for (const mixer of armyMixers) mixer.update(delta);
@@ -565,8 +582,9 @@ if (host && "WebGLRenderingContext" in window) {
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
   function startArmyAnimationLoop() {
-    if (animationFrame || (!armyMixers.length && !advancedShaders) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
+    if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
     lastAnimationTime = 0;
+    animationFrameTiming.reset();
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
   function normalizeGlbTemplate(gltf, asset) {
@@ -826,7 +844,9 @@ if (host && "WebGLRenderingContext" in window) {
         pixelRatio: renderer.getPixelRatio(),
         maxTextureSize: renderer.capabilities.maxTextureSize,
         shadows: renderer.shadowMap.enabled,
-        premiumWater: Boolean(waterFeature)
+        premiumWater: Boolean(waterFeature),
+      surfaceTextureSize: qualityProfile.surfaceTextureSize,
+      animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };
     window.__coiKingdomDiagnostics = diagnostics;
@@ -843,6 +863,10 @@ if (host && "WebGLRenderingContext" in window) {
       if (window.__coiKingdomDiagnostics === diagnostics) delete window.__coiKingdomDiagnostics;
       resizeObserver?.disconnect();
       resizeObserver = null;
+      sceneVisibilityObserver?.disconnect();
+      sceneVisibilityObserver = null;
+      if (visibilityChangeHandler) document.removeEventListener("visibilitychange", visibilityChangeHandler);
+      visibilityChangeHandler = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
       disposeSceneResources();
@@ -900,7 +924,7 @@ if (host && "WebGLRenderingContext" in window) {
           stopArmyAnimationLoop();
         } else {
           resize();
-          startArmyAnimationLoop();
+          refreshArmyAnimationVisibility();
         }
         return true;
       },
@@ -933,6 +957,16 @@ if (host && "WebGLRenderingContext" in window) {
 
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
     else { resizeHandler = resize; window.addEventListener("resize", resizeHandler, { passive: true }); }
+    visibilityChangeHandler = refreshArmyAnimationVisibility;
+    document.addEventListener("visibilitychange", visibilityChangeHandler);
+    if ("IntersectionObserver" in window) {
+      sceneVisibilityObserver = new IntersectionObserver(entries => {
+        const entry = entries[entries.length - 1];
+        sceneInViewport = entry?.isIntersecting === true;
+        refreshArmyAnimationVisibility();
+      }, { threshold: 0.01 });
+      sceneVisibilityObserver.observe(host);
+    }
     resize();
     if (advancedShaders) startArmyAnimationLoop();
   } catch (error) {
@@ -942,6 +976,10 @@ if (host && "WebGLRenderingContext" in window) {
     stopArmyAnimationLoop();
     resizeObserver?.disconnect();
     resizeObserver = null;
+    sceneVisibilityObserver?.disconnect();
+    sceneVisibilityObserver = null;
+    if (visibilityChangeHandler) document.removeEventListener("visibilitychange", visibilityChangeHandler);
+    visibilityChangeHandler = null;
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
     disposeSceneResources();
