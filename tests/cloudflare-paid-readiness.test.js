@@ -40,5 +40,5 @@ test("paid infrastructure documentation uses the current Cloudflare pricing and 
   assert.ok(doc.includes("25 bilhões"));
   assert.ok(doc.includes("400.000 GB-s"));
   assert.ok(doc.includes("Time Travel"));
-  assert.ok(doc.includes("não é um teto de fatura"));
+  assert.ok(doc.includes("Nenhum desses limites é um teto de fatura"));
 });
