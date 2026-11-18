@@ -845,8 +845,8 @@ if (host && "WebGLRenderingContext" in window) {
         maxTextureSize: renderer.capabilities.maxTextureSize,
         shadows: renderer.shadowMap.enabled,
         premiumWater: Boolean(waterFeature),
-      surfaceTextureSize: qualityProfile.surfaceTextureSize,
-      animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
+        surfaceTextureSize: qualityProfile.surfaceTextureSize,
+        animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };
     window.__coiKingdomDiagnostics = diagnostics;
