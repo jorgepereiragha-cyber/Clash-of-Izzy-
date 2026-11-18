@@ -66,7 +66,7 @@ test("a página, CSS e Service Worker integram o hub na PWA", async () => {
   assert.match(html, /id="angel-event"/);
   assert.match(js, /renderWorldEventCards/);
   assert.match(js, /loadValhallaEventConfig/);
-  assert.match(sw, /clash-of-izzy-shell-v37/);
+  assert.match(sw, /clash-of-izzy-shell-v38/);
   assert.match(sw, /\/assets\/art\/events\/shiva\.svg/);
   assert.match(sw, /\/assets\/art\/events\/khali\.svg/);
   assert.match(navigation, /shiva khali/i);

@@ -38,3 +38,16 @@ test("bônus de skin não elevam ataque acima do teto global de 30%", () => {
   const overCap = simulateBattle({ army, castleLevel: 8, defenderLevel: 18, equipmentAttackBonusPercent: 30, skinAttackBonusPercent: 2.5, roll: 1, criticalSeed: 777 });
   assert.deepEqual(overCap, exactCap);
 });
+
+test("o seed contém 200 skins e valores manuais são preservados pelo gatilho", async () => {
+  const seed = await readFile(new URL("../migrations/0002_seed_catalog.sql", import.meta.url), "utf8");
+  const insert = seed.match(/INSERT OR IGNORE INTO skins \(name, price_brl\) VALUES([\s\S]*?);/i);
+  assert.ok(insert, "seed inicial de skins encontrado");
+  const rows = [...insert[1].matchAll(/\('([^']+)',\s*([\d.]+)\)/g)];
+  assert.equal(rows.length, 200, "catálogo completo de 200 castelos");
+  assert.equal(new Set(rows.map(row => row[1])).size, 200, "nomes de skins sem duplicação exata");
+  const migration = await readFile(new URL("../migrations/0028_skin_combat_attributes.sql", import.meta.url), "utf8");
+  assert.match(migration, /WHEN NEW\.attack_bonus_percent = 0 OR NEW\.defense_bonus_percent = 0/);
+  assert.match(migration, /WHEN NEW\.attack_bonus_percent = 0 THEN ROUND/);
+  assert.match(migration, /WHEN NEW\.defense_bonus_percent = 0 THEN ROUND/);
+});
