@@ -53,8 +53,7 @@ function successfulFetch() {
     if (path === "/world-map-3d.js") {
       return makeResponse('import * as THREE from "three"; new THREE.OrthographicCamera(); function createMarchFormation(){}', 200, "text/javascript; charset=utf-8");
     }
-    if (path === "/engine/asset-loader.js" || path === "/scripts/kingdom-3d.js" ||
-        path === "/scripts/post-processing.js") {
+    if (path === "/engine/asset-loader.js" || path === "/scripts/kingdom-3d.js") {
       return makeResponse('import * as THREE from "three";', 200, "text/javascript; charset=utf-8");
     }
     if (path === "/arena.html" || path === "/kingdom.html" || path === "/world.html") {
