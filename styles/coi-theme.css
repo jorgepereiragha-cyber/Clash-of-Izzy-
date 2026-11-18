@@ -1,3 +1,4 @@
+@import url("/styles/kingdom-visual-upgrade.css");
 /* Clash of Izzy — design tokens compartilhados. Telas podem manter estilos locais, mas não redefinir a identidade. */
 :root{
   color-scheme:dark;
