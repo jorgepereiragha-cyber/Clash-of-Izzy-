@@ -438,6 +438,7 @@ document.getElementById("researchForm").addEventListener("submit",startResearch)
 window.setInterval(()=>{const now=Date.now();document.querySelectorAll("[data-completes]").forEach(el=>{const completionTime=Date.parse(el.dataset.completes||"");const remaining=Number.isFinite(completionTime)?Math.max(0,Math.ceil((completionTime-now)/1000)):0;el.textContent=formatDuration(remaining);const progress=queueProgressPercent(el.dataset.started,el.dataset.completes,now);const bar=el.closest(".queue-card")?.querySelector("[data-progress]");if(bar)bar.style.width=progress+"%";if(bar?.parentElement)bar.parentElement.setAttribute("aria-valuenow",String(progress));});},1000);
 window.setInterval(refreshQueueState,60000);
 document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshQueueState();});
+window.addEventListener("coi:app-resume",event=>{if(event.detail?.reason==="online")connect();});
 document.getElementById("playerSearchForm").addEventListener("submit",searchPlayers);
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
