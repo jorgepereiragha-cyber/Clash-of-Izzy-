@@ -18,10 +18,25 @@ async function refresh(){if(busy)return;try{const [game,event]=await Promise.all
 async function attack(){if(busy)return;const units=Object.fromEntries(Object.entries(selected).filter(([,quantity])=>Number(quantity)>0));if(!Object.keys(units).length)return;const total=Object.values(units).reduce((sum,value)=>sum+Number(value),0);if(!confirm("Você enviará "+fmt(total)+" tropas. As baixas deste evento são permanentes. Deseja confirmar o ataque?"))return;busy=true;updateAttackButton();if(!pendingRequestId){pendingRequestId=crypto.randomUUID();try{sessionStorage.setItem("coi_angel_death_request",pendingRequestId);}catch{}}message("O exército está avançando contra o Anjo da Morte…");try{const result=await request("/game/event/attack",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({requestId:pendingRequestId||(pendingRequestId=crypto.randomUUID()),units})});try{sessionStorage.removeItem("coi_angel_death_request");}catch{}pendingRequestId=null;selected={};const losses=Object.entries(result.losses||{}).filter(([,value])=>Number(value)>0).map(([key,value])=>key.replace("_"," T")+" × "+fmt(value)).join(", ");message("Dano: "+fmt(result.damage)+" · Tropas perdidas: "+fmt(result.troopsLost)+(losses?" ("+losses+")":""));await refresh();}catch(error){message(error.message,true);}finally{busy=false;updateAttackButton();}}
 $("attack").addEventListener("click",attack);
 $("refresh").addEventListener("click",refresh);
+let countdownTimer = null;
+let eventRefreshTimer = null;
+function stopEventTimers(){
+ if(countdownTimer!==null){clearInterval(countdownTimer);countdownTimer=null;}
+ if(eventRefreshTimer!==null){clearInterval(eventRefreshTimer);eventRefreshTimer=null;}
+}
+function startEventTimers(){
+ if(document.hidden)return;
+ if(countdownTimer===null)countdownTimer=window.setInterval(renderCountdown,1000);
+ if(eventRefreshTimer===null)eventRefreshTimer=window.setInterval(refresh,20000);
+}
 if(!token){location.replace("/kingdom.html");}else{
  refresh();
- setInterval(()=>{if(!document.hidden)renderCountdown();},1000);
- setInterval(()=>{if(!document.hidden)refresh();},20000);
- document.addEventListener("visibilitychange",()=>{if(!document.hidden){refresh();renderCountdown();}});
+ startEventTimers();
+ document.addEventListener("visibilitychange",()=>{
+  if(document.hidden)stopEventTimers();
+  else{renderCountdown();refresh();startEventTimers();}
+ });
  window.addEventListener("coi:app-resume",event=>{if(event.detail?.reason==="online")refresh();});
+ window.addEventListener("pagehide",stopEventTimers);
+ window.addEventListener("pageshow",event=>{if(event.persisted&&!document.hidden){renderCountdown();refresh();startEventTimers();}});
 }
