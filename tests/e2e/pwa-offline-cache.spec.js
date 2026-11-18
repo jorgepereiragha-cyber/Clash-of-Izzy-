@@ -29,12 +29,17 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
       present: names.includes(cacheName),
       offlinePage: Boolean(await cache.match("/offline.html")),
       manifest: Boolean(await cache.match("/manifest.json")),
+      kingdomArtwork: Boolean(await cache.match("/assets/art/landing-kingdom.svg")),
     };
   }, SHELL_CACHE);
 
   expect(shellState.present).toBe(true);
   expect(shellState.offlinePage).toBe(true);
   expect(shellState.manifest).toBe(true);
+  expect(shellState.kingdomArtwork).toBe(true);
+
+  const landingArtwork = await page.locator(".landing-kingdom-art").evaluate(image => ({ complete: image.complete, naturalWidth: image.naturalWidth }));
+  expect(landingArtwork).toEqual({ complete: true, naturalWidth: 900 });
 
   // GLBs are cached at runtime by the existing same-origin Cache API strategy.
   const onlineModel = await page.evaluate(async url => {
