@@ -338,3 +338,17 @@ test("procedural PBR material maps are attached and disposed as owned GPU resour
   assert.match(renderer, /if \(texture\?\.isTexture\) resources\.textures\.add\(texture\)/);
   assert.match(renderer, /pbrMaps: qualityProfile\.pbrMaps/);
 });
+
+
+test("the city ambient layer is loaded and respects Android power and lifecycle preferences", async () => {
+  const ambient = await readFile(new URL("../scripts/ambient-particles.js", import.meta.url), "utf8");
+  assert.match(kingdom, /scripts\/ambient-particles\.js/);
+  assert.match(ambient, /prefers-reduced-motion/);
+  assert.match(ambient, /saveData/);
+  assert.match(ambient, /navigator\.deviceMemory/);
+  assert.match(ambient, /new IntersectionObserver/);
+  assert.match(ambient, /document\.addEventListener\("visibilitychange"/);
+  assert.match(ambient, /if \(event\.persisted\)/);
+  assert.match(ambient, /setAttribute\("aria-hidden", "true"\)/);
+  assert.doesNotMatch(ambient, /new THREE\.WebGLRenderer/);
+});
