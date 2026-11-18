@@ -64,7 +64,7 @@ export function getAngelDeathWeekendWindow(now = new Date()) {
   return { startsAt: start.toISOString(), endsAt: end.toISOString(), timezone: ANGEL_DEATH_EVENT.timezone };
 }
 
-export function simulateAngelDeathAttack({ army, castleLevel = 1, heroLevel = 1, dragonLevel = 1, militaryLevel = 0, attackBonusPercent = 0, seed = 1 }) {
+export function simulateAngelDeathAttack({ army, castleLevel = 1, heroLevel = 1, dragonLevel = 1, militaryLevel = 0, attackBonusPercent = 0, defenseBonusPercent = 0, seed = 1 }) {
   const stacks = (army || []).filter(row => Number(row.quantity) > 0 && COMBAT_UNIT_RULES[row.unit_type]);
   if (!stacks.length) throw new Error("Selecione pelo menos uma tropa válida.");
   let totalPower = 0;
@@ -90,7 +90,8 @@ export function simulateAngelDeathAttack({ army, castleLevel = 1, heroLevel = 1,
     value = Math.imul(value ^ (value >>> 7), 61 | value);
     return ((value ^ (value >>> 14)) >>> 0) / 4294967296;
   };
-  const lossRate = clamp(0.09 + clamp(Number(castleLevel) || 1, 1, 30) * 0.001 + nextRandom() * 0.03, 0.09, 0.18);
+  const baseLossRate = clamp(0.09 + clamp(Number(castleLevel) || 1, 1, 30) * 0.001 + nextRandom() * 0.03, 0.09, 0.18);
+  const lossRate = clamp(baseLossRate * (1 - clamp(Number(defenseBonusPercent) || 0, 0, 30) / 200), 0.09, 0.18);
   const losses = {};
   let troopsLost = 0;
   for (const row of stacks) {

@@ -1,7 +1,7 @@
 // Equipamentos persistentes: inventário e loadout são validados pelo Worker.
 (() => {
   const API="/api";
-  let token=null,state=null,selected="coroa_izzy",selectedHeroId=null,busy=false,searchFocusApplied=false;
+  let token=null,state=null,selected="iron_sword",selectedHeroId=null,busy=false,searchFocusApplied=false;
   const requestedSkinSearch=new URLSearchParams(location.search).get("search")||"";
   const normalizeSearch=value=>String(value||"").normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR");
   const $=id=>document.getElementById(id);

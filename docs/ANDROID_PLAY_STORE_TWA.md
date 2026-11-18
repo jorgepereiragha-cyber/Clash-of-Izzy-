@@ -195,3 +195,19 @@ A tela de eventos passa a apresentar um catálogo responsivo com sete identidade
 Prêmios previstos dos cinco eventos futuros são marcados como **prévia**, nunca como saldo ou item disponível. A PWA atualiza o shell para v36 e pré-carrega catálogo, CSS e artes para navegação visual mais estável no Android. API, estado de combate e sincronização de conta continuam online; cache offline não habilita gameplay ou resgate offline.
 
 Não foram removidos módulos existentes por nome ou tamanho. Nenhum arquivo do projeto foi comprovadamente órfão nesta rodada; exclusões só serão feitas depois de verificar todas as referências estáticas, dinâmicas, manifesto e Service Worker.
+
+
+## Hub de sete eventos — evolução Android
+
+A central de eventos lista sete eventos com artes vetoriais locais e estados separados: Anjo da Morte já conectado ao Worker; Valhalla condicionado à ativação no servidor; Caçada Selvagem, Shiva, Khali, Cerco de Eldoria e Torneio dos Campeões em preparação, com prêmios visivelmente marcados como prévias e sem crédito no inventário.
+
+
+## Progressão de equipamentos e atributos de combate
+
+A forja possui cinco trilhas por espaço: arma, elmo, armadura, botas e acessório. Cada trilha percorre quatro raridades, Comum → Raro → Épico → Lendário. Para fabricar o próximo estágio o reino precisa possuir e destravar a peça anterior, cumprir as pesquisas exigidas e pagar ouro/ferro. A peça anterior não é consumida; itens existentes continuam no inventário.
+
+Os cinco equipamentos lendários finais são Mjölnir, Coroa de Izzy, Égide de Asgard, Grevas da Valquíria e Talismã das Valquírias. Cada peça tem estatísticas próprias e evolui por nível. Quando as cinco peças estão equipadas e destravadas no mesmo herói, o conjunto concede +1% ataque, +1% defesa e +0,5% vida. Os atributos somados continuam sujeitos aos limites do sistema.
+
+As skins de castelo compradas possuem valores individuais de ataque e defesa, preenchidos pela migração D1 0028. Para o catálogo inicial de 200 skins, a fórmula atribui valores distintos de 0,35% a 2,34% para cada atributo. O Worker só aplica o bônus se a skin estiver na propriedade do jogador e equipada no reino; o cliente não envia nem escolhe os percentuais. Os visuais colecionáveis nórdicos, cosméticos sazonais e fusões continuam puramente visuais.
+
+Os atributos entram nos cálculos PvE e no Anjo da Morte. A camada PvP permanece fora deste escopo enquanto o sistema PvP não estiver implementado. A migração altera apenas novas colunas e valores da tabela `skins`; nenhum equipamento do inventário existente é apagado. O shell da PWA foi atualizado para v37 para incluir as alterações de Forja e os recursos visuais.

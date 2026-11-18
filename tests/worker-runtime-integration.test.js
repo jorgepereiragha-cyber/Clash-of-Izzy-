@@ -641,6 +641,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(catalog.skins.length, 6, "catálogo de lançamento permanece limitado a seis skins");
       assert.ok(vip?.id, "pacote VIP aparece no catálogo");
       assert.ok(skin?.id && skin?.name, "skin existente aparece no catálogo");
+      assert.ok(Number(skin.attack_bonus_percent) >= 0.35 && Number(skin.attack_bonus_percent) <= 2.34, "skin apresenta bônus de ataque individual");
+      assert.ok(Number(skin.defense_bonus_percent) >= 0.35 && Number(skin.defense_bonus_percent) <= 2.34, "skin apresenta bônus de defesa individual");
 
       expectStatus(await admin("/api/admin/unlock-skin", {
         playerId: playerA, skin: skin.name,

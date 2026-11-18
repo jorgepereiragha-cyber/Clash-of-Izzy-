@@ -241,7 +241,7 @@ function renderCastleSkins(){
  for(const skin of skins){
   const card=document.createElement("div");card.className="event";
   const name=document.createElement("strong");name.textContent=skin.name;
-  const detail=document.createElement("div");detail.className="muted";detail.textContent="Skin de castelo · R$ "+Number(skin.price_brl||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+  const detail=document.createElement("div");detail.className="muted";detail.textContent="R$ "+Number(skin.price_brl||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})+" · Ataque +"+Number(skin.attack_bonus_percent||0).toFixed(2)+"% · Defesa +"+Number(skin.defense_bonus_percent||0).toFixed(2)+"%";
   const button=document.createElement("button");button.type="button";button.textContent=Number(skin.id)===equippedId?"✓ Equipada":"Equipar";button.disabled=busy||Number(skin.id)===equippedId;
   button.addEventListener("click",()=>equipCastleSkin(Number(skin.id)));
   card.append(name,detail,button);grid.append(card);
