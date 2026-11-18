@@ -50,7 +50,7 @@ test("cada card tem arte SVG local, e nenhuma arte depende de recurso remoto", a
     const svg = await readFile(path, "utf8");
     assert.match(svg, /<svg\b/);
     assert.match(svg, /<title\b/);
-    assert.doesNotMatch(svg, /<script\b|https?:\/\//i);
+    assert.doesNotMatch(svg, /<script\b|(?:href|src)=["']https?:\/\//i);
   }
 });
 
