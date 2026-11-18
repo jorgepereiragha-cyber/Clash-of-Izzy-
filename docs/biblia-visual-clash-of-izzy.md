@@ -100,8 +100,9 @@ Reprovar se houver divergência de paleta, escala, câmera, materiais, tipografi
 ## Camada ambiente Android — partículas da cidade
 
 - `scripts/ambient-particles.js` é carregado somente na tela do Reino e usa Canvas 2D transparente, sem criar outro contexto WebGL.
-- O número de partículas e o DPR são menores em telas móveis e em aparelhos com memória limitada.
+- O número de partículas e o DPR são menores em telas móveis e em aparelhos com memória limitada; o loop decorativo é limitado a aproximadamente 30 fps.
 - O efeito não inicia quando `prefers-reduced-motion`, Economia de dados ou memória reportada até 2 GB estão ativos.
 - `IntersectionObserver` e `visibilitychange` suspendem a animação fora da área visível ou em segundo plano; o ciclo BFCache pausa/retoma e a saída real da página libera recursos.
+- Temporizadores de construção, consultas da Loja de Valhalla e polling do evento global também ficam suspensos enquanto o documento está oculto; o estado oficial volta a ser buscado ao retornar.
 - A camada é decorativa, `aria-hidden` e não intercepta toques; edifícios e controles continuam sendo elementos HTML interativos.
 - O pós-processamento `scripts/post-processing.js` foi removido por não ter consumidor no runtime. Bloom/FXAA/Nordic Grade não devem ser descritos como ativos na cidade atual.
