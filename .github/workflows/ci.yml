@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, release/one-shared-realm-early-access]
 
 concurrency:
   group: clash-of-izzy-ci-${{ github.ref }}
