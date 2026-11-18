@@ -63,13 +63,17 @@ test("Mercador, Loja de Heróis e aceleradores funcionam no viewport Android", a
 
   await page.getByRole("button", { name: "TROCAR RECURSOS" }).click();
   await expect(page.locator("#market-status")).toContainText("Troca concluída");
-  expect(actions[0]).toEqual({ type: "merchant_exchange", offerId: "wood_acc_5min" });
+  expect(actions[1]).toEqual({ type: "merchant_exchange", offerId: "wood_acc_5min" });
+
+  await page.getByRole("button", { name: "CONVOCAR 1 HERÓI" }).click();
+  await expect(page.locator("#market-status")).toContainText("Convocação concluída");
+  expect(actions[0]).toEqual({ type: "hero_summon", quantity: 1 });
 
   await page.getByRole("button", { name: "COMPRAR FRAGMENTOS" }).click();
   await expect(page.locator("#market-status")).toContainText("Fragmentos comprados");
-  expect(actions[1]).toEqual({ type: "hero_shop_buy", heroKey: "kael_sunwarden" });
+  expect(actions[2]).toEqual({ type: "hero_shop_buy", heroKey: "kael_sunwarden" });
 
   await page.getByRole("button", { name: /Acelerador 5 min/ }).click();
   await expect(page.locator("#market-status")).toContainText("Acelerador aplicado");
-  expect(actions[2]).toEqual({ type: "queue_speedup", queueId: 42, itemId: "acc_5min", quantity: 1 });
+  expect(actions[3]).toEqual({ type: "queue_speedup", queueId: 42, itemId: "acc_5min", quantity: 1 });
 });
