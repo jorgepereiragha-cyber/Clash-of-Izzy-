@@ -181,3 +181,17 @@ Arquivos deliberadamente mantidos:
 - Teste físico Android, grupo de teste fechado (quando aplicável) e revisão da Play.
 
 **Segurança:** esta preparação não publica Worker, não altera secrets, não executa migrações remotas, não modifica D1 de produção e não envia AAB à loja.
+
+
+## Hub de sete eventos — evolução Android
+
+A tela de eventos passa a apresentar um catálogo responsivo com sete identidades visuais originais, artes SVG leves e estados explícitos:
+- Anjo da Morte: combate mundial já conectado ao Worker, com perdas, classificação e distribuição de recompensas idempotente.
+- Ascensão de Valhalla: modo sazonal condicionado ao estado retornado por `/api/config/valhalla`; permanece desativado até ativação protegida no servidor.
+- Caçada Selvagem: existem tabelas de persistência, mas o controlador de combate/premiação ainda não está integrado.
+- Shiva e Khali: chefes em preparação, com arte original e prévias de prêmios não creditáveis.
+- Cerco de Eldoria e Torneio dos Campeões: conceitos vinculados às bases de Alianças/Arena; calendário, placar e pagamentos sazonais ainda pendentes.
+
+Prêmios previstos dos cinco eventos futuros são marcados como **prévia**, nunca como saldo ou item disponível. A PWA atualiza o shell para v36 e pré-carrega catálogo, CSS e artes para navegação visual mais estável no Android. API, estado de combate e sincronização de conta continuam online; cache offline não habilita gameplay ou resgate offline.
+
+Não foram removidos módulos existentes por nome ou tamanho. Nenhum arquivo do projeto foi comprovadamente órfão nesta rodada; exclusões só serão feitas depois de verificar todas as referências estáticas, dinâmicas, manifesto e Service Worker.

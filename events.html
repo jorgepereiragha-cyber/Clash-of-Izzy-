@@ -4,10 +4,10 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#100d18">
-<meta name="description" content="Evento mundial Anjo da Morte — Clash of Izzy. Enfrente o chefe mais poderoso e dispute recompensas lendárias.">
+<meta name="description" content="Sete eventos mundiais de Clash of Izzy: Anjo da Morte, Valhalla, Caçada Selvagem, Shiva, Khali, Cerco de Eldoria e Torneio dos Campeões.">
 <link rel="stylesheet" href="/styles/coi-theme.css">
 <link rel="stylesheet" href="/styles/navigation.css">
-<title>Anjo da Morte — Clash of Izzy</title>
+<title>Eventos Mundiais — Clash of Izzy</title>
 <style>
 :root{color-scheme:dark;--gold:#efc56d;--panel:#19182a;--line:#76543b;--muted:#c0bdca}
 *{box-sizing:border-box}
@@ -49,15 +49,25 @@ button:disabled{opacity:.4;cursor:not-allowed}
 @media(max-width:420px){.troops{grid-template-columns:1fr}.boss{grid-template-columns:1fr}.boss-art{height:110px}}
 </style>
   <link rel="stylesheet" href="/styles/android-experience.css">
+  <link rel="stylesheet" href="/styles/events-hub.css">
 </head>
 <body>
 <header>
  <small>Evento mundial · Clash of Izzy</small>
- <h1>💀 ANJO DA MORTE</h1>
- <div>O Ceifador do Fim · Chefe nível 1.000</div>
+ <h1>⚔️ EVENTOS MUNDIAIS</h1>
+ <div>Sete desafios para os reinos de Eldoria</div>
 </header>
 <main>
- <section class="panel boss">
+ <section class="event-hub" id="world-events" aria-labelledby="world-events-title">
+  <div class="event-hub-heading">
+   <div><h2 id="world-events-title">Os sete eventos de Eldoria</h2><p>Veja o que está ativo, o que depende da configuração do servidor e quais desafios estão em preparação. Prêmios futuros aparecem apenas como prévia.</p></div>
+   <div class="event-hub-legend" aria-label="Estado dos eventos"><span>1 combate jogável</span><span>1 modo sazonal</span><span>5 em preparação</span></div>
+  </div>
+  <div id="worldEventGrid" class="world-event-grid" aria-live="polite" aria-busy="true">
+   <p class="muted">Sincronizando calendário e catálogo de eventos…</p>
+  </div>
+ </section>
+ <section class="panel boss" id="angel-event" aria-labelledby="angel-event-title">
   <div class="boss-art">
   <svg viewBox="0 0 240 240" role="img" aria-label="Anjo da Morte, chefe lendário com asas negras e foice">
    <defs>
@@ -96,7 +106,7 @@ button:disabled{opacity:.4;cursor:not-allowed}
  </div>
   <div>
    <div id="eventStatus" class="status">Sincronizando evento…</div>
-   <h2 style="margin-top:10px">A criatura mais poderosa já vista em Eldoria</h2>
+   <h2 id="angel-event-title" style="margin-top:10px">O Ceifador do Fim · Chefe nível 1.000</h2>
    <p class="muted">Reinos de todo o mundo enfrentam o mesmo inimigo. Cada ataque aumenta sua pontuação. A classificação final define as maiores recompensas do jogo.</p>
    <div class="muted" id="schedule">Sexta-feira 18:00 até segunda-feira 00:00 · Horário de Brasília</div>
    <h3 id="countdown" style="margin-top:8px">Calculando calendário…</h3>
