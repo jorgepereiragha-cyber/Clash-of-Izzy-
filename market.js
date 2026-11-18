@@ -91,10 +91,25 @@
       root.append(card);
     }
   }
+  function renderHeroRecruitment(){
+    const root=$("hero-recruitment");root.replaceChildren();
+    const options=[
+      {quantity:1,cost:100,label:"Convocação individual",description:"Uma chance de recrutar um novo comandante ou receber fragmentos de um repetido."},
+      {quantity:10,cost:900,label:"Convocação em lote",description:"Dez convocações com desconto sobre o preço individual."}
+    ];
+    for(const option of options){
+      const card=node("article","market-card");
+      card.append(node("div","market-icon","📜"),node("h3","",option.label),node("p","",option.description));
+      card.append(node("p","market-price","💎 "+fmt(option.cost)+" gemas"));
+      card.append(node("p","market-meta","Probabilidades por convocação: 70% Comum · 25% Raro · 5% Lendário"));
+      card.append(button(option.quantity===1?"CONVOCAR 1 HERÓI":"CONVOCAR 10 HERÓIS","hero-summon",{quantity:option.quantity},Number(state.player?.gems||0)<option.cost));
+      root.append(card);
+    }
+  }
   function renderHeroShop(){
     const root=$("hero-offers");root.replaceChildren();
     const offers=state?.heroShop?.offers||[];
-    if(!offers.length){root.append(node("p","empty-state","Recrute um herói para habilitar a compra de fragmentos. Nenhum herói será criado pela loja sem recrutamento."));return;}
+    if(!offers.length){root.append(node("p","empty-state","Recrute um herói para habilitar a compra de fragmentos. Nenhum herói será criado pela loja de fragmentos sem recrutamento."));return;}
     for(const offer of offers){
       const card=node("article","market-card");
       const rarity={white:"Comum",blue:"Raro",purple:"Lendário"}[offer.rarity]||offer.rarity;
@@ -168,7 +183,7 @@
     refreshBalances();
     const next=Number(state.shop?.refreshAt||0);
     $("merchant-refresh").textContent=next?"Próxima rotação: "+new Date(next).toLocaleString("pt-BR"):"Rotação periódica";
-    renderExchange();renderMerchantSpecials();renderHeroShop();renderAcceleratorInventory();renderQueues();renderOfficialShop();
+    renderExchange();renderMerchantSpecials();renderHeroRecruitment();renderHeroShop();renderAcceleratorInventory();renderQueues();renderOfficialShop();
   }
   async function refresh(){
     const result=await request("/api/game/state");state=result.state;render();
@@ -190,6 +205,7 @@
     const action=target.dataset.action;
     if(action==="exchange")perform({type:"merchant_exchange",offerId:target.dataset.offerId},"Troca concluída. O acelerador foi enviado ao inventário.");
     else if(action==="hero-buy")perform({type:"hero_shop_buy",heroKey:target.dataset.heroKey},"Fragmentos comprados e creditados ao herói.");
+    else if(action==="hero-summon")perform({type:"hero_summon",quantity:Number(target.dataset.quantity)},"Convocação concluída. Novos heróis e fragmentos foram sincronizados.");
     else if(action==="buy")perform({type:"shop_buy",item:target.dataset.item,source:target.dataset.source},"Compra concluída e item enviado ao inventário.");
     else if(action==="speedup")perform({type:"queue_speedup",queueId:Number(target.dataset.queueId),itemId:target.dataset.item,quantity:1},"Acelerador aplicado à fila. O tempo foi recalculado pelo servidor.");
   });
