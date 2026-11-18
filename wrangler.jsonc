@@ -33,7 +33,26 @@
   "vars": {
     "ENVIRONMENT": "production"
   },
-  "previews": {},
+  "previews": {
+    "vars": {
+      "ENVIRONMENT": "preview"
+    },
+    "d1_databases": [
+      {
+        "binding": "DB",
+        "database_name": "izzy-preview-17112026",
+        "database_id": "6674c0ac-3636-4e57-bff8-23cf60ab9637"
+      }
+    ],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "ELDORIA_ROOM",
+          "class_name": "EldoriaRoom"
+        }
+      ]
+    }
+  },
   "durable_objects": {
     "bindings": [
       {
