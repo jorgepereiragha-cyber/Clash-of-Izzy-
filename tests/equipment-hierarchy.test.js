@@ -47,7 +47,7 @@ test("o estado do jogo entrega as cinco trilhas e estágios de cada reino", asyn
   assert.ok(worker.includes("EQUIPMENT_PROGRESSION.map"));
   const ui = await read("equipment-system.js");
   const html = await read("equipment-ui.html");
-  assert.ok(ui.includes('state?.equipmentProgression||[]'));
+  assert.ok(ui.includes("equipmentProgression||[]"));
   assert.ok(ui.includes("Disponível para forjar"));
   assert.ok(html.includes('id="equipment-progression-grid"'));
 });

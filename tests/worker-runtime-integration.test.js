@@ -750,11 +750,11 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const heroId = Number(stateA.heroes?.[0]?.id);
       assert.ok(heroId > 0, "herói inicial tem identidade persistente");
 
-      await action(tokenA, { type: "equipment_upgrade", itemId: "espada_guerreiro" }, 200);
-      await action(tokenA, { type: "equipment_equip", itemId: "espada_guerreiro", heroId }, 200);
-      await action(tokenA, { type: "equipment_unequip", itemId: "espada_guerreiro", heroId }, 200);
-      await action(tokenA, { type: "equipment_lock", itemId: "espada_guerreiro" }, 200);
-      await action(tokenA, { type: "equipment_lock", itemId: "espada_guerreiro" }, 200);
+      await action(tokenA, { type: "equipment_upgrade", itemId: "iron_sword" }, 200);
+      await action(tokenA, { type: "equipment_equip", itemId: "iron_sword", heroId }, 200);
+      await action(tokenA, { type: "equipment_unequip", itemId: "iron_sword", heroId }, 200);
+      await action(tokenA, { type: "equipment_lock", itemId: "iron_sword" }, 200);
+      await action(tokenA, { type: "equipment_lock", itemId: "iron_sword" }, 200);
       await action(tokenA, { type: "equipment_craft", itemId: "rune_spear" }, [400, 409], "forja com pré-requisitos não concluídos");
       await action(tokenA, { type: "equipment_equip", itemId: "item_inexistente", heroId }, 400, "equipamento inexistente");
 
