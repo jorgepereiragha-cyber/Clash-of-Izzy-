@@ -140,6 +140,32 @@ O build e o AAB resultante devem ser verificados no ambiente real. Não executar
 | 7 | AAB em teste interno/fechado | Instalação, login, jogo e compra testados |
 | 8 | Acesso à produção e lançamento gradual | Todos os gates da Play Console atendidos |
 
+## 7.1 Auditoria de limpeza e validação executada
+
+A revisão de referências da branch removeu apenas arquivos de protótipo sem uso no produto atual:
+
+- **game-config.js:** configuração antiga com economia/entidades de um protótipo diferente. Não era importada pelo Worker, por nenhuma página HTML, nem pelo manifesto PWA.
+- **packages.js:** catálogo legado com preços/conteúdo desatualizados e abertura direta de WhatsApp. Não era importado pelo Worker nem carregado pelas páginas. A remoção evita deixar esse fluxo antigo disponível como asset estático.
+
+Arquivos deliberadamente mantidos:
+
+- **shared-world-coordinates.js:** dependência importada pelo Worker para distribuir castelos em um único mapa compartilhado Eldoria.
+- Os cinco GLBs do manifesto Kenney e as duas texturas colormap.png: todos os GLBs estão habilitados no manifesto e validados pelo pipeline; as texturas são recursos locais referenciados pelos modelos.
+- Os arquivos de licença e README dos assets: permanecem no Git para proveniência e manutenção, mas .assetsignore impede que sejam publicados como arquivos públicos.
+- migrations/, dados D1, secrets, backups, documentação de arquitetura e módulos do Worker: não foram apagados nem alterados remotamente.
+
+**Validação automatizada concluída:** execução GitHub Actions #44372734562, commit abf8f4c85659e8b47a6fa84e47320f196dbf2135:
+- 298/298 testes Node aprovados.
+- 7/7 testes Playwright aprovados, incluindo layouts Android e navegação do mapa por gesto.
+- Validação de migrações locais, Preview local, Service Worker, manifesto/arquivos 3D e bundle Worker aprovadas.
+- O bundle Worker foi somente validado em --dry-run; não houve publicação.
+
+**Aviso não bloqueante ainda existente:** o smoke test informativo contra produção registra que a página /arena.html publicada não corresponde às antigas expectativas de compra manual por WhatsApp do script scripts/production-smoke.js. A etapa é continue-on-error e a CI global permanece verde; isso não comprova que a loja de produção usa WhatsApp nem que pagamentos foram validados nesta PR. Não alteramos o fluxo de pagamento durante esta rodada.
+## Referências oficiais Android adicionais
+- [Diretrizes de qualidade adaptativa Android](https://developer.android.com/docs/quality-guidelines/adaptive-app-quality): compatibilidade de layout em telefones, tablets, dobráveis e janelas redimensionáveis.
+- [Diretrizes de qualidade principal e alvos de toque](https://developer.android.com/develop/adaptive-apps/quality-guidelines/core-app-quality): alvo de toque mínimo de 48 dp e requisitos de contraste/foco.
+- [Gestos de toque no Android](https://developer.android.com/develop/ui/views/touch-and-input/gestures): arrasto e gestos multitoque devem seguir comportamentos previsíveis e não substituir ações essenciais.
+
 ## 8. Bloqueios externos ainda necessários
 
 - Acesso/verificação da conta Play Console.
