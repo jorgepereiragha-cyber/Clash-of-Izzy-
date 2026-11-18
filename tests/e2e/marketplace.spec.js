@@ -54,7 +54,7 @@ test("Mercador, Loja de Heróis e aceleradores funcionam no viewport Android", a
   await expect(page.getByRole("heading", { name: "Mercador de Eldoria" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Loja de Heróis", exact: true })).toBeVisible();
   await expect(page.getByText("Kael · Guardião do Sol")).toBeVisible();
-  await expect(page.getByText("Acelerador 5 min × 1")).toBeVisible();
+  await expect(page.getByRole("button", { name: "Acelerador 5 min × 1", exact: true })).toBeVisible();
   await expect(page.getByText("Construção · castle")).toBeVisible();
   await expect(page.getByRole("link", { name: /Mercador & Heróis/ })).toBeVisible();
 
