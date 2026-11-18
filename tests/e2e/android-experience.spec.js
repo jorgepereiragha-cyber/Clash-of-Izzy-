@@ -48,3 +48,95 @@ test("Android runtime announces offline and restored connectivity accessibly", a
   await page.evaluate(() => window.dispatchEvent(new Event("online")));
   await expect(status).toContainText("Conexão restabelecida");
 });
+
+
+test("Android world map supports one-finger pan and two-finger pinch zoom", async ({ page }) => {
+  const token = "android-world-map-fixture";
+  await page.addInitScript(value => {
+    window.localStorage.setItem("coi_game_token", value);
+  }, token);
+
+  const state = {
+    kingdom: {
+      id: 77,
+      kingdom_name: "Eldoria",
+      food: 1000,
+      wood: 1000,
+      stone: 1000,
+      iron: 1000,
+      gold: 1000,
+      equipped_skin_id: 0,
+    },
+    territories: [{
+      id: 501,
+      name: "Bosque do Norte",
+      x: 12,
+      z: -8,
+      terrain: "forest",
+      resource_type: "wood",
+      resource_rate: 100,
+      level: 1,
+      owner_kingdom_id: null,
+    }],
+    troops: [{ unit_type: "militia", quantity: 100, tier: 1 }],
+    marches: [],
+  };
+
+  await page.route("**/api/game/state", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({ state }),
+  }));
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/world.html");
+  await expect(page.locator("#worldMap")).toBeVisible();
+  await expect(page.locator("#worldMap .territory-pin")).toHaveCount(1);
+
+  const map = page.locator("#worldMap");
+  const bounds = await map.boundingBox();
+  expect(bounds).not.toBeNull();
+  const centerX = bounds.x + bounds.width / 2;
+  const centerY = bounds.y + bounds.height / 2;
+
+  const client = await page.context().newCDPSession(page);
+  const beforePan = await page.locator("#mapContent").evaluate(node => node.style.transform);
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [{ x: centerX, y: centerY, id: 11 }],
+  });
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [{ x: centerX + 30, y: centerY + 18, id: 11 }],
+  });
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect.poll(() => page.locator("#mapContent").evaluate(node => node.style.transform))
+    .not.toBe(beforePan);
+
+  await page.locator("#mapReset").click();
+  await expect(page.locator("#mapScale")).toHaveText("100%");
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchStart",
+    touchPoints: [
+      { x: centerX - 50, y: centerY, id: 21 },
+      { x: centerX + 50, y: centerY, id: 22 },
+    ],
+  });
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchMove",
+    touchPoints: [
+      { x: centerX - 75, y: centerY, id: 21 },
+      { x: centerX + 75, y: centerY, id: 22 },
+    ],
+  });
+  await client.send("Input.dispatchTouchEvent", {
+    type: "touchEnd",
+    touchPoints: [],
+  });
+  await expect.poll(() => page.locator("#mapScale").textContent())
+    .toBe("150%");
+  await client.detach();
+});
