@@ -64,7 +64,7 @@ Fontes oficiais:
 2. Spending limit para uso variável de Workers, separado da assinatura.
 3. Métricas de Worker, D1 e Durable Objects com alertas.
 4. Segredos de produção e Preview isolados; nenhum valor sensível em `vars`, GitHub, HTML ou logs.
-5. D1 Time Travel habilitado no plano e exportação periódica testada.
+5. D1 Time Travel confirmado (é automático no backend novo; até 30 dias no Paid) e procedimento de recuperação revisado. Exportação externa é opcional para retenção maior ou cópia independente.
 6. Workflow de produção manual, com confirmação explícita, backup/check de migrations, deploy e smoke test somente de leitura.
 
 **Atenção ao spending limit:** quando alcançado, novas invocações de Workers podem ser rejeitadas, incluindo HTTP, Cron e consumers de Queue. Assets estáticos que não passam pelo Worker podem continuar disponíveis; rotas dinâmicas podem falhar. Definir limite que proteja a conta sem interromper o jogo inadvertidamente.
