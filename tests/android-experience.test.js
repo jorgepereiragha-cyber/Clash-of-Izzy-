@@ -101,6 +101,8 @@ test("kingdom, events and Valhalla pause visual timers and network polling while
   assert.match(kingdom, /function stopQueueTimers\(\)/);
   assert.match(kingdom, /window\.clearInterval\(queueClockTimer\)/);
   assert.match(kingdom, /window\.clearInterval\(queueRefreshTimer\)/);
+  assert.match(kingdom, /window\.addEventListener\("pagehide",stopQueueTimers\)/);
+  assert.match(kingdom, /window\.addEventListener\("pageshow"/);
   assert.match(events, /function stopEventTimers\(\)/);
   assert.match(events, /clearInterval\(countdownTimer\)/);
   assert.match(events, /clearInterval\(eventRefreshTimer\)/);
