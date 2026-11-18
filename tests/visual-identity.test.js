@@ -73,7 +73,7 @@ test("PBR map derivation wraps samples at texture edges and emits bounded linear
   const width = 8, height = 8;
   const luminance = new Uint8Array(width * height);
   for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
-    luminance[y * width + x] = ((x + y) % 2) ? 220 : 35;
+    luminance[y * width + x] = Math.min(255, x * 24 + y * 9);
   }
   const result = derivePbrTextureData({ luminance, width, height, kind: "stone" });
   assert.equal(result.normalData.length, width * height * 4);
