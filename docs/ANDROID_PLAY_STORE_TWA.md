@@ -141,6 +141,7 @@ O build e o AAB resultante devem ser verificados no ambiente real. Não executar
 | 8 | Acesso à produção e lançamento gradual | Todos os gates da Play Console atendidos |
 
 ## 7.1 Auditoria de limpeza e validação executada
+- `splash-screen.html` também foi removida: era pré-carregada mas não tinha rota, link, start_url ou consumidor; a PWA abre diretamente `/kingdom.html`, e o splash de instalação é gerado pelo sistema a partir do manifesto.
 
 A revisão de referências da branch removeu apenas arquivos de protótipo sem uso no produto atual:
 
