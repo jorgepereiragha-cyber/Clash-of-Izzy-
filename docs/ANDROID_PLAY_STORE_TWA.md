@@ -91,7 +91,7 @@ Fonte: [política oficial de pagamentos do Google Play](https://support.google.c
 
 ## 6. Comandos Bubblewrap — somente depois de definir domínio, ID e assinatura
 
-Ambiente Node 22+:
+Ambiente Node.js 18+ (requisito do Bubblewrap CLI atual):
 
 ```bash
 npm install --global @bubblewrap/cli
