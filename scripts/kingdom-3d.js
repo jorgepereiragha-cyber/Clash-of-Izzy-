@@ -6,6 +6,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler } from "./kingdom-quality.js";
+import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 
 const host = document.getElementById("city");
@@ -127,7 +128,9 @@ if (host && "WebGLRenderingContext" in window) {
     for (const template of glbTemplates.values()) disposeObject3D(template, resources);
     for (const template of glbPropTemplates.values()) disposeObject3D(template, resources);
     for (const entry of glbUnitTemplates.values()) disposeObject3D(entry.template, resources);
-    for (const texture of surfaceTextureCache.values()) resources.textures.add(texture);
+    for (const textureSet of surfaceTextureCache.values()) {
+      for (const texture of Object.values(textureSet)) if (texture?.isTexture) resources.textures.add(texture);
+    }
     for (const mat of Object.values(mats)) {
       if (!mat) continue;
       resources.materials.add(mat);
@@ -209,23 +212,57 @@ if (host && "WebGLRenderingContext" in window) {
       ctx.fillStyle = rand() > .5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
       ctx.fillRect(rand() * textureSize, rand() * textureSize, 1 + rand() * 2, 1 + rand() * 2);
     }
-    const texture = new THREE.CanvasTexture(canvas);
-    texture.colorSpace = THREE.SRGBColorSpace;
-    texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
-    texture.repeat.set(kind === "grass" ? 9 : 3, kind === "grass" ? 7 : 3);
-    texture.anisotropy = Math.min(qualityProfile?.anisotropy || 2, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
-    texture.needsUpdate = true;
-    return texture;
+    const repeat = kind === "grass" ? 9 : 3;
+    const repeatY = kind === "grass" ? 7 : 3;
+    const anisotropy = Math.min(qualityProfile?.anisotropy || 2, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
+    const configureTexture = (texture, colorSpace = THREE.NoColorSpace) => {
+      texture.colorSpace = colorSpace;
+      texture.wrapS = texture.wrapT = THREE.RepeatWrapping;
+      texture.repeat.set(repeat, repeatY);
+      texture.anisotropy = anisotropy;
+      texture.needsUpdate = true;
+      return texture;
+    };
+    const textureSet = {
+      map: configureTexture(new THREE.CanvasTexture(canvas), THREE.SRGBColorSpace),
+      normalMap: null,
+      roughnessMap: null
+    };
+
+    // Aparelhos de entrada mantem apenas o albedo e a rugosidade escalar.
+    // Balanced/High recebem mapas PBR lineares para relevo e resposta de luz.
+    if (qualityProfile?.pbrMaps) {
+      const pixels = ctx.getImageData(0, 0, textureSize, textureSize).data;
+      const luminance = new Uint8Array(textureSize * textureSize);
+      for (let i = 0; i < luminance.length; i++) {
+        const offset = i * 4;
+        luminance[i] = Math.round(pixels[offset] * 0.2126 + pixels[offset + 1] * 0.7152 + pixels[offset + 2] * 0.0722);
+      }
+      const derived = derivePbrTextureData({ luminance, width: textureSize, height: textureSize, kind });
+      const createLinearMap = data => {
+        const detailCanvas = document.createElement("canvas");
+        detailCanvas.width = detailCanvas.height = textureSize;
+        const detailContext = detailCanvas.getContext("2d");
+        const imageData = detailContext.createImageData(textureSize, textureSize);
+        imageData.data.set(data);
+        detailContext.putImageData(imageData, 0, 0);
+        return configureTexture(new THREE.CanvasTexture(detailCanvas));
+      };
+      textureSet.normalMap = createLinearMap(derived.normalData);
+      textureSet.roughnessMap = createLinearMap(derived.roughnessData);
+    }
+    return textureSet;
   }
-  function getSurfaceTexture(base, kind, seed) {
+  function getSurfaceMaps(base, kind, seed) {
     const key = `${base}:${kind}:${seed}`;
     if (!surfaceTextureCache.has(key)) surfaceTextureCache.set(key, makeSurfaceTexture(base, kind, seed));
     return surfaceTextureCache.get(key);
   }
   function surfaceMaterial(base, kind, seed) {
+    const maps = getSurfaceMaps(base, kind, seed);
     return new THREE.MeshStandardMaterial({
       color: "#ffffff",
-      map: getSurfaceTexture(base, kind, seed),
+      ...maps,
       roughness: kind === "roof" ? .86 : .96,
       metalness: 0.01
     });
@@ -241,7 +278,10 @@ if (host && "WebGLRenderingContext" in window) {
       [mats.roof, "#24476B", "roof", 47]
     ];
     for (const [mat, base, kind, seed] of maps) {
-      mat.map = makeSurfaceTexture(base, kind, seed);
+      const textureSet = makeSurfaceTexture(base, kind, seed);
+      mat.map = textureSet.map;
+      mat.normalMap = textureSet.normalMap;
+      mat.roughnessMap = textureSet.roughnessMap;
       mat.color.set("#ffffff");
       mat.needsUpdate = true;
     }
@@ -846,6 +886,7 @@ if (host && "WebGLRenderingContext" in window) {
         shadows: renderer.shadowMap.enabled,
         premiumWater: Boolean(waterFeature),
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
+        pbrMaps: qualityProfile.pbrMaps,
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };
