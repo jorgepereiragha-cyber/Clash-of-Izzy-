@@ -1,11 +1,12 @@
 body.valhalla-mode-active{background-image:radial-gradient(ellipse at 50% -20%,#49326a,#171327 56%,#080d18)}
 body.valhalla-mode-active header{border-bottom-color:#9b59b6;box-shadow:0 4px 22px #9b59b633}
+body.valhalla-mode-active #valhalla-shop-btn:not([hidden]){display:flex}
 #valhalla-shop-btn{position:fixed;right:max(14px,env(safe-area-inset-right));bottom:calc(88px + env(safe-area-inset-bottom));z-index:1200;display:none;align-items:center;gap:9px;min-height:48px;padding:11px 16px;border:1px solid #f6d77f;border-radius:13px;background:linear-gradient(135deg,#7544a1,#2c2445);color:#ffe69b;font:800 14px/1.1 system-ui,sans-serif;box-shadow:0 8px 28px #0009,0 0 22px #a76de966;cursor:pointer}
 #valhalla-shop-btn[hidden]{display:none}
 #valhalla-shop-btn .va-rune{font-size:21px;filter:drop-shadow(0 0 6px #f5ce66)}
 @media(prefers-reduced-motion:no-preference){#valhalla-shop-btn{animation:va-rune-pulse 2.4s ease-in-out infinite}#valhalla-shop-btn:hover{transform:translateY(-2px)}}
 @keyframes va-rune-pulse{0%,100%{box-shadow:0 8px 28px #0009,0 0 14px #a76de955}50%{box-shadow:0 8px 28px #0009,0 0 26px #e4c15b99}}
-#valhalla-shop-overlay{position:fixed;inset:0;z-index:1300;display:none;align-items:center;justify-content:center;padding:12px;background:#050711e8;backdrop-filter:blur(8px)}
+#valhalla-shop-overlay{position:fixed;inset:0;z-index:9999;display:none;align-items:center;justify-content:center;padding:12px;background:#050711e8;backdrop-filter:blur(8px)}
 #valhalla-shop-overlay.is-open{display:flex}
 #valhalla-shop-dialog{display:flex;flex-direction:column;width:min(100%,1080px);max-height:min(92dvh,900px);overflow:hidden;border:1px solid #9b65c0;border-radius:18px;background:linear-gradient(145deg,#21152e,#101a2b 70%);box-shadow:0 26px 90px #000c,0 0 45px #9b59b633;color:#f5edda}
 .va-shop-header{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:15px 18px;border-bottom:1px solid #80569c;background:linear-gradient(110deg,#3a2450,#18263b)}
