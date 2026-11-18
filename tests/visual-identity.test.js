@@ -57,3 +57,12 @@ test("tema compartilhado define tokens da marca e acessibilidade básica", async
   assert.match(css, /:focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
 });
+
+
+test("entrada do jogo apresenta arte própria do reino em vez de ampliar o brasão", async () => {
+  const landing = await readFile(new URL("../index.html", import.meta.url), "utf8");
+  const artwork = await readFile(new URL("../assets/art/landing-kingdom.svg", import.meta.url), "utf8");
+  assert.match(landing, /class="landing-kingdom-art" src="\/assets\/art\/landing-kingdom\.svg"/);
+  assert.match(artwork, /Castelo medieval de pedra com telhados azul-real/);
+  assert.match(artwork, /id="river"/);
+});
