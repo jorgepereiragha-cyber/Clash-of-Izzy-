@@ -96,18 +96,22 @@ test("Android world map supports one-finger pan and two-finger pinch zoom", asyn
   const map = page.locator("#worldMap");
   const bounds = await map.boundingBox();
   expect(bounds).not.toBeNull();
-  const centerX = bounds.x + bounds.width / 2;
-  const centerY = bounds.y + bounds.height / 2;
+  // At 100% the map exactly fills its viewport, so no pan range exists yet.
+  await page.locator("#zoomIn").click();
+  await page.locator("#zoomIn").click();
+  await expect(page.locator("#mapScale")).toHaveText("150%");
 
+  const gestureX = bounds.x + bounds.width * 0.2;
+  const gestureY = bounds.y + bounds.height * 0.72;
   const client = await page.context().newCDPSession(page);
   const beforePan = await page.locator("#mapContent").evaluate(node => node.style.transform);
   await client.send("Input.dispatchTouchEvent", {
     type: "touchStart",
-    touchPoints: [{ x: centerX, y: centerY, id: 11 }],
+    touchPoints: [{ x: gestureX, y: gestureY, id: 11 }],
   });
   await client.send("Input.dispatchTouchEvent", {
     type: "touchMove",
-    touchPoints: [{ x: centerX + 30, y: centerY + 18, id: 11 }],
+    touchPoints: [{ x: gestureX + 30, y: gestureY + 18, id: 11 }],
   });
   await client.send("Input.dispatchTouchEvent", {
     type: "touchEnd",
@@ -118,18 +122,22 @@ test("Android world map supports one-finger pan and two-finger pinch zoom", asyn
 
   await page.locator("#mapReset").click();
   await expect(page.locator("#mapScale")).toHaveText("100%");
+
+  const pinchY = bounds.y + bounds.height * 0.2;
+  const pinchX1 = bounds.x + bounds.width * 0.3;
+  const pinchX2 = bounds.x + bounds.width * 0.6;
   await client.send("Input.dispatchTouchEvent", {
     type: "touchStart",
     touchPoints: [
-      { x: centerX - 50, y: centerY, id: 21 },
-      { x: centerX + 50, y: centerY, id: 22 },
+      { x: pinchX1, y: pinchY, id: 21 },
+      { x: pinchX2, y: pinchY, id: 22 },
     ],
   });
   await client.send("Input.dispatchTouchEvent", {
     type: "touchMove",
     touchPoints: [
-      { x: centerX - 75, y: centerY, id: 21 },
-      { x: centerX + 75, y: centerY, id: 22 },
+      { x: bounds.x + bounds.width * 0.225, y: pinchY, id: 21 },
+      { x: bounds.x + bounds.width * 0.675, y: pinchY, id: 22 },
     ],
   });
   await client.send("Input.dispatchTouchEvent", {
