@@ -1,0 +1,154 @@
+name: Prepare Clash of Izzy Preview D1 (isolated)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_branch:
+        description: "Branch cujo schema será aplicado no D1 descartável"
+        required: true
+        default: release/one-shared-realm-early-access
+        type: string
+      confirm_preview_id:
+        description: "Digite exatamente o UUID do D1 Preview"
+        required: true
+        default: 6674c0ac-3636-4e57-bff8-23cf60ab9637
+        type: string
+      confirm_preview_is_disposable:
+        description: "Confirma que o D1 Preview é descartável e não contém dados reais"
+        required: true
+        default: false
+        type: boolean
+      confirm_apply_preview_migrations:
+        description: "Autoriza aplicar migrations remotamente somente no D1 Preview"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clash-of-izzy-preview-d1-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Require explicit Preview-only authorization
+        shell: bash
+        env:
+          CONFIRM_PREVIEW_ID: ${{ inputs.confirm_preview_id }}
+          CONFIRM_PREVIEW_IS_DISPOSABLE: ${{ inputs.confirm_preview_is_disposable }}
+          CONFIRM_APPLY: ${{ inputs.confirm_apply_preview_migrations }}
+        run: |
+          set -euo pipefail
+          EXPECTED_ID="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          if [[ "$CONFIRM_PREVIEW_ID" != "$EXPECTED_ID" ]]; then
+            echo "::error::UUID digitado não corresponde ao D1 Preview configurado."
+            exit 1
+          fi
+          if [[ "$CONFIRM_PREVIEW_IS_DISPOSABLE" != "true" || "$CONFIRM_APPLY" != "true" ]]; then
+            echo "::error::As duas confirmações de segurança são obrigatórias."
+            exit 1
+          fi
+
+      - name: Checkout selected release branch
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.target_branch }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci --ignore-scripts
+
+      - name: Run automated tests
+        run: npm test
+
+      - name: Validate Worker bundle without publishing
+        run: npx wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist
+
+      - name: Normalize Cloudflare API token
+        shell: bash
+        env:
+          RAW_CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          python - <<'PY'
+          import os
+          token = os.environ.get("RAW_CLOUDFLARE_API_TOKEN", "").strip()
+          if token[:7].lower() == "bearer ":
+              token = token[7:].strip()
+          if len(token) >= 2 and token[0] == token[-1] and token[0] in ("'", '"'):
+              token = token[1:-1].strip()
+          if not token or any(ch.isspace() for ch in token):
+              raise SystemExit("CLOUDFLARE_API_TOKEN ausente ou inválido.")
+          print("::add-mask::" + token)
+          with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as output:
+              output.write("CLOUDFLARE_API_TOKEN=" + token + "\n")
+          PY
+
+      - name: Validate account access
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          test -n "$CLOUDFLARE_ACCOUNT_ID" || (echo "::error::CLOUDFLARE_ACCOUNT_ID ausente." && exit 1)
+          npx wrangler whoami --account "$CLOUDFLARE_ACCOUNT_ID" --json
+
+      - name: Verify Preview D1 UUID before any write
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler --config wrangler.preview-migrations.jsonc d1 info PREVIEW_DB --json > "$RUNNER_TEMP/preview-d1-info.json"
+          python - <<'PY'
+          import os
+          from pathlib import Path
+          raw = Path(os.environ["RUNNER_TEMP"], "preview-d1-info.json").read_text()
+          expected = "6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          production = "7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          if expected not in raw:
+              raise SystemExit("O D1 Preview não corresponde ao UUID configurado. Nenhuma migration aplicada.")
+          if production in raw:
+              raise SystemExit("A consulta retornou o UUID de produção. Operação bloqueada.")
+          print("UUID do D1 Preview confirmado; produção não foi selecionada.")
+          PY
+
+      - name: Capture Preview D1 Time Travel bookmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler --config wrangler.preview-migrations.jsonc d1 time-travel info PREVIEW_DB --json > "$RUNNER_TEMP/preview-d1-time-travel.json"
+          test -s "$RUNNER_TEMP/preview-d1-time-travel.json"
+          echo "Bookmark/estado de Time Travel do Preview consultado antes da migration."
+
+      - name: Archive Preview D1 pre-migration metadata
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash-of-izzy-preview-d1-pre-migration-${{ github.run_id }}
+          path: |
+            ${{ runner.temp }}/preview-d1-info.json
+            ${{ runner.temp }}/preview-d1-time-travel.json
+          if-no-files-found: error
+          retention-days: 30
+
+      - name: Show pending Preview migrations (read-only)
+        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations list PREVIEW_DB --remote
+
+      - name: Apply migrations to isolated Preview D1 only
+        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --remote
+
+      - name: Verify Preview migration status after apply
+        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations list PREVIEW_DB --remote
+
+      - name: Confirm no production deploy was performed
+        run: |
+          echo "Only the isolated Preview D1 was targeted."
+          echo "No production D1 migration and no Worker deployment were performed."
