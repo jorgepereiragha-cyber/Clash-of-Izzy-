@@ -68,7 +68,7 @@ O status Paid é uma confirmação do proprietário no Dashboard; `wrangler whoa
 
 ## Plano pago e backup D1
 
-D1 Time Travel não precisa ser habilitado nem depende de Cron. Para databases no backend novo, ele mantém recuperação ponto-no-tempo automaticamente: até 30 dias no Workers Paid e 7 dias no Free. Confirme `version: production` em `wrangler d1 info`. Restaurar um bookmark sobrescreve o banco atual; deve ser tratado como operação destrutiva e executado somente com aprovação, bookmark anterior anotado e plano de reversão.
+D1 Time Travel não precisa ser habilitado nem depende de Cron. Para databases no novo storage backend, ele mantém recuperação ponto-no-tempo automaticamente: até 30 dias no Workers Paid e 7 dias no Free. Confirme `version: beta` em `wrangler d1 info`; bancos `alpha` usam o backend legado. Restaurar um bookmark sobrescreve o banco atual; deve ser tratado como operação destrutiva e executado somente com aprovação, bookmark anterior anotado e plano de reversão.
 
 Links oficiais:
 - [Workers Paid pricing](https://developers.cloudflare.com/workers/platform/pricing/)
