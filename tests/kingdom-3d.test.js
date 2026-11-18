@@ -294,6 +294,9 @@ test("procedural material texels scale from 128 to 256 and 512 without coarse hi
   assert.equal(low.surfaceTextureSize, 128);
   assert.equal(balanced.surfaceTextureSize, 256);
   assert.equal(high.surfaceTextureSize, 512);
+  assert.equal(low.pbrMaps, false);
+  assert.equal(balanced.pbrMaps, true);
+  assert.equal(high.pbrMaps, true);
   assert.match(renderer, /const textureSize = qualityProfile\?\.surfaceTextureSize \|\| 128/);
   assert.match(renderer, /ctx\.setTransform\(detailScale, 0, 0, detailScale, 0, 0\)/);
   assert.match(renderer, /const grainCount = Math\.round\(1200 \* detailScale \* detailScale\)/);
@@ -322,4 +325,16 @@ test("army and optional shader animation pause when hidden or outside the viewpo
   assert.match(renderer, /sceneVisibilityObserver\?\.disconnect\(\)/);
   assert.match(renderer, /animationLoop: \{ active: Boolean\(animationFrame\)/);
   assert.match(renderer, /animationFrameTiming\.snapshot\(\)/);
+});
+
+
+test("procedural PBR material maps are attached and disposed as owned GPU resources", () => {
+  assert.match(renderer, /import \{ derivePbrTextureData \} from "\.\/kingdom-materials\.js"/);
+  assert.match(renderer, /textureSet\.normalMap = createLinearMap\(derived\.normalData\)/);
+  assert.match(renderer, /textureSet\.roughnessMap = createLinearMap\(derived\.roughnessData\)/);
+  assert.match(renderer, /mat\.normalMap = textureSet\.normalMap/);
+  assert.match(renderer, /mat\.roughnessMap = textureSet\.roughnessMap/);
+  assert.match(renderer, /for \(const textureSet of surfaceTextureCache\.values\(\)\)/);
+  assert.match(renderer, /if \(texture\?\.isTexture\) resources\.textures\.add\(texture\)/);
+  assert.match(renderer, /pbrMaps: qualityProfile\.pbrMaps/);
 });
