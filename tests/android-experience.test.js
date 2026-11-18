@@ -91,3 +91,17 @@ test("public asset filters exclude build-only Node diagnostics but keep the runt
     "/scripts/pwa-runtime.js",
   ]) assert.ok(runtime.includes(browserModule), "active browser module not cached: " + browserModule);
 });
+
+
+test("kingdom, events and Valhalla pause visual timers and network polling while backgrounded", async () => {
+  const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  const events = await readFile(new URL("../events.js", import.meta.url), "utf8");
+  const shop = await readFile(new URL("../valhalla-shop-ui.js", import.meta.url), "utf8");
+
+  assert.match(kingdom, /setInterval\(\(\)=>\{if\(document\.hidden\)return/);
+  assert.match(kingdom, /setInterval\(\(\)=>\{if\(!document\.hidden\)refreshQueueState\(\)/);
+  assert.match(events, /setInterval\(\(\)=>\{if\(!document\.hidden\)renderCountdown\(\)/);
+  assert.match(events, /setInterval\(\(\)=>\{if\(!document\.hidden\)refresh\(\)/);
+  assert.match(shop, /if \(!document\.hidden\) void checkModeStatus\(\)/);
+  assert.match(shop, /document\.addEventListener\("visibilitychange"/);
+});
