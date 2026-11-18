@@ -49,7 +49,8 @@ test("official store submits an auditable payment request and opens WhatsApp", a
   assert.doesNotMatch(arena, /mercadopago|purchaseReference|purchaseMethod/i);
   assert.ok(arena.includes("https://wa.me/"));
   assert.ok(arena.includes("Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação'"));
-  assert.ok(arena.includes("Skin de castelo · Ataque +"));\n  assert.ok(arena.includes("defense_bonus_percent"));
+  assert.ok(arena.includes("Skin de castelo · Ataque +"));
+  assert.ok(arena.includes("defense_bonus_percent"));
   assert.ok(arena.includes("grid-template-columns:minmax(0,1fr) auto"));
   assert.ok(arena.includes("Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis."));
   assert.ok(arena.includes("manual_whatsapp"));

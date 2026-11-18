@@ -211,3 +211,6 @@ Os cinco equipamentos lendários finais são Mjölnir, Coroa de Izzy, Égide de 
 As skins de castelo compradas possuem valores individuais de ataque e defesa, preenchidos pela migração D1 0028. Para o catálogo inicial de 200 skins, a fórmula atribui valores distintos de 0,35% a 2,34% para cada atributo. O Worker só aplica o bônus se a skin estiver na propriedade do jogador e equipada no reino; o cliente não envia nem escolhe os percentuais. Os visuais colecionáveis nórdicos, cosméticos sazonais e fusões continuam puramente visuais.
 
 Os atributos entram nos cálculos PvE e no Anjo da Morte. A camada PvP permanece fora deste escopo enquanto o sistema PvP não estiver implementado. A migração altera apenas novas colunas e valores da tabela `skins`; nenhum equipamento do inventário existente é apagado. O shell da PWA foi atualizado para v37 para incluir as alterações de Forja e os recursos visuais.
+
+
+A migração 0028 possui também o gatilho `trg_skins_combat_attributes_after_insert`, para atribuir percentuais aos itens cadastrados depois da execução inicial. O gatilho não sobrescreve atributos diferentes de zero definidos explicitamente pelo administrador.

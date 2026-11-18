@@ -11,3 +11,17 @@ ALTER TABLE skins ADD COLUMN defense_bonus_percent REAL NOT NULL DEFAULT 0
 UPDATE skins
 SET attack_bonus_percent = ROUND(0.35 + ((id * 37) % 200) / 100.0, 2),
     defense_bonus_percent = ROUND(0.35 + ((id * 73 + 19) % 200) / 100.0, 2);
+
+
+-- Skins criadas depois da migração recebem também atributos individuais.
+-- A verificação dos dois campos em zero preserva qualquer valor explicitamente
+-- definido pelo administrador e mantém as skins existentes sem sobrescrita.
+CREATE TRIGGER IF NOT EXISTS trg_skins_combat_attributes_after_insert
+AFTER INSERT ON skins
+WHEN NEW.attack_bonus_percent = 0 AND NEW.defense_bonus_percent = 0
+BEGIN
+  UPDATE skins
+  SET attack_bonus_percent = ROUND(0.35 + ((NEW.id * 37) % 200) / 100.0, 2),
+      defense_bonus_percent = ROUND(0.35 + ((NEW.id * 73 + 19) % 200) / 100.0, 2)
+  WHERE id = NEW.id;
+END;

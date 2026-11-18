@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 // This isolated spec opts in so it can validate the real PWA lifecycle.
 test.use({ serviceWorkers: "allow" });
 
-const SHELL_CACHE = "clash-of-izzy-shell-v37";
+const SHELL_CACHE = "clash-of-izzy-shell-v38";
 const CACHED_MODEL = "/assets/3d/kenney/castle-kit/Models/GLB%20format/tower-square.glb";
 
 test("PWA activates its Service Worker and serves previously cached shell and GLB offline", async ({ page, context }) => {
