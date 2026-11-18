@@ -35,6 +35,19 @@ Referências oficiais:
 - Não existe ainda projeto Android TWA/Gradle, Application ID confirmado, assinatura, Digital Asset Links verificado nem AAB assinado.
 - Esta preparação não cria conta Play Console, não publica AAB e não altera o Worker de produção.
 
+## 2.1 Aprimoramentos Android já preparados na PR #128
+
+- Alvos de toque com altura mínima de 48 CSS px nas ações principais, navegação, campos e controles do mapa.
+- Campos de texto com tamanho mínimo de 16 px para evitar zoom automático do navegador em dispositivos móveis.
+- Respeito às áreas seguras do dispositivo (recortes, barras do sistema e bordas de gestos) e uso de viewport dinâmico.
+- Layouts testados em preparação para larguras de 360, 390, 600, 768, 844 em paisagem e 1280 px; o teste automatizado é Chromium, ainda não substitui aparelhos Android reais.
+- Aviso acessível de perda/retorno de conexão; a interface deixa claro que o jogo precisa de internet para sincronizar.
+- Atualização do Service Worker sem recarregar automaticamente uma sessão em andamento; o jogador escolhe quando aplicar uma nova versão.
+- Evento comum de retomada para sincronizar de novo o estado de Reino/Mapa quando a rede volta.
+- Mapa mundial com gesto de arrasto e pinça de dois dedos; animações de marchas pausam quando o app fica em segundo plano ou o mapa sai da área visível.
+- Limite de pixels do buffer gráfico do mapa e retomada compatível com o ciclo de vida/back-forward cache.
+- Shell PWA v34 inclui o runtime e estilos Android para abertura offline; isto não torna offline a economia, as marchas, batalhas nem o banco D1.
+
 ## 3. O que será necessário para enviar à loja
 
 1. Conta Google Play Console do proprietário, verificação de identidade e dados de desenvolvedor/pagamentos.
@@ -68,6 +81,8 @@ Guia oficial: [imagens e capturas para a ficha da Play Store](https://support.go
 ## 4. Pagamentos — requisito antes do lançamento Android
 
 Gemas, moedas, skins, VIP, personagens e outros itens usados dentro do jogo são bens digitais. A política do Google Play normalmente exige **Google Play Billing** para vender esses bens em um app distribuído pela Play Store, salvo exceção/programa oficial aplicável e atendido.
+
+**Atenção específica ao Brasil:** o programa oficial de User Choice Billing lista o Brasil entre os mercados participantes, mas a elegibilidade para o Brasil é restrita a apps que não sejam jogos; para games, a página lista elegibilidade no EEE e no Japão. Portanto, não presumir que Clash of Izzy possa aderir ao piloto brasileiro. Planejar a edição Play com Google Play Billing até que o Play Console/Google confirme formalmente um programa válido para este jogo. Fonte: [elegibilidade e requisitos do User Choice Billing](https://support.google.com/googleplay/android-developer/answer/12570971?hl=pt-br).
 
 Consequências para o projeto:
 - Não inserir botão, link, WebView ou redirecionamento para Mercado Pago, Pix ou WhatsApp na edição Play para comprar bens digitais sem enquadramento oficial em exceção/programa aplicável.
