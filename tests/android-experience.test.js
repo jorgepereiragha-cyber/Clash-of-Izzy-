@@ -59,3 +59,9 @@ test("world map renderer pauses when backgrounded and is adaptive to pixel budge
   assert.match(scene, /pixelBudgetRatio/);
   assert.match(scene, /window\.addEventListener\("pageshow"/);
 });
+
+
+test("PWA cache does not retain the orphan splash page", async () => {
+  const serviceWorker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
+  assert.doesNotMatch(serviceWorker, /splash-screen\.html/);
+});
