@@ -65,3 +65,11 @@ test("PWA cache does not retain the orphan splash page", async () => {
   const serviceWorker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
   assert.doesNotMatch(serviceWorker, /splash-screen\.html/);
 });
+
+
+test("PWA caches the active ambient layer without retaining deleted public modules or pages", async () => {
+  const serviceWorker = await readFile(new URL("../sw.js", import.meta.url), "utf8");
+  assert.match(serviceWorker, /scripts\/ambient-particles\.js/);
+  assert.doesNotMatch(serviceWorker, /post-processing\.js/);
+  assert.doesNotMatch(serviceWorker, /splash-screen\.html/);
+});
