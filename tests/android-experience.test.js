@@ -73,3 +73,21 @@ test("PWA caches the active ambient layer without retaining deleted public modul
   assert.doesNotMatch(serviceWorker, /post-processing\.js/);
   assert.doesNotMatch(serviceWorker, /splash-screen\.html/);
 });
+
+
+test("public asset filters exclude build-only Node diagnostics but keep the runtime", async () => {
+  const ignore = await readFile(new URL("../.assetsignore", import.meta.url), "utf8");
+  for (const tool of [
+    "scripts/diagnose-production-endpoint.js",
+    "scripts/production-smoke.js",
+    "scripts/validate-3d-assets.js",
+    "scripts/validate-core-loop.sh",
+  ]) assert.ok(ignore.split(/\r?\n/).includes(tool), "public asset exclusion missing: " + tool);
+
+  const runtime = await readFile(new URL("../sw.js", import.meta.url), "utf8");
+  for (const browserModule of [
+    "/scripts/ambient-particles.js",
+    "/scripts/kingdom-3d.js",
+    "/scripts/pwa-runtime.js",
+  ]) assert.ok(runtime.includes(browserModule), "active browser module not cached: " + browserModule);
+});
