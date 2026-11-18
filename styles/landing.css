@@ -66,3 +66,9 @@
 @media(max-width:900px){.landing-hero{grid-template-columns:minmax(0,1fr) minmax(230px,.75fr);gap:20px}.landing-features{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:680px){.landing-shell{width:min(100% - 28px,560px)}.landing-hero{min-height:0;grid-template-columns:1fr;padding:54px 0 34px;text-align:center}.landing-crest{margin:18px auto 12px}.landing-actions,.landing-trust{justify-content:center}.landing-description{margin:0 auto}.landing-visual{min-height:270px}.landing-visual-frame{width:min(76vw,320px);border-radius:24px}.landing-section{padding:54px 0}.landing-features{grid-template-columns:1fr}.landing-feature{min-height:0}.landing-callout{grid-template-columns:1fr;text-align:center}.landing-callout .landing-button{justify-self:center}.landing-form{grid-template-columns:1fr}.landing-referral-box{grid-template-columns:1fr}.landing-referral-box .landing-button{width:100%}.install-card{padding:28px 18px 20px}}
 @media(prefers-reduced-motion:reduce){.landing-button{transition:none}}
+
+/* Arte original do reino: castelo, muralhas, floresta, montanhas e rio. */
+.landing-kingdom-art{
+  position:absolute;inset:0;z-index:1;width:100%;height:100%;
+  object-fit:cover;display:block;filter:saturate(.96) brightness(.96)
+}
