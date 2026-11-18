@@ -52,7 +52,7 @@ test("Mercador, Loja de Heróis e aceleradores funcionam no viewport Android", a
   await page.setViewportSize({ width: 360, height: 780 });
   await page.goto("/market.html");
   await expect(page.getByRole("heading", { name: "Mercador de Eldoria" })).toBeVisible();
-  await expect(page.getByRole("heading", { name: "Loja de Heróis" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Loja de Heróis", exact: true })).toBeVisible();
   await expect(page.getByText("Kael · Guardião do Sol")).toBeVisible();
   await expect(page.getByText("Acelerador 5 min × 1")).toBeVisible();
   await expect(page.getByText("Construção · castle")).toBeVisible();
