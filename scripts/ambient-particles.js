@@ -27,6 +27,7 @@
 
   const particles = [];
   let width = 0, height = 0, frame = 0, lastFrame = 0;
+  const FRAME_INTERVAL_MS = 1000 / 30;
   let visible = true, disposed = false;
   let resizeObserver = null, intersectionObserver = null;
 
@@ -63,7 +64,11 @@
   function draw(timestamp) {
     frame = 0;
     if (disposed || !visible || document.hidden || width <= 1 || height <= 1) return;
-    const delta = Math.min(2, (timestamp - lastFrame) / 16.67 || 1);
+    if (lastFrame && timestamp - lastFrame < FRAME_INTERVAL_MS) {
+      frame = window.requestAnimationFrame(draw);
+      return;
+    }
+    const delta = Math.min(2, (timestamp - lastFrame) / FRAME_INTERVAL_MS || 1);
     lastFrame = timestamp;
     context.clearRect(0, 0, width, height);
     for (const particle of particles) {
@@ -95,7 +100,10 @@
   }
   function onVisibilityChange() {
     if (document.hidden) stop();
-    else start();
+    else {
+      resize();
+      start();
+    }
   }
   function onPageHide(event) {
     if (event.persisted) {
