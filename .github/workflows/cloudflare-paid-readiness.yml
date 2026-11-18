@@ -23,10 +23,21 @@ concurrency:
 
 jobs:
   readiness:
-    if: ${{ inputs.owner_confirmed_paid_plan == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
+      - name: Require owner confirmation of Paid plan and billing limits
+        shell: bash
+        env:
+          OWNER_CONFIRMED_PAID_PLAN: ${{ inputs.owner_confirmed_paid_plan }}
+        run: |
+          set -euo pipefail
+          if [[ "$OWNER_CONFIRMED_PAID_PLAN" != "true" ]]; then
+            echo "::error::Confirme primeiro no Cloudflare Dashboard que Workers Paid está ativo e os limites/alertas foram revisados."
+            exit 1
+          fi
+          echo "Confirmação do proprietário recebida; a API não permite provar o nível de assinatura neste workflow."
+
       - name: Checkout selected release branch
         uses: actions/checkout@v4
         with:
