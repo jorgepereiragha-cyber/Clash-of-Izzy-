@@ -11,7 +11,7 @@ test("Cloudflare Paid readiness can only be manually dispatched and checks a sel
   assert.doesNotMatch(workflow, /^\s+pull_request:/m);
   assert.match(workflow, /target_branch:[\s\S]*?type: string/);
   assert.ok(workflow.includes("ref: ${{ inputs.target_branch }}"));
-  assert.match(workflow, /owner_confirmed_paid_plan == true/);
+  assert.ok(workflow.includes("OWNER_CONFIRMED_PAID_PLAN"));
   assert.match(workflow, /permissions:\s*\n\s+contents:\s+read/m);
 });
 
