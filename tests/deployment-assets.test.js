@@ -13,6 +13,7 @@ test("Cloudflare public assets exclude local tooling, tests, and database artifa
 test("Worker-only modules stay in the Worker bundle and out of public static assets", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   const workerOnlyModules = [
+    "hero-catalog.js",
     "angel-death-event.js",
     "api-rate-limit.js",
     "battle-replay.js",
