@@ -260,6 +260,27 @@
       root.append(card);
     }
   }
+  function renderSummonOdds(){
+    const root=$("hero-summon-rates");
+    if(!root)return;
+    const rows=Array.isArray(state?.heroSummonOdds)?state.heroSummonOdds:[];
+    const labels={white:"Comum",blue:"Raro",purple:"Lendário"};
+    root.replaceChildren();
+    for(const row of rows){
+      const card=document.createElement("div");
+      const title=document.createElement("strong");
+      title.textContent=(labels[row.rarity]||row.rarity)+" · "+Number(row.chancePercent||0).toLocaleString("pt-BR")+"%";
+      const detail=document.createElement("span");
+      detail.textContent=Number(row.heroCount||0)+" herói(s) · "+Number(row.perHeroPercent||0).toLocaleString("pt-BR",{maximumFractionDigits:2})+"% por herói";
+      card.append(title,detail);
+      root.append(card);
+    }
+    if(!rows.length){
+      const empty=document.createElement("p");
+      empty.textContent="Probabilidades indisponíveis; tente sincronizar novamente.";
+      root.append(empty);
+    }
+  }
   function renderSummonControls(){
     const gems=$("hero-gem-balance"),one=$("hero-summon-one"),ten=$("hero-summon-ten");
     const balance=Math.max(0,Number(state?.player?.gems)||0);
@@ -322,6 +343,7 @@
     heroPicker.disabled=busy||!heroes.length;
     const selectedHero=heroes.find(hero=>Number(hero.id)===selectedHeroId);
     renderHeroGallery();
+    renderSummonOdds();
     renderSummonControls();
     renderSummonResults();
     $("item-name").textContent=item.name;
