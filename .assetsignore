@@ -27,8 +27,16 @@ coverage/
 *.log
 *.map
 
+# Node-only validation scripts are executed by CI/deploy, not by the browser.
+scripts/production-smoke.js
+scripts/validate-3d-assets.js
+
 # Art pipeline documentation is kept in Git, not served as a game asset.
 assets/art/README.md
 
 # Model documentation is not a public game asset.
 assets/models/README.md
+
+# Additional Node-only operational tools; browser modules under scripts/ remain public.
+scripts/diagnose-production-endpoint.js
+scripts/validate-core-loop.sh
