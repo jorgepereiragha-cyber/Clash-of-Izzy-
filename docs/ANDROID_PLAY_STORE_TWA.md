@@ -122,20 +122,25 @@ Fonte: [Requisitos de teste para novas contas pessoais](https://support.google.c
 
 ## 7. Pagamentos — bloqueio obrigatório antes de vender na Play
 
-Gemas, moedas virtuais, skins, VIP, heróis e outros itens digitais consumidos dentro do jogo são bens digitais. Para a edição distribuída pela Play Store, planejar **Google Play Billing** e validação server-side antes de conceder itens no D1.
+Gemas, moedas virtuais, skins, VIP, heróis e outros itens digitais consumidos dentro do jogo são bens digitais. Para a edição distribuída pela Play Store, usar **Google Play Billing** por meio das APIs próprias de TWA e validar a compra no servidor antes de conceder qualquer item no D1.
 
-**Brasil:** o piloto User Choice Billing lista o Brasil entre os mercados, mas, fora do EEE, Estados Unidos e Japão, a elegibilidade indicada para o piloto é limitada a apps que não sejam jogos. Portanto, não presumir que Clash of Izzy, por ser jogo, possa usar faturamento alternativo no Brasil.
+**Brasil:** o piloto User Choice Billing inclui o país, mas a regra de elegibilidade desse piloto limita os mercados fora do EEE, EUA e Japão a apps móveis/tablets que não sejam jogos. A página atual do novo programa Billing Choice lista Austrália, Japão, Reino Unido, EEE e EUA — não inclui Brasil. Os novos programas Level Up do Play Games / Experiência nos Apps também não listam o Brasil entre os mercados de lançamento. Portanto, para a edição brasileira do Clash of Izzy, não planejar Pix, Mercado Pago ou links externos como alternativa dentro da versão Play sem uma confirmação formal de elegibilidade no Play Console.
 
-Consequências:
-- Não usar Pix, Mercado Pago, WhatsApp, links externos ou WebView para vender bens digitais dentro da edição Play, salvo exceção/programa oficial cuja elegibilidade tenha sido confirmada para este jogo.
-- Separar o adaptador de compras por canal: Play Billing na edição Play; o fluxo web só permanece onde as regras aplicáveis permitirem.
-- O Worker deve validar a compra/token do Google antes de conceder gemas, skins ou VIP.
-- D1 continua sendo a fonte de verdade de propriedade e concessões; registrar idempotência e auditoria da compra.
-- Nunca armazenar número completo do cartão, validade ou CVV no jogo.
+**Integração obrigatória na TWA (Bubblewrap):**
+- Vincular a conta de desenvolvedor do Google Play à conta de comerciante do Google Payments; configurar os produtos no Play Console; ter pelo menos uma versão em faixa de teste e Digital Asset Links válido.
+- Em `twa-manifest.json`, habilitar `features.playBilling.enabled`; depois executar `bubblewrap update` e `bubblewrap build`.
+- No site carregado pela TWA, obter o serviço com `window.getDigitalGoodsService("https://play.google.com/billing")`, consultar preços localizados por `getDetails()` e iniciar a compra por `PaymentRequest` com o ID do produto.
+- Enviar o `purchaseToken` ao Worker; verificar o estado com a Google Play Developer API e só então conceder a compra. A concessão em D1 precisa ser idempotente, vinculada à conta correta e auditável.
+- Só confirmar compra em estado `PURCHASED`, nunca em `PENDING`. Após validar e conceder, consumir produtos consumíveis (como pacotes de gemas) ou reconhecer compras não consumíveis/assinaturas conforme o tipo. A confirmação precisa ocorrer dentro do prazo de três dias para evitar reembolso automático e revogação.
+- Sincronizar mudanças, cancelamentos e compras anuladas com notificações do Google Play e consulta server-side. Não confiar apenas no retorno do navegador.
+- Se o Play Billing não estiver disponível na edição Play, bloquear a compra e informar indisponibilidade; não fazer fallback automático para Pix, Mercado Pago, WhatsApp ou checkout web. O checkout web fica separado da versão distribuída pela Play.
 
 Fontes oficiais:
+- [Play Billing em Trusted Web Activities (Chrome for Developers)](https://developer.chrome.com/docs/android/trusted-web-activity/receive-payments-play-billing?hl=pt-br)
+- [Integração do Google Play Billing com o servidor](https://developer.android.com/google/play/billing/backend?hl=pt-br)
 - [Política de pagamentos do Google Play](https://support.google.com/googleplay/android-developer/answer/10281818?hl=pt-br)
 - [Elegibilidade do User Choice Billing](https://support.google.com/googleplay/android-developer/answer/12570971?hl=pt-br)
+- [Programa atual de escolha de faturamento e mercados elegíveis](https://support.google.com/googleplay/android-developer/answer/17161464?hl=pt-br)
 
 ## 8. Limpeza de código já realizada na PR #128
 
@@ -175,7 +180,9 @@ A página de equipamentos agora exibe a coleção com retratos SVG same-origin, 
 
 Os valores de atributo da ficha não multiplicam novamente os atributos-base pela raridade. O crescimento por nível e estrelas é aplicado uma única vez. Além disso, cada herói possui passivos server-side progressivos (ataque, defesa, vida e crítico), limitados por perfil e sujeitos aos tetos globais de combate. Os passivos entram nos encontros PvE e no Anjo da Morte; não declarar integração PvP até sua validação.
 
-A tela também expõe as taxas reais do sorteio padrão: 70% comum, 25% raro e 5% lendário; o elenco atual resulta em 17,5% por herói comum, 5% por herói raro e 1,25% por herói lendário. O jogador pode convocar um herói por 100 gemas ou dez por 900; duplicatas viram fragmentos. A ação continua autenticada e o Worker/D1 permanece responsável por debitar gemas, sortear raridade e conceder fragmentos/heróis. Não existe garantia de lendário por quantidade fixa de tentativas.
+A tela também expõe as taxas reais do sorteio padrão: 70% comum, 25% raro e 5% lendário; o elenco atual resulta em 17,5% por herói comum, 5% por herói raro e 1,25% por herói lendário. Para o pacote de dez, a chance acumulada de pelo menos um lendário é 40,13%; para um lendário específico, 11,82%. O jogador pode convocar um herói por 100 gemas ou dez por 900; duplicatas viram fragmentos. A ação continua autenticada e o Worker/D1 permanece responsável por debitar gemas, sortear raridade e conceder fragmentos/heróis. Não existe garantia de lendário por quantidade fixa de tentativas.
+
+**Limite funcional confirmado na auditoria:** `skill`, `skill_description` e `skill_power` estão no catálogo e na ficha visual, mas não são consumidos pelo motor de batalha em `game-adapter.js`. O que já entra nos cálculos PvE e no Anjo da Morte são os passivos server-side de ataque, defesa, vida e crítico. Portanto, não apresentar as habilidades ativas como efeitos de combate funcionais até implementar sua resolução no servidor, regras de ativação/cooldown e testes de equilíbrio.
 
 ## 10. Sequência de liberação
 
