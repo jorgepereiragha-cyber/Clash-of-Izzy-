@@ -50,6 +50,11 @@ function makeHeroState() {
     equipment: [item],
     heroes: [hero],
     heroInventory: [heroCard],
+    heroSummonOdds: [
+      { rarity: "white", chancePercent: 70, heroCount: 4, perHeroPercent: 17.5 },
+      { rarity: "blue", chancePercent: 25, heroCount: 5, perHeroPercent: 5 },
+      { rarity: "purple", chancePercent: 5, heroCount: 4, perHeroPercent: 1.25 },
+    ],
     heroEquipment: [],
     equipmentCatalog: [],
     equipmentResearch: [],
