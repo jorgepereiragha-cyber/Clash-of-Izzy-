@@ -74,3 +74,10 @@
 O catálogo `assets/art/events/` contém sete ilustrações SVG vetoriais originais para os cards da central de eventos. Foram desenhadas para renderização rápida no Android, sem dependência de CDN, fontes remotas ou imagens raster de grande resolução. Cada arquivo possui título/descrição acessíveis e usa a paleta medieval azul-real, dourado e sombras profundas. As imagens de Shiva e Khali são simbólicas e respeitosas; não reproduzem imagens religiosas existentes.
 
 As artes representam a identidade visual planejada, não comprovam a implementação dos respectivos combates. O estado funcional continua sendo definido pelo Worker: Anjo da Morte é jogável; Valhalla depende da configuração sazonal; os outros cinco aparecem como experiências em preparação com recompensas explicitamente classificadas como prévias.
+
+
+## Retratos do elenco de heróis
+
+`assets/art/heroes/portraits.svg` contém retratos vetoriais originais e leves para o elenco inicial e os heróis sazonais. O sprite é servido no mesmo domínio e pré-carregado pelo Service Worker v40; os cartões usam fragmentos SVG por herói, sem CDN ou imagens externas. Heróis sem arte individual usam um retrato de arquétipo (guarda, arqueiro, cavaleiro, suporte, comandante ou mago), evitando cartões vazios.
+
+Os atributos de apresentação vêm do catálogo canônico `hero-catalog.js` e, para heróis sazonais, do catálogo D1 de Valhalla. A fórmula aplica o crescimento de nível e estrela uma única vez; os valores-base de cada raridade não recebem um segundo multiplicador de raridade. Essa alteração corrige a ficha visual e não altera saldos, fragmentos, níveis, estrelas nem os modificadores do simulador de combate.
