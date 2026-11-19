@@ -279,6 +279,18 @@
       const empty=document.createElement("p");
       empty.textContent="Probabilidades indisponíveis; tente sincronizar novamente.";
       root.append(empty);
+      return;
+    }
+    const legendary=rows.find(row=>row.rarity==="purple");
+    const rarityChance=Number(legendary?.chancePercent);
+    const perHeroChance=Number(legendary?.perHeroPercent);
+    if(Number.isFinite(rarityChance)&&Number.isFinite(perHeroChance)&&rarityChance>0&&perHeroChance>0){
+      const chanceInTen=percent=>100*(1-Math.pow(1-Math.max(0,Math.min(100,percent))/100,10));
+      const formatPercent=value=>value.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+      const note=document.createElement("p");
+      note.className="hero-summon-intro";
+      note.textContent="Pacote de 10 convocações independentes: "+formatPercent(chanceInTen(rarityChance))+"% para obter ao menos 1 Lendário; "+formatPercent(chanceInTen(perHeroChance))+"% para obter um Lendário específico. Não há garantia.";
+      root.append(note);
     }
   }
   function renderSummonControls(){
