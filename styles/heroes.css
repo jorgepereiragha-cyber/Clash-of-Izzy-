@@ -1,0 +1,21 @@
+.hero-roster-section{margin:18px 0 24px;padding:16px;border:1px solid #8b6b39;border-radius:14px;background:linear-gradient(145deg,#1b3046,#0e1927);color:#f5edda}
+.hero-roster-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.hero-roster-header h2{margin:0;color:#f1d18d;font-size:clamp(18px,4vw,23px)}
+.hero-roster-count{color:#c7d2df;font-size:12px;font-weight:700}
+.hero-roster-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:10px}
+.hero-roster-card{display:grid;grid-template-columns:82px minmax(0,1fr);gap:12px;min-width:0;padding:10px;border:1px solid #52677d;border-radius:11px;background:linear-gradient(150deg,#263d54,#142438)}
+.hero-roster-card.is-selected{border-color:#e7c16f;box-shadow:inset 0 0 0 1px #e7c16f55}
+.hero-roster-portrait{display:block;width:82px;aspect-ratio:2/3;overflow:hidden;border-radius:8px;background:#0b1726;border:1px solid #b58b4c}
+.hero-roster-portrait svg{display:block;width:100%;height:100%}
+.hero-roster-copy{min-width:0;display:flex;flex-direction:column;gap:4px}
+.hero-roster-name{margin:0;color:#fff0c8;font-size:15px;line-height:1.2;overflow-wrap:anywhere}
+.hero-roster-title{margin:0;color:#c8d3df;font-size:11px;line-height:1.3}
+.hero-roster-meta{display:flex;flex-wrap:wrap;gap:5px;align-items:center;color:#f2cf8c;font-size:11px;font-weight:800}
+.hero-roster-stars{letter-spacing:1px;color:#ffd879}
+.hero-roster-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 8px;margin:4px 0;color:#e2e8ef;font-size:11px}
+.hero-roster-skill{margin:2px 0;color:#bdc9d6;font-size:11px;line-height:1.35}
+.hero-roster-skill strong{color:#b9d7f0}
+.hero-roster-fragments{margin:0;color:#c7d2df;font-size:10px}
+.hero-roster-select{grid-column:1/-1;min-height:44px;margin-top:3px;border:1px solid #d2aa63;border-radius:8px;background:#604523;color:#fff0cf;font-weight:800}
+.hero-roster-select:disabled{opacity:.55}
+@media(max-width:420px){.hero-roster-section{padding:11px}.hero-roster-grid{grid-template-columns:1fr}.hero-roster-card{grid-template-columns:76px minmax(0,1fr)}.hero-roster-portrait{width:76px}}
