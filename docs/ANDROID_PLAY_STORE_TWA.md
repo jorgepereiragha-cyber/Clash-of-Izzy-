@@ -145,6 +145,7 @@ Foram removidos somente arquivos identificados como protótipo legado ou sem con
 - `packages.js`: catálogo estático antigo com preços/conteúdo desatualizados e abertura direta de WhatsApp; não era carregado pelas páginas atuais.
 - `scripts/post-processing.js`: pipeline opcional sem consumidor ativo na renderização atual. Bloom/FXAA/Nordic Grade não devem ser anunciados como efeitos ativos.
 - `icons/premium-icons.svg`: sprite SVG de símbolos de recursos sem consumidor encontrado nas páginas e módulos de interface revisados; a referência operacional encontrada era apenas o pré-cache. O arquivo foi removido e a entrada saiu do shell, agora `clash-of-izzy-shell-v39`.
+- Módulos exclusivos do Worker (`angel-death-event.js`, `api-rate-limit.js`, `battle-replay.js`, `email-system.js`, `kingdom-queue-rules.js`, `mercadopago-orders.js`, `pets.js`, `player-accounts.js`, `rally.js`, `search-ranking.js`, `shared-world-coordinates.js` e módulos server-side de Valhalla) continuam no Git e no bundle do Worker, mas foram excluídos dos assets estáticos pelo `.assetsignore`. Isso reduz os arquivos publicados e evita expor endpoints de arquivo desnecessários; não remove módulos necessários do backend.
 - `splash-screen.html`: arquivo sem rota, link ou consumidor; não era o ponto de entrada da PWA. O splash de instalação da PWA e o splash da TWA devem ser tratados pelas configurações próprias de cada distribuição.
 
 Foram mantidos:
