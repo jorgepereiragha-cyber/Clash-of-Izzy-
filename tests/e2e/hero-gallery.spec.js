@@ -1,0 +1,134 @@
+import { test, expect } from "@playwright/test";
+
+const TOKEN = "playwright-hero-fixture-token";
+
+function makeHeroState() {
+  const item = {
+    id: "iron_sword",
+    name: "Lâmina de Ferro",
+    slot: "weapon",
+    level: 1,
+    maxLevel: 10,
+    rarity: "comum",
+    stats: { attack: 10, defense: 0, health: 0, resourceBonus: 0, critical: 0, march: 0 },
+    nextLevelStats: { attack: 12, defense: 0, health: 0, resourceBonus: 0, critical: 0, march: 0 },
+    upgradeCost: 120,
+    isLocked: false,
+    equippedHeroId: 101,
+  };
+  const hero = {
+    id: 101,
+    hero_key: "kael_sunwarden",
+    hero_name: "Kael",
+    level: 1,
+    experience: 0,
+    rarity: "rare",
+  };
+  const heroCard = {
+    hero_key: "kael_sunwarden",
+    name: "Kael",
+    title: "Guardião do Sol",
+    rarity: "blue",
+    rarity_label: "Azul · Raro",
+    level: 1,
+    max_level: 50,
+    stars: 1,
+    max_stars: 6,
+    fragments: 0,
+    fragments_to_next: 10,
+    stats: { hp: 1400, attack: 250, defense: 180, speed: 64 },
+    combat_bonuses: { attackPercent: 0.99, defensePercent: 0.77, healthPercent: 0.45, criticalChancePercent: 0.07 },
+    skill: "Lâmina Solar",
+    skill_description: "Golpe de luz que fortalece a linha de frente",
+    skill_power: 2.1,
+    portrait_symbol: "kael",
+    portrait_alt: "Kael — Guardião do Sol",
+  };
+  return {
+    player: { player_id: "hero-e2e-player", name: "QA", nickname: "QA", gems: 1000 },
+    kingdom: { id: 101, kingdom_name: "Eldoria QA", gold: 5000, iron: 1500, castle_level: 3 },
+    equipment: [item],
+    heroes: [hero],
+    heroInventory: [heroCard],
+    heroEquipment: [],
+    equipmentCatalog: [],
+    equipmentResearch: [],
+    equipmentProgression: [],
+    cosmetics: { skins: {}, owned: [], collections: [], claimed: [], shards: 0 },
+    castleSkins: [],
+    inventoryItems: [],
+    buildings: [{ building_type: "academy", level: 1 }],
+    pets: [],
+    petGold: 0,
+    petBonuses: {},
+    shop: {},
+  };
+}
+
+test("equipment page shows hero portraits, combat passives and exact summon rates", async ({ page, request }) => {
+  const actions = [];
+  let state = makeHeroState();
+
+  await page.addInitScript(token => {
+    window.localStorage.setItem("coi_game_token", token);
+  }, TOKEN);
+
+  await page.route("**/api/game/state", async route => {
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({ state }),
+    });
+  });
+
+  await page.route("**/api/game/action", async route => {
+    const action = route.request().postDataJSON();
+    actions.push(action);
+    state = {
+      ...state,
+      player: { ...state.player, gems: 900 },
+      heroInventory: [
+        ...state.heroInventory,
+        {
+          ...state.heroInventory[0],
+          hero_key: "thor_ragnarok",
+          name: "Thor",
+          title: "Senhor da Tempestade",
+          portrait_symbol: "thor",
+        },
+      ],
+    };
+    await route.fulfill({
+      status: 200,
+      contentType: "application/json",
+      body: JSON.stringify({
+        success: true,
+        state,
+        battle: {
+          summons: [{ hero_key: "thor_ragnarok", name: "Thor", rarity: "blue", result_type: "new", fragments: 0 }],
+          cost: 100,
+        },
+      }),
+    });
+  });
+
+  const spriteResponse = await request.get("/assets/art/heroes/portraits.svg");
+  expect(spriteResponse.ok()).toBe(true);
+
+  await page.goto("/equipment-ui.html");
+  await expect(page.locator(".hero-roster-card")).toHaveCount(1);
+  await expect(page.locator(".hero-roster-name")).toHaveText("Kael");
+  await expect(page.locator(".hero-roster-portrait use")).toHaveAttribute("href", /portraits\.svg#kael$/);
+  await expect(page.locator(".hero-roster-combat")).toContainText("ATQ +1.0%");
+  await expect(page.locator(".hero-summon-rates")).toContainText("17,5% por herói");
+  await expect(page.locator(".hero-summon-rates")).toContainText("1,25% por herói");
+  await expect(page.locator("#hero-summon-one")).toBeEnabled();
+  await expect(page.locator("#hero-summon-ten")).toBeEnabled();
+
+  await page.locator("#hero-summon-one").click();
+  await expect(page.locator("#hero-summon-status")).toContainText("1 herói(s) novo(s)");
+  await expect(page.locator("#hero-gem-balance")).toHaveText("Gemas: 900");
+  await expect(page.locator(".hero-roster-card")).toHaveCount(2);
+  await expect(page.locator(".hero-summon-result")).toContainText("Thor");
+  expect(actions).toEqual([{ type: "hero_summon", quantity: 1 }]);
+});
