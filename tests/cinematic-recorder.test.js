@@ -242,7 +242,7 @@ test("recorder uses the renderer API instead of an assumed window.map3d global",
 });
 
 test("PWA and shared styles include the recorder resources", () => {
-  assert.match(serviceWorker, /clash-of-izzy-shell-v38/);
+  assert.match(serviceWorker, /clash-of-izzy-shell-v39/);
   for (const path of [
     "/scripts/cinematic/capture-system.js",
     "/scripts/cinematic/media-recorder-support.js",
