@@ -12,6 +12,24 @@
 </head>
 <body style="background:#0f0f1e;padding:10px">
   <main class="mobile-equipment-container">
+    <section class="hero-summon-section" aria-labelledby="hero-summon-title">
+      <header class="hero-roster-header">
+        <h2 id="hero-summon-title">Convocar Heróis</h2>
+        <span id="hero-gem-balance" class="hero-roster-count">Gemas: —</span>
+      </header>
+      <p class="hero-summon-intro">Cada convocação usa o sorteio do servidor. Heróis repetidos são convertidos em fragmentos para evolução.</p>
+      <div class="hero-summon-rates" aria-label="Probabilidades de convocação">
+        <div><strong>Comum · 70%</strong><span>4 heróis · 17,5% por herói</span></div>
+        <div><strong>Raro · 25%</strong><span>5 heróis · 5% por herói</span></div>
+        <div><strong>Lendário · 5%</strong><span>4 heróis · 1,25% por herói</span></div>
+      </div>
+      <div class="hero-summon-actions">
+        <button id="hero-summon-one" type="button">Convocar 1 · 100 gemas</button>
+        <button id="hero-summon-ten" type="button">Convocar 10 · 900 gemas</button>
+      </div>
+      <p id="hero-summon-status" class="hero-summon-status" role="status" aria-live="polite">Não há garantia de lendário em uma quantidade fixa de convocações. Heróis sazonais de Valhalla não fazem parte deste sorteio.</p>
+      <div id="hero-summon-results" class="hero-summon-results" aria-live="polite"></div>
+    </section>
     <section class="hero-roster-section" aria-labelledby="hero-roster-title">
       <header class="hero-roster-header">
         <h2 id="hero-roster-title">Heróis do Reino</h2>
