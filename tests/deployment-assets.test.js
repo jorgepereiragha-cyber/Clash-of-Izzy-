@@ -32,7 +32,7 @@ test("Worker-only modules stay in the Worker bundle and out of public static ass
 
   for (const path of workerOnlyModules) {
     assert.ok(worker.includes("./" + path), "Worker import missing: " + path);
-    assert.ok(ignore.split("\\n").some(line => line.trim() === path),
+    assert.ok(ignore.split("\n").some(line => line.trim() === path),
       "Worker-only module must not be a public asset: " + path);
   }
 });
