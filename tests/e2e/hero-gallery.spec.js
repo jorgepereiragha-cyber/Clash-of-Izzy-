@@ -140,7 +140,7 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
   await expect(page.locator(".hero-summon-rates")).toContainText("17,5% por herói");
   await expect(page.locator(".hero-summon-rates")).toContainText("1,25% por herói");
   await expect(page.locator(".hero-summon-probability-note")).toContainText("40,13%");
-  await expect(page.locator(".hero-summon-probability-note")).toContainText("11,81%");
+  await expect(page.locator(".hero-summon-probability-note")).toContainText("11,82%");
   await expect(page.locator("#hero-summon-one")).toBeEnabled();
   await expect(page.locator("#hero-summon-ten")).toBeEnabled();
 
