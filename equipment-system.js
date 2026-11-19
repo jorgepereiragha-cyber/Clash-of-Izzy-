@@ -1,7 +1,7 @@
 // Equipamentos persistentes: inventário e loadout são validados pelo Worker.
 (() => {
   const API="/api";
-  let token=null,state=null,selected="iron_sword",selectedHeroId=null,busy=false,searchFocusApplied=false;
+  let token=null,state=null,selected="iron_sword",selectedHeroId=null,busy=false,searchFocusApplied=false,lastSummonResults=[];
   const requestedSkinSearch=new URLSearchParams(location.search).get("search")||"";
   const normalizeSearch=value=>String(value||"").normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR");
   const $=id=>document.getElementById(id);
@@ -253,6 +253,33 @@
       root.append(card);
     }
   }
+  function renderSummonControls(){
+    const gems=$("hero-gem-balance"),one=$("hero-summon-one"),ten=$("hero-summon-ten");
+    const balance=Math.max(0,Number(state?.player?.gems)||0);
+    if(gems)gems.textContent="Gemas: "+fmt(balance);
+    if(one)one.disabled=busy||balance<100;
+    if(ten)ten.disabled=busy||balance<900;
+  }
+  function renderSummonResults(){
+    const root=$("hero-summon-results");
+    if(!root)return;
+    root.replaceChildren();
+    if(!lastSummonResults.length)return;
+    for(const summon of lastSummonResults){
+      const card=document.createElement("div");
+      card.className="hero-summon-result";
+      const name=document.createElement("strong");
+      name.textContent=summon.name||summon.hero_key||"Herói";
+      const rarity=document.createElement("span");
+      rarity.textContent=({white:"Comum",blue:"Raro",purple:"Lendário"})[summon.rarity]||summon.rarity||"Herói";
+      const outcome=document.createElement("small");
+      outcome.textContent=summon.result_type==="duplicate"
+        ? "Duplicado · +"+Number(summon.fragments||0)+" fragmentos"
+        : "Novo herói recrutado";
+      card.append(name,rarity,outcome);
+      root.append(card);
+    }
+  }
   function render(){
     const container=document.querySelector(".mobile-equipment-container");
     const equipment=Array.isArray(state?.equipment)?state.equipment:[];
@@ -288,6 +315,8 @@
     heroPicker.disabled=busy||!heroes.length;
     const selectedHero=heroes.find(hero=>Number(hero.id)===selectedHeroId);
     renderHeroGallery();
+    renderSummonControls();
+    renderSummonResults();
     $("item-name").textContent=item.name;
     $("current-level").textContent=item.level;
     $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";
@@ -319,8 +348,25 @@
   }
   async function perform(action,success){
     if(busy)return;busy=true;render();
-    try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(action)});state=result.state;setStatus(success);}
-    catch(error){setStatus(error.message,true);try{await refresh()}catch{}}
+    try{
+      const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(action)});
+      state=result.state;
+      if(action.type==="hero_summon"){
+        lastSummonResults=Array.isArray(result.battle?.summons)?result.battle.summons:[];
+        const status=$("hero-summon-status");
+        if(status){
+          const newCount=lastSummonResults.filter(item=>item.result_type==="new").length;
+          const duplicateCount=lastSummonResults.length-newCount;
+          status.textContent="Convocação concluída: "+newCount+" herói(s) novo(s) e "+duplicateCount+" duplicado(s).";
+        }
+      }else setStatus(success);
+    }
+    catch(error){
+      if(action.type==="hero_summon"){
+        const status=$("hero-summon-status");if(status)status.textContent=error.message;
+      }else setStatus(error.message,true);
+      try{await refresh()}catch{}
+    }
     finally{busy=false;render();}
   }
   window.upgradeEquipment=()=>perform({type:"equipment_upgrade",itemId:selected},"Equipamento evoluído e salvo no servidor.");
@@ -338,6 +384,8 @@
     $("equip-btn").addEventListener("click",()=>window.equipEquipment());
     $("unequip-btn").addEventListener("click",()=>window.unequipEquipment());
     $("claim-norse-collection").addEventListener("click",()=>window.claimNorseCollection());
+    $("hero-summon-one").addEventListener("click",()=>perform({type:"hero_summon",quantity:1},"Convocação realizada."));
+    $("hero-summon-ten").addEventListener("click",()=>perform({type:"hero_summon",quantity:10},"Convocação realizada."));
     refresh().catch(error=>setStatus(error.message,true));
   });
 })();
