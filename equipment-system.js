@@ -162,6 +162,97 @@
     claim.disabled=busy||!complete||claimed;
     claim.textContent=claimed?"RECOMPENSA RESGATADA":complete?"RESGATAR COLEÇÃO · +5.000 GEMAS / 200 FRAGMENTOS":"COLEÇÃO "+skins.filter(([id])=>owned.has(id)).length+"/6";
   }
+  function renderHeroGallery(){
+    const root=$("hero-roster-grid"),count=$("hero-roster-count");
+    if(!root)return;
+    const roster=Array.isArray(state?.heroInventory)?state.heroInventory:[];
+    const owned=Array.isArray(state?.heroes)?state.heroes:[];
+    if(count)count.textContent=roster.length+" herói(s) no inventário";
+    root.replaceChildren();
+    if(!roster.length){
+      const empty=document.createElement("p");
+      empty.textContent="Nenhum herói encontrado. A coleção será exibida aqui depois da primeira convocação.";
+      root.append(empty);
+      return;
+    }
+    const statLabels={hp:"Vida",attack:"Ataque",defense:"Defesa",speed:"Velocidade"};
+    for(const hero of roster){
+      const boundHero=owned.find(row=>row.hero_key===hero.hero_key);
+      const heroId=Number(boundHero?.id)||null;
+      const selected=Boolean(heroId&&heroId===selectedHeroId);
+      const card=document.createElement("article");
+      card.className="hero-roster-card"+(selected?" is-selected":"");
+      const portrait=document.createElementNS("http://www.w3.org/2000/svg","svg");
+      portrait.setAttribute("class","hero-roster-portrait");
+      portrait.setAttribute("viewBox","0 0 320 480");
+      portrait.setAttribute("role","img");
+      portrait.setAttribute("aria-label",hero.portrait_alt||hero.name||"Retrato de herói");
+      const use=document.createElementNS("http://www.w3.org/2000/svg","use");
+      use.setAttribute("href","/assets/art/heroes/portraits.svg#"+String(hero.portrait_symbol||"commander"));
+      use.setAttribute("width","320");
+      use.setAttribute("height","480");
+      portrait.append(use);
+
+      const copy=document.createElement("div");
+      copy.className="hero-roster-copy";
+      const name=document.createElement("h3");
+      name.className="hero-roster-name";
+      name.textContent=hero.name||hero.hero_key||"Herói";
+      const title=document.createElement("p");
+      title.className="hero-roster-title";
+      title.textContent=hero.title||"Campeão de Eldoria";
+      const meta=document.createElement("div");
+      meta.className="hero-roster-meta";
+      const level=document.createElement("span");
+      level.textContent="Nv. "+Number(hero.level||1)+"/"+Number(hero.max_level||1);
+      const rarity=document.createElement("span");
+      rarity.textContent=hero.rarity_label||"Comum";
+      const stars=document.createElement("span");
+      stars.className="hero-roster-stars";
+      stars.textContent="★".repeat(Math.max(1,Number(hero.stars)||1))+"☆".repeat(Math.max(0,Number(hero.max_stars||1)-Number(hero.stars||1)));
+      stars.setAttribute("aria-label",Number(hero.stars||1)+" de "+Number(hero.max_stars||1)+" estrelas");
+      meta.append(level,rarity,stars);
+
+      const stats=document.createElement("div");
+      stats.className="hero-roster-stats";
+      for(const [key,label] of Object.entries(statLabels)){
+        const value=Number(hero.stats?.[key]);
+        if(!Number.isFinite(value))continue;
+        const line=document.createElement("span");
+        line.textContent=label+": "+Math.floor(value).toLocaleString("pt-BR");
+        stats.append(line);
+      }
+      const skill=document.createElement("p");
+      skill.className="hero-roster-skill";
+      const skillName=document.createElement("strong");
+      skillName.textContent=(hero.skill||"Talento")+" · ";
+      const skillDesc=document.createTextNode(hero.skill_description||"Habilidade do herói");
+      skill.append(skillName,skillDesc);
+      const fragments=document.createElement("p");
+      fragments.className="hero-roster-fragments";
+      fragments.textContent="Fragmentos: "+Number(hero.fragments||0).toLocaleString("pt-BR")+
+        (hero.fragments_to_next?" · Próxima estrela: "+hero.fragments_to_next:" · Estrelas máximas");
+      copy.append(name,title,meta,stats,skill,fragments);
+
+      const button=document.createElement("button");
+      button.type="button";
+      button.className="hero-roster-select";
+      button.textContent=selected?"Selecionado para equipamento":"Usar para equipar";
+      button.disabled=!heroId||busy||selected;
+      button.setAttribute("aria-pressed",String(selected));
+      button.addEventListener("click",()=>{
+        if(!heroId)return;
+        selectedHeroId=heroId;
+        const picker=$("hero-select");
+        if(picker)picker.value=String(heroId);
+        render();
+      });
+      const details=document.createElement("div");
+      details.append(copy,button);
+      card.append(portrait,details);
+      root.append(card);
+    }
+  }
   function render(){
     const container=document.querySelector(".mobile-equipment-container");
     const equipment=Array.isArray(state?.equipment)?state.equipment:[];
@@ -196,6 +287,7 @@
     }
     heroPicker.disabled=busy||!heroes.length;
     const selectedHero=heroes.find(hero=>Number(hero.id)===selectedHeroId);
+    renderHeroGallery();
     $("item-name").textContent=item.name;
     $("current-level").textContent=item.level;
     $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";
