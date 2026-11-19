@@ -96,10 +96,22 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
         ...state.heroInventory,
         {
           ...state.heroInventory[0],
-          hero_key: "thor_ragnarok",
-          name: "Thor",
-          title: "Senhor da Tempestade",
-          portrait_symbol: "thor",
+          hero_key: "merlin_arquimago",
+          name: "Merlin",
+          title: "O Arquimago Supremo",
+          rarity: "purple",
+          rarity_label: "Roxo · Lendário",
+          level: 1,
+          max_level: 70,
+          stars: 1,
+          max_stars: 7,
+          stats: { hp: 2800, attack: 650, defense: 250, speed: 65 },
+          combat_bonuses: { attackPercent: 0.99, defensePercent: 0.23, healthPercent: 0.23, criticalChancePercent: 0.45 },
+          skill: "Meteoro Ancestral",
+          skill_description: "Invoca destruição dos céus",
+          skill_power: 5,
+          portrait_symbol: "mage",
+          portrait_alt: "Merlin — O Arquimago Supremo",
         },
       ],
     };
@@ -110,7 +122,7 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
         success: true,
         state,
         battle: {
-          summons: [{ hero_key: "thor_ragnarok", name: "Thor", rarity: "blue", result_type: "new", fragments: 0 }],
+          summons: [{ hero_key: "merlin_arquimago", name: "Merlin", rarity: "purple", result_type: "new", fragments: 0 }],
           cost: 100,
         },
       }),
@@ -127,6 +139,8 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
   await expect(page.locator(".hero-roster-combat")).toContainText("ATQ +1.0%");
   await expect(page.locator(".hero-summon-rates")).toContainText("17,5% por herói");
   await expect(page.locator(".hero-summon-rates")).toContainText("1,25% por herói");
+  await expect(page.locator(".hero-summon-probability-note")).toContainText("40,13%");
+  await expect(page.locator(".hero-summon-probability-note")).toContainText("11,81%");
   await expect(page.locator("#hero-summon-one")).toBeEnabled();
   await expect(page.locator("#hero-summon-ten")).toBeEnabled();
 
@@ -134,6 +148,7 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
   await expect(page.locator("#hero-summon-status")).toContainText("1 herói(s) novo(s)");
   await expect(page.locator("#hero-gem-balance")).toHaveText("Gemas: 900");
   await expect(page.locator(".hero-roster-card")).toHaveCount(2);
-  await expect(page.locator(".hero-summon-result")).toContainText("Thor");
+  await expect(page.locator(".hero-summon-result")).toContainText("Merlin");
+  await expect(page.locator(".hero-roster-card").nth(1).locator(".hero-roster-portrait use")).toHaveAttribute("href", /portraits\\.svg#mage$/);
   expect(actions).toEqual([{ type: "hero_summon", quantity: 1 }]);
 });
