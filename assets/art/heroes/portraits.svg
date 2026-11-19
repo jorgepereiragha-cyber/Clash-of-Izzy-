@@ -177,4 +177,79 @@
     <path d="M83 360 160 318 237 360 222 480H98Z" fill="#402e2b"/>
     <path d="M126 362 160 343 194 362 184 410 160 426 136 410Z" fill="#b78744"/>
   </symbol>
+
+  <symbol id="master-archer" viewBox="0 0 320 480">
+    <rect width="320" height="480" fill="#102b2b"/><circle cx="160" cy="146" r="154" fill="url(#green)" opacity=".72"/>
+    <path d="M0 284 48 210 91 257 154 157 222 253 279 190 320 278V480H0Z" fill="#174337"/>
+    <path d="M22 480Q32 359 108 319L160 294 214 320Q287 359 298 480Z" fill="#244d3b" stroke="#c29b59" stroke-width="9"/>
+    <path d="M91 480 115 364 160 326 205 365 230 480Z" fill="#193d35" stroke="#77aa79" stroke-width="5"/>
+    <path d="M120 215Q116 139 160 126Q207 138 209 215L198 292 160 326 122 292Z" fill="url(#skin)"/>
+    <path d="M99 207Q80 111 151 79Q228 82 224 208L202 176 183 128 145 120 116 166Z" fill="#4d3526"/>
+    <path d="M91 155Q70 78 120 47L160 29 204 48Q249 82 228 170L205 135 187 97 160 112 128 99 110 144Z" fill="#193d35" stroke="#c6a56a" stroke-width="8"/>
+    <path d="M112 224 151 231M173 231 207 222" fill="none" stroke="#35261e" stroke-width="8" stroke-linecap="round"/>
+    <path d="M149 262 162 279 177 260" fill="none" stroke="#9b5844" stroke-width="5"/>
+    <path d="M111 351 160 325 209 351 227 480H93Z" fill="#163c36"/>
+    <path d="M117 360 160 340 203 360 188 420 160 438 132 420Z" fill="#b78f4e" stroke="#e8d59d" stroke-width="6"/>
+    <path d="M254 104Q307 235 256 373" fill="none" stroke="#d9b36d" stroke-width="12" stroke-linecap="round"/>
+    <path d="M263 110Q293 235 263 366" fill="none" stroke="#e5e7cb" stroke-width="3"/>
+    <path d="M251 236 281 205 279 230 300 241 276 248 261 272Z" fill="#e8d8aa" stroke="#a77e43" stroke-width="4"/>
+    <path d="M236 185 252 168 250 190 266 201 246 204Z" fill="#c9a45d"/>
+    <path d="M79 315 42 255 57 246 99 300" fill="none" stroke="#d2b16c" stroke-width="8"/>
+    <circle cx="160" cy="377" r="22" fill="#17382f" stroke="#e4c17c" stroke-width="6"/>
+    <path d="M160 360 168 377 160 394 152 377Z" fill="#d8e9ba"/>
+  </symbol>
+
+  <symbol id="dragon-knight" viewBox="0 0 320 480">
+    <rect width="320" height="480" fill="#291a22"/><circle cx="160" cy="145" r="155" fill="#b54c2d" opacity=".22"/>
+    <path d="M0 480 30 250 90 288 160 173 231 287 290 245 320 480Z" fill="#542d2b"/>
+    <path d="M25 480Q32 354 105 320L160 295 216 320Q288 360 295 480Z" fill="#344354" stroke="#c08b4e" stroke-width="10"/>
+    <path d="M56 480 93 363 160 325 228 363 265 480Z" fill="#6d302b" stroke="#d29a4e" stroke-width="7"/>
+    <path d="M120 210Q118 145 160 130Q205 143 207 211L194 284 160 317 126 285Z" fill="url(#skin)"/>
+    <path d="M105 206 106 126 130 86 158 103 188 82 215 126 216 209 192 177 160 164 128 179Z" fill="#273747" stroke="#c7a05e" stroke-width="8"/>
+    <path d="M111 151Q79 94 91 48Q130 68 143 106M207 151Q242 91 230 48Q190 68 178 106" fill="#8c3b2d" stroke="#d09c59" stroke-width="9"/>
+    <path d="M124 216 151 222M170 222 198 215" stroke="#f1c27a" stroke-width="8" stroke-linecap="round"/>
+    <path d="M132 255Q160 267 188 254L184 294 160 313 137 294Z" fill="#71382e"/>
+    <path d="M93 345 160 310 228 345 240 480H80Z" fill="#26384a" stroke="#bb894e" stroke-width="8"/>
+    <path d="M160 340 196 376 160 430 124 376Z" fill="#a63f2d" stroke="#e5b36b" stroke-width="7"/>
+    <path d="M160 351 176 376 160 402 144 376Z" fill="#f2d18b"/>
+    <path d="M92 379 121 350 139 376 111 408M228 379 199 350 181 376 209 408" fill="none" stroke="#c6a064" stroke-width="8"/>
+    <path d="M48 480 70 401 100 420 91 480M272 480 250 401 220 420 229 480Z" fill="#8d392d"/>
+  </symbol>
+
+  <symbol id="moon-priestess" viewBox="0 0 320 480">
+    <rect width="320" height="480" fill="#1b2140"/><circle cx="160" cy="145" r="157" fill="url(#moon)"/>
+    <path d="M0 480Q31 355 108 322L160 298 214 322Q286 361 300 480Z" fill="#59517c" stroke="#d7c7e6" stroke-width="9"/>
+    <path d="M85 480 111 355 160 325 211 355 237 480Z" fill="#302e59"/>
+    <path d="M118 211Q116 130 160 119Q207 129 210 211L197 291 160 325 124 290Z" fill="url(#skin)"/>
+    <path d="M99 218Q75 113 135 69Q195 43 228 129L221 231 198 196 188 116 151 100 121 151Z" fill="#d4dce7"/>
+    <path d="M112 221Q102 287 78 354L95 380 128 290M207 219Q220 291 245 353L224 382 193 291" fill="none" stroke="#cbd5e6" stroke-width="15"/>
+    <path d="M91 148 117 62 160 24 204 62 229 148 198 125 160 111 121 127Z" fill="#37446c" stroke="#e5d5a0" stroke-width="8"/>
+    <path d="M132 75Q160 18 188 75Q160 61 132 75Z" fill="none" stroke="#f4e6b7" stroke-width="9"/>
+    <path d="M120 225 151 231M171 231 201 224" stroke="#4a3b4b" stroke-width="7" stroke-linecap="round"/>
+    <path d="M148 261 160 276 173 261" fill="none" stroke="#a15b59" stroke-width="5"/>
+    <path d="M119 352 160 327 201 352 220 480H100Z" fill="#474477" stroke="#a9b9d4" stroke-width="5"/>
+    <path d="M160 342 181 374 160 414 139 374Z" fill="#d5eaff" stroke="#f1dfad" stroke-width="6"/>
+    <path d="M43 170 43 407" stroke="#bda5d7" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="43" cy="151" r="27" fill="#a9d6f5" stroke="#f5e6b8" stroke-width="7"/>
+    <path d="M43 125Q76 145 45 178Q20 180 15 152" fill="none" stroke="#f6e7bd" stroke-width="7"/>
+  </symbol>
+
+  <symbol id="arthur" viewBox="0 0 320 480">
+    <rect width="320" height="480" fill="#15263b"/><circle cx="160" cy="145" r="155" fill="url(#sun)"/>
+    <path d="M0 480 35 251 98 290 160 165 225 292 285 246 320 480Z" fill="#233e59"/>
+    <path d="M23 480Q35 354 109 318L160 296 214 319Q286 358 297 480Z" fill="#254b70" stroke="#e1bd73" stroke-width="10"/>
+    <path d="M91 480 117 365 160 324 204 365 229 480Z" fill="#172c46"/>
+    <path d="M118 212Q116 137 160 124Q207 137 208 213L196 283 160 317 124 283Z" fill="url(#skin)"/>
+    <path d="M99 201Q83 103 157 79Q232 91 221 201L198 166 183 124 149 116 119 158Z" fill="#4a3024"/>
+    <path d="M122 250Q160 270 199 249L191 294 160 318 130 293Z" fill="#563a2d"/>
+    <path d="M91 151 102 66 129 84 160 18 192 84 220 66 230 151 198 128 160 110 122 128Z" fill="url(#gold)" stroke="#fff0bd" stroke-width="8"/>
+    <path d="M131 83 160 39 188 83" fill="none" stroke="#fff0bd" stroke-width="7"/>
+    <path d="M112 347 160 322 208 347 229 480H91Z" fill="#193453" stroke="#c9a15d" stroke-width="7"/>
+    <path d="M160 340 195 378 160 434 125 378Z" fill="#c59a4b" stroke="#f3df9d" stroke-width="7"/>
+    <path d="M160 356 174 378 160 400 146 378Z" fill="#dbeafa"/>
+    <path d="M265 128 252 205 268 288" fill="none" stroke="#d7e1ea" stroke-width="10"/>
+    <path d="M240 143 265 109 290 143 265 168Z" fill="#d7e1ea" stroke="#b58b4b" stroke-width="6"/>
+    <path d="M253 204 265 219 277 204" fill="none" stroke="#e5c778" stroke-width="8"/>
+    <circle cx="160" cy="377" r="13" fill="#fff0ba"/>
+  </symbol>
 </svg>
