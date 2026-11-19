@@ -124,3 +124,23 @@ test("perdas inválidas não criam tropas extras nem quantidades negativas", () 
     archer: 0
   });
 });
+
+test("passivos do herói melhoram ataque e sobrevivência", () => {
+  const army = [{ unit_type: "knight", tier: 2, quantity: 40 }];
+  const base = simulateBattle({ army, castleLevel: 5, defenderLevel: 8, roll: 1, criticalSeed: 123 });
+  const hero = simulateBattle({
+    army, castleLevel: 5, defenderLevel: 8, roll: 1, criticalSeed: 123,
+    heroAttackBonusPercent: 2.2,
+    heroDefenseBonusPercent: 1.7,
+    heroHealthBonusPercent: 1
+  });
+  assert.ok(hero.attackerPower > base.attackerPower);
+  assert.ok(hero.survivors >= base.survivors);
+});
+
+test("passivo de ataque do herói respeita o teto global de 30%", () => {
+  const army = [{ unit_type: "knight", tier: 2, quantity: 20 }];
+  const capped = simulateBattle({ army, castleLevel: 5, defenderLevel: 8, roll: 1, equipmentAttackBonusPercent: 30 });
+  const over = simulateBattle({ army, castleLevel: 5, defenderLevel: 8, roll: 1, equipmentAttackBonusPercent: 30, heroAttackBonusPercent: 3 });
+  assert.deepEqual(over, capped);
+});
