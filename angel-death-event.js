@@ -92,15 +92,34 @@ export function simulateAngelDeathAttack({ army, castleLevel = 1, heroLevel = 1,
   };
   const baseLossRate = clamp(0.09 + clamp(Number(castleLevel) || 1, 1, 30) * 0.001 + nextRandom() * 0.03, 0.09, 0.18);
   const lossRate = clamp(baseLossRate * (1 - clamp(Number(defenseBonusPercent) || 0, 0, 30) / 200), 0.09, 0.18);
-  const losses = {};
-  let troopsLost = 0;
-  for (const row of stacks) {
+  // Define as baixas sobre o exército inteiro, e só depois distribui por pilha.
+  // Isso impede que dividir a mesma força em várias pilhas aumente artificialmente as perdas.
+  const totalLosses = Math.min(totalTroops, Math.max(1, Math.floor(totalTroops * lossRate)));
+  const allocations = stacks.map((row, index) => {
     const quantity = clamp(Math.floor(Number(row.quantity) || 0), 0, 50000);
-    const key = row.unit_type + "_" + clamp(Math.floor(Number(row.tier) || 1), 1, 10);
-    const loss = quantity > 0 ? Math.min(quantity, Math.max(1, Math.floor(quantity * lossRate))) : 0;
-    losses[key] = loss;
-    troopsLost += loss;
+    const exactLoss = totalLosses * quantity / totalTroops;
+    const loss = Math.floor(exactLoss);
+    return {
+      row,
+      quantity,
+      loss,
+      remainder: exactLoss - loss,
+      tieBreak: nextRandom(),
+      index
+    };
+  });
+  let unassignedLosses = totalLosses - allocations.reduce((sum, entry) => sum + entry.loss, 0);
+  allocations.sort((left, right) =>
+    right.remainder - left.remainder || left.tieBreak - right.tieBreak || left.index - right.index
+  );
+  for (let index = 0; index < unassignedLosses; index++) allocations[index].loss += 1;
+
+  const losses = {};
+  for (const entry of allocations) {
+    const key = entry.row.unit_type + "_" + clamp(Math.floor(Number(entry.row.tier) || 1), 1, 10);
+    losses[key] = (losses[key] || 0) + entry.loss;
   }
+  const troopsLost = Object.values(losses).reduce((sum, loss) => sum + loss, 0);
   return { damage, score: damage, totalPower, totalTroops, losses, troopsLost, lossRate };
 }
 
