@@ -222,6 +222,13 @@
         line.textContent=label+": "+Math.floor(value).toLocaleString("pt-BR");
         stats.append(line);
       }
+      const bonuses=hero.combat_bonuses||{};
+      const combat=document.createElement("p");
+      combat.className="hero-roster-combat";
+      combat.textContent="Passivos de batalha: ATQ +"+Number(bonuses.attackPercent||0).toFixed(1)+
+        "% · DEF +"+Number(bonuses.defensePercent||0).toFixed(1)+
+        "% · Vida +"+Number(bonuses.healthPercent||0).toFixed(1)+
+        "% · Crítico +"+Number(bonuses.criticalChancePercent||0).toFixed(1)+"%";
       const skill=document.createElement("p");
       skill.className="hero-roster-skill";
       const skillName=document.createElement("strong");
@@ -232,7 +239,7 @@
       fragments.className="hero-roster-fragments";
       fragments.textContent="Fragmentos: "+Number(hero.fragments||0).toLocaleString("pt-BR")+
         (hero.fragments_to_next?" · Próxima estrela: "+hero.fragments_to_next:" · Estrelas máximas");
-      copy.append(name,title,meta,stats,skill,fragments);
+      copy.append(name,title,meta,stats,combat,skill,fragments);
 
       const button=document.createElement("button");
       button.type="button";
