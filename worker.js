@@ -1,5 +1,5 @@
 import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "./game-adapter.js";
-import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, heroView } from "./hero-catalog.js";
+import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, heroView, getHeroCombatBonuses } from "./hero-catalog.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
@@ -408,7 +408,7 @@ async function processMarches(env,kingdomId,batchSize=50){
    if(target&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level,equipped_skin_id FROM kingdoms WHERE id=?").bind(kingdomId).first(),
-     env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
+     env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
@@ -418,6 +418,7 @@ async function processMarches(env,kingdomId,batchSize=50){
      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
     ]);
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
+    const heroCombat=getHeroCombatBonuses(hero||{});
     const skinBonus=await getEquippedCastleSkinCombatBonuses(env,kingdomId,kingdom?.equipped_skin_id);
     const [valhallaBuffs,petBonuses]=await Promise.all([getValhallaBuffMultipliers(env,kingdomId),getPetBonuses(env,kingdomId)]);
     const castleLevel=Number(kingdom?.castle_level||1);
@@ -431,6 +432,7 @@ async function processMarches(env,kingdomId,batchSize=50){
      equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
      skinAttackBonusPercent:skinBonus.attackPercent,skinDefenseBonusPercent:skinBonus.defensePercent,
      equipmentHealthBonusPercent:gear.healthPercent,
+     heroAttackBonusPercent:heroCombat.attackPercent,heroDefenseBonusPercent:heroCombat.defensePercent,heroHealthBonusPercent:heroCombat.healthPercent,heroCriticalChancePercent:heroCombat.criticalChancePercent,
      infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
      criticalChancePercent:gear.criticalChancePercent,
      criticalDamageMultiplier:1.5,
@@ -440,8 +442,8 @@ async function processMarches(env,kingdomId,batchSize=50){
     });
     simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
     losses=simulation.losses||{};
-    replayData={version:1,mode:"territory_pve",seed:{criticalSeed,roll:battleRoll},participants:{attacker:{kingdom_id:kingdomId,army:army.map(unit=>({...unit}))},defender:{territory_id:target.id,level:Math.max(1,Math.min(30,Number(target.level)||1))}},modifiers:{equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses:simulation.losses||{}},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
-    battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,equipment:gear,castleSkin:skinBonus,pet:petBonuses,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
+    replayData={version:1,mode:"territory_pve",seed:{criticalSeed,roll:battleRoll},participants:{attacker:{kingdom_id:kingdomId,army:army.map(unit=>({...unit}))},defender:{territory_id:target.id,level:Math.max(1,Math.min(30,Number(target.level)||1))}},modifiers:{hero:heroCombat,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses:simulation.losses||{}},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
+    battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,hero:heroCombat,equipment:gear,castleSkin:skinBonus,pet:petBonuses,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
     Object.assign(survivors, applyUnitLosses(army, losses));
    }else{
     for(const u of army)survivors[u.unit_type]=u.quantity;
@@ -1303,7 +1305,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(k.id).first(),
       env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(k.id).first(),
-      env.DB.prepare("SELECT hero_key,rarity,level,experience FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first(),
+      env.DB.prepare("SELECT hero_key,rarity,level,experience,stars FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first(),
     ]);
     const gearHero=activeHero?.hero_key?await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? AND hero_key=?").bind(k.id,activeHero.hero_key).first():null;
     await ensureEquipmentTables(env,k.id);
@@ -1312,6 +1314,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
     ]);
     const gear=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]);
+    const heroCombat=getHeroCombatBonuses(activeHero||{});
     const skinBonus=await getEquippedCastleSkinCombatBonuses(env,k.id,k.equipped_skin_id);
     const [valhallaBuffs,petBonuses]=await Promise.all([getValhallaBuffMultipliers(env,k.id),getPetBonuses(env,k.id)]);
     const defenseBonusPercent=Math.min(30,Math.max(0,Number(defenseTech?.level||0)+gear.defensePercent));
@@ -1322,6 +1325,7 @@ async function gameAction(env,playerId,body){
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
       equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),skinAttackBonusPercent:skinBonus.attackPercent,skinDefenseBonusPercent:skinBonus.defensePercent,equipmentHealthBonusPercent:gear.healthPercent,
+     heroAttackBonusPercent:heroCombat.attackPercent,heroDefenseBonusPercent:heroCombat.defensePercent,heroHealthBonusPercent:heroCombat.healthPercent,heroCriticalChancePercent:heroCombat.criticalChancePercent,
       infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
       criticalChancePercent:gear.criticalChancePercent,criticalDamageMultiplier:1.5,
       criticalSeed,
@@ -1336,7 +1340,7 @@ async function gameAction(env,playerId,body){
       snapshot[unit.unit_type+"_"+unit.tier]={quantity:unit.quantity,loss:lost};
     }
     const snapshotJson=JSON.stringify(snapshot),expectedRows=armyRows.length;
-    const replayData={version:1,mode:"pve",seed:{criticalSeed,roll},participants:{attacker:{kingdom_id:k.id,army:armyRows.map(unit=>({...unit}))},defender:{type:"pve",castle_level:Number(k.castle_level||1)}},modifiers:{equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,valhalla:{attack_power:valhallaBuffs.attackPower},pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won,rounds:simulation.rounds,attacker_power:attackerPower,defender_power:defenderPower,losses},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
+    const replayData={version:1,mode:"pve",seed:{criticalSeed,roll},participants:{attacker:{kingdom_id:k.id,army:armyRows.map(unit=>({...unit}))},defender:{type:"pve",castle_level:Number(k.castle_level||1)}},modifiers:{hero:heroCombat,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,valhalla:{attack_power:valhallaBuffs.attackPower},pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won,rounds:simulation.rounds,attacker_power:attackerPower,defender_power:defenderPower,losses},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
     const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID(),actionId=crypto.randomUUID();
     const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const battleLock=env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,k.id,previousBattleToken);
@@ -1458,7 +1462,7 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   if(!selected.length)return json({error:"Selecione pelo menos uma tropa."},400);
   if(total>50000)return json({error:"O limite por ataque é de 50.000 tropas."},400);
   const [hero,dragon,tech,battleState]=await Promise.all([
-    env.DB.prepare("SELECT h.id,h.level FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdom.id).first(),
+    env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdom.id).first(),
     env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdom.id).first(),
     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdom.id).first(),
     env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(kingdom.id).first()
@@ -1469,13 +1473,14 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdom.id).all()
   ]);
   const gear=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]);
+  const heroCombat=getHeroCombatBonuses(hero||{});
   const skinBonus=await getEquippedCastleSkinCombatBonuses(env,kingdom.id,kingdom.equipped_skin_id);
   const seed=crypto.getRandomValues(new Uint32Array(1))[0];
   const simulation=simulateAngelDeathAttack({
     army:selected,castleLevel:kingdom.castle_level,heroLevel:hero?.level||1,
     dragonLevel:dragon?.level||1,militaryLevel:tech?.level||0,
-    attackBonusPercent:gear.attackPercent+skinBonus.attackPercent,
-    defenseBonusPercent:gear.defensePercent+skinBonus.defensePercent,
+    attackBonusPercent:gear.attackPercent+skinBonus.attackPercent+heroCombat.attackPercent,
+    defenseBonusPercent:gear.defensePercent+skinBonus.defensePercent+heroCombat.defensePercent,
     seed
   });
   const snapshot={};
