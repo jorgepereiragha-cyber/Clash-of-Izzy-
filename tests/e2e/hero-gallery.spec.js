@@ -149,6 +149,6 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
   await expect(page.locator("#hero-gem-balance")).toHaveText("Gemas: 900");
   await expect(page.locator(".hero-roster-card")).toHaveCount(2);
   await expect(page.locator(".hero-summon-result")).toContainText("Merlin");
-  await expect(page.locator(".hero-roster-card").nth(1).locator(".hero-roster-portrait use")).toHaveAttribute("href", /portraits\\.svg#mage$/);
+  await expect(page.locator(".hero-roster-card").nth(1).locator(".hero-roster-portrait use")).toHaveAttribute("href", "/assets/art/heroes/portraits.svg#mage");
   expect(actions).toEqual([{ type: "hero_summon", quantity: 1 }]);
 });
