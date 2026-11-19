@@ -169,6 +169,14 @@ A central de eventos apresenta sete identidades visuais originais, mas seus esta
 
 A Forja possui cinco trilhas — arma, elmo, armadura, botas e acessório — com quatro raridades. A fabricação exige peça anterior destravada, pesquisas e recursos; a peça anterior não é consumida. Os cinco equipamentos lendários equipados e destravados no mesmo herói concedem bônus de conjunto. Skins de castelo têm atributos individuais aplicados pelo servidor quando a skin pertence ao jogador e está equipada. Os atributos documentados entram em PvE e Anjo da Morte; não anunciar bônus PvP até integração e teste do sistema PvP.
 
+## 9.1 Heróis, retratos e equilíbrio de atributos
+
+A página de equipamentos agora exibe a coleção com retratos SVG same-origin, raridade, nível, estrelas, fragmentos, atributos e passivos de combate. O Kael inicial possui definição canônica; os heróis de Valhalla usam nome/descrição/estatísticas do catálogo D1 sazonal.
+
+Os valores de atributo da ficha não multiplicam novamente os atributos-base pela raridade. O crescimento por nível e estrelas é aplicado uma única vez. Além disso, cada herói possui passivos server-side progressivos (ataque, defesa, vida e crítico), limitados por perfil e sujeitos aos tetos globais de combate. Os passivos entram nos encontros PvE e no Anjo da Morte; não declarar integração PvP até sua validação.
+
+A tela também expõe as taxas reais do sorteio padrão: 70% comum, 25% raro e 5% lendário; o elenco atual resulta em 17,5% por herói comum, 5% por herói raro e 1,25% por herói lendário. O jogador pode convocar um herói por 100 gemas ou dez por 900; duplicatas viram fragmentos. A ação continua autenticada e o Worker/D1 permanece responsável por debitar gemas, sortear raridade e conceder fragmentos/heróis. Não existe garantia de lendário por quantidade fixa de tentativas.
+
 ## 10. Sequência de liberação
 
 | Ordem | Entrega | Critério de aceite |
