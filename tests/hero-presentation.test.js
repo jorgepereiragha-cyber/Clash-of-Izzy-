@@ -61,3 +61,17 @@ test("todo herói invocável tem símbolo de retrato definido", async () => {
     assert.ok(sprite.includes('id="' + symbol + '"'), "arte sazonal ausente: " + symbol);
   }
 });
+
+test("probabilidades de convocação correspondem ao elenco e exibem odds individuais", () => {
+  const counts = Object.values(HERO_TEMPLATES).reduce((result, hero) => {
+    result[hero.rarity] = (result[hero.rarity] || 0) + 1;
+    return result;
+  }, {});
+  assert.deepEqual(counts, { white: 4, blue: 5, purple: 4 });
+  const whitePerHero = 70 / counts.white;
+  const bluePerHero = 25 / counts.blue;
+  const purplePerHero = 5 / counts.purple;
+  assert.equal(whitePerHero, 17.5);
+  assert.equal(bluePerHero, 5);
+  assert.equal(purplePerHero, 1.25);
+});
