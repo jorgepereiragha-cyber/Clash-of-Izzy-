@@ -1,4 +1,5 @@
 import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "./game-adapter.js";
+import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, heroView } from "./hero-catalog.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
@@ -35,23 +36,6 @@ const BUILDINGS = {
   embassy:{label:"Embaixada",wood:220,stone:180,food:0,iron:0},
   warehouse:{label:"Armazém",wood:170,stone:100,food:0,iron:0}
 };
-const HERO_TEMPLATES = {
-soldado_basico:{name:"Soldado Recruta",title:"Recruta do Reino",rarity:"white",type:"infantaria",stats:{hp:500,attack:80,defense:60,speed:30},skill:"Golpe Rápido",skillDesc:"Ataque básico simples",skillPower:1.2},
-arqueiro_comum:{name:"Arqueiro da Floresta",title:"Atirador Comum",rarity:"white",type:"arqueiro",stats:{hp:400,attack:100,defense:40,speed:45},skill:"Flecha Simples",skillDesc:"Disparo básico",skillPower:1.3},
-cavaleiro_iniciante:{name:"Cavaleiro Novato",title:"Montador Iniciante",rarity:"white",type:"cavalaria",stats:{hp:600,attack:90,defense:70,speed:50},skill:"Investida",skillDesc:"Carga básica",skillPower:1.4},
-curandeiro_aldeia:{name:"Curandeiro da Aldeia",title:"Médico Rural",rarity:"white",type:"suporte",stats:{hp:450,attack:50,defense:50,speed:35},skill:"Cura Menor",skillDesc:"Restaura pouca vida",skillPower:1.1},
-capitao_espada:{name:"Capitão da Guarda",title:"Líder Militar",rarity:"blue",type:"infantaria",stats:{hp:1200,attack:180,defense:140,speed:40},skill:"Corte Devastador",skillDesc:"Ataque poderoso em área",skillPower:2},
-mestre_arco:{name:"Mestre Arqueiro",title:"Atirador de Elite",rarity:"blue",type:"arqueiro",stats:{hp:900,attack:220,defense:80,speed:60},skill:"Chuva de Flechas",skillDesc:"Múltiplos disparos",skillPower:2.2},
-cavaleiro_dragao:{name:"Cavaleiro do Dragão",title:"Montador de Dragão",rarity:"blue",type:"cavalaria",stats:{hp:1400,attack:200,defense:160,speed:70},skill:"Sopro de Fogo",skillDesc:"Ataque flamejante",skillPower:2.5},
-sacerdotisa_luar:{name:"Sacerdotisa do Luar",title:"Curandeira Mística",rarity:"blue",type:"suporte",stats:{hp:1000,attack:120,defense:100,speed:50},skill:"Cura Lunar",skillDesc:"Cura poderosa em área",skillPower:1.8},
-rei_artur:{name:"Rei Artur",title:"O Rei Eterno",rarity:"purple",type:"infantaria",stats:{hp:3500,attack:500,defense:400,speed:55},skill:"Excalibur",skillDesc:"Espada sagrada causa dano massivo",skillPower:4.5},
-merlin_arquimago:{name:"Merlin",title:"O Arquimago Supremo",rarity:"purple",type:"suporte",stats:{hp:2800,attack:650,defense:250,speed:65},skill:"Meteoro Ancestral",skillDesc:"Invoca destruição dos céus",skillPower:5},
-joana_darc:{name:"Joana D\u0027Arc",title:"A Donzela de Ferro",rarity:"purple",type:"infantaria",stats:{hp:4000,attack:450,defense:550,speed:60},skill:"Fé Divina",skillDesc:"Proteção sagrada absoluta",skillPower:4},
-genghis_khan:{name:"Genghis Khan",title:"O Flagelo de Deus",rarity:"purple",type:"cavalaria",stats:{hp:3200,attack:600,defense:300,speed:85},skill:"Horda Mongol",skillDesc:"Convoca exército de cavalaria",skillPower:4.8}
-};
-const HERO_RARITY={white:{label:"Branco · Comum",multiplier:1,fragments:5,maxLevel:30,maxStars:5},blue:{label:"Azul · Raro",multiplier:1.8,fragments:15,maxLevel:50,maxStars:6},purple:{label:"Roxo · Lendário",multiplier:3.5,fragments:40,maxLevel:70,maxStars:7}};
-const HERO_STAR_COST={2:10,3:20,4:40,5:80,6:150,7:300};
-
 const COSMETIC_SKINS={
  c1:{name:"Pedra Antiga",icon:"🏰",rarity:"comum",theme:"Medieval",price:250,visual:"Pedra clara, bandeiras de reino e acabamento clássico"},
  c2:{name:"Madeira Rústica",icon:"🏚️",rarity:"comum",theme:"Viking",price:250,visual:"Madeira escura, cordas e escudos nórdicos"},
@@ -172,7 +156,6 @@ const cycle=merchantCycle(),offers=merchantOffers(cycle);
  const stock=Object.fromEntries((rows.results||[]).map(r=>[r.item_id,r.stock]));
  return {cycle,refreshAt:(cycle+1)*SHOP_CYCLE_MS,offers:offers.map(o=>({...SHOP_ITEMS[o.id],id:o.id,price:o.price,discount:o.discount,stock:stock[o.id]??o.stock,originalPrice:SHOP_ITEMS[o.id].price})),items:SHOP_ITEMS,inventory:inventory.results||[]};
 }
-function heroView(row){const t=HERO_TEMPLATES[row.hero_key],r=HERO_RARITY[row.rarity];if(!t||!r)return row;const stats=Object.fromEntries(Object.entries(t.stats).map(([key,value])=>[key,Math.floor(value*r.multiplier*(1+(row.level-1)*.03+(row.stars-1)*.15))]));return {...row,name:t.name,title:t.title,type:t.type,rarity_label:r.label,max_level:r.maxLevel,max_stars:r.maxStars,stats,skill:t.skill,skill_description:t.skillDesc,skill_power:t.skillPower,fragments_to_next:HERO_STAR_COST[row.stars+1]||null};}
 function rollHeroRarity(){const n=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296;return n<.70?"white":n<.95?"blue":"purple";}
 const TROOP_CAPACITY_PER_BARRACKS_LEVEL = 500;
 const UNITS = {
@@ -687,7 +670,12 @@ async function gameState(env,playerId){
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id),
     env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at,CASE WHEN replay_expires_at>unixepoch() AND replay_json<>'{}' THEN 1 ELSE 0 END AS has_replay FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id),
-    env.DB.prepare("SELECT * FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key").bind(kingdom.id),
+    env.DB.prepare(
+      "SELECT hi.*,vhc.hero_name AS seasonal_hero_name,vhc.rarity AS seasonal_rarity,"+
+      "vhc.description AS seasonal_description,vhc.stats_json AS seasonal_stats_json,vhc.base_level AS seasonal_base_level "+
+      "FROM hero_inventory hi LEFT JOIN valhalla_hero_catalog vhc ON vhc.hero_key=hi.hero_key "+
+      "WHERE hi.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,hi.hero_key"
+    ).bind(kingdom.id),
     env.DB.prepare("SELECT hero_key,rarity,result_type,created_at FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id),
     env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id),
     env.DB.prepare("SELECT id,event_type,payload_json FROM kingdom_events WHERE kingdom_id=? AND event_type!='__internal_action_guard' ORDER BY id DESC LIMIT 15").bind(kingdom.id),
@@ -1106,7 +1094,7 @@ async function gameAction(env,playerId,body){
     battleOutcome={summons:results,cost};
   }else if(type==="hero_evolve"){
     const heroKey=String(body.hero||""),hero=await env.DB.prepare("SELECT rarity,stars,fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
-    if(!hero||(!HERO_TEMPLATES[heroKey]&&heroKey!=="kael_sunwarden"))return json({error:"Herói não encontrado na coleção."},404);
+    if(!hero||!HERO_TEMPLATES[heroKey])return json({error:"Herói não encontrado na coleção."},404);
     const rarity=HERO_RARITY[hero.rarity],next=hero.stars+1,needed=HERO_STAR_COST[next];
     if(hero.stars>=rarity.maxStars||!needed)return json({error:"Herói já atingiu o máximo de estrelas."},409);
     if(hero.fragments<needed)return json({error:"Fragmentos insuficientes. Necessário: "+needed+"."},409);
