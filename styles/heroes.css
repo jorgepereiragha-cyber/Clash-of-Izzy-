@@ -19,3 +19,16 @@
 .hero-roster-select{grid-column:1/-1;min-height:44px;margin-top:3px;border:1px solid #d2aa63;border-radius:8px;background:#604523;color:#fff0cf;font-weight:800}
 .hero-roster-select:disabled{opacity:.55}
 @media(max-width:420px){.hero-roster-section{padding:11px}.hero-roster-grid{grid-template-columns:1fr}.hero-roster-card{grid-template-columns:76px minmax(0,1fr)}.hero-roster-portrait{width:76px}}
+.hero-summon-section{margin:18px 0;padding:16px;border:1px solid #8b6b39;border-radius:14px;background:linear-gradient(145deg,#202d43,#101b2a);color:#f5edda}
+.hero-summon-intro{margin:6px 0 12px;color:#c7d2df;font-size:13px;line-height:1.45}
+.hero-summon-rates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.hero-summon-rates div{display:grid;gap:4px;padding:10px;border:1px solid #53677c;border-radius:9px;background:#142337}
+.hero-summon-rates strong{color:#f3d18c;font-size:12px}.hero-summon-rates span{color:#c7d2df;font-size:11px}
+.hero-summon-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+.hero-summon-actions button{min-height:48px;border:1px solid #e0b96e;border-radius:9px;background:linear-gradient(145deg,#815b2c,#4b341e);color:#fff0c9;font-weight:850}
+.hero-summon-actions button:disabled{opacity:.45}
+.hero-summon-status{color:#c7d2df;font-size:12px;line-height:1.45}
+.hero-summon-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:7px}
+.hero-summon-result{display:grid;gap:3px;padding:9px;border:1px solid #56697d;border-radius:8px;background:#122337}
+.hero-summon-result strong{color:#fff0c9;font-size:13px}.hero-summon-result span{color:#e6c27e;font-size:11px}.hero-summon-result small{color:#c7d2df;font-size:10px}
+@media(max-width:420px){.hero-summon-section{padding:11px}.hero-summon-rates{grid-template-columns:1fr}.hero-summon-actions{grid-template-columns:1fr}}
