@@ -32,3 +32,5 @@
 .hero-summon-result{display:grid;gap:3px;padding:9px;border:1px solid #56697d;border-radius:8px;background:#122337}
 .hero-summon-result strong{color:#fff0c9;font-size:13px}.hero-summon-result span{color:#e6c27e;font-size:11px}.hero-summon-result small{color:#c7d2df;font-size:10px}
 @media(max-width:420px){.hero-summon-section{padding:11px}.hero-summon-rates{grid-template-columns:1fr}.hero-summon-actions{grid-template-columns:1fr}}
+
+.hero-roster-combat{margin:2px 0;color:#b5d8f0;font-size:10px;line-height:1.35;font-weight:800}
