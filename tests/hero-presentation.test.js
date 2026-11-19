@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { heroView, HERO_TEMPLATES, HERO_RARITY } from "../hero-catalog.js";
+import { heroView, HERO_TEMPLATES, HERO_RARITY, getHeroCombatBonuses } from "../hero-catalog.js";
 
 test("Kael tem ficha canônica, retrato e progressão consistente", () => {
   const base = heroView({ hero_key: "kael_sunwarden", rarity: "blue", level: 1, stars: 1 });
@@ -74,4 +74,16 @@ test("probabilidades de convocação correspondem ao elenco e exibem odds indivi
   assert.equal(whitePerHero, 17.5);
   assert.equal(bluePerHero, 5);
   assert.equal(purplePerHero, 1.25);
+});
+
+test("passivos dos heróis escalam de forma limitada por nível e estrelas", () => {
+  const starter = getHeroCombatBonuses({ hero_key: "kael_sunwarden", rarity: "blue", level: 1, stars: 1 });
+  const maxed = getHeroCombatBonuses({ hero_key: "kael_sunwarden", rarity: "blue", level: 50, stars: 6 });
+  assert.ok(starter.attackPercent > 0);
+  assert.ok(starter.attackPercent < maxed.attackPercent);
+  assert.equal(maxed.attackPercent, 2.2);
+  assert.equal(maxed.defensePercent, 1.7);
+  assert.ok(maxed.attackPercent <= 3 && maxed.defensePercent <= 3);
+  const card = heroView({ hero_key: "kael_sunwarden", rarity: "blue", level: 50, stars: 6 });
+  assert.deepEqual(card.combat_bonuses, maxed);
 });
