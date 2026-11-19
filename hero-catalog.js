@@ -20,6 +20,19 @@ const HERO_RARITY = Object.freeze({
   purple:{label:"Roxo · Lendário",fragments:40,maxLevel:70,maxStars:7}
 });
 const HERO_STAR_COST = Object.freeze({2:10,3:20,4:40,5:80,6:150,7:300});
+const HERO_SUMMON_RARITY_ODDS = Object.freeze({white:70,blue:25,purple:5});
+export function getHeroSummonOdds() {
+  const counts = Object.fromEntries(Object.keys(HERO_SUMMON_RARITY_ODDS).map(key => [key, 0]));
+  for (const hero of Object.values(HERO_TEMPLATES)) {
+    if (Object.hasOwn(counts, hero.rarity)) counts[hero.rarity]++;
+  }
+  return Object.entries(HERO_SUMMON_RARITY_ODDS).map(([rarity, chancePercent]) => ({
+    rarity,
+    chancePercent,
+    heroCount: counts[rarity] || 0,
+    perHeroPercent: counts[rarity] ? Number((chancePercent / counts[rarity]).toFixed(4)) : 0
+  }));
+}
 
 const HERO_COMBAT_PROFILES = Object.freeze({
   soldado_basico:{attack:0.9,defense:0.5,health:0.2,critical:0},
@@ -146,4 +159,4 @@ export function heroView(row = {}) {
   };
 }
 
-export { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST };
+export { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, HERO_SUMMON_RARITY_ODDS };
