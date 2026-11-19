@@ -64,7 +64,9 @@ test("heróis convocados e herói inicial compartilham uma única identidade de 
   assert.ok(worker.includes("UPDATE hero_inventory SET level=level+1,experience=experience+100"));
   assert.ok(worker.includes("UPDATE heroes SET level=level+1,experience=experience+100"));
   assert.ok(worker.includes("HERO_RARITY[inventoryHero.rarity]?.maxLevel"));
-  assert.ok(worker.includes('heroKey!=="kael_sunwarden"'));
+  assert.ok(worker.includes("HERO_TEMPLATES[heroKey]"));
+  const catalog = await read("hero-catalog.js");
+  assert.ok(catalog.includes("kael_sunwarden"));
 });
 
 
