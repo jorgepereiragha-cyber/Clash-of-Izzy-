@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { heroView, HERO_TEMPLATES, HERO_RARITY, getHeroCombatBonuses } from "../hero-catalog.js";
+import { heroView, HERO_TEMPLATES, HERO_RARITY, HERO_SUMMON_RARITY_ODDS, getHeroCombatBonuses, getHeroSummonOdds } from "../hero-catalog.js";
 
 test("Kael tem ficha canônica, retrato e progressão consistente", () => {
   const base = heroView({ hero_key: "kael_sunwarden", rarity: "blue", level: 1, stars: 1 });
@@ -62,18 +62,14 @@ test("todo herói invocável tem símbolo de retrato definido", async () => {
   }
 });
 
-test("probabilidades de convocação correspondem ao elenco e exibem odds individuais", () => {
-  const counts = Object.values(HERO_TEMPLATES).reduce((result, hero) => {
-    result[hero.rarity] = (result[hero.rarity] || 0) + 1;
-    return result;
-  }, {});
-  assert.deepEqual(counts, { white: 4, blue: 5, purple: 4 });
-  const whitePerHero = 70 / counts.white;
-  const bluePerHero = 25 / counts.blue;
-  const purplePerHero = 5 / counts.purple;
-  assert.equal(whitePerHero, 17.5);
-  assert.equal(bluePerHero, 5);
-  assert.equal(purplePerHero, 1.25);
+test("probabilidades de convocação são calculadas pelo catálogo canônico", () => {
+  assert.deepEqual(HERO_SUMMON_RARITY_ODDS, { white: 70, blue: 25, purple: 5 });
+  const odds = getHeroSummonOdds();
+  assert.deepEqual(odds.map(row => [row.rarity, row.heroCount, row.perHeroPercent]), [
+    ["white", 4, 17.5],
+    ["blue", 5, 5],
+    ["purple", 4, 1.25]
+  ]);
 });
 
 test("passivos dos heróis escalam de forma limitada por nível e estrelas", () => {
