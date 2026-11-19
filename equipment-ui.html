@@ -8,9 +8,19 @@
   <link rel="stylesheet" href="/styles/coi-theme.css">
   <link rel="stylesheet" href="/equipment-styles.css">
   <link rel="stylesheet" href="/styles/navigation.css">
+  <link rel="stylesheet" href="/styles/heroes.css">
 </head>
 <body style="background:#0f0f1e;padding:10px">
   <main class="mobile-equipment-container">
+    <section class="hero-roster-section" aria-labelledby="hero-roster-title">
+      <header class="hero-roster-header">
+        <h2 id="hero-roster-title">Heróis do Reino</h2>
+        <span id="hero-roster-count" class="hero-roster-count">Sincronizando coleção…</span>
+      </header>
+      <div id="hero-roster-grid" class="hero-roster-grid" aria-live="polite">
+        <p>Carregando heróis e atributos do servidor…</p>
+      </div>
+    </section>
     <header class="item-header">
       <h2 id="item-name">Carregando...</h2>
       <span id="rarity-badge" class="rarity-badge comum">Comum</span>
