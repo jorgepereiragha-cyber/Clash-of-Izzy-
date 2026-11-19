@@ -53,10 +53,16 @@ test("nível, estrelas e estatísticas inválidas são limitados sem NaN", () =>
 
 test("todo herói invocável tem símbolo de retrato definido", async () => {
   const sprite = await readFile(new URL("../assets/art/heroes/portraits.svg", import.meta.url), "utf8");
-  for (const [key, hero] of Object.entries(HERO_TEMPLATES)) {
+  const portraitSymbols = Object.entries(HERO_TEMPLATES).map(([key, hero]) => {
     assert.ok(hero.portrait, "símbolo de retrato ausente: " + key);
     assert.ok(sprite.includes('id="' + hero.portrait + '"'), "arte ausente: " + hero.portrait);
-  }
+    return hero.portrait;
+  });
+  assert.equal(
+    new Set(portraitSymbols).size,
+    portraitSymbols.length,
+    "cada herói do sorteio padrão precisa ter um retrato exclusivo"
+  );
   for (const symbol of ["odin", "thor", "freya", "loki", "valhalla-king"]) {
     assert.ok(sprite.includes('id="' + symbol + '"'), "arte sazonal ausente: " + symbol);
   }
