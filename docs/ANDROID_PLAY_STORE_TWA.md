@@ -1,11 +1,11 @@
 # Clash of Izzy — preparação Android e Google Play Store
 
-**Revisão:** 18 de novembro de 2026  
-**Status:** preparação técnica e documental; não publicado na Play Store.
+**Revisão:** 19 de novembro de 2026  
+**Status:** preparação técnica e documental. O jogo ainda não foi publicado na Play Store e não existe AAB assinado neste repositório.
 
 ## 1. Arquitetura escolhida
 
-A edição Android será uma **Trusted Web Activity (TWA)** sobre a PWA existente, gerada com Bubblewrap. A camada Android abre o domínio verificado do jogo em tela cheia; o mundo compartilhado Eldoria, login, economia e persistência continuam no Worker + D1 atuais.
+A edição Android será distribuída como **Trusted Web Activity (TWA)**, gerada com Bubblewrap, sobre a PWA atual. A TWA abre o domínio verificado em tela cheia; o reino compartilhado Eldoria, a autenticação, a economia e a persistência continuam usando o Worker + D1 existentes.
 
 ```text
 Google Play (Android App Bundle)
@@ -20,197 +20,167 @@ PWA Clash of Izzy (/kingdom.html)
 Cloudflare Worker + D1 (Eldoria compartilhado)
 ```
 
-**Não criar um segundo servidor, banco, login ou sistema de economia.** A TWA é a camada de distribuição Android e não substitui o jogo web nem a fonte de verdade D1.
+Não criar segundo servidor, banco, login ou sistema de economia. A camada Android é a embalagem de distribuição, não uma nova implementação do jogo.
 
-Referências oficiais:
+Referências:
 - [Trusted Web Activity — início rápido](https://developer.chrome.com/docs/android/trusted-web-activity/quick-start)
-- [Bubblewrap — projeto e CLI](https://github.com/GoogleChromeLabs/bubblewrap)
+- [Bubblewrap](https://github.com/GoogleChromeLabs/bubblewrap)
 
-## 2. Auditoria da base existente
+## 2. Estado técnico comprovado no repositório
 
-- PWA já possui `manifest.json`, modo `standalone`, ícones e início em `/kingdom.html`.
-- Service Worker mantém cache do shell e dos módulos Three.js same-origin; rotas `/api/*` continuam fora do cache offline.
-- Three.js está fixado em `0.187.0`, com loaders Draco, KTX2/Basis e Meshopt locais.
-- Cidade 3D tem fallback 2D quando WebGL falha/perde contexto.
-- Não existe ainda projeto Android TWA/Gradle, Application ID confirmado, assinatura, Digital Asset Links verificado nem AAB assinado.
-- Esta preparação não cria conta Play Console, não publica AAB e não altera o Worker de produção.
+- A PWA possui `manifest.json`, modo `standalone`, ícones e entrada em `/kingdom.html`.
+- O Service Worker atual é `clash-of-izzy-shell-v38`; ele mantém o shell e os módulos Three.js same-origin em cache e exclui as rotas `/api/*` do cache.
+- Three.js está fixado em `0.187.0`; os loaders/decodificadores usados pelo jogo são empacotados localmente.
+- A cidade 3D possui fallback visual quando WebGL falha ou perde o contexto.
+- O shell offline permite abrir recursos previamente armazenados, mas **não** torna offline login, economia, marchas, batalhas, compras ou sincronização D1.
+- A PR #128 acrescenta ajustes responsivos, alvos de toque de 48 CSS px, campos de 16 px, áreas seguras, redução de animação, suspensão de tarefas em segundo plano, retomada de sincronização e gestos de pinça no mapa.
+- Os testes Playwright executam em Chromium com viewports móveis. Isso não substitui teste em Android físico.
+- Ainda não existe projeto Android TWA/Gradle, Application ID confirmado, assinatura, Digital Asset Links verificado ou AAB assinado.
 
-## 2.1 Aprimoramentos Android já preparados na PR #128
+## 3. Estado das branches e dependências
 
-- Alvos de toque com altura mínima de 48 CSS px nas ações principais, navegação, campos e controles do mapa.
-- Campos de texto com tamanho mínimo de 16 px para evitar zoom automático do navegador em dispositivos móveis.
-- Respeito às áreas seguras do dispositivo (recortes, barras do sistema e bordas de gestos) e uso de viewport dinâmico.
-- Layouts testados em preparação para larguras de 360, 390, 600, 768, 844 em paisagem e 1280 px; o teste automatizado é Chromium, ainda não substitui aparelhos Android reais.
-- Aviso acessível de perda/retorno de conexão; a interface deixa claro que o jogo precisa de internet para sincronizar.
-- Atualização do Service Worker sem recarregar automaticamente uma sessão em andamento; o jogador escolhe quando aplicar uma nova versão.
-- Temporizadores visuais do Reino, polling da Loja de Valhalla e atualizações do Evento Mundial são suspensos em segundo plano; ao retornar, o cliente consulta o estado oficial do Worker/D1.
-- Partículas decorativas da cidade usam Canvas 2D a cerca de 30 fps, com menos partículas em dispositivos modestos; respeitam Economia de dados, movimento reduzido e visibilidade e não interceptam toques.
-- Ferramentas de CI (diagnóstico, smoke test e validação de assets) são mantidas no Git, mas excluídas dos assets públicos pelo `.assetsignore`.
-- Evento comum de retomada para sincronizar de novo o estado de Reino/Mapa quando a rede volta.
-- Mapa mundial com gesto de arrasto e pinça de dois dedos; animações de marchas pausam quando o app fica em segundo plano ou o mapa sai da área visível.
-- Limite de pixels do buffer gráfico do mapa e retomada compatível com o ciclo de vida/back-forward cache.
-- Shell PWA v34 inclui o runtime e estilos Android para abertura offline; isto não torna offline a economia, as marchas, batalhas nem o banco D1.
+- **PR #120** é a base de lançamento Eldoria, está aberta e ainda não foi mesclada. Sua branch `release/one-shared-realm-early-access` tem 207 commits à frente e 3 atrás da `main` consultada nesta auditoria; o GitHub informa que a PR está mergeável, mas isso não substitui as validações externas pendentes descritas nela.
+- **PR #128** é esta frente Android/qualidade visual, permanece Draft e tem como base a branch da PR #120. O commit auditado antes desta atualização documental era `c6b1232ba7c79e82c41fefa275572bf7bed1279b`.
+- **PR #129** também usa a branch de lançamento como base e permanece Draft; a loja adicional não é requisito para criar o pacote TWA inicial.
 
-## 3. O que será necessário para enviar à loja
+Não fazer merge em cadeia apenas porque uma PR aparece como mergeável. A base de lançamento precisa concluir sua validação remota de staging e sua inspeção Android antes da liberação.
 
-1. Conta Google Play Console do proprietário, verificação de identidade e dados de desenvolvedor/pagamentos.
-2. Domínio final controlado pelo projeto. Recomenda-se domínio próprio para a marca e continuidade, em vez de depender permanentemente de um endereço técnico.
-3. Application ID exclusivo no formato reverso de domínio. `com.clashofizzy.game` é somente uma sugestão para verificar; não está reservado nem confirmado.
-4. Android target API **36 ou superior** para novos apps e atualizações enviados desde 31/08/2026.
-5. Projeto TWA gerado pelo Bubblewrap, com nome, ícones, cores, orientação, start URL e versão configurados.
-6. Chave/certificado de assinatura e Play App Signing. Registrar o SHA-256 do certificado realmente usado para assinar a versão distribuída.
-7. Digital Asset Links em `/.well-known/assetlinks.json` no mesmo domínio da PWA, com Application ID e fingerprint reais. Não usar placeholder fictício.
-8. Android App Bundle (`.aab`) assinado e testado em aparelho físico.
-9. Ficha da loja: nome, descrição curta/longa, categoria Estratégia, ícone de loja, imagem de destaque e capturas reais do jogo.
-10. Política de privacidade pública, formulário Data safety, classificação indicativa, contato de suporte e instruções de acesso para revisão quando houver login.
+## 4. Evidência automatizada da PR #128
 
-Requisito oficial de API: [target API do Google Play](https://developer.android.com/google/play/requirements/target-sdk?hl=pt-br).
+Execução GitHub Actions [#44393581758](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44393581758), run #1133, no commit `c6b1232`:
 
-### Teste fechado de contas pessoais
+| Verificação | Resultado |
+|---|---:|
+| Testes Node.js | 319 aprovados |
+| Falhas Node.js | 0 |
+| Playwright | 8 aprovados |
+| Migrações D1 locais | Aprovadas |
+| Perfil local de Preview D1 | Aprovado |
+| Manifesto/assets 3D | Aprovados |
+| Service Worker | Aprovado |
+| Wrangler deploy dry-run | 366,66 KiB; 79,67 KiB gzip |
 
-Se a conta for pessoal e tiver sido criada após 13/11/2023, a regra atual exige teste fechado com pelo menos **12 testadores inscritos continuamente por 14 dias** antes de solicitar acesso à produção. Isso depende da categoria/idade da conta; confirmar o requisito no Play Console do proprietário.
+**Interpretação correta da CI:**
 
-Fonte: [requisitos de teste para novas contas pessoais](https://support.google.com/googleplay/android-developer/answer/14151465?hl=pt).
+- As migrações foram aplicadas somente ao D1 local criado pelo Wrangler durante a CI. Os logs indicam explicitamente execução local; não são prova de migração remota.
+- O diagnóstico GET de produção recebeu `Sessão do jogador inválida.`; isso não valida uma sessão real de jogador nem substitui um teste autenticado em staging.
+- O smoke test informativo de produção terminou com `A loja não usa o fluxo manual por WhatsApp.`. Essa etapa possui `continue-on-error: true`; portanto, o job geral ficou verde apesar dessa falha informativa.
+- A falha confirma uma diferença entre o fluxo esperado pela branch de lançamento e a loja atualmente publicada. Não afirmar que a loja de produção já foi convertida.
+- Esta execução corresponde ao commit anterior à atualização deste documento. A nova alteração documental deve gerar uma nova execução de CI; não herda automaticamente o resultado #1133.
 
-### Materiais gráficos da loja
+## 5. D1 e isolamento do Preview
 
-- Capturas precisam mostrar a build real: cidade, mapa, interface e recursos de jogo que estejam disponíveis.
-- Preparar imagens em retrato e paisagem para os formatos suportados; imagens de tablet só devem mostrar layout realmente validado em tablet.
-- Criar ícone e imagem de destaque segundo as especificações atuais exibidas na Play Console no momento do envio.
-- Não usar arte, personagens, logos ou interface copiados de Clash of Kings. A referência é o gênero e o nível de acabamento, mantendo identidade própria do Clash of Izzy.
+IDs configurados no repositório:
 
-Guia oficial: [imagens e capturas para a ficha da Play Store](https://support.google.com/googleplay/android-developer/answer/9866151?hl=pt).
+| Recurso | Binding | Banco | UUID |
+|---|---|---|---|
+| Produção | `DB` | `clash-of-izzy-db` | `7e63af59-d9ff-4159-a9cf-b02e35b92605` |
+| Preview | `DB` | `izzy-preview-17112026` | `6674c0ac-3636-4e57-bff8-23cf60ab9637` |
+| Migrações de Preview | `PREVIEW_DB` | `izzy-preview-17112026` | `6674c0ac-3636-4e57-bff8-23cf60ab9637` |
 
-## 4. Pagamentos — requisito antes do lançamento Android
+A configuração do Worker Preview está no bloco `previews` de `wrangler.jsonc`. O arquivo `wrangler.preview-migrations.jsonc` aponta para o mesmo UUID usando o binding `PREVIEW_DB`.
 
-Gemas, moedas, skins, VIP, personagens e outros itens usados dentro do jogo são bens digitais. A política do Google Play normalmente exige **Google Play Billing** para vender esses bens em um app distribuído pela Play Store, salvo exceção/programa oficial aplicável e atendido.
+Segundo a documentação atual da Cloudflare, Worker Previews não herdam a configuração de produção. Bindings de recursos devem ser declarados no bloco `previews`; dois Previews ligados ao mesmo `database_id` compartilham as mesmas linhas. Secrets são administrados separadamente pela Previews Base configuration ou no Preview individual, e não devem ser inseridos no Wrangler config ou no Git.
 
-**Atenção específica ao Brasil:** o programa oficial de User Choice Billing lista o Brasil entre os mercados participantes, mas a elegibilidade para o Brasil é restrita a apps que não sejam jogos; para games, a página lista elegibilidade no EEE e no Japão. Portanto, não presumir que Clash of Izzy possa aderir ao piloto brasileiro. Planejar a edição Play com Google Play Billing até que o Play Console/Google confirme formalmente um programa válido para este jogo. Fonte: [elegibilidade e requisitos do User Choice Billing](https://support.google.com/googleplay/android-developer/answer/12570971?hl=pt-br).
+Procedimento necessário antes de qualquer teste remoto:
 
-Consequências para o projeto:
-- Não inserir botão, link, WebView ou redirecionamento para Mercado Pago, Pix ou WhatsApp na edição Play para comprar bens digitais sem enquadramento oficial em exceção/programa aplicável.
-- Separar o adaptador de compra por canal: a loja Android usa Play Billing; a edição web mantém o fluxo próprio somente nos canais permitidos.
-- Validar no Worker o token/compra confirmado pelo Google antes de conceder gemas, skins ou VIP.
-- Manter D1 como fonte de verdade da concessão e da auditoria da compra.
+1. Confirmar na conta Cloudflare que o D1 Preview com UUID `6674c0ac-3636-4e57-bff8-23cf60ab9637` existe e é descartável.
+2. Confirmar que ele é diferente do UUID de produção.
+3. Conferir as migrações remotas pendentes usando `wrangler.preview-migrations.jsonc`.
+4. Configurar secrets exclusivos de QA no Previews Base ou no Preview específico, quando necessários: `SESSION_SECRET`, `ADMIN_EMAIL` e `ADMIN_PASSWORD`. Não reutilizar secrets de produção.
+5. Aplicar migrações somente depois de confirmar identidade, isolamento e backup do banco de staging.
+6. Validar login, estado do reino, filas, alianças, loja e equipagem usando contas descartáveis.
+
+A CI atual apenas valida o perfil de Preview localmente; a existência e o estado remoto desse D1 continuam **não comprovados**.
+
+Fontes Cloudflare:
+- [Worker Previews — Configuration](https://developers.cloudflare.com/workers/previews/configuration/)
+- [Worker Previews — Resources and isolation](https://developers.cloudflare.com/workers/previews/resources/)
+
+## 6. Requisitos atuais da Google Play
+
+1. Conta Google Play Console do proprietário, verificação de identidade e dados de desenvolvedor.
+2. Domínio final controlado pelo projeto.
+3. Application ID exclusivo no formato reverso de domínio. `com.clashofizzy.game` é apenas uma sugestão; não está reservado nem confirmado.
+4. Novos apps e atualizações enviados desde 31/08/2026 devem direcionar Android 16, **API 36 ou superior**.
+5. Projeto TWA gerado com Bubblewrap, configurado com domínio, manifesto, nome, ícones, versão e target SDK reais.
+6. Certificado/chave de assinatura e Play App Signing; registrar o fingerprint SHA-256 do certificado efetivamente usado.
+7. Digital Asset Links em `/.well-known/assetlinks.json`, contendo o Application ID e o fingerprint reais.
+8. AAB assinado e testado em aparelho físico.
+9. Ficha da loja com descrição, categoria Estratégia, ícone, imagem de destaque e capturas da build real.
+10. Política de privacidade pública, Data safety, classificação indicativa, suporte e instruções para acesso de revisão.
+
+Fontes oficiais:
+- [Requisitos de nível da API do Google Play](https://support.google.com/googleplay/android-developer/answer/11926878?hl=pt-br)
+- [Imagens e capturas da ficha](https://support.google.com/googleplay/android-developer/answer/9866151?hl=pt-br)
+
+### Teste fechado para determinadas contas pessoais
+
+Se a conta de desenvolvedor for pessoal e tiver sido criada depois de 13/11/2023, o Google exige um teste fechado com pelo menos **12 testadores inscritos continuamente por 14 dias** antes do pedido de acesso à produção. Confirmar a condição no Play Console do proprietário.
+
+Fonte: [Requisitos de teste para novas contas pessoais](https://support.google.com/googleplay/android-developer/answer/14151465?hl=pt).
+
+## 7. Pagamentos — bloqueio obrigatório antes de vender na Play
+
+Gemas, moedas virtuais, skins, VIP, heróis e outros itens digitais consumidos dentro do jogo são bens digitais. Para a edição distribuída pela Play Store, planejar **Google Play Billing** e validação server-side antes de conceder itens no D1.
+
+**Brasil:** o piloto User Choice Billing lista o Brasil entre os mercados, mas, fora do EEE, Estados Unidos e Japão, a elegibilidade indicada para o piloto é limitada a apps que não sejam jogos. Portanto, não presumir que Clash of Izzy, por ser jogo, possa usar faturamento alternativo no Brasil.
+
+Consequências:
+- Não usar Pix, Mercado Pago, WhatsApp, links externos ou WebView para vender bens digitais dentro da edição Play, salvo exceção/programa oficial cuja elegibilidade tenha sido confirmada para este jogo.
+- Separar o adaptador de compras por canal: Play Billing na edição Play; o fluxo web só permanece onde as regras aplicáveis permitirem.
+- O Worker deve validar a compra/token do Google antes de conceder gemas, skins ou VIP.
+- D1 continua sendo a fonte de verdade de propriedade e concessões; registrar idempotência e auditoria da compra.
 - Nunca armazenar número completo do cartão, validade ou CVV no jogo.
 
-Fonte: [política oficial de pagamentos do Google Play](https://support.google.com/googleplay/android-developer/answer/10281818?hl=pt).
+Fontes oficiais:
+- [Política de pagamentos do Google Play](https://support.google.com/googleplay/android-developer/answer/10281818?hl=pt-br)
+- [Elegibilidade do User Choice Billing](https://support.google.com/googleplay/android-developer/answer/12570971?hl=pt-br)
 
-## 5. Qualidade, segurança e privacidade
+## 8. Limpeza de código já realizada na PR #128
 
-- Política de privacidade coerente com conta, autenticação, identificadores, telemetria, suporte e fornecedores realmente utilizados.
-- Preencher Data safety com base no tráfego e nas práticas reais; não presumir respostas.
-- Responder ao questionário de classificação indicativa incluindo chat/interações entre usuários, compras e conteúdo efetivo.
-- Fornecer acesso de revisão para telas que exigem login, sem expor credenciais Master ou secrets.
-- Manter saldo, inventário, construção, marcha e combate validados no Worker; o cliente não decide concessões ou resultados econômicos.
-- Testar retomada de sessão, rede instável, reconexão, offline do shell, rotação, cortes de tela, navegação Android, memória, perda de contexto WebGL e fallback 2D.
-- Validar em ao menos um Android de entrada e um intermediário/alto. Chromium automatizado não substitui aparelho real.
-- Acompanhar crash, ANR, consumo de memória, temperatura, tempo de quadro e estabilidade antes de ampliar a distribuição.
+Foram removidos somente arquivos identificados como protótipo legado ou sem consumidor no runtime desta edição:
 
-## 6. Comandos Bubblewrap — somente depois de definir domínio, ID e assinatura
+- `game-config.js`: configuração de um protótipo distinto, com economia e entidades que não correspondem ao Worker/D1 atual.
+- `packages.js`: catálogo estático antigo com preços/conteúdo desatualizados e abertura direta de WhatsApp; não era carregado pelas páginas atuais.
+- `scripts/post-processing.js`: pipeline opcional sem consumidor ativo na renderização atual. Bloom/FXAA/Nordic Grade não devem ser anunciados como efeitos ativos.
+- `splash-screen.html`: arquivo sem rota, link ou consumidor; não era o ponto de entrada da PWA. O splash de instalação da PWA e o splash da TWA devem ser tratados pelas configurações próprias de cada distribuição.
 
-Ambiente Node.js 18+ (requisito do Bubblewrap CLI atual):
+Foram mantidos:
+- `shared-world-coordinates.js`, usado pelo Worker para posicionar castelos no reino compartilhado.
+- Os modelos GLB habilitados no manifesto, os recursos de textura usados pelos modelos e os arquivos de licença/proveniência.
+- Migrações, módulos do Worker, inventários, dados de jogador, documentação de arquitetura e mecanismos de backup.
+- Ferramentas de CI e diagnóstico no Git, excluídas dos assets públicos por `.assetsignore`.
 
-```bash
-npm install --global @bubblewrap/cli
-```
+Não fazer exclusões adicionais por nome, tamanho ou aparência. Cada candidato precisa ser rastreado em imports, scripts HTML, Worker, manifestos, Service Worker, testes e referências dinâmicas antes da remoção.
 
-Inicializar apontando para o manifesto real do domínio definitivo:
+## 9. Recursos do jogo e limites de divulgação
 
-```bash
-bubblewrap init --manifest https://SEU-DOMINIO/manifest.json --directory android-twa
-```
+A central de eventos apresenta sete identidades visuais originais, mas seus estados funcionais são diferentes:
 
-Após configurar Application ID, assinatura, ícones, versão e target SDK conforme o assistente atual:
+- **Anjo da Morte:** combate conectado ao Worker, com perdas, classificação e recompensas processadas pelo servidor.
+- **Ascensão de Valhalla:** condicionado à configuração sazonal retornada pelo servidor; permanece desligado até ativação autorizada.
+- **Caçada Selvagem:** estrutura de dados existe, mas controlador de combate/premiação continua pendente.
+- **Shiva e Khali:** artes originais e prévias; não prometer combate ou recompensas ainda não implementados.
+- **Cerco de Eldoria e Torneio dos Campeões:** conceitos ligados às bases de Alianças/Arena; calendário, ranking sazonal e distribuição de prêmios continuam pendentes.
 
-```bash
-cd android-twa
-bubblewrap build
-```
+A Forja possui cinco trilhas — arma, elmo, armadura, botas e acessório — com quatro raridades. A fabricação exige peça anterior destravada, pesquisas e recursos; a peça anterior não é consumida. Os cinco equipamentos lendários equipados e destravados no mesmo herói concedem bônus de conjunto. Skins de castelo têm atributos individuais aplicados pelo servidor quando a skin pertence ao jogador e está equipada. Os atributos documentados entram em PvE e Anjo da Morte; não anunciar bônus PvP até integração e teste do sistema PvP.
 
-O build e o AAB resultante devem ser verificados no ambiente real. Não executar esses comandos com domínio, ID ou chaves inventados.
-
-## 7. Sequência de conclusão
+## 10. Sequência de liberação
 
 | Ordem | Entrega | Critério de aceite |
 |---|---|---|
-| 1 | Abrir a PWA atualizada no Preview | Sem erro em Android físico |
-| 2 | Definir domínio e Application ID | Domínio sob controle e ID exclusivo |
-| 3 | Gerar TWA/Bubblewrap | Projeto Android reproduzível |
-| 4 | Assinatura + Digital Asset Links | Verificação da TWA aprovada |
-| 5 | Pagamentos compatíveis com a Play | Compra e concessão server-side testadas |
-| 6 | Ficha, privacidade e Data safety | Declarações revisadas pelo proprietário |
-| 7 | AAB em teste interno/fechado | Instalação, login, jogo e compra testados |
-| 8 | Acesso à produção e lançamento gradual | Todos os gates da Play Console atendidos |
+| 1 | PR #120 / base de lançamento | Revisão, CI atual e gates de release resolvidos |
+| 2 | D1 Preview remoto | UUID confirmado, schema aplicado apenas no banco descartável e secrets QA isolados |
+| 3 | Fluxos reais no staging | Login, jogo, loja manual web e aprovação Master testados sem dados de produção |
+| 4 | Inspeção Android físico | Aparelho de entrada e intermediário/alto; toque, instalação, WebGL, memória, temperatura e retomada |
+| 5 | Domínio e identidade Android | Domínio, Application ID e certificado definidos pelo proprietário |
+| 6 | TWA e Digital Asset Links | TWA verificada e build reproduzível |
+| 7 | Play Billing | Compra de teste validada server-side e concessão idempotente |
+| 8 | Ficha e conformidade | Privacidade, Data safety, classificação e materiais reais revisados |
+| 9 | Teste interno/fechado | AAB assinado instalado e fluxo completo aprovado |
+| 10 | Produção | Acesso liberado no Play Console e lançamento gradual aprovado |
 
-## 7.1 Auditoria de limpeza e validação executada
-- `splash-screen.html` também foi removida: era pré-carregada mas não tinha rota, link, start_url ou consumidor; a PWA abre diretamente `/kingdom.html`, e o splash de instalação é gerado pelo sistema a partir do manifesto.
+## 11. Segurança e preservação
 
-A revisão de referências da branch removeu apenas arquivos de protótipo sem uso no produto atual:
-
-- **game-config.js:** configuração antiga com economia/entidades de um protótipo diferente. Não era importada pelo Worker, por nenhuma página HTML, nem pelo manifesto PWA.
-- **packages.js:** catálogo legado com preços/conteúdo desatualizados e abertura direta de WhatsApp. Não era importado pelo Worker nem carregado pelas páginas. A remoção evita deixar esse fluxo antigo disponível como asset estático.
-
-Arquivos deliberadamente mantidos:
-
-- **shared-world-coordinates.js:** dependência importada pelo Worker para distribuir castelos em um único mapa compartilhado Eldoria.
-- Os cinco GLBs do manifesto Kenney e as duas texturas colormap.png: todos os GLBs estão habilitados no manifesto e validados pelo pipeline; as texturas são recursos locais referenciados pelos modelos.
-- Os arquivos de licença e README dos assets: permanecem no Git para proveniência e manutenção, mas .assetsignore impede que sejam publicados como arquivos públicos.
-- migrations/, dados D1, secrets, backups, documentação de arquitetura e módulos do Worker: não foram apagados nem alterados remotamente.
-
-**Validação automatizada concluída:** execução GitHub Actions #44372734562, commit abf8f4c85659e8b47a6fa84e47320f196dbf2135:
-- 298/298 testes Node aprovados.
-- 7/7 testes Playwright aprovados, incluindo layouts Android e navegação do mapa por gesto.
-- Validação de migrações locais, Preview local, Service Worker, manifesto/arquivos 3D e bundle Worker aprovadas.
-- O bundle Worker foi somente validado em --dry-run; não houve publicação.
-
-**Aviso não bloqueante ainda existente:** o smoke test informativo contra produção registra que a página /arena.html publicada não corresponde às antigas expectativas de compra manual por WhatsApp do script scripts/production-smoke.js. A etapa é continue-on-error e a CI global permanece verde; isso não comprova que a loja de produção usa WhatsApp nem que pagamentos foram validados nesta PR. Não alteramos o fluxo de pagamento durante esta rodada.
-## Referências oficiais Android adicionais
-- [Diretrizes de qualidade adaptativa Android](https://developer.android.com/docs/quality-guidelines/adaptive-app-quality): compatibilidade de layout em telefones, tablets, dobráveis e janelas redimensionáveis.
-- [Diretrizes de qualidade principal e alvos de toque](https://developer.android.com/develop/adaptive-apps/quality-guidelines/core-app-quality): alvo de toque mínimo de 48 dp e requisitos de contraste/foco.
-- [Gestos de toque no Android](https://developer.android.com/develop/ui/views/touch-and-input/gestures): arrasto e gestos multitoque devem seguir comportamentos previsíveis e não substituir ações essenciais.
-
-## 8. Bloqueios externos ainda necessários
-
-- Acesso/verificação da conta Play Console.
-- Domínio definitivo e Application ID confirmado.
-- Certificado/assinatura e fingerprint Play App Signing.
-- Digital Asset Links com valores reais.
-- Integração Google Play Billing no catálogo e Worker.
-- Política de privacidade, Data safety e respostas do proprietário.
-- Teste físico Android, grupo de teste fechado (quando aplicável) e revisão da Play.
-
-**Segurança:** esta preparação não publica Worker, não altera secrets, não executa migrações remotas, não modifica D1 de produção e não envia AAB à loja.
-
-
-## Hub de sete eventos — evolução Android
-
-A tela de eventos passa a apresentar um catálogo responsivo com sete identidades visuais originais, artes SVG leves e estados explícitos:
-- Anjo da Morte: combate mundial já conectado ao Worker, com perdas, classificação e distribuição de recompensas idempotente.
-- Ascensão de Valhalla: modo sazonal condicionado ao estado retornado por `/api/config/valhalla`; permanece desativado até ativação protegida no servidor.
-- Caçada Selvagem: existem tabelas de persistência, mas o controlador de combate/premiação ainda não está integrado.
-- Shiva e Khali: chefes em preparação, com arte original e prévias de prêmios não creditáveis.
-- Cerco de Eldoria e Torneio dos Campeões: conceitos vinculados às bases de Alianças/Arena; calendário, placar e pagamentos sazonais ainda pendentes.
-
-Prêmios previstos dos cinco eventos futuros são marcados como **prévia**, nunca como saldo ou item disponível. A PWA atualiza o shell para v36 e pré-carrega catálogo, CSS e artes para navegação visual mais estável no Android. API, estado de combate e sincronização de conta continuam online; cache offline não habilita gameplay ou resgate offline.
-
-Não foram removidos módulos existentes por nome ou tamanho. Nenhum arquivo do projeto foi comprovadamente órfão nesta rodada; exclusões só serão feitas depois de verificar todas as referências estáticas, dinâmicas, manifesto e Service Worker.
-
-
-## Hub de sete eventos — evolução Android
-
-A central de eventos lista sete eventos com artes vetoriais locais e estados separados: Anjo da Morte já conectado ao Worker; Valhalla condicionado à ativação no servidor; Caçada Selvagem, Shiva, Khali, Cerco de Eldoria e Torneio dos Campeões em preparação, com prêmios visivelmente marcados como prévias e sem crédito no inventário.
-
-
-## Progressão de equipamentos e atributos de combate
-
-A forja possui cinco trilhas por espaço: arma, elmo, armadura, botas e acessório. Cada trilha percorre quatro raridades, Comum → Raro → Épico → Lendário. Para fabricar o próximo estágio o reino precisa possuir e destravar a peça anterior, cumprir as pesquisas exigidas e pagar ouro/ferro. A peça anterior não é consumida; itens existentes continuam no inventário.
-
-Os cinco equipamentos lendários finais são Mjölnir, Coroa de Izzy, Égide de Asgard, Grevas da Valquíria e Talismã das Valquírias. Cada peça tem estatísticas próprias e evolui por nível. Quando as cinco peças estão equipadas e destravadas no mesmo herói, o conjunto concede +1% ataque, +1% defesa e +0,5% vida. Os atributos somados continuam sujeitos aos limites do sistema.
-
-As skins de castelo compradas possuem valores individuais de ataque e defesa, preenchidos pela migração D1 0028. Para o catálogo inicial de 200 skins, a fórmula atribui valores distintos de 0,35% a 2,34% para cada atributo. O Worker só aplica o bônus se a skin estiver na propriedade do jogador e equipada no reino; o cliente não envia nem escolhe os percentuais. Os visuais colecionáveis nórdicos, cosméticos sazonais e fusões continuam puramente visuais.
-
-Os atributos entram nos cálculos PvE e no Anjo da Morte. A camada PvP permanece fora deste escopo enquanto o sistema PvP não estiver implementado. A migração altera apenas novas colunas e valores da tabela `skins`; nenhum equipamento do inventário existente é apagado. O shell da PWA foi atualizado para v37 para incluir as alterações de Forja e os recursos visuais.
-
-
-A migração 0028 possui também o gatilho `trg_skins_combat_attributes_after_insert`, para atribuir percentuais aos itens cadastrados depois da execução inicial. O gatilho não sobrescreve atributos diferentes de zero definidos explicitamente pelo administrador.
+Esta preparação documental não autoriza deploy, migração remota, alteração de secrets, criação de jogadores de QA na produção, alteração de saldos/inventários nem publicação de AAB. A publicação do Worker continua dependente do fluxo manual protegido, backup/Time Travel e smoke test somente de leitura.
