@@ -21,6 +21,44 @@ const HERO_RARITY = Object.freeze({
 });
 const HERO_STAR_COST = Object.freeze({2:10,3:20,4:40,5:80,6:150,7:300});
 
+const HERO_COMBAT_PROFILES = Object.freeze({
+  soldado_basico:{attack:0.9,defense:0.5,health:0.2,critical:0},
+  arqueiro_comum:{attack:1.2,defense:0.2,health:0,critical:0.35},
+  cavaleiro_iniciante:{attack:0.8,defense:0.8,health:0.7,critical:0},
+  curandeiro_aldeia:{attack:0.2,defense:0.7,health:1,critical:0},
+  capitao_espada:{attack:1.6,defense:1.1,health:0.5,critical:0},
+  mestre_arco:{attack:1.8,defense:0.2,health:0,critical:0.7},
+  cavaleiro_dragao:{attack:2,defense:0.7,health:0.7,critical:0.15},
+  sacerdotisa_luar:{attack:0.6,defense:1.2,health:1.5,critical:0},
+  rei_artur:{attack:2,defense:1.8,health:1.3,critical:0.25},
+  merlin_arquimago:{attack:2.2,defense:0.5,health:0.5,critical:1},
+  joana_darc:{attack:1.3,defense:2.2,health:1.5,critical:0},
+  genghis_khan:{attack:2.4,defense:0.4,health:0.3,critical:0.6},
+  kael_sunwarden:{attack:2.2,defense:1.7,health:1,critical:0.15},
+  odin_awakened:{attack:1.8,defense:1.8,health:1.2,critical:0.3},
+  thor_ragnarok:{attack:2.8,defense:0.6,health:0.5,critical:0.4},
+  freya_vanir:{attack:1.1,defense:1.7,health:1.6,critical:0.3},
+  loki_chaos:{attack:2,defense:0.6,health:0.3,critical:1.2},
+  valhalla_king:{attack:2,defense:1.8,health:1.5,critical:0.4}
+});
+
+export function getHeroCombatBonuses(hero = {}) {
+  const key = String(hero.hero_key || "");
+  const profile = HERO_COMBAT_PROFILES[key] || {attack:0,defense:0,health:0,critical:0};
+  const rarity = HERO_RARITY[normalizedRarity(hero.rarity)];
+  const level = integerInRange(hero.level, 1, 1, rarity.maxLevel);
+  const stars = integerInRange(hero.stars, 1, 1, rarity.maxStars);
+  const levelProgress = rarity.maxLevel > 1 ? (level - 1) / (rarity.maxLevel - 1) : 1;
+  const starProgress = rarity.maxStars > 1 ? (stars - 1) / (rarity.maxStars - 1) : 1;
+  const progression = 0.45 + levelProgress * 0.35 + starProgress * 0.20;
+  return {
+    attackPercent: Number((profile.attack * progression).toFixed(2)),
+    defensePercent: Number((profile.defense * progression).toFixed(2)),
+    healthPercent: Number((profile.health * progression).toFixed(2)),
+    criticalChancePercent: Number((profile.critical * progression).toFixed(2))
+  };
+}
+
 const SEASONAL_PORTRAITS = Object.freeze({
   odin_awakened:"odin",
   thor_ragnarok:"thor",
@@ -103,7 +141,8 @@ export function heroView(row = {}) {
     skill_power: Number(template?.skillPower || 1),
     fragments_to_next: HERO_STAR_COST[stars + 1] || null,
     portrait_symbol: portrait,
-    portrait_alt: name + " — " + title
+    portrait_alt: name + " — " + title,
+    combat_bonuses: getHeroCombatBonuses({ ...row, hero_key: heroKey, rarity: row.rarity, level, stars })
   };
 }
 
