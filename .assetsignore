@@ -10,6 +10,23 @@ node_modules/**
 dist/**
 game-adapter.js
 package.json
+
+# Worker-only modules are bundled by worker.js and must not be published as browser assets.
+angel-death-event.js
+api-rate-limit.js
+battle-replay.js
+email-system.js
+kingdom-queue-rules.js
+mercadopago-orders.js
+pets.js
+player-accounts.js
+rally.js
+search-ranking.js
+shared-world-coordinates.js
+valhalla-admin.js
+valhalla-config.js
+valhalla-rewards.js
+valhalla-shop.js
 scripts/vendor-three.mjs
 docs/**
 
