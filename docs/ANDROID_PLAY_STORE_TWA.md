@@ -29,7 +29,7 @@ Referências:
 ## 2. Estado técnico comprovado no repositório
 
 - A PWA possui `manifest.json`, modo `standalone`, ícones e entrada em `/kingdom.html`.
-- O Service Worker atual é `clash-of-izzy-shell-v41`; ele mantém o shell, os módulos Three.js same-origin e os retratos SVG de heróis em cache e exclui as rotas `/api/*` do cache.
+- O Service Worker atual é `clash-of-izzy-shell-v42`; ele mantém o shell, os módulos Three.js same-origin e os retratos SVG de heróis em cache e exclui as rotas `/api/*` do cache.
 - Three.js está fixado em `0.187.0`; os loaders/decodificadores usados pelo jogo são empacotados localmente.
 - A cidade 3D possui fallback visual quando WebGL falha ou perde o contexto.
 - O shell offline permite abrir recursos previamente armazenados, mas **não** torna offline login, economia, marchas, batalhas, compras ou sincronização D1.
