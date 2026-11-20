@@ -24,6 +24,9 @@ test("Master approval queue is protected by admin session and grants packages on
   assert.ok(worker.includes("status='pending'"));
   assert.ok(worker.includes("status='approved'"));
   assert.ok(worker.includes("reviewed_at=CURRENT_TIMESTAMP"));
+  assert.ok(worker.includes('decision==="approve"&&(pending.payment_method==="mercadopago_link"||pending.mp_order_id)'));
+  assert.ok(worker.includes("somente o webhook após confirmação do pagamento pode liberar este item."));
+  assert.ok(worker.includes("r.mp_order_id,r.mp_payment_status"));
   assert.ok(worker.includes("UPDATE players SET gems=gems+?"));
   assert.ok(worker.includes("changes()=1 AND EXISTS(SELECT 1 FROM purchase_requests"));
   assert.ok(worker.includes("INSERT OR IGNORE INTO player_skins"));
