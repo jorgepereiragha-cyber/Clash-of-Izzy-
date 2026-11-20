@@ -29,7 +29,7 @@ Referências:
 ## 2. Estado técnico comprovado no repositório
 
 - A PWA possui `manifest.json`, modo `standalone`, ícones e entrada em `/kingdom.html`.
-- O Service Worker atual é `clash-of-izzy-shell-v40`; ele mantém o shell, os módulos Three.js same-origin e os retratos SVG de heróis em cache e exclui as rotas `/api/*` do cache.
+- O Service Worker atual é `clash-of-izzy-shell-v41`; ele mantém o shell, os módulos Three.js same-origin e os retratos SVG de heróis em cache e exclui as rotas `/api/*` do cache.
 - Three.js está fixado em `0.187.0`; os loaders/decodificadores usados pelo jogo são empacotados localmente.
 - A cidade 3D possui fallback visual quando WebGL falha ou perde o contexto.
 - O shell offline permite abrir recursos previamente armazenados, mas **não** torna offline login, economia, marchas, batalhas, compras ou sincronização D1.
@@ -149,7 +149,7 @@ Foram removidos somente arquivos identificados como protótipo legado ou sem con
 - `game-config.js`: configuração de um protótipo distinto, com economia e entidades que não correspondem ao Worker/D1 atual.
 - `packages.js`: catálogo estático antigo com preços/conteúdo desatualizados e abertura direta de WhatsApp; não era carregado pelas páginas atuais.
 - `scripts/post-processing.js`: pipeline opcional sem consumidor ativo na renderização atual. Bloom/FXAA/Nordic Grade não devem ser anunciados como efeitos ativos.
-- `icons/premium-icons.svg`: sprite SVG de símbolos de recursos sem consumidor encontrado nas páginas e módulos de interface revisados; a referência operacional encontrada era apenas o pré-cache. O arquivo foi removido e a entrada saiu do shell, agora `clash-of-izzy-shell-v40`.
+- `icons/premium-icons.svg`: sprite SVG de símbolos de recursos sem consumidor encontrado nas páginas e módulos de interface revisados; a referência operacional encontrada era apenas o pré-cache. O arquivo foi removido e a entrada saiu do shell, agora `clash-of-izzy-shell-v41`.
 - `assets/art/heroes/portraits.svg`: retratos de heróis adicionados à experiência de apresentação; o sprite é utilizado pelos cartões e foi incorporado ao precache v40. O arquivo é mantido porque tem consumidor real.
 - Módulos exclusivos do Worker (`angel-death-event.js`, `api-rate-limit.js`, `battle-replay.js`, `email-system.js`, `kingdom-queue-rules.js`, `mercadopago-orders.js`, `pets.js`, `player-accounts.js`, `rally.js`, `search-ranking.js`, `shared-world-coordinates.js`, `hero-catalog.js` e módulos server-side de Valhalla) continuam no Git e no bundle do Worker, mas foram excluídos dos assets estáticos pelo `.assetsignore`. Isso reduz os arquivos publicados e evita expor endpoints de arquivo desnecessários; não remove módulos necessários do backend.
 - `splash-screen.html`: arquivo sem rota, link ou consumidor; não era o ponto de entrada da PWA. O splash de instalação da PWA e o splash da TWA devem ser tratados pelas configurações próprias de cada distribuição.
