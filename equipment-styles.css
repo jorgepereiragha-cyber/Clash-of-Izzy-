@@ -172,3 +172,40 @@
 .equipment-tier-card .forge-action{width:100%;min-height:42px;margin-top:auto;font-size:11px}
 @media(max-width:680px){.equipment-progression-stages{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:360px){.equipment-progression-stages{grid-template-columns:1fr}}
+
+
+/* Original vector relic gallery: responsive, accessible and touch-friendly. */
+.pantheon-skin-sets{margin:22px 0;padding:15px;border:1px solid #8c7045;border-radius:15px;background:linear-gradient(150deg,#17283b,#0d1725);box-shadow:0 12px 28px #0003}
+.pantheon-skin-header{display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap}
+.pantheon-skin-header h2{margin:0;color:#ffe2a5;font-size:1.2rem}
+.pantheon-skin-header p{margin:7px 0 0;color:#c5d1df;font-size:13px;line-height:1.5;max-width:620px}
+.pantheon-set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,310px),1fr));gap:13px;margin-top:14px}
+.pantheon-set-card{min-width:0;padding:12px;border:1px solid var(--pantheon-accent,#b99556);border-radius:13px;background:linear-gradient(155deg,#22364d,#111f31);box-shadow:inset 0 1px #ffffff12}
+.pantheon-set-header{display:flex;align-items:center;gap:10px}
+.pantheon-set-emblem{display:grid;place-items:center;flex:0 0 46px;width:46px;height:46px;border:1px solid var(--pantheon-accent,#b99556);border-radius:12px;background:#0b1726;color:#ffe4a5;font-size:26px}
+.pantheon-set-heading{flex:1;min-width:0}
+.pantheon-set-heading h3{margin:0;color:#fff0ca;font-size:15px;line-height:1.25}
+.pantheon-set-heading p{margin:4px 0 0;color:#bac9d9;font-size:11px;line-height:1.35}
+.pantheon-set-count{color:#ffe0a0;font-variant-numeric:tabular-nums;font-size:14px}
+.pantheon-set-description{margin:9px 0;color:#ccd7e2;font-size:12px;line-height:1.45}
+.pantheon-set-progress{height:7px;margin:9px 0 8px;overflow:hidden;border-radius:99px;background:#08121f;border:1px solid #43546a}
+.pantheon-set-progress span{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--pantheon-accent,#b99556),#fff0b4);transition:width .2s ease}
+.pantheon-set-milestones{display:flex;gap:5px;flex-wrap:wrap;margin:7px 0}
+.pantheon-milestone{padding:4px 7px;border:1px solid #56677a;border-radius:7px;color:#9eacbb;font-size:10px}
+.pantheon-milestone.is-active{border-color:#b99959;color:#ffdfa0;background:#7c5b2626}
+.pantheon-next-threshold,.pantheon-active-bonus{margin:7px 0;color:#dfd3b6;font-size:11px;line-height:1.4}
+.pantheon-active-bonus{color:#aee0c3}
+.pantheon-relic-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(125px,1fr));gap:8px;margin-top:11px}
+.pantheon-relic-card{display:flex;flex-direction:column;align-items:stretch;min-width:0;gap:6px;padding:8px;border:1px solid #506278;border-radius:10px;background:linear-gradient(150deg,#1b2c40,#132033)}
+.pantheon-relic-card[data-equipped="true"]{border-color:#dfbf76;box-shadow:0 0 0 1px #dfbf7640,inset 0 0 18px #bd99451a}
+.pantheon-relic-art{display:block;width:68px;height:68px;align-self:center;filter:drop-shadow(0 4px 8px #0007)}
+.pantheon-relic-details{display:grid;gap:3px;flex:1;min-width:0}
+.pantheon-relic-details strong{color:#fff0cd;font-size:12px;line-height:1.3}
+.pantheon-relic-slot{color:#f2cd82;font-size:10px;font-weight:800;text-transform:uppercase;letter-spacing:.05em}
+.pantheon-relic-details p{margin:0;color:#c2cfdb;font-size:10px;line-height:1.4}
+.pantheon-relic-details small{color:#d7b875;font-size:10px;text-transform:capitalize}
+.pantheon-skin-action{width:100%;min-height:44px;margin-top:auto;padding:9px 6px;border:1px solid var(--pantheon-accent,#b99556);border-radius:8px;background:#5a4328;color:#fff0c9;font-size:10px;font-weight:900;line-height:1.2}
+.pantheon-skin-action:disabled{opacity:.55;cursor:wait}
+.pantheon-set-bonus-summary{padding:10px;border:1px solid #4e7898;border-radius:9px;background:linear-gradient(130deg,#1c344c,#152237);color:#d8ebff;font-weight:700;font-size:12px;line-height:1.5}
+.pantheon-empty-state{padding:12px;color:#c8d3df;font-size:13px}
+@media(max-width:390px){.pantheon-skin-sets{padding:10px}.pantheon-set-card{padding:9px}.pantheon-relic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pantheon-relic-art{width:60px;height:60px}}

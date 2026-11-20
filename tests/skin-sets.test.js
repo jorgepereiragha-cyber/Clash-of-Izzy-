@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
 import { SKIN_SET_CATALOG, PANTHEON_SKIN_ITEMS, buildSkinSetGallery, getSkinSetBonuses } from "../skin-sets.js";
 
 function ownedSetPieces(set, count = 5) {
@@ -84,4 +85,14 @@ test("galeria informa propriedade, espaço equipado e próximo marco", () => {
   assert.equal(complete.activeThresholds.length, 3);
   assert.equal(complete.activeBonuses.attackPercent, 2.25);
   assert.equal(complete.activeBonuses.defensePercent, 2);
+});
+
+
+test("cada peça dos panteões possui arte vetorial local para a galeria e o modo offline", async () => {
+  const sprite = await readFile(new URL("../assets/art/skins/pantheon-relics.svg", import.meta.url), "utf8");
+  for (const set of SKIN_SET_CATALOG) {
+    for (const item of set.items) {
+      assert.ok(sprite.includes('<symbol id="' + item.id + '"'), "ilustração ausente: " + item.id);
+    }
+  }
 });

@@ -33,6 +33,7 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
       offlinePage: Boolean(await cache.match("/offline.html")),
       manifest: Boolean(await cache.match("/manifest.json")),
       kingdomArtwork: Boolean(await cache.match("/assets/art/landing-kingdom.svg")),
+      pantheonArtwork: Boolean(await cache.match("/assets/art/skins/pantheon-relics.svg")),
       androidRuntime: Boolean(await cache.match("/scripts/pwa-runtime.js")),
       androidStyles: Boolean(await cache.match("/styles/android-experience.css")),
       eventsCatalog: Boolean(await cache.match("/event-catalog.js")),
@@ -46,6 +47,7 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(shellState.offlinePage).toBe(true);
   expect(shellState.manifest).toBe(true);
   expect(shellState.kingdomArtwork).toBe(true);
+  expect(shellState.pantheonArtwork).toBe(true);
   expect(shellState.androidRuntime).toBe(true);
   expect(shellState.androidStyles).toBe(true);
   expect(shellState.eventsCatalog).toBe(true);

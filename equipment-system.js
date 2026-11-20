@@ -143,16 +143,6 @@
       button.addEventListener("click",()=>perform({type:"cosmetic_buy",skin:id},"Skin "+skin.name+" adquirida."));
       card.append(title,rarity,description,button);return card;
     }));
-    if(requestedSkinSearch&&!searchFocusApplied){
-      const needle=normalizeSearch(requestedSkinSearch);
-      const matches=[...grid.children].filter(card=>normalizeSearch(card.textContent).includes(needle));
-      if(matches.length){
-        matches[0].style.outline="3px solid #ffe09a";
-        matches[0].scrollIntoView({behavior:"smooth",block:"center"});
-        setStatus("Skin localizada pela busca global: "+requestedSkinSearch+".");
-      }else setStatus("A skin pesquisada não foi encontrada no catálogo cosmético atual.");
-      searchFocusApplied=true;
-    }
     $("skin-gems").textContent="Gemas: "+fmt(state?.player?.gems);
     $("skin-shards").textContent="Fragmentos: "+fmt(cosmetics.shards);
     const collection=cosmetics.collections?.find(item=>item.id==="col_norse");
@@ -161,6 +151,165 @@
     const claim=$("claim-norse-collection");
     claim.disabled=busy||!complete||claimed;
     claim.textContent=claimed?"RECOMPENSA RESGATADA":complete?"RESGATAR COLEÇÃO · +5.000 GEMAS / 200 FRAGMENTOS":"COLEÇÃO "+skins.filter(([id])=>owned.has(id)).length+"/6";
+  }
+  function describeSkinBonuses(bonuses={}){
+    const fields=[["attackPercent","ATQ"],["defensePercent","DEF"],["healthPercent","VIDA"],["criticalChancePercent","CRÍT"]];
+    const parts=fields.map(([key,label])=>{
+      const value=Number(bonuses[key]||0);
+      return value>0?label+" +"+value.toFixed(2)+"%":null;
+    }).filter(Boolean);
+    return parts.length?parts.join(" · "):"Nenhum bônus ativo";
+  }
+  function renderPantheonSkinSets(){
+    const root=$("pantheon-skin-set-grid");
+    if(!root)return;
+    const cosmetics=state?.cosmetics||{};
+    const sets=Array.isArray(cosmetics.skinSets)?cosmetics.skinSets:[];
+    root.replaceChildren();
+    if(!sets.length){
+      const empty=document.createElement("p");
+      empty.className="pantheon-empty-state";
+      empty.textContent="As coleções de relíquias serão exibidas aqui quando o catálogo estiver disponível.";
+      root.append(empty);
+    }else{
+      const accents={
+        egyptian_solar_court:"#d7a94b",
+        sumerian_first_light:"#c88b54",
+        mesopotamian_ishtar_gate:"#4c9dc3",
+        poseidon_abyssal_tide:"#53b4bf"
+      };
+      for(const set of sets){
+        const card=document.createElement("article");
+        card.className="pantheon-set-card";
+        card.dataset.setId=String(set.id||"");
+        card.dataset.theme=String(set.theme||"");
+        card.style.setProperty("--pantheon-accent",accents[set.id]||"#c8a56a");
+
+        const header=document.createElement("header");
+        header.className="pantheon-set-header";
+        const emblem=document.createElement("span");
+        emblem.className="pantheon-set-emblem";
+        emblem.setAttribute("aria-hidden","true");
+        emblem.textContent=set.icon||"✧";
+        const heading=document.createElement("div");
+        heading.className="pantheon-set-heading";
+        const title=document.createElement("h3");
+        title.textContent=set.name||"Conjunto ancestral";
+        const subtitle=document.createElement("p");
+        subtitle.textContent=set.subtitle||set.theme||"Relíquias lendárias";
+        heading.append(title,subtitle);
+        const count=document.createElement("strong");
+        count.className="pantheon-set-count";
+        const equippedCount=Math.max(0,Number(set.equippedCount)||0);
+        const totalPieces=Math.max(1,Number(set.totalPieces)||5);
+        count.textContent=equippedCount+"/"+totalPieces;
+        header.append(emblem,heading,count);
+
+        const description=document.createElement("p");
+        description.className="pantheon-set-description";
+        description.textContent=set.description||"Cinco peças ancestrais formam este conjunto.";
+
+        const progress=document.createElement("div");
+        progress.className="pantheon-set-progress";
+        progress.setAttribute("role","progressbar");
+        progress.setAttribute("aria-label","Peças equipadas de "+(set.name||"conjunto"));
+        progress.setAttribute("aria-valuemin","0");
+        progress.setAttribute("aria-valuemax",String(totalPieces));
+        progress.setAttribute("aria-valuenow",String(Math.min(totalPieces,equippedCount)));
+        const fill=document.createElement("span");
+        fill.style.width=(Math.min(totalPieces,equippedCount)/totalPieces*100)+"%";
+        progress.append(fill);
+
+        const milestones=document.createElement("div");
+        milestones.className="pantheon-set-milestones";
+        const active=Array.isArray(set.activeThresholds)?set.activeThresholds:[];
+        for(const threshold of active){
+          const milestone=document.createElement("span");
+          milestone.className="pantheon-milestone is-active";
+          milestone.textContent="✓ "+threshold.label;
+          milestones.append(milestone);
+        }
+        const next=set.nextThreshold;
+        const nextLine=document.createElement("p");
+        nextLine.className="pantheon-next-threshold";
+        nextLine.textContent=next
+          ?"Próximo marco ("+next.pieces+" peças): "+next.label+" · "+describeSkinBonuses(next.bonuses)
+          :"Todos os marcos deste panteão estão ativos.";
+        const activeBonus=document.createElement("p");
+        activeBonus.className="pantheon-active-bonus";
+        activeBonus.textContent="Bônus equipado: "+describeSkinBonuses(set.activeBonuses||{});
+
+        const items=document.createElement("div");
+        items.className="pantheon-relic-grid";
+        for(const item of (Array.isArray(set.items)?set.items:[])){
+          const itemCard=document.createElement("article");
+          itemCard.className="pantheon-relic-card";
+          itemCard.dataset.itemId=String(item.id||"");
+          itemCard.dataset.equipped=String(Boolean(item.equipped));
+
+          const art=document.createElementNS("http://www.w3.org/2000/svg","svg");
+          art.setAttribute("class","pantheon-relic-art");
+          art.setAttribute("viewBox","0 0 160 160");
+          art.setAttribute("role","img");
+          art.setAttribute("aria-label",item.name||"Relíquia ancestral");
+          const use=document.createElementNS("http://www.w3.org/2000/svg","use");
+          use.setAttribute("href","/assets/art/skins/pantheon-relics.svg#"+String(item.id||""));
+          art.append(use);
+
+          const details=document.createElement("div");
+          details.className="pantheon-relic-details";
+          const name=document.createElement("strong");
+          name.textContent=item.name||"Relíquia";
+          const slot=document.createElement("span");
+          slot.className="pantheon-relic-slot";
+          slot.textContent=item.slotLabel||item.slot||"Peça";
+          const visual=document.createElement("p");
+          visual.textContent=item.visual||"Artefato ancestral de acabamento único.";
+          const rarity=document.createElement("small");
+          rarity.textContent=item.rarity||"Lendária";
+          details.append(name,slot,visual,rarity);
+
+          const button=document.createElement("button");
+          button.type="button";
+          button.className="pantheon-skin-action";
+          button.disabled=busy;
+          button.textContent=item.equipped
+            ?"DESEQUIPAR"
+            :item.owned?"EQUIPAR":"COMPRAR · "+fmt(item.price)+" gemas";
+          button.setAttribute("aria-label",button.textContent+" "+(item.name||"relíquia"));
+          button.addEventListener("click",()=>{
+            if(item.equipped){
+              perform({type:"skin_set_unequip",slot:item.slot},"Relíquia "+item.name+" removida.");
+            }else if(item.owned){
+              perform({type:"skin_set_equip",itemId:item.id},"Relíquia "+item.name+" equipada.");
+            }else{
+              perform({type:"cosmetic_buy",skin:item.id},"Relíquia "+item.name+" adquirida.");
+            }
+          });
+          itemCard.append(art,details,button);
+          items.append(itemCard);
+        }
+        card.append(header,description,progress,milestones,nextLine,activeBonus,items);
+        root.append(card);
+      }
+    }
+    const summary=$("pantheon-set-bonus-summary");
+    if(summary)summary.textContent="Bônus combinados em combate: "+describeSkinBonuses(cosmetics.skinSetBonuses||{});
+  }
+  function focusSearchedSkin(){
+    if(!requestedSkinSearch||searchFocusApplied)return;
+    const roots=[$("norse-skin-list"),$("pantheon-skin-set-grid")].filter(Boolean);
+    const cards=roots.flatMap(root=>Array.from(root.querySelectorAll(".norse-skin-card,.pantheon-relic-card")));
+    const needle=normalizeSearch(requestedSkinSearch);
+    const match=cards.find(card=>normalizeSearch(card.textContent).includes(needle));
+    if(match){
+      match.style.outline="3px solid #ffe09a";
+      match.scrollIntoView({behavior:"smooth",block:"center"});
+      setStatus("Skin localizada pela busca global: "+requestedSkinSearch+".");
+    }else{
+      setStatus("A skin pesquisada não foi encontrada no catálogo cosmético atual.");
+    }
+    searchFocusApplied=true;
   }
   function renderHeroGallery(){
     const root=$("hero-roster-grid"),count=$("hero-roster-count");
@@ -382,6 +531,8 @@
     if(!heroes.length)setStatus("Convoque um herói para usar seus equipamentos. O inventário já está salvo.",true);
     else if(selectedHero)setStatus("Herói selecionado: "+(selectedHero.hero_name||selectedHero.hero_key)+". Cada slot aceita um item.");
     renderNorseSkins();
+    renderPantheonSkinSets();
+    focusSearchedSkin();
     renderForge();
   }
   async function refresh(){

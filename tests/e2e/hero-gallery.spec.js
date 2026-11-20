@@ -1,8 +1,10 @@
 import { test, expect } from "@playwright/test";
+import { buildSkinSetGallery } from "../../skin-sets.js";
 
 const TOKEN = "playwright-hero-fixture-token";
 
 function makeHeroState() {
+  const pantheonGallery = buildSkinSetGallery([]);
   const item = {
     id: "iron_sword",
     name: "Lâmina de Ferro",
@@ -59,7 +61,7 @@ function makeHeroState() {
     equipmentCatalog: [],
     equipmentResearch: [],
     equipmentProgression: [],
-    cosmetics: { skins: {}, owned: [], collections: [], claimed: [], shards: 0 },
+    cosmetics: { skins: {}, owned: [], collections: [], claimed: [], shards: 0, skinSets: pantheonGallery.sets, skinSetBonuses: pantheonGallery.bonuses },
     castleSkins: [],
     inventoryItems: [],
     buildings: [{ building_type: "academy", level: 1 }],
@@ -131,8 +133,15 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
 
   const spriteResponse = await request.get("/assets/art/heroes/portraits.svg");
   expect(spriteResponse.ok()).toBe(true);
+  const pantheonSpriteResponse = await request.get("/assets/art/skins/pantheon-relics.svg");
+  expect(pantheonSpriteResponse.ok()).toBe(true);
 
   await page.goto("/equipment-ui.html");
+  await expect(page.locator("#pantheon-skin-set-grid .pantheon-set-card")).toHaveCount(4);
+  await expect(page.locator("#pantheon-skin-set-grid")).toContainText("Corte Solar do Egito");
+  await expect(page.locator("#pantheon-skin-set-grid [data-set-id='egyptian_solar_court'] .pantheon-relic-card")).toHaveCount(5);
+  await expect(page.locator("#pantheon-skin-set-grid [data-item-id='eg_ra_crown'] .pantheon-relic-art use")).toHaveAttribute("href", "/assets/art/skins/pantheon-relics.svg#eg_ra_crown");
+  await expect(page.locator("#pantheon-skin-set-grid [data-item-id='eg_ra_crown'] .pantheon-skin-action")).toHaveText("COMPRAR · 1.400 gemas");
   await expect(page.locator(".hero-roster-card")).toHaveCount(1);
   await expect(page.locator(".hero-roster-name")).toHaveText("Kael");
   await expect(page.locator(".hero-roster-portrait use")).toHaveAttribute("href", /portraits\.svg#kael$/);
