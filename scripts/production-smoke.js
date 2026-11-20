@@ -203,7 +203,7 @@ export async function runProductionSmokeTests({
       pagePath + " ainda depende do CDN do Three.js.");
   }
 
-  for (const modulePath of ["/engine/asset-loader.js", "/scripts/kingdom-3d.js", "/world-map-3d.js", "/scripts/post-processing.js"]) {
+  for (const modulePath of ["/engine/asset-loader.js", "/scripts/kingdom-3d.js", "/world-map-3d.js", "/scripts/ambient-particles.js"]) {
     const moduleResponse = await get(modulePath);
     assert(moduleResponse.status === 200, modulePath + " indisponível.");
     const moduleBody = await moduleResponse.text();

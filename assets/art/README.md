@@ -67,3 +67,10 @@
 - O manifesto GLB existe, mas ainda está vazio; nenhum modelo artístico GLB/KTX2 real foi publicado no projeto.
 - O pipeline está preparado para GLB/Draco/KTX2, mas precisa de assets licenciados, validação de tamanho, LOD e testes visuais em Android físico.
 - Não marcar o trabalho como concluído só porque o módulo 3D ou o bundle compila.
+
+
+## Arte original dos eventos
+
+O catálogo `assets/art/events/` contém sete ilustrações SVG vetoriais originais para os cards da central de eventos. Foram desenhadas para renderização rápida no Android, sem dependência de CDN, fontes remotas ou imagens raster de grande resolução. Cada arquivo possui título/descrição acessíveis e usa a paleta medieval azul-real, dourado e sombras profundas. As imagens de Shiva e Khali são simbólicas e respeitosas; não reproduzem imagens religiosas existentes.
+
+As artes representam a identidade visual planejada, não comprovam a implementação dos respectivos combates. O estado funcional continua sendo definido pelo Worker: Anjo da Morte é jogável; Valhalla depende da configuração sazonal; os outros cinco aparecem como experiências em preparação com recompensas explicitamente classificadas como prévias.

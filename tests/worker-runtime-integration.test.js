@@ -641,6 +641,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(catalog.skins.length, 6, "catálogo de lançamento permanece limitado a seis skins");
       assert.ok(vip?.id, "pacote VIP aparece no catálogo");
       assert.ok(skin?.id && skin?.name, "skin existente aparece no catálogo");
+      assert.ok(Number(skin.attack_bonus_percent) >= 0.35 && Number(skin.attack_bonus_percent) <= 2.34, "skin apresenta bônus de ataque individual");
+      assert.ok(Number(skin.defense_bonus_percent) >= 0.35 && Number(skin.defense_bonus_percent) <= 2.34, "skin apresenta bônus de defesa individual");
 
       expectStatus(await admin("/api/admin/unlock-skin", {
         playerId: playerA, skin: skin.name,
@@ -739,6 +741,19 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c2", "c3"] }, 200);
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c1", "c2"] }, 400, "fusão com skins repetidas");
       await action(tokenA, { type: "shop_buy", item: "acc_5min", source: "shop" }, 200);
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdoms SET food=1000000,wood=1000000,stone=1000000,iron=1000000,gold=1000000 WHERE id=" + kingdomA + ";",
+      ]);
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const exchangeOffer = stateA.shop?.exchangeOffers?.[0];
+      assert.ok(exchangeOffer?.id, "Mercador retorna ofertas de troca");
+      await action(tokenA, { type: "merchant_exchange", offerId: exchangeOffer.id }, 200);
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      assert.ok(stateA.shop.inventory.some(item => item.item_id === exchangeOffer.reward.item && item.quantity > 0),
+        "troca entrega acelerador no inventário canônico");
+      await action(tokenA, { type: "merchant_exchange", offerId: "troca_inexistente" }, 409, "troca fora da rotação");
       await action(tokenA, { type: "seasonal_buy", skin: "s1" }, 409, "compra sazonal sem gemas suficientes");
       await action(tokenA, { type: "cosmetic_buy", skin: "skin_inexistente" }, 400, "skin cosmética inválida");
     });
@@ -748,17 +763,26 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const heroId = Number(stateA.heroes?.[0]?.id);
       assert.ok(heroId > 0, "herói inicial tem identidade persistente");
 
-      await action(tokenA, { type: "equipment_upgrade", itemId: "espada_guerreiro" }, 200);
-      await action(tokenA, { type: "equipment_equip", itemId: "espada_guerreiro", heroId }, 200);
-      await action(tokenA, { type: "equipment_unequip", itemId: "espada_guerreiro", heroId }, 200);
-      await action(tokenA, { type: "equipment_lock", itemId: "espada_guerreiro" }, 200);
-      await action(tokenA, { type: "equipment_lock", itemId: "espada_guerreiro" }, 200);
+      await action(tokenA, { type: "equipment_upgrade", itemId: "iron_sword" }, 200);
+      await action(tokenA, { type: "equipment_equip", itemId: "iron_sword", heroId }, 200);
+      await action(tokenA, { type: "equipment_unequip", itemId: "iron_sword", heroId }, 200);
+      await action(tokenA, { type: "equipment_lock", itemId: "iron_sword" }, 200);
+      await action(tokenA, { type: "equipment_lock", itemId: "iron_sword" }, 200);
       await action(tokenA, { type: "equipment_craft", itemId: "rune_spear" }, [400, 409], "forja com pré-requisitos não concluídos");
       await action(tokenA, { type: "equipment_equip", itemId: "item_inexistente", heroId }, 400, "equipamento inexistente");
 
       await action(tokenA, { type: "dragon_upgrade" }, 200);
       await action(tokenA, { type: "hero_train", hero: "kael_sunwarden" }, 200);
       await action(tokenA, { type: "hero_summon", quantity: 1 }, 200);
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const heroOffer = stateA.heroShop?.offers?.[0];
+      assert.ok(heroOffer?.heroKey, "Loja de heróis apresenta apenas heróis recrutados");
+      const fragmentsBefore = Number(stateA.heroInventory.find(hero => hero.hero_key === heroOffer.heroKey)?.fragments || 0);
+      await action(tokenA, { type: "hero_shop_buy", heroKey: heroOffer.heroKey }, 200);
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const fragmentsAfter = Number(stateA.heroInventory.find(hero => hero.hero_key === heroOffer.heroKey)?.fragments || 0);
+      assert.equal(fragmentsAfter, fragmentsBefore + Number(heroOffer.quantity), "compra credita fragmentos ao herói correto");
+      await action(tokenA, { type: "hero_shop_buy", heroKey: "heroi_nao_recrutado" }, 404, "fragmentos de herói não recrutado");
       await action(tokenA, { type: "hero_evolve", hero: "heroi_inexistente" }, 404);
       await action(tokenA, { type: "prestige" }, 409, "prestígio sem castelo nível 30");
       await action(tokenA, { type: "battle" }, 200, "batalha PvE");
@@ -776,6 +800,16 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const barracksLevelBefore = Number(stateA.buildings.find(item => item.building_type === "barracks")?.level || 0);
       await action(tokenA, { type: "upgrade", building: "building_invalid" }, 400);
       await action(tokenA, { type: "upgrade", building: "castle" }, 200);
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const activeConstruction = stateA.queues.find(queue => queue.queue_type === "construction" && queue.status === "running");
+      assert.ok(activeConstruction?.id, "a melhoria do castelo cria fila ativa");
+      const previousCompletion = Date.parse(activeConstruction.completes_at);
+      await action(tokenA, { type: "queue_speedup", queueId: activeConstruction.id, itemId: "acc_5min", quantity: 1 }, 200);
+      stateA = (await api("/api/game/state", { token: tokenA })).data.state;
+      const acceleratedQueue = stateA.queues.find(queue => Number(queue.id) === Number(activeConstruction.id));
+      assert.ok(!acceleratedQueue || acceleratedQueue.status === "completed" || Date.parse(acceleratedQueue.completes_at) < previousCompletion,
+        "acelerador reduz o prazo da fila ou a conclui");
+      await action(tokenA, { type: "queue_speedup", queueId: activeConstruction.id, itemId: "train_1h", quantity: 1 }, [400,409], "acelerador incompatível");
 
       // Conclui o upgrade inicial localmente para liberar melhorias secundárias.
       await runCli([
@@ -882,14 +916,14 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     await t.test("todas as 34 ações previstas foram alcançadas no fluxo de integração", async () => {
       const actionTypes = [
         "set_nickname","equipment_craft","equipment_upgrade","equipment_equip","equipment_unequip","equipment_lock",
-        "cosmetic_buy","cosmetic_claim","seasonal_buy","skin_fuse","shop_buy","alliance_create","alliance_join",
+        "cosmetic_buy","cosmetic_claim","seasonal_buy","skin_fuse","shop_buy","merchant_exchange","hero_shop_buy","queue_speedup","alliance_create","alliance_join",
         "alliance_invite","alliance_accept_invite","alliance_promote","alliance_kick","alliance_donate","alliance_help",
         "alliance_chat","alliance_war_declare","alliance_claim_territory","alliance_leave","dragon_upgrade","hero_summon",
         "hero_evolve","hero_train","prestige","upgrade","train","research","march","battle","rename",
       ];
-      assert.equal(actionTypes.length, 34);
+      assert.equal(actionTypes.length, 37);
       assert.deepEqual([...executedActions].sort(), [...actionTypes].sort(),
-        "cada um dos 34 tipos de ação deve ter sido enviado ao Worker autenticado");
+        "cada um dos 37 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
   } finally {
     if (workerProcess && workerProcess.exitCode === null) {

@@ -34,3 +34,13 @@ assets/art/README.md
 
 # Model documentation is not a public game asset.
 assets/models/README.md
+
+# Keep asset provenance and licence texts in Git, not in the public static asset directory.
+assets/3d/README.md
+assets/3d/licenses/
+
+# Node/CLI diagnostics and validation scripts are CI/build tooling, never browser assets.
+scripts/diagnose-production-endpoint.js
+scripts/production-smoke.js
+scripts/validate-3d-assets.js
+scripts/validate-core-loop.sh

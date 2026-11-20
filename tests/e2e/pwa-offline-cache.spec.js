@@ -4,7 +4,7 @@ import { test, expect } from "@playwright/test";
 // This isolated spec opts in so it can validate the real PWA lifecycle.
 test.use({ serviceWorkers: "allow" });
 
-const SHELL_CACHE = "clash-of-izzy-shell-v28";
+const SHELL_CACHE = "clash-of-izzy-shell-v39";
 const CACHED_MODEL = "/assets/3d/kenney/castle-kit/Models/GLB%20format/tower-square.glb";
 
 test("PWA activates its Service Worker and serves previously cached shell and GLB offline", async ({ page, context }) => {
@@ -29,12 +29,29 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
       present: names.includes(cacheName),
       offlinePage: Boolean(await cache.match("/offline.html")),
       manifest: Boolean(await cache.match("/manifest.json")),
+      kingdomArtwork: Boolean(await cache.match("/assets/art/landing-kingdom.svg")),
+      androidRuntime: Boolean(await cache.match("/scripts/pwa-runtime.js")),
+      androidStyles: Boolean(await cache.match("/styles/android-experience.css")),
+      eventsCatalog: Boolean(await cache.match("/event-catalog.js")),
+      eventsStyles: Boolean(await cache.match("/styles/events-hub.css")),
+      shivaArtwork: Boolean(await cache.match("/assets/art/events/shiva.svg")),
+      khaliArtwork: Boolean(await cache.match("/assets/art/events/khali.svg")),
     };
   }, SHELL_CACHE);
 
   expect(shellState.present).toBe(true);
   expect(shellState.offlinePage).toBe(true);
   expect(shellState.manifest).toBe(true);
+  expect(shellState.kingdomArtwork).toBe(true);
+  expect(shellState.androidRuntime).toBe(true);
+  expect(shellState.androidStyles).toBe(true);
+  expect(shellState.eventsCatalog).toBe(true);
+  expect(shellState.eventsStyles).toBe(true);
+  expect(shellState.shivaArtwork).toBe(true);
+  expect(shellState.khaliArtwork).toBe(true);
+
+  const landingArtwork = await page.locator(".landing-kingdom-art").evaluate(image => ({ complete: image.complete, naturalWidth: image.naturalWidth }));
+  expect(landingArtwork).toEqual({ complete: true, naturalWidth: 900 });
 
   // GLBs are cached at runtime by the existing same-origin Cache API strategy.
   const onlineModel = await page.evaluate(async url => {

@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#142b44">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="description" content="Mercador de Eldoria, trocas por aceleradores e loja de fragmentos de heróis.">
+  <link rel="stylesheet" href="/styles/coi-theme.css">
+  <link rel="stylesheet" href="/styles/navigation.css">
+  <link rel="stylesheet" href="/market.css">
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+  <title>Mercador & Heróis — Clash of Izzy</title>
+</head>
+<body>
+  <main class="market-shell">
+    <header class="market-heading">
+      <div>
+        <p class="eyebrow">ECONOMIA DE ELDORIA</p>
+        <h1>Mercador & Loja de Heróis</h1>
+        <p class="market-intro">Troque recursos excedentes por acelerações, aproveite ofertas rotativas e fortaleça os heróis que já recrutou.</p>
+      </div>
+      <button id="market-refresh" class="button-secondary" type="button">↻ Atualizar</button>
+    </header>
+
+    <div class="market-status" id="market-status" role="status" aria-live="polite">Conectando ao reino…</div>
+
+    <section class="wallet-grid" aria-label="Saldos do reino">
+      <div class="wallet-card"><span>🌾 Comida</span><strong id="balance-food">—</strong></div>
+      <div class="wallet-card"><span>🪵 Madeira</span><strong id="balance-wood">—</strong></div>
+      <div class="wallet-card"><span>🪨 Pedra</span><strong id="balance-stone">—</strong></div>
+      <div class="wallet-card"><span>⛓️ Ferro</span><strong id="balance-iron">—</strong></div>
+      <div class="wallet-card"><span>🪙 Ouro</span><strong id="balance-gold">—</strong></div>
+      <div class="wallet-card"><span>💎 Gemas</span><strong id="balance-gems">—</strong></div>
+    </section>
+
+    <nav class="market-tabs" aria-label="Seções do mercado">
+      <a href="#merchant">Mercador</a>
+      <a href="#hero-shop">Loja de Heróis</a>
+      <a href="#accelerators">Aceleradores</a>
+      <a href="#official-shop">Loja do Reino</a>
+    </nav>
+
+    <section class="market-section" id="merchant">
+      <div class="section-heading">
+        <div><p class="eyebrow">ROTAÇÃO DE 8 HORAS</p><h2>Mercador de Eldoria</h2><p>Trocas limitadas de recursos por aceleradores. Cada reino tem estoque próprio.</p></div>
+        <span class="refresh-clock" id="merchant-refresh">Próxima rotação: —</span>
+      </div>
+      <div id="merchant-exchanges" class="market-grid">
+        <p class="empty-state">Carregando ofertas de troca…</p>
+      </div>
+      <div class="subsection-heading"><h3>Ofertas especiais</h3><span>Compras com gemas · estoque limitado</span></div>
+      <div id="merchant-specials" class="market-grid compact-grid">
+        <p class="empty-state">Carregando ofertas…</p>
+      </div>
+    </section>
+
+    <section class="market-section" id="hero-shop">
+      <div class="section-heading">
+        <div><p class="eyebrow">EVOLUÇÃO DE COMANDANTES</p><h2>Loja de Heróis</h2><p>Compre fragmentos dos heróis que você já possui. Os fragmentos são creditados diretamente na ficha do herói.</p></div>
+        <span class="refresh-clock">Sem duplicar inventários</span>
+      </div>
+      <div id="hero-offers" class="market-grid">
+        <p class="empty-state">Carregando heróis…</p>
+      </div>
+      <div class="subsection-heading"><h3>Recrutamento de Heróis</h3><span>Convocações com gemas · sem duplicar coleções</span></div>
+      <div id="hero-recruitment" class="recruitment-grid">
+        <p class="empty-state">Carregando opções de recrutamento…</p>
+      </div>
+    </section>
+
+    <section class="market-section" id="accelerators">
+      <div class="section-heading">
+        <div><p class="eyebrow">INVENTÁRIO E TEMPO</p><h2>Aceleradores</h2><p>Use os itens no tipo correto de fila. A redução é validada e aplicada pelo servidor.</p></div>
+      </div>
+      <div id="accelerator-inventory" class="accelerator-inventory"></div>
+      <div class="subsection-heading"><h3>Filas em andamento</h3><span>Construção · Treino · Pesquisa</span></div>
+      <div id="active-queues" class="queue-list">
+        <p class="empty-state">Carregando filas…</p>
+      </div>
+    </section>
+
+    <section class="market-section" id="official-shop">
+      <div class="section-heading">
+        <div><p class="eyebrow">CATÁLOGO DO REINO</p><h2>Loja do Reino</h2><p>Itens já cadastrados no catálogo do jogo. O preço e a moeda são definidos pelo servidor.</p></div>
+      </div>
+      <div id="official-products" class="market-grid compact-grid">
+        <p class="empty-state">Carregando catálogo…</p>
+      </div>
+    </section>
+
+    <footer class="market-footer">
+      <a href="/kingdom.html">← Voltar ao reino</a>
+      <a href="/equipment-ui.html">Abrir Forja e equipamentos →</a>
+    </footer>
+  </main>
+  <script src="/scripts/pwa-runtime.js" defer></script>
+  <script src="/market.js" defer></script>
+  <script src="/navigation.js" defer></script>
+</body>
+</html>

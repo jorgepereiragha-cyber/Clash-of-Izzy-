@@ -1,7 +1,7 @@
 // Equipamentos persistentes: inventário e loadout são validados pelo Worker.
 (() => {
   const API="/api";
-  let token=null,state=null,selected="coroa_izzy",selectedHeroId=null,busy=false,searchFocusApplied=false;
+  let token=null,state=null,selected="iron_sword",selectedHeroId=null,busy=false,searchFocusApplied=false;
   const requestedSkinSearch=new URLSearchParams(location.search).get("search")||"";
   const normalizeSearch=value=>String(value||"").normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR");
   const $=id=>document.getElementById(id);
@@ -45,30 +45,87 @@
         card.append(title,description,level,cost,gate,button);return card;
       }));
     }
+    const progressionRoot=$("equipment-progression-grid");
+    if(progressionRoot){
+      progressionRoot.replaceChildren();
+      for(const path of (state?.equipmentProgression||[])){
+        const lane=document.createElement("section");lane.className="equipment-progression-lane";
+        const heading=document.createElement("h3");heading.textContent=path.label;
+        const stages=document.createElement("div");stages.className="equipment-progression-stages";
+        for(const stage of path.stages||[]){
+          const card=document.createElement("article");card.className="equipment-tier-card rarity-"+stage.rarity;
+          const rarity=document.createElement("span");rarity.className="equipment-tier-rarity";rarity.textContent=stage.tierLabel||stage.rarity;
+          const title=document.createElement("strong");title.textContent=(stage.icon||"⚔️")+" "+stage.name;
+          const status=document.createElement("small");
+          status.textContent=stage.owned?(stage.isLocked?"Possuída · bloqueada":"Adquirida · Nv. "+stage.level):stage.available?"Disponível para forjar":"Aguardando raridade anterior";
+          const stats=document.createElement("p");
+          const base=stage.base||{};
+          stats.textContent="Ataque "+formatGearStat("attack",base.attack||0)+" · Defesa "+formatGearStat("defense",base.defense||0)+" · Vida "+formatGearStat("health",base.health||0);
+          card.append(rarity,title,status,stats);
+          if(!stage.owned&&stage.available&&stage.craft){
+            const requirements=Object.entries(stage.requiredResearch||{});
+            const missing=requirements.filter(([key,required])=>(levels.get(key)||0)<required);
+            const enough=Number(state?.kingdom?.gold||0)>=Number(stage.craft.gold||0)&&Number(state?.kingdom?.iron||0)>=Number(stage.craft.iron||0);
+            const action=document.createElement("button");action.type="button";action.className="forge-action";
+            action.disabled=busy||missing.length>0||!enough;
+            action.textContent=!enough?"RECURSOS INSUFICIENTES":missing.length?"PESQUISE PRIMEIRO":"⚒️ FORJAR";
+            action.addEventListener("click",()=>perform({type:"equipment_craft",itemId:stage.id},"Equipamento "+stage.name+" forjado. A próxima raridade foi liberada."));
+            card.append(action);
+            if(missing.length){
+              const gate=document.createElement("small");
+              gate.textContent="Pesquisa necessária: "+missing.map(([key,required])=>(research.find(x=>x.id===key)?.name||key)+" Nv. "+required).join(", ");
+              card.append(gate);
+            }else{
+              const cost=document.createElement("small");
+              cost.textContent="Custo: "+fmt(stage.craft.gold)+" ouro · "+fmt(stage.craft.iron)+" ferro";
+              card.append(cost);
+            }
+          }else if(stage.requiresItem&&!stage.owned){
+            const dependency=document.createElement("small");
+            dependency.textContent="Requer: "+(state?.equipmentCatalog||[]).find(x=>x.id===stage.requiresItem)?.name;
+            card.append(dependency);
+          }
+          stages.append(card);
+        }
+        lane.append(heading,stages);progressionRoot.append(lane);
+      }
+    }
+    const pathItemIds=new Set((state?.equipmentProgression||[]).flatMap(path=>(path.stages||[]).map(stage=>stage.id)));
     const catalogGrid=$("forge-catalog-list");
     if(catalogGrid){
-      const available=(state?.equipmentCatalog||[]).filter(item=>item.craft&&!item.owned);
+      const available=(state?.equipmentCatalog||[]).filter(item=>item.craft&&!item.owned&&!pathItemIds.has(item.id));
       catalogGrid.replaceChildren(...(available.length?available.map(item=>{
         const card=document.createElement("article");card.className="forge-card";
         const title=document.createElement("h3");title.textContent=(item.icon||"⚔️")+" "+item.name;
-        const rarity=document.createElement("small");rarity.textContent=(item.rarity||"").toUpperCase()+" · "+(slotLabels[item.slot]||item.slot);
+        const rarity=document.createElement("small");rarity.textContent=(item.tierLabel||item.rarity||"").toUpperCase()+" · "+(slotLabels[item.slot]||item.slot);
         const description=document.createElement("p");description.textContent=item.description||"Equipamento forjado no reino.";
         const stats=document.createElement("p");stats.className="forge-stats";stats.textContent="Atributos iniciais: "+Object.entries(item.base||{}).map(([key,value])=>(labels[key]||key)+": "+formatGearStat(key,value)).join(" · ");
         const requirements=Object.entries(item.requiredResearch||{});
         const missing=requirements.filter(([key,required])=>(levels.get(key)||0)<required);
-        const requirementText=document.createElement("small");requirementText.textContent=missing.length?"Pesquisa necessária: "+missing.map(([key,required])=>(research.find(x=>x.id===key)?.name||key)+" Nv. "+required).join(", "):"Requisitos de pesquisa atendidos";
+        const predecessor=item.requiresItem?(state?.equipment||[]).find(x=>x.id===item.requiresItem):null;
+        const missingPredecessor=Boolean(item.requiresItem&&!predecessor);
+        const requirementText=document.createElement("small");
+        requirementText.textContent=missingPredecessor?"Requer: "+((state?.equipmentCatalog||[]).find(x=>x.id===item.requiresItem)?.name||item.requiresItem):missing.length?"Pesquisa necessária: "+missing.map(([key,required])=>(research.find(x=>x.id===key)?.name||key)+" Nv. "+required).join(", "):"Requisitos atendidos";
         const cost=document.createElement("p");cost.className="forge-cost";cost.textContent="Custo: "+fmt(item.craft.gold)+" ouro · "+fmt(item.craft.iron)+" ferro";
-        const button=document.createElement("button");button.type="button";button.className="forge-action";
         const enough=Number(state?.kingdom?.gold||0)>=Number(item.craft.gold||0)&&Number(state?.kingdom?.iron||0)>=Number(item.craft.iron||0);
-        button.disabled=busy||missing.length>0||!enough;
-        button.textContent=!enough?"RECURSOS INSUFICIENTES":missing.length?"PESQUISE PRIMEIRO":"⚒️ FORJAR";
-        button.addEventListener("click",()=>perform({type:"equipment_craft",itemId:item.id},"Equipamento "+item.name+" forjado e adicionado ao inventário."));
+        const button=document.createElement("button");button.type="button";button.className="forge-action";
+        button.disabled=busy||missing.length>0||!enough||missingPredecessor;
+        button.textContent=missingPredecessor?"FORJE A PEÇA ANTERIOR":!enough?"RECURSOS INSUFICIENTES":missing.length?"PESQUISE PRIMEIRO":"⚒️ FORJAR";
+        button.addEventListener("click",()=>perform({type:"equipment_craft",itemId:item.id},"Equipamento "+item.name+" forjado."));
         card.append(title,rarity,description,stats,requirementText,cost,button);return card;
-      }):[(()=>{const empty=document.createElement("p");empty.textContent="Todos os projetos disponíveis já foram forjados.";return empty;})()]));
+      }):[(()=>{const empty=document.createElement("p");empty.textContent="Nenhum projeto alternativo disponível.";return empty;})()]));
     }
     const bonus=state?.equipmentBonuses||{};
-    const summary=$("equipment-bonus-summary");
-    if(summary)summary.textContent="Bônus do herói ativo: Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%";
+    const summary=$("equipment-bonus-summary"),skinSummary=$("castle-skin-bonus-summary"),skin=state?.activeCastleSkin;
+    if(summary){
+      const setText=bonus.legendarySetActive===true?" · Conjunto completo: +1% Ataque / +1% Defesa / +0,5% Vida":"";
+      summary.textContent="Bônus do herói em combate: Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%"+setText;
+    }
+    if(skinSummary){
+      skinSummary.textContent=skin?.id
+        ?"Skin equipada: "+skin.name+" · Ataque +"+Number(skin.attackPercent||0).toFixed(2)+"% · Defesa +"+Number(skin.defensePercent||0).toFixed(2)+"%. Aplicada apenas enquanto esta skin continuar equipada."
+        :"Nenhuma skin paga equipada. Visuais cosméticos de coleção continuam sem bônus de combate.";
+    }
   }
   function renderNorseSkins(){
     const cosmetics=state?.cosmetics||{},catalog=cosmetics.skins||{},owned=new Set((cosmetics.owned||[]).map(item=>item.item_id));

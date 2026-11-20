@@ -2,14 +2,14 @@
  .coi-global-nav{position:relative;width:100%;position:relative;z-index:20;display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:9px max(12px,env(safe-area-inset-right)) 9px max(12px,env(safe-area-inset-left));background:rgba(8,14,24,.97);border-bottom:1px solid rgba(231,189,104,.58);box-shadow:0 5px 18px #0005;color:#f5edda;font:13px system-ui,sans-serif}
 .coi-nav-brand{display:flex;align-items:center;gap:8px;color:#e7bd68;text-decoration:none;letter-spacing:.07em;white-space:nowrap}.coi-nav-brand span{font-size:21px}
 .coi-nav-links{display:flex;align-items:center;gap:5px;flex:1;flex-wrap:wrap}
-.coi-nav-links a{display:inline-flex;align-items:center;gap:6px;padding:8px 10px;border:1px solid transparent;border-radius:8px;color:#dce5ef;text-decoration:none;font-weight:700}
+.coi-nav-links a{display:inline-flex;align-items:center;gap:6px;min-height:48px;padding:8px 10px;border:1px solid transparent;border-radius:8px;color:#dce5ef;text-decoration:none;font-weight:700}
 .coi-nav-links a:hover,.coi-nav-links a.active{background:#22364e;border-color:#80643b;color:#f1c46a}
 .coi-nav-search{position:relative;display:flex;min-width:min(100%,220px);max-width:300px;flex:0 1 260px}
 .coi-nav-search input{width:100%;min-width:0;padding:9px 10px;border:1px solid #52677d;border-radius:8px 0 0 8px;background:#101d30;color:#fff;font:inherit}
-.coi-nav-search button,.coi-nav-toggle{padding:8px 11px;border:1px solid #80643b;border-radius:0 8px 8px 0;background:#68451f;color:#fff;font-weight:800}
+.coi-nav-search button,.coi-nav-toggle{min-height:48px;padding:8px 11px;border:1px solid #80643b;border-radius:0 8px 8px 0;background:#68451f;color:#fff;font-weight:800}
 .coi-nav-results{position:absolute;top:calc(100% + 6px);right:0;width:min(340px,90vw);max-height:55vh;overflow:auto;padding:6px;border:1px solid #80643b;border-radius:10px;background:#101d30;box-shadow:0 12px 30px #0009;z-index:30}
 .coi-nav-results a{display:grid;gap:3px;padding:10px;border-radius:7px;color:#f5edda;text-decoration:none}.coi-nav-results a:hover{background:#22364e}.coi-nav-results small{color:#b9c5d4}.coi-nav-results p{margin:8px;color:#b9c5d4;line-height:1.4}.coi-nav-group-label{padding:7px 10px 4px;color:#e7bd68;font-size:11px;font-weight:900;letter-spacing:.06em;text-transform:uppercase}.coi-nav-results[aria-busy="true"]::after{content:"Pesquisando…";display:block;padding:7px 10px;color:#b9c5d4;font-size:11px}
-.coi-nav-toggle{display:none;border-radius:8px}.coi-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
+.coi-nav-toggle{display:none;min-width:48px;min-height:48px;border-radius:8px}.coi-sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}
 @media(max-width:760px){.coi-global-nav{gap:8px}.coi-nav-brand{flex:1}.coi-nav-toggle{display:inline-flex;align-items:center;gap:5px}.coi-nav-links{display:none;order:3;flex-basis:100%;align-items:stretch}.coi-nav-links.open{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}.coi-nav-links a{background:#14243a}.coi-nav-search{order:4;flex:1 1 100%;max-width:none}.coi-nav-results{left:0;right:auto;width:100%}}
 @media(prefers-reduced-motion:reduce){.coi-global-nav *{scroll-behavior:auto!important;transition:none!important}}
 

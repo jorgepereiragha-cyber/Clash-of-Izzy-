@@ -34,15 +34,14 @@ test("Three.js runtime is vendored from the exact pinned npm version", async () 
 });
 
 test("3D entry points and page import maps no longer depend on a Three.js CDN", async () => {
-  const [kingdom, world, postProcessing, kingdomHtml, worldHtml, arenaHtml] = await Promise.all([
+  const [kingdom, world, kingdomHtml, worldHtml, arenaHtml] = await Promise.all([
     read("scripts/kingdom-3d.js"),
     read("world-map-3d.js"),
-    read("scripts/post-processing.js"),
     read("kingdom.html"),
     read("world.html"),
     read("arena.html")
   ]);
-  for (const source of [kingdom, world, postProcessing, kingdomHtml, worldHtml, arenaHtml]) {
+  for (const source of [kingdom, world, kingdomHtml, worldHtml, arenaHtml]) {
     assert.doesNotMatch(source, /cdn\.jsdelivr\.net\/npm\/three/i);
   }
   for (const html of [kingdomHtml, worldHtml, arenaHtml]) {
@@ -57,14 +56,14 @@ test("3D entry points and page import maps no longer depend on a Three.js CDN", 
   assert.ok(engine.includes("dracoLoader.setDecoderPath(options.dracoPath || `${THREE_VENDOR_PATH}draco/`)"));
   assert.match(engine, /setMeshoptDecoder\(MeshoptDecoder\)/);
   assert.match(world, /from "three"/);
-  assert.match(postProcessing, /from "three\/addons\/postprocessing\/EffectComposer\.js"/);
+  assert.match(kingdomHtml, /scripts\/ambient-particles\.js/);
 });
 
 test("the Service Worker precaches all vendored Three.js modules and decoder binaries", async () => {
   const sw = await read("sw.js");
   assert.match(sw, /vendor\/three\/asset-manifest\.json/);
   assert.match(sw, /manifest\.assets/);
-  assert.match(sw, /clash-of-izzy-shell-v28/);
+  assert.match(sw, /clash-of-izzy-shell-v39/);
   assert.match(sw, /url\.pathname\.startsWith\("\/api\/"\)/);
 });
 
