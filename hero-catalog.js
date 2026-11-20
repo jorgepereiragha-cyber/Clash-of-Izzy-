@@ -11,7 +11,12 @@ const HERO_TEMPLATES = Object.freeze({
   merlin_arquimago:{name:"Merlin",title:"O Arquimago Supremo",rarity:"purple",type:"suporte",portrait:"mage",stats:{hp:2800,attack:650,defense:250,speed:65},skill:"Meteoro Ancestral",skillDesc:"Invoca destruição dos céus",skillPower:5},
   joana_darc:{name:"Joana D’Arc",title:"A Donzela de Ferro",rarity:"purple",type:"infantaria",portrait:"valkyrie",stats:{hp:4000,attack:450,defense:550,speed:60},skill:"Fé Divina",skillDesc:"Proteção sagrada absoluta",skillPower:4},
   genghis_khan:{name:"Genghis Khan",title:"O Flagelo de Deus",rarity:"purple",type:"cavalaria",portrait:"raider",stats:{hp:3200,attack:600,defense:300,speed:85},skill:"Horda Mongol",skillDesc:"Convoca exército de cavalaria",skillPower:4.8},
-  kael_sunwarden:{name:"Kael",title:"Guardião do Sol",rarity:"blue",type:"infantaria",portrait:"kael",stats:{hp:1400,attack:250,defense:180,speed:64},skill:"Lâmina Solar",skillDesc:"Golpe de luz que fortalece a linha de frente",skillPower:2.1}
+  kael_sunwarden:{name:"Kael",title:"Guardião do Sol",rarity:"blue",type:"infantaria",portrait:"kael",stats:{hp:1400,attack:250,defense:180,speed:64},skill:"Lâmina Solar",skillDesc:"Golpe de luz que fortalece a linha de frente",skillPower:2.1},
+  amun_ra_solar:{name:"Amon-Rá",title:"Soberano do Disco Solar",rarity:"purple",type:"infantaria",portrait:"amun-ra",theme:"egypt",aura:"solar",stats:{hp:4100,attack:640,defense:430,speed:62},skill:"Presença do Meio-Dia",skillDesc:"Passivo de comandante: amplia o poder ofensivo da formação",skillPower:4.7},
+  anubis_duat:{name:"Anúbis",title:"Guardião das Balanças do Duat",rarity:"purple",type:"infantaria",portrait:"anubis",theme:"egypt",aura:"duat",stats:{hp:4700,attack:430,defense:650,speed:50},skill:"Vigília do Duat",skillDesc:"Passivo de comandante: reforça a resistência da linha de frente",skillPower:4.5},
+  isis_eternal_wings:{name:"Ísis",title:"Senhora das Asas Eternas",rarity:"purple",type:"suporte",portrait:"isis",theme:"egypt",aura:"wings",stats:{hp:4300,attack:520,defense:560,speed:60},skill:"Manto de Ísis",skillDesc:"Passivo de comandante: fortalece a proteção e a sobrevivência do exército",skillPower:4.6},
+  horus_eternal_eye:{name:"Hórus",title:"Olho da Eternidade",rarity:"purple",type:"arqueiro",portrait:"horus",theme:"egypt",aura:"falcon",stats:{hp:3900,attack:700,defense:420,speed:70},skill:"Olho Celeste",skillDesc:"Passivo de comandante: favorece o ataque preciso e os golpes críticos",skillPower:4.8},
+  sekhmet_crimson_lioness:{name:"Sekhmet",title:"A Leoa Carmesim",rarity:"purple",type:"cavalaria",portrait:"sekhmet",theme:"egypt",aura:"crimson",stats:{hp:4500,attack:690,defense:450,speed:76},skill:"Fúria da Leoa",skillDesc:"Passivo de comandante: intensifica o ataque de choque",skillPower:4.9}
 });
 
 const HERO_RARITY = Object.freeze({
@@ -52,7 +57,12 @@ const HERO_COMBAT_PROFILES = Object.freeze({
   thor_ragnarok:{attack:2.8,defense:0.6,health:0.5,critical:0.4},
   freya_vanir:{attack:1.1,defense:1.7,health:1.6,critical:0.3},
   loki_chaos:{attack:2,defense:0.6,health:0.3,critical:1.2},
-  valhalla_king:{attack:2,defense:1.8,health:1.5,critical:0.4}
+  valhalla_king:{attack:2,defense:1.8,health:1.5,critical:0.4},
+  amun_ra_solar:{attack:2.6,defense:1.4,health:1.1,critical:0.4},
+  anubis_duat:{attack:1.4,defense:2.8,health:2.3,critical:0.1},
+  isis_eternal_wings:{attack:1.4,defense:2.2,health:2.4,critical:0.2},
+  horus_eternal_eye:{attack:2.8,defense:1,health:0.7,critical:0.7},
+  sekhmet_crimson_lioness:{attack:2.8,defense:1.2,health:1.1,critical:0.6}
 });
 
 export function getHeroCombatBonuses(hero = {}) {
@@ -155,6 +165,8 @@ export function heroView(row = {}) {
     fragments_to_next: HERO_STAR_COST[stars + 1] || null,
     portrait_symbol: portrait,
     portrait_alt: name + " — " + title,
+    theme_key: template?.theme || null,
+    aura_key: template?.aura || null,
     combat_bonuses: getHeroCombatBonuses({ ...row, hero_key: heroKey, rarity: row.rarity, level, stars })
   };
 }
