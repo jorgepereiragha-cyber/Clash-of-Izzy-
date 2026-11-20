@@ -19,7 +19,7 @@
 
 ## Cena atual
 - `kingdom.html` mantém a arte procedural 2D em Canvas como fallback para WebGL indisponível.
-- `scripts/kingdom-3d.js` adiciona uma cena isométrica Three.js com terreno, estrada, árvores, iluminação, até 16 edifícios 3D procedurais e mapas de textura tileáveis gerados por código para pedra, madeira, telhado, grama e estrada.
+- `scripts/kingdom-3d.js` adiciona uma cena isométrica Three.js com terreno, estrada, árvores, iluminação e edifícios procedurais com mapas de textura tileáveis para pedra, madeira, telhado, grama e estrada. A grade de posicionamento e a camada de controles HTML limitam atualmente a nove edifícios visíveis (3×3); os perfis low/balanced/high ainda declaram limites nominais de 8/12/16, mas o teto global de nove prevalece nos três perfis.
 - A vegetação usa `InstancedMesh` para agrupar partes repetidas em poucos draw calls. Os modelos procedurais antigos liberam geometrias e materiais próprios ao serem substituídos; texturas compartilhadas permanecem em cache.
 - `kingdom.html` declara um import map para que `GLTFLoader` e `KTX2Loader` resolvam a mesma instância do módulo `three` no navegador.
 - `assets/3d/manifest.json` é o catálogo versionado para substituição explícita por modelos GLB reais (`enabled: true`). O manifesto atualmente contém cinco entradas CC0 do Kenney habilitadas: duas estruturas (torre e muralha), dois props (trebuchet e árvore) e uma unidade (arqueiro). Os arquivos locais passam pela validação estrutural e de orçamento do CI. São assets reais de base, não a cobertura artística final de todos os edifícios, tropas, heróis, animações e cosméticos.
@@ -48,8 +48,8 @@
 
 ## Budgets adaptativos de cena (validados em CI)
 - Tier low: até 8 edifícios visíveis, DPR máximo 1.0, orçamento de 1,2 milhão de pixels e sombras desligadas.
-- Tier balanced: até 12 edifícios visíveis, DPR máximo 1.25 e orçamento de 2,4 milhões de pixels.
-- Tier high: até 16 edifícios visíveis, DPR máximo 1.5 e orçamento de 4,2 milhões de pixels.
+- Tier balanced: limite nominal de 12 edifícios, DPR máximo 1.25 e orçamento de 2,4 milhões de pixels; a grade atual continua limitada a nove edifícios visíveis.
+- Tier high: limite nominal de 16 edifícios, DPR máximo 1.5 e orçamento de 4,2 milhões de pixels; a grade atual continua limitada a nove edifícios visíveis.
 - O limite de pixels tem precedência sobre qualquer piso de resolução; em viewports extremos o DPR pode cair abaixo de 0.5 para não exceder o orçamento.
 - A quantidade de edifícios afeta apenas a representação 3D visível; o estado completo continua no servidor e na interface de gestão.
 
@@ -64,7 +64,7 @@
 
 ## Gaps reais antes de chamar a cidade de "arte final"
 - O castelo Meshy texturizado ainda não foi baixado nem incorporado; a cena usa o castelo procedural como fallback.
-- O manifesto GLB existe, mas ainda está vazio; nenhum modelo artístico GLB/KTX2 real foi publicado no projeto.
+- O manifesto GLB não está vazio: contém cinco assets CC0 genéricos da Kenney habilitados (torre, muralha, trebuchet, árvore e arqueiro). Ainda não há modelos GLB artísticos próprios para o castelo, os demais edifícios, o elenco de heróis e as demais tropas, nem um pacote artístico KTX2 final.
 - O pipeline está preparado para GLB/Draco/KTX2, mas precisa de assets licenciados, validação de tamanho, LOD e testes visuais em Android físico.
 - Não marcar o trabalho como concluído só porque o módulo 3D ou o bundle compila.
 
@@ -78,7 +78,7 @@ As artes representam a identidade visual planejada, não comprovam a implementa�
 
 ## Retratos do elenco de heróis
 
-`assets/art/heroes/portraits.svg` contém retratos vetoriais originais e leves para o elenco inicial e os heróis sazonais. O sprite é servido no mesmo domínio e pré-carregado pelo Service Worker v40; os cartões usam fragmentos SVG por herói, sem CDN ou imagens externas. Heróis sem arte individual usam um retrato de arquétipo (guarda, arqueiro, cavaleiro, suporte, comandante ou mago), evitando cartões vazios.
+`assets/art/heroes/portraits.svg` contém retratos vetoriais originais e leves para o elenco inicial e os heróis sazonais. O sprite é servido no mesmo domínio e pré-carregado pelo Service Worker v42; os cartões usam fragmentos SVG por herói, sem CDN ou imagens externas. Heróis sem arte individual usam um retrato de arquétipo (guarda, arqueiro, cavaleiro, suporte, comandante ou mago), evitando cartões vazios.
 
 Os atributos de apresentação vêm do catálogo canônico `hero-catalog.js` e, para heróis sazonais, do catálogo D1 de Valhalla. A fórmula aplica o crescimento de nível e estrela uma única vez; os valores-base de cada raridade não recebem um segundo multiplicador de raridade.
 
