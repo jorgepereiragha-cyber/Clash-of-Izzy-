@@ -40,6 +40,20 @@ test("Worker valida equipamento por propriedade e aplica bônus dos conjuntos no
   assert.ok(worker.includes("skin_sets:cosmeticState.skinSetBonuses"));
 });
 
+test("batalha PvE direta aplica bônus das coleções cosméticas equipadas e registra o replay", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const start = worker.indexOf('}else if(type==="battle"){');
+  const end = worker.indexOf('}else if(type==="rename"){', start);
+  assert.ok(start >= 0 && end > start, "rota da batalha PvE não encontrada");
+  const battleRoute = worker.slice(start, end);
+  assert.ok(battleRoute.includes("getCosmeticState(env,k.id)"));
+  assert.ok(battleRoute.includes("skinSetAttackBonusPercent:cosmeticState.skinSetBonuses.attackPercent"));
+  assert.ok(battleRoute.includes("skinSetDefenseBonusPercent:cosmeticState.skinSetBonuses.defensePercent"));
+  assert.ok(battleRoute.includes("skinSetHealthBonusPercent:cosmeticState.skinSetBonuses.healthPercent"));
+  assert.ok(battleRoute.includes("skinSetCriticalChancePercent:cosmeticState.skinSetBonuses.criticalChancePercent"));
+  assert.ok(battleRoute.includes("skin_sets:cosmeticState.skinSetBonuses"));
+});
+
 test("migração de loadout é aditiva e não apaga itens existentes", async () => {
   const migration = await readFile(new URL("../migrations/0029_skin_set_gallery.sql", import.meta.url), "utf8");
   assert.ok(migration.includes("ADD COLUMN equipped_slot TEXT"));
