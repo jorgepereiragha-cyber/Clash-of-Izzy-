@@ -34,3 +34,17 @@
 @media(max-width:420px){.hero-summon-section{padding:11px}.hero-summon-rates{grid-template-columns:1fr}.hero-summon-actions{grid-template-columns:1fr}}
 
 .hero-roster-combat{margin:2px 0;color:#b5d8f0;font-size:10px;line-height:1.35;font-weight:800}
+
+/* Original pantheon auras: restrained motion, no extra WebGL pass. */
+.hero-roster-card[data-hero-theme="egypt"]{border-color:#b58d45;background:radial-gradient(ellipse at 18% 12%,#6b4c2244,transparent 54%),linear-gradient(150deg,#28364a,#142235)}
+.hero-roster-card[data-hero-theme="egypt"] .hero-roster-portrait{box-shadow:0 0 0 1px #e9c56e,0 0 13px #d99b3f88}
+.hero-roster-card[data-hero-aura="solar"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #ffcf55) drop-shadow(0 0 15px #d98a32)}
+.hero-roster-card[data-hero-aura="duat"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #91a6d5) drop-shadow(0 0 14px #33466d)}
+.hero-roster-card[data-hero-aura="wings"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #66d8db) drop-shadow(0 0 14px #c4a5ec)}
+.hero-roster-card[data-hero-aura="falcon"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #78c8ff) drop-shadow(0 0 14px #dfb65b)}
+.hero-roster-card[data-hero-aura="crimson"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #ff7752) drop-shadow(0 0 14px #c33a36)}
+@media(prefers-reduced-motion:no-preference){
+ .hero-roster-card[data-hero-theme="egypt"] .hero-roster-portrait{animation:coi-egypt-aura 3.4s ease-in-out infinite alternate}
+}
+@keyframes coi-egypt-aura{from{filter:drop-shadow(0 0 4px #dca34c88)}to{filter:drop-shadow(0 0 9px #ffd36ecc) drop-shadow(0 0 16px #b7783d66)}}
+@media(prefers-reduced-motion:reduce){.hero-roster-card[data-hero-theme="egypt"] .hero-roster-portrait{animation:none}}
