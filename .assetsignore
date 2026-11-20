@@ -1,5 +1,6 @@
 worker.js
 wrangler.jsonc
+wrangler.preview-migrations.jsonc
 .assetsignore
 README.md
 .git/**
@@ -9,6 +10,7 @@ node_modules/**
 dist/**
 game-adapter.js
 package.json
+scripts/vendor-three.mjs
 docs/**
 
 # Build/runtime artifacts must never be published as public game assets.

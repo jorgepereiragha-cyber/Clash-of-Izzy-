@@ -90,7 +90,9 @@ test("leaderboard ties follow the same stable ordering as final reward payout", 
   assert.ok(worker.includes("last_attack_at<?"));
   assert.ok(worker.includes("kingdom_id<?"));
   assert.ok(worker.includes("ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC"));
-  assert.ok(worker.includes("offset+=15"));
+  assert.ok(worker.includes("ROW_NUMBER() OVER (ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC) AS final_rank"));
+  assert.ok(worker.includes("ORDER BY ranked.final_rank LIMIT 10"));
+  assert.ok(worker.includes("Number(participant.final_rank)||index+1"));
 });
 
 test("the browser reuses a pending attack request ID after a network retry", async () => {

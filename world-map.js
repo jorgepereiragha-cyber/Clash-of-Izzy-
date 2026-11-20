@@ -132,7 +132,8 @@ function renderMap() {
   const visualState = {
     territories: state.territories || [],
     marches: state.marches || [],
-    kingdomId: state.kingdom?.id || 0
+    kingdomId: state.kingdom?.id || 0,
+    castleSkinId: Number(state.kingdom?.equipped_skin_id || 0)
   };
   window.__coiWorldMapButtons = buttonRefs;
   window.__coiWorldMapState = visualState;

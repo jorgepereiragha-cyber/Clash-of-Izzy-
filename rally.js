@@ -200,11 +200,12 @@ async function recallNode(env,kingdomId,body){
  if(Number(result[0]?.meta?.changes||0)!==1)return reply({error:"O estado do nó mudou; atualize e tente novamente."},409);
  return reply({success:true,returned:entries.reduce((sum,[,count])=>sum+count,0)});
 }
-export async function processDueRallies(env){
+export async function processDueRallies(env,batchSize=1){
  if(!env?.DB)return;
  const now=Math.floor(Date.now()/1000);
- await env.DB.prepare("UPDATE rallies SET status='marching' WHERE status='gathering' AND departure_time<=?").bind(now).run();
- const due=await env.DB.prepare("SELECT id,leader_kingdom_id,target_id FROM rallies WHERE status='marching' AND arrival_time<=? ORDER BY arrival_time,id LIMIT 100").bind(now).all();
+ const limit=Math.max(1,Math.min(10,Math.floor(Number(batchSize)||1)));
+ await env.DB.prepare("UPDATE rallies SET status='marching' WHERE id IN (SELECT id FROM rallies WHERE status='gathering' AND departure_time<=? ORDER BY departure_time,id LIMIT ?)").bind(now,limit).run();
+ const due=await env.DB.prepare("SELECT id,leader_kingdom_id,target_id FROM rallies WHERE status='marching' AND arrival_time<=? ORDER BY arrival_time,id LIMIT ?").bind(now,limit).all();
  for(const rally of due.results||[]){
   const rows=await env.DB.prepare("SELECT troop_data FROM rally_reinforcements WHERE rally_id=? ORDER BY id").bind(rally.id).all();
   const garrison={};

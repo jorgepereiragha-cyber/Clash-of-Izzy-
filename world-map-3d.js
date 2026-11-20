@@ -1,4 +1,4 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
+import * as THREE from "three";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -28,6 +28,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   let disposed = false;
   let worldState = null;
   let activeMarches = [];
+  let homeCastleGroup = null;
   let projectionButtons = new Map();
   let lastFrameTime = 0;
   let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
@@ -88,6 +89,15 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     skin: new THREE.MeshStandardMaterial({ color: 0xd9ad82, roughness: .9 }),
     spear: new THREE.MeshStandardMaterial({ color: 0x9ca9a5, metalness: .38, roughness: .55 })
   };
+  const castleSkinMaterials = {
+    1:{wall:new THREE.MeshStandardMaterial({color:0xc7a86f,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xead5a3,roughness:.82}),roof:new THREE.MeshStandardMaterial({color:0x9b6627,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x8d401f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xf1d078,metalness:.25,roughness:.48})},
+    2:{wall:new THREE.MeshStandardMaterial({color:0xd2d0c5,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xf1ead4,roughness:.82}),roof:new THREE.MeshStandardMaterial({color:0x264d77,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x17385f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xe4bd68,metalness:.25,roughness:.48})},
+    3:{wall:new THREE.MeshStandardMaterial({color:0x887767,roughness:.9}),wallLight:new THREE.MeshStandardMaterial({color:0xb69b75,roughness:.82}),roof:new THREE.MeshStandardMaterial({color:0x5a3828,roughness:.72}),banner:new THREE.MeshStandardMaterial({color:0x5a2724,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xc6a15d,metalness:.25,roughness:.5})},
+    4:{wall:new THREE.MeshStandardMaterial({color:0xaaa2c8,roughness:.86}),wallLight:new THREE.MeshStandardMaterial({color:0xd8cbed,roughness:.8}),roof:new THREE.MeshStandardMaterial({color:0x5a4b8c,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x342d6f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xe2caef,metalness:.22,roughness:.5})},
+    5:{wall:new THREE.MeshStandardMaterial({color:0x9fb8ca,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xd9e8ee,roughness:.8}),roof:new THREE.MeshStandardMaterial({color:0x3e6b91,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x264869,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xc2e1ec,metalness:.22,roughness:.5})},
+    6:{wall:new THREE.MeshStandardMaterial({color:0xd29b65,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xf2c68a,roughness:.8}),roof:new THREE.MeshStandardMaterial({color:0x9e3d27,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x7c241f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xf5cf63,metalness:.28,roughness:.46})}
+  };
+
 
   function seeded(seed) {
     let value = (Number(seed) || 1) >>> 0;
@@ -215,26 +225,28 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     box(parent, .8, .42, .06, shared.banner, x + .61, y + height + 1.82, z);
   }
 
-  function createCastle(parent, x, z, scale = 1, color = "home") {
+  function createCastle(parent, x, z, scale = 1, color = "home", skinId = 0) {
     const group = new THREE.Group();
     group.position.set(x, terrainHeight(x, z), z);
     group.scale.setScalar(scale);
-    const wall = color === "enemy" ? shared.enemy : shared.stone;
-    const banner = color === "enemy" ? shared.enemy : shared.banner;
-    box(group, 5.6, 1.35, 4.5, wall, 0, .76, 0);
-    box(group, 3.2, 2.8, 3.1, shared.stoneLight, 0, 2.55, 0);
-    box(group, 1.15, 1.9, .18, shared.wood, 0, 1.1, 1.64);
-    for (const [tx, tz] of [[-2.5, -1.9], [2.5, -1.9], [-2.5, 1.9], [2.5, 1.9]]) {
-      const tower = new THREE.Group();
-      tower.position.set(tx, 0, tz);
-      group.add(tower);
-      box(tower, 1.25, 2.6, 1.25, shared.stone, 0, 1.3, 0);
-      box(tower, 1.42, .2, 1.42, shared.stoneLight, 0, 2.65, 0);
-      cone(tower, 1.05, 1.45, shared.roof, 0, 3.45, 0, 4);
+    const theme=castleSkinMaterials[Number(skinId)]||null;
+    const wall=theme?.wall||(color==="enemy"?shared.enemy:shared.stone);
+    const wallLight=theme?.wallLight||shared.stoneLight;
+    const roof=theme?.roof||shared.roof;
+    const banner=theme?.banner||(color==="enemy"?shared.enemy:shared.banner);
+    const accent=theme?.accent||shared.gold;
+    box(group,5.6,1.35,4.5,wall,0,.76,0);
+    box(group,3.2,2.8,3.1,wallLight,0,2.55,0);
+    box(group,1.15,1.9,.18,shared.wood,0,1.1,1.64);
+    for(const [tx,tz] of [[-2.5,-1.9],[2.5,-1.9],[-2.5,1.9],[2.5,1.9]]){
+      const tower=new THREE.Group();tower.position.set(tx,0,tz);group.add(tower);
+      box(tower,1.25,2.6,1.25,wall,0,1.3,0);
+      box(tower,1.42,.2,1.42,wallLight,0,2.65,0);
+      cone(tower,1.05,1.45,roof,0,3.45,0,4);
     }
-    cone(group, 1.8, 1.25, shared.roof, 0, 4.55, 0, 4);
-    box(group, .08, 1.85, .08, shared.gold, .55, 5.45, 0);
-    box(group, 1.0, .48, .07, banner, 1.02, 5.83, 0);
+    cone(group,1.8,1.25,roof,0,4.55,0,4);
+    box(group,.08,1.85,.08,accent,.55,5.45,0);
+    box(group,1.0,.48,.07,banner,1.02,5.83,0);
     parent.add(group);
     return group;
   }
@@ -261,7 +273,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     inset.rotation.y = Math.PI / 6;
 
     if (territory.territory_kind === "castle") {
-      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home");
+      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home", territory.castle_skin_id);
       return;
     }
 
@@ -420,6 +432,11 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   function setWorldState(nextState) {
     if (!nextState || !Array.isArray(nextState.territories)) return;
     worldState = nextState;
+    if(homeCastleGroup){
+      terrainRoot.remove(homeCastleGroup);
+      homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
+    }
+    homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(worldState.castleSkinId)||0);
     rebuildTerritories();
     rebuildRoads();
     rebuildMarches();
@@ -452,6 +469,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       renderer.domElement.remove();
     }
     Object.values(shared).forEach(material => material.dispose());
+    Object.values(castleSkinMaterials).forEach(theme => Object.values(theme).forEach(material => material.dispose()));
   }
 
   function init() {
@@ -487,7 +505,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       scene.add(worldRoot);
       worldRoot.add(terrainRoot, routeRoot, territoryRoot, armyRoot);
       createGround();
-      createCastle(terrainRoot, 0, 0, 1.4, "home");
+      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(window.__coiWorldMapState?.castleSkinId)||0);
       resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
       resizeObserver?.observe(host);
       window.addEventListener("resize", resize, { passive: true });

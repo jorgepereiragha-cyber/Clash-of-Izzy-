@@ -47,7 +47,7 @@ test("world map renders untrusted territory labels with DOM text, not HTML injec
 });
 
 test("PWA shell includes the world map and increments its cache version", () => {
-  for (const marker of ['clash-of-izzy-shell-v26', '"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  for (const marker of ['clash-of-izzy-shell-v28', '"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
   assert.ok(serviceWorker.includes('url.pathname.startsWith("/api/")'));
 });
 
@@ -94,4 +94,12 @@ test("map viewport transform is finite and deterministic", () => {
     mapViewportTransform({ zoom: Number.NaN, panX: Number.POSITIVE_INFINITY }),
     "translate3d(0px, 0px, 0) scale(1)"
   );
+});
+
+
+test("shared world map applies the local player's equipped skin to the central castle", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  assert.ok(script.includes("castleSkinId: Number(state.kingdom?.equipped_skin_id || 0)"));
+  assert.ok(scene.includes("homeCastleGroup=createCastle(terrainRoot,0,0,1.4,\"home\",Number(worldState.castleSkinId)||0)"));
+  assert.ok(scene.includes("Number(window.__coiWorldMapState?.castleSkinId)||0"));
 });

@@ -9,7 +9,7 @@ const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json",
 
 test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(kingdom, /type="module" src="\/scripts\/kingdom-3d\.js"/);
-  assert.match(kingdom, /drawKingdomScene\(buildings\)/);
+  assert.match(kingdom, /drawKingdomScene\(buildings,Number\(k\.equipped_skin_id\|\|0\)\)/);
   assert.match(renderer, /new THREE\.WebGLRenderer/);
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
   assert.match(renderer, /coi:kingdom-render/);
@@ -18,7 +18,7 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.ok(renderer.includes("new THREE.InstancedMesh"));
   assert.match(renderer, /addForestInstances/);
   assert.match(kingdom, /type="importmap"/);
-  assert.ok(kingdom.includes('"three":"https://cdn.jsdelivr.net'));
+  assert.ok(kingdom.includes('"three":"/vendor/three/build/three.module.js"'));
 });
 
 test("bundled CC0 models can render props and only display units present in the army", () => {
@@ -30,7 +30,7 @@ test("bundled CC0 models can render props and only display units present in the 
   assert.match(renderer, /cloneSkinned\(asset\.template\)/);
   assert.match(renderer, /new THREE\.AnimationMixer\(root\)/);
   assert.match(kingdom, /window\.__coiKingdomTroops=state\.troops\|\|\[\]/);
-  assert.match(kingdom, /detail:\{buildings,troops:state\.troops\|\|\[\]\}/);
+  assert.match(kingdom, /detail:\{buildings,troops:state\.troops\|\|\[\],castleSkinId:Number\(k\.equipped_skin_id\|\|0\)\}/);
 });
 
 test("quality profile uses the real viewport while the kingdom panel is initially hidden", () => {

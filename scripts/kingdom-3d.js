@@ -1,16 +1,19 @@
 /* Progressive Three.js kingdom renderer. Canvas art remains as offline/WebGL fallback. */
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
-import { GLTFLoader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/GLTFLoader.js";
-import { KTX2Loader } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/loaders/KTX2Loader.js";
-import { clone as cloneSkinned } from "https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/utils/SkeletonUtils.js";
+import * as THREE from "three";
+import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
+import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
+import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
+import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "./kingdom-quality.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
-  let renderer, scene, camera, resizeObserver, ktx2, gltfLoader, resizeHandler, qualityProfile;
+  let renderer, scene, camera, resizeObserver, ktx2, draco, gltfLoader, resizeHandler, qualityProfile;
   let latestBuildings = [];
   let latestTroops = [];
+  let latestCastleSkinId = 0;
   let activeModels = [];
   let activeProps = [];
   let activeTroops = [];
@@ -43,6 +46,14 @@ if (host && "WebGLRenderingContext" in window) {
     watchtower: ["#9c927b", "#24476B"], stable: ["#98734e", "#31577D"],
     archery_range: ["#a49a6c", "#456B4E"], siege_workshop: ["#827466", "#52677D"],
     embassy: ["#b0a18a", "#31577D"], warehouse: ["#9b886a", "#24476B"]
+  };
+  const castleSkinPalettes = {
+    1:{wall:"#c7a86f",roof:"#9b6627",stone:"#ead5a3",accent:"#f1d078",banner:"#8d401f",seal:"#f6dc92"},
+    2:{wall:"#d2d0c5",roof:"#264d77",stone:"#f1ead4",accent:"#e4bd68",banner:"#17385f",seal:"#dcecf5"},
+    3:{wall:"#887767",roof:"#5a3828",stone:"#b69b75",accent:"#c6a15d",banner:"#5a2724",seal:"#d8b776"},
+    4:{wall:"#aaa2c8",roof:"#5a4b8c",stone:"#d8cbed",accent:"#e2caef",banner:"#342d6f",seal:"#e8d7f4"},
+    5:{wall:"#9fb8ca",roof:"#3e6b91",stone:"#d9e8ee",accent:"#c2e1ec",banner:"#264869",seal:"#edf8ff"},
+    6:{wall:"#d29b65",roof:"#9e3d27",stone:"#f2c68a",accent:"#f5cf63",banner:"#7c241f",seal:"#ffe3a1"}
   };
   const sharedMaterials = new Set(Object.values(mats));
   const surfaceTextureCache = new Map();
@@ -279,15 +290,19 @@ if (host && "WebGLRenderingContext" in window) {
     parent.add(wheel);
     addCylinder(parent, .055, .055, .18, mats.darkStone, x, y, z, 8).rotation.z = Math.PI / 2;
   }
-  function createBuilding(type, level, x, z) {
+  function createBuilding(type, level, x, z, castleSkinId = 0) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.userData.coIType = type;
     group.userData.coIProcedural = true;
-    const colors = palettes[type] || palettes.warehouse;
+    const castleSkin=type==="castle"?(castleSkinPalettes[Number(castleSkinId)]||null):null;
+    const colors = castleSkin ? [castleSkin.wall,castleSkin.roof] : (palettes[type] || palettes.warehouse);
     const seed = [...String(type)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
     const wall = surfaceMaterial(colors[0], "stone", seed);
     const roof = surfaceMaterial(colors[1], "roof", seed + 101);
+    const castleStone=castleSkin?surfaceMaterial(castleSkin.stone,"stone",seed+207):mats.stone;
+    const castleRoof=castleSkin?surfaceMaterial(castleSkin.roof,"roof",seed+309):mats.roof;
+    const castleAccent=castleSkin?material(castleSkin.accent,.52):mats.gold;
     const height = 1.0 + Math.min(30, Math.max(1, Number(level) || 1)) * .035;
 
     // Shared architectural language: visible stone footing, timber eaves and a
@@ -313,35 +328,35 @@ if (host && "WebGLRenderingContext" in window) {
     if (type === "castle") {
       // Four corner keeps, crenellated parapet, royal standards and a heraldic seal.
       for (const tx of [-.56, .56]) for (const tz of [-.43, .43]) {
-        box(group, .36, 1.5, .36, mats.stone, tx, .75, tz);
-        const turret = new THREE.Mesh(new THREE.ConeGeometry(.27, .54, 4), mats.roof);
+        box(group, .36, 1.5, .36, castleStone, tx, .75, tz);
+        const turret = new THREE.Mesh(new THREE.ConeGeometry(.27, .54, 4), castleRoof);
         turret.position.set(tx, 1.78, tz);
         turret.rotation.y = Math.PI / 4;
         turret.castShadow = true;
         group.add(turret);
-        box(group, .4, .09, .4, mats.gold, tx, 1.51, tz);
+        box(group, .4, .09, .4, castleAccent, tx, 1.51, tz);
       }
       for (let i = -2; i <= 2; i++) {
-        box(group, .18, .22, .18, mats.stone, i * .24, height + .16, -.58);
-        box(group, .18, .22, .18, mats.stone, i * .24, height + .16, .58);
+        box(group, .18, .22, .18, castleStone, i * .24, height + .16, -.58);
+        box(group, .18, .22, .18, castleStone, i * .24, height + .16, .58);
       }
       for (const tx of [-.56, .56]) {
-        box(group, .045, .52, .045, mats.gold, tx, 1.92, .49);
+        box(group, .045, .52, .045, castleAccent, tx, 1.92, .49);
         const banner = new THREE.Mesh(new THREE.PlaneGeometry(.34, .42), new THREE.MeshStandardMaterial({
-          color: "#E7BD68", roughness: .82, side: THREE.DoubleSide
+          color: castleSkin ? castleSkin.banner : "#E7BD68", roughness: .82, side: THREE.DoubleSide
         }));
         banner.position.set(tx + .18, 1.86, .515);
         banner.castShadow = true;
         group.add(banner);
       }
-      const seal = new THREE.Mesh(new THREE.CircleGeometry(.2, 8), mats.gold);
+      const seal = new THREE.Mesh(new THREE.CircleGeometry(.2, 8), castleAccent);
       seal.position.set(0, 1.02, .66);
       seal.castShadow = true;
       group.add(seal);
-      const sealCore = new THREE.Mesh(new THREE.CircleGeometry(.12, 8), material("#24476B", .58));
+      const sealCore = new THREE.Mesh(new THREE.CircleGeometry(.12, 8), material(castleSkin ? castleSkin.seal : "#24476B", .58));
       sealCore.position.set(0, 1.02, .668);
       group.add(sealCore);
-      box(group, .62, .24, .24, mats.gold, 0, height + .08, .76);
+      box(group, .62, .24, .24, castleAccent, 0, height + .08, .76);
     } else if (type === "watchtower") {
       box(group, .16, .95, .16, mats.wood, 0, height + .42, 0);
       const flag = new THREE.Mesh(new THREE.PlaneGeometry(.48, .28), material("#A9433B"));
@@ -502,8 +517,9 @@ if (host && "WebGLRenderingContext" in window) {
     });
     window.dispatchEvent(new CustomEvent("coi:kingdom-projection", { detail: { positions } }));
   }
-  function renderBuildings(buildings) {
+  function renderBuildings(buildings, castleSkinId = latestCastleSkinId) {
     latestBuildings = Array.isArray(buildings) ? buildings : [];
+    latestCastleSkinId=Number(castleSkinId)||0;
     if (!renderer || !scene || !camera) return;
     for (const item of activeModels) {
       scene.remove(item);
@@ -522,7 +538,7 @@ if (host && "WebGLRenderingContext" in window) {
       const col = i % 3, row = Math.floor(i / 3);
       const x = (col - 1) * 4.15, z = (row - 1) * 3.15;
       const template = glbTemplates.get(b.building_type);
-      const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z);
+      const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       scene.add(group);
@@ -787,9 +803,14 @@ if (host && "WebGLRenderingContext" in window) {
       }
     }
     ktx2 = new KTX2Loader();
-    ktx2.setTranscoderPath("https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/basis/");
+    ktx2.setTranscoderPath("/vendor/three/examples/jsm/libs/basis/");
     ktx2.detectSupport(renderer);
-    gltfLoader = new GLTFLoader(); gltfLoader.setKTX2Loader(ktx2);
+    draco = new DRACOLoader();
+    draco.setDecoderPath("/vendor/three/examples/jsm/libs/draco/");
+    gltfLoader = new GLTFLoader();
+    gltfLoader.setDRACOLoader(draco);
+    gltfLoader.setKTX2Loader(ktx2);
+    gltfLoader.setMeshoptDecoder(MeshoptDecoder);
     host.classList.add("has-3d");
     host.dataset.qualityTier = qualityProfile.tier;
     const diagnostics = () => {
@@ -826,6 +847,7 @@ if (host && "WebGLRenderingContext" in window) {
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
       disposeSceneResources();
       ktx2?.dispose();
+      draco?.dispose();
       renderer?.domElement.remove();
       renderer?.dispose();
       renderer = null;
@@ -839,7 +861,8 @@ if (host && "WebGLRenderingContext" in window) {
       const detail = event.detail || {};
       const list = detail.buildings || [];
       latestTroops = Array.isArray(detail.troops) ? detail.troops : [];
-      renderBuildings(list);
+      latestCastleSkinId=Number(detail.castleSkinId)||0;
+      renderBuildings(list,latestCastleSkinId);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
@@ -847,7 +870,8 @@ if (host && "WebGLRenderingContext" in window) {
     window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
     if (Array.isArray(window.__coiKingdomBuildings)) {
       latestTroops = Array.isArray(window.__coiKingdomTroops) ? window.__coiKingdomTroops : [];
-      renderBuildings(window.__coiKingdomBuildings);
+      latestCastleSkinId=Number(window.__coiKingdomCastleSkin)||0;
+      renderBuildings(window.__coiKingdomBuildings,latestCastleSkinId);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops);
@@ -922,6 +946,7 @@ if (host && "WebGLRenderingContext" in window) {
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
     disposeSceneResources();
     ktx2?.dispose();
+      draco?.dispose();
     renderer?.domElement.remove();
     renderer?.dispose();
     renderer = null;

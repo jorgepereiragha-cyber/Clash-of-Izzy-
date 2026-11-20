@@ -3,6 +3,11 @@ name: Deploy Clash of Izzy to Cloudflare
 on:
   workflow_dispatch:
     inputs:
+      confirm_paid_plan:
+        description: "Confirma Workers Paid ativo e orçamento/alertas revisados no Dashboard Cloudflare"
+        required: true
+        default: false
+        type: boolean
       confirm_production:
         description: "Confirma migrações D1 remotas e publicação do Worker em produção"
         required: true
@@ -15,7 +20,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm_production == true }}
+    if: ${{ inputs.confirm_paid_plan == true && inputs.confirm_production == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment:
@@ -68,6 +73,19 @@ jobs:
           with open(os.environ["GITHUB_ENV"], "a", encoding="utf-8") as env_file:
               env_file.write("CLOUDFLARE_API_TOKEN=" + token + "\n")
           PY
+
+      - name: Confirm paid plan and budget gate
+        shell: bash
+        env:
+          CONFIRM_PAID_PLAN: ${{ inputs.confirm_paid_plan }}
+        run: |
+          set -euo pipefail
+          if [[ "$CONFIRM_PAID_PLAN" != "true" ]]; then
+            echo "::error::Workers Paid e os limites/alertas de cobrança precisam estar ativos antes da publicação."
+            exit 1
+          fi
+          echo "Operador confirmou Workers Paid ativo e orçamento revisado no Dashboard."
+          echo "Esta confirmação é manual; a API do Wrangler não comprova o nível de assinatura."
 
       - name: Verify Cloudflare API token
         shell: bash
