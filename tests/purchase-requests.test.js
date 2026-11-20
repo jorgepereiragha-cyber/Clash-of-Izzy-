@@ -11,7 +11,7 @@ test("purchase requests require a valid player session and a stable idempotency 
   assert.ok(worker.includes('SELECT id,kingdom_name FROM kingdoms WHERE player_id=?").bind(player.id)'));
   assert.ok(worker.includes("purchase-request-player"));
   assert.ok(worker.includes("requestKey"));
-  assert.ok(worker.includes("SELECT id,status,product_name,price_brl FROM purchase_requests"));
+  assert.ok(worker.includes("SELECT id,status,product_name,price_brl,payment_method,mp_order_id,mp_checkout_url FROM purchase_requests"));
   assert.ok(worker.includes("payment_method,payment_reference,request_key"));
   assert.ok(worker.includes('["mercadopago_link","manual_whatsapp"].includes(requestedPaymentMethod)'));
   assert.ok(worker.includes('requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":"manual"'));
@@ -49,10 +49,11 @@ test("official store creates an auditable per-order Mercado Pago checkout", asyn
   assert.ok(arena.includes("Pedido #"));
   assert.ok(arena.includes("paymentMethod:'mercadopago_link'"));
   assert.ok(arena.includes("mercadopago_link"));
-  assert.ok(arena.includes("const orderName=data.request?.product_name||item.name;\\n  const orderPrice=") === false,
-    "escaped literal line break must not corrupt the purchase handler");
-  assert.ok(arena.includes("const orderName=data.request?.product_name||item.name;\n  const orderPrice="),
-    "purchase handler must contain a real line break between declarations");
+  assert.ok(arena.includes("body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod:'mercadopago_link'})"));
+  assert.ok(arena.includes("const requestId=Number(requestData.request?.id)"));
+  assert.ok(arena.includes("body:JSON.stringify({requestId})"));
+  assert.ok(arena.includes("checkoutUrl.protocol!=='https:'"));
+  assert.ok(arena.includes("o item será liberado após a confirmação do webhook"));
   assert.ok(arena.includes("API_BASE+'/store/checkout'"));
   assert.ok(arena.includes("checkout.checkoutUrl"));
   assert.ok(arena.includes("API_BASE+'/store/purchase-request'"));

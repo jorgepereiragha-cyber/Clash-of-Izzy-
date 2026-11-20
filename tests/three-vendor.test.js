@@ -63,7 +63,8 @@ test("the Service Worker precaches all vendored Three.js modules and decoder bin
   const sw = await read("sw.js");
   assert.match(sw, /vendor\/three\/asset-manifest\.json/);
   assert.match(sw, /manifest\.assets/);
-  assert.match(sw, /clash-of-izzy-shell-v40/);
+  const cacheVersion = Number(sw.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
+  assert.ok(cacheVersion > 40, `expected Service Worker cache version above v40, got v${cacheVersion || "missing"}`);
   assert.match(sw, /url\.pathname\.startsWith\("\/api\/"\)/);
 });
 

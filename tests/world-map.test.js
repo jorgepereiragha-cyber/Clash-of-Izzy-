@@ -47,7 +47,9 @@ test("world map renders untrusted territory labels with DOM text, not HTML injec
 });
 
 test("PWA shell includes the world map and increments its cache version", () => {
-  for (const marker of ['clash-of-izzy-shell-v40', '"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  for (const marker of ['"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  const cacheVersion = Number(serviceWorker.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
+  assert.ok(cacheVersion > 40, `expected Service Worker cache version above v40, got v${cacheVersion || "missing"}`);
   assert.ok(serviceWorker.includes('url.pathname.startsWith("/api/")'));
 });
 

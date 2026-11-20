@@ -66,7 +66,8 @@ test("a página, CSS e Service Worker integram o hub na PWA", async () => {
   assert.match(html, /id="angel-event"/);
   assert.match(js, /renderWorldEventCards/);
   assert.match(js, /loadValhallaEventConfig/);
-  assert.match(sw, /clash-of-izzy-shell-v40/);
+  const cacheVersion = Number(sw.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
+  assert.ok(cacheVersion > 40, `expected Service Worker cache version above v40, got v${cacheVersion || "missing"}`);
   assert.match(sw, /\/assets\/art\/events\/shiva\.svg/);
   assert.match(sw, /\/assets\/art\/events\/khali\.svg/);
   assert.match(navigation, /shiva khali/i);
