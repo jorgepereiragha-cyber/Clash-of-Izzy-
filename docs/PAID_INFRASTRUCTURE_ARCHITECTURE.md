@@ -169,3 +169,142 @@ Documentação:
 - [ ] Workflow manual protegido e smoke test read-only aprovados.
 
 **Estado em 18/11/2026:** plano e arquitetura preparados; não foi ativado plano pago, criado Queue/R2, aplicado migration remota, alterado segredo, executada carga ou feito deploy de produção.
+
+
+## 10. Revisão de capacidade e preços — 19/11/2026
+
+Esta seção substitui qualquer estimativa antiga de capacidade que não esteja acompanhada de benchmark. Os limites abaixo foram conferidos na documentação oficial da Cloudflare em 19/11/2026; preços em USD, antes de câmbio/impostos.
+
+### 10.1 Plano recomendado para a edição atual
+
+**Recomendação: Workers Paid / Standard, começando pelo nível de entrada de US$ 5 por mês por conta.** Não é necessário contratar Cloudflare Enterprise, Containers, VPS/Discloud, Redis externo ou uma segunda base apenas para executar o jogo atual.
+
+| Serviço | Configuração recomendada agora | Inclusão/preço de referência no Paid |
+|---|---|---|
+| Workers | Manter o Worker `clash-of-izzy` e o mesmo deploy | US$ 5/mês por conta; 10 milhões de requests dinâmicas/mês e 30 milhões de CPU-ms/mês incluídos; excedentes US$ 0,30/milhão de requests e US$ 0,02/milhão de CPU-ms |
+| Static Assets | Continuar servindo HTML/CSS/JS/SVG/GLB same-origin pelo binding `ASSETS` | Requests diretas a static assets são gratuitas e ilimitadas no modelo Standard |
+| D1 | Manter `clash-of-izzy-db` como fonte autoritativa única | 25 bilhões de linhas lidas/mês, 50 milhões escritas/mês e 5 GB de armazenamento incluídos; excedentes de leitura US$ 0,001/milhão de linhas, escrita US$ 1/milhão e armazenamento US$ 0,75/GB-mês |
+| Durable Objects (SQLite) | Não ativar para gameplay público ainda; concluir ticket, cliente e sharding antes | 1 milhão de requests/mês e 400 mil GB-s/mês incluídos; excedentes US$ 0,15/milhão de requests e US$ 12,50/milhão de GB-s |
+| Queues | Não criar fila vazia; criar somente junto de producer/consumer idempotentes | 1 milhão de operações/mês incluídas; excedente US$ 0,40/milhão |
+| R2 Standard | Não criar bucket nesta fase | 10 GB-mês, 1 milhão de operações A e 10 milhões B incluídos; sem cobrança de egress |
+| DNS/zone | Manter a zona/domínio existente; não contratar plano superior apenas para Worker | Plano DNS Free é suficiente para a arquitetura atual, salvo necessidade independente de WAF/recursos de zona pagos |
+
+Workers Paid também aumenta o limite de CPU por invocação HTTP para até 5 minutos (padrão 30 s); não aumenta a memória de 128 MB. O plano Free atual limita Worker a 100.000 requests/dia, 10 ms de CPU por invocação e 50 subrequests. No Paid, o limite de subrequests é 10.000 por invocação e as requests são faturadas conforme uso; não interpretar os 10 milhões incluídos como teto total.
+
+**Orçamento inicial de plataforma:** a parcela base de Workers é US$ 5/mês. Com o tráfego e os armazenamentos dentro das inclusões, D1 e DO dentro das suas franquias e sem outros produtos pagos, esse é o custo mínimo de referência. Não é uma cotação final nem garantia de que o jogo ficará em US$ 5: D1, DO, Queues, R2, domínio, e-mail, pagamentos, impostos e excedentes devem ser acompanhados em suas linhas próprias.
+
+Fórmulas de excedente a usar na planilha mensal:
+- Workers = `max(0, requests - 10.000.000) / 1.000.000 × US$0,30` + `max(0, CPU_ms - 30.000.000) / 1.000.000 × US$0,02`.
+- D1 = `max(0, rows_read - 25.000.000.000) / 1.000.000 × US$0,001` + `max(0, rows_written - 50.000.000) / 1.000.000 × US$1,00` + armazenamento acima de 5 GB × US$0,75/GB-mês.
+- Durable Objects = `max(0, requests - 1.000.000) / 1.000.000 × US$0,15` + `max(0, GB-s - 400.000) / 1.000.000 × US$12,50`.
+- Queues = operações acima de 1.000.000 × US$0,40/milhão. Um ciclo típico de entrega de uma mensagem exige write + read + delete (aproximadamente 3 operações); cada retry acrescenta leitura.
+- R2 Standard, quando necessário: acima da franquia, US$0,015/GB-mês, US$4,50/milhão de operações A e US$0,36/milhão B; egress permanece sem cobrança.
+
+### 10.2 Gargalo real: D1, não a quantidade de Workers
+
+O Paid não transforma um banco D1 em banco multi-writer. Cada banco D1 individual é single-threaded e processa queries uma por vez. A documentação usa como aproximação teórica até 1.000 queries/s para query de 1 ms ou 10 queries/s para query de 100 ms, mas o overhead de plataforma reduz o throughput real. Esses exemplos não são capacidade de jogadores.
+
+Limites atuais relevantes:
+- Até 10 GB por banco D1 individual; esse teto não pode ser aumentado.
+- Até 1 TB de armazenamento total da conta no Paid.
+- Até 1.000 subqueries D1 por invocação do Worker no Paid.
+- Time Travel de até 30 dias no Paid.
+- 100.000 bancos D1 incluídos no Paid; o jogo não precisa criar bancos por jogador.
+
+**Decisão de arquitetura:** manter a economia de Eldoria no D1 atual. Não dividir jogadores, castelos ou inventários em bancos por jogador. Primeiro medir tempo de query, rows read/written, índices, batches e concorrência. Uma eventual partição futura deverá ser por domínio/entidade com estratégia transacional e reconciliação explícita, não uma divisão de Eldoria em mundos.
+
+### 10.3 Replicação global de leitura D1 — candidata a P2, não ativar cegamente
+
+A Cloudflare disponibiliza read replicas globais para D1. Para utilizar as réplicas, o Worker precisa usar a D1 Sessions API (`env.DB.withSession(...)`); o código atual usa a interface D1 existente e não deve ser considerado já beneficiado pela replicação.
+
+As réplicas recebem as escritas do primário de forma assíncrona. Todas as escritas continuam indo ao primário. A Sessions API usa bookmarks para fornecer consistência sequencial entre leituras da mesma sessão, incluindo leitura após a própria escrita.
+
+Plano seguro:
+1. Criar banco de experimento descartável e medir latência/rows antes.
+2. Implementar um adaptador isolado de leitura com `withSession("first-primary")` ou bookmark válido, sem alterar operações econômicas.
+3. Propagar bookmark entre chamadas somente onde o contrato da sessão esteja definido e testado.
+4. Testar leitura imediatamente após escrita, duas sessões do mesmo jogador, troca de região, bookmark ausente/expirado e réplica atrasada.
+5. Pilotar em rotas predominantemente de leitura (por exemplo, catálogo/configuração pública e consultas de mapa apropriadas) antes de considerar o estado completo do reino.
+6. Manter compras, saldo, tropas, inventário, propriedade de skin, marcha e concessão de prêmios no caminho autoritativo do primário até prova de consistência e integridade.
+
+Não ativar global read replication como uma opção isolada de painel esperando ganho automático: sem Sessions API, as queries continuam usando o primário.
+
+### 10.4 Durable Objects e WebSocket: requisito de escala e controle de custo
+
+Workers Paid inclui franquias de DO, mas o custo de duração pode superar o custo de requests quando a conexão fica ativa sem hibernação. A Hibernation WebSocket API mantém os clientes conectados sem cobrar duração durante períodos em que o DO está elegível para hibernar. WebSocket protocol ping/pong não deve ser simulado com timers permanentes; timers/alarmes e trabalho em memória impedem a hibernação enquanto ativos.
+
+O protótipo da PR #122 usa `ctx.acceptWebSocket(server)` e `serializeAttachment()`, que correspondem ao modelo de Hibernation WebSocket. Isso é um bom ponto de partida, mas não o torna pronto para produção:
+- o protótipo usa um único ID lógico `eldoria` e teto defensivo de 200 sockets;
+- não conecta ainda as telas do jogo ao WebSocket;
+- não sincroniza movimento, chat global, marcha, combate ou eventos de jogo;
+- o número 200 é limite local do protótipo, não capacidade de Cloudflare nem capacidade comercial comprovada.
+
+A documentação apresenta 1.000 requests/s por objeto como limite soft, não throughput garantido. Cada objeto continua single-threaded. O limite de conexões do runtime não é critério de capacidade de jogo: CPU, tamanho de payload, frequência de broadcast, armazenamento e eventos por socket determinam o throughput real.
+
+**Sequência antes de liberar realtime:**
+1. Concluir a issue #123 (cliente autenticado, reconexão com backoff/jitter, pausa em aba oculta, fallback HTTP).
+2. Derivar sala/região no Worker a partir da posição validada em D1; ignorar qualquer sala arbitrária informada pelo navegador.
+3. Criar salas por região/célula com IDs determinísticos e handoff controlado. Eldoria permanece um único reino para o jogador.
+4. Enviar somente eventos tipados e autorizados. O Worker/D1 validam a ação e persistem qualquer efeito econômico; DO apenas coordena/presença/transporte.
+5. Manter Hibernation API, attachment pequeno e sem timers em espera; medir requests, GB-s, duração acordada e mensagens por socket.
+6. Testar 2, 10, 50, 100 e 200 sockets por sala, depois aumentar em passos controlados, verificando latência, erros, reconnect storm, broadcast e custo.
+7. Não remover o teto piloto nem anunciar número de jogadores até medir headroom e falhas.
+
+### 10.5 Queues: usar apenas para trabalho que pode ser assíncrono
+
+Queues fornece entrega at-least-once, portanto a mesma mensagem pode ser processada novamente. O consumidor precisa validar novamente a operação e utilizar chave de idempotência persistida em D1. A cobrança é por operação de 64 KB escrita, lida ou excluída; batches não reduzem operações por mensagem.
+
+Primeiros usos adequados quando houver código real:
+- e-mails e notificações não críticas;
+- analytics e telemetria que não podem atrasar uma ação do jogador;
+- tarefas de limpeza e processamento de lotes recuperáveis.
+
+Não usar Queue para confirmar saldo/compra, atribuir gemas ou decidir resultado de batalha sem ledger/idempotência e revalidação. Não mover a fonte de verdade para Queue. Configurar retry, backoff, Dead Letter Queue, alarmes de backlog/idade e replay administrativo com autorização.
+
+### 10.6 R2 e recursos gráficos
+
+O inventário de assets da edição atual é pequeno (a auditoria anterior estimou cerca de 443 KB para os assets examinados). Não criar R2 agora: o armazenamento same-origin e o cache atual são mais simples. Reavaliar R2 para coleções grandes de GLB/KTX2, vídeos, replays ou uploads, com versionamento, licenças e política de cache. R2 não deve guardar estado econômico, sessão, inventário ou progresso.
+
+### 10.7 Segurança financeira e alertas de gasto
+
+A Cloudflare agora oferece spending limits e email alerts separados para Workers e Durable Objects:
+- um spending limit pode bloquear operações e interromper aplicações que usam aquele produto em toda a conta;
+- o email alert e o Budget Alert notificam sem parar os serviços;
+- limites Workers e DO são independentes, não incluem outros produtos, storage ou a assinatura base e não garantem teto absoluto da fatura devido a atraso de medição/operações em andamento.
+
+**Recomendação de lançamento:** habilitar alertas por e-mail para Workers e DO e Budget Alert da conta; acompanhar D1, Queues e R2 nos próprios painéis. Não estabelecer limite rígido baixo sem aceitar que o jogo pode ficar indisponível quando o limite for atingido. Definir um teto rígido só depois de conhecer o consumo do staging e registrar formalmente a consequência de interrupção.
+
+### 10.8 Plano operacional final recomendado
+
+| Fase | Ação | Critério para avançar |
+|---|---|---|
+| P0 | Proprietário ativa Workers Paid na conta atual e registra orçamento em USD | Plano visível no Dashboard; alertas e responsável definidos |
+| P0 | Validar D1 Preview por UUID, secrets QA separados, status das migrations e Time Travel | Readiness workflow verde com consulta remota; sem migration na produção |
+| P0 | Testar login, conta convidada/vinculada, reino, construção, treino, aliança, loja e skin no Preview | Fluxos ponta a ponta em conta descartável; sem duplicação/PII |
+| P0 | Inspeção Android física em aparelho de entrada e intermediário/alto | FPS/estabilidade/memória/temperatura/toque/rede e retomada medidos |
+| P1 | Rodar benchmark da issue #117 em D1/Worker descartáveis | Quadros API/D1/Cron/backlog, p50/p95/p99, custo estimado e invariantes aprovados |
+| P1 | Implementar Sessions API em rotas selecionadas, se o benchmark provar gargalo de leitura | Testes de bookmark, read-your-writes e replica lag aprovados |
+| P1 | Integrar realtime e sharding regional da issue #123 | Cliente real, Hibernation, handoff, fallback e carga por sala aprovados |
+| P1 | Adicionar Queues junto com o primeiro consumidor real | Idempotência, retry, DLQ, replay e backlog aprovados |
+| P2 | Migrar assets para R2 somente quando o volume justificar | Medição de tamanho, tráfego e custo mostrar vantagem |
+| P2 | Avaliar particionamento de D1 por domínio somente se o primário atingir gargalo/10 GB | Plano de consistência, transação, migração, reconciliação e rollback |
+
+### 10.9 Limites de capacidade e o que o plano não resolve
+
+O Workers Paid remove o limite diário do Free e melhora o envelope de CPU/subrequests, mas não transforma D1 em banco multi-writer, não faz as batalhas mais rápidas que o scheduler, não ativa automaticamente a sala WebSocket e não melhora o FPS do WebGL no celular. O FPS é principalmente renderizado pela GPU/CPU do dispositivo Android; o Worker apenas entrega a lógica/API e os assets.
+
+Assim, não existe hoje evidência para declarar 200, 1.000, 5.000 ou qualquer outro número de jogadores simultâneos. A capacidade será definida após a issue #117, integração realtime da #123, staging remoto e teste físico. O primeiro marco comercial deve ser beta controlado, com capacidade conservadora, métricas e rollback.
+
+### Referências oficiais conferidas em 19/11/2026
+
+- Workers pricing: https://developers.cloudflare.com/workers/platform/pricing/
+- Workers limits: https://developers.cloudflare.com/workers/platform/limits/
+- D1 pricing: https://developers.cloudflare.com/d1/platform/pricing/
+- D1 limits: https://developers.cloudflare.com/d1/platform/limits/
+- D1 global read replication / Sessions API: https://developers.cloudflare.com/d1/best-practices/read-replication/
+- Durable Objects pricing: https://developers.cloudflare.com/durable-objects/platform/pricing/
+- Durable Objects limits: https://developers.cloudflare.com/durable-objects/platform/limits/
+- WebSocket Hibernation: https://developers.cloudflare.com/durable-objects/best-practices/websockets/
+- Queues pricing: https://developers.cloudflare.com/queues/platform/pricing/
+- R2 pricing: https://developers.cloudflare.com/r2/pricing/
+- Spending limits and alerts: https://developers.cloudflare.com/billing/manage/spend-management/
