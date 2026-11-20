@@ -1,10 +1,13 @@
 import { test, expect } from "@playwright/test";
+import { readFile } from "node:fs/promises";
 
 // The general UI suite blocks Service Workers to keep API mocking deterministic.
 // This isolated spec opts in so it can validate the real PWA lifecycle.
 test.use({ serviceWorkers: "allow" });
 
-const SHELL_CACHE = "clash-of-izzy-shell-v40";
+const serviceWorkerSource = await readFile(new URL("../../sw.js", import.meta.url), "utf8");
+const SHELL_CACHE = serviceWorkerSource.match(/const CACHE_NAME="(clash-of-izzy-shell-v\\d+)"/)?.[1];
+if (!SHELL_CACHE) throw new Error("Não foi possível identificar o cache ativo do Service Worker.");
 const CACHED_MODEL = "/assets/3d/kenney/castle-kit/Models/GLB%20format/tower-square.glb";
 
 test("PWA activates its Service Worker and serves previously cached shell and GLB offline", async ({ page, context }) => {
