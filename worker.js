@@ -15,6 +15,7 @@ import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
 import { handleMercadoPagoRoute } from "./mercadopago-orders.js";
+import { PANTHEON_SKIN_ITEMS, buildSkinSetGallery } from "./skin-sets.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -64,6 +65,7 @@ const COSMETIC_SKINS={
  n5:{name:"Týr — Juramento de Fenrir",icon:"🛡️",rarity:"épica",theme:"Panteão Nórdico",price:1800,visual:"Armadura de juramento, escudo rúnico e luz dourada"},
  n6:{name:"Heimdall — Guardião do Bifröst",icon:"🌈",rarity:"épica",theme:"Panteão Nórdico",price:1800,visual:"Armadura dourada, espada Hofund e aurora Bifröst"}
 };
+Object.assign(COSMETIC_SKINS, PANTHEON_SKIN_ITEMS);
 const COSMETIC_COLLECTIONS=[
  {id:"col_medieval",name:"Coleção Medieval",icon:"🏰",desc:"Complete as skins medievais",skins:["c1","c2","c3"],gems:500,shards:20},
  {id:"col_elemental",name:"Coleção Elemental",icon:"🌊",desc:"Domine os elementos",skins:["c5","c6","c7","c8"],gems:1000,shards:40},
@@ -100,11 +102,12 @@ async function ensureCosmeticDefaults(env,kingdomId){
 async function getCosmeticState(env,kingdomId){
  await ensureCosmeticDefaults(env,kingdomId);
  const [owned,claims,wallet]=await env.DB.batch([
-  env.DB.prepare("SELECT item_id,kind,acquired_at FROM kingdom_cosmetics WHERE kingdom_id=? ORDER BY acquired_at").bind(kingdomId),
+  env.DB.prepare("SELECT item_id,kind,acquired_at,equipped_slot FROM kingdom_cosmetics WHERE kingdom_id=? ORDER BY acquired_at").bind(kingdomId),
   env.DB.prepare("SELECT collection_id FROM kingdom_collection_claims WHERE kingdom_id=?").bind(kingdomId),
   env.DB.prepare("SELECT shards FROM kingdom_cosmetic_wallet WHERE kingdom_id=?").bind(kingdomId)
  ]);
- return {owned:owned.results||[],claimed:(claims.results||[]).map(x=>x.collection_id),shards:wallet?.results?.[0]?.shards||0,skins:COSMETIC_SKINS,collections:COSMETIC_COLLECTIONS,seasonal:SEASONAL_COSMETICS,seasonEnd:SEASON_END,seasonActive:Date.now()<Date.parse(SEASON_END),fusions:SKIN_FUSIONS};
+ const gallery=buildSkinSetGallery(owned.results||[]);
+ return {owned:owned.results||[],claimed:(claims.results||[]).map(x=>x.collection_id),shards:wallet?.results?.[0]?.shards||0,skins:COSMETIC_SKINS,collections:COSMETIC_COLLECTIONS,seasonal:SEASONAL_COSMETICS,seasonEnd:SEASON_END,seasonActive:Date.now()<Date.parse(SEASON_END),fusions:SKIN_FUSIONS,skinSets:gallery.sets,skinSetBonuses:gallery.bonuses};
 }
 
 const SHOP_ITEMS={
@@ -420,7 +423,7 @@ async function processMarches(env,kingdomId,batchSize=50){
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
     const heroCombat=getHeroCombatBonuses(hero||{});
     const skinBonus=await getEquippedCastleSkinCombatBonuses(env,kingdomId,kingdom?.equipped_skin_id);
-    const [valhallaBuffs,petBonuses]=await Promise.all([getValhallaBuffMultipliers(env,kingdomId),getPetBonuses(env,kingdomId)]);
+    const [valhallaBuffs,petBonuses,cosmeticState]=await Promise.all([getValhallaBuffMultipliers(env,kingdomId),getPetBonuses(env,kingdomId),getCosmeticState(env,kingdomId)]);
     const castleLevel=Number(kingdom?.castle_level||1);
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
     const battleRoll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
@@ -431,6 +434,8 @@ async function processMarches(env,kingdomId,batchSize=50){
      defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
      equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
      skinAttackBonusPercent:skinBonus.attackPercent,skinDefenseBonusPercent:skinBonus.defensePercent,
+     skinSetAttackBonusPercent:cosmeticState.skinSetBonuses.attackPercent,skinSetDefenseBonusPercent:cosmeticState.skinSetBonuses.defensePercent,
+     skinSetHealthBonusPercent:cosmeticState.skinSetBonuses.healthPercent,skinSetCriticalChancePercent:cosmeticState.skinSetBonuses.criticalChancePercent,
      equipmentHealthBonusPercent:gear.healthPercent,
      heroAttackBonusPercent:heroCombat.attackPercent,heroDefenseBonusPercent:heroCombat.defensePercent,heroHealthBonusPercent:heroCombat.healthPercent,heroCriticalChancePercent:heroCombat.criticalChancePercent,
      infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
@@ -442,8 +447,8 @@ async function processMarches(env,kingdomId,batchSize=50){
     });
     simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
     losses=simulation.losses||{};
-    replayData={version:1,mode:"territory_pve",seed:{criticalSeed,roll:battleRoll},participants:{attacker:{kingdom_id:kingdomId,army:army.map(unit=>({...unit}))},defender:{territory_id:target.id,level:Math.max(1,Math.min(30,Number(target.level)||1))}},modifiers:{hero:heroCombat,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses:simulation.losses||{}},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
-    battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,hero:heroCombat,equipment:gear,castleSkin:skinBonus,pet:petBonuses,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
+    replayData={version:1,mode:"territory_pve",seed:{criticalSeed,roll:battleRoll},participants:{attacker:{kingdom_id:kingdomId,army:army.map(unit=>({...unit}))},defender:{territory_id:target.id,level:Math.max(1,Math.min(30,Number(target.level)||1))}},modifiers:{hero:heroCombat,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,skin_sets:cosmeticState.skinSetBonuses,pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses:simulation.losses||{}},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
+    battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,hero:heroCombat,equipment:gear,castleSkin:skinBonus,skinSets:cosmeticState.skinSetBonuses,pet:petBonuses,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
     Object.assign(survivors, applyUnitLosses(army, losses));
    }else{
     for(const u of army)survivors[u.unit_type]=u.quantity;
@@ -838,6 +843,22 @@ async function gameAction(env,playerId,body){
     const rows=await ensureEquipmentTables(env,k.id),row=rows.find(x=>x.item_key===itemKey);
     if(!row)return json({error:"Equipamento não encontrado."},404);
     await env.DB.prepare("UPDATE kingdom_equipment SET is_locked=?,updated_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND item_key=?").bind(Number(!Number(row.is_locked)),k.id,itemKey).run();
+  }else if(type==="skin_set_equip"){
+    const itemId=String(body.itemId||""),skin=PANTHEON_SKIN_ITEMS[itemId];
+    if(!skin)return json({error:"Peça de conjunto inválida."},400);
+    const owned=await env.DB.prepare("SELECT 1 FROM kingdom_cosmetics WHERE kingdom_id=? AND item_id=?").bind(k.id,itemId).first();
+    if(!owned)return json({error:"Você precisa adquirir esta peça antes de equipá-la."},404);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdom_cosmetics SET equipped_slot=NULL WHERE kingdom_id=? AND equipped_slot=?").bind(k.id,skin.slot),
+      env.DB.prepare("UPDATE kingdom_cosmetics SET equipped_slot=? WHERE kingdom_id=? AND item_id=?").bind(skin.slot,k.id,itemId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"skin_set_piece_equipped",JSON.stringify({itemId,slot:skin.slot,setId:skin.setId}))
+    ]);
+    if(!result[1]?.meta?.changes)return json({error:"Não foi possível equipar esta peça. Sincronize o inventário e tente novamente."},409);
+  }else if(type==="skin_set_unequip"){
+    const slot=String(body.slot||"");
+    if(!["head","body","weapon","relic","aura"].includes(slot))return json({error:"Espaço de equipamento inválido."},400);
+    const result=await env.DB.prepare("UPDATE kingdom_cosmetics SET equipped_slot=NULL WHERE kingdom_id=? AND equipped_slot=?").bind(k.id,slot).run();
+    if(result.meta?.changes)await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"skin_set_piece_unequipped",JSON.stringify({slot})).run();
   }else if(type==="cosmetic_buy"){
     await ensureCosmeticDefaults(env,k.id);
     const id=String(body.skin||""),skin=COSMETIC_SKINS[id];
