@@ -588,8 +588,8 @@ function renderKingdomStore(){
   const active=set.activeThreshold;
   const next=set.nextThreshold;
   if(active){
-   const activeTitle=document.createElement('strong');activeTitle.textContent='BÔNUS ATIVO · '+active.label;
-   const activeDescription=document.createElement('p');activeDescription.textContent=bonusText(active.bonuses);
+   const activeTitle=document.createElement('strong');activeTitle.textContent='BÔNUS ATIVO · '+(set.activeThresholds||[active]).map(entry=>entry.label).join(' + ');
+   const activeDescription=document.createElement('p');activeDescription.textContent=bonusText(set.activeBonuses||active.bonuses);
    threshold.append(activeTitle,activeDescription);
   }else{
    const lockedTitle=document.createElement('strong');lockedTitle.textContent='BÔNUS A DESBLOQUEAR';
