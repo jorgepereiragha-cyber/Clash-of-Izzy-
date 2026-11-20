@@ -738,6 +738,48 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "cosmetic_claim", collection: "col_medieval" }, 200);
       await action(tokenA, { type: "cosmetic_claim", collection: "col_medieval" }, 409, "recompensa de coleção duplicada");
       await action(tokenA, { type: "cosmetic_buy", skin: "c7" }, 200);
+
+      // Isolated local D1 fixture: fund the test account, then exercise the complete
+      // five-piece Egypt set through the authenticated game-action contract.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE players SET gems=12000 WHERE player_id='" + playerA + "';",
+      ]);
+      const egyptianPieces = [
+        "eg_ra_crown",
+        "eg_anubis_armor",
+        "eg_horus_blade",
+        "eg_isis_ankh",
+        "eg_sekhmet_aura",
+      ];
+      for (const skin of egyptianPieces) {
+        await action(tokenA, { type: "cosmetic_buy", skin }, 200, "compra da relíquia " + skin);
+      }
+      await action(tokenB, { type: "skin_set_equip", itemId: "eg_ra_crown" }, 404,
+        "outro reino não equipa relíquia alheia");
+      for (const itemId of egyptianPieces) {
+        await action(tokenA, { type: "skin_set_equip", itemId }, 200, "equipar relíquia " + itemId);
+      }
+      let pantheonState = expectStatus(
+        await api("/api/game/state", { token: tokenA }), 200, "estado após equipar o Panteão Egípcio"
+      ).state;
+      let egyptianSet = pantheonState.cosmetics.skinSets.find(set => set.id === "egyptian_solar_court");
+      assert.equal(egyptianSet.equippedCount, 5, "as cinco relíquias devem permanecer equipadas");
+      assert.deepEqual(egyptianSet.activeThresholds.map(item => item.pieces), [2, 3, 5]);
+      assert.equal(egyptianSet.activeBonuses.attackPercent, 2.25);
+      assert.equal(egyptianSet.activeBonuses.defensePercent, 2);
+      await action(tokenA, { type: "skin_set_unequip", slot: "aura" }, 200, "desequipar aura egípcia");
+      pantheonState = expectStatus(
+        await api("/api/game/state", { token: tokenA }), 200, "estado após remover uma relíquia"
+      ).state;
+      egyptianSet = pantheonState.cosmetics.skinSets.find(set => set.id === "egyptian_solar_court");
+      assert.equal(egyptianSet.equippedCount, 4);
+      assert.equal(egyptianSet.activeThreshold.requiredPieces, 3,
+        "remover a quinta peça deve desligar apenas o marco de conjunto completo");
+      await action(tokenA, { type: "skin_set_equip", itemId: "eg_sekhmet_aura" }, 200,
+        "reequipar aura egípcia");
+
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c2", "c3"] }, 200);
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c1", "c2"] }, 400, "fusão com skins repetidas");
       await action(tokenA, { type: "shop_buy", item: "acc_5min", source: "shop" }, 200);
@@ -881,17 +923,17 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(await api("/api/admin/purchase-requests", { method: "POST", body: {} }), 401, "fila Master sem sessão");
     });
 
-    await t.test("todas as 34 ações previstas foram alcançadas no fluxo de integração", async () => {
+    await t.test("todas as 36 ações previstas foram alcançadas no fluxo de integração", async () => {
       const actionTypes = [
         "set_nickname","equipment_craft","equipment_upgrade","equipment_equip","equipment_unequip","equipment_lock",
-        "cosmetic_buy","cosmetic_claim","seasonal_buy","skin_fuse","shop_buy","alliance_create","alliance_join",
+        "cosmetic_buy","cosmetic_claim","skin_set_equip","skin_set_unequip","seasonal_buy","skin_fuse","shop_buy","alliance_create","alliance_join",
         "alliance_invite","alliance_accept_invite","alliance_promote","alliance_kick","alliance_donate","alliance_help",
         "alliance_chat","alliance_war_declare","alliance_claim_territory","alliance_leave","dragon_upgrade","hero_summon",
         "hero_evolve","hero_train","prestige","upgrade","train","research","march","battle","rename",
       ];
-      assert.equal(actionTypes.length, 34);
+      assert.equal(actionTypes.length, 36);
       assert.deepEqual([...executedActions].sort(), [...actionTypes].sort(),
-        "cada um dos 34 tipos de ação deve ter sido enviado ao Worker autenticado");
+        "cada um dos 36 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
   } finally {
     if (workerProcess && workerProcess.exitCode === null) {
