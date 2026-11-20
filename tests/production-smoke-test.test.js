@@ -25,7 +25,7 @@ function successfulFetch() {
     if (path === "/api/game/state" || path === "/api/game/referral/link" || path === "/api/account/status") return makeResponse({ error: "Sessão inválida." }, 401);
     if (path === "/api/store/catalog") return makeResponse({ skins: [], packages: [] });
     if (path === "/arena.html") return makeResponse(
-      '<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><p>purchase-request manual_whatsapp https://wa.me/</p>',
+      '<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><p>purchase-request manual_whatsapp https://wa.me/ mercadopago_link /store/checkout checkoutWindow</p>',
       200,
       "text/html; charset=utf-8"
     );
