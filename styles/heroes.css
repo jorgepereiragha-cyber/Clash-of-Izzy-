@@ -46,5 +46,5 @@
 @media(prefers-reduced-motion:no-preference){
  .hero-roster-card[data-hero-theme="egypt"] .hero-roster-portrait{animation:coi-egypt-aura 3.4s ease-in-out infinite alternate}
 }
-@keyframes coi-egypt-aura{from{filter:drop-shadow(0 0 4px #dca34c88)}to{filter:drop-shadow(0 0 9px #ffd36ecc) drop-shadow(0 0 16px #b7783d66)}}
+@keyframes coi-egypt-aura{from{opacity:.94;transform:translateY(0)}to{opacity:1;transform:translateY(-1px)}}
 @media(prefers-reduced-motion:reduce){.hero-roster-card[data-hero-theme="egypt"] .hero-roster-portrait{animation:none}}
