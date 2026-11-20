@@ -23,7 +23,9 @@ test("PWA sharing uses the OS share sheet with safe fallbacks and preserves refe
 
 test("new landing assets invalidate the previous offline shell cache", async () => {
   const serviceWorker = await read("sw.js");
-  assert.ok(serviceWorker.includes('clash-of-izzy-shell-v41'));
+  const cacheVersion = Number(serviceWorker.match(/const CACHE_NAME="clash-of-izzy-shell-v(\\d+)"/)?.[1] || 0);
+  assert.ok(cacheVersion > 41, `expected a new shell cache above v41, got v${cacheVersion || "missing"}`);
+  assert.ok(serviceWorker.includes('"/assets/art/skins/pantheon-relics.svg"'));
   assert.ok(serviceWorker.includes('"/index.html"'));
   assert.ok(serviceWorker.includes('"/landing.js"'));
   assert.ok(serviceWorker.includes('"/assets/art/heroes/portraits.svg"'));
