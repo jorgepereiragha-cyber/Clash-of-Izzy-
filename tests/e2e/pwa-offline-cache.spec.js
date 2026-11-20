@@ -6,7 +6,7 @@ import { readFile } from "node:fs/promises";
 test.use({ serviceWorkers: "allow" });
 
 const serviceWorkerSource = await readFile(new URL("../../sw.js", import.meta.url), "utf8");
-const SHELL_CACHE = serviceWorkerSource.match(/const CACHE_NAME="(clash-of-izzy-shell-v\\d+)"/)?.[1];
+const SHELL_CACHE = serviceWorkerSource.match(/const CACHE_NAME="(clash-of-izzy-shell-v\d+)"/)?.[1];
 if (!SHELL_CACHE) throw new Error("Não foi possível identificar o cache ativo do Service Worker.");
 const CACHED_MODEL = "/assets/3d/kenney/castle-kit/Models/GLB%20format/tower-square.glb";
 
