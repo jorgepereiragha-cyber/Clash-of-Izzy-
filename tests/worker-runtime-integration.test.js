@@ -783,6 +783,13 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c2", "c3"] }, 200);
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c1", "c2"] }, 400, "fusão com skins repetidas");
       await action(tokenA, { type: "shop_buy", item: "acc_5min", source: "shop" }, 200);
+      // The Egypt fixture deliberately funds five relic purchases; restore the
+      // insufficient-balance condition before asserting seasonal purchase rejection.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE players SET gems=0 WHERE player_id='" + playerA + "';",
+      ]);
       await action(tokenA, { type: "seasonal_buy", skin: "s1" }, 409, "compra sazonal sem gemas suficientes");
       await action(tokenA, { type: "cosmetic_buy", skin: "skin_inexistente" }, 400, "skin cosmética inválida");
     });
