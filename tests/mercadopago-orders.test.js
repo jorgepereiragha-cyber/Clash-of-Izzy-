@@ -14,7 +14,11 @@ test("Mercado Pago Orders checkout retains idempotency and is enabled when secre
     "checkout_url",
     "MP_ACCESS_TOKEN || !env.MP_WEBHOOK_SECRET",
     "mp_checkout_lock",
-    "mp_order_id"
+    "mp_order_id",
+    "function isTrustedCheckoutUrl",
+    'host.endsWith(".mercadopago.com.br")',
+    'host.endsWith(".mercadopago.com")',
+    "if (!isTrustedCheckoutUrl(order.mp_checkout_url))"
   ]) assert.ok(module.includes(snippet), "missing checkout safety: " + snippet);
   for (const column of ["mp_external_reference","mp_idempotency_key","mp_order_id","mp_checkout_url","mp_checkout_lock"]) {
     assert.ok(migration.includes(column), "missing persisted order field: " + column);
