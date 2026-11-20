@@ -36,12 +36,12 @@ test("o conjunto egípcio concede bônus progressivo somente por peças equipada
   const three = getSkinSetBonuses(ownedSetPieces(egypt, 3));
   assert.equal(three.activeSets[0].requiredPieces, 3);
   assert.equal(three.attackPercent, 0.75);
-  assert.equal(three.defensePercent, 0.5);
+  assert.equal(three.defensePercent, 1);
 
   const five = getSkinSetBonuses(ownedSetPieces(egypt, 5));
   assert.equal(five.activeSets[0].requiredPieces, 5);
-  assert.equal(five.attackPercent, 2);
-  assert.equal(five.defensePercent, 1.5);
+  assert.equal(five.attackPercent, 2.25);
+  assert.equal(five.defensePercent, 2);
   assert.equal(five.healthPercent, 1);
   assert.equal(five.criticalChancePercent, 0.5);
 });
@@ -79,4 +79,9 @@ test("galeria informa propriedade, espaço equipado e próximo marco", () => {
   assert.equal(set.items[1].equipped, false);
   assert.equal(set.equippedCount, 1);
   assert.equal(set.nextThreshold.pieces, 2);
+  const complete = buildSkinSetGallery(egypt.items.map(item => ({item_id:item.id,equipped_slot:item.slot})))
+    .sets.find(item => item.id === egypt.id);
+  assert.equal(complete.activeThresholds.length, 3);
+  assert.equal(complete.activeBonuses.attackPercent, 2.25);
+  assert.equal(complete.activeBonuses.defensePercent, 2);
 });
