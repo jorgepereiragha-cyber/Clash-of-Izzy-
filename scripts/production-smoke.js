@@ -146,10 +146,16 @@ export async function runProductionSmokeTests({
   const arenaResponse = await get("/arena.html");
   assert(arenaResponse.status === 200, "Página da arena respondeu HTTP " + arenaResponse.status + ".");
   const arena = await arenaResponse.text();
-  assert(arena.includes("purchase-request"), "A loja não registra pedidos manuais.");
-  assert(arena.includes("manual_whatsapp"), "A loja não usa o fluxo manual por WhatsApp.");
-  assert(arena.includes("https://wa.me/"), "O redirecionamento para o WhatsApp não está disponível.");
-  assert(!/store\/checkout|link\.mercadopago/i.test(arena), "A loja ainda oferece checkout Mercado Pago.");
+  assert(arena.includes("purchase-request"), "A loja não registra pedidos vinculados ao reino.");
+  assert(arena.includes("mercadopago_link"), "A loja não está configurada para Mercado Pago.");
+  assert(
+    arena.includes("/store/checkout") || arena.includes("https://link.mercadopago.com.br/pagamentosskin"),
+    "O checkout Mercado Pago não está disponível."
+  );
+  assert(
+    arena.includes("checkoutWindow") || arena.includes("paymentWindow"),
+    "A abertura segura do checkout Mercado Pago não está disponível."
+  );
   assert(!/<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i.test(arena), "A loja ainda oferece um método de pagamento desativado.");
 
   const mapHelperResponse = await get("/world-map-viewport.js");
@@ -203,7 +209,7 @@ export async function runProductionSmokeTests({
       pagePath + " ainda depende do CDN do Three.js.");
   }
 
-  for (const modulePath of ["/engine/asset-loader.js", "/scripts/kingdom-3d.js", "/world-map-3d.js", "/scripts/post-processing.js"]) {
+  for (const modulePath of ["/engine/asset-loader.js", "/scripts/kingdom-3d.js", "/world-map-3d.js", "/scripts/ambient-particles.js"]) {
     const moduleResponse = await get(modulePath);
     assert(moduleResponse.status === 200, modulePath + " indisponível.");
     const moduleBody = await moduleResponse.text();

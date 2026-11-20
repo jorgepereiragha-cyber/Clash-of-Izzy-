@@ -77,7 +77,7 @@ test("shop, cosmetics, heroes and pets collapse independent state reads into D1 
   const worker = await read("worker.js");
   const pets = await read("pets.js");
   const shopStart = worker.indexOf("async function getShopState(env,kingdomId)");
-  const shopEnd = worker.indexOf("function heroView", shopStart);
+  const shopEnd = worker.indexOf("function rollHeroRarity()", shopStart);
   const cosmeticStart = worker.indexOf("async function getCosmeticState(env,kingdomId)");
   const cosmeticEnd = worker.indexOf("const SHOP_ITEMS", cosmeticStart);
   const heroStart = worker.indexOf("async function syncHeroSystems(env,kingdomId)");

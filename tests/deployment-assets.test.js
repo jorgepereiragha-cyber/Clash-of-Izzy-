@@ -9,3 +9,32 @@ test("Cloudflare public assets exclude local tooling, tests, and database artifa
     assert.ok(ignore.split("\n").some(line => line.trim() === pattern), "missing assets exclusion: " + pattern);
   }
 });
+
+test("Worker-only modules stay in the Worker bundle and out of public static assets", async () => {
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const workerOnlyModules = [
+    "hero-catalog.js",
+    "skin-sets.js",
+    "angel-death-event.js",
+    "api-rate-limit.js",
+    "battle-replay.js",
+    "email-system.js",
+    "kingdom-queue-rules.js",
+    "mercadopago-orders.js",
+    "pets.js",
+    "player-accounts.js",
+    "rally.js",
+    "search-ranking.js",
+    "shared-world-coordinates.js",
+    "valhalla-admin.js",
+    "valhalla-config.js",
+    "valhalla-rewards.js",
+    "valhalla-shop.js",
+  ];
+
+  for (const path of workerOnlyModules) {
+    assert.ok(worker.includes("./" + path), "Worker import missing: " + path);
+    assert.ok(ignore.split("\n").some(line => line.trim() === path),
+      "Worker-only module must not be a public asset: " + path);
+  }
+});

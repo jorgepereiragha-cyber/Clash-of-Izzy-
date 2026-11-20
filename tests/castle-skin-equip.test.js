@@ -42,7 +42,8 @@ test("the kingdom city, world map and arena expose only skins owned by the curre
 
 test("PWA shell cache is bumped for the updated city and world renderers", async () => {
   const sw=await read("sw.js");
-  assert.ok(sw.includes('clash-of-izzy-shell-v28'));
+  const cacheVersion = Number(sw.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
+  assert.ok(cacheVersion > 40, `expected Service Worker cache version above v40, got v${cacheVersion || "missing"}`);
 });
 
 

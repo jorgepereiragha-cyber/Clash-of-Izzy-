@@ -133,3 +133,30 @@ test("Anjo da Morte top rewards exceed the largest existing gem collection rewar
   assert.ok(first.deathEssence>top10.deathEssence&&top10.deathEssence>participation.deathEssence);
 });
 
+test("Anjo da Morte distribui as baixas pelo exército inteiro, sem punir pilhas pequenas", () => {
+  const seed = 98765;
+  const singleStack = simulateAngelDeathAttack({
+    army: [{ unit_type: "militia", tier: 1, quantity: 10 }],
+    castleLevel: 12,
+    seed
+  });
+  const splitStacks = simulateAngelDeathAttack({
+    army: Array.from({ length: 10 }, (_, index) => ({
+      unit_type: "militia",
+      tier: index + 1,
+      quantity: 1
+    })),
+    castleLevel: 12,
+    seed
+  });
+
+  assert.equal(splitStacks.totalTroops, 10);
+  assert.equal(splitStacks.troopsLost, singleStack.troopsLost);
+  assert.equal(splitStacks.troopsLost, Math.max(1, Math.floor(splitStacks.totalTroops * splitStacks.lossRate)));
+  assert.equal(
+    Object.values(splitStacks.losses).reduce((total, loss) => total + loss, 0),
+    splitStacks.troopsLost
+  );
+  assert.ok(splitStacks.troopsLost < splitStacks.totalTroops);
+  assert.ok(Object.values(splitStacks.losses).every(loss => loss === 0 || loss === 1));
+});

@@ -24,8 +24,13 @@ import * as THREE from "three";
   let scene = null;
   let camera = null;
   let resizeObserver = null;
+  let sceneVisibilityObserver = null;
+  let visibilityChangeHandler = null;
+  let resizeHandler = null;
   let frame = 0;
   let disposed = false;
+  let contextLost = false;
+  let sceneInViewport = true;
   let worldState = null;
   let activeMarches = [];
   let homeCastleGroup = null;
@@ -414,17 +419,34 @@ import * as THREE from "three";
     projectTerritories();
   }
 
+  function canAnimateMarches() {
+    return !disposed && !contextLost && !reduceMotion && !document.hidden && sceneInViewport;
+  }
+
+  function stopMarchAnimation() {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    lastFrameTime = 0;
+  }
+
+  function syncMarchAnimation() {
+    if (canAnimateMarches() && activeMarches.some(march => Date.now() < march.endAt)) animateMarches();
+    else stopMarchAnimation();
+  }
+
   function animateMarches() {
-    if (frame || disposed || reduceMotion || !activeMarches.length) return;
+    if (frame || !canAnimateMarches() || !activeMarches.length) return;
     lastFrameTime = 0;
     const tick = timestamp => {
       frame = 0;
-      if (disposed || !renderer || !scene) return;
+      if (!canAnimateMarches() || !renderer || !scene) return;
       const now = Date.now();
       updateMarchPositions(now);
       renderer.render(scene, camera);
       projectTerritories();
-      if (activeMarches.some(march => now < march.endAt)) frame = requestAnimationFrame(tick);
+      if (activeMarches.some(march => now < march.endAt) && canAnimateMarches()) {
+        frame = requestAnimationFrame(tick);
+      }
     };
     frame = requestAnimationFrame(tick);
   }
@@ -454,15 +476,21 @@ import * as THREE from "three";
     camera.top = viewHeight / 2;
     camera.bottom = -viewHeight / 2;
     camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === "high" ? 1.6 : 1.15));
+    const maxPixelCount = quality === "high" ? 3200000 : quality === "balanced" ? 1800000 : 1000000;
+    const pixelBudgetRatio = Math.sqrt(maxPixelCount / (width * height));
+    const profileRatioCap = quality === "high" ? 1.5 : quality === "balanced" ? 1.15 : 1;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, profileRatioCap, pixelBudgetRatio));
     renderer.setSize(width, height, false);
     draw();
   }
 
   function dispose() {
     disposed = true;
-    if (frame) cancelAnimationFrame(frame);
+    stopMarchAnimation();
     resizeObserver?.disconnect();
+    sceneVisibilityObserver?.disconnect();
+    if (visibilityChangeHandler) document.removeEventListener("visibilitychange", visibilityChangeHandler);
+    if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (renderer) {
       renderer.setAnimationLoop(null);
       renderer.dispose();
@@ -508,10 +536,22 @@ import * as THREE from "three";
       homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(window.__coiWorldMapState?.castleSkinId)||0);
       resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
       resizeObserver?.observe(host);
-      window.addEventListener("resize", resize, { passive: true });
+      resizeHandler = resize;
+      window.addEventListener("resize", resizeHandler, { passive: true });
+      visibilityChangeHandler = syncMarchAnimation;
+      document.addEventListener("visibilitychange", visibilityChangeHandler);
+      if ("IntersectionObserver" in window) {
+        sceneVisibilityObserver = new IntersectionObserver(entries => {
+          const entry = entries[entries.length - 1];
+          sceneInViewport = entry?.isIntersecting === true;
+          syncMarchAnimation();
+        }, { threshold: 0.01 });
+        sceneVisibilityObserver.observe(host);
+      }
       canvas.addEventListener("webglcontextlost", event => {
         event.preventDefault();
-        if (frame) cancelAnimationFrame(frame);
+        contextLost = true;
+        stopMarchAnimation();
         canvas.hidden = true;
         host.classList.add("map-3d-fallback");
         console.warn("Clash of Izzy: WebGL do mapa indisponível; marcadores táticos continuam ativos.");
@@ -530,7 +570,16 @@ import * as THREE from "three";
       if (window.__coiWorldMapState) setWorldState(window.__coiWorldMapState);
       if (window.__coiWorldMapButtons) projectionButtons = window.__coiWorldMapButtons;
       projectTerritories();
-      window.addEventListener("pagehide", dispose, { once: true });
+      window.addEventListener("pagehide", event => {
+        if (!event.persisted) dispose();
+      });
+      window.addEventListener("pageshow", event => {
+        if (event.persisted && !disposed) {
+          resize();
+          draw();
+          syncMarchAnimation();
+        }
+      });
     } catch (error) {
       canvas.hidden = true;
       host.classList.add("map-3d-fallback");

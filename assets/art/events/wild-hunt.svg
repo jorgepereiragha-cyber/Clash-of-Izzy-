@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+<title id="title">Caçada Selvagem</title><desc id="desc">Lobo lendário de chifres em uma floresta nórdica.</desc>
+<defs>
+ <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#21434a"/><stop offset="1" stop-color="#101924"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#a9d2a2" stop-opacity=".65"/><stop offset="1" stop-color="#a9d2a2" stop-opacity="0"/></radialGradient>
+ <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#fff0b7"/><stop offset=".48" stop-color="#d6a94f"/><stop offset="1" stop-color="#79512d"/></linearGradient>
+</defs>
+<rect width="640" height="360" fill="url(#bg)"/>
+<circle cx="320" cy="152" r="210" fill="url(#glow)"/>
+<path d="M0 292 80 250 145 275 220 218 290 266 365 210 440 265 520 225 640 282V360H0Z" fill="#0c1624" opacity=".72"/>
+<path d="M0 320 95 290 165 304 240 272 322 300 408 267 500 302 575 273 640 294V360H0Z" fill="#101d2a"/>
+
+
+<path d="M166 234q-18-65 36-112l-2-56 42 30 39-45 6 67 54 19-42 31 15 71-45-28-38 44-14-60Z" fill="#263d48" stroke="#a9d2a2" stroke-width="5"/>
+<path d="M236 174q42-55 83-5l-7 51q-34 24-66-2Z" fill="#172534" stroke="#c3a66d" stroke-width="4"/>
+<path d="M260 184h10l-5 6m31-6h10l-5 6" fill="none" stroke="#f4d27e" stroke-width="5"/>
+<path d="M204 117 171 53l55 28 18-54 20 62M324 111l44-64-11 73 53-29-37 73" fill="none" stroke="#a9d2a2" stroke-width="11" stroke-linecap="round"/>
+<path d="M0 280 85 210l54 70m370 0 67-90 64 94" fill="#101d28" stroke="#355d61" stroke-width="8"/>
+
+<path d="M0 332Q160 300 320 333T640 329" fill="none" stroke="#a9d2a2" stroke-opacity=".55" stroke-width="3"/>
+</svg>
