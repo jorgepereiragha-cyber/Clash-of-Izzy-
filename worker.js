@@ -1801,10 +1801,16 @@ export default {
       await env.DB.prepare("INSERT INTO purchase_requests(player_id,kingdom_id,product_kind,product_id,product_name,price_brl,currency,gems_amount,payment_method,payment_reference,request_key) VALUES(?,?,?,?,?,?,'BRL',?,?,?,?)")
         .bind(player.id,kingdom.id,kind,item.id,item.name,item.price_brl,kind==="vip_package"?Number(item.gems||0):0,paymentMethod,paymentReference,requestKey).run();
     }catch(error){
-      const existing=await env.DB.prepare("SELECT id,status,product_name,price_brl FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
-      if(existing)return json({success:true,request:existing,reused:true,whatsappNumber:"5547996531437"},200);
-      const duplicate=await env.DB.prepare("SELECT id,status,product_name,price_brl FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
-      if(duplicate)return json({success:true,request:duplicate,reused:true,whatsappNumber:"5547996531437",message:"Você já possui um pedido aguardando análise."},200);
+      const existing=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
+      if(existing){
+        if(existing.payment_method!==paymentMethod)return json({error:"A chave de idempotência já pertence a outro meio de pagamento."},409);
+        return json({success:true,request:existing,reused:true},200);
+      }
+      const duplicate=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
+      if(duplicate){
+        if(duplicate.payment_method!==paymentMethod)return json({error:"Já existe um pedido deste produto em outro meio de pagamento."},409);
+        return json({success:true,request:duplicate,reused:true,message:"Você já possui um pedido aguardando pagamento."},200);
+      }
       throw error;
     }
     const created=await env.DB.prepare("SELECT id,status,product_name,price_brl,currency,payment_method,payment_reference,created_at FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
@@ -2208,8 +2214,8 @@ export default {
       if(!Number.isSafeInteger(id)||id<1||!["approve","reject"].includes(decision))return json({error:"Pedido ou decisão inválidos."},400);
       const pending=await env.DB.prepare("SELECT id,product_kind,product_id,product_name,player_id,gems_amount,payment_method,mp_order_id,mp_payment_status FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
       if(!pending)return json({error:"Pedido já processado ou não encontrado."},409);
-      if(decision==="approve"&&(pending.payment_method==="mercadopago_link"||pending.mp_order_id)){
-        return json({error:"Pedido Mercado Pago: somente o webhook após confirmação do pagamento pode liberar este item."},409);
+      if(pending.payment_method==="mercadopago_link"||pending.mp_order_id){
+        return json({error:"Pedido Mercado Pago: alterações manuais bloqueadas. O estado é controlado pela confirmação ou operação de estorno no provedor."},409);
       }
       let result;
       if(decision==="reject"){
