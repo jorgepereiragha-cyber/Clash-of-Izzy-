@@ -100,7 +100,12 @@
   }
 
   async function shareGame() {
-    const shareUrl = new URL("/", window.location.origin).href;
+    const shareTarget = new URL("/", window.location.origin);
+    const referralCode = new URLSearchParams(window.location.search).get("ref");
+    if (referralCode && /^izzy_[a-f0-9]{32}$/.test(referralCode)) {
+      shareTarget.searchParams.set("ref", referralCode);
+    }
+    const shareUrl = shareTarget.href;
     const payload = {
       title: "Clash of Izzy",
       text: "Construa seu reino, fortaleça seu exército e conquiste territórios.",
