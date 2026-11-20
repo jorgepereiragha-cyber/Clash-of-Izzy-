@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
-test("legacy Mercado Pago checkout implementation retains idempotency protections but is disabled for new launch orders", async () => {
+test("Mercado Pago Orders checkout retains idempotency and is enabled when secrets are configured", async () => {
   const module = await read("mercadopago-orders.js");
   const migration = await read("migrations/0024_player_accounts_mercadopago_orders.sql");
   for (const snippet of [
@@ -104,7 +104,7 @@ test("Mercado Pago webhook signature accepts the official HMAC manifest and reje
 });
 
 
-test("launch edition blocks new Mercado Pago checkouts and keeps legacy webhook route", async () => {
+test("checkout fails closed when provider secrets are absent and webhook remains protected", async () => {
   const ctx = {
     json(payload, status = 200) {
       return new Response(JSON.stringify(payload), {
@@ -119,8 +119,8 @@ test("launch edition blocks new Mercado Pago checkouts and keeps legacy webhook 
     body: JSON.stringify({ requestId: 1 })
   });
   const checkoutResponse = await handleMercadoPagoRoute(checkoutRequest, {}, ctx);
-  assert.equal(checkoutResponse.status, 410);
-  assert.equal((await checkoutResponse.json()).code, "MANUAL_WHATSAPP_ONLY");
+  assert.equal(checkoutResponse.status, 503);
+  assert.equal((await checkoutResponse.json()).code, "MP_NOT_CONFIGURED");
 
   const webhookRequest = new Request("https://game.example/api/webhook/mp?type=order&data.id=OLD-ORDER", {
     method: "POST"
