@@ -648,30 +648,39 @@ async function refreshKingdomStore(){
 async function requestOfficialPurchase(item,kind,button){
  const notice=document.getElementById('purchaseNotice');
  const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
- if(!token){notice.textContent='Conecte seu reino antes de solicitar um pacote.';return}
- const whatsappWindow=window.open('about:blank','_blank');
- if(whatsappWindow)whatsappWindow.opener=null;
- button.disabled=true;notice.textContent='Registrando seu pedido…';
+ if(!token){notice.textContent='Conecte seu reino antes de comprar.';return}
+ const checkoutWindow=window.open('about:blank','_blank');
+ if(checkoutWindow)checkoutWindow.opener=null;
+ button.disabled=true;notice.textContent='Registrando pedido seguro…';
  try{
   const response=await fetch(API_BASE+'/store/purchase-request',{
    method:'POST',
    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-   body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod:'manual_whatsapp'})
+   body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod:'mercadopago_link'})
   });
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data.error||'Não foi possível registrar o pedido.');
-  const requestId=Number(data.request?.id);
+  const requestData=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(requestData.error||'Não foi possível registrar o pedido.');
+  const requestId=Number(requestData.request?.id);
   if(!Number.isSafeInteger(requestId)||requestId<1)throw new Error('O servidor não retornou um número de pedido válido.');
-  const number=String(data.whatsappNumber||'5547996531437').replace(/\D/g,'');
-  const orderName=data.request?.product_name||item.name;
-  const orderPrice=Number(data.request?.price_brl??item.price_brl??0);
-  const message='Olá! Quero adquirir um pacote no Clash of Izzy.\nPedido: #'+requestId+'\nJogador: '+(kingdomSession?.player?.name||'Jogador')+'\nID do jogador: '+(kingdomSession?.player?.player_id||'')+'\nReino: '+(kingdomSession?.kingdom?.kingdom_name||'Eldoria')+'\nProduto: '+orderName+' ('+(kind==='skin'?'Skin':'Pacote VIP')+')\nValor: R$ '+orderPrice.toFixed(2).replace('.',',');
-  notice.textContent='Pedido #'+requestId+' registrado. O WhatsApp será aberto para combinar o pagamento. A liberação ocorre após sua confirmação.';
-  button.textContent='Pedido enviado · #'+requestId;
-  const whatsappUrl='https://wa.me/'+number+'?text='+encodeURIComponent(message);
-  if(whatsappWindow)whatsappWindow.location.href=whatsappUrl;
-  else window.location.assign(whatsappUrl);
- }catch(error){if(whatsappWindow)whatsappWindow.close();notice.textContent=error.message;button.disabled=false}
+  const checkoutResponse=await fetch(API_BASE+'/store/checkout',{
+   method:'POST',
+   headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+   body:JSON.stringify({requestId})
+  });
+  const checkout=await checkoutResponse.json().catch(()=>({}));
+  if(!checkoutResponse.ok)throw new Error(checkout.error||'Checkout Mercado Pago indisponível.');
+  const checkoutUrl=new URL(String(checkout.checkoutUrl||''));
+  if(checkoutUrl.protocol!=='https:')throw new Error('O servidor não retornou um endereço seguro para pagamento.');
+  notice.textContent='Pedido #'+requestId+' criado. Finalize o pagamento no ambiente seguro do Mercado Pago; o item será liberado após a confirmação do webhook.';
+  button.textContent='Pagamento · Pedido #'+requestId;
+  if(checkoutWindow)checkoutWindow.location.href=checkoutUrl.href;
+  else window.location.assign(checkoutUrl.href);
+ }catch(error){
+  if(checkoutWindow)checkoutWindow.close();
+  notice.textContent=error.message+' O pedido fica preservado e pode ser tentado novamente quando o checkout estiver configurado.';
+  button.disabled=false;
+  button.textContent='Tentar pagamento novamente';
+ }
 }
 async function loadCatalog(){
  const box=document.getElementById('catalog');
