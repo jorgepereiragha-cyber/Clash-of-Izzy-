@@ -516,6 +516,65 @@ function renderKingdomStore(){
   collectionGrid.append(storeCard(collection.icon+' '+collection.name,description,buttonLabel,()=>runStoreAction({type:'cosmetic_claim',collection:collection.id}),!complete||claimed));
  }
  root.append(collectionGrid);
+ const pantheonTitle=document.createElement('h3');pantheonTitle.textContent='🏛️ Galeria dos Panteões · Conjuntos de 5 peças';root.append(pantheonTitle);
+ const pantheonIntro=document.createElement('p');pantheonIntro.className='storeMuted';pantheonIntro.textContent='Equipe peças nos cinco espaços para desbloquear bônus de conjunto. Ter a peça no inventário não ativa o bônus: ela precisa estar equipada.';root.append(pantheonIntro);
+ const pantheonGrid=document.createElement('div');pantheonGrid.className='pantheon-set-gallery';
+ const bonusLabels={attackPercent:'Ataque',defensePercent:'Defesa',healthPercent:'Vida',criticalChancePercent:'Crítico'};
+ const bonusText=bonuses=>Object.entries(bonuses||{}).filter(([,value])=>Number(value)>0).map(([key,value])=>(bonusLabels[key]||key)+' +'+Number(value).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%').join(' · ');
+ for(const set of cosmetics.skinSets||[]){
+  const card=document.createElement('section');card.className='pantheon-set-card';card.dataset.set=set.id;
+  const head=document.createElement('div');head.className='pantheon-set-head';
+  const heading=document.createElement('div');
+  const title=document.createElement('h4');title.textContent=(set.icon||'✨')+' '+set.name;
+  const subtitle=document.createElement('p');subtitle.textContent=set.subtitle||set.theme||'Conjunto mítico';
+  heading.append(title,subtitle);
+  const progress=document.createElement('strong');progress.className='pantheon-set-progress';progress.textContent=Number(set.equippedCount||0)+'/'+Number(set.totalPieces||5)+' equipadas';
+  head.append(heading,progress);card.append(head);
+  const description=document.createElement('p');description.className='pantheon-set-description';description.textContent=set.description||'';card.append(description);
+  const pieces=document.createElement('div');pieces.className='pantheon-piece-grid';
+  for(const item of set.items||[]){
+   const piece=document.createElement('article');piece.className='pantheon-piece'+(item.equipped?' is-equipped':'')+(!item.owned?' is-locked':'');
+   const icon=document.createElement('span');icon.className='pantheon-piece-icon';icon.textContent=item.icon||'✦';
+   const copy=document.createElement('div');copy.className='pantheon-piece-copy';
+   const slot=document.createElement('small');slot.textContent=item.slotLabel||item.slot;
+   const name=document.createElement('strong');name.textContent=item.name;
+   const stateText=document.createElement('small');stateText.textContent=item.equipped?'Equipado':item.owned?'Adquirido · não equipado':'Ainda não adquirida';
+   copy.append(slot,name,stateText);
+   const button=document.createElement('button');button.type='button';
+   if(!item.owned){
+    button.textContent='Adquirir · '+Number(item.price||0).toLocaleString('pt-BR')+' gemas';
+    button.disabled=Number(player.gems||0)<Number(item.price||0);
+    button.addEventListener('click',()=>runStoreAction({type:'cosmetic_buy',skin:item.id}));
+   }else if(item.equipped){
+    button.textContent='Desequipar';
+    button.addEventListener('click',()=>runStoreAction({type:'skin_set_unequip',slot:item.slot}));
+   }else{
+    button.textContent='Equipar';
+    button.addEventListener('click',()=>runStoreAction({type:'skin_set_equip',itemId:item.id}));
+   }
+   piece.append(icon,copy,button);pieces.append(piece);
+  }
+  card.append(pieces);
+  const threshold=document.createElement('div');threshold.className='pantheon-set-bonus';
+  const active=set.activeThreshold;
+  const next=set.nextThreshold;
+  if(active){
+   const activeTitle=document.createElement('strong');activeTitle.textContent='BÔNUS ATIVO · '+active.label;
+   const activeDescription=document.createElement('p');activeDescription.textContent=bonusText(active.bonuses);
+   threshold.append(activeTitle,activeDescription);
+  }else{
+   const lockedTitle=document.createElement('strong');lockedTitle.textContent='BÔNUS A DESBLOQUEAR';
+   const lockedDescription=document.createElement('p');lockedDescription.textContent=next?'Equipe '+Number(next.pieces)+' peças para '+next.label+': '+bonusText(next.bonuses):'Conjunto completo.';
+   threshold.append(lockedTitle,lockedDescription);
+  }
+  card.append(threshold);pantheonGrid.append(card);
+ }
+ if(!pantheonGrid.children.length){const empty=document.createElement('p');empty.className='storeMuted';empty.textContent='Nenhum conjunto disponível no momento.';pantheonGrid.append(empty);}
+ root.append(pantheonGrid);
+ const activeSetBonus=cosmetics.skinSetBonuses||{};
+ const activeSetSummary=document.createElement('p');activeSetSummary.className='pantheon-active-summary';
+ activeSetSummary.textContent='Bônus totais ativos · '+bonusText(activeSetBonus)+' · limite global aplicado pelo servidor';
+ root.append(activeSetSummary);
  const seasonTitle=document.createElement('h3');seasonTitle.textContent='🌙 Skins da temporada';root.append(seasonTitle);
  const seasonGrid=document.createElement('div');seasonGrid.className='storeGrid';
  for(const skin of cosmetics.seasonal||[]){
