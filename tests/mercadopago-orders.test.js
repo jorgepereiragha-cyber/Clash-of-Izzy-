@@ -38,13 +38,15 @@ test("Mercado Pago webhook authenticates, fetches and verifies the payment befor
   ]) assert.ok(module.includes(snippet), "missing webhook verification: " + snippet);
 });
 
-test("launch store registers a manual request and redirects to WhatsApp instead of checkout", async () => {
+test("store creates an individually linked Mercado Pago order and opens the HTTPS checkout", async () => {
   const arena = await read("arena.html");
   assert.ok(arena.includes("API_BASE+'/store/purchase-request'"));
-  assert.ok(arena.includes("paymentMethod:'manual_whatsapp'"));
-  assert.ok(arena.includes("https://wa.me/"));
+  assert.ok(arena.includes("paymentMethod:'mercadopago_link'"));
+  assert.ok(arena.includes("API_BASE+'/store/checkout'"));
+  assert.ok(arena.includes("checkout.checkoutUrl"));
   assert.ok(arena.includes("window.open('about:blank'"));
-  assert.doesNotMatch(arena, /store\/checkout|link\.mercadopago/i);
+  assert.ok(arena.includes("checkoutUrl.protocol!=='https:'"));
+  assert.doesNotMatch(arena, /paymentMethod:'manual_whatsapp'/);
 });
 
 
