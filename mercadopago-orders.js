@@ -36,6 +36,20 @@ export async function validateWebhookSignature(request, orderId, secret) {
   return constantTimeHexEqual(calculated, received);
 }
 
+function isTrustedCheckoutUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    const host = url.hostname.toLowerCase();
+    const trustedHost = host === "mercadopago.com.br"
+      || host.endsWith(".mercadopago.com.br")
+      || host === "mercadopago.com"
+      || host.endsWith(".mercadopago.com");
+    return url.protocol === "https:" && trustedHost;
+  } catch {
+    return false;
+  }
+}
+
 async function createCheckout(request, env, ctx) {
   if (!env.MP_ACCESS_TOKEN || !env.MP_WEBHOOK_SECRET) return ctx.json({ error: "Checkout automático ainda não configurado por completo; o link Mercado Pago atual continua disponível.", code: "MP_NOT_CONFIGURED" }, 503);
   const playerId = await ctx.gameIdentity(request, env);
@@ -54,7 +68,10 @@ async function createCheckout(request, env, ctx) {
   if (!order) return ctx.json({ error: "Pedido não encontrado para este reino." }, 404);
   if (order.status !== "pending") return ctx.json({ error: "Este pedido não está mais aguardando pagamento." }, 409);
   if (order.payment_method !== "mercadopago_link") return ctx.json({ error: "Este pedido foi criado para conferência manual e não pode ser convertido em checkout automático." }, 409);
-  if (order.mp_checkout_url && order.mp_order_id) return ctx.json({ success: true, checkoutUrl: order.mp_checkout_url, orderId: order.mp_order_id, reused: true });
+  if (order.mp_checkout_url && order.mp_order_id) {
+    if (!isTrustedCheckoutUrl(order.mp_checkout_url)) return ctx.json({ error: "O checkout salvo não pertence a um domínio oficial do Mercado Pago." }, 502);
+    return ctx.json({ success: true, checkoutUrl: order.mp_checkout_url, orderId: order.mp_order_id, reused: true });
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const lockToken = crypto.randomUUID();
@@ -100,7 +117,7 @@ async function createCheckout(request, env, ctx) {
       return ctx.json({ error: "O Mercado Pago não conseguiu criar o checkout. O pedido foi preservado para nova tentativa." }, 502);
     }
     const checkout = new URL(String(result.checkout_url));
-    if (checkout.protocol !== "https:") throw new Error("invalid_checkout_url");
+    if (!isTrustedCheckoutUrl(checkout.href)) throw new Error("invalid_checkout_url");
     const saved = await env.DB.prepare(
       "UPDATE purchase_requests SET mp_order_id=?,mp_checkout_url=?,mp_payment_status=?,mp_checkout_lock=NULL,mp_checkout_lock_expires_at=NULL " +
       "WHERE id=? AND status='pending' AND mp_checkout_lock=? AND mp_external_reference=?"
