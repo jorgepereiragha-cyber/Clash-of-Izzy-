@@ -18,7 +18,7 @@ export const SKIN_SET_CATALOG = Object.freeze([
     thresholds: [
       { pieces: 2, label: "Juramento do Nilo", bonuses: { defensePercent: 0.5 } },
       { pieces: 3, label: "Bênção das Duas Terras", bonuses: { attackPercent: 0.75, defensePercent: 0.5 } },
-      { pieces: 5, label: "Ascensão do Panteão Solar", bonuses: { attackPercent: 2, defensePercent: 1.5, healthPercent: 1, criticalChancePercent: 0.5 } }
+      { pieces: 5, label: "Ascensão do Panteão Solar", bonuses: { attackPercent: 1.5, defensePercent: 1, healthPercent: 1, criticalChancePercent: 0.5 } }
     ]
   },
   {
@@ -38,7 +38,7 @@ export const SKIN_SET_CATALOG = Object.freeze([
     thresholds: [
       { pieces: 2, label: "Pacto de Uruk", bonuses: { healthPercent: 0.5 } },
       { pieces: 3, label: "Sabedoria das Tábuas", bonuses: { attackPercent: 0.5, defensePercent: 0.5 } },
-      { pieces: 5, label: "Despertar dos Anunnaki", bonuses: { attackPercent: 1.5, defensePercent: 1, healthPercent: 1.5 } }
+      { pieces: 5, label: "Despertar dos Anunnaki", bonuses: { attackPercent: 1, defensePercent: 0.5, healthPercent: 1.5 } }
     ]
   },
   {
@@ -58,7 +58,7 @@ export const SKIN_SET_CATALOG = Object.freeze([
     thresholds: [
       { pieces: 2, label: "Guardiões da Porta Azul", bonuses: { defensePercent: 0.5 } },
       { pieces: 3, label: "Realeza da Babilônia", bonuses: { attackPercent: 0.5, defensePercent: 0.75 } },
-      { pieces: 5, label: "Império das Duas Margens", bonuses: { attackPercent: 1.5, defensePercent: 2, healthPercent: 1 } }
+      { pieces: 5, label: "Império das Duas Margens", bonuses: { attackPercent: 1, defensePercent: 1.5, healthPercent: 1 } }
     ]
   },
   {
@@ -78,7 +78,7 @@ export const SKIN_SET_CATALOG = Object.freeze([
     thresholds: [
       { pieces: 2, label: "Chamado das Correntes", bonuses: { healthPercent: 0.5, defensePercent: 0.25 } },
       { pieces: 3, label: "Proteção de Anfitrite", bonuses: { defensePercent: 1, healthPercent: 0.5 } },
-      { pieces: 5, label: "Soberania dos Sete Mares", bonuses: { attackPercent: 1, defensePercent: 1.5, healthPercent: 1.5, criticalChancePercent: 0.25 } }
+      { pieces: 5, label: "Soberania dos Sete Mares", bonuses: { attackPercent: 1, defensePercent: 0.5, healthPercent: 1, criticalChancePercent: 0.25 } }
     ]
   }
 ]);
@@ -108,17 +108,27 @@ export function getSkinSetBonuses(equippedRows = []) {
 
   for (const set of SKIN_SET_CATALOG) {
     const pieces = set.items.filter(item => equippedIds.has(item.id)).length;
-    const threshold = [...set.thresholds].reverse().find(entry => pieces >= entry.pieces);
-    if (!threshold) continue;
+    const unlocked = set.thresholds.filter(entry => pieces >= entry.pieces);
+    if (!unlocked.length) continue;
+
+    const setBonuses = { attackPercent: 0, defensePercent: 0, healthPercent: 0, criticalChancePercent: 0 };
+    for (const threshold of unlocked) {
+      for (const key of Object.keys(setBonuses)) {
+        setBonuses[key] += Number(threshold.bonuses[key] || 0);
+      }
+    }
+    for (const key of Object.keys(totals)) totals[key] += setBonuses[key];
+
+    const latest = unlocked[unlocked.length - 1];
     activeSets.push({
       id: set.id,
       name: set.name,
       pieces,
-      requiredPieces: threshold.pieces,
-      bonusName: threshold.label,
-      bonuses: { ...threshold.bonuses }
+      requiredPieces: latest.pieces,
+      bonusName: unlocked.map(entry => entry.label).join(" + "),
+      thresholds: unlocked.map(entry => ({ ...entry, bonuses: { ...entry.bonuses } })),
+      bonuses: setBonuses
     });
-    for (const key of Object.keys(totals)) totals[key] += Number(threshold.bonuses[key] || 0);
   }
 
   for (const key of Object.keys(totals)) totals[key] = Math.min(BONUS_CAPS[key], Number(totals[key].toFixed(2)));
@@ -141,7 +151,12 @@ export function buildSkinSetGallery(ownedRows = []) {
     });
     const equippedCount = items.filter(item => item.equipped).length;
     const nextThreshold = set.thresholds.find(entry => equippedCount < entry.pieces) || null;
-    const activeThreshold = [...set.thresholds].reverse().find(entry => equippedCount >= entry.pieces) || null;
+    const activeThresholds = set.thresholds.filter(entry => equippedCount >= entry.pieces);
+    const activeThreshold = activeThresholds[activeThresholds.length - 1] || null;
+    const activeBonuses = { attackPercent: 0, defensePercent: 0, healthPercent: 0, criticalChancePercent: 0 };
+    for (const threshold of activeThresholds) {
+      for (const key of Object.keys(activeBonuses)) activeBonuses[key] += Number(threshold.bonuses[key] || 0);
+    }
     return {
       id: set.id,
       name: set.name,
@@ -153,7 +168,9 @@ export function buildSkinSetGallery(ownedRows = []) {
       equippedCount,
       totalPieces: set.items.length,
       nextThreshold: nextThreshold ? { ...nextThreshold, bonuses: { ...nextThreshold.bonuses } } : null,
-      activeThreshold: activeThreshold ? { ...activeThreshold, bonuses: { ...activeThreshold.bonuses } } : null
+      activeThreshold: activeThreshold ? { ...activeThreshold, bonuses: { ...activeThreshold.bonuses } } : null,
+      activeThresholds: activeThresholds.map(entry => ({ ...entry, bonuses: { ...entry.bonuses } })),
+      activeBonuses
     };
   });
   return { sets, bonuses: getSkinSetBonuses(ownedRows) };
