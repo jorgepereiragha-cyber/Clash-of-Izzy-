@@ -602,7 +602,9 @@ function renderKingdomStore(){
  root.append(pantheonGrid);
  const activeSetBonus=cosmetics.skinSetBonuses||{};
  const activeSetSummary=document.createElement('p');activeSetSummary.className='pantheon-active-summary';
- activeSetSummary.textContent='Bônus totais ativos · '+bonusText(activeSetBonus)+' · limite global aplicado pelo servidor';
+ activeSetSummary.textContent=activeSetBonus.activeSets?.length
+  ?'Bônus totais ativos · '+bonusText(activeSetBonus)+' · limite global aplicado pelo servidor'
+  :'Nenhum bônus ativo: equipe duas peças de um conjunto para desbloquear o primeiro marco.';
  root.append(activeSetSummary);
  const seasonTitle=document.createElement('h3');seasonTitle.textContent='🌙 Skins da temporada';root.append(seasonTitle);
  const seasonGrid=document.createElement('div');seasonGrid.className='storeGrid';
