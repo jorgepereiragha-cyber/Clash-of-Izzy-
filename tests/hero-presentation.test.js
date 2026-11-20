@@ -74,8 +74,31 @@ test("probabilidades de convocação são calculadas pelo catálogo canônico", 
   assert.deepEqual(odds.map(row => [row.rarity, row.heroCount, row.perHeroPercent]), [
     ["white", 4, 17.5],
     ["blue", 5, 5],
-    ["purple", 4, 1.25]
+    ["purple", 9, 0.5556]
   ]);
+});
+
+test("os cinco comandantes do panteão egípcio têm retratos, auras e passivos canônicos", async () => {
+  const sprite = await readFile(new URL("../assets/art/heroes/portraits.svg", import.meta.url), "utf8");
+  const egyptian = [
+    ["amun_ra_solar", "Amon-Rá", "amun-ra", "solar"],
+    ["anubis_duat", "Anúbis", "anubis", "duat"],
+    ["isis_eternal_wings", "Ísis", "isis", "wings"],
+    ["horus_eternal_eye", "Hórus", "horus", "falcon"],
+    ["sekhmet_crimson_lioness", "Sekhmet", "sekhmet", "crimson"]
+  ];
+  for (const [key, name, portrait, aura] of egyptian) {
+    const hero = HERO_TEMPLATES[key];
+    assert.ok(hero, "herói ausente: " + key);
+    assert.equal(hero.name, name);
+    assert.equal(hero.rarity, "purple");
+    assert.equal(hero.portrait, portrait);
+    assert.ok(sprite.includes('id="' + portrait + '"'), "retrato ausente: " + portrait);
+    const view = heroView({ hero_key: key, rarity: "purple", level: 1, stars: 1 });
+    assert.equal(view.theme_key, "egypt");
+    assert.equal(view.aura_key, aura);
+    assert.ok(view.combat_bonuses.attackPercent > 0 || view.combat_bonuses.defensePercent > 0);
+  }
 });
 
 test("passivos dos heróis escalam de forma limitada por nível e estrelas", () => {
