@@ -184,7 +184,7 @@ Esta seção substitui qualquer estimativa antiga de capacidade que não esteja 
 | Workers | Manter o Worker `clash-of-izzy` e o mesmo deploy | US$ 5/mês por conta; 10 milhões de requests dinâmicas/mês e 30 milhões de CPU-ms/mês incluídos; excedentes US$ 0,30/milhão de requests e US$ 0,02/milhão de CPU-ms |
 | Static Assets | Continuar servindo HTML/CSS/JS/SVG/GLB same-origin pelo binding `ASSETS` | Requests diretas a static assets são gratuitas e ilimitadas no modelo Standard |
 | D1 | Manter `clash-of-izzy-db` como fonte autoritativa única | 25 bilhões de linhas lidas/mês, 50 milhões escritas/mês e 5 GB de armazenamento incluídos; excedentes de leitura US$ 0,001/milhão de linhas, escrita US$ 1/milhão e armazenamento US$ 0,75/GB-mês |
-| Durable Objects (SQLite) | Não ativar para gameplay público ainda; concluir ticket, cliente e sharding antes | 1 milhão de requests/mês e 400 mil GB-s/mês incluídos; excedentes US$ 0,15/milhão de requests e US$ 12,50/milhão de GB-s |
+| Durable Objects (SQLite) | Não ativar para gameplay público ainda; concluir ticket, cliente e sharding antes | Compute: 1 milhão de requests/mês e 400 mil GB-s/mês incluídos; excedentes US$ 0,15/milhão e US$ 12,50/milhão GB-s. Storage SQLite: 25 bilhões de linhas lidas, 50 milhões escritas e 5 GB-mês incluídos; excedentes US$ 0,001/milhão de reads, US$ 1/milhão de writes e US$ 0,20/GB-mês |
 | Queues | Não criar fila vazia; criar somente junto de producer/consumer idempotentes | 1 milhão de operações/mês incluídas; excedente US$ 0,40/milhão |
 | R2 Standard | Não criar bucket nesta fase | 10 GB-mês, 1 milhão de operações A e 10 milhões B incluídos; sem cobrança de egress |
 | DNS/zone | Manter a zona/domínio existente; não contratar plano superior apenas para Worker | Plano DNS Free é suficiente para a arquitetura atual, salvo necessidade independente de WAF/recursos de zona pagos |
@@ -196,7 +196,7 @@ Workers Paid também aumenta o limite de CPU por invocação HTTP para até 5 mi
 Fórmulas de excedente a usar na planilha mensal:
 - Workers = `max(0, requests - 10.000.000) / 1.000.000 × US$0,30` + `max(0, CPU_ms - 30.000.000) / 1.000.000 × US$0,02`.
 - D1 = `max(0, rows_read - 25.000.000.000) / 1.000.000 × US$0,001` + `max(0, rows_written - 50.000.000) / 1.000.000 × US$1,00` + armazenamento acima de 5 GB × US$0,75/GB-mês.
-- Durable Objects = `max(0, requests - 1.000.000) / 1.000.000 × US$0,15` + `max(0, GB-s - 400.000) / 1.000.000 × US$12,50`.
+- Durable Objects = `max(0, requests - 1.000.000) / 1.000.000 × US$0,15` + `max(0, GB-s - 400.000) / 1.000.000 × US$12,50` + linhas SQLite acima de 25 bilhões lidas (`US$0,001/milhão`) + acima de 50 milhões escritas (`US$1/milhão`) + armazenamento acima de 5 GB-mês (`US$0,20/GB-mês`).
 - Queues = operações acima de 1.000.000 × US$0,40/milhão. Um ciclo típico de entrega de uma mensagem exige write + read + delete (aproximadamente 3 operações); cada retry acrescenta leitura.
 - R2 Standard, quando necessário: acima da franquia, US$0,015/GB-mês, US$4,50/milhão de operações A e US$0,36/milhão B; egress permanece sem cobrança.
 
@@ -270,7 +270,7 @@ O inventário de assets da edição atual é pequeno (a auditoria anterior estim
 A Cloudflare agora oferece spending limits e email alerts separados para Workers e Durable Objects:
 - um spending limit pode bloquear operações e interromper aplicações que usam aquele produto em toda a conta;
 - o email alert e o Budget Alert notificam sem parar os serviços;
-- limites Workers e DO são independentes, não incluem outros produtos, storage ou a assinatura base e não garantem teto absoluto da fatura devido a atraso de medição/operações em andamento.
+- limites Workers e DO são independentes, não incluem outros produtos, o armazenamento de DO nem a assinatura base e não garantem teto absoluto da fatura devido a atraso de medição/operações em andamento.
 
 **Recomendação de lançamento:** habilitar alertas por e-mail para Workers e DO e Budget Alert da conta; acompanhar D1, Queues e R2 nos próprios painéis. Não estabelecer limite rígido baixo sem aceitar que o jogo pode ficar indisponível quando o limite for atingido. Definir um teto rígido só depois de conhecer o consumo do staging e registrar formalmente a consequência de interrupção.
 
