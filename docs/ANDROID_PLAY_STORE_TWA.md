@@ -202,3 +202,52 @@ A tela também expõe as taxas reais do sorteio padrão: 70% comum, 25% raro e 5
 ## 11. Segurança e preservação
 
 Esta preparação documental não autoriza deploy, migração remota, alteração de secrets, criação de jogadores de QA na produção, alteração de saldos/inventários nem publicação de AAB. A publicação do Worker continua dependente do fluxo manual protegido, backup/Time Travel e smoke test somente de leitura.
+
+
+## 9.2 Auditoria de qualidade visual — 19/11/2026
+
+A CI comprova contratos, carregamento e renderização automatizada em Chromium; não comprova que a direção de arte já atingiu nível comercial premium. O inventário efetivo do manifesto 3D desta branch contém cinco GLBs habilitados:
+
+- torre quadrada e muralha do pacote Kenney Castle Kit;
+- trebuchet do mesmo pacote;
+- árvore alta do pacote Kenney Mini Forest;
+- um personagem de arqueiro.
+
+Os cartões de heróis utilizam retratos SVG same-origin; os outros edifícios, castelo central e partes do mapa dependem majoritariamente de geometria procedural Three.js. Não há, no manifesto atual, modelos 3D exclusivos e animados para cada edifício, conjunto de heróis, dragões ou chefes dos eventos. As sete ilustrações SVG de eventos são arte de apresentação; não provam que os sete encontros estejam implementados.
+
+A cidade usa mapas procedurais PBR aproximados por perfil: 128 px (low), 256 px (balanced) e 512 px (high). Isso é uma otimização apropriada para mobile, mas não substitui um pacote autoral premium de albedo, normal, roughness, AO, metalness quando pertinente, variações de material, LOD e animações. A própria bíblia visual classifica o sistema procedural como aproximação e prevê materiais autorais para acabamento final.
+
+### O que está bom e deve ser preservado
+
+- identidade visual consistente em azul-noite, azul-real e ouro;
+- cidade e mapa estratégicos com linguagem geométrica coerente;
+- assets locais, licença/proveniência registrada e ausência de dependência Three.js CDN;
+- fallback quando WebGL falha, limite de pixels do drawing buffer e suspensão de animações em segundo plano;
+- perfis low/balanced/high com Data Saver e movimento reduzido;
+- alvos de toque de 48 CSS px, tipografia de campo de 16 px e áreas seguras Android;
+- arte original dos sete cards de eventos e retratos SVG dos heróis.
+
+### O que ainda falta para declarar acabamento premium
+
+1. Modelos autorais ou licenciados com silhuetas exclusivas para castelo, quartel, fazenda, serraria, pedreira, muralha, academia e demais edifícios centrais.
+2. Modelos 3D rigged e animações coerentes para Kael e os heróis principais; modelos/rigs de dragões se forem apresentados como unidades 3D.
+3. Modelos e animações dos chefes de evento realmente implementados; manter Shiva, Khali e eventos em preparação identificados como prévias até terem controlador e recompensa server-side.
+4. Materiais PBR autorais com variação por superfície, mipmaps, LOD e budgets definidos por GPU; preservar o fallback procedural para aparelhos de entrada.
+5. Iluminação/sombras e efeitos testados por aparelho; não aumentar sombras, anisotropia ou resolução apenas para tornar uma captura mais bonita.
+6. Comparação visual lado a lado de cidade, mapa, heróis, equipamento, aliança, eventos e combate, evitando estilos low-poly/cartoon/realista misturados sem direção artística.
+7. Capturas reais em Android, não screenshots conceituais, para a ficha Play Store.
+
+### Critério de desempenho real
+
+O sampler atual coleta intervalos entre callbacks `requestAnimationFrame`; ele não mede diretamente o tempo de GPU, o FPS sustentado após aquecimento térmico ou a memória gráfica real. A aprovação de Chromium/Playwright não substitui aparelhos físicos.
+
+Para cada aparelho Android de teste, registrar:
+- modelo, versão Android, RAM, GPU, navegador/WebView e densidade;
+- tempo de abertura e tempo até a cidade utilizável;
+- FPS observado e p50/p95 dos intervalos de frame durante pelo menos 10 minutos;
+- memória do processo e estabilidade WebGL/context lost;
+- temperatura/throttling percebidos, consumo e estabilidade após alternar telas;
+- qualidade legível do HUD/toque no viewport 360 px e em tela de alta densidade;
+- instalação PWA, atualização do Service Worker, retomada, perda/retorno de rede e sessão autenticada.
+
+**Decisão:** a camada Android está tecnicamente preparada para continuar o beta, mas a arte 3D é uma base evolutiva, não uma versão final de alto orçamento. Não prometer visual equivalente a um MMO mobile premium nem publicar material de loja que mostre funcionalidades/arte que não aparecem na build real. A aprovação visual final depende de assets, testes físicos e revisão humana.
