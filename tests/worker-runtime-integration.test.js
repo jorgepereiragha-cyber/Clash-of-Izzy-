@@ -791,6 +791,12 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         "--command", "UPDATE players SET gems=0 WHERE player_id='" + playerA + "';",
       ]);
       await action(tokenA, { type: "seasonal_buy", skin: "s1" }, 409, "compra sazonal sem gemas suficientes");
+      // Restore the funded test balance so later hero-summon coverage is independent.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE players SET gems=12000 WHERE player_id='" + playerA + "';",
+      ]);
       await action(tokenA, { type: "cosmetic_buy", skin: "skin_inexistente" }, 400, "skin cosmética inválida");
     });
 
