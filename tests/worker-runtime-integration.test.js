@@ -775,7 +775,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       ).state;
       egyptianSet = pantheonState.cosmetics.skinSets.find(set => set.id === "egyptian_solar_court");
       assert.equal(egyptianSet.equippedCount, 4);
-      assert.equal(egyptianSet.activeThreshold.requiredPieces, 3,
+      assert.equal(egyptianSet.activeThreshold.pieces, 3,
         "remover a quinta peça deve desligar apenas o marco de conjunto completo");
       await action(tokenA, { type: "skin_set_equip", itemId: "eg_sekhmet_aura" }, 200,
         "reequipar aura egípcia");
