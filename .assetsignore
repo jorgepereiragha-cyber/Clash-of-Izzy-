@@ -10,6 +10,7 @@ node_modules/**
 dist/**
 game-adapter.js
 hero-catalog.js
+skin-sets.js
 package.json
 
 # Worker-only modules are bundled by worker.js and must not be published as browser assets.
