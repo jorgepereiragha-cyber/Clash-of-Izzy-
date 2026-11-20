@@ -1778,9 +1778,9 @@ export default {
     if(body.__bodyError)return json({error:"Solicitação inválida."},400);
     const kind=String(body.kind||""),itemId=Number(body.itemId),requestKey=String(body.requestKey||"").slice(0,64);
     if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
-    const requestedPaymentMethod=String(body.paymentMethod||"manual_whatsapp");
-    if(requestedPaymentMethod!=="manual_whatsapp")return json({error:"Os pedidos desta edição são tratados manualmente pelo WhatsApp."},400);
-    const paymentMethod="manual";
+    const requestedPaymentMethod=String(body.paymentMethod||"mercadopago_link");
+    if(!["mercadopago_link","manual_whatsapp"].includes(requestedPaymentMethod))return json({error:"Método de pagamento inválido."},400);
+    const paymentMethod=requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":"manual";
     const paymentReference=null;
     const player=await env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first();
     if(!player)return json({error:"Jogador não encontrado."},404);
@@ -1794,8 +1794,8 @@ export default {
       const owned=await env.DB.prepare("SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?").bind(player.id,item.id).first();
       if(owned)return json({error:"Você já possui esta skin."},409);
     }
-    const pending=await env.DB.prepare("SELECT id,status,product_name,price_brl FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
-    if(pending)return json({success:true,request:pending,reused:true,whatsappNumber:"5547996531437",message:"Você já possui um pedido aguardando análise."},200);
+    const pending=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method,mp_order_id,mp_checkout_url FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
+    if(pending)return json({success:true,request:pending,reused:true,message:"Você já possui um pedido aguardando pagamento."},200);
     try{
       await env.DB.prepare("INSERT INTO purchase_requests(player_id,kingdom_id,product_kind,product_id,product_name,price_brl,currency,gems_amount,payment_method,payment_reference,request_key) VALUES(?,?,?,?,?,?,'BRL',?,?,?,?)")
         .bind(player.id,kingdom.id,kind,item.id,item.name,item.price_brl,kind==="vip_package"?Number(item.gems||0):0,paymentMethod,paymentReference,requestKey).run();
@@ -1807,7 +1807,7 @@ export default {
       throw error;
     }
     const created=await env.DB.prepare("SELECT id,status,product_name,price_brl,currency,payment_method,payment_reference,created_at FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
-    return json({success:true,request:created,whatsappNumber:"5547996531437",message:"Pedido registrado. Continue a conversa pelo WhatsApp; a liberação será feita manualmente no painel após a confirmação."},201);
+    return json({success:true,request:created,message:paymentMethod==="mercadopago_link"?"Pedido registrado. Finalize o pagamento no checkout seguro.":"Pedido registrado para conferência manual."},201);
   }
   const isGamePath=url.pathname.startsWith("/api/game/");
   if(isGamePath){
