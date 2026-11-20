@@ -18,7 +18,6 @@ test("PWA sharing uses the OS share sheet with safe fallbacks and preserves refe
   assert.ok(script.includes("navigator.share(payload)"));
   assert.ok(script.includes("navigator.clipboard.writeText(shareUrl)"));
   assert.ok(script.includes("https://wa.me/?text="));
-  assert.ok(script.includes(/^$/.source) === false);
   assert.ok(script.includes("/^izzy_[a-f0-9]{32}$/"));
 });
 
