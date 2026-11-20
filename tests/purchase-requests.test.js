@@ -59,7 +59,7 @@ test("official store creates an auditable per-order Mercado Pago checkout", asyn
   assert.ok(arena.includes("defense_bonus_percent"));
   assert.ok(arena.includes("grid-template-columns:minmax(0,1fr) auto"));
   assert.ok(arena.includes("Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis."));
-  assert.ok(arena.includes("manual_whatsapp"));
+  assert.doesNotMatch(arena, /paymentMethod:'manual_whatsapp'/);
   assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i);
   assert.ok(arena.includes('id="whatsapp"'));
 });
@@ -69,7 +69,7 @@ test("purchase schema restricts products, states, payment methods and duplicate 
   assert.ok(migration.includes("CHECK (product_kind IN ('vip_package','skin'))"));
   assert.ok(migration.includes("CHECK (status IN ('pending','approved','rejected'))"));
   assert.ok(migration.includes("CHECK (payment_method IN ('mercadopago_link','pix','bank_transfer','manual'))"));
-  // Legacy payment values remain readable for historical orders; new requests use the manual WhatsApp workflow.
+  // Legacy manual requests remain readable; new orders use the individual Mercado Pago checkout.
   assert.ok(migration.includes("UNIQUE (player_id, request_key)"));
   assert.ok(migration.includes("idx_purchase_requests_status_created"));
   assert.ok(migration.includes("idx_purchase_requests_one_pending_product"));
