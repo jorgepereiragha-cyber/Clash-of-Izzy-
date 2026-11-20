@@ -1,0 +1,20 @@
+/* Clash of Izzy — visual refinement layer, optimized for mobile GPU and readable HUD. */
+:root{--coi-surface-0:#081321;--coi-surface-1:#102139;--coi-surface-2:#1a3048;--coi-metal:#71839a;--coi-gold-soft:#f5d995;--coi-glass:rgba(10,22,37,.78);--coi-focus:rgba(245,217,149,.9)}
+body{background-color:var(--coi-night-deep);background-image:radial-gradient(ellipse at 50% -18%,rgba(68,103,139,.34),transparent 58%),radial-gradient(ellipse at 100% 70%,rgba(35,72,68,.14),transparent 45%),linear-gradient(180deg,#101a2b 0%,#0b1422 58%,#080e18 100%);background-attachment:fixed}
+.panel,.premium-panel{border:1px solid rgba(231,189,104,.48);border-radius:15px;background:linear-gradient(145deg,rgba(31,54,79,.96),rgba(10,23,39,.98)),var(--coi-panel);box-shadow:0 14px 34px rgba(0,0,0,.32),inset 0 1px rgba(255,255,255,.055)}
+.panel h2,.premium-panel-title{letter-spacing:.018em;text-wrap:balance}
+.resource,.stat,.queue-card,.building-row,.event{border-color:rgba(142,164,187,.3);background:linear-gradient(145deg,rgba(30,49,70,.94),rgba(11,24,40,.98))}
+.resource{border-radius:10px;box-shadow:inset 0 1px rgba(255,255,255,.06),0 5px 14px rgba(0,0,0,.2)}
+.resource b{color:var(--coi-gold-soft);font-variant-numeric:tabular-nums}
+.city{border-color:rgba(231,189,104,.52);box-shadow:inset 0 0 0 1px rgba(255,255,255,.07),0 12px 28px rgba(0,0,0,.28);background-color:#294638;background-image:radial-gradient(ellipse at 18% 20%,rgba(174,194,127,.18),transparent 34%),radial-gradient(ellipse at 82% 78%,rgba(21,49,42,.32),transparent 42%),linear-gradient(145deg,#607c54,#294638 62%,#1d382f)}
+button,.linkbtn,.btn-epic{min-height:42px;border-radius:9px;box-shadow:inset 0 1px rgba(255,255,255,.13),0 5px 13px rgba(0,0,0,.2);touch-action:manipulation}
+button:focus-visible,.linkbtn:focus-visible,a:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:2px solid var(--coi-focus);outline-offset:3px}
+.building,.building-row,.queue-card{border-radius:10px}
+.building{border-color:rgba(245,217,149,.62);box-shadow:0 7px 17px rgba(0,0,0,.34),inset 0 1px rgba(255,255,255,.1)}
+.queue-progress{height:8px;border-color:rgba(231,189,104,.38)}
+.queue-progress span{background:linear-gradient(90deg,#94602b,#e7bd68,#f5d995)}
+#status,[role=status],[aria-live=polite]{overflow-wrap:anywhere}
+img,canvas,video{max-width:100%}
+@media(max-width:760px){.panel,.premium-panel{border-radius:12px;padding:12px}button,.linkbtn,.btn-epic{min-height:44px}.resources{gap:6px}}
+@media(hover:none){button:not(:disabled):hover,.linkbtn:hover,.btn-epic:hover{transform:none;filter:none}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
