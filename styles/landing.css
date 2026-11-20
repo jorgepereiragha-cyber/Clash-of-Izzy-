@@ -72,3 +72,6 @@
   position:absolute;inset:0;z-index:1;width:100%;height:100%;
   object-fit:cover;display:block;filter:saturate(.96) brightness(.96)
 }
+
+.landing-share-status{min-height:1.5em;margin:-8px 0 15px;color:#d8e2ee;font-size:12px;line-height:1.45}
+@media(max-width:680px){.landing-share-status{text-align:center}}
