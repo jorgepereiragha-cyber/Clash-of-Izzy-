@@ -2199,14 +2199,17 @@ export default {
       return await handleValhallaAdmin(request,env,body);
     }
     if(url.pathname==="/api/admin/purchase-requests"){
-      const rows=await env.DB.prepare("SELECT r.id,r.product_kind,r.product_name,r.price_brl,r.currency,r.gems_amount,r.payment_method,r.payment_reference,r.status,r.created_at,p.player_id,p.name AS player_name,k.kingdom_name FROM purchase_requests r JOIN players p ON p.id=r.player_id JOIN kingdoms k ON k.id=r.kingdom_id WHERE r.status='pending' ORDER BY r.created_at ASC LIMIT 100").all();
+      const rows=await env.DB.prepare("SELECT r.id,r.product_kind,r.product_name,r.price_brl,r.currency,r.gems_amount,r.payment_method,r.payment_reference,r.mp_order_id,r.mp_payment_status,r.status,r.created_at,p.player_id,p.name AS player_name,k.kingdom_name FROM purchase_requests r JOIN players p ON p.id=r.player_id JOIN kingdoms k ON k.id=r.kingdom_id WHERE r.status='pending' ORDER BY r.created_at ASC LIMIT 100").all();
       return json({requests:rows.results||[]});
     }
     if(url.pathname==="/api/admin/purchase-requests/review"){
       const id=Number(body.requestId),decision=String(body.decision||"");
       if(!Number.isSafeInteger(id)||id<1||!["approve","reject"].includes(decision))return json({error:"Pedido ou decisão inválidos."},400);
-      const pending=await env.DB.prepare("SELECT id,product_kind,product_id,product_name,player_id,gems_amount FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
+      const pending=await env.DB.prepare("SELECT id,product_kind,product_id,product_name,player_id,gems_amount,payment_method,mp_order_id,mp_payment_status FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
       if(!pending)return json({error:"Pedido já processado ou não encontrado."},409);
+      if(decision==="approve"&&(pending.payment_method==="mercadopago_link"||pending.mp_order_id)){
+        return json({error:"Pedido Mercado Pago: somente o webhook após confirmação do pagamento pode liberar este item."},409);
+      }
       let result;
       if(decision==="reject"){
         result=await env.DB.prepare("UPDATE purchase_requests SET status='rejected',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending'").bind(id).run();
