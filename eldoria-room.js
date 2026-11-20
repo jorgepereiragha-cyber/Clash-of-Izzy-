@@ -122,7 +122,19 @@ export class EldoriaRoom {
     socket.send(JSON.stringify({ type: "error", code: "unsupported_message" }));
   }
 
-  async webSocketClose() {
+  async webSocketClose(socket, code, reason) {
+    // Acknowledge the peer's Close frame when using the Hibernation WebSocket API.
+    // Reserved/abnormal codes must not be sent back as a status code.
+    const validCode = Number.isInteger(code)
+      && code >= 1000
+      && code < 5000
+      && ![1004, 1005, 1006, 1015].includes(code);
+    try {
+      if (validCode) socket.close(code, String(reason || ""));
+      else socket.close();
+    } catch {
+      try { socket.close(); } catch {}
+    }
     this.broadcastPresence();
   }
 
