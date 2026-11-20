@@ -143,6 +143,23 @@ test("Eldoria reports invalid JSON", async () => {
   assert.deepEqual(sent, [{ type: "error", code: "invalid_json" }]);
 });
 
+
+test("Eldoria acknowledges valid WebSocket close frames", async () => {
+  let closed;
+  const room = roomWith([]);
+  const socket = { close: (...args) => { closed = args; } };
+  await room.webSocketClose(socket, 1000, "Client closed");
+  assert.deepEqual(closed, [1000, "Client closed"]);
+});
+
+test("Eldoria never echoes reserved or abnormal WebSocket close codes", async () => {
+  let closed;
+  const room = roomWith([]);
+  const socket = { close: (...args) => { closed = args; } };
+  await room.webSocketClose(socket, 1006, "Abnormal closure");
+  assert.deepEqual(closed, []);
+});
+
 test("Eldoria closes oversized payloads", async () => {
   let closed;
   const room = roomWith([]);
