@@ -21,6 +21,15 @@ test("PWA sharing uses the OS share sheet with safe fallbacks and preserves refe
   assert.ok(script.includes("/^izzy_[a-f0-9]{32}$/"));
 });
 
+test("new landing assets invalidate the previous offline shell cache", async () => {
+  const serviceWorker = await read("sw.js");
+  assert.ok(serviceWorker.includes('clash-of-izzy-shell-v41'));
+  assert.ok(serviceWorker.includes('"/index.html"'));
+  assert.ok(serviceWorker.includes('"/landing.js"'));
+  assert.ok(serviceWorker.includes('"/assets/art/heroes/portraits.svg"'));
+  assert.ok(serviceWorker.includes('"/styles/heroes.css"'));
+});
+
 test("manifest opens the actual game as an installable standalone PWA", async () => {
   const manifest = JSON.parse(await read("manifest.json"));
   assert.equal(manifest.start_url, "/kingdom.html");
