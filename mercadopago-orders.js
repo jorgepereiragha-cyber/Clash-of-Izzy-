@@ -48,11 +48,12 @@ async function createCheckout(request, env, ctx) {
   if (!Number.isSafeInteger(requestId) || requestId < 1) return ctx.json({ error: "Pedido inválido." }, 400);
 
   const order = await env.DB.prepare(
-    "SELECT r.id,r.player_id,r.product_kind,r.product_id,r.product_name,r.price_brl,r.currency,r.status,r.mp_external_reference,r.mp_idempotency_key,r.mp_order_id,r.mp_checkout_url,r.mp_checkout_lock,r.mp_checkout_lock_expires_at,p.player_id AS public_player_id " +
+    "SELECT r.id,r.player_id,r.product_kind,r.product_id,r.product_name,r.price_brl,r.currency,r.status,r.payment_method,r.mp_external_reference,r.mp_idempotency_key,r.mp_order_id,r.mp_checkout_url,r.mp_checkout_lock,r.mp_checkout_lock_expires_at,p.player_id AS public_player_id " +
     "FROM purchase_requests r JOIN players p ON p.id=r.player_id WHERE r.id=? AND p.player_id=?"
   ).bind(requestId, playerId).first();
   if (!order) return ctx.json({ error: "Pedido não encontrado para este reino." }, 404);
   if (order.status !== "pending") return ctx.json({ error: "Este pedido não está mais aguardando pagamento." }, 409);
+  if (order.payment_method !== "mercadopago_link") return ctx.json({ error: "Este pedido foi criado para conferência manual e não pode ser convertido em checkout automático." }, 409);
   if (order.mp_checkout_url && order.mp_order_id) return ctx.json({ success: true, checkoutUrl: order.mp_checkout_url, orderId: order.mp_order_id, reused: true });
 
   const now = Math.floor(Date.now() / 1000);
