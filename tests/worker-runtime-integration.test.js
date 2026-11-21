@@ -973,17 +973,17 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(await api("/api/admin/purchase-requests", { method: "POST", body: {} }), 401, "fila Master sem sessão");
     });
 
-    await t.test("todas as 36 ações previstas foram alcançadas no fluxo de integração", async () => {
+    await t.test("todas as 39 ações previstas foram alcançadas no fluxo de integração", async () => {
       const actionTypes = [
         "set_nickname","equipment_craft","equipment_upgrade","equipment_equip","equipment_unequip","equipment_lock",
-        "cosmetic_buy","cosmetic_claim","skin_set_equip","skin_set_unequip","seasonal_buy","skin_fuse","shop_buy","alliance_create","alliance_join",
+        "cosmetic_buy","cosmetic_claim","skin_set_equip","skin_set_unequip","seasonal_buy","skin_fuse","shop_buy","merchant_exchange","hero_shop_buy","queue_speedup","alliance_create","alliance_join",
         "alliance_invite","alliance_accept_invite","alliance_promote","alliance_kick","alliance_donate","alliance_help",
         "alliance_chat","alliance_war_declare","alliance_claim_territory","alliance_leave","dragon_upgrade","hero_summon",
         "hero_evolve","hero_train","prestige","upgrade","train","research","march","battle","rename",
       ];
-      assert.equal(actionTypes.length, 36);
+      assert.equal(actionTypes.length, 39);
       assert.deepEqual([...executedActions].sort(), [...actionTypes].sort(),
-        "cada um dos 36 tipos de ação deve ter sido enviado ao Worker autenticado");
+        "cada um dos 39 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
   } finally {
     if (workerProcess && workerProcess.exitCode === null) {
