@@ -72,3 +72,12 @@ test('Tela de abertura nativa usa a identidade do jogo e libera acesso quando a 
   assert.match(activity, /offlinePanel\.setVisibility\(View\.VISIBLE\)/);
   assert.doesNotMatch(activity, /WebView\.setWebContentsDebuggingEnabled\(true\)/);
 });
+
+test('A recuperação offline usa cartão medieval, botão acessível e largura limitada', () => {
+  assert.match(activity, /recoveryCardBackground\.setCornerRadius\(dp\(18\)\)/);
+  assert.match(activity, /recoveryCardBackground\.setStroke\(dp\(1\)/);
+  assert.match(activity, /retry\.setMinimumHeight\(dp\(54\)\)/);
+  assert.match(activity, /retry\.setBackground\(retryBackground\)/);
+  assert.match(activity, /Math\.min\(dp\(420\), availableWidth\)/);
+  assert.match(activity, /hasLoadedPage = false;/);
+});
