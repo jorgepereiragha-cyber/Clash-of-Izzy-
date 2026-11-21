@@ -28,18 +28,25 @@ test("ticket request uses same-origin POST and Bearer, and rejects malformed tic
       status: 201, headers: { "content-type": "application/json" }
     });
   };
-  assert.equal(await requestRealtimeTicket({ token: "private-token", fetchImpl }), expectedTicket);
+  assert.deepEqual(await requestRealtimeTicket({ token: "private-token", fetchImpl }), { ticket: expectedTicket, room: null });
   assert.equal(observed.url, "/api/realtime/eldoria/ticket");
   assert.equal(observed.options.method, "POST");
   assert.equal(observed.options.redirect, "error");
   assert.equal(observed.options.credentials, "same-origin");
   assert.equal(observed.options.headers.Authorization, "Bearer private-token");
+  assert.equal(observed.options.headers["X-COI-Shard-Support"], "1");
   await assert.rejects(requestRealtimeTicket({ token: "", fetchImpl }));
   await assert.rejects(requestRealtimeTicket({
     token: "valid", fetchImpl: async () => new Response('{"ticket":"bad"}', { status: 201 })
   }));
   await assert.rejects(requestRealtimeTicket({
     token: "valid", fetchImpl: async () => new Response('{"error":"missing"}', { status: 503 })
+  }));
+  assert.deepEqual(await requestRealtimeTicket({ token: "valid", fetchImpl: async () =>
+    new Response(JSON.stringify({ ticket: expectedTicket, room: 7 }), { status: 201 })
+  }), { ticket: expectedTicket, room: 7 });
+  await assert.rejects(requestRealtimeTicket({ token: "valid", fetchImpl: async () =>
+    new Response(JSON.stringify({ ticket: expectedTicket, room: 8 }), { status: 201 })
   }));
 });
 
