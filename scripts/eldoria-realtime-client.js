@@ -33,13 +33,21 @@ export async function requestRealtimeTicket({ token, fetchImpl = fetch, signal }
     cache: "no-store",
     redirect: "error",
     credentials: "same-origin",
-    headers: { "Authorization": "Bearer " + token, "Accept": "application/json" },
+    headers: {
+      "Authorization": "Bearer " + token,
+      "Accept": "application/json",
+      "X-COI-Shard-Support": "1"
+    },
     signal
   });
   if (response.status !== 201) throw new Error("ticket-unavailable");
   const data = await response.json();
   if (!TICKET_PATTERN.test(String(data.ticket || ""))) throw new Error("invalid-ticket");
-  return data.ticket;
+  const room = data.room === undefined ? null : data.room;
+  if (room !== null && (!Number.isSafeInteger(room) || room < 0 || room >= 8)) {
+    throw new Error("invalid-room");
+  }
+  return { ticket: data.ticket, room };
 }
 
 export function startRealtimePresence({
@@ -96,9 +104,10 @@ export function startRealtimePresence({
     }
     update("Conectando ao tempo real…");
     try {
-      const ticket = await requestRealtimeTicket({ token, fetchImpl });
+      const { ticket, room } = await requestRealtimeTicket({ token, fetchImpl });
       if (!active || documentRef.hidden) return;
-      const address = "wss://" + windowRef.location.host + "/api/realtime/eldoria";
+      const address = "wss://" + windowRef.location.host + "/api/realtime/eldoria" +
+        (room === null ? "" : "?room=" + room);
       const client = new WebSocketImpl(address, ["coi-eldoria", "coi-ticket." + ticket]);
       socket = client;
       client.addEventListener("open", () => {
