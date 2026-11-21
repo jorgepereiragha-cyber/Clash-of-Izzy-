@@ -8,7 +8,7 @@ export function normalizeToken(raw){
   let token=String(raw||"").trim();
   if(token.slice(0,7).toLowerCase()==="bearer ")token=token.slice(7).trim();
   if(token.length>=2&&token[0]===token[token.length-1]&&(token[0]==='"'||token[0]==="'"))token=token.slice(1,-1).trim();
-  return /\\s/.test(token)?"":token;
+  return /\s/.test(token)?"":token;
 }
 
 export function validateIds(prod,preview){
