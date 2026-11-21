@@ -36,3 +36,8 @@ test("normalizes Cloudflare GitHub token variants and rejects interior whitespac
   assert.equal(normalizeToken(" 'test_token' "), "test_token");
   assert.equal(normalizeToken("invalid key"), "");
 });
+
+test("cloud-only diagnostic source is not published as a static asset",async()=>{
+  const ignored=(await read(".assetsignore")).split(/\r?\n/);
+  assert.ok(ignored.includes("scripts/cloudflare-remote-audit.mjs"));
+});
