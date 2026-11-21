@@ -81,6 +81,7 @@ header p{font-size:clamp(15px,2.5vw,20px);color:#d3dce9}
   let promptEvent=null;
   window.addEventListener('beforeinstallprompt',event=>{event.preventDefault();promptEvent=event;status.textContent='Este navegador permite solicitar a instalação.';});
   window.addEventListener('appinstalled',()=>{promptEvent=null;status.textContent='Instalação concluída neste aparelho.';});
+  if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('/sw.js').catch(()=>{}));}
   button.addEventListener('click',async()=>{
     if(!promptEvent){status.textContent='Use o menu do navegador e siga as instruções acima. A instalação depende do dispositivo.';return;}
     const offered=promptEvent;promptEvent=null;offered.prompt();
