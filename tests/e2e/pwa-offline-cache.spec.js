@@ -41,6 +41,8 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
       eventsStyles: Boolean(await cache.match("/styles/events-hub.css")),
       shivaArtwork: Boolean(await cache.match("/assets/art/events/shiva.svg")),
       khaliArtwork: Boolean(await cache.match("/assets/art/events/khali.svg")),
+      marketShell: Boolean(await cache.match("/market.html")),
+      marketRuntime: Boolean(await cache.match("/market.js")),
     };
   }, SHELL_CACHE);
 
@@ -55,6 +57,8 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(shellState.eventsStyles).toBe(true);
   expect(shellState.shivaArtwork).toBe(true);
   expect(shellState.khaliArtwork).toBe(true);
+  expect(shellState.marketShell).toBe(true);
+  expect(shellState.marketRuntime).toBe(true);
 
   const landingArtwork = await page.locator(".landing-kingdom-art").evaluate(image => ({ complete: image.complete, naturalWidth: image.naturalWidth }));
   expect(landingArtwork).toEqual({ complete: true, naturalWidth: 900 });

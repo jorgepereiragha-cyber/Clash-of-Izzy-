@@ -783,6 +783,43 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c2", "c3"] }, 200);
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c1", "c2"] }, 400, "fusão com skins repetidas");
       await action(tokenA, { type: "shop_buy", item: "acc_5min", source: "shop" }, 200);
+      // End-to-end economy assertions use a disposable local D1 only.
+      const baseline = (await api("/api/game/state", { token: tokenA })).data.state;
+      const resources = ["food","wood","stone","iron","gold"];
+      const beforeMarket = Object.fromEntries(resources.map(key => [key, Number(baseline.kingdom[key] || 0)]));
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdoms SET food=1000000,wood=1000000,stone=1000000,iron=1000000,gold=1000000 WHERE id=" + Number(kingdomA) + ";",
+      ]);
+      try {
+        let marketState = (await api("/api/game/state", { token: tokenA })).data.state;
+        const exchange = marketState.shop.exchangeOffers[0];
+        assert.ok(exchange?.id && exchange?.reward?.item, "servidor envia ofertas do mercador");
+        const qtyBefore = Number(marketState.shop.inventory.find(x => x.item_id === exchange.reward.item)?.quantity || 0);
+        await action(tokenA, { type: "merchant_exchange", offerId: exchange.id }, 200);
+        marketState = (await api("/api/game/state", { token: tokenA })).data.state;
+        const qtyAfter = Number(marketState.shop.inventory.find(x => x.item_id === exchange.reward.item)?.quantity || 0);
+        assert.equal(qtyAfter - qtyBefore, Number(exchange.reward.quantity), "recompensa creditada uma vez");
+        await action(tokenA, { type: "merchant_exchange", offerId: "oferta_invalida" }, 409);
+
+        const offer = marketState.heroShop.offers[0];
+        assert.ok(offer?.heroKey && offer?.quantity > 0, "loja apresenta herói já recrutado");
+        await action(tokenA, { type: "hero_shop_buy", heroKey: "heroi_inexistente" }, 404);
+        await action(tokenA, { type: "hero_shop_buy", heroKey: offer.heroKey }, 200);
+        const next = (await api("/api/game/state", { token: tokenA })).data.state;
+        const updated = next.heroShop.offers.find(x => x.heroKey === offer.heroKey);
+        assert.equal(Number(updated?.fragments) - Number(offer.fragments), Number(offer.quantity),
+          "fragmentos creditados no herói canônico");
+        await action(tokenA, { type: "queue_speedup", queueId: 999999, itemId: "acc_5min", quantity: 1 }, 404);
+      } finally {
+        await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE kingdoms SET " + resources.map(key => key + "=" + beforeMarket[key]).join(",") +
+            " WHERE id=" + Number(kingdomA) + ";",
+        ]);
+      }
       // The Egypt fixture deliberately funds five relic purchases; restore the
       // insufficient-balance condition before asserting seasonal purchase rejection.
       await runCli([
@@ -936,17 +973,17 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(await api("/api/admin/purchase-requests", { method: "POST", body: {} }), 401, "fila Master sem sessão");
     });
 
-    await t.test("todas as 36 ações previstas foram alcançadas no fluxo de integração", async () => {
+    await t.test("todas as 39 ações previstas foram alcançadas no fluxo de integração", async () => {
       const actionTypes = [
         "set_nickname","equipment_craft","equipment_upgrade","equipment_equip","equipment_unequip","equipment_lock",
-        "cosmetic_buy","cosmetic_claim","skin_set_equip","skin_set_unequip","seasonal_buy","skin_fuse","shop_buy","alliance_create","alliance_join",
+        "cosmetic_buy","cosmetic_claim","skin_set_equip","skin_set_unequip","seasonal_buy","skin_fuse","shop_buy","merchant_exchange","hero_shop_buy","queue_speedup","alliance_create","alliance_join",
         "alliance_invite","alliance_accept_invite","alliance_promote","alliance_kick","alliance_donate","alliance_help",
         "alliance_chat","alliance_war_declare","alliance_claim_territory","alliance_leave","dragon_upgrade","hero_summon",
         "hero_evolve","hero_train","prestige","upgrade","train","research","march","battle","rename",
       ];
-      assert.equal(actionTypes.length, 36);
+      assert.equal(actionTypes.length, 39);
       assert.deepEqual([...executedActions].sort(), [...actionTypes].sort(),
-        "cada um dos 36 tipos de ação deve ter sido enviado ao Worker autenticado");
+        "cada um dos 39 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
   } finally {
     if (workerProcess && workerProcess.exitCode === null) {

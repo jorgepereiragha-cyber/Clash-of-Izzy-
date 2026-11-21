@@ -84,3 +84,28 @@ envia heartbeat, usa reconexão limitada e para quando a página entra em segund
 Sem o Durable Object implantado, a interface exibe indisponibilidade sem bloquear o reino.
 
 A conexão usa a API de WebSocket do Durable Object. A implementação deve continuar usando a interface de Hibernation WebSocket e validar o comportamento/custo em staging antes de produção.
+
+
+## Salas particionadas para homologação de até 1.000 conexões
+
+A infraestrutura agora oferece **oito salas Durable Objects** estáveis,
+identificadas por um hash determinístico do identificador autenticado
+de cada jogador. Cada sala mantém o teto de 200 WebSockets; logo,
+**1.600 vagas são um limite teórico agregado, não capacidade medida**.
+Persistência, ações de jogo e autoridade econômica continuam no Worker/D1.
+O número mostrado no HUD é apenas o total de conexões da sala do usuário.
+
+O navegador atualizado informa suporte às salas no POST autenticado
+`/api/realtime/eldoria/ticket`. O Worker calcula a sala a partir do
+jogador, emite um ticket de uso único armazenado naquela sala e devolve
+`room` (0 a 7). O WebSocket acessa exclusivamente
+`/api/realtime/eldoria?room=N` com o ticket temporário; passar outro
+número de sala faz o ticket falhar. Códigos de sala inválidos, duplicados
+ou fora do intervalo são rejeitados. Clientes antigos sem a opção de
+particionamento continuam na sala original `eldoria`.
+
+**Ainda faltam:** provisionamento real em Preview isolado, teste de
+1.000 usuários autenticados simultâneos e reconexões, medição de custo
+no Workers Paid, distribuição com IDs reais e verificação de perdas
+de conexão ou fila. O código não deve ser promovido à produção antes
+dessas verificações, mesmo após passar nos testes automatizados.
