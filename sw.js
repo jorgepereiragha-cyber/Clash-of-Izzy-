@@ -30,7 +30,7 @@ function isShellPath(pathname) {
 }
 
 function isRuntimeAsset(pathname) {
-  return pathname.startsWith("/assets/") && RUNTIME_ASSET_PATTERN.test(pathname);
+  return (pathname.startsWith("/assets/") || pathname.startsWith("/vendor/three/")) && RUNTIME_ASSET_PATTERN.test(pathname);
 }
 
 function canStoreResponse(response) {
