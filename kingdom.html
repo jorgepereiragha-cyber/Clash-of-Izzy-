@@ -118,6 +118,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <input id="playerSearchInput" minlength="3" maxlength="20" autocomplete="off" placeholder="Digite o início do nickname" required style="min-width:180px;flex:1;padding:10px;border-radius:8px;border:1px solid #71839a;background:#0e1a2a;color:#fff">
 <button type="submit" class="secondary">🔎 Buscar</button>
 </form>
+<div id="eldoriaPresence" class="muted" role="status" aria-live="polite" style="margin:10px 0">Tempo real: aguardando sessão.</div>
 <div id="playerSearchResults" class="events" aria-live="polite" style="margin-top:10px"></div>
 </section>
 <section class="panel" style="margin-top:14px">
@@ -476,4 +477,5 @@ const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
 </script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-3d.js"></script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
+<script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>
