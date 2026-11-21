@@ -17,6 +17,9 @@
   ];
 
   const path = location.pathname.replace(/\/$/,"") || "/index.html";
+  // As paginas publicas sao exclusivamente de divulgacao e download.
+  // A navegacao de jogo permanece apenas nas telas internas do cliente Android.
+  if (path === "/index.html" || path === "/portal.html") return;
   const root = document.createElement("nav");
   root.className = "coi-global-nav";
   root.setAttribute("aria-label","Navegação principal");
