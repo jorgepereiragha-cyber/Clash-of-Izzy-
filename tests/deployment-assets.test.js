@@ -9,3 +9,7 @@ test("Cloudflare public assets exclude local tooling, tests, and database artifa
     assert.ok(ignore.split("\n").some(line => line.trim() === pattern), "missing assets exclusion: " + pattern);
   }
 });
+
+test("staging load probe is excluded from public asset hosting", () => {
+  assert.ok(ignore.split("\n").some(line => line.trim() === "scripts/staging-load-smoke.mjs"));
+});

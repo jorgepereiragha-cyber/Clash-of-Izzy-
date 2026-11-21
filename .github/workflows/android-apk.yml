@@ -1,0 +1,113 @@
+name: Android APK - instalacao direta
+
+on:
+  pull_request:
+    paths:
+      - "android-sideload/**"
+      - ".github/workflows/android-apk.yml"
+      - "tests/android-apk-sideload.test.js"
+      - "docs/ANDROID_APK_SEM_PLAY_STORE.md"
+  workflow_dispatch:
+    inputs:
+      tipo:
+        description: "Teste instalavel ou release assinada com chave privada?"
+        required: true
+        default: teste
+        type: choice
+        options:
+          - teste
+          - assinado
+
+permissions:
+  contents: read
+
+jobs:
+  apk:
+    name: Compilar APK Android
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - name: Checkout da versao solicitada
+        uses: actions/checkout@v4
+      - name: JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Plataforma Android e ferramentas de assinatura
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Testar invariantes de seguranca e distribuicao
+        run: node --test tests/android-apk-sideload.test.js
+      - name: Compilar APK de teste
+        if: ${{ github.event_name == 'pull_request' || inputs.tipo == 'teste' }}
+        working-directory: android-sideload
+        run: gradle --no-daemon assembleDebug
+      - name: Verificar assinatura e SHA-256 do APK de teste
+        if: ${{ github.event_name == 'pull_request' || inputs.tipo == 'teste' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir=android-sideload/app/build/outputs/apk/debug
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$dir/app-debug.apk"
+          (cd "$dir" && sha256sum app-debug.apk > app-debug.apk.sha256)
+          echo "APK de teste SHA-256: $(cut -d' ' -f1 "$dir/app-debug.apk.sha256")" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publicar APK de teste (ZIP no GitHub Actions)
+        if: ${{ github.event_name == 'pull_request' || inputs.tipo == 'teste' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash-of-izzy-android-apk-teste
+          path: android-sideload/app/build/outputs/apk/debug/app-debug.apk*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Validar secrets de assinatura (somente release)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tipo == 'assinado' }}
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          SIGNING_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" && test -n "$STORE_PASS" && test -n "$SIGNING_ALIAS" && test -n "$KEY_PASS" || {
+            echo "::error::Secrets de assinatura ausentes. Nao gerar release sem assinatura persistente."
+            exit 1
+          }
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/clash-izzy-release.jks"
+          chmod 600 "$RUNNER_TEMP/clash-izzy-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/clash-izzy-release.jks" >> "$GITHUB_ENV"
+      - name: Compilar APK de release assinado
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tipo == 'assinado' }}
+        working-directory: android-sideload
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+      - name: Verificar assinatura do APK de release
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tipo == 'assinado' }}
+        run: |
+          set -euo pipefail
+          dir=android-sideload/app/build/outputs/apk/release
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$dir/app-release.apk"
+          (cd "$dir" && sha256sum app-release.apk > app-release.apk.sha256)
+          echo "APK de release SHA-256: $(cut -d' ' -f1 "$dir/app-release.apk.sha256")" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publicar APK de release (ZIP no GitHub Actions)
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tipo == 'assinado' }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash-of-izzy-android-apk-assinado
+          path: android-sideload/app/build/outputs/apk/release/app-release.apk*
+          if-no-files-found: error
+          retention-days: 14
+      - name: Apagar arquivo de assinatura do runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/clash-izzy-release.jks"

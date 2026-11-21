@@ -58,15 +58,42 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   #feedbackForm textarea{resize:vertical;min-height:84px}
   #feedbackForm button{justify-self:start}
 </style>  <link rel="stylesheet" href="/styles/navigation.css">
+<link rel="stylesheet" href="/styles/kingdom-4x-command.css">
 </head>
-<body>
+<body class="coi-fourx">
 <header><div class="top"><div class="brand"><img src="/logo.svg" alt="Clash of Izzy" width="190" height="55" style="display:block;max-width:38vw;height:auto"></div><div id="status" role="status">Conectando ao reino…</div></div><div class="resources" id="resources"><div class="resource">🌾<b>—</b>Comida</div><div class="resource">🪵<b>—</b>Madeira</div><div class="resource">🪨<b>—</b>Pedra</div><div class="resource">⛓️<b>—</b>Ferro</div><div class="resource">🪙<b>—</b>Ouro</div></div></header>
 <main>
 <div class="hero"><div><h1 id="kingdomName">Seu Reino</h1><div class="muted" id="playerName">Carregando comandante…</div></div><div class="toolbar"><button class="secondary" id="refresh">↻ Atualizar</button></div></div>
 <div id="loading">Carregando seu reino e sincronizando com o servidor…</div>
 <div id="game" hidden>
+<section class="coi-command-deck" aria-label="Comando do reino">
+ <div class="coi-command-identity"><span class="coi-command-kicker">SALA DO TRONO · ELDORIA</span><strong>Conquiste sua história</strong><span>Construa, pesquise e comande seu exército.</span></div>
+ <div class="coi-command-metrics" aria-label="Indicadores do reino">
+  <div><small>Castelo</small><strong id="coiHudCastle">—</strong></div>
+  <div><small>Poder real</small><strong id="coiHudPower">—</strong></div>
+  <div><small>Exército</small><strong id="coiHudArmy">—</strong></div>
+ </div>
+ <div class="coi-command-orders" id="coiCommandOrders" role="status" aria-live="polite">
+  <span id="coiHudOrderLabel">Sincronizando ordens…</span>
+  <a id="coiHudOrderLink" href="#queues">Ver centro de operações</a>
+ </div>
+</section>
+<nav class="coi-mobile-dock" aria-label="Acesso rápido ao jogo">
+ <a href="#city"><span aria-hidden="true">🏰</span><span>Cidade</span></a>
+ <a href="#buildings"><span aria-hidden="true">🔨</span><span>Construir</span></a>
+ <a href="#trainingForm"><span aria-hidden="true">⚔️</span><span>Tropas</span></a>
+ <a href="/world.html"><span aria-hidden="true">🗺️</span><span>Mundo</span></a>
+ <a href="/alliance.html"><span aria-hidden="true">🛡️</span><span>Aliança</span></a>
+</nav>
 <div class="layout">
-<section class="panel"><h2>🏰 Sua cidade</h2><div class="city" id="city"></div><div class="grid2" id="summary"></div></section>
+<section class="panel coi-city-panel"><h2>🏰 Sua cidade fortificada</h2>
+ <div class="coi-city-stage">
+  <div class="coi-city-stage-label" aria-hidden="true"><span>ELDORIA</span><small>CENTRO DO REINO</small></div>
+  <div class="city" id="city"></div>
+  <div class="coi-city-stage-corner" aria-hidden="true">Toque em um edifício para ver melhorias</div>
+ </div>
+ <div class="grid2" id="summary"></div>
+</section>
 <div class="stack">
 <section class="panel"><h2>🏗️ Edifícios e melhorias</h2><div class="building-list" id="buildings"></div></section>
 <section class="panel"><h2>⏳ Centro de operações</h2><div id="queues" class="events"><div class="muted">Carregando filas do reino…</div></div></section>
@@ -237,6 +264,11 @@ document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).
 renderPets();renderBattleReports();
 city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
 document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
+window.dispatchEvent(new CustomEvent("coi:command-state",{detail:{
+ kingdom:{castle_level:k.castle_level,power:k.power},
+ queues:state.queues||[],armyCount:state.armyCount??total,troopCapacity:state.troopCapacity||500,
+ marches:state.marches||[]
+}}));
 }
 function renderPets(){
  const root=document.getElementById("petsList");
@@ -405,5 +437,5 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-3d.js"></script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-3d.js"></script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
 </body></html>
