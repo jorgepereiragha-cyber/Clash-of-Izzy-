@@ -39,3 +39,6 @@ package-lock.json
 
 # Script operacional executado apenas no GitHub Actions.
 scripts/cloudflare-remote-audit.mjs
+
+# Staging-only load probe is never a public static asset.
+scripts/staging-load-smoke.mjs
