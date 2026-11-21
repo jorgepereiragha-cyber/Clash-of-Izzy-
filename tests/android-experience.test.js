@@ -88,6 +88,8 @@ test("public asset filters exclude build-only Node diagnostics but keep the runt
   for (const browserModule of [
     "/scripts/ambient-particles.js",
     "/scripts/kingdom-3d.js",
+    "/scripts/kingdom-visual-boot.js",
+    "/scripts/kingdom-visual-preferences.js",
     "/scripts/pwa-runtime.js",
   ]) assert.ok(runtime.includes(browserModule), "active browser module not cached: " + browserModule);
 });

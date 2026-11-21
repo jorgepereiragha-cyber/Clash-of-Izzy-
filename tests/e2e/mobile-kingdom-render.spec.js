@@ -215,4 +215,30 @@ test.describe("Mobile kingdom rendering", () => {
     await expect.poll(() => actions.length).toBe(2);
     expect(actions[1]).toEqual({ type: "train", unit: "archer", quantity: 4 });
   });
+
+  test("graphics preferences persist and 2D mode keeps mobile controls usable", async ({ page }) => {
+    await page.addInitScript(() => localStorage.setItem("coi_graphics_preference", "2d"));
+    await installApiFixtures(page);
+    await page.setViewportSize({width:360,height:740});
+    await page.goto("/kingdom.html");
+    await expect(page.locator("#game")).toBeVisible();
+    await expect(page.locator("#coiGraphicsPreset")).toHaveValue("2d");
+    await expect(page.locator("#coiGraphicsStatus")).toContainText("2D leve");
+    await expect(page.locator("#city #kingdom3d")).toHaveCount(0);
+    await expect(page.locator('#city .building[data-building="castle"]')).toBeVisible();
+    await expect(page.locator("#coiGraphicsApply")).toBeDisabled();
+    await page.locator("#coiGraphicsPreset").selectOption("low");
+    await expect(page.locator("#coiGraphicsApply")).toBeEnabled();
+    await page.locator("#coiGraphicsApply").click();
+    await expect(page.locator("#coiGraphicsPreset")).toHaveValue("low");
+    await expect(page.locator("#game")).toBeVisible();
+    const saved = await page.evaluate(() => ({
+      value:localStorage.getItem("coi_graphics_preference"),
+      width:document.documentElement.scrollWidth,
+      viewport:innerWidth
+    }));
+    expect(saved.value).toBe("low");
+    expect(saved.width).toBeLessThanOrEqual(saved.viewport + 1);
+  });
+
 });

@@ -7,6 +7,7 @@ export function selectKingdomQualityProfile({
   maxTextureSize = 4096,
   saveData = false,
   prefersReducedMotion = false,
+  preferredTier = "auto",
 } = {}) {
   const memory = Number.isFinite(Number(deviceMemory)) ? Number(deviceMemory) : 0;
   const cores = Number.isFinite(Number(hardwareConcurrency)) ? Number(hardwareConcurrency) : 4;
@@ -20,7 +21,17 @@ export function selectKingdomQualityProfile({
     || (cores > 0 && cores <= 4)
     || (textureLimit > 0 && textureLimit < 4096);
   const high = !low && memory >= 8 && cores >= 8 && textureLimit >= 8192;
-  const tier = low ? "low" : high ? "high" : "balanced";
+  // Manual choices never bypass Data Saver or hard hardware limits.
+  const severeLimits = (memory > 0 && memory <= 2)
+    || (cores > 0 && cores <= 2)
+    || (textureLimit > 0 && textureLimit < 2048);
+  const requested = ["low", "balanced", "high"].includes(preferredTier) ? preferredTier : null;
+  const highUnsafe = (memory > 0 && memory < 6)
+    || (cores > 0 && cores < 6)
+    || (textureLimit > 0 && textureLimit < 8192);
+  const tier = dataSaver || severeLimits ? "low"
+    : requested === "high" && highUnsafe ? "balanced"
+    : requested || (low ? "low" : high ? "high" : "balanced");
 
   return Object.freeze({
     tier,
@@ -32,7 +43,7 @@ export function selectKingdomQualityProfile({
     pbrMaps: tier !== "low",
     maxBuildings: tier === "low" ? 8 : tier === "balanced" ? 12 : 16,
     maxPixelCount: tier === "low" ? 1200000 : tier === "high" ? 4200000 : 2400000,
-    loadOptionalAssets: !dataSaver,
+    loadOptionalAssets: !dataSaver && tier !== "low",
     prefersReducedMotion: prefersReducedMotion === true,
   });
 }

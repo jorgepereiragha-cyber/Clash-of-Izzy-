@@ -181,3 +181,41 @@
   .coi-fourx *{scroll-behavior:auto!important}
   .coi-fourx .coi-command-deck,.coi-fourx .coi-mobile-dock a{transition:none!important}
 }
+
+/* Graphics controls remain below the scene, never over building hit targets. */
+.coi-graphics-controls{
+ display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);
+ gap:10px 14px;align-items:center;margin:0 0 14px;padding:12px 13px;
+ background:linear-gradient(150deg,#102737,#152335);border:1px solid #d7b37582;
+ border-radius:10px;box-shadow:inset 0 1px #ffffff10
+}
+.coi-graphics-description{display:grid;gap:4px;min-width:0}
+.coi-graphics-description strong{font:700 15px/1.3 Georgia,serif;color:#ffe1a5}
+.coi-graphics-description small{font:500 12px/1.5 system-ui,sans-serif;color:#dde9f0}
+.coi-graphics-form{display:flex;align-items:center;justify-content:flex-end;gap:8px;min-width:0}
+.coi-graphics-form label{font-size:12px;font-weight:700;color:#f1dfb3}
+.coi-graphics-form select{
+ flex:1;min-width:0;max-width:230px;min-height:48px;padding:8px 10px;
+ background:#0c1a2a;color:#fff2d5;border:1px solid #bd9e6d;border-radius:7px;
+ font:600 13px system-ui,sans-serif
+}
+.coi-graphics-form button{
+ flex:0 0 auto;min-height:48px;min-width:70px;padding:9px 12px;
+ color:#0b1926;background:#e9c878;border:1px solid #f6dca3;
+ border-radius:7px;font:800 13px system-ui,sans-serif
+}
+.coi-graphics-form button:disabled{opacity:.55;cursor:default;transform:none;box-shadow:none}
+.coi-graphics-hint{grid-column:1/-1;color:#bdcbd8;font-size:11px;line-height:1.4}
+.coi-city-panel:has(.coi-graphics-controls) .coi-city-stage{margin-bottom:12px}
+@media(max-width:760px){
+ .coi-graphics-controls{grid-template-columns:1fr;gap:9px;padding:11px}
+ .coi-graphics-form{justify-content:stretch}
+ .coi-graphics-form select{max-width:none}
+}
+@media(max-width:360px){
+ .coi-graphics-form{display:grid;grid-template-columns:minmax(0,1fr) auto}
+ .coi-graphics-form label{grid-column:1/-1}
+}
+@media(prefers-reduced-motion:reduce){
+ .coi-graphics-controls *{animation:none!important;transition:none!important}
+}

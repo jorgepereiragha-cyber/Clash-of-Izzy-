@@ -6,6 +6,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler } from "./kingdom-quality.js";
+import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 
@@ -811,8 +812,10 @@ if (host && "WebGLRenderingContext" in window) {
   }
   try {
     const deviceMemory = Number(navigator.deviceMemory || 0);
+    const preferredTier = readGraphicsChoice(window.localStorage);
     renderer = new THREE.WebGLRenderer({
-      alpha: true, antialias: false, powerPreference: "low-power",
+      alpha: true, antialias: preferredTier === "high",
+      powerPreference: preferredTier === "high" ? "high-performance" : "default",
       depth: true, stencil: false, preserveDrawingBuffer: false
     });
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
@@ -823,10 +826,12 @@ if (host && "WebGLRenderingContext" in window) {
       viewportWidth: host.clientWidth || window.innerWidth,
       maxTextureSize: renderer.capabilities.maxTextureSize,
       saveData: connection?.saveData === true,
+      preferredTier,
       prefersReducedMotion
     });
     window.__coiKingdomQuality = Object.freeze({
       tier: qualityProfile.tier,
+      preference: preferredTier,
       dataSaver: !qualityProfile.loadOptionalAssets,
       prefersReducedMotion: qualityProfile.prefersReducedMotion
     });
