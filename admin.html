@@ -153,7 +153,15 @@ function renderPurchaseRequests(requests){
   info.append(name,meta);
   const actions=document.createElement("div");actions.className="actions";
   const approve=document.createElement("button");approve.type="button";approve.textContent="Confirmar pagamento e liberar";
-  approve.addEventListener("click",()=>reviewPurchase(request.id,"approve",approve));
+  let bankStatementConfirmation=null;
+  if(request.payment_method==="pix"){
+   const label=document.createElement("label");label.style.cssText="display:flex;gap:8px;align-items:flex-start;margin:12px 0;color:#f4d89e;";
+   bankStatementConfirmation=document.createElement("input");bankStatementConfirmation.type="checkbox";
+   label.append(bankStatementConfirmation,document.createTextNode("Conferi no extrato Nubank da conta autorizada o valor, o identificador deste pedido e o crédito efetivamente recebido; não utilizei apenas comprovante enviado pelo jogador."));
+   info.append(label);approve.disabled=true;
+   bankStatementConfirmation.addEventListener("change",()=>{approve.disabled=!bankStatementConfirmation.checked;});
+  }
+  approve.addEventListener("click",()=>reviewPurchase(request.id,"approve",approve,Boolean(bankStatementConfirmation?.checked)));
   const reject=document.createElement("button");reject.type="button";reject.className="secondary";reject.textContent="Recusar";
   reject.addEventListener("click",()=>reviewPurchase(request.id,"reject",reject));
   actions.append(approve,reject);card.append(info,actions);root.append(card);
@@ -163,11 +171,11 @@ async function refreshPurchaseRequests(){
  const data=await api("/admin/purchase-requests",{});
  renderPurchaseRequests(data.requests||[]);
 }
-async function reviewPurchase(id,decision,button){
- if(decision==="approve"&&!confirm("Confirma que o pagamento foi recebido e deseja liberar este pacote agora?"))return;
+async function reviewPurchase(id,decision,button,bankStatementConfirmed=false){
+ if(decision==="approve"&&!confirm("Confirma que o pagamento foi recebido no extrato da conta autorizada e deseja liberar este pacote agora?"))return;
  if(decision==="reject"&&!confirm("Deseja recusar este pedido?"))return;
  button.disabled=true;
- try{const result=await api("/admin/purchase-requests/review",{requestId:id,decision});showNotice(result.message);await refreshPurchaseRequests()}
+ try{const result=await api("/admin/purchase-requests/review",{requestId:id,decision,bankStatementConfirmed});showNotice(result.message);await refreshPurchaseRequests()}
  catch(error){showNotice(error.message);button.disabled=false}
 }
 function renderPlayers(players){
