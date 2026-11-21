@@ -26,17 +26,34 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - name: Require owner confirmation of Paid plan and billing limits
+      - name: Record billing confirmation without blocking read-only diagnostics
         shell: bash
         env:
           OWNER_CONFIRMED_PAID_PLAN: ${{ inputs.owner_confirmed_paid_plan }}
         run: |
           set -euo pipefail
-          if [[ "$OWNER_CONFIRMED_PAID_PLAN" != "true" ]]; then
-            echo "::error::Confirme primeiro no Cloudflare Dashboard que Workers Paid está ativo e os limites/alertas foram revisados."
-            exit 1
+          if [[ "$OWNER_CONFIRMED_PAID_PLAN" == "true" ]]; then
+            echo "Proprietário confirmou plano Workers Paid e revisão do orçamento."
+            echo "A confirmação é declaratória e não prova o plano via API."
+            echo "Confirmação de cobrança pelo proprietário: SIM (não verificada via API)" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning::Plano Workers Paid não confirmado pelo proprietário. Auditoria read-only permitida; publicação permanece bloqueada."
+            echo "Confirmação de cobrança pelo proprietário: PENDENTE" >> "$GITHUB_STEP_SUMMARY"
           fi
-          echo "Confirmação do proprietário recebida; a API não permite provar o nível de assinatura neste workflow."
+
+      - name: Restrict code checkout to trusted branches
+        shell: bash
+        env:
+          SELECTED_BRANCH: ${{ inputs.target_branch }}
+        run: |
+          set -euo pipefail
+          case "$SELECTED_BRANCH" in
+            main|release/one-shared-realm-early-access) ;;
+            *)
+              echo "::error::Branch não autorizada para executar código com credenciais Cloudflare."
+              exit 1
+              ;;
+          esac
 
       - name: Checkout selected release branch
         uses: actions/checkout@v4
@@ -47,10 +64,9 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: npm
 
       - name: Install dependencies
-        run: npm ci --ignore-scripts
+        run: npm install --ignore-scripts --no-audit --no-fund
 
       - name: Run complete automated test suite
         run: npm test

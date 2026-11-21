@@ -32,3 +32,7 @@ assets/art/README.md
 
 # Model documentation is not a public game asset.
 assets/models/README.md
+
+# Arquivos de configuração internos: nunca expor via static assets.
+wrangler.preview-migrations.jsonc
+package-lock.json

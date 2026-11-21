@@ -1,0 +1,8 @@
+node_modules/
+.wrangler/
+dist/
+playwright-report/
+test-results/
+coverage/
+vendor/three/
+artifacts/3d-optimization/

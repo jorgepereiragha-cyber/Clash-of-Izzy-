@@ -1,0 +1,11 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "d1_databases": [
+    {
+      "binding": "PREVIEW_DB",
+      "database_name": "izzy-preview-17112026",
+      "database_id": "6674c0ac-3636-4e57-bff8-23cf60ab9637",
+      "migrations_dir": "migrations"
+    }
+  ]
+}
