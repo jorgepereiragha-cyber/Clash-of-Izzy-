@@ -12,8 +12,9 @@ test("purchase requests require a valid player session and a stable idempotency 
   assert.ok(worker.includes("purchase-request-player"));
   assert.ok(worker.includes("requestKey"));
   assert.ok(worker.includes("payment_method,payment_reference,request_key"));
-  assert.ok(worker.includes('requestedPaymentMethod!=="mercadopago_link"'));
-  assert.ok(worker.includes('const paymentMethod="mercadopago_link"'));
+  assert.ok(worker.includes('["mercadopago_link","pix"].includes(requestedPaymentMethod)'));
+  assert.ok(worker.includes('NUBANK_PIX_ENABLED'));
+  assert.ok(worker.includes('const paymentMethod=requestedPaymentMethod'));
 });
 
 test("Master approval queue is protected by admin session and grants packages only once", async () => {
@@ -41,7 +42,8 @@ test("official store submits an auditable payment request instead of opening Wha
   assert.ok(arena.includes('id="purchaseReference"'));
   assert.ok(arena.includes("https://link.mercadopago.com.br/pagamentosskin"));
   assert.ok(arena.includes("mercadopago_link"));
-  assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i);
+  assert.ok(arena.includes('<option value="pix" disabled>'));
+  assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:bank_transfer|manual)["']/i);
   assert.ok(arena.includes('id="whatsapp"'));
 });
 
