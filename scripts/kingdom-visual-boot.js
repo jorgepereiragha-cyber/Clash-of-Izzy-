@@ -37,7 +37,7 @@ window.addEventListener("coi:kingdom-2d-fallback", () => {
 
 if (saved === "2d") {
   window.__coiKingdomQuality = Object.freeze({ tier: "2d", mode: "2d", dataSaver: true });
-  announce("Modo 2D leve: sem downloads do motor 3D; economia de bateria e memória.");
+  announce("Modo 2D leve: sem renderização 3D; menor uso da GPU e da bateria.");
 } else if (!("WebGLRenderingContext" in window)) {
   announce("GPU/WebGL indisponível: mantendo a cidade em 2D.");
 } else {

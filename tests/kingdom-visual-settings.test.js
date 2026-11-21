@@ -58,7 +58,7 @@ test("2D boot bypasses Three.js and graphics controls remain local-only", async 
 });
 
 test("world map honors 2D preference and avoids loading Three.js in compatibility mode", async () => {
-  const world = await readFile(new URL("../world-map-visual-boot.js",import.meta.url),"utf8");
+  const world = await readFile(new URL("../scripts/world-map-visual-boot.js",import.meta.url),"utf8");
   const source = await readFile(new URL("../world-map-3d.js",import.meta.url),"utf8");
   const html = await readFile(new URL("../world.html",import.meta.url),"utf8");
   assert.match(world, /choice === "2d"/);

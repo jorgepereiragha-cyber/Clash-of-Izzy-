@@ -813,12 +813,17 @@ if (host && "WebGLRenderingContext" in window) {
   try {
     const deviceMemory = Number(navigator.deviceMemory || 0);
     const preferredTier = readGraphicsChoice(window.localStorage);
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const cores = Number(navigator.hardwareConcurrency || 0);
+    const safeForHighGpu = connection?.saveData !== true
+      && (deviceMemory === 0 || deviceMemory >= 6)
+      && (cores === 0 || cores >= 6);
+    const highGpuRequested = preferredTier === "high" && safeForHighGpu;
     renderer = new THREE.WebGLRenderer({
-      alpha: true, antialias: preferredTier === "high",
-      powerPreference: preferredTier === "high" ? "high-performance" : "default",
+      alpha: true, antialias: highGpuRequested,
+      powerPreference: highGpuRequested ? "high-performance" : "default",
       depth: true, stencil: false, preserveDrawingBuffer: false
     });
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
     qualityProfile = selectKingdomQualityProfile({
       deviceMemory,

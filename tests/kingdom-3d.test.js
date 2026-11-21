@@ -38,7 +38,7 @@ test("quality profile uses the real viewport while the kingdom panel is initiall
 });
 
 test("3D scene is mobile-conscious and does not run an unnecessary animation loop", () => {
-  assert.match(renderer, /powerPreference: preferredTier === "high" \? "high-performance" : "default"/);
+  assert.match(renderer, /powerPreference: highGpuRequested \? "high-performance" : "default"/);
   assert.match(renderer, /calculateKingdomPixelRatio\(\{ width: host\.clientWidth, height: host\.clientHeight, devicePixelRatio: window\.devicePixelRatio \|\| 1, profile: qualityProfile \}\)/);
   assert.match(renderer, /renderer\.shadowMap\.enabled = qualityProfile\.shadows/);
   assert.match(renderer, /ResizeObserver/);
