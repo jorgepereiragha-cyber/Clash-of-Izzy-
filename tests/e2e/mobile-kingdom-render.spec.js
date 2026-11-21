@@ -61,10 +61,27 @@ function makeKingdomState() {
   };
 }
 
-async function installApiFixtures(page) {
+function waitForAccountStatus(page) {
+  return page.waitForResponse(response => new URL(response.url()).pathname === "/api/account/status");
+}
+
+async function installApiFixtures(page, accountStatus = { hasAccount: false, account: null }, accountStatusHttpStatus = 200) {
   const actions = [];
   const stateRequests = [];
+  const accountStatusRequests = [];
   const state = makeKingdomState();
+
+  await page.route("**/api/account/status", async route => {
+    accountStatusRequests.push({
+      method: route.request().method(),
+      authorization: route.request().headers().authorization || "",
+    });
+    await route.fulfill({
+      status: accountStatusHttpStatus,
+      contentType: "application/json",
+      body: JSON.stringify(accountStatus),
+    });
+  });
 
   await page.addInitScript(token => {
     window.localStorage.setItem("coi_game_token", token);
@@ -99,16 +116,28 @@ async function installApiFixtures(page) {
     });
   });
 
-  return { actions, stateRequests };
+  return { actions, stateRequests, accountStatusRequests };
 }
 
 test.describe("Mobile kingdom rendering", () => {
   test("renders resources, buildings, queues and troop controls on Pixel 5", async ({ page }) => {
-    const { stateRequests } = await installApiFixtures(page);
+    const { stateRequests, accountStatusRequests } = await installApiFixtures(page);
+    const accountStatusResponsePromise = waitForAccountStatus(page);
 
     await page.goto("/kingdom.html");
+    const accountStatusResponse = await accountStatusResponsePromise;
+    expect(accountStatusResponse.status()).toBe(200);
+    expect(await accountStatusResponse.json()).toMatchObject({ hasAccount: false });
+    expect(accountStatusRequests).toEqual([{
+      method: "GET",
+      authorization: "Bearer " + SESSION_TOKEN,
+    }]);
+    await page.waitForLoadState("networkidle");
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
+    await expect(page.locator("#guestAccountNotice")).toBeVisible();
+    await expect(page.locator("#guestAccountNotice")).toContainText("Modo Convidado");
+    await expect(page.locator("#guestAccountNotice a")).toHaveAttribute("href", "/account.html");
 
     // The expanded recorder panel used to cover upgrade/training controls on phones.
     // It now starts minimized on mobile and remains accessible through its toggle.
@@ -210,4 +239,94 @@ test.describe("Mobile kingdom rendering", () => {
     await expect.poll(() => actions.length).toBe(2);
     expect(actions[1]).toEqual({ type: "train", unit: "archer", quantity: 4 });
   });
+  test("hides the guest notice when the player account is already linked", async ({ page }) => {
+    const { accountStatusRequests } = await installApiFixtures(page, {
+      hasAccount: true,
+      account: { username: "ComandanteTeste" },
+    });
+    const accountStatusResponsePromise = waitForAccountStatus(page);
+
+    await page.goto("/kingdom.html");
+    const accountStatusResponse = await accountStatusResponsePromise;
+    expect(accountStatusResponse.status()).toBe(200);
+    expect(await accountStatusResponse.json()).toMatchObject({ hasAccount: true });
+    expect(accountStatusRequests).toEqual([{
+      method: "GET",
+      authorization: "Bearer " + SESSION_TOKEN,
+    }]);
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.locator("#game")).toBeVisible();
+    await expect(page.locator("#guestAccountNotice")).toBeHidden();
+  });
+
+  test("keeps the guest notice hidden when the account status endpoint returns HTTP 500", async ({ page }) => {
+    const { accountStatusRequests } = await installApiFixtures(page, {
+      error: "Serviço de contas temporariamente indisponível",
+    }, 500);
+    const accountStatusResponsePromise = waitForAccountStatus(page);
+    const fallbackLogPromise = page.waitForEvent("console", message =>
+      message.type() === "debug" && message.text().includes("account_status_unavailable")
+    );
+
+    await page.goto("/kingdom.html");
+    const accountStatusResponse = await accountStatusResponsePromise;
+    expect(accountStatusResponse.status()).toBe(500);
+    expect(await accountStatusResponse.json()).toMatchObject({
+      error: "Serviço de contas temporariamente indisponível",
+    });
+    expect(accountStatusRequests).toEqual([{
+      method: "GET",
+      authorization: "Bearer " + SESSION_TOKEN,
+    }]);
+    await fallbackLogPromise;
+    await page.waitForLoadState("networkidle");
+
+    await expect(page.locator("#game")).toBeVisible();
+    await expect(page.locator("#guestAccountNotice")).toBeHidden();
+  });
+
+  test("masks the linked account email on the account page", async ({ page }) => {
+    const sensitiveEmail = "jose.silva.privado@example.com";
+    const maskedEmail = "j***@example.com";
+    const { accountStatusRequests } = await installApiFixtures(page, {
+      hasAccount: true,
+      account: { username: "ComandanteTeste", emailMasked: maskedEmail },
+    });
+    const accountStatusResponsePromise = waitForAccountStatus(page);
+
+    await page.goto("/account.html");
+    const accountStatusResponse = await accountStatusResponsePromise;
+    expect(accountStatusResponse.status()).toBe(200);
+    const accountStatusBody = await accountStatusResponse.json();
+    expect(accountStatusBody).toMatchObject({
+      hasAccount: true,
+      account: { emailMasked: maskedEmail },
+    });
+    expect(accountStatusBody.account).not.toHaveProperty("email");
+    expect(JSON.stringify(accountStatusBody)).not.toContain(sensitiveEmail);
+    expect(accountStatusRequests).toEqual([{
+      method: "GET",
+      authorization: "Bearer " + SESSION_TOKEN,
+    }]);
+
+    await expect(page.locator("#accountStatus")).toContainText("E-mail: " + maskedEmail);
+    await expect(page.locator("#accountStatus")).not.toContainText(sensitiveEmail);
+    expect(await page.locator("body").innerText()).not.toContain(sensitiveEmail);
+    await expect(page.locator("#registerForm")).toBeHidden();
+    await expect(page.locator("#logoutButton")).toBeVisible();
+  });
+
+  test("opens the account protection page when the guest notice link is clicked", async ({ page }) => {
+    await installApiFixtures(page);
+
+    await page.goto("/kingdom.html");
+
+    await expect(page.locator("#guestAccountNotice")).toBeVisible();
+    await page.locator("#guestAccountNotice a").click();
+
+    await expect.poll(() => new URL(page.url()).pathname).toBe("/account");
+    await expect(page.getByRole("heading", { name: "Proteja seu reino e acesse de outros dispositivos" })).toBeVisible();
+  });
+
 });
