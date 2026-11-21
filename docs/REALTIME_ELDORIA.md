@@ -25,7 +25,7 @@ Fluxo implementado na branch:
 
 O token principal nunca é colocado na URL, no nome da sala ou no protocolo WebSocket.
 
-Exemplo conceitual de cliente (a integração real às telas está na issue #123):
+Exemplo conceitual. O cliente de presença já está conectado à tela `kingdom.html` pelo módulo `scripts/eldoria-realtime-client.js`:
 
 ```js
 const ticketResponse = await request("/realtime/eldoria/ticket", {
@@ -77,5 +77,10 @@ Antes de promover:
 Esta fase não sincroniza movimentos, chat global, castelos, marchas ou batalhas em tempo real. O limite 200 é um guard rail para piloto. A sala atual ainda usa um único ID lógico (`eldoria`), portanto não deve ser tratada como arquitetura final para milhares de conexões.
 
 A evolução paga precisa particionar as salas por região/célula calculada no servidor e implementar handoff. O reino de produto continua único: particionamento técnico de salas não cria mundos privados. D1 continua autoridade dos resultados econômicos/combate. Não confiar em estado enviado pelo cliente.
+
+A tela do reino mostra apenas o total de conexões **na sala**, não o total de jogadores do jogo.
+O cliente obtém um ticket por POST autenticado, abre o WebSocket com o ticket efêmero,
+envia heartbeat, usa reconexão limitada e para quando a página entra em segundo plano.
+Sem o Durable Object implantado, a interface exibe indisponibilidade sem bloquear o reino.
 
 A conexão usa a API de WebSocket do Durable Object. A implementação deve continuar usando a interface de Hibernation WebSocket e validar o comportamento/custo em staging antes de produção.
