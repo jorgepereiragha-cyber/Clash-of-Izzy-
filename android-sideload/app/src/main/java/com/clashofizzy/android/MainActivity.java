@@ -201,35 +201,96 @@ public final class MainActivity extends Activity {
         offlinePanel.setOrientation(LinearLayout.VERTICAL);
         offlinePanel.setGravity(Gravity.CENTER);
         offlinePanel.setPadding(dp(28), dp(24), dp(28), dp(24));
-        offlinePanel.setBackgroundColor(Color.rgb(16, 26, 43));
+        offlinePanel.setContentDescription("Recuperação de conexão de Clash of Izzy");
+        GradientDrawable recoveryBackground = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] { Color.rgb(9, 20, 32), Color.rgb(17, 34, 49) });
+        offlinePanel.setBackground(recoveryBackground);
+
+        LinearLayout recoveryCard = new LinearLayout(this);
+        recoveryCard.setOrientation(LinearLayout.VERTICAL);
+        recoveryCard.setGravity(Gravity.CENTER);
+        recoveryCard.setPadding(dp(22), dp(27), dp(22), dp(25));
+        GradientDrawable recoveryCardBackground = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] { Color.rgb(29, 50, 62), Color.rgb(14, 27, 44) });
+        recoveryCardBackground.setCornerRadius(dp(18));
+        recoveryCardBackground.setStroke(dp(1), Color.rgb(198, 162, 93));
+        recoveryCard.setBackground(recoveryCardBackground);
+
+        TextView emblem = new TextView(this);
+        emblem.setText("✦");
+        emblem.setTextColor(Color.rgb(244, 210, 143));
+        emblem.setTextSize(36);
+        emblem.setGravity(Gravity.CENTER);
+        recoveryCard.addView(emblem);
 
         TextView title = new TextView(this);
-        title.setText("Clash of Izzy");
-        title.setTextColor(Color.rgb(237, 198, 125));
-        title.setTextSize(26);
+        title.setText("CLASH OF IZZY");
+        title.setTextColor(Color.rgb(244, 210, 143));
+        title.setLetterSpacing(0.07f);
+        title.setTextSize(27);
         title.setGravity(Gravity.CENTER);
-        offlinePanel.addView(title);
+        recoveryCard.addView(title);
+
+        TextView recoverySubtitle = new TextView(this);
+        recoverySubtitle.setText("Eldoria está fora de alcance");
+        recoverySubtitle.setTextColor(Color.rgb(240, 231, 209));
+        recoverySubtitle.setTextSize(18);
+        recoverySubtitle.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams subtitleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        subtitleParams.topMargin = dp(16);
+        recoveryCard.addView(recoverySubtitle, subtitleParams);
 
         TextView details = new TextView(this);
-        details.setText("Não foi possível carregar o jogo. Verifique sua conexão e tente novamente. Seu progresso no servidor não será apagado.");
-        details.setTextColor(Color.WHITE);
-        details.setTextSize(16);
+        details.setText("Não foi possível abrir o reino. Verifique a conexão e tente novamente. Seu progresso permanece salvo no servidor.");
+        details.setTextColor(Color.rgb(210, 222, 231));
+        details.setTextSize(15);
         details.setGravity(Gravity.CENTER);
         LinearLayout.LayoutParams textParams = new LinearLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
-        textParams.topMargin = dp(14);
-        textParams.bottomMargin = dp(18);
-        offlinePanel.addView(details, textParams);
+        textParams.topMargin = dp(10);
+        textParams.bottomMargin = dp(22);
+        recoveryCard.addView(details, textParams);
 
         Button retry = new Button(this);
         retry.setText("Tentar novamente");
+        retry.setAllCaps(false);
+        retry.setTextColor(Color.rgb(18, 28, 38));
+        retry.setTextSize(16);
+        retry.setMinimumHeight(dp(54));
+        GradientDrawable retryBackground = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] { Color.rgb(251, 221, 157), Color.rgb(212, 171, 98) });
+        retryBackground.setCornerRadius(dp(9));
+        retryBackground.setStroke(dp(1), Color.rgb(255, 239, 197));
+        retry.setBackground(retryBackground);
         retry.setOnClickListener(v -> {
             offlinePanel.setVisibility(View.GONE);
             hasLoadedPage = false;
             loadingPanel.setVisibility(View.VISIBLE);
             if (webView != null) webView.loadUrl(GAME_URL);
         });
-        offlinePanel.addView(retry);
+        recoveryCard.addView(retry, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView recoveryHint = new TextView(this);
+        recoveryHint.setText("Internet necessária para sincronizar batalhas e construções");
+        recoveryHint.setTextColor(Color.rgb(174, 194, 205));
+        recoveryHint.setTextSize(12);
+        recoveryHint.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams hintParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        hintParams.topMargin = dp(18);
+        recoveryCard.addView(recoveryHint, hintParams);
+
+        int availableWidth = Math.max(dp(240),
+                getResources().getDisplayMetrics().widthPixels - dp(56));
+        LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                Math.min(dp(420), availableWidth), ViewGroup.LayoutParams.WRAP_CONTENT);
+        cardParams.gravity = Gravity.CENTER;
+        offlinePanel.addView(recoveryCard, cardParams);
         root.addView(offlinePanel, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
