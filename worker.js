@@ -1613,6 +1613,7 @@ export default {
       return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
+  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:true,nubankPix:env.NUBANK_PIX_ENABLED==="true"});
   if(url.pathname==="/api/store/purchase-request"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);
@@ -1624,8 +1625,10 @@ export default {
     const kind=String(body.kind||""),itemId=Number(body.itemId),requestKey=String(body.requestKey||"").slice(0,64);
     if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
     const requestedPaymentMethod=String(body.paymentMethod||"mercadopago_link");
-    if(requestedPaymentMethod!=="mercadopago_link")return json({error:"Pagamento disponível somente pelo Mercado Pago."},400);
-    const paymentMethod="mercadopago_link";
+    if(!["mercadopago_link","pix"].includes(requestedPaymentMethod))return json({error:"Forma de pagamento não suportada."},400);
+    // Pix Nubank exige cobrança gerada na conta autorizada e conferência manual do crédito.
+    if(requestedPaymentMethod==="pix" && env.NUBANK_PIX_ENABLED!=="true")return json({error:"O Pix Nubank ainda não está habilitado para pedidos.",code:"NUBANK_PIX_NOT_CONFIGURED"},503);
+    const paymentMethod=requestedPaymentMethod;
     const paymentReference=String(body.paymentReference||"").trim().slice(0,120)||null;
     const player=await env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first();
     if(!player)return json({error:"Jogador não encontrado."},404);
@@ -1639,20 +1642,20 @@ export default {
       const owned=await env.DB.prepare("SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?").bind(player.id,item.id).first();
       if(owned)return json({error:"Você já possui esta skin."},409);
     }
-    const pending=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
+    const pending=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
     if(pending)return json({success:true,request:pending,reused:true,message:"Você já possui um pedido aguardando análise."},200);
     try{
       await env.DB.prepare("INSERT INTO purchase_requests(player_id,kingdom_id,product_kind,product_id,product_name,price_brl,currency,gems_amount,payment_method,payment_reference,request_key) VALUES(?,?,?,?,?,?,'BRL',?,?,?,?)")
         .bind(player.id,kingdom.id,kind,item.id,item.name,item.price_brl,kind==="vip_package"?Number(item.gems||0):0,paymentMethod,paymentReference,requestKey).run();
     }catch(error){
-      const existing=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
+      const existing=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
       if(existing)return json({success:true,request:existing,reused:true},200);
-      const duplicate=await env.DB.prepare("SELECT id,status,product_name FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
+      const duplicate=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
       if(duplicate)return json({success:true,request:duplicate,reused:true,message:"Você já possui um pedido aguardando análise."},200);
       throw error;
     }
     const created=await env.DB.prepare("SELECT id,status,product_name,price_brl,currency,payment_method,payment_reference,created_at FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
-    return json({success:true,request:created,message:"Pedido enviado ao painel Master. A liberação acontece após a confirmação do pagamento."},201);
+    return json({success:true,request:created,message:paymentMethod==="pix"?"Pedido Pix Nubank registrado. Solicite a cobrança pelo atendimento e aguarde a confirmação bancária antes da entrega.":"Pedido enviado ao painel Master. A liberação acontece após a confirmação do pagamento."},201);
   }
   const isGamePath=url.pathname.startsWith("/api/game/");
   if(isGamePath){
