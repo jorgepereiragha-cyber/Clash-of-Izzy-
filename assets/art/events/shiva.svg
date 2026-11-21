@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+<title id="title">Shiva</title><desc id="desc">Representação simbólica e respeitosa de Shiva com tridente e halo cósmico.</desc>
+<defs>
+ <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#284f85"/><stop offset="1" stop-color="#10182a"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#8cc8ee" stop-opacity=".65"/><stop offset="1" stop-color="#8cc8ee" stop-opacity="0"/></radialGradient>
+ <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#fff0b7"/><stop offset=".48" stop-color="#d6a94f"/><stop offset="1" stop-color="#79512d"/></linearGradient>
+</defs>
+<rect width="640" height="360" fill="url(#bg)"/>
+<circle cx="320" cy="152" r="210" fill="url(#glow)"/>
+<path d="M0 292 80 250 145 275 220 218 290 266 365 210 440 265 520 225 640 282V360H0Z" fill="#0c1624" opacity=".72"/>
+<path d="M0 320 95 290 165 304 240 272 322 300 408 267 500 302 575 273 640 294V360H0Z" fill="#101d2a"/>
+
+
+<circle cx="320" cy="148" r="106" fill="none" stroke="#8cc8ee" stroke-width="4" opacity=".8"/>
+<path d="M320 43q-54 34-54 89 0 56 54 84 54-28 54-84 0-55-54-89Z" fill="#243d65" stroke="url(#gold)" stroke-width="4"/>
+<path d="M285 119q35-34 70 0l-8 54h-54Z" fill="#9db6df" stroke="#8cc8ee" stroke-width="3"/>
+<path d="M305 130v22m30-22v22" stroke="#14243c" stroke-width="5"/>
+<path d="M320 27v249M287 72q33-30 66 0" stroke="url(#gold)" stroke-width="8" stroke-linecap="round"/>
+<path d="M278 255q42 29 84 0M286 275q34 22 68 0" fill="none" stroke="#8cc8ee" stroke-width="4"/>
+<path d="M320 26 292 61m28-35 28 35" stroke="#fff0bb" stroke-width="4"/>
+
+<path d="M0 332Q160 300 320 333T640 329" fill="none" stroke="#8cc8ee" stroke-opacity=".55" stroke-width="3"/>
+</svg>

@@ -58,6 +58,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   #feedbackForm textarea{resize:vertical;min-height:84px}
   #feedbackForm button{justify-self:start}
 </style>  <link rel="stylesheet" href="/styles/navigation.css">
+  <link rel="stylesheet" href="/styles/android-experience.css">
 <link rel="stylesheet" href="/styles/kingdom-4x-command.css">
 </head>
 <body class="coi-fourx">
@@ -92,7 +93,26 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <div class="city" id="city"></div>
   <div class="coi-city-stage-corner" aria-hidden="true">Toque em um edifício para ver melhorias</div>
  </div>
+ <div class="coi-graphics-controls" aria-label="Configurações de imagem">
+  <div class="coi-graphics-description">
+   <strong>Imagem e desempenho</strong>
+   <small id="coiGraphicsStatus" role="status" aria-live="polite">Detectando capacidade gráfica…</small>
+  </div>
+  <div class="coi-graphics-form">
+   <label for="coiGraphicsPreset">Qualidade</label>
+   <select id="coiGraphicsPreset" aria-describedby="coiGraphicsHint">
+    <option value="auto">Automático (recomendado)</option>
+    <option value="low">Economia (3D leve)</option>
+    <option value="balanced">Equilibrado (3D)</option>
+    <option value="high">Máximo (GPU avançada)</option>
+    <option value="2d">2D (compatibilidade)</option>
+   </select>
+   <button id="coiGraphicsApply" type="button" disabled>Aplicar</button>
+  </div>
+  <small class="coi-graphics-hint" id="coiGraphicsHint">Preferência salva apenas neste dispositivo. Perfis exigentes podem ser reduzidos conforme a GPU.</small>
+ </div>
  <div class="grid2" id="summary"></div>
+ <div class="events" id="castleSkins" aria-live="polite"></div>
 </section>
 <div class="stack">
 <section class="panel"><h2>🏗️ Edifícios e melhorias</h2><div class="building-list" id="buildings"></div></section>
@@ -144,6 +164,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <input id="playerSearchInput" minlength="3" maxlength="20" autocomplete="off" placeholder="Digite o início do nickname" required style="min-width:180px;flex:1;padding:10px;border-radius:8px;border:1px solid #71839a;background:#0e1a2a;color:#fff">
 <button type="submit" class="secondary">🔎 Buscar</button>
 </form>
+<div id="eldoriaPresence" class="muted" role="status" aria-live="polite" style="margin:10px 0">Tempo real: aguardando sessão.</div>
 <div id="playerSearchResults" class="events" aria-live="polite" style="margin-top:10px"></div>
 </section>
 <section class="panel" style="margin-top:14px">
@@ -185,8 +206,8 @@ async function request(path,options={}){const response=await fetch(API+path,{...
 const analyticsSessionId=globalThis.crypto?.randomUUID?.()||("session_"+Date.now()+"_"+Math.random().toString(36).slice(2,10));
 let analyticsStarted=false;
 async function trackAnalytics(event,data={}){if(!token)return;try{await request("/game/analytics",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event,sessionId:analyticsSessionId,data})});}catch(error){console.debug("analytics_unavailable",error?.message||error);}}
-async function connect(){setStatus("Sincronizando…");try{token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");let data;if(token){data=await request("/game/state");}else{const referrerCode=new URLSearchParams(location.search).get("ref")||"";data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(referrerCode?{referrer_code:referrerCode}:{})});if(data.token){token=data.token;localStorage.setItem("coi_game_token",token);if(referrerCode){const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete("ref");history.replaceState({}, "", cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);}}}state=data.state||data;if(!state.kingdom)throw new Error("O servidor não retornou os dados do reino.");render();document.getElementById("loading").hidden=true;document.getElementById("game").hidden=false;setStatus("● Reino sincronizado");if(!analyticsStarted){analyticsStarted=true;void trackAnalytics("kingdom.opened",{castle_level:Number(state.kingdom.castle_level||1)});}}catch(error){setStatus(error.message,true);const loading=document.getElementById("loading");loading.textContent=error.message+" Seu acesso salvo foi preservado. Tente novamente após verificar a conexão. ";let retry=document.getElementById("retryConnection");if(!retry){retry=document.createElement("button");retry.id="retryConnection";retry.type="button";retry.className="secondary";retry.textContent="↻ Tentar novamente";retry.style.marginTop="12px";retry.addEventListener("click",connect);loading.append(retry);}retry.disabled=false;}}
-function drawKingdomScene(buildings){
+async function connect(){setStatus("Sincronizando…");try{token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");if(token){localStorage.setItem("coi_game_token",token);sessionStorage.setItem("coi_game_token",token);}let data;if(token){data=await request("/game/state");}else{const referrerCode=new URLSearchParams(location.search).get("ref")||"";data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(referrerCode?{referrer_code:referrerCode}:{})});if(data.token){token=data.token;localStorage.setItem("coi_game_token",token);sessionStorage.setItem("coi_game_token",token);if(referrerCode){const cleanUrl=new URL(location.href);cleanUrl.searchParams.delete("ref");history.replaceState({}, "", cleanUrl.pathname+cleanUrl.search+cleanUrl.hash);}}}state=data.state||data;if(!state.kingdom)throw new Error("O servidor não retornou os dados do reino.");render();document.getElementById("loading").hidden=true;document.getElementById("game").hidden=false;setStatus("● Reino sincronizado");if(!analyticsStarted){analyticsStarted=true;void trackAnalytics("kingdom.opened",{castle_level:Number(state.kingdom.castle_level||1)});}}catch(error){setStatus(error.message,true);const loading=document.getElementById("loading");loading.textContent=error.message+" Seu acesso salvo foi preservado. Tente novamente após verificar a conexão. ";let retry=document.getElementById("retryConnection");if(!retry){retry=document.createElement("button");retry.id="retryConnection";retry.type="button";retry.className="secondary";retry.textContent="↻ Tentar novamente";retry.style.marginTop="12px";retry.addEventListener("click",connect);loading.append(retry);}retry.disabled=false;}}
+function drawKingdomScene(buildings,castleSkinId=0){
  const host=document.getElementById("city");if(!host)return;
  let canvas=document.getElementById("kingdomScene");
  if(!canvas){canvas=document.createElement("canvas");canvas.id="kingdomScene";canvas.setAttribute("aria-hidden","true");host.prepend(canvas);}
@@ -209,8 +230,14 @@ function drawKingdomScene(buildings){
  // Trees and shrubs decorate the outer tiles.
  for(let n=0;n<12;n++){const col=n%3,row=Math.floor(n/3),x=col*cw+((n*43+17)%(Math.max(1,cw-28)))+14,y=row*ch+((n*29+13)%(Math.max(1,ch-26)))+13;if(n===4)continue;ctx.fillStyle="#172e20aa";ctx.beginPath();ctx.ellipse(x+3,y+5,8,4,0,0,Math.PI*2);ctx.fill();ctx.fillStyle=n%2?"#315f3b":"#477747";ctx.beginPath();ctx.arc(x,y,7+(n%3),0,Math.PI*2);ctx.fill();ctx.fillStyle="#8eaa65";ctx.beginPath();ctx.arc(x-2,y-3,3,0,Math.PI*2);ctx.fill();}
  const palette={castle:["#9b805c","#d6b777","#5a5362"],barracks:["#8e6447","#b18a5d","#4e3940"],farm:["#8c9b59","#c4bd75","#637a45"],quarry:["#858b8a","#c5c9bd","#59646a"],lumber_mill:["#795b3e","#b58a56","#493a31"],iron_mine:["#66727c","#a4aeb1","#394954"],market:["#a27a50","#d4b36c","#9a4f3d"],academy:["#6c7190","#c2b5a0","#4d4b6e"],wall:["#8d9695","#c6c4b3","#626d75"],hospital:["#d0c8b2","#e4d9b8","#a65a50"],watchtower:["#7d827b","#c3b58e","#5b4d3d"],stable:["#946a48","#c4a36d","#51403a"],archery_range:["#a18a58","#d0bd7b","#657c4c"],siege_workshop:["#6f6255","#a58d70","#51433c"],embassy:["#9b8a70","#d7c7a1","#536d81"],warehouse:["#8a7759","#c3a775","#5c4a3a"]};
+ const castleSkinPalettes={
+  1:["#c7a86f","#9b6627","#8d401f"],2:["#d2d0c5","#264d77","#17385f"],
+  3:["#887767","#5a3828","#5a2724"],4:["#aaa2c8","#5a4b8c","#342d6f"],
+  5:["#9fb8ca","#3e6b91","#264869"],6:["#d29b65","#9e3d27","#7c241f"]
+ };
+ const castleSkin=castleSkinPalettes[Number(castleSkinId)]||null;
  const order=buildings.slice(0,9);
- order.forEach((b,i)=>{const col=i%3,row=Math.floor(i/3),cx=col*cw+cw*.5,base=row*ch+ch*.73,scale=Math.min(cw,ch)/100,colors=palette[b.building_type]||palette.warehouse,level=Math.max(1,Number(b.level)||1),height=(22+Math.min(level,20)*1.35)*scale;
+ order.forEach((b,i)=>{const col=i%3,row=Math.floor(i/3),cx=col*cw+cw*.5,base=row*ch+ch*.73,scale=Math.min(cw,ch)/100,colors=b.building_type==="castle"&&castleSkin?[castleSkin[0],castleSkin[1],castleSkin[2]]:(palette[b.building_type]||palette.warehouse),level=Math.max(1,Number(b.level)||1),height=(22+Math.min(level,20)*1.35)*scale;
   ctx.fillStyle="#07170f88";ctx.beginPath();ctx.ellipse(cx,base+3,Math.min(cw,ch)*.31,7*scale,0,0,Math.PI*2);ctx.fill();
   const bw=Math.min(cw*.52,66*scale),wallH=height*.62,roofH=height*.48,left=cx-bw/2,right=cx+bw/2,top=base-wallH;
   poly([[left,top],[right,top],[right,base],[left,base]],colors[0],"#342b25");
@@ -227,8 +254,8 @@ function watchKingdomScene(){
  const host=document.getElementById("city");if(!host)return;
  if(kingdomResizeObserver)kingdomResizeObserver.disconnect();
  if(kingdomResizeHandler)window.removeEventListener("resize",kingdomResizeHandler);
- if("ResizeObserver" in window){kingdomResizeObserver=new ResizeObserver(()=>drawKingdomScene(state?.buildings||[]));kingdomResizeObserver.observe(host);}
- else{kingdomResizeHandler=()=>drawKingdomScene(state?.buildings||[]);window.addEventListener("resize",kingdomResizeHandler,{passive:true});}
+ if("ResizeObserver" in window){kingdomResizeObserver=new ResizeObserver(()=>drawKingdomScene(state?.buildings||[],Number(state?.kingdom?.equipped_skin_id||0)));kingdomResizeObserver.observe(host);}
+ else{kingdomResizeHandler=()=>drawKingdomScene(state?.buildings||[],Number(state?.kingdom?.equipped_skin_id||0));window.addEventListener("resize",kingdomResizeHandler,{passive:true});}
 }
 window.addEventListener("coi:kingdom-projection",event=>{
  const city=document.getElementById("city");if(!city)return;
@@ -249,8 +276,38 @@ window.addEventListener("coi:kingdom-2d-fallback",()=>{
   button.style.top="";
  });
 });
-function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);
-const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings);if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[]}}));
+function renderCastleSkins(){
+ const root=document.getElementById("castleSkins");if(!root)return;
+ root.replaceChildren();
+ const skins=Array.isArray(state?.castleSkins)?state.castleSkins:[];
+ const equippedId=Number(state?.kingdom?.equipped_skin_id||0);
+ const title=document.createElement("strong");title.textContent="👑 Aparência do castelo";root.append(title);
+ const hint=document.createElement("div");hint.className="muted";hint.textContent="Somente skins que pertencem a este jogador podem ser equipadas. A aparência também aparece no mapa compartilhado.";root.append(hint);
+ if(!skins.length){const empty=document.createElement("div");empty.className="event";empty.textContent="Você ainda não possui skins de castelo. As seis opções iniciais aparecem na Loja oficial.";root.append(empty);return;}
+ const grid=document.createElement("div");grid.className="grid2";
+ for(const skin of skins){
+  const card=document.createElement("div");card.className="event";
+  const name=document.createElement("strong");name.textContent=skin.name;
+  const detail=document.createElement("div");detail.className="muted";detail.textContent="R$ "+Number(skin.price_brl||0).toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2})+" · Ataque +"+Number(skin.attack_bonus_percent||0).toFixed(2)+"% · Defesa +"+Number(skin.defense_bonus_percent||0).toFixed(2)+"%";
+  const button=document.createElement("button");button.type="button";button.textContent=Number(skin.id)===equippedId?"✓ Equipada":"Equipar";button.disabled=busy||Number(skin.id)===equippedId;
+  button.addEventListener("click",()=>equipCastleSkin(Number(skin.id)));
+  card.append(name,detail,button);grid.append(card);
+ }
+ root.append(grid);
+ if(equippedId){const clear=document.createElement("button");clear.type="button";clear.className="secondary";clear.textContent="Usar aparência original";clear.disabled=busy;clear.addEventListener("click",()=>equipCastleSkin(null));root.append(clear);}
+}
+async function equipCastleSkin(skinId){
+ if(busy)return;
+ busy=true;setStatus("Atualizando aparência do castelo…");renderCastleSkins();
+ try{
+  await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"castle_skin_equip",skinId})});
+  const fresh=await request("/game/state");state=fresh.state;
+  setStatus(skinId===null?"Aparência original restaurada.":"Skin equipada no reino compartilhado.");
+ }catch(error){setStatus(error.message||"Não foi possível equipar esta skin.",true);}
+ finally{busy=false;render();}
+}
+function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();
+const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings,Number(k.equipped_skin_id||0));if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],castleSkinId:Number(k.equipped_skin_id||0)}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const blocked=maxed||activeConstructionCount>=2||alreadyQueued||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
@@ -430,12 +487,46 @@ document.getElementById("feedbackForm").addEventListener("submit",submitFeedback
 document.getElementById("nicknameForm").addEventListener("submit",setNickname);
 document.getElementById("trainingForm").addEventListener("submit",startTraining);
 document.getElementById("researchForm").addEventListener("submit",startResearch);
-window.setInterval(()=>{const now=Date.now();document.querySelectorAll("[data-completes]").forEach(el=>{const completionTime=Date.parse(el.dataset.completes||"");const remaining=Number.isFinite(completionTime)?Math.max(0,Math.ceil((completionTime-now)/1000)):0;el.textContent=formatDuration(remaining);const progress=queueProgressPercent(el.dataset.started,el.dataset.completes,now);const bar=el.closest(".queue-card")?.querySelector("[data-progress]");if(bar)bar.style.width=progress+"%";if(bar?.parentElement)bar.parentElement.setAttribute("aria-valuenow",String(progress));});},1000);
-window.setInterval(refreshQueueState,30000);
-document.addEventListener("visibilitychange",()=>{if(!document.hidden)refreshQueueState();});
+let queueClockTimer = null;
+let queueRefreshTimer = null;
+
+function updateQueueClock() {
+ if (document.hidden) return;
+ const now=Date.now();
+ document.querySelectorAll("[data-completes]").forEach(el=>{
+  const completionTime=Date.parse(el.dataset.completes||"");
+  const remaining=Number.isFinite(completionTime)?Math.max(0,Math.ceil((completionTime-now)/1000)):0;
+  el.textContent=formatDuration(remaining);
+  const progress=queueProgressPercent(el.dataset.started,el.dataset.completes,now);
+  const bar=el.closest(".queue-card")?.querySelector("[data-progress]");
+  if(bar)bar.style.width=progress+"%";
+  if(bar?.parentElement)bar.parentElement.setAttribute("aria-valuenow",String(progress));
+ });
+}
+function stopQueueTimers() {
+ if(queueClockTimer!==null){window.clearInterval(queueClockTimer);queueClockTimer=null;}
+ if(queueRefreshTimer!==null){window.clearInterval(queueRefreshTimer);queueRefreshTimer=null;}
+}
+function startQueueTimers() {
+ if(document.hidden)return;
+ if(queueClockTimer===null)queueClockTimer=window.setInterval(updateQueueClock,1000);
+ if(queueRefreshTimer===null)queueRefreshTimer=window.setInterval(refreshQueueState,60000);
+}
+document.addEventListener("visibilitychange",()=>{
+ if(document.hidden)stopQueueTimers();
+ else{updateQueueClock();refreshQueueState();startQueueTimers();}
+});
+window.addEventListener("pagehide",stopQueueTimers);
+window.addEventListener("pageshow",event=>{
+ if(event.persisted&&!document.hidden){updateQueueClock();refreshQueueState();startQueueTimers();}
+});
+startQueueTimers();
+window.addEventListener("coi:app-resume",event=>{if(event.detail?.reason==="online")connect();});
 document.getElementById("playerSearchForm").addEventListener("submit",searchPlayers);
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-3d.js"></script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
+  <script src="/scripts/pwa-runtime.js" defer></script>
+<script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>

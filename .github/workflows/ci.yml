@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main]
+    branches: [main, release/one-shared-realm-early-access]
 
 concurrency:
   group: clash-of-izzy-ci-${{ github.ref }}
@@ -24,6 +24,8 @@ jobs:
         run: npm install --ignore-scripts
       - name: Validate D1 migrations locally
         run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
+      - name: Validate isolated Preview D1 migrations locally
+        run: npm run db:migrate:preview:local
       - name: Validate service worker
         run: node --check sw.js
       - name: Validate 3D asset manifest and local GLB files
@@ -42,6 +44,14 @@ jobs:
           path: |
             test-results/
             playwright-report/
+          if-no-files-found: ignore
+          retention-days: 7
+      - name: Archive visual previews from synthetic mobile fixture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash-of-izzy-visual-preview
+          path: test-results/visual-preview/
           if-no-files-found: ignore
           retention-days: 7
       - name: Forensic diagnostic of production account endpoint (read-only)

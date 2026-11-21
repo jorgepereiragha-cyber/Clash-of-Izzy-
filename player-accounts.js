@@ -70,6 +70,18 @@ function normalizeEmail(value) {
   return { display: email, key: email };
 }
 
+export function maskAccountEmail(value) {
+  if (typeof value !== "string") return null;
+  const email = value.trim();
+  const separator = email.lastIndexOf("@");
+  if (separator <= 0 || separator !== email.indexOf("@") || separator === email.length - 1) return null;
+  const localPart = email.slice(0, separator);
+  const domain = email.slice(separator + 1);
+  const firstCharacter = Array.from(localPart)[0];
+  if (!firstCharacter || !domain) return null;
+  return firstCharacter + "***@" + domain;
+}
+
 function issueGameToken(playerId, sessionVersion, secret) {
   return signPayload(
     { sub: playerId, scope: "game", exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * 365, av: sessionVersion },
@@ -120,7 +132,7 @@ export async function handlePlayerAccountRoute(request, env, ctx) {
       success: true,
       token,
       player: { player_id: account.player_id, name: account.name },
-      account: { username: account.username, email: account.email }
+      account: { username: account.username, emailMasked: maskAccountEmail(account.email) }
     });
   }
 
@@ -132,7 +144,7 @@ export async function handlePlayerAccountRoute(request, env, ctx) {
       "JOIN players p ON p.id=a.player_id WHERE p.player_id=?"
     ).bind(playerId).first();
     return ctx.json({ hasAccount: Boolean(account), account: account ? {
-      username: account.username, email: account.email, created_at: account.created_at
+      username: account.username, emailMasked: maskAccountEmail(account.email), created_at: account.created_at
     } : null });
   }
 
@@ -175,7 +187,7 @@ export async function handlePlayerAccountRoute(request, env, ctx) {
 
     // A versão de sessão passa a exigir o claim av; tokens anônimos antigos deixam de autenticar este reino.
     const token = await issueGameToken(String(player.player_id), 1, env.SESSION_SECRET);
-    return ctx.json({ success: true, token, account: { username: username.display, email: email.display } }, 201);
+    return ctx.json({ success: true, token, account: { username: username.display, emailMasked: maskAccountEmail(email.display) } }, 201);
   }
 
   if (url.pathname === "/api/account/logout" && request.method === "POST") {

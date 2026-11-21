@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+<title id="title">Valhalla</title><desc id="desc">Coroa rúnica dourada, montanhas e aurora do norte.</desc>
+<defs>
+ <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#183b52"/><stop offset="1" stop-color="#101726"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#8bc5d0" stop-opacity=".65"/><stop offset="1" stop-color="#8bc5d0" stop-opacity="0"/></radialGradient>
+ <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#fff0b7"/><stop offset=".48" stop-color="#d6a94f"/><stop offset="1" stop-color="#79512d"/></linearGradient>
+</defs>
+<rect width="640" height="360" fill="url(#bg)"/>
+<circle cx="320" cy="152" r="210" fill="url(#glow)"/>
+<path d="M0 292 80 250 145 275 220 218 290 266 365 210 440 265 520 225 640 282V360H0Z" fill="#0c1624" opacity=".72"/>
+<path d="M0 320 95 290 165 304 240 272 322 300 408 267 500 302 575 273 640 294V360H0Z" fill="#101d2a"/>
+
+
+<path d="M120 260 190 129l50 74 70-133 76 133 48-74 86 131Z" fill="#15283b" stroke="#8bc5d0" stroke-width="4"/>
+<path d="M280 203 320 70 360 203Z" fill="#263e50" stroke="#b6c4c9" stroke-width="3"/>
+<path d="M254 236q66-70 132 0v59H254Z" fill="#162334" stroke="url(#gold)" stroke-width="6"/>
+<path d="M286 235v-30h68v30M320 205v-40" fill="none" stroke="#8bc5d0" stroke-width="6"/>
+<path d="M225 65 260 40 280 65 320 26 360 65 380 40 415 65 380 91 260 91Z" fill="url(#gold)" stroke="#fff0b7" stroke-width="3"/>
+<path d="M320 42v42m-22-21h44" stroke="#4f3823" stroke-width="5"/>
+
+<path d="M0 332Q160 300 320 333T640 329" fill="none" stroke="#8bc5d0" stroke-opacity=".55" stroke-width="3"/>
+</svg>

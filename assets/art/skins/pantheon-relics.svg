@@ -1,0 +1,143 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 160">
+  <symbol id="eg_ra_crown" viewBox="0 0 160 160">
+    <circle cx="80" cy="82" r="61" fill="#10243d" stroke="#e3bf68" stroke-width="5"/>
+    <g fill="#e9c55f"><path d="M80 13 88 38 72 38Z"/><path d="m31 31 22 14-12 10Z"/><path d="m129 31-10 24-12-10Z"/><path d="M16 82 42 74 42 90Z"/><path d="m144 82-26-8v16Z"/><path d="m34 130 10-25 12 11Z"/><path d="m126 130-22-14 12-11Z"/></g>
+    <circle cx="80" cy="82" r="34" fill="#e9c55f" stroke="#fff0b0" stroke-width="4"/>
+    <circle cx="80" cy="82" r="22" fill="#126a91" stroke="#073a61" stroke-width="4"/>
+    <path d="M80 64 85 77 99 82 85 87 80 101 75 87 61 82 75 77Z" fill="#f5e5a2"/>
+    <path d="M53 115h54l-7 17H60Z" fill="#d59d3f" stroke="#fff0b0" stroke-width="3"/>
+  </symbol>
+  <symbol id="eg_anubis_armor" viewBox="0 0 160 160">
+    <path d="M80 12 133 42 124 113 80 145 36 113 27 42Z" fill="#111a29" stroke="#d5ad55" stroke-width="6"/>
+    <path d="m54 42-19-27 5 54 20 11Z" fill="#171b25" stroke="#e5bf65" stroke-width="4"/>
+    <path d="m106 42 19-27-5 54-20 11Z" fill="#171b25" stroke="#e5bf65" stroke-width="4"/>
+    <path d="M80 42 59 61 61 103 80 119 99 103 101 61Z" fill="#232a35" stroke="#dfb95e" stroke-width="4"/>
+    <path d="m65 65 15-10 15 10-5 25-10 10-10-10Z" fill="#0e111a"/>
+    <path d="m67 76 11-4v9l-11 3Zm26 0-11-4v9l11 3Z" fill="#4fc0cd"/>
+    <path d="M80 86 74 101h12Z" fill="#d8ad58"/>
+    <path d="M52 113 80 132 108 113" fill="none" stroke="#e9c66e" stroke-width="6"/>
+    <path d="M44 47h13m46 0h13" stroke="#f3d47c" stroke-width="4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="eg_horus_blade" viewBox="0 0 160 160">
+    <path d="M80 10 111 61 80 78 49 61Z" fill="#2b91ae" stroke="#e7c66e" stroke-width="5"/>
+    <path d="M80 15v113" stroke="#dbb75a" stroke-width="8" stroke-linecap="round"/>
+    <path d="M53 60 35 78 64 87 80 79 96 87 125 78 107 60 80 72Z" fill="#e9c36b" stroke="#fff0b4" stroke-width="4"/>
+    <path d="M80 27 89 53 80 68 71 53Z" fill="#bfe9ee"/>
+    <path d="M80 119 62 139h36Z" fill="#164568" stroke="#d5ae54" stroke-width="4"/>
+    <circle cx="80" cy="85" r="9" fill="#123b5c" stroke="#f5d77f" stroke-width="4"/>
+  </symbol>
+  <symbol id="eg_isis_ankh" viewBox="0 0 160 160">
+    <path d="M80 19C47 20 24 43 22 69c21-10 39-8 58 11 19-19 37-21 58-11-2-26-25-49-58-50Z" fill="#1a86a0" stroke="#e2c16d" stroke-width="5"/>
+    <path d="M80 23c-16 0-26 11-26 25 0 14 11 25 26 25s26-11 26-25c0-14-10-25-26-25Z" fill="#f0cc6c" stroke="#fff0b7" stroke-width="4"/>
+    <path d="M80 70v64M54 94h52M80 129 65 145h30Z" fill="none" stroke="#eac15e" stroke-width="11" stroke-linejoin="round"/>
+    <circle cx="80" cy="45" r="8" fill="#1887ad"/>
+    <path d="M23 77 11 105 54 96m83-19 12 28-43-18" fill="none" stroke="#69c6ce" stroke-width="7" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="eg_sekhmet_aura" viewBox="0 0 160 160">
+    <circle cx="80" cy="80" r="58" fill="#321b23" stroke="#e1b95b" stroke-width="5"/>
+    <path d="M80 10 92 37 116 19 111 49 143 47 123 71 148 91 116 99 128 132 96 117 80 150 64 117 32 132 44 99 12 91 37 71 17 47 49 49 44 19 68 37Z" fill="#b63837" stroke="#efbf65" stroke-width="4"/>
+    <circle cx="80" cy="81" r="34" fill="#bf873f" stroke="#f5d87e" stroke-width="4"/>
+    <path d="M50 67 67 53 80 64 93 53 110 67 104 99 80 119 56 99Z" fill="#9d542e" stroke="#f2ca75" stroke-width="4"/>
+    <path d="M65 81h10m10 0h10" stroke="#ffe5a0" stroke-width="6" stroke-linecap="round"/>
+    <path d="M80 84 73 99h14Z" fill="#231a1d"/>
+    <path d="M65 108 80 113 95 108" fill="none" stroke="#f4d18a" stroke-width="4"/>
+  </symbol>
+  <symbol id="su_enlil_crown" viewBox="0 0 160 160">
+    <path d="M24 125h112v17H24Z" fill="#71442e" stroke="#d9a05d" stroke-width="5"/>
+    <path d="M37 125V92h86v33M49 92V66h62v26M61 66V43h38v23" fill="#b77b4a" stroke="#efca82" stroke-width="5"/>
+    <path d="M80 43V17M80 17c-18 0-18 20 0 20s18-20 0-20m0 12c-12-8-24 4-14 15m14-15c12-8 24 4 14 15" fill="none" stroke="#73b8bd" stroke-width="5" stroke-linecap="round"/>
+    <path d="M49 105h62M60 78h40" stroke="#f4d38d" stroke-width="4"/>
+    <circle cx="80" cy="55" r="7" fill="#245f73"/>
+  </symbol>
+  <symbol id="su_inanna_armor" viewBox="0 0 160 160">
+    <path d="M45 25 80 13l35 12 19 37-14 76H40L26 62Z" fill="#68426d" stroke="#e1b46b" stroke-width="6"/>
+    <path d="M80 28 91 55 119 67 91 79 80 108 69 79 41 67 69 55Z" fill="#f4d17a" stroke="#fff0bd" stroke-width="4"/>
+    <path d="M80 39v56M52 67h56" stroke="#b17aa7" stroke-width="4"/>
+    <path d="m51 112 29 20 29-20" fill="none" stroke="#e8c98a" stroke-width="6"/>
+    <circle cx="80" cy="67" r="10" fill="#2f6688" stroke="#f7e1a6" stroke-width="3"/>
+  </symbol>
+  <symbol id="su_enki_scepter" viewBox="0 0 160 160">
+    <path d="M80 17v121" stroke="#d39a59" stroke-width="9" stroke-linecap="round"/>
+    <path d="M80 20c-24-18-42 6-26 22 9 9 20 8 26 0 6 8 17 9 26 0 16-16-2-40-26-22Z" fill="#297e94" stroke="#e9c577" stroke-width="5"/>
+    <path d="M28 98c15-13 29 13 44 0s29 13 44 0 20 4 22 7M23 119c17-13 32 13 49 0s32 13 49 0" fill="none" stroke="#68c9ca" stroke-width="6" stroke-linecap="round"/>
+    <path d="M67 138h26" stroke="#f0d08a" stroke-width="7" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="su_utu_disc" viewBox="0 0 160 160">
+    <circle cx="80" cy="80" r="54" fill="#9b5f36" stroke="#edc66f" stroke-width="6"/>
+    <circle cx="80" cy="80" r="35" fill="#e8b95d" stroke="#f8e2a0" stroke-width="5"/>
+    <circle cx="80" cy="80" r="15" fill="#2f607b" stroke="#fff0bc" stroke-width="4"/>
+    <g stroke="#f5d995" stroke-width="6" stroke-linecap="round"><path d="M80 9v18M80 133v18M9 80h18M133 80h18M30 30l13 13M117 117l13 13M130 30l-13 13M43 117l-13 13"/></g>
+  </symbol>
+  <symbol id="su_ninhursag_aura" viewBox="0 0 160 160">
+    <path d="M16 128 48 72 67 94 90 35l54 93Z" fill="#55704e" stroke="#d8b36e" stroke-width="5"/>
+    <path d="M40 128 68 92l15 18 20-41 30 59Z" fill="#b18b52" stroke="#f0d18b" stroke-width="4"/>
+    <path d="M80 127V71m0 19-22-18m22 35 23-24" fill="none" stroke="#8fc18a" stroke-width="6" stroke-linecap="round"/>
+    <path d="M80 72c-13-17-30-10-27 3 4 12 18 11 27-3 9 14 23 15 27 3 3-13-14-20-27-3Z" fill="#80a86e" stroke="#efd08b" stroke-width="4"/>
+    <circle cx="80" cy="48" r="9" fill="#e6be64"/>
+  </symbol>
+  <symbol id="me_marduk_crown" viewBox="0 0 160 160">
+    <path d="M25 112h110v27H25Z" fill="#16395e" stroke="#e8c46b" stroke-width="5"/>
+    <path d="M37 112 48 48l32 23 32-23 11 64" fill="#236b92" stroke="#f0d084" stroke-width="5"/>
+    <path d="M80 67c-3-29 26-39 39-20 12 17-2 37-23 38l-16 24-9-14 14-20" fill="#174d6a" stroke="#ecc86f" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M107 47 132 22 128 61M95 48 90 19 112 43" fill="none" stroke="#e9c36c" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="111" cy="61" r="4" fill="#fff0a9"/>
+    <path d="M48 82h64" stroke="#e3bb65" stroke-width="5"/>
+  </symbol>
+  <symbol id="me_ishtar_armor" viewBox="0 0 160 160">
+    <path d="M44 20 80 12l36 8 23 44-20 78H41L21 64Z" fill="#15537a" stroke="#e7bc62" stroke-width="6"/>
+    <path d="M80 28 91 55 119 67 91 79 80 107 69 79 41 67 69 55Z" fill="#e4b85d" stroke="#fff0b7" stroke-width="4"/>
+    <path d="M80 43v50M56 67h48" stroke="#1c618a" stroke-width="5"/>
+    <path d="M48 111 80 132 112 111" fill="none" stroke="#b7dce3" stroke-width="5"/>
+  </symbol>
+  <symbol id="me_gilgamesh_axe" viewBox="0 0 160 160">
+    <path d="M80 24 70 140" stroke="#9a643b" stroke-width="12" stroke-linecap="round"/>
+    <path d="M74 28 33 39 23 75 65 89 82 62Z" fill="#c88648" stroke="#f1cd80" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M80 29 126 17 138 54 91 67Z" fill="#27678a" stroke="#edc36b" stroke-width="5"/>
+    <path d="M40 48 62 54M46 68l21 8M96 36l26-6M93 51l29-7" stroke="#fff0ac" stroke-width="4" stroke-linecap="round"/>
+    <path d="M64 133h31" stroke="#e9c16c" stroke-width="8" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="me_tiamat_scale" viewBox="0 0 160 160">
+    <path d="M80 14 117 34 136 69 121 113 80 145 39 113 24 69 43 34Z" fill="#123b62" stroke="#6fc0c7" stroke-width="5"/>
+    <g fill="#1c78a1" stroke="#e6c474" stroke-width="4"><path d="M80 35 99 54 80 72 61 54Z"/><path d="M48 65 68 84 48 102 30 84Z"/><path d="M112 65 130 84 112 102 92 84Z"/><path d="M80 81 101 102 80 123 59 102Z"/></g>
+    <circle cx="80" cy="80" r="9" fill="#e8d18d"/>
+    <path d="M28 125c20-15 36 15 55 0s35 15 52 0" fill="none" stroke="#73d1d1" stroke-width="6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="me_nergal_aura" viewBox="0 0 160 160">
+    <circle cx="80" cy="80" r="60" fill="#18253a" stroke="#dcae5a" stroke-width="5"/>
+    <path d="M80 9 94 39 119 19 115 50 148 49 125 77 148 105 115 108 120 140 93 120 80 151 66 120 39 140 45 108 12 105 35 77 12 49 45 50 41 19 66 39Z" fill="#a94b35" stroke="#e6c36a" stroke-width="4"/>
+    <path d="M48 61 64 48 80 57 96 48 112 61 105 103 80 120 55 103Z" fill="#bd8746" stroke="#f1d38a" stroke-width="4"/>
+    <path d="m64 77 12-5v10l-12 3Zm32 0-12-5v10l12 3Z" fill="#fff0a7"/>
+    <path d="M80 82 72 98h16Z" fill="#201921"/>
+    <path d="M62 105 80 112 98 105" fill="none" stroke="#f3d18b" stroke-width="4"/>
+  </symbol>
+  <symbol id="po_poseidon_crown" viewBox="0 0 160 160">
+    <path d="M25 105 37 46 61 68 80 25 99 68 123 46 135 105Z" fill="#266f93" stroke="#c8e5e9" stroke-width="5"/>
+    <path d="M80 23V133M58 49 80 67 102 49" stroke="#ebd28a" stroke-width="6" stroke-linecap="round"/>
+    <path d="M37 105h86v26H37Z" fill="#1b4d70" stroke="#e4c16a" stroke-width="5"/>
+    <path d="M18 143c17-12 28 12 45 0s28 12 45 0 25 5 34 0" fill="none" stroke="#65c9d0" stroke-width="6" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="po_amphitrite_armor" viewBox="0 0 160 160">
+    <path d="M80 17c-23 18-53 23-59 53-5 27 14 61 59 77 45-16 64-50 59-77-6-30-36-35-59-53Z" fill="#23647f" stroke="#d4edf0" stroke-width="5"/>
+    <path d="M80 37c-20 22-28 38-26 56 3 19 17 34 26 39 9-5 23-20 26-39 2-18-6-34-26-56Z" fill="#b3dbe0" stroke="#f0d590" stroke-width="4"/>
+    <path d="M80 39v90M52 80c12-10 20-10 28 0 8-10 16-10 28 0" fill="none" stroke="#4b9caf" stroke-width="5"/>
+    <circle cx="80" cy="79" r="9" fill="#e5c475"/>
+  </symbol>
+  <symbol id="po_trident" viewBox="0 0 160 160">
+    <path d="M80 44v99" stroke="#d7dce2" stroke-width="10" stroke-linecap="round"/>
+    <path d="M80 49 45 15v49c0 18 20 19 26 4l9-22 9 22c6 15 26 14 26-4V15Z" fill="#68c2cb" stroke="#e9d28b" stroke-width="5" stroke-linejoin="round"/>
+    <path d="M80 49V12M48 18l-3 34M112 18l3 34" stroke="#fff0b5" stroke-width="5" stroke-linecap="round"/>
+    <path d="M64 142h32" stroke="#e7c776" stroke-width="8" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="po_tethys_pearl" viewBox="0 0 160 160">
+    <path d="M22 104c19-32 38 12 58-12s38 20 58-4" fill="none" stroke="#4fc0ce" stroke-width="9" stroke-linecap="round"/>
+    <path d="M24 126c19-32 38 12 58-12s38 20 58-4" fill="none" stroke="#2c7fa1" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="80" cy="66" r="37" fill="#c7e8e6" stroke="#f2d79b" stroke-width="5"/>
+    <circle cx="68" cy="52" r="13" fill="#fff" opacity=".7"/>
+    <path d="M48 31c16-12 43-14 61 0" fill="none" stroke="#f7e8bd" stroke-width="4" stroke-linecap="round"/>
+  </symbol>
+  <symbol id="po_abyss_aura" viewBox="0 0 160 160">
+    <circle cx="80" cy="80" r="59" fill="#102d45" stroke="#6bc3ca" stroke-width="5"/>
+    <path d="M24 94c19-35 38-28 56 0 18-28 37-35 56 0M24 118c19-35 38-28 56 0 18-28 37-35 56 0" fill="none" stroke="#53b6c2" stroke-width="7" stroke-linecap="round"/>
+    <path d="m89 13-24 48 20 2-17 42 42-57-22-1 17-34Z" fill="#e7d08b" stroke="#fff3bf" stroke-width="3" stroke-linejoin="round"/>
+  </symbol>
+</svg>

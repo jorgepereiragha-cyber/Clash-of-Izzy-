@@ -8,14 +8,20 @@
     "dev": "wrangler --config wrangler.jsonc dev",
     "db:migrate:local": "wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local",
     "db:migrate:remote": "wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --remote",
+    "db:migrate:preview:local": "wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --local",
+    "db:migrate:preview:remote": "wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --remote",
     "check": "wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist",
     "test": "node --test",
     "assets:validate": "node scripts/validate-3d-assets.js",
     "test:e2e": "playwright test",
-    "test:e2e:headed": "playwright test --headed"
+    "test:e2e:headed": "playwright test --headed",
+    "vendor:three": "node scripts/vendor-three.mjs",
+    "pretest": "npm run vendor:three",
+    "pretest:e2e": "npm run vendor:three"
   },
   "devDependencies": {
     "wrangler": "4.161.0",
-    "@playwright/test": "1.65.1"
+    "@playwright/test": "1.65.1",
+    "three": "0.187.0"
   }
 }

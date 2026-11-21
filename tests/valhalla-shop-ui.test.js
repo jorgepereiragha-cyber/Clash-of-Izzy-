@@ -23,8 +23,8 @@ test("Loja Valhalla é carregada nas telas do reino e do mapa mundial", () => {
     assert.ok(html.includes('/styles/valhalla-shop.css'));
     assert.ok(html.includes('/valhalla-shop-ui.js'));
   }
-  assert.ok(kingdom.includes('/scripts/kingdom-3d.js'));
-  assert.ok(world.includes('/world-map-3d.js'));
+  assert.ok(kingdom.includes('/scripts/kingdom-visual-boot.js'));
+  assert.ok(world.includes('/scripts/world-map-visual-boot.js'));
 });
 
 test("interface usa as rotas autenticadas reais e não cria um segundo contrato de sessão", () => {

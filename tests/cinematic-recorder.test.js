@@ -242,7 +242,8 @@ test("recorder uses the renderer API instead of an assumed window.map3d global",
 });
 
 test("PWA and shared styles include the recorder resources", () => {
-  assert.match(serviceWorker, /clash-of-izzy-shell-v27/);
+  const cacheVersion = Number(serviceWorker.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
+  assert.ok(cacheVersion > 40, `expected Service Worker cache version above v40, got v${cacheVersion || "missing"}`);
   for (const path of [
     "/scripts/cinematic/capture-system.js",
     "/scripts/cinematic/media-recorder-support.js",
@@ -410,4 +411,15 @@ test("low-memory devices reject unsafe recording duration before resizing the ki
   } finally {
     harness.restore();
   }
+});
+
+test("lazy kingdom GPU initialization publishes recorder availability without duplicate panels", async () => {
+  const rendererSource = await import("node:fs/promises").then(fs =>
+    fs.readFile(new URL("../scripts/kingdom-3d.js",import.meta.url),"utf8"));
+  const uiSource = await import("node:fs/promises").then(fs =>
+    fs.readFile(new URL("../scripts/cinematic/recorder-ui.js",import.meta.url),"utf8"));
+  assert.match(rendererSource, /new CustomEvent\("coi:kingdom-cinematic-ready"\)/);
+  assert.match(uiSource, /window\.addEventListener\("coi:kingdom-cinematic-ready", ensureTrailerRecorder\)/);
+  assert.match(uiSource, /window\.trailerRecorder/);
+  assert.match(uiSource, /if \(typeof window === "undefined" \|\| !window\.__coiKingdomCinematic \|\| window\.trailerRecorder\) return/);
 });

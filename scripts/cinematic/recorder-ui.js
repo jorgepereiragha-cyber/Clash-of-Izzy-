@@ -277,6 +277,13 @@ class TrailerRecorderUI {
   }
 }
 
-if (typeof window !== "undefined" && window.__coiKingdomCinematic) {
+// The 3D engine now boots lazily. Recorder initialization must not race with
+// the GPU bootstrap or create a useless recorder panel when 2D is selected.
+function ensureTrailerRecorder() {
+  if (typeof window === "undefined" || !window.__coiKingdomCinematic || window.trailerRecorder) return;
   window.trailerRecorder = new TrailerRecorderUI(window.__coiKingdomCinematic);
+}
+if (typeof window !== "undefined") {
+  window.addEventListener("coi:kingdom-cinematic-ready", ensureTrailerRecorder);
+  ensureTrailerRecorder();
 }

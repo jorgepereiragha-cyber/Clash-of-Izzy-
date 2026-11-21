@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 
 const SESSION_TOKEN = "playwright-mobile-fixture-session";
 
@@ -110,6 +111,11 @@ test.describe("Mobile kingdom rendering", () => {
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
 
+    const ambientLayer = page.locator("#city .coi-ambient-layer");
+    await expect(ambientLayer).toBeAttached();
+    await expect(ambientLayer).toHaveAttribute("aria-hidden", "true");
+    await expect(ambientLayer).toHaveCSS("pointer-events", "none");
+
     // The expanded recorder panel used to cover upgrade/training controls on phones.
     // It now starts minimized on mobile and remains accessible through its toggle.
     const recorderBody = page.locator("#coi-recorder-body");
@@ -210,4 +216,43 @@ test.describe("Mobile kingdom rendering", () => {
     await expect.poll(() => actions.length).toBe(2);
     expect(actions[1]).toEqual({ type: "train", unit: "archer", quantity: 4 });
   });
+
+  test("graphics preferences persist and 2D mode keeps mobile controls usable", async ({ page }) => {
+    await page.addInitScript(() => {
+      if (!localStorage.getItem("coi_graphics_preference")) localStorage.setItem("coi_graphics_preference", "2d");
+    });
+    await installApiFixtures(page);
+    await page.setViewportSize({width:360,height:740});
+    await page.goto("/kingdom.html");
+    await expect(page.locator("#game")).toBeVisible();
+    await expect(page.locator("#coiGraphicsPreset")).toHaveValue("2d");
+    await expect(page.locator("#coiGraphicsStatus")).toContainText("2D leve");
+    await expect(page.locator("#city #kingdom3d")).toHaveCount(0);
+    await expect(page.locator('#city .building[data-building="castle"]')).toBeVisible();
+    await expect(page.locator("#coiGraphicsApply")).toBeDisabled();
+    await mkdir("test-results/visual-preview", { recursive: true });
+    await page.locator(".coi-city-panel").screenshot({
+      path: "test-results/visual-preview/cidade-360px-2d.png"
+    });
+    await page.locator("#coiGraphicsPreset").selectOption("low");
+    await expect(page.locator("#coiGraphicsApply")).toBeEnabled();
+    await page.locator("#coiGraphicsApply").click();
+    await expect(page.locator("#coiGraphicsPreset")).toHaveValue("low");
+    await expect(page.locator("#game")).toBeVisible();
+    const saved = await page.evaluate(() => ({
+      value:localStorage.getItem("coi_graphics_preference"),
+      width:document.documentElement.scrollWidth,
+      viewport:innerWidth
+    }));
+    expect(saved.value).toBe("low");
+    expect(saved.width).toBeLessThanOrEqual(saved.viewport + 1);
+    await page.setViewportSize({width: 1120, height: 850});
+    await expect(page.locator(".coi-city-panel")).toBeVisible();
+    const desktopBounds = await page.locator(".coi-city-panel").boundingBox();
+    expect(desktopBounds.height).toBeLessThan(1200); // No full-sidebar-height blank panel.
+    await page.locator(".coi-city-panel").screenshot({
+      path: "test-results/visual-preview/cidade-desktop-equilibrio.png"
+    });
+  });
+
 });

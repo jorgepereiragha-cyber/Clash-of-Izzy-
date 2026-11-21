@@ -62,7 +62,7 @@ test("email queue checks contact preferences at enqueue and send time, escapes H
 
 test("Worker runs the queue on its existing schedule and queues a receipt after approved purchase", async () => {
   const worker = await read("worker.js");
-  assert.ok(worker.includes("await processEmailQueue(env,10)"));
+  assert.ok(worker.includes("await processEmailQueue(env,1)"));
   assert.ok(worker.includes("queueEmailForInternalPlayer"));
   assert.ok(worker.includes('idempotencyKey:"purchase:"+id'));
   assert.ok(worker.includes('"email_templates","player_email_contacts","email_queue","email_history"'));

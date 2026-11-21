@@ -21,14 +21,14 @@ test("world map page loads authenticated territory and march interface", () => {
 
 test("world map presents an isometric 3D strategy view instead of a free-roaming arena hero", async () => {
   const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
-  for (const marker of ['id="world3d"', 'Mapa estratégico 3D', 'world-map-3d.js']) assert.ok(html.includes(marker), "missing 3D map presentation: " + marker);
+  for (const marker of ['id="world3d"', 'Mapa estratégico 3D', 'world-map-visual-boot.js']) assert.ok(html.includes(marker), "missing 3D map presentation: " + marker);
   for (const marker of ['OrthographicCamera', 'createCastle', 'createTerritoryFeature', 'createMarchFormation', 'updateMarchPositions', 'projectTerritories']) assert.ok(scene.includes(marker), "missing strategic scene feature: " + marker);
   assert.ok(scene.includes('march.status === "marching"'));
   assert.ok(script.includes('window.__coiWorldMap3D.update(visualState)'));
 });
 
 test("strategic 3D world map and territory controls parse before deployment", () => {
-  for (const file of ["../world-map.js", "../world-map-3d.js"]) {
+  for (const file of ["../world-map.js", "../world-map-3d.js", "../scripts/world-map-visual-boot.js"]) {
     const target = fileURLToPath(new URL(file, import.meta.url));
     const result = spawnSync(process.execPath, ["--check", target], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr || result.stdout || ("Syntax check failed: " + file));
@@ -47,7 +47,9 @@ test("world map renders untrusted territory labels with DOM text, not HTML injec
 });
 
 test("PWA shell includes the world map and increments its cache version", () => {
-  for (const marker of ['clash-of-izzy-shell-v27', '"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  for (const marker of ['"/styles/landing.css"', '"/landing.js"', '"/world.html"', '"/world-map.js"', '"/world-map-3d.js"', '"/events.html"', '"/events.js"', '"/styles/coi-theme.css"', '"/admin.html"', '"/valhalla-admin-ui.js"', '"/styles/valhalla-admin.css"', '"/valhalla-shop-ui.js"', '"/styles/valhalla-shop.css"']) assert.ok(serviceWorker.includes(marker), "missing cached asset: " + marker);
+  const cacheVersion = Number(serviceWorker.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
+  assert.ok(cacheVersion > 40, `expected Service Worker cache version above v40, got v${cacheVersion || "missing"}`);
   assert.ok(serviceWorker.includes('url.pathname.startsWith("/api/")'));
 });
 
@@ -94,4 +96,32 @@ test("map viewport transform is finite and deterministic", () => {
     mapViewportTransform({ zoom: Number.NaN, panX: Number.POSITIVE_INFINITY }),
     "translate3d(0px, 0px, 0) scale(1)"
   );
+});
+
+
+test("shared world map applies the local player's equipped skin to the central castle", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  assert.ok(script.includes("castleSkinId: Number(state.kingdom?.equipped_skin_id || 0)"));
+  assert.ok(scene.includes("homeCastleGroup=createCastle(terrainRoot,0,0,1.4,\"home\",Number(worldState.castleSkinId)||0)"));
+  assert.ok(scene.includes("Number(window.__coiWorldMapState?.castleSkinId)||0"));
+});
+
+
+test("3D world-map marches pause when the app is hidden or the map leaves the viewport", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  assert.ok(scene.includes("function canAnimateMarches()"));
+  assert.ok(scene.includes("!document.hidden && sceneInViewport"));
+  assert.ok(scene.includes("new IntersectionObserver"));
+  assert.ok(scene.includes('document.addEventListener("visibilitychange", visibilityChangeHandler)'));
+  assert.ok(scene.includes("sceneVisibilityObserver?.disconnect()"));
+  assert.ok(scene.includes("function stopMarchAnimation()"));
+  assert.ok(scene.includes("contextLost = true"));
+});
+
+test("world-map renderer caps drawing-buffer pixels and restores from Android back/forward cache", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  assert.ok(scene.includes("pixelBudgetRatio"));
+  assert.ok(scene.includes("window.addEventListener(\"pageshow\""));
+  assert.ok(scene.includes("if (!event.persisted) dispose()"));
+  assert.ok(scene.includes("syncMarchAnimation()"));
 });

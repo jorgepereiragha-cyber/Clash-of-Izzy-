@@ -118,7 +118,7 @@ test("PWA fetches query-bearing navigation but never stores its parameters or re
   assert.equal(h.stores.size, 0);
   assert.equal(h.networkCalls.length, 1);
 
-  await (await h.caches.open("clash-of-izzy-shell-v27"))
+  await (await h.caches.open("clash-of-izzy-shell-v46"))
     .put("/world.html", makeResponse());
   h.offline();
   const offline = await h.dispatch("/world.html?search=private-player", { mode: "navigate" });
@@ -131,11 +131,11 @@ test("PWA shell responses are cached by pathname and serve offline fallback", as
   const first = await h.dispatch("/kingdom.html", { mode: "navigate" });
   assert.equal(first.handled, true);
   assert.equal(first.result.status, 200);
-  assert.ok(h.stores.get("clash-of-izzy-shell-v27").has("/kingdom.html"));
+  assert.ok(h.stores.get("clash-of-izzy-shell-v46").has("/kingdom.html"));
   h.offline();
   const fallback = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
   assert.equal(fallback.result, undefined);
-  await (await h.caches.open("clash-of-izzy-shell-v27"))
+  await (await h.caches.open("clash-of-izzy-shell-v46"))
     .put("/offline.html", makeResponse());
   const offline = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
   assert.equal(offline.result.status, 200);
@@ -146,6 +146,10 @@ test("PWA only adds approved static assets without query strings", async () => {
   assert.equal((await h.dispatch("/assets/3d/model.glb")).handled, true);
   assert.equal(h.stores.get("clash-of-izzy-runtime-v1").has("/assets/3d/model.glb"), true);
   assert.equal((await h.dispatch("/assets/3d/model.glb?token=secret")).handled, false);
+  assert.equal((await h.dispatch("/vendor/three/examples/jsm/loaders/GLTFLoader.js")).handled, true);
+  assert.equal(h.stores.get("clash-of-izzy-runtime-v1").has("/vendor/three/examples/jsm/loaders/GLTFLoader.js"), true);
+  assert.equal((await h.dispatch("/vendor/three/examples/jsm/loaders/GLTFLoader.js?key=secret")).handled, false);
+  assert.equal((await h.dispatch("/vendor/unsafe/private-data.js")).handled, false);
   assert.equal((await h.dispatch("/account/status")).handled, false);
   assert.equal((await h.dispatch("/assets/private-data.json")).handled, false);
   assert.equal((await h.dispatch("/uploads/private-avatar.png")).handled, false);

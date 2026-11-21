@@ -21,6 +21,7 @@
   <link rel="stylesheet" href="/styles/navigation.css">
   <link rel="stylesheet" href="/styles/landing.css">
   <title>Clash of Izzy — Jogo Medieval de Estratégia</title>
+  <link rel="stylesheet" href="/styles/android-experience.css">
 </head>
 <body class="landing-page">
   <header class="landing-shell landing-hero">
@@ -36,7 +37,9 @@
       <div class="landing-actions">
         <a class="landing-button" id="play-now" href="./kingdom.html">⚔️ ENTRAR NO REINO</a>
         <button class="landing-button secondary" id="install-button" type="button">📲 Instalar no celular</button>
+        <button class="landing-button secondary" id="share-game-button" type="button">↗ Compartilhar jogo</button>
       </div>
+      <p id="share-game-status" class="landing-share-status" role="status" aria-live="polite"></p>
       <div class="landing-trust" aria-label="Informações do jogo">
         <span>✓ Jogue no navegador</span>
         <span>✓ Sem instalação obrigatória</span>
@@ -45,7 +48,7 @@
     </div>
     <div class="landing-visual" aria-hidden="true">
       <div class="landing-visual-frame">
-        <img class="landing-visual-icon" src="/icon-512.svg" alt="" width="512" height="512">
+        <img class="landing-kingdom-art" src="/assets/art/landing-kingdom.svg" alt="" width="900" height="900" fetchpriority="high" decoding="async">
         <span class="landing-visual-caption">Seu reino começa aqui</span>
       </div>
     </div>
@@ -143,5 +146,6 @@
 
   <script src="/landing.js" defer></script>
   <script src="/navigation.js" defer></script>
+  <script src="/scripts/pwa-runtime.js" defer></script>
 </body>
 </html>

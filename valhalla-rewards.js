@@ -1,7 +1,7 @@
 import { getValhallaConfig } from "./valhalla-config.js";
 
-const ACTIVE_KINGDOM_PAGE_SIZE = 100;
-const D1_BATCH_KINGDOM_SIZE = 30;
+const ACTIVE_KINGDOM_PAGE_SIZE = 10;
+const D1_BATCH_KINGDOM_SIZE = 10;
 
 /**
  * Daily runes are granted only to kingdoms whose player opened the kingdom UI
@@ -28,8 +28,10 @@ export async function distributeValhallaDailyRunes(env, now = new Date()) {
   const nowSeconds = Math.floor(instant.getTime() / 1000);
   let eligible = 0;
   let granted = 0;
+  let pagesProcessed = 0;
+  const maxPagesPerScheduledRun = 1;
 
-  while (true) {
+  while (pagesProcessed < maxPagesPerScheduledRun) {
     const candidates = await env.DB.prepare(
       "SELECT k.id " +
       "FROM kingdoms k " +
@@ -90,6 +92,7 @@ export async function distributeValhallaDailyRunes(env, now = new Date()) {
       const inserted = results.filter((result, index) => index % 3 === 0 && result?.meta?.changes).length;
       if (inserted === 0) return { active: true, rewardDate, eligible, granted };
     }
+    pagesProcessed += 1;
   }
 
   return { active: true, rewardDate, eligible, granted };

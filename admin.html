@@ -15,7 +15,7 @@ button{background:linear-gradient(#d6ad5c,#98652b);border:0;border-radius:8px;pa
 button.secondary{background:#263b55;color:#fff;border:1px solid #8c744b}
 #dashboard{display:none;margin-top:18px}.toolbar{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}
 #notice{min-height:24px;color:#f5d58e;margin:10px 0}.results{display:grid;gap:10px}.player{background:#17283c;border:1px solid #465c76;border-radius:10px;padding:14px;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:10px;align-items:center}
-.player small{display:block;color:#b8c5d5;overflow-wrap:anywhere;margin-top:4px}.actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.actions input{width:110px;min-width:0;padding:9px}
+.player small{display:block;color:#b8c5d5;overflow-wrap:anywhere;margin-top:4px}.actions{display:flex;gap:7px;align-items:center;flex-wrap:wrap}.actions input{width:110px;min-width:0;padding:9px}.actions button.approve{background:linear-gradient(#55c982,#23834b);color:#061b10}
 footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
 @media(max-width:560px){body{padding:12px}.panel{padding:16px}.player{grid-template-columns:1fr}.actions input{flex:1}}
 </style>
@@ -32,7 +32,7 @@ footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
 <div class="toolbar"><h2>👑 Jogadores do reino</h2><button class="secondary" id="logout" type="button">Sair</button></div>
 <section id="purchaseQueue" style="margin:18px 0;padding:16px;border:1px solid #a98245;border-radius:12px;background:#0b1728">
  <div class="toolbar"><h2>🔔 Pedidos de compra <span id="pendingCount">0</span></h2><button class="secondary" id="refreshPurchases" type="button">Atualizar</button></div>
- <p class="sub">Novos pedidos aparecem automaticamente. Confira o recebimento do pagamento fora do jogo antes de aprovar. A aprovação libera as gemas ou a skin no reino.</p>
+ <p class="sub">Novos pedidos aparecem automaticamente. Os pedidos abrem uma conversa no WhatsApp. Confira o recebimento por fora e toque em ✓ Liberar pacote para entregar as gemas ou a skin ao jogador.</p>
  <div id="purchaseRequests" class="results" aria-live="polite">Carregando pedidos…</div>
 </section>
 <section id="valhalla-admin-section" aria-labelledby="valhalla-admin-title">
@@ -149,14 +149,22 @@ function renderPurchaseRequests(requests){
   const card=document.createElement("article");card.className="player";
   const info=document.createElement("div"),name=document.createElement("strong"),meta=document.createElement("small");
   name.textContent="#"+request.id+" · "+request.product_name;
-  meta.textContent=(request.player_name||"Jogador")+" · "+(request.kingdom_name||"Reino")+" · ID "+request.player_id+" · R$ "+Number(request.price_brl).toFixed(2).replace(".",",")+(request.product_kind==="vip_package"?" · "+Number(request.gems_amount||0).toLocaleString("pt-BR")+" gemas":" · Skin")+" · Pagamento: "+(request.payment_method||"manual")+" · Referência: "+(request.payment_reference||"não informada");
+  const automatic=request.payment_method==="mercadopago_link"||Boolean(request.mp_order_id);
+  const providerStatus=request.mp_payment_status||"aguardando confirmação";
+  meta.textContent=(request.player_name||"Jogador")+" · "+(request.kingdom_name||"Reino")+" · ID "+request.player_id+" · R$ "+Number(request.price_brl).toFixed(2).replace(".",",")+(request.product_kind==="vip_package"?" · "+Number(request.gems_amount||0).toLocaleString("pt-BR")+" gemas":" · Skin")+" · "+(automatic?"Mercado Pago · "+providerStatus+" · Liberação automática após webhook":"Canal manual · aguardando conferência");
   info.append(name,meta);
   const actions=document.createElement("div");actions.className="actions";
-  const approve=document.createElement("button");approve.type="button";approve.textContent="Confirmar pagamento e liberar";
-  approve.addEventListener("click",()=>reviewPurchase(request.id,"approve",approve));
-  const reject=document.createElement("button");reject.type="button";reject.className="secondary";reject.textContent="Recusar";
-  reject.addEventListener("click",()=>reviewPurchase(request.id,"reject",reject));
-  actions.append(approve,reject);card.append(info,actions);root.append(card);
+  if(automatic){
+   const waiting=document.createElement("small");waiting.className="sub";waiting.textContent="Pagamento automático: não liberar nem recusar manualmente. O servidor confirma o pagamento.";
+   actions.append(waiting);
+  }else{
+   const approve=document.createElement("button");approve.type="button";approve.className="approve";approve.textContent="✓ Liberar pacote";
+   approve.addEventListener("click",()=>reviewPurchase(request.id,"approve",approve));
+   const reject=document.createElement("button");reject.type="button";reject.className="secondary";reject.textContent="Recusar";
+   reject.addEventListener("click",()=>reviewPurchase(request.id,"reject",reject));
+   actions.append(approve,reject);
+  }
+  card.append(info,actions);root.append(card);
  }
 }
 async function refreshPurchaseRequests(){
@@ -164,7 +172,7 @@ async function refreshPurchaseRequests(){
  renderPurchaseRequests(data.requests||[]);
 }
 async function reviewPurchase(id,decision,button){
- if(decision==="approve"&&!confirm("Confirma que o pagamento foi recebido e deseja liberar este pacote agora?"))return;
+ if(decision==="approve"&&!confirm("Você confirmou o recebimento do pagamento e deseja liberar este pacote agora?"))return;
  if(decision==="reject"&&!confirm("Deseja recusar este pedido?"))return;
  button.disabled=true;
  try{const result=await api("/admin/purchase-requests/review",{requestId:id,decision});showNotice(result.message);await refreshPurchaseRequests()}

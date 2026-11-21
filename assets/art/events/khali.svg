@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+<title id="title">Khali</title><desc id="desc">Rainha mística sob halo lunar, lótus e luz dourada.</desc>
+<defs>
+ <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#49305b"/><stop offset="1" stop-color="#171729"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#c6a0e6" stop-opacity=".65"/><stop offset="1" stop-color="#c6a0e6" stop-opacity="0"/></radialGradient>
+ <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#fff0b7"/><stop offset=".48" stop-color="#d6a94f"/><stop offset="1" stop-color="#79512d"/></linearGradient>
+</defs>
+<rect width="640" height="360" fill="url(#bg)"/>
+<circle cx="320" cy="152" r="210" fill="url(#glow)"/>
+<path d="M0 292 80 250 145 275 220 218 290 266 365 210 440 265 520 225 640 282V360H0Z" fill="#0c1624" opacity=".72"/>
+<path d="M0 320 95 290 165 304 240 272 322 300 408 267 500 302 575 273 640 294V360H0Z" fill="#101d2a"/>
+
+
+<path d="M320 56q-70 16-70 90v78q70 65 140 0v-78q0-74-70-90Z" fill="#392a55" stroke="url(#gold)" stroke-width="5"/>
+<path d="M275 127q45-38 90 0l-12 70h-66Z" fill="#18233b" stroke="#c6a0e6" stroke-width="4"/>
+<path d="M293 151h12m30 0h12" stroke="#f7d884" stroke-width="6" stroke-linecap="round"/>
+<path d="M320 53v-28m-62 53-33-34m157 34 33-34" stroke="url(#gold)" stroke-width="8"/>
+<path d="M320 245v-82m-26 30 26-30 26 30" fill="none" stroke="#c6a0e6" stroke-width="7" stroke-linecap="round"/>
+<path d="M256 252q64 52 128 0" fill="none" stroke="url(#gold)" stroke-width="6"/>
+<path d="M288 290q32-25 64 0" fill="none" stroke="#c6a0e6" stroke-width="7"/>
+
+<path d="M0 332Q160 300 320 333T640 329" fill="none" stroke="#c6a0e6" stroke-opacity=".55" stroke-width="3"/>
+</svg>

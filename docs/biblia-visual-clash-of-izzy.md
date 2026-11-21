@@ -37,6 +37,20 @@ Os tokens devem ser centralizados em CSS variables e reutilizados. Não criar um
 - Combate: manter materiais, proporções, iluminação e design de personagens do mesmo universo.
 - Edifícios devem manter escala relativa, orientação e pontos de ancoragem coerentes entre cenas.
 
+## Materiais PBR e desempenho por perfil
+
+A cidade utiliza materiais PBR do Three.js. Os mapas procedurais devem manter a mesma semente e o mesmo padrão de repetição em todas as instâncias equivalentes.
+
+- **Albedo:** mapa de cor em espaço sRGB.
+- **Normal:** mapa linear em espaço tangente, derivado da altura/luminância do padrão procedural e com amostragem em borda circular para evitar costura.
+- **Roughness:** mapa linear de rugosidade, com faixa específica para pedra, madeira, telhado, grama e estrada.
+- **Metalness:** reservado a metais reais (armaduras, ferragens e ornamentos); pedra, madeira e telha não devem receber brilho metálico artificial.
+- **Low:** albedo 128 px e rugosidade escalar, sem mapas PBR adicionais para reduzir memória e trabalho de GPU.
+- **Balanced:** albedo, normal e roughness em 256 px.
+- **High:** albedo, normal e roughness em 512 px, respeitando o limite máximo de textura reportado pela GPU.
+
+Os mapas devem usar repetição e anisotropia coerentes, ser compartilhados por cache por material e ser descartados explicitamente junto com os demais recursos WebGL. Mapas de normal e rugosidade não devem receber transformação sRGB. O sistema procedural é uma aproximação de materiais PBR; não deve ser apresentado como textura escaneada ou material PBR artístico final. Para a qualidade premium final, adicionar materiais autorais com albedo, normal, roughness, AO e, quando necessário, metalness, além de registrar licença, resolução e origem dos arquivos.
+
 ## Regras de consistência
 
 1. Um único logo oficial, sem redesenhos improvisados.
@@ -81,3 +95,14 @@ Antes de aprovar qualquer tela, comparar lado a lado:
 - combate.
 
 Reprovar se houver divergência de paleta, escala, câmera, materiais, tipografia, ícones ou linguagem de ilustração.
+
+
+## Camada ambiente Android — partículas da cidade
+
+- `scripts/ambient-particles.js` é carregado somente na tela do Reino e usa Canvas 2D transparente, sem criar outro contexto WebGL.
+- O número de partículas e o DPR são menores em telas móveis e em aparelhos com memória limitada; o loop decorativo é limitado a aproximadamente 30 fps.
+- O efeito não inicia quando `prefers-reduced-motion`, Economia de dados ou memória reportada até 2 GB estão ativos.
+- `IntersectionObserver` e `visibilitychange` suspendem a animação fora da área visível ou em segundo plano; o ciclo BFCache pausa/retoma e a saída real da página libera recursos.
+- Temporizadores de construção, consultas da Loja de Valhalla e polling do evento global também ficam suspensos enquanto o documento está oculto; o estado oficial volta a ser buscado ao retornar.
+- A camada é decorativa, `aria-hidden` e não intercepta toques; edifícios e controles continuam sendo elementos HTML interativos.
+- O pós-processamento `scripts/post-processing.js` foi removido por não ter consumidor no runtime. Bloom/FXAA/Nordic Grade não devem ser descritos como ativos na cidade atual.

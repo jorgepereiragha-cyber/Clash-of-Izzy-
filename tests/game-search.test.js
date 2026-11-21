@@ -20,7 +20,7 @@ test("search accepts only public categories and builds a parameterized FTS query
   assert.ok(worker.includes("\\p{L}"));
   assert.ok(worker.includes('game_search_fts MATCH ?'));
   assert.ok(worker.includes('entityType=({kingdoms:"kingdom",alliances:"alliance",territories:"territory",skins:"skin"})[kind]||""'));
-  assert.ok(worker.includes('.bind(ftsQuery,kind,entityType,playerId,limit*4)'));
+  assert.ok(worker.includes('.bind(ftsQuery,kind,entityType,playerId,INITIAL_PAID_SKIN_LIMIT,limit*4)'));
   assert.ok(worker.includes('Math.min(20,Math.max(1,Math.floor(Number(url.searchParams.get("limit"))||10)))'));
 });
 
@@ -196,4 +196,12 @@ test("FTS5 ranks primary titles above secondary descriptions in prefix and subst
   const migration = await read("migrations/0015_search_rank_weights.sql");
   assert.ok(migration.includes("INSERT INTO game_search_fts(game_search_fts, rank) VALUES('rank', 'bm25(6.0, 1.0)')"));
   assert.ok(migration.includes("INSERT INTO game_search_substring_fts(game_search_substring_fts, rank) VALUES('rank', 'bm25(6.0, 1.0)')"));
+});
+
+
+test("global search hides paid skins outside the six-item launch edition", async () => {
+  const worker = await read("worker.js");
+  assert.ok(worker.includes("const INITIAL_PAID_SKIN_LIMIT = 6"));
+  assert.ok(worker.includes("d.entity_type<>'skin' OR CAST(d.entity_key AS INTEGER) IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
+  assert.ok(worker.includes("SELECT name FROM skins WHERE id IN (SELECT id FROM skins ORDER BY id LIMIT ?)"));
 });
