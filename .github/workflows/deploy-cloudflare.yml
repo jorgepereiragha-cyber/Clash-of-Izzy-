@@ -3,6 +3,11 @@ name: Deploy Clash of Izzy to Cloudflare
 on:
   workflow_dispatch:
     inputs:
+      confirm_paid_plan:
+        description: "Confirme Workers Paid e limites de gastos no Dashboard"
+        required: true
+        default: false
+        type: boolean
       confirm_production:
         description: "Confirma migrações D1 remotas e publicação do Worker em produção"
         required: true
@@ -15,7 +20,7 @@ concurrency:
 
 jobs:
   deploy:
-    if: ${{ inputs.confirm_production == true }}
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_paid_plan == true && inputs.confirm_production == true }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     environment:
@@ -107,6 +112,11 @@ jobs:
               raise SystemExit("O token Cloudflare não está ativo. Gere um token novo e atualize CLOUDFLARE_API_TOKEN.")
           print("Token Cloudflare válido e ativo.")
           PY
+
+      - name: Verify remote Cloudflare before any D1 write (read-only)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/cloudflare-remote-audit.mjs
 
       - name: Capture D1 pre-deployment restore point
         id: capture_d1

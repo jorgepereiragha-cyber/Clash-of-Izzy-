@@ -34,7 +34,7 @@ Comandos úteis:
 
 ## Deploy manual protegido
 
-O workflow `.github/workflows/deploy-cloudflare.yml` **não publica automaticamente em um push para `main`**. A publicação só pode ser iniciada manualmente em GitHub Actions (`workflow_dispatch`) e exige marcar `confirm_production` como `true`, além do ambiente protegido `production`. O fluxo executa testes, validação do bundle, migrações D1 locais, captura e arquivamento de um bookmark Time Travel, migrações D1 remotas, publicação do Worker/assets e smoke test de produção somente de leitura. Um push para `main` executa a CI de qualidade, não o deploy de produção.
+O workflow `.github/workflows/deploy-cloudflare.yml` **não publica automaticamente em um push para `main`**. A publicação só pode ser iniciada manualmente em GitHub Actions (`workflow_dispatch`) e exige marcar `confirm_paid_plan` e `confirm_production` como `true`, seleção da branch `main`, auditoria remota prévia e aprovação do ambiente protegido `production`. O fluxo executa testes, validação do bundle, migrações D1 locais, captura e arquivamento de um bookmark Time Travel, migrações D1 remotas, publicação do Worker/assets e smoke test de produção somente de leitura. Um push para `main` executa a CI de qualidade, não o deploy de produção.
 
 O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação. **Restaurar Time Travel sobrescreve o estado atual do banco**; não execute uma restauração sem plano de recuperação e autorização.
 
@@ -54,3 +54,6 @@ Permissões mínimas do token para este workflow:
 - D1: Edit, para executar migrações remotas.
 - Workers: Editor (ou Workers Scripts Edit no modelo legado), para publicar o Worker.
 - Account Settings: Read, se solicitado pelo Wrangler para identificar a conta.
+## Auditoria remota automática, somente leitura
+
+Ao integrar alterações na infraestrutura, o workflow `Cloudflare Remote Audit (read-only)` consulta saúde pública, autenticação, identidade separada dos D1, Time Travel e, quando autorizado, assinatura Workers Paid. Ele não publica nem altera o D1. Um resultado sem permissão de Billing **não confirma** que a assinatura paga está ativa. Consulte também `docs/CLOUDFLARE_VALIDACAO_FINAL.md`.
