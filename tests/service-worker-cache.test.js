@@ -118,7 +118,7 @@ test("PWA fetches query-bearing navigation but never stores its parameters or re
   assert.equal(h.stores.size, 0);
   assert.equal(h.networkCalls.length, 1);
 
-  await (await h.caches.open("clash-of-izzy-shell-v28"))
+  await (await h.caches.open("clash-of-izzy-shell-v29"))
     .put("/world.html", makeResponse());
   h.offline();
   const offline = await h.dispatch("/world.html?search=private-player", { mode: "navigate" });
@@ -131,11 +131,11 @@ test("PWA shell responses are cached by pathname and serve offline fallback", as
   const first = await h.dispatch("/kingdom.html", { mode: "navigate" });
   assert.equal(first.handled, true);
   assert.equal(first.result.status, 200);
-  assert.ok(h.stores.get("clash-of-izzy-shell-v28").has("/kingdom.html"));
+  assert.ok(h.stores.get("clash-of-izzy-shell-v29").has("/kingdom.html"));
   h.offline();
   const fallback = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
   assert.equal(fallback.result, undefined);
-  await (await h.caches.open("clash-of-izzy-shell-v28"))
+  await (await h.caches.open("clash-of-izzy-shell-v29"))
     .put("/offline.html", makeResponse());
   const offline = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
   assert.equal(offline.result.status, 200);
@@ -176,10 +176,10 @@ test("PWA bounds its runtime asset cache and retires older named caches", async 
   assert.equal(h.stores.get("clash-of-izzy-runtime-v1").size, 64);
   assert.equal(h.stores.get("clash-of-izzy-runtime-v1").has("/assets/3d/model-0.glb"), false);
   assert.equal(h.stores.get("clash-of-izzy-runtime-v1").has("/assets/3d/model-69.glb"), true);
-  await h.caches.open("clash-of-izzy-shell-v26");
+  await h.caches.open("clash-of-izzy-shell-v29");
   await h.caches.open("clash-of-izzy-runtime-v0");
   await h.lifecycle("activate");
-  assert.equal(h.stores.has("clash-of-izzy-shell-v26"), false);
+  assert.equal(h.stores.has("clash-of-izzy-shell-v29"), false);
   assert.equal(h.stores.has("clash-of-izzy-runtime-v0"), false);
   assert.equal(h.stores.has("clash-of-izzy-runtime-v1"), true);
 });
