@@ -115,7 +115,6 @@ jobs:
 
       - name: Verify remote Cloudflare before any D1 write (read-only)
         env:
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: node scripts/cloudflare-remote-audit.mjs
 
