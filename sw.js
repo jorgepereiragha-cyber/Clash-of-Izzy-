@@ -1,7 +1,22 @@
-const CACHE_NAME="clash-of-izzy-shell-v27";
-const CORE_ASSETS=["/","/index.html","/account.html","/arena.html","/kingdom.html","/world.html","/world-map.js","/world-map-3d.js","/world-map-viewport.js","/rally-ui.js","/styles/rally.css","/events.html","/events.js","/scripts/kingdom-3d.js","/scripts/kingdom-quality.js","/scripts/cinematic/capture-system.js","/scripts/cinematic/media-recorder-support.js","/scripts/cinematic/trailer-script.js","/scripts/cinematic/recorder-ui.js","/assets/3d/manifest.json","/engine/asset-loader.js","/engine/resource-disposal.js","/engine/texture-manager.js","/equipment-ui.html","/equipment-system.js","/equipment-styles.css","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/navigation.js","/styles/navigation.css","/alliance.html","/styles/coi-theme.css","/styles/landing.css","/landing.js","/manifest.json","/icon-192.svg","/icon-512.svg","/favicon.svg","/logo.svg","/styles/premium-ui.css","/icons/premium-icons.svg","/splash-screen.html","/scripts/ambient-particles.js","/scripts/advanced-shaders.js","/scripts/post-processing.js","/offline.html"];
-self.addEventListener("install",event=>{
- event.waitUntil(caches.open(CACHE_NAME).then(cache=>cache.addAll(CORE_ASSETS)).then(()=>self.skipWaiting()));
+const CACHE_NAME="clash-of-izzy-shell-v43";
+const CORE_ASSETS=["/","/index.html","/account.html","/arena.html","/kingdom.html","/world.html","/world-map.js","/world-map-3d.js","/world-map-viewport.js","/rally-ui.js","/styles/rally.css","/events.html","/events.js","/event-catalog.js","/styles/events-hub.css","/assets/art/events/angel-of-death.svg","/assets/art/events/valhalla.svg","/assets/art/events/wild-hunt.svg","/assets/art/events/shiva.svg","/assets/art/events/khali.svg","/assets/art/events/siege-of-eldoria.svg","/assets/art/events/champions-tournament.svg","/scripts/kingdom-3d.js","/scripts/kingdom-quality.js","/scripts/kingdom-materials.js","/scripts/pwa-runtime.js","/styles/android-experience.css","/scripts/cinematic/capture-system.js","/scripts/cinematic/media-recorder-support.js","/scripts/cinematic/trailer-script.js","/scripts/cinematic/recorder-ui.js","/assets/3d/manifest.json","/assets/art/landing-kingdom.svg","/assets/art/heroes/portraits.svg","/assets/art/skins/pantheon-relics.svg","/styles/heroes.css","/engine/asset-loader.js","/engine/resource-disposal.js","/engine/texture-manager.js","/equipment-ui.html","/equipment-system.js","/equipment-styles.css","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/navigation.js","/styles/navigation.css","/alliance.html","/styles/coi-theme.css","/styles/landing.css","/landing.js","/manifest.json","/icon-192.svg","/icon-512.svg","/favicon.svg","/logo.svg","/styles/premium-ui.css","/scripts/ambient-particles.js","/scripts/advanced-shaders.js","/offline.html","/styles/kingdom-4x-command.css","/scripts/kingdom-command-hud.js","/scripts/kingdom-command-state.js","/scripts/eldoria-realtime-client.js"];
+async function precacheApplicationShell() {
+ const cache = await caches.open(CACHE_NAME);
+ const manifestPath = "/vendor/three/asset-manifest.json";
+ const response = await fetch(manifestPath, { cache: "no-store" });
+ if (!response.ok) throw new Error("Manifesto Three.js local indisponível.");
+ const manifest = await response.json();
+ if (manifest?.format !== 1 || manifest?.threeVersion !== "0.187.0" || !Array.isArray(manifest.assets)) {
+  throw new Error("Manifesto Three.js inválido ou incompatível.");
+ }
+ if (!manifest.assets.every(path => typeof path === "string" && path.startsWith("/vendor/three/") && !path.includes(".."))) {
+  throw new Error("O manifesto Three.js contém caminhos não permitidos.");
+ }
+ await cache.addAll([...CORE_ASSETS, manifestPath, ...manifest.assets]);
+ await self.skipWaiting();
+}
+self.addEventListener("install", event => {
+ event.waitUntil(precacheApplicationShell());
 });
 
 // Keep application navigation available offline without caching arbitrary same-origin

@@ -5,6 +5,8 @@
   const modal = document.getElementById("install-modal");
   const installContent = document.getElementById("install-content");
   const installButton = document.getElementById("install-button");
+  const shareButton = document.getElementById("share-game-button");
+  const shareStatus = document.getElementById("share-game-status");
   const referralInput = document.getElementById("referral-link");
   const referralButton = document.getElementById("copy-referral");
   const referralStatus = document.getElementById("referral-status");
@@ -95,6 +97,45 @@
       }
     }
     showInstallGuide();
+  }
+
+  async function shareGame() {
+    const shareTarget = new URL("/", window.location.origin);
+    const referralCode = new URLSearchParams(window.location.search).get("ref");
+    if (referralCode && /^izzy_[a-f0-9]{32}$/.test(referralCode)) {
+      shareTarget.searchParams.set("ref", referralCode);
+    }
+    const shareUrl = shareTarget.href;
+    const payload = {
+      title: "Clash of Izzy",
+      text: "Construa seu reino, fortaleça seu exército e conquiste territórios.",
+      url: shareUrl
+    };
+    if (shareButton) shareButton.disabled = true;
+    if (shareStatus) shareStatus.textContent = "Preparando link de compartilhamento…";
+    try {
+      if (typeof navigator.share === "function") {
+        await navigator.share(payload);
+        if (shareStatus) shareStatus.textContent = "Link compartilhado.";
+        return;
+      }
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(shareUrl);
+        if (shareStatus) shareStatus.textContent = "Link copiado. Cole em uma conversa do WhatsApp, Facebook ou outro aplicativo.";
+        return;
+      }
+      const whatsappUrl = "https://wa.me/?text=" + encodeURIComponent(payload.text + " " + shareUrl);
+      window.open(whatsappUrl, "_blank", "noopener,noreferrer");
+      if (shareStatus) shareStatus.textContent = "Abrindo o WhatsApp para compartilhar o link.";
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        if (shareStatus) shareStatus.textContent = "Compartilhamento cancelado.";
+      } else if (shareStatus) {
+        shareStatus.textContent = "Não foi possível abrir o menu de compartilhamento. Copie o endereço do navegador.";
+      }
+    } finally {
+      if (shareButton) shareButton.disabled = false;
+    }
   }
 
   async function loadReferralLink() {
@@ -188,6 +229,7 @@
   });
 
   installButton?.addEventListener("click", handleInstallClick);
+  shareButton?.addEventListener("click", shareGame);
   document.querySelector(".install-close")?.addEventListener("click", closeInstallGuide);
   modal?.addEventListener("click", event => {
     if (event.target === modal) closeInstallGuide();

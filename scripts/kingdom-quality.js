@@ -1,5 +1,5 @@
-// Conservative, capability-based quality tiers for the WebGL kingdom renderer.
-// This deliberately avoids guessing Android thermal state from unsupported web APIs.
+// Perfis gráficos conservadores baseados em capacidade do dispositivo.
+// A largura CSS afeta o custo de sombras, não define a capacidade da GPU.
 export function selectKingdomQualityProfile({
   deviceMemory = 0,
   hardwareConcurrency = 4,
@@ -14,12 +14,12 @@ export function selectKingdomQualityProfile({
   const textureLimit = Math.max(0, Number(maxTextureSize) || 0);
   const dataSaver = saveData === true;
 
+  // A tela de 360–430 px é comum em Android e não deve rebaixar um aparelho capaz.
   const low = dataSaver
     || (memory > 0 && memory <= 4)
     || (cores > 0 && cores <= 4)
-    || width < 520
     || (textureLimit > 0 && textureLimit < 4096);
-  const high = !low && memory >= 8 && cores >= 8 && width >= 900 && textureLimit >= 8192;
+  const high = !low && memory >= 8 && cores >= 8 && textureLimit >= 8192;
   const tier = low ? "low" : high ? "high" : "balanced";
 
   return Object.freeze({
@@ -28,6 +28,8 @@ export function selectKingdomQualityProfile({
     shadows: !dataSaver && (tier === "high" || (tier === "balanced" && width > 1024)),
     shadowMapSize: tier === "high" ? 1536 : tier === "balanced" ? 1024 : 512,
     anisotropy: tier === "high" ? 8 : tier === "balanced" ? 4 : 2,
+    surfaceTextureSize: tier === "high" ? 512 : tier === "balanced" ? 256 : 128,
+    pbrMaps: tier !== "low",
     maxBuildings: tier === "low" ? 8 : tier === "balanced" ? 12 : 16,
     maxPixelCount: tier === "low" ? 1200000 : tier === "high" ? 4200000 : 2400000,
     loadOptionalAssets: !dataSaver,
@@ -35,8 +37,7 @@ export function selectKingdomQualityProfile({
   });
 }
 
-// Bound the drawing buffer by physical pixel count, not only devicePixelRatio.
-// This prevents tall/high-density mobile screens from multiplying GPU work.
+// Limita o buffer de desenho pelo número total de pixels, não só pelo DPR.
 export function calculateKingdomPixelRatio({ width, height, devicePixelRatio = 1, profile } = {}) {
   const safeWidth = Math.max(1, Number(width) || 1);
   const safeHeight = Math.max(1, Number(height) || 1);
@@ -44,6 +45,34 @@ export function calculateKingdomPixelRatio({ width, height, devicePixelRatio = 1
   const cap = Math.max(0.1, Number(profile?.pixelRatioCap) || 1);
   const budget = Math.max(250000, Number(profile?.maxPixelCount) || 1200000);
   const pixelBudgetCap = Math.sqrt(budget / (safeWidth * safeHeight));
-  // Do not impose a 0.5 floor: on extreme high-density viewports it can break the pixel budget.
   return Math.min(requested, cap, pixelBudgetCap);
+}
+
+// Mede intervalos entre callbacks requestAnimationFrame. Não representa tempo
+// de GPU nem garante FPS sustentado; a memória do sampler é limitada.
+export function createFrameTimingSampler(maxSamples = 120) {
+  const limit = Math.max(1, Math.min(600, Math.floor(Number(maxSamples) || 120)));
+  const samples = [];
+
+  return Object.freeze({
+    record(intervalMs) {
+      const value = Number(intervalMs);
+      if (!Number.isFinite(value) || value <= 0) return;
+      samples.push(value);
+      if (samples.length > limit) samples.shift();
+    },
+    reset() {
+      samples.length = 0;
+    },
+    snapshot() {
+      if (!samples.length) return { sampleCount: 0, p50Ms: null, p95Ms: null };
+      const sorted = [...samples].sort((a, b) => a - b);
+      const at = percentile => sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * percentile) - 1)];
+      return {
+        sampleCount: sorted.length,
+        p50Ms: Number(at(0.5).toFixed(2)),
+        p95Ms: Number(at(0.95).toFixed(2))
+      };
+    }
+  });
 }

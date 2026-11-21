@@ -39,20 +39,13 @@ export function calculatePetProgress(level, experience, gainedExperience, maxLev
   return { level: nextLevel, experience: nextExperience };
 }
 
-export async function getPetBonuses(env, kingdomId) {
+function petBonusesFromRow(row) {
   const empty = {
     activePetId: null,
     marchSpeedPercent: 0,
     infantryAttackPercent: 0,
     resourceProductionMultiplier: 1
   };
-  if (!env?.DB || !Number.isSafeInteger(Number(kingdomId)) || Number(kingdomId) <= 0) return empty;
-
-  const row = await env.DB.prepare(
-    "SELECT kp.pet_id,kp.level,pc.base_skill_json " +
-    "FROM kingdom_pets kp JOIN pet_catalog pc ON pc.id=kp.pet_id " +
-    "WHERE kp.kingdom_id=? AND kp.is_active=1 AND pc.active=1 LIMIT 1"
-  ).bind(Number(kingdomId)).first();
   if (!row) return empty;
 
   const skill = safeJson(row.base_skill_json);
@@ -71,8 +64,20 @@ export async function getPetBonuses(env, kingdomId) {
   return bonuses;
 }
 
+export async function getPetBonuses(env, kingdomId) {
+  if (!env?.DB || !Number.isSafeInteger(Number(kingdomId)) || Number(kingdomId) <= 0) {
+    return petBonusesFromRow(null);
+  }
+  const row = await env.DB.prepare(
+    "SELECT kp.pet_id,kp.level,pc.base_skill_json " +
+    "FROM kingdom_pets kp JOIN pet_catalog pc ON pc.id=kp.pet_id " +
+    "WHERE kp.kingdom_id=? AND kp.is_active=1 AND pc.active=1 LIMIT 1"
+  ).bind(Number(kingdomId)).first();
+  return petBonusesFromRow(row);
+}
+
 export async function getPetsState(env, kingdomId) {
-  const [rows, kingdom, bonuses] = await Promise.all([
+  const reads = await env.DB.batch([
     env.DB.prepare(
       "SELECT pc.id,pc.name,pc.description,pc.rarity,pc.base_skill_json,pc.icon,pc.unlock_cost_gold, " +
       "kp.level,kp.experience,kp.is_active,kp.acquired_at, " +
@@ -80,11 +85,18 @@ export async function getPetsState(env, kingdomId) {
       "FROM pet_catalog pc LEFT JOIN kingdom_pets kp " +
       "ON kp.pet_id=pc.id AND kp.kingdom_id=? " +
       "WHERE pc.active=1 ORDER BY CASE pc.rarity WHEN 'mythic' THEN 0 WHEN 'legendary' THEN 1 WHEN 'epic' THEN 2 WHEN 'rare' THEN 3 ELSE 4 END,pc.name"
-    ).bind(kingdomId).all(),
-    env.DB.prepare("SELECT gold FROM kingdoms WHERE id=?").bind(kingdomId).first(),
-    getPetBonuses(env, kingdomId)
+    ).bind(kingdomId),
+    env.DB.prepare("SELECT gold FROM kingdoms WHERE id=?").bind(kingdomId),
+    env.DB.prepare(
+      "SELECT kp.pet_id,kp.level,pc.base_skill_json " +
+      "FROM kingdom_pets kp JOIN pet_catalog pc ON pc.id=kp.pet_id " +
+      "WHERE kp.kingdom_id=? AND kp.is_active=1 AND pc.active=1 LIMIT 1"
+    ).bind(kingdomId)
   ]);
 
+  const rows = reads[0];
+  const kingdom = reads[1]?.results?.[0] || null;
+  const bonuses = petBonusesFromRow(reads[2]?.results?.[0] || null);
   const pets = (rows.results || []).map(row => ({
     ...row,
     is_owned: Number(row.is_owned) === 1,

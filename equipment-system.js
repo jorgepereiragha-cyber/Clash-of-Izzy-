@@ -1,7 +1,7 @@
 // Equipamentos persistentes: inventário e loadout são validados pelo Worker.
 (() => {
   const API="/api";
-  let token=null,state=null,selected="coroa_izzy",selectedHeroId=null,busy=false,searchFocusApplied=false;
+  let token=null,state=null,selected="iron_sword",selectedHeroId=null,busy=false,searchFocusApplied=false,lastSummonResults=[];
   const requestedSkinSearch=new URLSearchParams(location.search).get("search")||"";
   const normalizeSearch=value=>String(value||"").normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR");
   const $=id=>document.getElementById(id);
@@ -45,30 +45,87 @@
         card.append(title,description,level,cost,gate,button);return card;
       }));
     }
+    const progressionRoot=$("equipment-progression-grid");
+    if(progressionRoot){
+      progressionRoot.replaceChildren();
+      for(const path of (state?.equipmentProgression||[])){
+        const lane=document.createElement("section");lane.className="equipment-progression-lane";
+        const heading=document.createElement("h3");heading.textContent=path.label;
+        const stages=document.createElement("div");stages.className="equipment-progression-stages";
+        for(const stage of path.stages||[]){
+          const card=document.createElement("article");card.className="equipment-tier-card rarity-"+stage.rarity;
+          const rarity=document.createElement("span");rarity.className="equipment-tier-rarity";rarity.textContent=stage.tierLabel||stage.rarity;
+          const title=document.createElement("strong");title.textContent=(stage.icon||"⚔️")+" "+stage.name;
+          const status=document.createElement("small");
+          status.textContent=stage.owned?(stage.isLocked?"Possuída · bloqueada":"Adquirida · Nv. "+stage.level):stage.available?"Disponível para forjar":"Aguardando raridade anterior";
+          const stats=document.createElement("p");
+          const base=stage.base||{};
+          stats.textContent="Ataque "+formatGearStat("attack",base.attack||0)+" · Defesa "+formatGearStat("defense",base.defense||0)+" · Vida "+formatGearStat("health",base.health||0);
+          card.append(rarity,title,status,stats);
+          if(!stage.owned&&stage.available&&stage.craft){
+            const requirements=Object.entries(stage.requiredResearch||{});
+            const missing=requirements.filter(([key,required])=>(levels.get(key)||0)<required);
+            const enough=Number(state?.kingdom?.gold||0)>=Number(stage.craft.gold||0)&&Number(state?.kingdom?.iron||0)>=Number(stage.craft.iron||0);
+            const action=document.createElement("button");action.type="button";action.className="forge-action";
+            action.disabled=busy||missing.length>0||!enough;
+            action.textContent=!enough?"RECURSOS INSUFICIENTES":missing.length?"PESQUISE PRIMEIRO":"⚒️ FORJAR";
+            action.addEventListener("click",()=>perform({type:"equipment_craft",itemId:stage.id},"Equipamento "+stage.name+" forjado. A próxima raridade foi liberada."));
+            card.append(action);
+            if(missing.length){
+              const gate=document.createElement("small");
+              gate.textContent="Pesquisa necessária: "+missing.map(([key,required])=>(research.find(x=>x.id===key)?.name||key)+" Nv. "+required).join(", ");
+              card.append(gate);
+            }else{
+              const cost=document.createElement("small");
+              cost.textContent="Custo: "+fmt(stage.craft.gold)+" ouro · "+fmt(stage.craft.iron)+" ferro";
+              card.append(cost);
+            }
+          }else if(stage.requiresItem&&!stage.owned){
+            const dependency=document.createElement("small");
+            dependency.textContent="Requer: "+(state?.equipmentCatalog||[]).find(x=>x.id===stage.requiresItem)?.name;
+            card.append(dependency);
+          }
+          stages.append(card);
+        }
+        lane.append(heading,stages);progressionRoot.append(lane);
+      }
+    }
+    const pathItemIds=new Set((state?.equipmentProgression||[]).flatMap(path=>(path.stages||[]).map(stage=>stage.id)));
     const catalogGrid=$("forge-catalog-list");
     if(catalogGrid){
-      const available=(state?.equipmentCatalog||[]).filter(item=>item.craft&&!item.owned);
+      const available=(state?.equipmentCatalog||[]).filter(item=>item.craft&&!item.owned&&!pathItemIds.has(item.id));
       catalogGrid.replaceChildren(...(available.length?available.map(item=>{
         const card=document.createElement("article");card.className="forge-card";
         const title=document.createElement("h3");title.textContent=(item.icon||"⚔️")+" "+item.name;
-        const rarity=document.createElement("small");rarity.textContent=(item.rarity||"").toUpperCase()+" · "+(slotLabels[item.slot]||item.slot);
+        const rarity=document.createElement("small");rarity.textContent=(item.tierLabel||item.rarity||"").toUpperCase()+" · "+(slotLabels[item.slot]||item.slot);
         const description=document.createElement("p");description.textContent=item.description||"Equipamento forjado no reino.";
         const stats=document.createElement("p");stats.className="forge-stats";stats.textContent="Atributos iniciais: "+Object.entries(item.base||{}).map(([key,value])=>(labels[key]||key)+": "+formatGearStat(key,value)).join(" · ");
         const requirements=Object.entries(item.requiredResearch||{});
         const missing=requirements.filter(([key,required])=>(levels.get(key)||0)<required);
-        const requirementText=document.createElement("small");requirementText.textContent=missing.length?"Pesquisa necessária: "+missing.map(([key,required])=>(research.find(x=>x.id===key)?.name||key)+" Nv. "+required).join(", "):"Requisitos de pesquisa atendidos";
+        const predecessor=item.requiresItem?(state?.equipment||[]).find(x=>x.id===item.requiresItem):null;
+        const missingPredecessor=Boolean(item.requiresItem&&!predecessor);
+        const requirementText=document.createElement("small");
+        requirementText.textContent=missingPredecessor?"Requer: "+((state?.equipmentCatalog||[]).find(x=>x.id===item.requiresItem)?.name||item.requiresItem):missing.length?"Pesquisa necessária: "+missing.map(([key,required])=>(research.find(x=>x.id===key)?.name||key)+" Nv. "+required).join(", "):"Requisitos atendidos";
         const cost=document.createElement("p");cost.className="forge-cost";cost.textContent="Custo: "+fmt(item.craft.gold)+" ouro · "+fmt(item.craft.iron)+" ferro";
-        const button=document.createElement("button");button.type="button";button.className="forge-action";
         const enough=Number(state?.kingdom?.gold||0)>=Number(item.craft.gold||0)&&Number(state?.kingdom?.iron||0)>=Number(item.craft.iron||0);
-        button.disabled=busy||missing.length>0||!enough;
-        button.textContent=!enough?"RECURSOS INSUFICIENTES":missing.length?"PESQUISE PRIMEIRO":"⚒️ FORJAR";
-        button.addEventListener("click",()=>perform({type:"equipment_craft",itemId:item.id},"Equipamento "+item.name+" forjado e adicionado ao inventário."));
+        const button=document.createElement("button");button.type="button";button.className="forge-action";
+        button.disabled=busy||missing.length>0||!enough||missingPredecessor;
+        button.textContent=missingPredecessor?"FORJE A PEÇA ANTERIOR":!enough?"RECURSOS INSUFICIENTES":missing.length?"PESQUISE PRIMEIRO":"⚒️ FORJAR";
+        button.addEventListener("click",()=>perform({type:"equipment_craft",itemId:item.id},"Equipamento "+item.name+" forjado."));
         card.append(title,rarity,description,stats,requirementText,cost,button);return card;
-      }):[(()=>{const empty=document.createElement("p");empty.textContent="Todos os projetos disponíveis já foram forjados.";return empty;})()]));
+      }):[(()=>{const empty=document.createElement("p");empty.textContent="Nenhum projeto alternativo disponível.";return empty;})()]));
     }
     const bonus=state?.equipmentBonuses||{};
-    const summary=$("equipment-bonus-summary");
-    if(summary)summary.textContent="Bônus do herói ativo: Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%";
+    const summary=$("equipment-bonus-summary"),skinSummary=$("castle-skin-bonus-summary"),skin=state?.activeCastleSkin;
+    if(summary){
+      const setText=bonus.legendarySetActive===true?" · Conjunto completo: +1% Ataque / +1% Defesa / +0,5% Vida":"";
+      summary.textContent="Bônus do herói em combate: Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%"+setText;
+    }
+    if(skinSummary){
+      skinSummary.textContent=skin?.id
+        ?"Skin equipada: "+skin.name+" · Ataque +"+Number(skin.attackPercent||0).toFixed(2)+"% · Defesa +"+Number(skin.defensePercent||0).toFixed(2)+"%. Aplicada apenas enquanto esta skin continuar equipada."
+        :"Nenhuma skin paga equipada. Visuais cosméticos de coleção continuam sem bônus de combate.";
+    }
   }
   function renderNorseSkins(){
     const cosmetics=state?.cosmetics||{},catalog=cosmetics.skins||{},owned=new Set((cosmetics.owned||[]).map(item=>item.item_id));
@@ -86,16 +143,6 @@
       button.addEventListener("click",()=>perform({type:"cosmetic_buy",skin:id},"Skin "+skin.name+" adquirida."));
       card.append(title,rarity,description,button);return card;
     }));
-    if(requestedSkinSearch&&!searchFocusApplied){
-      const needle=normalizeSearch(requestedSkinSearch);
-      const matches=[...grid.children].filter(card=>normalizeSearch(card.textContent).includes(needle));
-      if(matches.length){
-        matches[0].style.outline="3px solid #ffe09a";
-        matches[0].scrollIntoView({behavior:"smooth",block:"center"});
-        setStatus("Skin localizada pela busca global: "+requestedSkinSearch+".");
-      }else setStatus("A skin pesquisada não foi encontrada no catálogo cosmético atual.");
-      searchFocusApplied=true;
-    }
     $("skin-gems").textContent="Gemas: "+fmt(state?.player?.gems);
     $("skin-shards").textContent="Fragmentos: "+fmt(cosmetics.shards);
     const collection=cosmetics.collections?.find(item=>item.id==="col_norse");
@@ -104,6 +151,325 @@
     const claim=$("claim-norse-collection");
     claim.disabled=busy||!complete||claimed;
     claim.textContent=claimed?"RECOMPENSA RESGATADA":complete?"RESGATAR COLEÇÃO · +5.000 GEMAS / 200 FRAGMENTOS":"COLEÇÃO "+skins.filter(([id])=>owned.has(id)).length+"/6";
+  }
+  function describeSkinBonuses(bonuses={}){
+    const fields=[["attackPercent","ATQ"],["defensePercent","DEF"],["healthPercent","VIDA"],["criticalChancePercent","CRÍT"]];
+    const parts=fields.map(([key,label])=>{
+      const value=Number(bonuses[key]||0);
+      return value>0?label+" +"+value.toFixed(2)+"%":null;
+    }).filter(Boolean);
+    return parts.length?parts.join(" · "):"Nenhum bônus ativo";
+  }
+  function renderPantheonSkinSets(){
+    const root=$("pantheon-skin-set-grid");
+    if(!root)return;
+    const cosmetics=state?.cosmetics||{};
+    const sets=Array.isArray(cosmetics.skinSets)?cosmetics.skinSets:[];
+    root.replaceChildren();
+    if(!sets.length){
+      const empty=document.createElement("p");
+      empty.className="pantheon-empty-state";
+      empty.textContent="As coleções de relíquias serão exibidas aqui quando o catálogo estiver disponível.";
+      root.append(empty);
+    }else{
+      const accents={
+        egyptian_solar_court:"#d7a94b",
+        sumerian_first_light:"#c88b54",
+        mesopotamian_ishtar_gate:"#4c9dc3",
+        poseidon_abyssal_tide:"#53b4bf"
+      };
+      for(const set of sets){
+        const card=document.createElement("article");
+        card.className="pantheon-set-card";
+        card.dataset.setId=String(set.id||"");
+        card.dataset.theme=String(set.theme||"");
+        card.style.setProperty("--pantheon-accent",accents[set.id]||"#c8a56a");
+
+        const header=document.createElement("header");
+        header.className="pantheon-set-header";
+        const emblem=document.createElement("span");
+        emblem.className="pantheon-set-emblem";
+        emblem.setAttribute("aria-hidden","true");
+        emblem.textContent=set.icon||"✧";
+        const heading=document.createElement("div");
+        heading.className="pantheon-set-heading";
+        const title=document.createElement("h3");
+        title.textContent=set.name||"Conjunto ancestral";
+        const subtitle=document.createElement("p");
+        subtitle.textContent=set.subtitle||set.theme||"Relíquias lendárias";
+        heading.append(title,subtitle);
+        const count=document.createElement("strong");
+        count.className="pantheon-set-count";
+        const equippedCount=Math.max(0,Number(set.equippedCount)||0);
+        const totalPieces=Math.max(1,Number(set.totalPieces)||5);
+        count.textContent=equippedCount+"/"+totalPieces;
+        header.append(emblem,heading,count);
+
+        const description=document.createElement("p");
+        description.className="pantheon-set-description";
+        description.textContent=set.description||"Cinco peças ancestrais formam este conjunto.";
+
+        const progress=document.createElement("div");
+        progress.className="pantheon-set-progress";
+        progress.setAttribute("role","progressbar");
+        progress.setAttribute("aria-label","Peças equipadas de "+(set.name||"conjunto"));
+        progress.setAttribute("aria-valuemin","0");
+        progress.setAttribute("aria-valuemax",String(totalPieces));
+        progress.setAttribute("aria-valuenow",String(Math.min(totalPieces,equippedCount)));
+        const fill=document.createElement("span");
+        fill.style.width=(Math.min(totalPieces,equippedCount)/totalPieces*100)+"%";
+        progress.append(fill);
+
+        const milestones=document.createElement("div");
+        milestones.className="pantheon-set-milestones";
+        const active=Array.isArray(set.activeThresholds)?set.activeThresholds:[];
+        for(const threshold of active){
+          const milestone=document.createElement("span");
+          milestone.className="pantheon-milestone is-active";
+          milestone.textContent="✓ "+threshold.label;
+          milestones.append(milestone);
+        }
+        const next=set.nextThreshold;
+        const nextLine=document.createElement("p");
+        nextLine.className="pantheon-next-threshold";
+        nextLine.textContent=next
+          ?"Próximo marco ("+next.pieces+" peças): "+next.label+" · "+describeSkinBonuses(next.bonuses)
+          :"Todos os marcos deste panteão estão ativos.";
+        const activeBonus=document.createElement("p");
+        activeBonus.className="pantheon-active-bonus";
+        activeBonus.textContent="Bônus equipado: "+describeSkinBonuses(set.activeBonuses||{});
+
+        const items=document.createElement("div");
+        items.className="pantheon-relic-grid";
+        for(const item of (Array.isArray(set.items)?set.items:[])){
+          const itemCard=document.createElement("article");
+          itemCard.className="pantheon-relic-card";
+          itemCard.dataset.itemId=String(item.id||"");
+          itemCard.dataset.equipped=String(Boolean(item.equipped));
+
+          const art=document.createElementNS("http://www.w3.org/2000/svg","svg");
+          art.setAttribute("class","pantheon-relic-art");
+          art.setAttribute("viewBox","0 0 160 160");
+          art.setAttribute("role","img");
+          art.setAttribute("aria-label",item.name||"Relíquia ancestral");
+          const use=document.createElementNS("http://www.w3.org/2000/svg","use");
+          use.setAttribute("href","/assets/art/skins/pantheon-relics.svg#"+String(item.id||""));
+          art.append(use);
+
+          const details=document.createElement("div");
+          details.className="pantheon-relic-details";
+          const name=document.createElement("strong");
+          name.textContent=item.name||"Relíquia";
+          const slot=document.createElement("span");
+          slot.className="pantheon-relic-slot";
+          slot.textContent=item.slotLabel||item.slot||"Peça";
+          const visual=document.createElement("p");
+          visual.textContent=item.visual||"Artefato ancestral de acabamento único.";
+          const rarity=document.createElement("small");
+          rarity.textContent=item.rarity||"Lendária";
+          details.append(name,slot,visual,rarity);
+
+          const button=document.createElement("button");
+          button.type="button";
+          button.className="pantheon-skin-action";
+          button.disabled=busy;
+          button.textContent=item.equipped
+            ?"DESEQUIPAR"
+            :item.owned?"EQUIPAR":"COMPRAR · "+fmt(item.price)+" gemas";
+          button.setAttribute("aria-label",button.textContent+" "+(item.name||"relíquia"));
+          button.addEventListener("click",()=>{
+            if(item.equipped){
+              perform({type:"skin_set_unequip",slot:item.slot},"Relíquia "+item.name+" removida.");
+            }else if(item.owned){
+              perform({type:"skin_set_equip",itemId:item.id},"Relíquia "+item.name+" equipada.");
+            }else{
+              perform({type:"cosmetic_buy",skin:item.id},"Relíquia "+item.name+" adquirida.");
+            }
+          });
+          itemCard.append(art,details,button);
+          items.append(itemCard);
+        }
+        card.append(header,description,progress,milestones,nextLine,activeBonus,items);
+        root.append(card);
+      }
+    }
+    const summary=$("pantheon-set-bonus-summary");
+    if(summary)summary.textContent="Bônus combinados em combate: "+describeSkinBonuses(cosmetics.skinSetBonuses||{});
+  }
+  function focusSearchedSkin(){
+    if(!requestedSkinSearch||searchFocusApplied)return;
+    const roots=[$("norse-skin-list"),$("pantheon-skin-set-grid")].filter(Boolean);
+    const cards=roots.flatMap(root=>Array.from(root.querySelectorAll(".norse-skin-card,.pantheon-relic-card")));
+    const needle=normalizeSearch(requestedSkinSearch);
+    const match=cards.find(card=>normalizeSearch(card.textContent).includes(needle));
+    if(match){
+      match.style.outline="3px solid #ffe09a";
+      match.scrollIntoView({behavior:"smooth",block:"center"});
+      setStatus("Skin localizada pela busca global: "+requestedSkinSearch+".");
+    }else{
+      setStatus("A skin pesquisada não foi encontrada no catálogo cosmético atual.");
+    }
+    searchFocusApplied=true;
+  }
+  function renderHeroGallery(){
+    const root=$("hero-roster-grid"),count=$("hero-roster-count");
+    if(!root)return;
+    const roster=Array.isArray(state?.heroInventory)?state.heroInventory:[];
+    const owned=Array.isArray(state?.heroes)?state.heroes:[];
+    if(count)count.textContent=roster.length+" herói(s) no inventário";
+    root.replaceChildren();
+    if(!roster.length){
+      const empty=document.createElement("p");
+      empty.textContent="Nenhum herói encontrado. A coleção será exibida aqui depois da primeira convocação.";
+      root.append(empty);
+      return;
+    }
+    const statLabels={hp:"Vida",attack:"Ataque",defense:"Defesa",speed:"Velocidade"};
+    for(const hero of roster){
+      const boundHero=owned.find(row=>row.hero_key===hero.hero_key);
+      const heroId=Number(boundHero?.id)||null;
+      const selected=Boolean(heroId&&heroId===selectedHeroId);
+      const card=document.createElement("article");
+      card.className="hero-roster-card"+(selected?" is-selected":"");
+      if(hero.theme_key)card.dataset.heroTheme=String(hero.theme_key);
+      if(hero.aura_key)card.dataset.heroAura=String(hero.aura_key);
+      const portrait=document.createElementNS("http://www.w3.org/2000/svg","svg");
+      portrait.setAttribute("class","hero-roster-portrait");
+      portrait.setAttribute("viewBox","0 0 320 480");
+      portrait.setAttribute("role","img");
+      portrait.setAttribute("aria-label",hero.portrait_alt||hero.name||"Retrato de herói");
+      const use=document.createElementNS("http://www.w3.org/2000/svg","use");
+      use.setAttribute("href","/assets/art/heroes/portraits.svg#"+String(hero.portrait_symbol||"commander"));
+      use.setAttribute("width","320");
+      use.setAttribute("height","480");
+      portrait.append(use);
+
+      const copy=document.createElement("div");
+      copy.className="hero-roster-copy";
+      const name=document.createElement("h3");
+      name.className="hero-roster-name";
+      name.textContent=hero.name||hero.hero_key||"Herói";
+      const title=document.createElement("p");
+      title.className="hero-roster-title";
+      title.textContent=hero.title||"Campeão de Eldoria";
+      const meta=document.createElement("div");
+      meta.className="hero-roster-meta";
+      const level=document.createElement("span");
+      level.textContent="Nv. "+Number(hero.level||1)+"/"+Number(hero.max_level||1);
+      const rarity=document.createElement("span");
+      rarity.textContent=hero.rarity_label||"Comum";
+      const stars=document.createElement("span");
+      stars.className="hero-roster-stars";
+      stars.textContent="★".repeat(Math.max(1,Number(hero.stars)||1))+"☆".repeat(Math.max(0,Number(hero.max_stars||1)-Number(hero.stars||1)));
+      stars.setAttribute("aria-label",Number(hero.stars||1)+" de "+Number(hero.max_stars||1)+" estrelas");
+      meta.append(level,rarity,stars);
+
+      const stats=document.createElement("div");
+      stats.className="hero-roster-stats";
+      for(const [key,label] of Object.entries(statLabels)){
+        const value=Number(hero.stats?.[key]);
+        if(!Number.isFinite(value))continue;
+        const line=document.createElement("span");
+        line.textContent=label+": "+Math.floor(value).toLocaleString("pt-BR");
+        stats.append(line);
+      }
+      const bonuses=hero.combat_bonuses||{};
+      const combat=document.createElement("p");
+      combat.className="hero-roster-combat";
+      combat.textContent="Passivos de batalha: ATQ +"+Number(bonuses.attackPercent||0).toFixed(1)+
+        "% · DEF +"+Number(bonuses.defensePercent||0).toFixed(1)+
+        "% · Vida +"+Number(bonuses.healthPercent||0).toFixed(1)+
+        "% · Crítico +"+Number(bonuses.criticalChancePercent||0).toFixed(1)+"%";
+      const skill=document.createElement("p");
+      skill.className="hero-roster-skill";
+      const skillName=document.createElement("strong");
+      skillName.textContent=(hero.skill||"Talento")+" · ";
+      const skillDesc=document.createTextNode(hero.skill_description||"Habilidade do herói");
+      skill.append(skillName,skillDesc);
+      const fragments=document.createElement("p");
+      fragments.className="hero-roster-fragments";
+      fragments.textContent="Fragmentos: "+Number(hero.fragments||0).toLocaleString("pt-BR")+
+        (hero.fragments_to_next?" · Próxima estrela: "+hero.fragments_to_next:" · Estrelas máximas");
+      copy.append(name,title,meta,stats,combat,skill,fragments);
+
+      const button=document.createElement("button");
+      button.type="button";
+      button.className="hero-roster-select";
+      button.textContent=selected?"Selecionado para equipamento":"Usar para equipar";
+      button.disabled=!heroId||busy||selected;
+      button.setAttribute("aria-pressed",String(selected));
+      button.addEventListener("click",()=>{
+        if(!heroId)return;
+        selectedHeroId=heroId;
+        const picker=$("hero-select");
+        if(picker)picker.value=String(heroId);
+        render();
+      });
+      const details=document.createElement("div");
+      details.append(copy,button);
+      card.append(portrait,details);
+      root.append(card);
+    }
+  }
+  function renderSummonOdds(){
+    const root=$("hero-summon-rates");
+    if(!root)return;
+    const rows=Array.isArray(state?.heroSummonOdds)?state.heroSummonOdds:[];
+    const labels={white:"Comum",blue:"Raro",purple:"Lendário"};
+    root.replaceChildren();
+    for(const row of rows){
+      const card=document.createElement("div");
+      const title=document.createElement("strong");
+      title.textContent=(labels[row.rarity]||row.rarity)+" · "+Number(row.chancePercent||0).toLocaleString("pt-BR")+"%";
+      const detail=document.createElement("span");
+      detail.textContent=Number(row.heroCount||0)+" herói(s) · "+Number(row.perHeroPercent||0).toLocaleString("pt-BR",{maximumFractionDigits:2})+"% por herói";
+      card.append(title,detail);
+      root.append(card);
+    }
+    if(!rows.length){
+      const empty=document.createElement("p");
+      empty.textContent="Probabilidades indisponíveis; tente sincronizar novamente.";
+      root.append(empty);
+      return;
+    }
+    const legendary=rows.find(row=>row.rarity==="purple");
+    const rarityChance=Number(legendary?.chancePercent);
+    const perHeroChance=Number(legendary?.perHeroPercent);
+    if(Number.isFinite(rarityChance)&&Number.isFinite(perHeroChance)&&rarityChance>0&&perHeroChance>0){
+      const chanceInTen=percent=>100*(1-Math.pow(1-Math.max(0,Math.min(100,percent))/100,10));
+      const formatPercent=value=>value.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
+      const note=document.createElement("p");
+      note.className="hero-summon-intro hero-summon-probability-note";
+      note.textContent="Pacote de 10 convocações independentes: "+formatPercent(chanceInTen(rarityChance))+"% para obter ao menos 1 Lendário; "+formatPercent(chanceInTen(perHeroChance))+"% para obter um Lendário específico. Não há garantia.";
+      root.append(note);
+    }
+  }
+  function renderSummonControls(){
+    const gems=$("hero-gem-balance"),one=$("hero-summon-one"),ten=$("hero-summon-ten");
+    const balance=Math.max(0,Number(state?.player?.gems)||0);
+    if(gems)gems.textContent="Gemas: "+fmt(balance);
+    if(one)one.disabled=busy||balance<100;
+    if(ten)ten.disabled=busy||balance<900;
+  }
+  function renderSummonResults(){
+    const root=$("hero-summon-results");
+    if(!root)return;
+    root.replaceChildren();
+    if(!lastSummonResults.length)return;
+    for(const summon of lastSummonResults){
+      const card=document.createElement("div");
+      card.className="hero-summon-result";
+      const name=document.createElement("strong");
+      name.textContent=summon.name||summon.hero_key||"Herói";
+      const rarity=document.createElement("span");
+      rarity.textContent=({white:"Comum",blue:"Raro",purple:"Lendário"})[summon.rarity]||summon.rarity||"Herói";
+      const outcome=document.createElement("small");
+      outcome.textContent=summon.result_type==="duplicate"
+        ? "Duplicado · +"+Number(summon.fragments||0)+" fragmentos"
+        : "Novo herói recrutado";
+      card.append(name,rarity,outcome);
+      root.append(card);
+    }
   }
   function render(){
     const container=document.querySelector(".mobile-equipment-container");
@@ -139,6 +505,10 @@
     }
     heroPicker.disabled=busy||!heroes.length;
     const selectedHero=heroes.find(hero=>Number(hero.id)===selectedHeroId);
+    renderHeroGallery();
+    renderSummonOdds();
+    renderSummonControls();
+    renderSummonResults();
     $("item-name").textContent=item.name;
     $("current-level").textContent=item.level;
     $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";
@@ -161,6 +531,8 @@
     if(!heroes.length)setStatus("Convoque um herói para usar seus equipamentos. O inventário já está salvo.",true);
     else if(selectedHero)setStatus("Herói selecionado: "+(selectedHero.hero_name||selectedHero.hero_key)+". Cada slot aceita um item.");
     renderNorseSkins();
+    renderPantheonSkinSets();
+    focusSearchedSkin();
     renderForge();
   }
   async function refresh(){
@@ -170,8 +542,25 @@
   }
   async function perform(action,success){
     if(busy)return;busy=true;render();
-    try{const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(action)});state=result.state;setStatus(success);}
-    catch(error){setStatus(error.message,true);try{await refresh()}catch{}}
+    try{
+      const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(action)});
+      state=result.state;
+      if(action.type==="hero_summon"){
+        lastSummonResults=Array.isArray(result.battle?.summons)?result.battle.summons:[];
+        const status=$("hero-summon-status");
+        if(status){
+          const newCount=lastSummonResults.filter(item=>item.result_type==="new").length;
+          const duplicateCount=lastSummonResults.length-newCount;
+          status.textContent="Convocação concluída: "+newCount+" herói(s) novo(s) e "+duplicateCount+" duplicado(s).";
+        }
+      }else setStatus(success);
+    }
+    catch(error){
+      if(action.type==="hero_summon"){
+        const status=$("hero-summon-status");if(status)status.textContent=error.message;
+      }else setStatus(error.message,true);
+      try{await refresh()}catch{}
+    }
     finally{busy=false;render();}
   }
   window.upgradeEquipment=()=>perform({type:"equipment_upgrade",itemId:selected},"Equipamento evoluído e salvo no servidor.");
@@ -189,6 +578,8 @@
     $("equip-btn").addEventListener("click",()=>window.equipEquipment());
     $("unequip-btn").addEventListener("click",()=>window.unequipEquipment());
     $("claim-norse-collection").addEventListener("click",()=>window.claimNorseCollection());
+    $("hero-summon-one").addEventListener("click",()=>perform({type:"hero_summon",quantity:1},"Convocação realizada."));
+    $("hero-summon-ten").addEventListener("click",()=>perform({type:"hero_summon",quantity:10},"Convocação realizada."));
     refresh().catch(error=>setStatus(error.message,true));
   });
 })();

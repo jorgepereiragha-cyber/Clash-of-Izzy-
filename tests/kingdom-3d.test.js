@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { selectKingdomQualityProfile, calculateKingdomPixelRatio } from "../scripts/kingdom-quality.js";
+import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler } from "../scripts/kingdom-quality.js";
 
 const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
@@ -9,7 +9,7 @@ const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json",
 
 test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(kingdom, /type="module" src="\/scripts\/kingdom-3d\.js"/);
-  assert.match(kingdom, /drawKingdomScene\(buildings\)/);
+  assert.match(kingdom, /drawKingdomScene\(buildings,Number\(k\.equipped_skin_id\|\|0\)\)/);
   assert.match(renderer, /new THREE\.WebGLRenderer/);
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
   assert.match(renderer, /coi:kingdom-render/);
@@ -18,7 +18,7 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.ok(renderer.includes("new THREE.InstancedMesh"));
   assert.match(renderer, /addForestInstances/);
   assert.match(kingdom, /type="importmap"/);
-  assert.ok(kingdom.includes('"three":"https://cdn.jsdelivr.net'));
+  assert.ok(kingdom.includes('"three":"/vendor/three/build/three.module.js"'));
 });
 
 test("bundled CC0 models can render props and only display units present in the army", () => {
@@ -30,7 +30,7 @@ test("bundled CC0 models can render props and only display units present in the 
   assert.match(renderer, /cloneSkinned\(asset\.template\)/);
   assert.match(renderer, /new THREE\.AnimationMixer\(root\)/);
   assert.match(kingdom, /window\.__coiKingdomTroops=state\.troops\|\|\[\]/);
-  assert.match(kingdom, /detail:\{buildings,troops:state\.troops\|\|\[\]\}/);
+  assert.match(kingdom, /detail:\{buildings,troops:state\.troops\|\|\[\],castleSkinId:Number\(k\.equipped_skin_id\|\|0\)\}/);
 });
 
 test("quality profile uses the real viewport while the kingdom panel is initially hidden", () => {
@@ -275,4 +275,82 @@ test("failed optional GLB downloads preserve procedural models and allow later r
   assert.ok(renderer.includes("GLB assets not ready; procedural models remain active"));
   assert.ok(renderer.includes("glbLoadPromises.delete(key)"));
   assert.ok(renderer.includes("manifestLoad = null"));
+});
+
+
+test("a narrow Android viewport does not downgrade capable GPU hardware", () => {
+  const high = selectKingdomQualityProfile({ deviceMemory: 8, hardwareConcurrency: 8, viewportWidth: 390, maxTextureSize: 8192 });
+  const balanced = selectKingdomQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, viewportWidth: 390, maxTextureSize: 8192 });
+  assert.equal(high.tier, "high");
+  assert.equal(high.surfaceTextureSize, 512);
+  assert.equal(balanced.tier, "balanced");
+  assert.equal(balanced.surfaceTextureSize, 256);
+});
+
+test("procedural material texels scale from 128 to 256 and 512 without coarse high-tier grain", () => {
+  const low = selectKingdomQualityProfile({ deviceMemory: 4, hardwareConcurrency: 4, viewportWidth: 390, maxTextureSize: 4096 });
+  const balanced = selectKingdomQualityProfile({ deviceMemory: 6, hardwareConcurrency: 6, viewportWidth: 390, maxTextureSize: 8192 });
+  const high = selectKingdomQualityProfile({ deviceMemory: 8, hardwareConcurrency: 8, viewportWidth: 390, maxTextureSize: 8192 });
+  assert.equal(low.surfaceTextureSize, 128);
+  assert.equal(balanced.surfaceTextureSize, 256);
+  assert.equal(high.surfaceTextureSize, 512);
+  assert.equal(low.pbrMaps, false);
+  assert.equal(balanced.pbrMaps, true);
+  assert.equal(high.pbrMaps, true);
+  assert.match(renderer, /const textureSize = qualityProfile\?\.surfaceTextureSize \|\| 128/);
+  assert.match(renderer, /ctx\.setTransform\(detailScale, 0, 0, detailScale, 0, 0\)/);
+  assert.match(renderer, /const grainCount = Math\.round\(1200 \* detailScale \* detailScale\)/);
+  assert.match(renderer, /ctx\.setTransform\(1, 0, 0, 1, 0, 0\)/);
+  assert.match(renderer, /rand\(\) \* textureSize/);
+});
+
+test("the requestAnimationFrame sampler is bounded and reports callback intervals", () => {
+  const sampler = createFrameTimingSampler(3);
+  assert.deepEqual(sampler.snapshot(), { sampleCount: 0, p50Ms: null, p95Ms: null });
+  sampler.record(16.67);
+  sampler.record(20);
+  sampler.record(33.33);
+  sampler.record(10);
+  sampler.record(-2);
+  assert.deepEqual(sampler.snapshot(), { sampleCount: 3, p50Ms: 20, p95Ms: 33.33 });
+  sampler.reset();
+  assert.equal(sampler.snapshot().sampleCount, 0);
+});
+
+test("army and optional shader animation pause when hidden or outside the viewport", () => {
+  assert.match(renderer, /function canRunArmyAnimation\(\)/);
+  assert.match(renderer, /!document\.hidden && sceneInViewport/);
+  assert.match(renderer, /new IntersectionObserver\(/);
+  assert.match(renderer, /document\.addEventListener\("visibilitychange", visibilityChangeHandler\)/);
+  assert.match(renderer, /sceneVisibilityObserver\?\.disconnect\(\)/);
+  assert.match(renderer, /animationLoop: \{ active: Boolean\(animationFrame\)/);
+  assert.match(renderer, /animationFrameTiming\.snapshot\(\)/);
+});
+
+
+test("procedural PBR material maps are attached and disposed as owned GPU resources", () => {
+  assert.match(renderer, /import \{ derivePbrTextureData \} from "\.\/kingdom-materials\.js"/);
+  assert.match(renderer, /textureSet\.normalMap = createLinearMap\(derived\.normalData\)/);
+  assert.match(renderer, /textureSet\.roughnessMap = createLinearMap\(derived\.roughnessData\)/);
+  assert.match(renderer, /mat\.normalMap = textureSet\.normalMap/);
+  assert.match(renderer, /mat\.roughnessMap = textureSet\.roughnessMap/);
+  assert.match(renderer, /for \(const textureSet of surfaceTextureCache\.values\(\)\)/);
+  assert.match(renderer, /if \(texture\?\.isTexture\) resources\.textures\.add\(texture\)/);
+  assert.match(renderer, /pbrMaps: qualityProfile\.pbrMaps/);
+});
+
+
+test("the city ambient layer is loaded and respects Android power and lifecycle preferences", async () => {
+  const ambient = await readFile(new URL("../scripts/ambient-particles.js", import.meta.url), "utf8");
+  assert.match(kingdom, /scripts\/ambient-particles\.js/);
+  assert.match(ambient, /prefers-reduced-motion/);
+  assert.match(ambient, /saveData/);
+  assert.match(ambient, /navigator\.deviceMemory/);
+  assert.match(ambient, /new IntersectionObserver/);
+  assert.match(ambient, /document\.addEventListener\("visibilitychange"/);
+  assert.match(ambient, /if \(event\.persisted\)/);
+  assert.match(ambient, /setAttribute\("aria-hidden", "true"\)/);
+  assert.doesNotMatch(ambient, /new THREE\.WebGLRenderer/);
+  assert.match(ambient, /FRAME_INTERVAL_MS = 1000 \/ 30/);
+  assert.match(ambient, /timestamp - lastFrame < FRAME_INTERVAL_MS/);
 });

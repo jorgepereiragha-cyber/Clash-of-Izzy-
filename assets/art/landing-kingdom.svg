@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="900" height="900" viewBox="0 0 900 900" role="img" aria-labelledby="title desc">
+<title id="title">O reino de Clash of Izzy</title>
+<desc id="desc">Castelo medieval de pedra com telhados azul-real e detalhes dourados, cercado por muralhas, florestas, montanhas e um rio.</desc>
+<defs>
+  <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#142b45"/><stop offset=".58" stop-color="#42647a"/><stop offset="1" stop-color="#b7a77e"/></linearGradient>
+  <linearGradient id="land" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#688753"/><stop offset="1" stop-color="#293f35"/></linearGradient>
+  <linearGradient id="stone" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e0d4b4"/><stop offset=".52" stop-color="#a99d82"/><stop offset="1" stop-color="#6f7269"/></linearGradient>
+  <linearGradient id="roof" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#4f7da3"/><stop offset=".45" stop-color="#24476b"/><stop offset="1" stop-color="#142a43"/></linearGradient>
+  <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#ffe9ad"/><stop offset=".5" stop-color="#e7bd68"/><stop offset="1" stop-color="#95632e"/></linearGradient>
+  <linearGradient id="river" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#9ad2d8"/><stop offset=".48" stop-color="#438ba0"/><stop offset="1" stop-color="#1d4a68"/></linearGradient>
+  <linearGradient id="road" x1="0" y1="0" x2="0" y2="1"><stop stop-color="#a9936c"/><stop offset="1" stop-color="#594c3c"/></linearGradient>
+  <pattern id="stoneBlocks" width="76" height="42" patternUnits="userSpaceOnUse"><path d="M0 1H76M0 41H76M38 1V21M0 21H76M12 21V41" fill="none" stroke="#535b59" stroke-opacity=".27" stroke-width="2"/></pattern>
+  <pattern id="roofTiles" width="28" height="18" patternUnits="userSpaceOnUse"><path d="M0 1H28M14 1V18" fill="none" stroke="#b6d1df" stroke-opacity=".35" stroke-width="2"/></pattern>
+  <pattern id="grassGrain" width="34" height="34" patternUnits="userSpaceOnUse"><path d="M5 23l3-7m13 15 2-6m3-16 3-5" stroke="#d7d69c" stroke-opacity=".26" stroke-width="2" stroke-linecap="round"/></pattern>
+  <filter id="shadow" x="-30%" y="-30%" width="160%" height="170%"><feGaussianBlur stdDeviation="18"/></filter>
+  <filter id="softGlow" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="18"/></filter>
+  <g id="pine"><path d="M0 0-33 52H-15L-42 89H42L15 52H33Z" fill="#183b35" stroke="#9eaa70" stroke-opacity=".34" stroke-width="3"/><path d="M-5 80H5V112H-5Z" fill="#5b4631"/></g>
+  <g id="banner"><path d="M0 0V92" stroke="#e7bd68" stroke-width="7"/><path d="M2 5H48L38 28 48 51H2Z" fill="#24476b" stroke="#f1d18d" stroke-width="3"/><path d="M10 14l15 25 15-25" fill="none" stroke="#e7bd68" stroke-width="3"/></g>
+</defs>
+<rect width="900" height="900" fill="url(#sky)"/>
+<circle cx="710" cy="170" r="86" fill="#ffe4a4" opacity=".13" filter="url(#softGlow)"/>
+<circle cx="710" cy="170" r="45" fill="#f5d99c" opacity=".82"/>
+<path d="M0 420 130 260 220 350 340 205 460 360 580 245 700 365 810 250 900 365V580H0Z" fill="#536d73"/>
+<path d="M0 455 145 330 255 430 390 290 500 430 640 315 760 440 900 335V610H0Z" fill="#344f51"/>
+<path d="M0 505Q155 440 290 495T570 485T900 465V900H0Z" fill="url(#land)"/>
+<path d="M0 505Q155 440 290 495T570 485T900 465V900H0Z" fill="url(#grassGrain)" opacity=".75"/>
+<path d="M770 430C710 500 785 560 728 620S660 735 712 900H900V430Z" fill="url(#river)" opacity=".94"/>
+<path d="M790 452C740 520 810 555 750 628S700 752 748 900" fill="none" stroke="#c0e7e6" stroke-opacity=".38" stroke-width="8"/>
+<path d="M460 660C490 730 420 775 462 900H595C530 788 608 730 555 660Z" fill="url(#road)" stroke="#d0bb8f" stroke-opacity=".28" stroke-width="5"/>
+<path d="M490 700Q520 785 510 900" fill="none" stroke="#e6d2a6" stroke-opacity=".25" stroke-width="5" stroke-dasharray="18 24"/>
+<ellipse cx="450" cy="690" rx="330" ry="78" fill="#101a20" opacity=".38" filter="url(#shadow)"/>
+<g stroke="#5d625d" stroke-width="7" stroke-linejoin="round">
+  <path d="M150 590 205 548H695L750 590V710H150Z" fill="url(#stone)"/>
+  <path d="M150 590 205 548H695L750 590" fill="none" stroke="#f1dfb7" stroke-width="10"/>
+  <path d="M150 590H750V710H150Z" fill="url(#stoneBlocks)" opacity=".82" stroke="none"/>
+  <path d="M130 570H215V735H130Z" fill="url(#stone)"/><path d="M685 570H770V735H685Z" fill="url(#stone)"/>
+  <path d="M130 570 172 510 215 570Z" fill="url(#roof)"/><path d="M685 570 727 510 770 570Z" fill="url(#roof)"/>
+  <path d="M130 570 172 510 215 570Z M685 570 727 510 770 570Z" fill="url(#roofTiles)" stroke="none"/>
+  <path d="M130 735H215M685 735H770" stroke="#e7bd68" stroke-width="9"/>
+  <path d="M155 555V535H173V555M190 555V535H208V555M710 555V535H728V555M745 555V535H763V555" fill="#c6b99c" stroke="#6c716b" stroke-width="5"/>
+</g>
+<g stroke="#565e5b" stroke-width="7" stroke-linejoin="round">
+  <path d="M315 485H585V670H315Z" fill="url(#stone)"/>
+  <path d="M315 485H585V670H315Z" fill="url(#stoneBlocks)" opacity=".78" stroke="none"/>
+  <path d="M286 488 450 315 614 488Z" fill="url(#roof)"/>
+  <path d="M286 488 450 315 614 488Z" fill="url(#roofTiles)" opacity=".78" stroke="none"/>
+  <path d="M342 486 450 374 558 486Z" fill="none" stroke="#7da2ba" stroke-opacity=".4" stroke-width="5"/>
+  <path d="M382 670V568Q450 510 518 568V670Z" fill="#253f53"/>
+  <path d="M421 670V594Q450 563 479 594V670Z" fill="#101a2b"/>
+  <path d="M404 671H496" stroke="#e7bd68" stroke-width="12"/>
+  <path d="M352 552H390V612H352ZM510 552H548V612H510Z" fill="#263d4f" stroke="#e7bd68" stroke-width="5"/>
+  <path d="M365 565H378V599H365ZM523 565H536V599H523Z" fill="#f3d48f" stroke="none"/>
+  <path d="M330 395H394V535H330Z" fill="url(#stone)"/><path d="M506 395H570V535H506Z" fill="url(#stone)"/>
+  <path d="M330 395H394V535H330Z M506 395H570V535H506Z" fill="url(#stoneBlocks)" opacity=".7" stroke="none"/>
+  <path d="M315 400 362 320 409 400Z" fill="url(#roof)"/><path d="M491 400 538 320 585 400Z" fill="url(#roof)"/>
+  <path d="M315 400 362 320 409 400Z M491 400 538 320 585 400Z" fill="url(#roofTiles)" opacity=".7" stroke="none"/>
+  <path d="M320 399H404M496 399H580" stroke="#e7bd68" stroke-width="8"/>
+  <path d="M355 455H369V485H355ZM531 455H545V485H531Z" fill="#f5d99c" stroke="none"/>
+  <path d="M362 315V265M538 315V265" stroke="#e7bd68" stroke-width="6"/>
+</g>
+<use href="#banner" transform="translate(362 264) scale(.82)"/>
+<use href="#banner" transform="translate(538 264) scale(.82)"/>
+<use href="#banner" transform="translate(450 300) scale(1.08)"/>
+<path d="M438 414 450 402 462 414 450 426Z" fill="#e7bd68" stroke="#fff0c9" stroke-width="3"/>
+<g opacity=".96">
+  <use href="#pine" transform="translate(85 520) scale(1.35)"/><use href="#pine" transform="translate(72 640) scale(1.55)"/>
+  <use href="#pine" transform="translate(805 515) scale(1.25)"/><use href="#pine" transform="translate(830 665) scale(1.5)"/>
+  <use href="#pine" transform="translate(245 450) scale(.85)"/><use href="#pine" transform="translate(650 445) scale(.9)"/>
+  <use href="#pine" transform="translate(260 730) scale(.95)"/><use href="#pine" transform="translate(640 745) scale(1.1)"/>
+</g>
+<g fill="#e7bd68" opacity=".76"><circle cx="240" cy="570" r="5"/><circle cx="660" cy="570" r="5"/><circle cx="290" cy="770" r="4"/><circle cx="700" cy="800" r="4"/></g>
+<g fill="#f5edda" opacity=".72"><circle cx="120" cy="155" r="3"/><circle cx="250" cy="115" r="2"/><circle cx="510" cy="165" r="3"/><circle cx="825" cy="280" r="2"/><circle cx="95" cy="335" r="2"/></g>
+<path d="M18 18H882V882H18Z" fill="none" stroke="#e7bd68" stroke-opacity=".36" stroke-width="3"/>
+<path d="M31 31H869V869H31Z" fill="none" stroke="#f5edda" stroke-opacity=".11" stroke-width="2"/>
+</svg>

@@ -25,7 +25,7 @@ function successfulFetch() {
     if (path === "/api/game/state" || path === "/api/game/referral/link" || path === "/api/account/status") return makeResponse({ error: "Sessão inválida." }, 401);
     if (path === "/api/store/catalog") return makeResponse({ skins: [], packages: [] });
     if (path === "/arena.html") return makeResponse(
-      '<select id="purchaseMethod"><option value="mercadopago_link" selected>Mercado Pago</option></select> https://link.mercadopago.com.br/pagamentosskin paymentWindow',
+      '<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><p>purchase-request manual_whatsapp https://wa.me/ mercadopago_link /store/checkout checkoutWindow</p>',
       200,
       "text/html; charset=utf-8"
     );
@@ -40,19 +40,33 @@ function successfulFetch() {
       "text/html; charset=utf-8"
     );
     if (path === "/kingdom.html") return makeResponse(
-      '<main><form id="feedbackForm"></form><script>trackAnalytics("kingdom.opened"); request("/game/analytics")</script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script></main>',
+      '<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><main><form id="feedbackForm"></form><script>trackAnalytics("kingdom.opened"); request("/game/analytics")</script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script></main>',
       200,
       "text/html; charset=utf-8"
     );
+    if (path === "/vendor/three/asset-manifest.json") return makeResponse({
+      format: 1, threeVersion: "0.187.0",
+      assets: ["/vendor/three/build/three.module.js","/vendor/three/examples/jsm/loaders/GLTFLoader.js","/vendor/three/examples/jsm/loaders/DRACOLoader.js","/vendor/three/examples/jsm/loaders/KTX2Loader.js","/vendor/three/examples/jsm/libs/meshopt_decoder.module.js","/vendor/three/examples/jsm/libs/draco/draco_decoder.js","/vendor/three/examples/jsm/libs/draco/draco_decoder.wasm","/vendor/three/examples/jsm/libs/draco/draco_wasm_wrapper.js","/vendor/three/examples/jsm/libs/basis/basis_transcoder.js","/vendor/three/examples/jsm/libs/basis/basis_transcoder.wasm"]
+    });
+    if (path.startsWith("/vendor/three/")) return makeResponse("x".repeat(256), 200,
+      path.endsWith(".wasm") ? "application/wasm" : "text/javascript; charset=utf-8");
+    if (path === "/world-map-3d.js") {
+      return makeResponse('import * as THREE from "three"; new THREE.OrthographicCamera(); function createMarchFormation(){}', 200, "text/javascript; charset=utf-8");
+    }
+    if (path === "/engine/asset-loader.js" || path === "/scripts/kingdom-3d.js") {
+      return makeResponse('import * as THREE from "three";', 200, "text/javascript; charset=utf-8");
+    }
+    if (path === "/arena.html" || path === "/kingdom.html" || path === "/world.html") {
+      return makeResponse('<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>', 200, "text/html; charset=utf-8");
+    }
     if (path === "/manifest.json") return makeResponse({ name: "Clash of Izzy" });
-    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v26"; const CORE_ASSETS=["/account.html","/styles/landing.css","/landing.js","/world-map-3d.js","/world-map-viewport.js","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/scripts/cinematic/capture-system.js","/scripts/cinematic/media-recorder-support.js","/scripts/cinematic/trailer-script.js","/scripts/cinematic/recorder-ui.js"];', 200, "text/javascript");
+    if (path === "/sw.js") return makeResponse('const CACHE_NAME="clash-of-izzy-shell-v35"; const CORE_ASSETS=["/account.html","/styles/landing.css","/landing.js","/world-map-3d.js","/world-map-viewport.js","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/scripts/cinematic/capture-system.js","/scripts/cinematic/media-recorder-support.js","/scripts/cinematic/trailer-script.js","/scripts/cinematic/recorder-ui.js"];', 200, "text/javascript");
     if (path === "/styles/landing.css") return makeResponse("body{color:#fff}.landing-hero{display:grid}", 200, "text/css");
     if (path === "/landing.js") return makeResponse("function showInstallGuide(){} fetch(\"/api/game/referral/link\")", 200, "text/javascript");
     if (path.startsWith("/scripts/cinematic/")) return makeResponse(("export class CinematicCapture {} export const TRAILER_SCRIPT = {};").repeat(12), 200, "text/javascript");
     if (path === "/styles/premium-ui.css") return makeResponse("/* CINEMATIC TRAILER RECORDER */", 200, "text/css");
 
     if (path === "/world-map-viewport.js") return makeResponse("export function clampMapViewport(){} export function mapViewportTransform(){}", 200, "text/javascript");
-    if (path === "/world-map-3d.js") return makeResponse("new THREE.OrthographicCamera(); function createMarchFormation(){}", 200, "text/javascript");
     return makeResponse("<!doctype html><html lang=\"pt-BR\"><head><title>Clash of Izzy</title></head><body><main>Clash of Izzy - estratégia medieval e reino</main></body></html>", 200, "text/html; charset=utf-8");
   };
   return { fetchImpl, calls };
@@ -67,12 +81,13 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.apiHealth, true);
   assert.equal(result.checks.d1, true);
   assert.equal(result.checks.adminHealthAuthBoundary, true);
-  assert.equal(result.checks.mercadoPagoCheckout, true);
+  assert.equal(result.checks.manualWhatsAppPurchaseFlow, true);
   assert.equal(result.checks.betaSignupUi, true);
   assert.equal(result.checks.feedbackUiAndAnalytics, true);
   assert.equal(result.checks.staticPages, 9);
   assert.equal(result.checks.worldMapNavigation, true);
   assert.equal(result.checks.worldMap3D, true);
+  assert.equal(result.checks.threeVendorRuntime, true);
   assert.equal(result.checks.cinematicTrailerRecorder, true);
   assert.ok(calls.includes("/world-map-viewport.js"));
   assert.ok(calls.includes("/world-map-3d.js"));

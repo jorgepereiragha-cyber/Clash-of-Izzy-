@@ -118,7 +118,7 @@ test("PWA fetches query-bearing navigation but never stores its parameters or re
   assert.equal(h.stores.size, 0);
   assert.equal(h.networkCalls.length, 1);
 
-  await (await h.caches.open("clash-of-izzy-shell-v27"))
+  await (await h.caches.open("clash-of-izzy-shell-v43"))
     .put("/world.html", makeResponse());
   h.offline();
   const offline = await h.dispatch("/world.html?search=private-player", { mode: "navigate" });
@@ -131,11 +131,11 @@ test("PWA shell responses are cached by pathname and serve offline fallback", as
   const first = await h.dispatch("/kingdom.html", { mode: "navigate" });
   assert.equal(first.handled, true);
   assert.equal(first.result.status, 200);
-  assert.ok(h.stores.get("clash-of-izzy-shell-v27").has("/kingdom.html"));
+  assert.ok(h.stores.get("clash-of-izzy-shell-v43").has("/kingdom.html"));
   h.offline();
   const fallback = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
   assert.equal(fallback.result, undefined);
-  await (await h.caches.open("clash-of-izzy-shell-v27"))
+  await (await h.caches.open("clash-of-izzy-shell-v43"))
     .put("/offline.html", makeResponse());
   const offline = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
   assert.equal(offline.result.status, 200);

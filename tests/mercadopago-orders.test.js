@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
-test("Mercado Pago creates one Orders API checkout linked to an existing purchase request", async () => {
+test("Mercado Pago Orders checkout retains idempotency and is enabled when secrets are configured", async () => {
   const module = await read("mercadopago-orders.js");
   const migration = await read("migrations/0024_player_accounts_mercadopago_orders.sql");
   for (const snippet of [
@@ -14,7 +14,11 @@ test("Mercado Pago creates one Orders API checkout linked to an existing purchas
     "checkout_url",
     "MP_ACCESS_TOKEN || !env.MP_WEBHOOK_SECRET",
     "mp_checkout_lock",
-    "mp_order_id"
+    "mp_order_id",
+    "function isTrustedCheckoutUrl",
+    'host.endsWith(".mercadopago.com.br")',
+    'host.endsWith(".mercadopago.com")',
+    "if (!isTrustedCheckoutUrl(order.mp_checkout_url))"
   ]) assert.ok(module.includes(snippet), "missing checkout safety: " + snippet);
   for (const column of ["mp_external_reference","mp_idempotency_key","mp_order_id","mp_checkout_url","mp_checkout_lock"]) {
     assert.ok(migration.includes(column), "missing persisted order field: " + column);
@@ -38,17 +42,20 @@ test("Mercado Pago webhook authenticates, fetches and verifies the payment befor
   ]) assert.ok(module.includes(snippet), "missing webhook verification: " + snippet);
 });
 
-test("store frontend opens the individual checkout and keeps the shared link as unconfigured fallback", async () => {
+test("store creates an individually linked Mercado Pago order and opens the HTTPS checkout", async () => {
   const arena = await read("arena.html");
+  assert.ok(arena.includes("API_BASE+'/store/purchase-request'"));
+  assert.ok(arena.includes("paymentMethod:'mercadopago_link'"));
   assert.ok(arena.includes("API_BASE+'/store/checkout'"));
   assert.ok(arena.includes("checkout.checkoutUrl"));
-  assert.ok(arena.includes('checkout.code===\'MP_NOT_CONFIGURED\''));
-  assert.ok(arena.includes("https://link.mercadopago.com.br/pagamentosskin"));
+  assert.ok(arena.includes("window.open('about:blank'"));
+  assert.ok(arena.includes("checkoutUrl.protocol!=='https:'"));
+  assert.doesNotMatch(arena, /paymentMethod:'manual_whatsapp'/);
 });
 
 
 import { webcrypto } from "node:crypto";
-import { validateWebhookSignature } from "../mercadopago-orders.js";
+import { handleMercadoPagoRoute, validateWebhookSignature } from "../mercadopago-orders.js";
 
 globalThis.crypto ??= webcrypto;
 
@@ -100,4 +107,31 @@ test("Mercado Pago webhook signature accepts the official HMAC manifest and reje
     headers: { "x-signature": `ts=${timestamp},v1=${validSignature}` }
   });
   assert.equal(await validateWebhookSignature(missingRequestId, orderId, secret), false);
+});
+
+
+test("checkout fails closed when provider secrets are absent and webhook remains protected", async () => {
+  const ctx = {
+    json(payload, status = 200) {
+      return new Response(JSON.stringify(payload), {
+        status,
+        headers: { "content-type": "application/json" }
+      });
+    }
+  };
+  const checkoutRequest = new Request("https://game.example/api/store/checkout", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ requestId: 1 })
+  });
+  const checkoutResponse = await handleMercadoPagoRoute(checkoutRequest, {}, ctx);
+  assert.equal(checkoutResponse.status, 503);
+  assert.equal((await checkoutResponse.json()).code, "MP_NOT_CONFIGURED");
+
+  const webhookRequest = new Request("https://game.example/api/webhook/mp?type=order&data.id=OLD-ORDER", {
+    method: "POST"
+  });
+  const legacyWebhookResponse = await handleMercadoPagoRoute(webhookRequest, {}, ctx);
+  assert.equal(legacyWebhookResponse.status, 503);
+  assert.equal((await legacyWebhookResponse.json()).error, "Webhook de pagamento não configurado.");
 });

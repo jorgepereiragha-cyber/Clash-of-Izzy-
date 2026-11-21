@@ -1,0 +1,50 @@
+.hero-roster-section{margin:18px 0 24px;padding:16px;border:1px solid #8b6b39;border-radius:14px;background:linear-gradient(145deg,#1b3046,#0e1927);color:#f5edda}
+.hero-roster-header{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:12px}
+.hero-roster-header h2{margin:0;color:#f1d18d;font-size:clamp(18px,4vw,23px)}
+.hero-roster-count{color:#c7d2df;font-size:12px;font-weight:700}
+.hero-roster-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(235px,1fr));gap:10px}
+.hero-roster-card{display:grid;grid-template-columns:82px minmax(0,1fr);gap:12px;min-width:0;padding:10px;border:1px solid #52677d;border-radius:11px;background:linear-gradient(150deg,#263d54,#142438)}
+.hero-roster-card.is-selected{border-color:#e7c16f;box-shadow:inset 0 0 0 1px #e7c16f55}
+.hero-roster-portrait{display:block;width:82px;aspect-ratio:2/3;overflow:hidden;border-radius:8px;background:#0b1726;border:1px solid #b58b4c}
+.hero-roster-portrait svg{display:block;width:100%;height:100%}
+.hero-roster-copy{min-width:0;display:flex;flex-direction:column;gap:4px}
+.hero-roster-name{margin:0;color:#fff0c8;font-size:15px;line-height:1.2;overflow-wrap:anywhere}
+.hero-roster-title{margin:0;color:#c8d3df;font-size:11px;line-height:1.3}
+.hero-roster-meta{display:flex;flex-wrap:wrap;gap:5px;align-items:center;color:#f2cf8c;font-size:11px;font-weight:800}
+.hero-roster-stars{letter-spacing:1px;color:#ffd879}
+.hero-roster-stats{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:3px 8px;margin:4px 0;color:#e2e8ef;font-size:11px}
+.hero-roster-skill{margin:2px 0;color:#bdc9d6;font-size:11px;line-height:1.35}
+.hero-roster-skill strong{color:#b9d7f0}
+.hero-roster-fragments{margin:0;color:#c7d2df;font-size:10px}
+.hero-roster-select{grid-column:1/-1;min-height:44px;margin-top:3px;border:1px solid #d2aa63;border-radius:8px;background:#604523;color:#fff0cf;font-weight:800}
+.hero-roster-select:disabled{opacity:.55}
+@media(max-width:420px){.hero-roster-section{padding:11px}.hero-roster-grid{grid-template-columns:1fr}.hero-roster-card{grid-template-columns:76px minmax(0,1fr)}.hero-roster-portrait{width:76px}}
+.hero-summon-section{margin:18px 0;padding:16px;border:1px solid #8b6b39;border-radius:14px;background:linear-gradient(145deg,#202d43,#101b2a);color:#f5edda}
+.hero-summon-intro{margin:6px 0 12px;color:#c7d2df;font-size:13px;line-height:1.45}
+.hero-summon-rates{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.hero-summon-rates div{display:grid;gap:4px;padding:10px;border:1px solid #53677c;border-radius:9px;background:#142337}
+.hero-summon-rates strong{color:#f3d18c;font-size:12px}.hero-summon-rates span{color:#c7d2df;font-size:11px}
+.hero-summon-actions{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px;margin:12px 0}
+.hero-summon-actions button{min-height:48px;border:1px solid #e0b96e;border-radius:9px;background:linear-gradient(145deg,#815b2c,#4b341e);color:#fff0c9;font-weight:850}
+.hero-summon-actions button:disabled{opacity:.45}
+.hero-summon-status{color:#c7d2df;font-size:12px;line-height:1.45}
+.hero-summon-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:7px}
+.hero-summon-result{display:grid;gap:3px;padding:9px;border:1px solid #56697d;border-radius:8px;background:#122337}
+.hero-summon-result strong{color:#fff0c9;font-size:13px}.hero-summon-result span{color:#e6c27e;font-size:11px}.hero-summon-result small{color:#c7d2df;font-size:10px}
+@media(max-width:420px){.hero-summon-section{padding:11px}.hero-summon-rates{grid-template-columns:1fr}.hero-summon-actions{grid-template-columns:1fr}}
+
+.hero-roster-combat{margin:2px 0;color:#b5d8f0;font-size:10px;line-height:1.35;font-weight:800}
+
+/* Original pantheon auras: restrained motion, no extra WebGL pass. */
+.hero-roster-card[data-hero-theme="egypt"]{border-color:#b58d45;background:radial-gradient(ellipse at 18% 12%,#6b4c2244,transparent 54%),linear-gradient(150deg,#28364a,#142235)}
+.hero-roster-card[data-hero-theme="egypt"] .hero-roster-portrait{box-shadow:0 0 0 1px #e9c56e,0 0 13px #d99b3f88}
+.hero-roster-card[data-hero-aura="solar"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #ffcf55) drop-shadow(0 0 15px #d98a32)}
+.hero-roster-card[data-hero-aura="duat"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #91a6d5) drop-shadow(0 0 14px #33466d)}
+.hero-roster-card[data-hero-aura="wings"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #66d8db) drop-shadow(0 0 14px #c4a5ec)}
+.hero-roster-card[data-hero-aura="falcon"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #78c8ff) drop-shadow(0 0 14px #dfb65b)}
+.hero-roster-card[data-hero-aura="crimson"] .hero-roster-portrait{filter:drop-shadow(0 0 7px #ff7752) drop-shadow(0 0 14px #c33a36)}
+@media(prefers-reduced-motion:no-preference){
+ .hero-roster-card[data-hero-theme="egypt"] .hero-roster-portrait{animation:coi-egypt-aura 3.4s ease-in-out infinite alternate}
+}
+@keyframes coi-egypt-aura{from{opacity:.94;transform:translateY(0)}to{opacity:1;transform:translateY(-1px)}}
+@media(prefers-reduced-motion:reduce){.hero-roster-card[data-hero-theme="egypt"] .hero-roster-portrait{animation:none}}
