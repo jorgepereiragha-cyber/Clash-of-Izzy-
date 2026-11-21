@@ -219,3 +219,5 @@
 @media(prefers-reduced-motion:reduce){
  .coi-graphics-controls *{animation:none!important;transition:none!important}
 }
+
+#coiGraphicsPreset{scroll-margin-top:160px}

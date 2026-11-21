@@ -88,6 +88,8 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
     <output id="mapScale" class="map-scale" aria-live="polite">100%</output>
     <button id="zoomIn" type="button" aria-label="Aumentar zoom" title="Aumentar zoom">+</button>
     <button id="mapReset" type="button" class="secondary">Centralizar</button>
+    <span id="worldGraphicsStatus" class="map-hint" role="status" aria-live="polite">Carregando qualidade gráfica…</span>
+    <a class="secondary" href="/kingdom.html#coiGraphicsPreset">Ajustes de imagem</a>
    </div>
    <div id="worldMap" class="world-map" role="group" aria-label="Mapa estratégico 3D isométrico. Arraste para navegar, use os controles de zoom e toque em um território para selecioná-lo.">
     <span class="map-label north">Norte</span><span class="map-label south">Sul</span>
@@ -133,7 +135,7 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 </main>
 <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
 <script type="module" src="/world-map.js"></script>
-<script type="module" src="/world-map-3d.js"></script>
+<script type="module" src="/scripts/world-map-visual-boot.js"></script>
 <script type="module" src="/rally-ui.js"></script>
 <script src="/valhalla-shop-ui.js" defer></script>
 <script src="/navigation.js" defer></script>

@@ -56,3 +56,15 @@ test("2D boot bypasses Three.js and graphics controls remain local-only", async 
   for (const path of ["/scripts/kingdom-visual-boot.js","/scripts/kingdom-visual-preferences.js"])
     assert.ok(sw.includes('"' + path + '"'), path + " not cached in PWA");
 });
+
+test("world map honors 2D preference and avoids loading Three.js in compatibility mode", async () => {
+  const world = await readFile(new URL("../world-map-visual-boot.js",import.meta.url),"utf8");
+  const source = await readFile(new URL("../world-map-3d.js",import.meta.url),"utf8");
+  const html = await readFile(new URL("../world.html",import.meta.url),"utf8");
+  assert.match(world, /choice === "2d"/);
+  assert.match(world, /await import\("\/world-map-3d\.js"\)/);
+  assert.match(world, /map-3d-fallback/);
+  assert.match(source, /readGraphicsChoice\(window\.localStorage\)/);
+  assert.match(html, /id="worldGraphicsStatus"/);
+  assert.match(html, /kingdom\.html#coiGraphicsPreset/);
+});

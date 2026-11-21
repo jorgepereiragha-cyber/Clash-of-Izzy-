@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -16,9 +17,19 @@ import * as THREE from "three";
 
   const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  const lowMemory = Number(navigator.deviceMemory || 4) <= 2;
+  const memory = Number(navigator.deviceMemory || 0);
+  const cores = Number(navigator.hardwareConcurrency || 0);
+  const lowMemory = memory > 0 && memory <= 2;
   const saveData = connection?.saveData === true;
-  const quality = lowMemory || saveData ? "low" : Number(navigator.deviceMemory || 4) >= 8 ? "high" : "balanced";
+  const preference = readGraphicsChoice(window.localStorage);
+  const automatic = lowMemory ? "low" : memory >= 8 ? "high" : "balanced";
+  const highUnsafe = (memory > 0 && memory < 6) || (cores > 0 && cores < 6);
+  const quality = lowMemory || saveData ? "low"
+    : preference === "low" ? "low"
+    : preference === "balanced" ? "balanced"
+    : preference === "high" ? (highUnsafe ? "balanced" : "high")
+    : automatic;
+  window.__coiWorldGraphicsQuality = quality;
 
   let renderer = null;
   let scene = null;
@@ -506,7 +517,7 @@ import * as THREE from "three";
         canvas,
         alpha: false,
         antialias: quality !== "low",
-        powerPreference: "low-power",
+        powerPreference: preference === "high" ? "high-performance" : "default",
         stencil: false,
         depth: true
       });
