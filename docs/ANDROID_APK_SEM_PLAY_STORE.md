@@ -37,6 +37,19 @@ O APK de teste e assinado pela chave de debug do runner e usa package ID
 atualizacoes: o certificado temporario muda entre builds e a instalacao anterior
 pode precisar ser removida antes de instalar outro APK debug.
 
+O ZIP do GitHub Actions inclui o APK e o respectivo arquivo `.sha256`.
+Para conferir o arquivo extraido em um terminal com `sha256sum`,
+execute o comando na pasta que contem os dois arquivos:
+
+```sh
+sha256sum -c app-debug.apk.sha256
+```
+
+O workflow tambem verifica a assinatura do APK de teste e informa o hash
+SHA-256 no resumo da execucao. Este hash comprova integridade em relacao
+ao build consultado, mas **nao** substitui a verificacao da origem
+do arquivo nem torna a assinatura temporaria de debug adequada a producao.
+
 ## APK de release com atualizacao permanente
 
 Para gerar um APK estavel, crie **uma** keystore privada, faca backup offline
@@ -62,7 +75,8 @@ release anterior assinada.
 Em **Actions > Android APK - instalacao direta > Run workflow**, escolha
 `assinado`. O build **falhara** caso falte algum secret. Quando aprovado,
 o artifact `clash-of-izzy-android-apk-assinado` tera o APK assinado
-para instalacao direta. O application ID de release e
+para instalacao direta, acompanhado de `app-release.apk.sha256`. Use
+`sha256sum -c app-release.apk.sha256` para validar a copia extraida. O application ID de release e
 `com.clashofizzy.android`. Incremente `versionCode` a cada
 nova release para permitir atualizacao no Android. Para instalar sobre
 uma versao anterior, mantenha **applicationId e certificado iguais**.
