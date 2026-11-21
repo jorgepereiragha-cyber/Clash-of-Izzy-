@@ -50,12 +50,21 @@ jobs:
         if: ${{ github.event_name == 'pull_request' || inputs.tipo == 'teste' }}
         working-directory: android-sideload
         run: gradle --no-daemon assembleDebug
+      - name: Verificar assinatura e SHA-256 do APK de teste
+        if: ${{ github.event_name == 'pull_request' || inputs.tipo == 'teste' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          dir=android-sideload/app/build/outputs/apk/debug
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$dir/app-debug.apk"
+          (cd "$dir" && sha256sum app-debug.apk > app-debug.apk.sha256)
+          echo "APK de teste SHA-256: $(cut -d' ' -f1 "$dir/app-debug.apk.sha256")" >> "$GITHUB_STEP_SUMMARY"
       - name: Publicar APK de teste (ZIP no GitHub Actions)
         if: ${{ github.event_name == 'pull_request' || inputs.tipo == 'teste' }}
         uses: actions/upload-artifact@v4
         with:
           name: clash-of-izzy-android-apk-teste
-          path: android-sideload/app/build/outputs/apk/debug/*.apk
+          path: android-sideload/app/build/outputs/apk/debug/app-debug.apk*
           if-no-files-found: error
           retention-days: 14
       - name: Validar secrets de assinatura (somente release)
@@ -87,13 +96,16 @@ jobs:
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.tipo == 'assinado' }}
         run: |
           set -euo pipefail
-          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose android-sideload/app/build/outputs/apk/release/app-release.apk
+          dir=android-sideload/app/build/outputs/apk/release
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$dir/app-release.apk"
+          (cd "$dir" && sha256sum app-release.apk > app-release.apk.sha256)
+          echo "APK de release SHA-256: $(cut -d' ' -f1 "$dir/app-release.apk.sha256")" >> "$GITHUB_STEP_SUMMARY"
       - name: Publicar APK de release (ZIP no GitHub Actions)
         if: ${{ github.event_name == 'workflow_dispatch' && inputs.tipo == 'assinado' }}
         uses: actions/upload-artifact@v4
         with:
           name: clash-of-izzy-android-apk-assinado
-          path: android-sideload/app/build/outputs/apk/release/app-release.apk
+          path: android-sideload/app/build/outputs/apk/release/app-release.apk*
           if-no-files-found: error
           retention-days: 14
       - name: Apagar arquivo de assinatura do runner
