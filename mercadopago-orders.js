@@ -19,6 +19,20 @@ function moneyToCents(value) {
   return Math.round(amount * 100);
 }
 
+// Checkout links must remain on an HTTPS domain controlled by Mercado Pago.
+// Do not redirect players to an arbitrary URL, even if it appeared in a gateway response.
+export function isTrustedMercadoPagoCheckoutUrl(value) {
+  try {
+    const checkout = new URL(String(value || ""));
+    const host = checkout.hostname.toLowerCase();
+    const trusted = ["mercadopago.com.br", "mercadopago.com"]
+      .some(domain => host === domain || host.endsWith("." + domain));
+    return checkout.protocol === "https:" && trusted && !checkout.username && !checkout.password && !checkout.port;
+  } catch {
+    return false;
+  }
+}
+
 export async function validateWebhookSignature(request, orderId, secret) {
   const signatureHeader = request.headers.get("x-signature") || "";
   const requestId = request.headers.get("x-request-id") || "";
@@ -98,8 +112,8 @@ async function createCheckout(request, env, ctx) {
       await env.DB.prepare("UPDATE purchase_requests SET mp_checkout_lock=NULL,mp_checkout_lock_expires_at=NULL WHERE id=? AND mp_checkout_lock=?").bind(requestId, lockToken).run();
       return ctx.json({ error: "O Mercado Pago não conseguiu criar o checkout. O pedido foi preservado para nova tentativa." }, 502);
     }
+    if (!isTrustedMercadoPagoCheckoutUrl(result.checkout_url)) throw new Error("untrusted_checkout_url");
     const checkout = new URL(String(result.checkout_url));
-    if (checkout.protocol !== "https:") throw new Error("invalid_checkout_url");
     const saved = await env.DB.prepare(
       "UPDATE purchase_requests SET mp_order_id=?,mp_checkout_url=?,mp_payment_status=?,mp_checkout_lock=NULL,mp_checkout_lock_expires_at=NULL " +
       "WHERE id=? AND status='pending' AND mp_checkout_lock=? AND mp_external_reference=?"
