@@ -32,7 +32,37 @@
 @media(max-width:650px){#openTerritories{top:245px;right:8px;padding:8px;font-size:11px}#territoryTroops{grid-template-columns:1fr 1fr}#territoryPanel{max-height:76vh}}
 #materialsHead{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #80663e;padding-bottom:10px;margin-bottom:12px}#materialsHead h2{font-size:18px;margin:0;color:#f1c46a}#materialsClose{background:#68451f;border:1px solid #e0b75d;color:white;border-radius:7px;padding:7px 10px}#materialsList{display:grid;grid-template-columns:1fr 1fr;gap:8px}.materialItem{background:#24364c;border:1px solid #59677a;border-radius:9px;padding:10px;min-width:0}.materialItem strong{display:block;color:#f1c46a;margin-bottom:4px}.materialItem small{color:#cbd5e1;display:block;line-height:1.35}.materialQty{font-size:20px;font-weight:900;margin-top:6px}.materialsNote{font-size:12px;line-height:1.5;color:#cbd5e1;margin:12px 0 0}@media(max-width:420px){#materialsList{grid-template-columns:1fr}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important}}
-</style></head>
+
+.pantheon-set-gallery{display:grid;gap:14px;margin:10px 0 18px}
+.pantheon-set-card{--pantheon-accent:#d8b36b;min-width:0;padding:14px;border:1px solid var(--pantheon-accent);border-radius:13px;background:radial-gradient(ellipse at 14% 0%,color-mix(in srgb,var(--pantheon-accent) 16%,transparent),transparent 48%),linear-gradient(145deg,#182b40,#0e1928);box-shadow:0 10px 28px #0004}
+.pantheon-set-card[data-set="egyptian_solar_court"]{--pantheon-accent:#d7a84e}
+.pantheon-set-card[data-set="sumerian_first_light"]{--pantheon-accent:#b58a55}
+.pantheon-set-card[data-set="mesopotamian_ishtar_gate"]{--pantheon-accent:#55a5bb}
+.pantheon-set-card[data-set="poseidon_abyssal_tide"]{--pantheon-accent:#62c6dc}
+.pantheon-set-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+.pantheon-set-head h4{margin:0;color:#fff0c8;font-size:16px}
+.pantheon-set-head p{margin:3px 0 0;color:#bccbd9;font-size:11px}
+.pantheon-set-progress{flex:0 0 auto;color:var(--pantheon-accent);font-size:12px;font-variant-numeric:tabular-nums}
+.pantheon-set-description{margin:9px 0 12px;color:#c8d3df;font-size:12px;line-height:1.45}
+.pantheon-piece-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:7px}
+.pantheon-piece{display:grid;grid-template-rows:auto 1fr auto;gap:6px;min-width:0;padding:9px;border:1px solid #52677d;border-radius:9px;background:#0d1b2b}
+.pantheon-piece.is-equipped{border-color:var(--pantheon-accent);box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--pantheon-accent) 44%,transparent),0 0 13px color-mix(in srgb,var(--pantheon-accent) 16%,transparent)}
+.pantheon-piece-icon{display:grid;place-items:center;min-height:34px;font-size:24px;color:var(--pantheon-accent);filter:drop-shadow(0 0 7px color-mix(in srgb,var(--pantheon-accent) 45%,transparent))}
+.pantheon-piece-copy{display:grid;gap:4px;min-width:0}
+.pantheon-piece-copy small{color:#b5c3d2;font-size:10px;line-height:1.25}
+.pantheon-piece-copy strong{color:#f7e6bf;font-size:11px;line-height:1.3;overflow-wrap:anywhere}
+.pantheon-piece button{width:100%;min-height:38px;padding:7px 5px;font-size:10px;line-height:1.2}
+.pantheon-piece.is-locked button{background:#293b50;border-color:#5f7891;color:#d7e3ef}
+.pantheon-set-bonus{margin-top:10px;padding:10px;border:1px solid color-mix(in srgb,var(--pantheon-accent) 55%,#43536a);border-radius:9px;background:#0b1726}
+.pantheon-set-bonus strong{display:block;color:var(--pantheon-accent);font-size:11px;letter-spacing:.04em}
+.pantheon-set-bonus p{margin:4px 0 0;color:#e7e0d0;font-size:12px;line-height:1.4}
+.pantheon-active-summary{padding:10px;border:1px solid #6a8197;border-radius:9px;background:#102238;color:#e8d5a9;font-size:12px;line-height:1.45}
+.pantheon-piece button:focus-visible{outline:3px solid #fff0b9;outline-offset:2px}
+@media(max-width:720px){.pantheon-piece-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pantheon-piece:last-child{grid-column:1/-1}.pantheon-set-card{padding:11px}}
+@media(max-width:360px){.pantheon-set-head{display:grid}.pantheon-piece-grid{grid-template-columns:1fr}.pantheon-piece:last-child{grid-column:auto}}
+
+</style>  <link rel="stylesheet" href="/styles/android-experience.css">
+</head>
 <body>
 <div id="hud">
  <div class="card"><div class="brand">⚔ CLASH OF IZZY · MODO ARENA (SECUNDÁRIO)</div><a class="arena-home" href="/kingdom.html">🏰 Meu reino</a><div id="heroName">Kael · Guardião do Sol · Nv. 1</div><div class="bar"><div id="hp" class="fill"></div></div><div class="bar-caption"><span>❤️ Vida</span><b id="hpText">1200/1200</b></div><div class="bar"><div id="mp" class="fill mana"></div></div><div class="bar-caption"><span>💧 Mana</span><b id="mpText">100/100</b></div></div>
@@ -65,7 +95,7 @@
  <div id="territoryList"><div class="territoryCard">Carregando territórios…</div></div>
 </section>
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
-<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Envie um pedido ao painel Master. A liberação acontece somente depois da conferência manual do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><p>Escolha um pacote para registrar seu pedido e abrir uma conversa no WhatsApp. A equipe confere o pagamento e libera o item pelo painel administrativo.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
+<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Escolha seu pacote e conclua a compra pelo checkout seguro do Mercado Pago. A liberação ocorre após a confirmação do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><p>Seu pedido fica vinculado ao reino. O checkout abre em uma nova janela; o item é liberado somente após a confirmação do webhook do Mercado Pago.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'three';
 import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } from './engine/asset-loader.js';
@@ -515,6 +545,67 @@ function renderKingdomStore(){
   collectionGrid.append(storeCard(collection.icon+' '+collection.name,description,buttonLabel,()=>runStoreAction({type:'cosmetic_claim',collection:collection.id}),!complete||claimed));
  }
  root.append(collectionGrid);
+ const pantheonTitle=document.createElement('h3');pantheonTitle.textContent='🏛️ Galeria dos Panteões · Conjuntos de 5 peças';root.append(pantheonTitle);
+ const pantheonIntro=document.createElement('p');pantheonIntro.className='storeMuted';pantheonIntro.textContent='Equipe peças nos cinco espaços para desbloquear bônus de conjunto. Ter a peça no inventário não ativa o bônus: ela precisa estar equipada.';root.append(pantheonIntro);
+ const pantheonGrid=document.createElement('div');pantheonGrid.className='pantheon-set-gallery';
+ const bonusLabels={attackPercent:'Ataque',defensePercent:'Defesa',healthPercent:'Vida',criticalChancePercent:'Crítico'};
+ const bonusText=bonuses=>Object.entries(bonuses||{}).filter(([,value])=>Number(value)>0).map(([key,value])=>(bonusLabels[key]||key)+' +'+Number(value).toLocaleString('pt-BR',{maximumFractionDigits:2})+'%').join(' · ');
+ for(const set of cosmetics.skinSets||[]){
+  const card=document.createElement('section');card.className='pantheon-set-card';card.dataset.set=set.id;
+  const head=document.createElement('div');head.className='pantheon-set-head';
+  const heading=document.createElement('div');
+  const title=document.createElement('h4');title.textContent=(set.icon||'✨')+' '+set.name;
+  const subtitle=document.createElement('p');subtitle.textContent=set.subtitle||set.theme||'Conjunto mítico';
+  heading.append(title,subtitle);
+  const progress=document.createElement('strong');progress.className='pantheon-set-progress';progress.textContent=Number(set.equippedCount||0)+'/'+Number(set.totalPieces||5)+' equipadas';
+  head.append(heading,progress);card.append(head);
+  const description=document.createElement('p');description.className='pantheon-set-description';description.textContent=set.description||'';card.append(description);
+  const pieces=document.createElement('div');pieces.className='pantheon-piece-grid';
+  for(const item of set.items||[]){
+   const piece=document.createElement('article');piece.className='pantheon-piece'+(item.equipped?' is-equipped':'')+(!item.owned?' is-locked':'');
+   const icon=document.createElement('span');icon.className='pantheon-piece-icon';icon.textContent=item.icon||'✦';
+   const copy=document.createElement('div');copy.className='pantheon-piece-copy';
+   const slot=document.createElement('small');slot.textContent=item.slotLabel||item.slot;
+   const name=document.createElement('strong');name.textContent=item.name;
+   const stateText=document.createElement('small');stateText.textContent=item.equipped?'Equipado':item.owned?'Adquirido · não equipado':'Ainda não adquirida';
+   copy.append(slot,name,stateText);
+   const button=document.createElement('button');button.type='button';
+   if(!item.owned){
+    button.textContent='Adquirir · '+Number(item.price||0).toLocaleString('pt-BR')+' gemas';
+    button.disabled=Number(player.gems||0)<Number(item.price||0);
+    button.addEventListener('click',()=>runStoreAction({type:'cosmetic_buy',skin:item.id}));
+   }else if(item.equipped){
+    button.textContent='Desequipar';
+    button.addEventListener('click',()=>runStoreAction({type:'skin_set_unequip',slot:item.slot}));
+   }else{
+    button.textContent='Equipar';
+    button.addEventListener('click',()=>runStoreAction({type:'skin_set_equip',itemId:item.id}));
+   }
+   piece.append(icon,copy,button);pieces.append(piece);
+  }
+  card.append(pieces);
+  const threshold=document.createElement('div');threshold.className='pantheon-set-bonus';
+  const active=set.activeThreshold;
+  const next=set.nextThreshold;
+  if(active){
+   const activeTitle=document.createElement('strong');activeTitle.textContent='BÔNUS ATIVO · '+(set.activeThresholds||[active]).map(entry=>entry.label).join(' + ');
+   const activeDescription=document.createElement('p');activeDescription.textContent=bonusText(set.activeBonuses||active.bonuses);
+   threshold.append(activeTitle,activeDescription);
+  }else{
+   const lockedTitle=document.createElement('strong');lockedTitle.textContent='BÔNUS A DESBLOQUEAR';
+   const lockedDescription=document.createElement('p');lockedDescription.textContent=next?'Equipe '+Number(next.pieces)+' peças para '+next.label+': '+bonusText(next.bonuses):'Conjunto completo.';
+   threshold.append(lockedTitle,lockedDescription);
+  }
+  card.append(threshold);pantheonGrid.append(card);
+ }
+ if(!pantheonGrid.children.length){const empty=document.createElement('p');empty.className='storeMuted';empty.textContent='Nenhum conjunto disponível no momento.';pantheonGrid.append(empty);}
+ root.append(pantheonGrid);
+ const activeSetBonus=cosmetics.skinSetBonuses||{};
+ const activeSetSummary=document.createElement('p');activeSetSummary.className='pantheon-active-summary';
+ activeSetSummary.textContent=activeSetBonus.activeSets?.length
+  ?'Bônus totais ativos · '+bonusText(activeSetBonus)+' · limite global aplicado pelo servidor'
+  :'Nenhum bônus ativo: equipe duas peças de um conjunto para desbloquear o primeiro marco.';
+ root.append(activeSetSummary);
  const seasonTitle=document.createElement('h3');seasonTitle.textContent='🌙 Skins da temporada';root.append(seasonTitle);
  const seasonGrid=document.createElement('div');seasonGrid.className='storeGrid';
  for(const skin of cosmetics.seasonal||[]){
@@ -559,30 +650,39 @@ async function refreshKingdomStore(){
 async function requestOfficialPurchase(item,kind,button){
  const notice=document.getElementById('purchaseNotice');
  const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
- if(!token){notice.textContent='Conecte seu reino antes de solicitar um pacote.';return}
- const whatsappWindow=window.open('about:blank','_blank');
- if(whatsappWindow)whatsappWindow.opener=null;
- button.disabled=true;notice.textContent='Registrando seu pedido…';
+ if(!token){notice.textContent='Conecte seu reino antes de comprar.';return}
+ const checkoutWindow=window.open('about:blank','_blank');
+ if(checkoutWindow)checkoutWindow.opener=null;
+ button.disabled=true;notice.textContent='Registrando pedido seguro…';
  try{
   const response=await fetch(API_BASE+'/store/purchase-request',{
    method:'POST',
    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-   body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod:'manual_whatsapp'})
+   body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod:'mercadopago_link'})
   });
-  const data=await response.json().catch(()=>({}));
-  if(!response.ok)throw new Error(data.error||'Não foi possível registrar o pedido.');
-  const requestId=Number(data.request?.id);
+  const requestData=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(requestData.error||'Não foi possível registrar o pedido.');
+  const requestId=Number(requestData.request?.id);
   if(!Number.isSafeInteger(requestId)||requestId<1)throw new Error('O servidor não retornou um número de pedido válido.');
-  const number=String(data.whatsappNumber||'5547996531437').replace(/\D/g,'');
-  const orderName=data.request?.product_name||item.name;
-  const orderPrice=Number(data.request?.price_brl??item.price_brl??0);
-  const message='Olá! Quero adquirir um pacote no Clash of Izzy.\nPedido: #'+requestId+'\nJogador: '+(kingdomSession?.player?.name||'Jogador')+'\nID do jogador: '+(kingdomSession?.player?.player_id||'')+'\nReino: '+(kingdomSession?.kingdom?.kingdom_name||'Eldoria')+'\nProduto: '+orderName+' ('+(kind==='skin'?'Skin':'Pacote VIP')+')\nValor: R$ '+orderPrice.toFixed(2).replace('.',',');
-  notice.textContent='Pedido #'+requestId+' registrado. O WhatsApp será aberto para combinar o pagamento. A liberação ocorre após sua confirmação.';
-  button.textContent='Pedido enviado · #'+requestId;
-  const whatsappUrl='https://wa.me/'+number+'?text='+encodeURIComponent(message);
-  if(whatsappWindow)whatsappWindow.location.href=whatsappUrl;
-  else window.location.assign(whatsappUrl);
- }catch(error){if(whatsappWindow)whatsappWindow.close();notice.textContent=error.message;button.disabled=false}
+  const checkoutResponse=await fetch(API_BASE+'/store/checkout',{
+   method:'POST',
+   headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+   body:JSON.stringify({requestId})
+  });
+  const checkout=await checkoutResponse.json().catch(()=>({}));
+  if(!checkoutResponse.ok)throw new Error(checkout.error||'Checkout Mercado Pago indisponível.');
+  const checkoutUrl=new URL(String(checkout.checkoutUrl||''));
+  if(checkoutUrl.protocol!=='https:')throw new Error('O servidor não retornou um endereço seguro para pagamento.');
+  notice.textContent='Pedido #'+requestId+' criado. Finalize o pagamento no ambiente seguro do Mercado Pago; o item será liberado após a confirmação do webhook.';
+  button.textContent='Pagamento · Pedido #'+requestId;
+  if(checkoutWindow)checkoutWindow.location.href=checkoutUrl.href;
+  else window.location.assign(checkoutUrl.href);
+ }catch(error){
+  if(checkoutWindow)checkoutWindow.close();
+  notice.textContent=error.message+' O pedido fica preservado e pode ser tentado novamente quando o checkout estiver configurado.';
+  button.disabled=false;
+  button.textContent='Tentar pagamento novamente';
+ }
 }
 async function loadCatalog(){
  const box=document.getElementById('catalog');
@@ -599,7 +699,7 @@ async function loadCatalog(){
   for(const item of entries){
    const b=document.createElement('button');const label=document.createElement('span');const detail=document.createElement('small');const price=document.createElement('b');
    label.textContent=item.kind+' · '+item.name;
-   detail.textContent=item.productKind==='vip_package'?Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação':'Aparência cosmética para seu castelo';
+   detail.textContent=item.productKind==='vip_package'?Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação':'Skin de castelo · Ataque +'+Number(item.attack_bonus_percent||0).toFixed(2)+'% · Defesa +'+Number(item.defense_bonus_percent||0).toFixed(2)+'%';
    price.textContent='R$ '+Number(item.price_brl).toFixed(2).replace('.',',');
    b.append(label,detail,price);b.addEventListener('click',()=>requestOfficialPurchase(item,item.productKind,b));
    box.appendChild(b);
@@ -634,4 +734,5 @@ if(new URLSearchParams(location.search).get('debug')==='1'){const panel=document
 let last=performance.now();function loop(now){if(document.hidden){last=now;return}const dt=Math.min(.04,(now-last)/1000);last=now;update(dt,now);updateMapChunks(dt);updateAssetAnimations(dt);renderer.render(scene,camera);adaptRenderResolution(dt)}renderer.setAnimationLoop(loop);
 window.addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight,false)});
 updateHud();
-</script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script></body></html>
+</script><script>if("serviceWorker" in navigator){window.addEventListener("load",()=>navigator.serviceWorker.register("/sw.js").catch(()=>{}));}</script>  <script src="/scripts/pwa-runtime.js" defer></script>
+</body></html>

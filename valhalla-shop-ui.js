@@ -351,11 +351,37 @@
     }
   }
 
+  function startPolling() {
+    if (!pollHandle && !document.hidden) pollHandle = window.setInterval(() => {
+      void checkModeStatus();
+    }, 60000);
+  }
+
+  function stopPolling() {
+    if (pollHandle) window.clearInterval(pollHandle);
+    pollHandle = null;
+  }
+
   function init() {
     createUI();
     void checkModeStatus();
-    if (!pollHandle) pollHandle = window.setInterval(checkModeStatus, 60000);
+    startPolling();
   }
+
+  document.addEventListener("visibilitychange", () => {
+    if (document.hidden) stopPolling();
+    else {
+      void checkModeStatus();
+      startPolling();
+    }
+  });
+  window.addEventListener("pagehide", stopPolling);
+  window.addEventListener("pageshow", event => {
+    if (event.persisted && !document.hidden) {
+      void checkModeStatus();
+      startPolling();
+    }
+  });
 
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", init, { once: true });

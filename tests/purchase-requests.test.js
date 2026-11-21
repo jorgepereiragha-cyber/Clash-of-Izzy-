@@ -11,10 +11,10 @@ test("purchase requests require a valid player session and a stable idempotency 
   assert.ok(worker.includes('SELECT id,kingdom_name FROM kingdoms WHERE player_id=?").bind(player.id)'));
   assert.ok(worker.includes("purchase-request-player"));
   assert.ok(worker.includes("requestKey"));
-  assert.ok(worker.includes("SELECT id,status,product_name,price_brl FROM purchase_requests"));
+  assert.ok(worker.includes("SELECT id,status,product_name,price_brl,payment_method,mp_order_id,mp_checkout_url FROM purchase_requests"));
   assert.ok(worker.includes("payment_method,payment_reference,request_key"));
-  assert.ok(worker.includes('requestedPaymentMethod!=="manual_whatsapp"'));
-  assert.ok(worker.includes('const paymentMethod="manual"'));
+  assert.ok(worker.includes('["mercadopago_link","manual_whatsapp"].includes(requestedPaymentMethod)'));
+  assert.ok(worker.includes('requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":"manual"'));
 });
 
 test("Master approval queue is protected by admin session and grants packages only once", async () => {
@@ -24,6 +24,12 @@ test("Master approval queue is protected by admin session and grants packages on
   assert.ok(worker.includes("status='pending'"));
   assert.ok(worker.includes("status='approved'"));
   assert.ok(worker.includes("reviewed_at=CURRENT_TIMESTAMP"));
+  assert.ok(worker.includes('if(pending.payment_method==="mercadopago_link"||pending.mp_order_id)'));
+  assert.ok(worker.includes("alterações manuais bloqueadas."));
+  assert.ok(admin.includes("const automatic=request.payment_method"));
+  assert.ok(admin.includes('"Mercado Pago · "+providerStatus'));
+  assert.ok(admin.includes("não liberar nem recusar manualmente"));
+  assert.ok(worker.includes("r.mp_order_id,r.mp_payment_status"));
   assert.ok(worker.includes("UPDATE players SET gems=gems+?"));
   assert.ok(worker.includes("changes()=1 AND EXISTS(SELECT 1 FROM purchase_requests"));
   assert.ok(worker.includes("INSERT OR IGNORE INTO player_skins"));
@@ -36,23 +42,28 @@ test("Master approval queue is protected by admin session and grants packages on
   assert.doesNotThrow(()=>new Function(adminScript), "admin inline script must parse");
 });
 
-test("official store submits an auditable payment request and opens WhatsApp", async () => {
+test("official store creates an auditable per-order Mercado Pago checkout", async () => {
   const arena = await read("arena.html");
   assert.ok(arena.includes("/store/purchase-request"));
   assert.ok(arena.includes("requestOfficialPurchase"));
   assert.ok(arena.includes("Pedido #"));
-  assert.ok(arena.includes("manual_whatsapp"));
-  assert.ok(arena.includes("const orderName=data.request?.product_name||item.name;\\n  const orderPrice=") === false,
-    "escaped literal line break must not corrupt the purchase handler");
-  assert.ok(arena.includes("const orderName=data.request?.product_name||item.name;\n  const orderPrice="),
-    "purchase handler must contain a real line break between declarations");
-  assert.doesNotMatch(arena, /mercadopago|purchaseReference|purchaseMethod/i);
-  assert.ok(arena.includes("https://wa.me/"));
+  assert.ok(arena.includes("paymentMethod:'mercadopago_link'"));
+  assert.ok(arena.includes("mercadopago_link"));
+  assert.ok(arena.includes("body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod:'mercadopago_link'})"));
+  assert.ok(arena.includes("const requestId=Number(requestData.request?.id)"));
+  assert.ok(arena.includes("body:JSON.stringify({requestId})"));
+  assert.ok(arena.includes("checkoutUrl.protocol!=='https:'"));
+  assert.ok(arena.includes("o item será liberado após a confirmação do webhook"));
+  assert.ok(arena.includes("API_BASE+'/store/checkout'"));
+  assert.ok(arena.includes("checkout.checkoutUrl"));
+  assert.ok(arena.includes("API_BASE+'/store/purchase-request'"));
+  assert.ok(arena.includes("https://wa.me/"), "WhatsApp remains available for support, not automatic payment");
   assert.ok(arena.includes("Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação'"));
-  assert.ok(arena.includes("Aparência cosmética para seu castelo"));
+  assert.ok(arena.includes("Skin de castelo · Ataque +"));
+  assert.ok(arena.includes("defense_bonus_percent"));
   assert.ok(arena.includes("grid-template-columns:minmax(0,1fr) auto"));
   assert.ok(arena.includes("Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis."));
-  assert.ok(arena.includes("manual_whatsapp"));
+  assert.doesNotMatch(arena, /paymentMethod:'manual_whatsapp'/);
   assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i);
   assert.ok(arena.includes('id="whatsapp"'));
 });
@@ -62,7 +73,7 @@ test("purchase schema restricts products, states, payment methods and duplicate 
   assert.ok(migration.includes("CHECK (product_kind IN ('vip_package','skin'))"));
   assert.ok(migration.includes("CHECK (status IN ('pending','approved','rejected'))"));
   assert.ok(migration.includes("CHECK (payment_method IN ('mercadopago_link','pix','bank_transfer','manual'))"));
-  // Legacy payment values remain readable for historical orders; new requests use the manual WhatsApp workflow.
+  // Legacy manual requests remain readable; new orders use the individual Mercado Pago checkout.
   assert.ok(migration.includes("UNIQUE (player_id, request_key)"));
   assert.ok(migration.includes("idx_purchase_requests_status_created"));
   assert.ok(migration.includes("idx_purchase_requests_one_pending_product"));

@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+<title id="title">Anjo da Morte</title><desc id="desc">O Ceifador do Fim com asas negras, foice e aura rubra.</desc>
+<defs>
+ <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#33253c"/><stop offset="1" stop-color="#0c1220"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#df8a82" stop-opacity=".65"/><stop offset="1" stop-color="#df8a82" stop-opacity="0"/></radialGradient>
+ <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#fff0b7"/><stop offset=".48" stop-color="#d6a94f"/><stop offset="1" stop-color="#79512d"/></linearGradient>
+</defs>
+<rect width="640" height="360" fill="url(#bg)"/>
+<circle cx="320" cy="152" r="210" fill="url(#glow)"/>
+<path d="M0 292 80 250 145 275 220 218 290 266 365 210 440 265 520 225 640 282V360H0Z" fill="#0c1624" opacity=".72"/>
+<path d="M0 320 95 290 165 304 240 272 322 300 408 267 500 302 575 273 640 294V360H0Z" fill="#101d2a"/>
+
+
+<path d="M270 111C209 46 113 62 82 124c58-18 102 11 129 58-61-27-103-14-136 18 83-12 142 21 190 73l41-55z" fill="#25253b" stroke="#df8a82" stroke-width="5"/>
+<path d="M370 111C431 46 527 62 558 124c-58-18-102 11-129 58 61-27 103-14 136 18-83-12-142 21-190 73l-41-55z" fill="#25253b" stroke="#df8a82" stroke-width="5"/>
+<path d="M290 110 379 42 418 65 337 150Z" fill="#2d2d43" stroke="url(#gold)" stroke-width="4"/>
+<path d="M389 50c72-24 104 19 69 58-28 31-65 27-90 5 40 1 62-22 21-63Z" fill="#d8e2ed" stroke="#df8a82" stroke-width="4"/>
+<path d="M278 130Q320 89 362 130l-15 130h-54Z" fill="#171c2e" stroke="#df8a82" stroke-width="4"/>
+<path d="M292 132q28-28 56 0l-8 47h-40Z" fill="#0d101b" stroke="#c6b5d0" stroke-width="3"/>
+<circle cx="306" cy="153" r="5" fill="#ff526a"/><circle cx="334" cy="153" r="5" fill="#ff526a"/>
+<path d="M320 202v59" stroke="url(#gold)" stroke-width="8" stroke-linecap="round"/>
+
+<path d="M0 332Q160 300 320 333T640 329" fill="none" stroke="#df8a82" stroke-opacity=".55" stroke-width="3"/>
+</svg>

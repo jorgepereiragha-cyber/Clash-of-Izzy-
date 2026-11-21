@@ -1,44 +1,153 @@
-/* Partículas 2D leves para a cidade. Sem novo contexto WebGL ou dependência externa. */
+/* Particulas 2D sutis da cidade. Sem novo contexto WebGL ou dependencias externas. */
 (() => {
- "use strict";
- const host=document.getElementById("city");
- if(!host||host.querySelector(".coi-ambient-layer"))return;
- const reduce=window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches===true;
- const saveData=navigator.connection?.saveData===true;
- if(reduce||saveData)return;
- const canvas=document.createElement("canvas");
- canvas.className="coi-ambient-layer";canvas.setAttribute("aria-hidden","true");
- host.append(canvas);
- const ctx=canvas.getContext("2d",{alpha:true});
- if(!ctx){canvas.remove();return;}
- const particles=[];
- let width=0,height=0,raf=0,last=0,visible=true;
- const mobile=matchMedia("(max-width: 760px)").matches;
- const count=mobile?22:48;
- const resize=()=>{
-  const rect=host.getBoundingClientRect(),dpr=Math.min(1.5,window.devicePixelRatio||1);
-  width=Math.max(1,rect.width);height=Math.max(1,rect.height);
-  canvas.width=Math.round(width*dpr);canvas.height=Math.round(height*dpr);
-  ctx.setTransform(dpr,0,0,dpr,0,0);
-  if(!particles.length)for(let i=0;i<count;i++)particles.push({x:Math.random()*width,y:Math.random()*height,r:.6+Math.random()*1.5,v:.12+Math.random()*.3,a:.18+Math.random()*.35,phase:Math.random()*6.28});
- };
- const draw=(time)=>{
-  raf=0;if(!visible||document.hidden)return;
-  const dt=Math.min(2,(time-last)/16.67||1);last=time;
-  ctx.clearRect(0,0,width,height);
-  for(const p of particles){
-   p.y-=p.v*dt;p.x+=Math.sin(time*.00035+p.phase)*.16*dt;
-   if(p.y< -4){p.y=height+4;p.x=Math.random()*width;}
-   ctx.globalAlpha=p.a;ctx.fillStyle=p.phase%2<1?"#f5d995":"#d9ecff";
-   ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);ctx.fill();
+  "use strict";
+  const host = document.getElementById("city");
+  if (!host || host.querySelector(".coi-ambient-layer")) return;
+
+  const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
+  const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+  const saveData = connection?.saveData === true;
+  const memory = Number(navigator.deviceMemory || 4);
+  if (reduceMotion || saveData || (Number.isFinite(memory) && memory <= 2)) return;
+
+  const mobile = window.matchMedia?.("(max-width: 760px)")?.matches === true;
+  const count = mobile ? (memory <= 4 ? 12 : 18) : (memory <= 4 ? 24 : 36);
+  const pixelRatioCap = mobile ? 1.25 : 1.5;
+  const canvas = document.createElement("canvas");
+  canvas.className = "coi-ambient-layer";
+  canvas.setAttribute("aria-hidden", "true");
+  canvas.setAttribute("role", "presentation");
+  host.append(canvas);
+
+  const context = canvas.getContext("2d", { alpha: true });
+  if (!context) {
+    canvas.remove();
+    return;
   }
-  ctx.globalAlpha=1;raf=requestAnimationFrame(draw);
- };
- const start=()=>{if(!raf&&visible&&!document.hidden){last=0;raf=requestAnimationFrame(draw)}};
- const stop=()=>{if(raf)cancelAnimationFrame(raf);raf=0};
- const observer=new IntersectionObserver(entries=>{visible=entries[0]?.isIntersecting===true;visible?start():stop()});
- observer.observe(host);resize();start();
- window.addEventListener("resize",resize,{passive:true});
- document.addEventListener("visibilitychange",()=>document.hidden?stop():start());
- window.addEventListener("pagehide",()=>{stop();observer.disconnect();window.removeEventListener("resize",resize);},{once:true});
+
+  const particles = [];
+  let width = 0, height = 0, frame = 0, lastFrame = 0;
+  const FRAME_INTERVAL_MS = 1000 / 30;
+  let visible = true, disposed = false;
+  let resizeObserver = null, intersectionObserver = null;
+
+  function resize() {
+    if (disposed) return;
+    const rect = host.getBoundingClientRect();
+    const nextWidth = Math.max(1, rect.width);
+    const nextHeight = Math.max(1, rect.height);
+    if (nextWidth <= 1 || nextHeight <= 1) return;
+    width = nextWidth;
+    height = nextHeight;
+    const dpr = Math.min(pixelRatioCap, window.devicePixelRatio || 1);
+    canvas.width = Math.round(width * dpr);
+    canvas.height = Math.round(height * dpr);
+    context.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    if (!particles.length) {
+      for (let i = 0; i < count; i++) particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        radius: .6 + Math.random() * 1.25,
+        speed: .1 + Math.random() * .24,
+        alpha: .14 + Math.random() * .28,
+        phase: Math.random() * Math.PI * 2,
+      });
+    } else {
+      for (const particle of particles) {
+        particle.x = Math.min(width, particle.x);
+        particle.y = Math.min(height, particle.y);
+      }
+    }
+  }
+
+  function draw(timestamp) {
+    frame = 0;
+    if (disposed || !visible || document.hidden || width <= 1 || height <= 1) return;
+    if (lastFrame && timestamp - lastFrame < FRAME_INTERVAL_MS) {
+      frame = window.requestAnimationFrame(draw);
+      return;
+    }
+    const delta = Math.min(2, (timestamp - lastFrame) / FRAME_INTERVAL_MS || 1);
+    lastFrame = timestamp;
+    context.clearRect(0, 0, width, height);
+    for (const particle of particles) {
+      particle.y -= particle.speed * delta;
+      particle.x += Math.sin(timestamp * .00035 + particle.phase) * .14 * delta;
+      if (particle.y < -4) {
+        particle.y = height + 4;
+        particle.x = Math.random() * width;
+      }
+      context.globalAlpha = particle.alpha;
+      context.fillStyle = particle.phase % 2 < 1 ? "#f5d995" : "#d9ecff";
+      context.beginPath();
+      context.arc(particle.x, particle.y, particle.radius, 0, Math.PI * 2);
+      context.fill();
+    }
+    context.globalAlpha = 1;
+    frame = window.requestAnimationFrame(draw);
+  }
+
+  function start() {
+    if (disposed || frame || !visible || document.hidden || width <= 1 || height <= 1) return;
+    lastFrame = 0;
+    frame = window.requestAnimationFrame(draw);
+  }
+  function stop() {
+    if (frame) window.cancelAnimationFrame(frame);
+    frame = 0;
+    lastFrame = 0;
+  }
+  function onVisibilityChange() {
+    if (document.hidden) stop();
+    else {
+      resize();
+      start();
+    }
+  }
+  function onPageHide(event) {
+    if (event.persisted) {
+      stop();
+      return;
+    }
+    dispose();
+  }
+  function onPageShow(event) {
+    if (!event.persisted || disposed) return;
+    resize();
+    start();
+  }
+  function dispose() {
+    if (disposed) return;
+    disposed = true;
+    stop();
+    resizeObserver?.disconnect();
+    intersectionObserver?.disconnect();
+    document.removeEventListener("visibilitychange", onVisibilityChange);
+    window.removeEventListener("pagehide", onPageHide);
+    window.removeEventListener("pageshow", onPageShow);
+    window.removeEventListener("resize", resize);
+    canvas.remove();
+  }
+
+  if ("ResizeObserver" in window) {
+    resizeObserver = new ResizeObserver(resize);
+    resizeObserver.observe(host);
+  } else {
+    window.addEventListener("resize", resize, { passive: true });
+  }
+  if ("IntersectionObserver" in window) {
+    intersectionObserver = new IntersectionObserver(entries => {
+      visible = entries[entries.length - 1]?.isIntersecting === true;
+      if (visible) { resize(); start(); }
+      else stop();
+    }, { threshold: 0.01 });
+    intersectionObserver.observe(host);
+  }
+
+  document.addEventListener("visibilitychange", onVisibilityChange);
+  window.addEventListener("pagehide", onPageHide);
+  window.addEventListener("pageshow", onPageShow);
+  resize();
+  start();
 })();

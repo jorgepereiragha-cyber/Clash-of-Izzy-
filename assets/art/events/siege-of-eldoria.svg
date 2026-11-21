@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="360" viewBox="0 0 640 360" role="img" aria-labelledby="title desc">
+<title id="title">Cerco de Eldoria</title><desc id="desc">Fortaleza medieval com estandartes azuis e dourados.</desc>
+<defs>
+ <linearGradient id="bg" x2="0" y2="1"><stop stop-color="#3a4255"/><stop offset="1" stop-color="#111b2b"/></linearGradient>
+ <radialGradient id="glow"><stop stop-color="#d2a66a" stop-opacity=".65"/><stop offset="1" stop-color="#d2a66a" stop-opacity="0"/></radialGradient>
+ <linearGradient id="gold" x2="1" y2="1"><stop stop-color="#fff0b7"/><stop offset=".48" stop-color="#d6a94f"/><stop offset="1" stop-color="#79512d"/></linearGradient>
+</defs>
+<rect width="640" height="360" fill="url(#bg)"/>
+<circle cx="320" cy="152" r="210" fill="url(#glow)"/>
+<path d="M0 292 80 250 145 275 220 218 290 266 365 210 440 265 520 225 640 282V360H0Z" fill="#0c1624" opacity=".72"/>
+<path d="M0 320 95 290 165 304 240 272 322 300 408 267 500 302 575 273 640 294V360H0Z" fill="#101d2a"/>
+
+
+<path d="M112 292V124h55V88h46v36h48V65h56v59h49V93h49v31h61v168Z" fill="#283c53" stroke="#d2a66a" stroke-width="5"/>
+<path d="M253 292v-98q67-72 134 0v98" fill="#152235" stroke="url(#gold)" stroke-width="5"/>
+<path d="M310 292v-48q10-24 20 0v48" fill="#0b1624" stroke="#d2a66a" stroke-width="4"/>
+<path d="M140 122v-54l32 20 32-20v54M422 123V69l32 20 32-20v54" fill="#183d63" stroke="url(#gold)" stroke-width="4"/>
+<path d="M0 297h640" stroke="#b68a4a" stroke-width="5"/>
+
+<path d="M0 332Q160 300 320 333T640 329" fill="none" stroke="#d2a66a" stroke-opacity=".55" stroke-width="3"/>
+</svg>

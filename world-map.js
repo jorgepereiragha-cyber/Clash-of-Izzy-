@@ -26,7 +26,9 @@ let selectedTerritoryId = null;
 let selectedUnits = {};
 let busy = false;
 let mapViewport = { zoom: 1, panX: 0, panY: 0 };
-let mapPointer = null;
+const activeMapPointers = new Map();
+let mapPanStart = null;
+let mapPinchStart = null;
 const requestedTerritorySearch = new URLSearchParams(location.search).get("search") || "";
 let requestedTerritoryApplied = false;
 const normalizeTerritorySearch = value => String(value || "").normalize("NFKD").replace(/[\p{M}]/gu, "").toLocaleLowerCase("pt-BR").trim();
@@ -307,38 +309,81 @@ $("mapReset").addEventListener("click", resetMapViewport);
 
 $("worldMap").addEventListener("pointerdown", event => {
   if (event.button !== 0 || event.target.closest(".territory-pin,.resource-node-pin")) return;
-  mapPointer = {
-    pointerId: event.pointerId,
-    startX: event.clientX,
-    startY: event.clientY,
-    panX: mapViewport.panX,
-    panY: mapViewport.panY,
-  };
+  activeMapPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
   $("worldMap").classList.add("is-dragging");
   try {
     $("worldMap").setPointerCapture(event.pointerId);
   } catch {
-    mapPointer = null;
-    $("worldMap").classList.remove("is-dragging");
+    activeMapPointers.delete(event.pointerId);
+    $("worldMap").classList.toggle("is-dragging", activeMapPointers.size > 0);
+    return;
+  }
+
+  if (activeMapPointers.size === 1) {
+    mapPanStart = {
+      pointerId: event.pointerId,
+      startX: event.clientX,
+      startY: event.clientY,
+      panX: mapViewport.panX,
+      panY: mapViewport.panY,
+    };
+    mapPinchStart = null;
+  } else if (activeMapPointers.size === 2) {
+    const points = [...activeMapPointers.values()];
+    const dx = points[1].x - points[0].x;
+    const dy = points[1].y - points[0].y;
+    mapPinchStart = {
+      distance: Math.max(1, Math.hypot(dx, dy)),
+      zoom: mapViewport.zoom,
+    };
+    mapPanStart = null;
   }
 });
+
 $("worldMap").addEventListener("pointermove", event => {
-  if (!mapPointer || event.pointerId !== mapPointer.pointerId) return;
-  const dx = event.clientX - mapPointer.startX;
-  const dy = event.clientY - mapPointer.startY;
+  if (!activeMapPointers.has(event.pointerId)) return;
+  activeMapPointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+
+  if (activeMapPointers.size >= 2 && mapPinchStart) {
+    const points = [...activeMapPointers.values()];
+    const dx = points[1].x - points[0].x;
+    const dy = points[1].y - points[0].y;
+    const distance = Math.max(1, Math.hypot(dx, dy));
+    applyMapViewport({ zoom: mapPinchStart.zoom * (distance / mapPinchStart.distance) });
+    return;
+  }
+
+  if (!mapPanStart || event.pointerId !== mapPanStart.pointerId) return;
+  const dx = event.clientX - mapPanStart.startX;
+  const dy = event.clientY - mapPanStart.startY;
   if (Math.abs(dx) + Math.abs(dy) < 2) return;
-  applyMapViewport({ panX: mapPointer.panX + dx, panY: mapPointer.panY + dy });
+  applyMapViewport({ panX: mapPanStart.panX + dx, panY: mapPanStart.panY + dy });
 });
+
 function endMapPan(event) {
-  if (!mapPointer || (event && event.pointerId !== mapPointer.pointerId)) return;
-  const pointerId = mapPointer.pointerId;
-  mapPointer = null;
-  $("worldMap").classList.remove("is-dragging");
+  if (!event || !activeMapPointers.has(event.pointerId)) return;
+  const pointerId = event.pointerId;
+  activeMapPointers.delete(pointerId);
   try {
     if ($("worldMap").hasPointerCapture(pointerId)) $("worldMap").releasePointerCapture(pointerId);
   } catch {
     // Pointer capture may already have been released by the browser.
   }
+
+  mapPinchStart = null;
+  if (activeMapPointers.size === 1) {
+    const [remainingId, point] = activeMapPointers.entries().next().value;
+    mapPanStart = {
+      pointerId: remainingId,
+      startX: point.x,
+      startY: point.y,
+      panX: mapViewport.panX,
+      panY: mapViewport.panY,
+    };
+  } else {
+    mapPanStart = null;
+  }
+  $("worldMap").classList.toggle("is-dragging", activeMapPointers.size > 0);
 }
 $("worldMap").addEventListener("pointerup", endMapPan);
 $("worldMap").addEventListener("pointercancel", endMapPan);
@@ -370,4 +415,9 @@ window.setInterval(() => {
 }, 15000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && !busy && token) refreshState().catch(error => setStatus(error.message, true));
+});
+window.addEventListener("coi:app-resume", event => {
+  if (event.detail?.reason === "online" && !busy && token) {
+    refreshState().catch(error => setStatus(error.message, true));
+  }
 });

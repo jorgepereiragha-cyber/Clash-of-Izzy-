@@ -110,6 +110,11 @@ test.describe("Mobile kingdom rendering", () => {
     await expect(page.locator("#game")).toBeVisible();
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
 
+    const ambientLayer = page.locator("#city .coi-ambient-layer");
+    await expect(ambientLayer).toBeAttached();
+    await expect(ambientLayer).toHaveAttribute("aria-hidden", "true");
+    await expect(ambientLayer).toHaveCSS("pointer-events", "none");
+
     // The expanded recorder panel used to cover upgrade/training controls on phones.
     // It now starts minimized on mobile and remains accessible through its toggle.
     const recorderBody = page.locator("#coi-recorder-body");
