@@ -46,6 +46,14 @@ jobs:
             playwright-report/
           if-no-files-found: ignore
           retention-days: 7
+      - name: Archive visual previews from synthetic mobile fixture
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash-of-izzy-visual-preview
+          path: test-results/visual-preview/
+          if-no-files-found: ignore
+          retention-days: 7
       - name: Forensic diagnostic of production account endpoint (read-only)
         if: github.event_name == 'pull_request'
         continue-on-error: true

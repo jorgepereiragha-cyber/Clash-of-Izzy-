@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 
 const SESSION_TOKEN = "playwright-mobile-fixture-session";
 
@@ -217,7 +218,9 @@ test.describe("Mobile kingdom rendering", () => {
   });
 
   test("graphics preferences persist and 2D mode keeps mobile controls usable", async ({ page }) => {
-    await page.addInitScript(() => localStorage.setItem("coi_graphics_preference", "2d"));
+    await page.addInitScript(() => {
+      if (!localStorage.getItem("coi_graphics_preference")) localStorage.setItem("coi_graphics_preference", "2d");
+    });
     await installApiFixtures(page);
     await page.setViewportSize({width:360,height:740});
     await page.goto("/kingdom.html");
@@ -227,6 +230,10 @@ test.describe("Mobile kingdom rendering", () => {
     await expect(page.locator("#city #kingdom3d")).toHaveCount(0);
     await expect(page.locator('#city .building[data-building="castle"]')).toBeVisible();
     await expect(page.locator("#coiGraphicsApply")).toBeDisabled();
+    await mkdir("test-results/visual-preview", { recursive: true });
+    await page.locator(".coi-city-panel").screenshot({
+      path: "test-results/visual-preview/cidade-360px-2d.png"
+    });
     await page.locator("#coiGraphicsPreset").selectOption("low");
     await expect(page.locator("#coiGraphicsApply")).toBeEnabled();
     await page.locator("#coiGraphicsApply").click();
@@ -239,6 +246,11 @@ test.describe("Mobile kingdom rendering", () => {
     }));
     expect(saved.value).toBe("low");
     expect(saved.width).toBeLessThanOrEqual(saved.viewport + 1);
+    await page.setViewportSize({width: 1120, height: 850});
+    await expect(page.locator(".coi-city-panel")).toBeVisible();
+    await page.locator(".coi-city-panel").screenshot({
+      path: "test-results/visual-preview/cidade-desktop-equilibrio.png"
+    });
   });
 
 });

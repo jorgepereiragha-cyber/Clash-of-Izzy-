@@ -62,3 +62,13 @@ test('APK client keeps city navigation and official game backend separate', () =
   assert.match(city, /src="\/scripts\/kingdom-command-hud\.js"/);
   assert.match(activity, /https:\/\/clash-of-izzy\.jorgepereiragha\.workers\.dev\/kingdom\.html/);
 });
+
+test('Tela de abertura nativa usa a identidade do jogo e libera acesso quando a pagina conclui', () => {
+  assert.match(activity, /GradientDrawable\.Orientation\.TOP_BOTTOM/);
+  assert.match(activity, /loadingTitle\.setText\("CLASH OF IZZY"\)/);
+  assert.match(activity, /loadingPanel\.setVisibility\(View\.GONE\)/);
+  assert.match(activity, /if \(!hasLoadedPage\) loadingPanel\.setVisibility\(View\.VISIBLE\)/);
+  assert.match(activity, /progress\.setProgressTintList/);
+  assert.match(activity, /offlinePanel\.setVisibility\(View\.VISIBLE\)/);
+  assert.doesNotMatch(activity, /WebView\.setWebContentsDebuggingEnabled\(true\)/);
+});
