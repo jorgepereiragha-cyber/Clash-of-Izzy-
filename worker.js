@@ -144,6 +144,45 @@ const MERCHANT_POOL=[
  {id:"pack_starter",stock:2,discount:.70},{id:"food_medium",stock:4,discount:.65}
 ];
 const SHOP_CYCLE_MS=8*60*60*1000;
+const MERCHANT_EXCHANGE_POOL=[
+ {id:"wood_acc_5min",name:"Madeira por aceleração",description:"Troque madeira excedente por 5 minutos de construção.",costs:{wood:2500},reward:{item:"acc_5min",quantity:1},stock:5},
+ {id:"stone_acc_5min",name:"Pedra por aceleração",description:"Troque pedra por 5 minutos de construção.",costs:{stone:2000},reward:{item:"acc_5min",quantity:1},stock:5},
+ {id:"food_train_1h",name:"Provisões de recrutamento",description:"Troque comida por 1 hora de aceleração de treino.",costs:{food:12000},reward:{item:"train_1h",quantity:1},stock:3},
+ {id:"iron_train_1h",name:"Ferro de guerra",description:"Troque ferro por 1 hora de aceleração de treino.",costs:{iron:900},reward:{item:"train_1h",quantity:1},stock:3},
+ {id:"wood_stone_build_1h",name:"Materiais de construção",description:"Troque madeira e pedra por 1 hora de construção.",costs:{wood:9000,stone:5000},reward:{item:"acc_1h",quantity:1},stock:2},
+ {id:"iron_stone_research_1h",name:"Materiais de pesquisa",description:"Troque ferro e pedra por 1 hora de pesquisa.",costs:{iron:1200,stone:3000},reward:{item:"res_1h",quantity:1},stock:2},
+ {id:"mixed_build_8h",name:"Contrato de fortificação",description:"Grande troca por 8 horas de construção.",costs:{wood:45000,stone:30000,iron:5000},reward:{item:"acc_8h",quantity:1},stock:1},
+ {id:"gold_research_8h",name:"Tratado dos estudiosos",description:"Troque ouro por 8 horas de pesquisa.",costs:{gold:12000},reward:{item:"res_8h",quantity:1},stock:1}
+];
+const HERO_FRAGMENT_SHOP={
+ white:{quantity:5,costs:{gold:1800,food:2500},stock:2},
+ blue:{quantity:5,costs:{gold:5200,food:7000},stock:2},
+ purple:{quantity:5,costs:{gold:14500,food:18000},stock:1}
+};
+function rotatingPick(pool,cycle,count){
+ const values=[...pool],seed=(cycle*2246822519+3266489917)>>>0;
+ let x=seed||1;
+ const rand=()=>{x^=x<<13;x^=x>>>17;x^=x<<5;return (x>>>0)/4294967296;};
+ for(let i=values.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[values[i],values[j]]=[values[j],values[i]];}
+ return values.slice(0,count);
+}
+function merchantExchangeOffers(cycle){
+ return rotatingPick(MERCHANT_EXCHANGE_POOL,cycle,6);
+}
+async function getHeroShopState(env,kingdomId,cycle=merchantCycle()){
+ const [heroes,stocks]=await env.DB.batch([
+  env.DB.prepare("SELECT hero_key,rarity,stars,fragments FROM hero_inventory WHERE kingdom_id=? ORDER BY rarity DESC,hero_key").bind(kingdomId),
+  env.DB.prepare("SELECT item_id,stock FROM merchant_stock WHERE kingdom_id=? AND cycle_id=? AND item_id LIKE 'hero_frag_%'").bind(kingdomId,cycle)
+ ]);
+ const stock=Object.fromEntries((stocks.results||[]).map(row=>[row.item_id,Number(row.stock)||0]));
+ const offers=(heroes.results||[]).map(hero=>{
+  const rule=HERO_FRAGMENT_SHOP[hero.rarity];
+  if(!rule)return null;
+  const itemId="hero_frag_"+hero.hero_key;
+  return {id:itemId,heroKey:hero.hero_key,name:HERO_TEMPLATES[hero.hero_key]?.name||hero.hero_key,rarity:hero.rarity,stars:Number(hero.stars)||1,fragments:Number(hero.fragments)||0,quantity:rule.quantity,costs:rule.costs,stock:stock[itemId]??rule.stock,description:"Fragmentos para evoluir este herói. A compra só aparece para heróis já recrutados."};
+ }).filter(Boolean);
+ return {cycle,refreshAt:(cycle+1)*SHOP_CYCLE_MS,offers};
+}
 function merchantCycle(now=Date.now()){return Math.floor(now/SHOP_CYCLE_MS);}
 function merchantOffers(cycle){
  const pool=[...MERCHANT_POOL],seed=(cycle*2654435761)>>>0;
@@ -152,13 +191,18 @@ function merchantOffers(cycle){
  return pool.slice(0,8).map(o=>({id:o.id,stock:o.stock,discount:Math.round((1-o.discount)*100),price:Math.max(1,Math.floor(SHOP_ITEMS[o.id].price*o.discount))}));
 }
 async function getShopState(env,kingdomId){
-const cycle=merchantCycle(),offers=merchantOffers(cycle);
+ const cycle=merchantCycle(),offers=merchantOffers(cycle),exchanges=merchantExchangeOffers(cycle);
  const [rows,inventory]=await env.DB.batch([
   env.DB.prepare("SELECT item_id,stock FROM merchant_stock WHERE kingdom_id=? AND cycle_id=?").bind(kingdomId,cycle),
   env.DB.prepare("SELECT item_id,quantity FROM shop_inventory WHERE kingdom_id=? AND quantity>0 ORDER BY item_id").bind(kingdomId)
  ]);
  const stock=Object.fromEntries((rows.results||[]).map(r=>[r.item_id,r.stock]));
- return {cycle,refreshAt:(cycle+1)*SHOP_CYCLE_MS,offers:offers.map(o=>({...SHOP_ITEMS[o.id],id:o.id,price:o.price,discount:o.discount,stock:stock[o.id]??o.stock,originalPrice:SHOP_ITEMS[o.id].price})),items:SHOP_ITEMS,inventory:inventory.results||[]};
+ return {
+  cycle,refreshAt:(cycle+1)*SHOP_CYCLE_MS,
+  offers:offers.map(o=>({...SHOP_ITEMS[o.id],id:o.id,price:o.price,discount:o.discount,stock:stock[o.id]??o.stock,originalPrice:SHOP_ITEMS[o.id].price})),
+  exchangeOffers:exchanges.map(o=>({...o,stock:stock[o.id]??o.stock,rewardName:SHOP_ITEMS[o.reward.item]?.name||o.reward.item})),
+  items:SHOP_ITEMS,inventory:inventory.results||[]
+ };
 }
 function rollHeroRarity(){const n=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296*100,common=HERO_SUMMON_RARITY_ODDS.white,rare=common+HERO_SUMMON_RARITY_ODDS.blue;return n<common?"white":n<rare?"blue":"purple";}
 const TROOP_CAPACITY_PER_BARRACKS_LEVEL = 500;
@@ -720,6 +764,7 @@ async function gameState(env,playerId){
   const queuedTraining=(queues.results||[]).filter(row=>row.queue_type==="training"&&row.status==="running").reduce((sum,row)=>sum+Math.max(0,Number(row.quantity)||0),0);
   const armyCount=totalTroops+fieldTroops+queuedTraining;
   const shop=await getShopState(env,kingdom.id);
+  const heroShop=await getHeroShopState(env,kingdom.id,shop.cycle);
   const cosmetics=await getCosmeticState(env,kingdom.id);
   const equipmentRows=await ensureEquipmentTables(env,kingdom.id);
   const heroEquipment=(await env.DB.prepare("SELECT he.hero_id,h.hero_name,he.slot,he.item_key,he.level FROM hero_equipment he JOIN heroes h ON h.id=he.hero_id WHERE h.kingdom_id=? ORDER BY h.level DESC,h.id,he.slot").bind(kingdom.id).all()).results||[];
@@ -737,7 +782,7 @@ async function gameState(env,playerId){
   const activeCastleSkinRow=(castleSkins.results||[]).find(row=>Number(row.id)===Number(fresh?.equipped_skin_id))||null;
   const activeCastleSkin=castleSkinCombatView(activeCastleSkinRow);
   const petState=await getPetsState(env,kingdom.id);
-  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
+  return {equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -945,6 +990,84 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"shop_purchase",JSON.stringify({item:itemId,source,price,currency:item.currency})));
     await env.DB.batch(statements);
 
+  }else if(type==="merchant_exchange"){
+    const offerId=String(body.offerId||""),cycle=merchantCycle(),offer=merchantExchangeOffers(cycle).find(item=>item.id===offerId);
+    if(!offer)return json({error:"Esta troca não pertence à rotação atual do mercador."},409);
+    await env.DB.prepare("INSERT OR IGNORE INTO merchant_stock(kingdom_id,cycle_id,item_id,stock) VALUES(?,?,?,?)").bind(k.id,cycle,offer.id,offer.stock).run();
+    const actionId=crypto.randomUUID(),stockGuard=crypto.randomUUID(),paidGuard=crypto.randomUUID();
+    const guard=(id)=>"EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const resourceBindings=["food","wood","stone","iron","gold"].map(key=>Number(offer.costs[key]||0));
+    const resourceChecks=["food","wood","stone","iron","gold"].map(key=>" AND "+key+">=?").join("");
+    const batch=await env.DB.batch([
+      env.DB.prepare("UPDATE merchant_stock SET stock=stock-1 WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND stock>0").bind(k.id,cycle,offer.id),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",stockGuard),
+      env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,stone=stone-?,iron=iron-?,gold=gold-?,updated_at=CURRENT_TIMESTAMP WHERE id=?"+resourceChecks+" AND "+guard(stockGuard)).bind(...resourceBindings,k.id,...resourceBindings,k.id,stockGuard),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0 AND "+guard(stockGuard)).bind(k.id,"__internal_action_guard",paidGuard,k.id,stockGuard),
+      env.DB.prepare("INSERT INTO shop_inventory(kingdom_id,item_id,quantity) SELECT ?,?,? WHERE "+guard(paidGuard)+" ON CONFLICT(kingdom_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,offer.reward.item,offer.reward.quantity,k.id,paidGuard),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard(paidGuard)).bind(k.id,"merchant_exchange",JSON.stringify({offer:offer.id,costs:offer.costs,reward:offer.reward}),k.id,paidGuard),
+      env.DB.prepare("UPDATE merchant_stock SET stock=stock+1 WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND "+guard(stockGuard)+" AND NOT "+guard(paidGuard)).bind(k.id,cycle,offer.id,k.id,stockGuard,k.id,paidGuard),
+      env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json IN (?,?)").bind(k.id,stockGuard,paidGuard)
+    ]);
+    if(!batch[0]?.meta?.changes)return json({error:"Oferta esgotada nesta rotação."},409);
+    if(!batch[2]?.meta?.changes)return json({error:"Recursos insuficientes para concluir esta troca. Nenhum recurso foi debitado."},409);
+  }else if(type==="hero_shop_buy"){
+    const heroKey=String(body.heroKey||"");
+    if(!/^[a-z0-9_]{2,64}$/.test(heroKey))return json({error:"Herói inválido para a loja."},400);
+    const hero=await env.DB.prepare("SELECT rarity,fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
+    if(!hero)return json({error:"A loja só vende fragmentos de heróis que você já recrutou."},404);
+    const rule=HERO_FRAGMENT_SHOP[hero.rarity];
+    if(!rule)return json({error:"Este herói não possui oferta de fragmentos nesta rotação."},409);
+    const cycle=merchantCycle(),itemId="hero_frag_"+heroKey;
+    await env.DB.prepare("INSERT OR IGNORE INTO merchant_stock(kingdom_id,cycle_id,item_id,stock) VALUES(?,?,?,?)").bind(k.id,cycle,itemId,rule.stock).run();
+    const actionId=crypto.randomUUID(),stockGuard=crypto.randomUUID(),paidGuard=crypto.randomUUID();
+    const guard=(id)=>"EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const keys=["food","wood","stone","iron","gold"],values=keys.map(key=>Number(rule.costs[key]||0));
+    const checks=keys.map(key=>" AND "+key+">=?").join("");
+    const batch=await env.DB.batch([
+      env.DB.prepare("UPDATE merchant_stock SET stock=stock-1 WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND stock>0").bind(k.id,cycle,itemId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",stockGuard),
+      env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,stone=stone-?,iron=iron-?,gold=gold-?,updated_at=CURRENT_TIMESTAMP WHERE id=?"+checks+" AND EXISTS(SELECT 1 FROM hero_inventory WHERE kingdom_id=? AND hero_key=?) AND "+guard(stockGuard)).bind(...values,k.id,...values,k.id,heroKey,k.id,stockGuard),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0 AND "+guard(stockGuard)).bind(k.id,"__internal_action_guard",paidGuard,k.id,stockGuard),
+      env.DB.prepare("UPDATE hero_inventory SET fragments=fragments+? WHERE kingdom_id=? AND hero_key=? AND "+guard(paidGuard)).bind(rule.quantity,k.id,heroKey,k.id,paidGuard),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0 AND "+guard(paidGuard)).bind(k.id,"__internal_action_guard",actionId,k.id,paidGuard),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard(actionId)).bind(k.id,"hero_fragments_purchased",JSON.stringify({hero:heroKey,quantity:rule.quantity,costs:rule.costs}),k.id,actionId),
+      env.DB.prepare("UPDATE merchant_stock SET stock=stock+1 WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND "+guard(stockGuard)+" AND NOT "+guard(paidGuard)).bind(k.id,cycle,itemId,k.id,stockGuard,k.id,paidGuard),
+      env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json IN (?,?,?)").bind(k.id,stockGuard,paidGuard,actionId)
+    ]);
+    if(!batch[0]?.meta?.changes)return json({error:"Oferta de fragmentos esgotada nesta rotação."},409);
+    if(!batch[2]?.meta?.changes)return json({error:"Recursos insuficientes para comprar fragmentos. Nenhum recurso foi debitado."},409);
+    if(!batch[4]?.meta?.changes)return json({error:"Não foi possível creditar os fragmentos. Atualize a loja."},409);
+  }else if(type==="queue_speedup"){
+    const queueId=Number(body.queueId),itemId=String(body.itemId||""),quantity=Number(body.quantity??1);
+    const speedups={
+      construction:{acc_5min:300,acc_1h:3600,acc_8h:28800,acc_1d:86400},
+      training:{train_1h:3600,train_8h:28800},
+      research:{res_1h:3600,res_8h:28800}
+    };
+    if(!Number.isSafeInteger(queueId)||queueId<1||!Number.isSafeInteger(quantity)||quantity<1||quantity>25)return json({error:"Fila ou quantidade de aceleradores inválida."},400);
+    const queue=await env.DB.prepare("SELECT id,queue_type,status,started_at,completes_at FROM kingdom_queues WHERE id=? AND kingdom_id=? AND status='running'").bind(queueId,k.id).first();
+    if(!queue)return json({error:"Fila ativa não encontrada neste reino."},404);
+    const secondsPerItem=speedups[queue.queue_type]?.[itemId];
+    if(!secondsPerItem)return json({error:"Este acelerador não corresponde ao tipo desta fila."},400);
+    const inventory=await env.DB.prepare("SELECT quantity FROM shop_inventory WHERE kingdom_id=? AND item_id=?").bind(k.id,itemId).first();
+    if(Number(inventory?.quantity||0)<quantity)return json({error:"Quantidade de aceleradores insuficiente."},409);
+    const now=Date.now(),remaining=Math.max(0,Date.parse(queue.completes_at)-now);
+    if(!Number.isFinite(remaining)||remaining<=0)return json({error:"Esta fila já está concluindo. Atualize o reino para sincronizar."},409);
+    const reduction=Math.min(remaining,secondsPerItem*quantity*1000);
+    const newCompletesAt=new Date(Math.max(Date.parse(queue.started_at)+1000,Date.parse(queue.completes_at)-reduction)).toISOString();
+    const stockGuard=crypto.randomUUID(),actionId=crypto.randomUUID();
+    const guard=(id)=>"EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const batch=await env.DB.batch([
+      env.DB.prepare("UPDATE shop_inventory SET quantity=quantity-? WHERE kingdom_id=? AND item_id=? AND quantity>=?").bind(quantity,k.id,itemId,quantity),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",stockGuard),
+      env.DB.prepare("UPDATE kingdom_queues SET completes_at=? WHERE id=? AND kingdom_id=? AND queue_type=? AND status='running' AND completes_at=? AND "+guard(stockGuard)).bind(newCompletesAt,queueId,k.id,queue.queue_type,queue.completes_at,k.id,stockGuard),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0 AND "+guard(stockGuard)).bind(k.id,"__internal_action_guard",actionId,k.id,stockGuard),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard(actionId)).bind(k.id,"queue_speedup",JSON.stringify({queueId,itemId,quantity,reducedSeconds:Math.ceil(reduction/1000),completesAt:newCompletesAt}),k.id,actionId),
+      env.DB.prepare("UPDATE shop_inventory SET quantity=quantity+? WHERE kingdom_id=? AND item_id=? AND "+guard(stockGuard)+" AND NOT "+guard(actionId)).bind(quantity,k.id,itemId,k.id,stockGuard,k.id,actionId),
+      env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json IN (?,?)").bind(k.id,stockGuard,actionId)
+    ]);
+    if(!batch[0]?.meta?.changes)return json({error:"Aceleradores insuficientes ou inventário alterado."},409);
+    if(!batch[2]?.meta?.changes)return json({error:"A fila foi alterada por outra ação. O acelerador foi devolvido."},409);
   }else if(type==="alliance_create"){
     const name=String(body.name||"").trim().slice(0,32);
     const tag=String(body.tag||name.replace(/[^a-z0-9]/gi,"").slice(0,4)).toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5);
