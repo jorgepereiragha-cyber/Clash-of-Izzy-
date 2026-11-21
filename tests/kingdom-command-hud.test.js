@@ -51,7 +51,7 @@ test("untrusted server target is not reflected as markup or fake order", () => {
   assert.equal(view.power,0);
 });
 test("CSS keeps the existing Three.js and 2D fallback interactive", () => {
-  assert.match(html, /drawKingdomScene\(buildings\)/);
+  assert.match(html, /drawKingdomScene\(buildings,Number\(k\.equipped_skin_id\|\|0\)\)/);
   assert.match(html, /if\(kingdom3d\)city\.append\(kingdom3d\)/);
   assert.match(html, /coi:kingdom-2d-fallback/);
   assert.match(html, /request\("\/game\/state"\)/);
