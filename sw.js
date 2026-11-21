@@ -60,8 +60,13 @@ self.addEventListener("fetch", event => {
         // Query-bearing routes may contain referral/search/account data.
         // Fetch those normally, but never persist their response or URL.
         if (!url.search && isShellPath(url.pathname) && canStoreResponse(response)) {
-          const cache = await caches.open(CACHE_NAME);
-          await cache.put(url.pathname, response.clone());
+          // Storage quotas and private-mode cache failures are not network failures.
+          try {
+            const cache = await caches.open(CACHE_NAME);
+            await cache.put(url.pathname, response.clone());
+          } catch {
+            // Online navigation must succeed even when offline storage is unavailable.
+          }
         }
         return response;
       } catch {
@@ -81,10 +86,14 @@ self.addEventListener("fetch", event => {
     if (cached) return cached;
     const response = await fetch(request);
     if (canStoreResponse(response)) {
-      const runtime = isRuntimeAsset(url.pathname) && !isShellPath(url.pathname);
-      const cache = await caches.open(runtime ? RUNTIME_CACHE_NAME : CACHE_NAME);
-      await cache.put(url.pathname, response.clone());
-      if (runtime) await limitRuntimeCache(cache);
+      try {
+        const runtime = isRuntimeAsset(url.pathname) && !isShellPath(url.pathname);
+        const cache = await caches.open(runtime ? RUNTIME_CACHE_NAME : CACHE_NAME);
+        await cache.put(url.pathname, response.clone());
+        if (runtime) await limitRuntimeCache(cache);
+      } catch {
+        // Cache errors must not block the successfully fetched static resource.
+      }
     }
     return response;
   })());
