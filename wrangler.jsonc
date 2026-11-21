@@ -26,7 +26,9 @@
     "nodejs_compat"
   ],
   "triggers": {
-    "crons": ["* * * * *"]
+    "crons": [
+      "* * * * *"
+    ]
   },
   "observability": {
     "enabled": true
@@ -44,6 +46,30 @@
         "database_name": "izzy-preview-17112026",
         "database_id": "6674c0ac-3636-4e57-bff8-23cf60ab9637"
       }
+    ],
+    "durable_objects": {
+      "bindings": [
+        {
+          "name": "ELDORIA_ROOM",
+          "class_name": "EldoriaRoom"
+        }
+      ]
+    }
+  },
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "ELDORIA_ROOM",
+        "class_name": "EldoriaRoom"
+      }
     ]
-  }
+  },
+  "migrations": [
+    {
+      "tag": "v1-eldoria-room",
+      "new_sqlite_classes": [
+        "EldoriaRoom"
+      ]
+    }
+  ]
 }
