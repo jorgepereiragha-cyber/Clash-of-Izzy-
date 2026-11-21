@@ -78,7 +78,7 @@
   padding:8px 10px;border:1px solid #be8b4f;border-radius:7px;
   white-space:nowrap;background:#23374a;
 }
-.coi-fourx .layout{grid-template-columns:minmax(0,1.65fr) minmax(265px,.85fr)}
+.coi-fourx .layout{grid-template-columns:minmax(0,1.65fr) minmax(265px,.85fr);align-items:start}
 .coi-city-panel{min-width:0}
 .coi-city-stage{position:relative;isolation:isolate;margin-bottom:10px}
 .coi-fourx .coi-city-stage .city{
