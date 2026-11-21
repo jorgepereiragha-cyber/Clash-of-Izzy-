@@ -7,6 +7,8 @@ Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e p
 ## Produção e release
 
 - 🎮 **Jogar:** [Clash of Izzy — Produção](https://clash-of-izzy.jorgepereiragha.workers.dev)
+- 📲 **Portal de instalação e loja (após deploy):** [/portal.html](https://clash-of-izzy.jorgepereiragha.workers.dev/portal.html)
+- 💳 **Monetização e reconciliação:** [docs/MONETIZACAO_SEGURA.md](docs/MONETIZACAO_SEGURA.md)
 - 📘 **Relatório oficial:** [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 - ⚙️ **Deploy final validado:** [GitHub Actions — run #43872671573](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671573)
 - ✅ **CI final validada:** [GitHub Actions — run #43872671700](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671700)
