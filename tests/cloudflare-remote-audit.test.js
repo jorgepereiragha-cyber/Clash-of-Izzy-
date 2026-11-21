@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
-import {validateIds,audit,summary} from "../scripts/cloudflare-remote-audit.mjs";
+import {validateIds,audit,summary,normalizeToken} from "../scripts/cloudflare-remote-audit.mjs";
 const read=async p=>readFile(new URL("../"+p,import.meta.url),"utf8");
 const prod=JSON.parse(await read("wrangler.jsonc"));
 const staging=JSON.parse(await read("wrangler.preview-migrations.jsonc"));
@@ -29,4 +29,10 @@ test("production deployment requires paid confirmation separately from productio
   assert.match(workflow,/branches: \[main\]/);
   assert.match(workflow,/cloudflare-remote-audit\.mjs/);
   assert.doesNotMatch(workflow,/d1 migrations apply/);
+});
+
+test("normalizes Cloudflare GitHub token variants and rejects interior whitespace",()=>{
+  assert.equal(normalizeToken(" Bearer test_token "), "test_token");
+  assert.equal(normalizeToken(" 'test_token' "), "test_token");
+  assert.equal(normalizeToken("invalid key"), "");
 });
