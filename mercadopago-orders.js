@@ -67,7 +67,10 @@ async function createCheckout(request, env, ctx) {
   ).bind(requestId, playerId).first();
   if (!order) return ctx.json({ error: "Pedido não encontrado para este reino." }, 404);
   if (order.status !== "pending") return ctx.json({ error: "Este pedido não está mais aguardando pagamento." }, 409);
-  if (order.mp_checkout_url && order.mp_order_id) return ctx.json({ success: true, checkoutUrl: order.mp_checkout_url, orderId: order.mp_order_id, reused: true });
+  if (order.mp_checkout_url && order.mp_order_id) {
+    if (!isTrustedMercadoPagoCheckoutUrl(order.mp_checkout_url)) return ctx.json({ error: "Checkout armazenado com destino inválido; solicite revisão do suporte." }, 409);
+    return ctx.json({ success: true, checkoutUrl: order.mp_checkout_url, orderId: order.mp_order_id, reused: true });
+  }
 
   const now = Math.floor(Date.now() / 1000);
   const lockToken = crypto.randomUUID();
@@ -79,7 +82,10 @@ async function createCheckout(request, env, ctx) {
   ).bind(externalReference, idempotencyKey, lockToken, now + 90, requestId, now).run();
   if (!claimed.meta?.changes) {
     const current = await env.DB.prepare("SELECT mp_order_id,mp_checkout_url,mp_checkout_lock_expires_at FROM purchase_requests WHERE id=?").bind(requestId).first();
-    if (current?.mp_checkout_url && current?.mp_order_id) return ctx.json({ success: true, checkoutUrl: current.mp_checkout_url, orderId: current.mp_order_id, reused: true });
+    if (current?.mp_checkout_url && current?.mp_order_id) {
+      if (!isTrustedMercadoPagoCheckoutUrl(current.mp_checkout_url)) return ctx.json({ error: "Checkout armazenado com destino inválido; solicite revisão do suporte." }, 409);
+      return ctx.json({ success: true, checkoutUrl: current.mp_checkout_url, orderId: current.mp_order_id, reused: true });
+    }
     return ctx.json({ error: "O checkout deste pedido já está sendo preparado. Tente novamente em instantes." }, 409);
   }
 
