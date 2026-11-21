@@ -4,6 +4,13 @@ import {readFile,appendFile} from "node:fs/promises";
 import {pathToFileURL} from "node:url";
 const API="https://api.cloudflare.com/client/v4";
 const PUBLIC="https://clash-of-izzy.jorgepereiragha.workers.dev";
+export function normalizeToken(raw){
+  let token=String(raw||"").trim();
+  if(token.slice(0,7).toLowerCase()==="bearer ")token=token.slice(7).trim();
+  if(token.length>=2&&token[0]===token[token.length-1]&&(token[0]==='"'||token[0]==="'"))token=token.slice(1,-1).trim();
+  return /\\s/.test(token)?"":token;
+}
+
 export function validateIds(prod,preview){
   const p=prod?.d1_databases?.find(x=>x.binding==="DB");
   const t=preview?.d1_databases?.find(x=>x.binding==="PREVIEW_DB");
@@ -105,7 +112,7 @@ async function main(){
       readFile(new URL("../wrangler.preview-migrations.jsonc",import.meta.url),"utf8")
     ]);
     report=await audit({production:JSON.parse(production),staging:JSON.parse(staging),
-      token:process.env.CLOUDFLARE_API_TOKEN||"",accountId:process.env.CLOUDFLARE_ACCOUNT_ID||""});
+      token:normalizeToken(process.env.CLOUDFLARE_API_TOKEN),accountId:process.env.CLOUDFLARE_ACCOUNT_ID||""});
   }catch(e){report={ready:false,checks:[{ok:false,required:true,name:"Configuração",detail:e.message}]}};
   const text=summary(report);console.log(text);
   if(process.env.GITHUB_STEP_SUMMARY)await appendFile(process.env.GITHUB_STEP_SUMMARY,text);
