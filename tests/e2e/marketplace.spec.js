@@ -56,6 +56,7 @@ test("Mercador, Loja de Heróis e aceleradores funcionam no viewport Android", a
   await expect(page.getByText("Kael · Guardião do Sol")).toBeVisible();
   await expect(page.getByRole("button", { name: "Acelerador 5 min × 1", exact: true })).toBeVisible();
   await expect(page.getByText("Construção · castle")).toBeVisible();
+  await page.locator(".coi-nav-toggle").click();
   await expect(page.getByRole("link", { name: /Mercador & Heróis/ })).toBeVisible();
 
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth > window.innerWidth);
