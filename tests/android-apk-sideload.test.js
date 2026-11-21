@@ -40,6 +40,21 @@ test('release nunca e publicada unsigned e nao toca D1', () => {
   assert.match(workflow, /actions\/upload-artifact@v4/);
 });
 
+test('Falhas HTTP 5xx da pagina principal mostram recuperacao sem bloquear APIs', () => {
+  assert.match(activity, /void onReceivedHttpError\(/);
+  assert.match(activity, /request\.isForMainFrame\(\) && errorResponse\.getStatusCode\(\) >= 500/);
+  assert.match(activity, /offlinePanel\.setVisibility\(View\.VISIBLE\)/);
+});
+
+test('APK publicado inclui checksum e assinatura verificada', () => {
+  assert.match(workflow, /apksigner" verify --verbose "\$dir\/app-debug\.apk"/);
+  assert.match(workflow, /apksigner" verify --verbose "\$dir\/app-release\.apk"/);
+  assert.match(workflow, /sha256sum app-debug\.apk > app-debug\.apk\.sha256/);
+  assert.match(workflow, /sha256sum app-release\.apk > app-release\.apk\.sha256/);
+  assert.match(workflow, /app-debug\.apk\*/);
+  assert.match(workflow, /app-release\.apk\*/);
+});
+
 test('APK client keeps city navigation and official game backend separate', () => {
   const city = read('kingdom.html');
   assert.match(city, /coi:command-state/);
