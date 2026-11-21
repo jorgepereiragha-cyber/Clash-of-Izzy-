@@ -2036,8 +2036,9 @@ export default {
     if(url.pathname==="/api/admin/purchase-requests/review"){
       const id=Number(body.requestId),decision=String(body.decision||"");
       if(!Number.isSafeInteger(id)||id<1||!["approve","reject"].includes(decision))return json({error:"Pedido ou decisão inválidos."},400);
-      const pending=await env.DB.prepare("SELECT id,product_kind,product_id,product_name,player_id,gems_amount FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
+      const pending=await env.DB.prepare("SELECT id,product_kind,product_id,product_name,player_id,gems_amount,payment_method FROM purchase_requests WHERE id=? AND status='pending'").bind(id).first();
       if(!pending)return json({error:"Pedido já processado ou não encontrado."},409);
+      if(decision==="approve"&&pending.payment_method==="pix"&&body.bankStatementConfirmed!==true)return json({error:"Confirme que o crédito Pix foi verificado no extrato da conta autorizada."},400);
       let result;
       if(decision==="reject"){
         result=await env.DB.prepare("UPDATE purchase_requests SET status='rejected',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending'").bind(id).run();
