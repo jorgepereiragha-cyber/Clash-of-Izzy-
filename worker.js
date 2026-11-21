@@ -1,3 +1,4 @@
+export { EldoriaRoom } from "./eldoria-room.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "./game-adapter.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
@@ -1519,6 +1520,34 @@ export default {
  async fetch(request,env){
   if(request.method==="OPTIONS")return new Response(null,{status:204});
   const url=new URL(request.url);
+  if(url.pathname==="/api/realtime/eldoria/ticket"){
+    if(request.method!=="POST")return json({error:"Método não permitido."},405);
+    if(!env.ELDORIA_ROOM)return json({error:"Sala realtime ainda não implantada."},503);
+    const playerId=await gameIdentity(request,env);
+    if(!playerId)return json({error:"Sessão do jogador inválida."},401);
+    const limited=await rateLimitDecision(env,"eldoria-realtime-ticket",playerId,20,60);
+    if(limited)return limited;
+    const roomId=env.ELDORIA_ROOM.idFromName("eldoria");
+    const headers=new Headers();
+    headers.set("X-COI-Player-Id",playerId);
+    return await env.ELDORIA_ROOM.get(roomId).fetch(new Request("https://eldoria.internal/ticket",{method:"POST",headers}));
+  }
+  if(url.pathname==="/api/realtime/eldoria"){
+    if(request.method!=="GET")return json({error:"Método não permitido."},405);
+    if(!env.ELDORIA_ROOM)return json({error:"Sala realtime ainda não implantada."},503);
+    if(request.headers.get("Upgrade")?.toLowerCase()!=="websocket")return json({error:"Conexão WebSocket necessária."},426);
+    // Browser WebSocket cannot set Authorization. A one-use ticket is obtained
+    // through the authenticated POST endpoint and presented as a subprotocol.
+    const offeredProtocols=String(request.headers.get("Sec-WebSocket-Protocol")||"").split(",").map(value=>value.trim()).filter(Boolean);
+    const ticketProtocol=offeredProtocols.find(value=>value.startsWith("coi-ticket."));
+    if(!offeredProtocols.includes("coi-eldoria")||!ticketProtocol)return json({error:"Ticket realtime ausente ou inválido."},401);
+    const ticket=ticketProtocol.slice("coi-ticket.".length);
+    if(!/^[a-f0-9-]{72}$/i.test(ticket))return json({error:"Ticket realtime inválido."},401);
+    const headers=new Headers(request.headers);
+    headers.set("X-COI-Realtime-Ticket",ticket);
+    const roomId=env.ELDORIA_ROOM.idFromName("eldoria");
+    return await env.ELDORIA_ROOM.get(roomId).fetch(new Request(request,{headers}));
+  }
   if(url.pathname==="/api/email/verify"&&request.method==="GET")return await verifyEmailToken(env,url.searchParams.get("token"));
   if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
   if(url.pathname==="/api/admin/health"){
