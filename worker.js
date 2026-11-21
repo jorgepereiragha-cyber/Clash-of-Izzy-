@@ -1,4 +1,5 @@
 export { EldoriaRoom } from "./eldoria-room.js";
+import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "./game-adapter.js";
 import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, HERO_SUMMON_RARITY_ODDS, heroView, getHeroCombatBonuses, getHeroSummonOdds } from "./hero-catalog.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank } from "./angel-death-event.js";
@@ -1671,10 +1672,15 @@ export default {
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     const limited=await rateLimitDecision(env,"eldoria-realtime-ticket",playerId,20,60);
     if(limited)return limited;
-    const roomId=env.ELDORIA_ROOM.idFromName("eldoria");
+    // Legacy WebViews omit this opt-in header and stay in the original room.
+    const shard=request.headers.get("X-COI-Shard-Support")==="1"?shardForPlayerId(playerId):null;
+    const roomId=env.ELDORIA_ROOM.idFromName(roomNameForShard(shard));
     const headers=new Headers();
     headers.set("X-COI-Player-Id",playerId);
-    return await env.ELDORIA_ROOM.get(roomId).fetch(new Request("https://eldoria.internal/ticket",{method:"POST",headers}));
+    const response=await env.ELDORIA_ROOM.get(roomId).fetch(new Request("https://eldoria.internal/ticket",{method:"POST",headers}));
+    if(shard===null||response.status!==201)return response;
+    const issued=await response.json();
+    return json({...issued,room:shard},201);
   }
   if(url.pathname==="/api/realtime/eldoria"){
     if(request.method!=="GET")return json({error:"Método não permitido."},405);
@@ -1689,7 +1695,11 @@ export default {
     if(!/^[a-f0-9-]{72}$/i.test(ticket))return json({error:"Ticket realtime inválido."},401);
     const headers=new Headers(request.headers);
     headers.set("X-COI-Realtime-Ticket",ticket);
-    const roomId=env.ELDORIA_ROOM.idFromName("eldoria");
+    if(url.searchParams.getAll("room").length>1)return json({error:"Sala realtime ambígua."},400);
+    let shard;
+    try{shard=parseRealtimeShard(url.searchParams.get("room"));}
+    catch{return json({error:"Sala realtime inválida."},400);}
+    const roomId=env.ELDORIA_ROOM.idFromName(roomNameForShard(shard));
     return await env.ELDORIA_ROOM.get(roomId).fetch(new Request(request,{headers}));
   }
   if(url.pathname==="/api/email/verify"&&request.method==="GET")return await verifyEmailToken(env,url.searchParams.get("token"));
