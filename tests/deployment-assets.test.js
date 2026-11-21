@@ -38,3 +38,7 @@ test("Worker-only modules stay in the Worker bundle and out of public static ass
       "Worker-only module must not be a public asset: " + path);
   }
 });
+
+test("Durable Object source must not leak via public static hosting", () => {
+  assert.ok(ignore.split("\n").some(line => line.trim() === "eldoria-room.js"));
+});
