@@ -3,7 +3,9 @@ package com.clashofizzy.android;
 import android.app.Activity;
 import android.content.ActivityNotFoundException;
 import android.content.Intent;
+import android.content.res.ColorStateList;
 import android.graphics.Color;
+import android.graphics.drawable.GradientDrawable;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -35,6 +37,8 @@ public final class MainActivity extends Activity {
     private FrameLayout root;
     private WebView webView;
     private LinearLayout offlinePanel;
+    private LinearLayout loadingPanel;
+    private boolean hasLoadedPage;
     private ProgressBar progress;
     private boolean mainFrameFailed;
 
@@ -68,6 +72,46 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
 
+        // This small native splash prevents a blank screen before WebView has painted.
+        // Assets stay local; no additional network requests or WebGL contexts.
+        loadingPanel = new LinearLayout(this);
+        loadingPanel.setOrientation(LinearLayout.VERTICAL);
+        loadingPanel.setGravity(Gravity.CENTER);
+        loadingPanel.setPadding(dp(30), dp(24), dp(30), dp(24));
+        GradientDrawable loadingGradient = new GradientDrawable(
+                GradientDrawable.Orientation.TOP_BOTTOM,
+                new int[] { Color.rgb(7, 18, 29), Color.rgb(28, 49, 59) });
+        loadingPanel.setBackground(loadingGradient);
+
+        TextView loadingTitle = new TextView(this);
+        loadingTitle.setText("CLASH OF IZZY");
+        loadingTitle.setTextColor(Color.rgb(242, 206, 133));
+        loadingTitle.setTextSize(29);
+        loadingTitle.setLetterSpacing(0.08f);
+        loadingTitle.setGravity(Gravity.CENTER);
+        loadingPanel.addView(loadingTitle, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        TextView loadingMessage = new TextView(this);
+        loadingMessage.setText("Preparando Eldoria e sincronizando seu reino…");
+        loadingMessage.setTextColor(Color.rgb(216, 228, 233));
+        loadingMessage.setTextSize(14);
+        loadingMessage.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams messageParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        messageParams.topMargin = dp(14);
+        loadingPanel.addView(loadingMessage, messageParams);
+
+        ProgressBar loadingSpinner = new ProgressBar(this);
+        loadingSpinner.setIndeterminateTintList(ColorStateList.valueOf(Color.rgb(233, 200, 120)));
+        LinearLayout.LayoutParams spinnerParams = new LinearLayout.LayoutParams(dp(44), dp(44));
+        spinnerParams.topMargin = dp(22);
+        spinnerParams.gravity = Gravity.CENTER_HORIZONTAL;
+        loadingPanel.addView(loadingSpinner, spinnerParams);
+        root.addView(loadingPanel, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT));
+
         webView.setWebChromeClient(new WebChromeClient() {
             @Override
             public void onProgressChanged(WebView view, int newProgress) {
@@ -90,6 +134,7 @@ public final class MainActivity extends Activity {
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 mainFrameFailed = false;
                 offlinePanel.setVisibility(View.GONE);
+                if (!hasLoadedPage) loadingPanel.setVisibility(View.VISIBLE);
             }
 
             @Override
@@ -97,6 +142,7 @@ public final class MainActivity extends Activity {
                                         WebResourceError error) {
                 if (request.isForMainFrame()) {
                     mainFrameFailed = true;
+                    loadingPanel.setVisibility(View.GONE);
                     offlinePanel.setVisibility(View.VISIBLE);
                 }
             }
@@ -108,6 +154,7 @@ public final class MainActivity extends Activity {
                 // Não bloquear a interface por falhas de subrecursos ou APIs.
                 if (request.isForMainFrame() && errorResponse.getStatusCode() >= 500) {
                     mainFrameFailed = true;
+                    loadingPanel.setVisibility(View.GONE);
                     offlinePanel.setVisibility(View.VISIBLE);
                 }
             }
@@ -115,7 +162,11 @@ public final class MainActivity extends Activity {
             @Override
             public void onPageFinished(WebView view, String url) {
                 if (progress != null) progress.setVisibility(View.GONE);
-                if (!mainFrameFailed) offlinePanel.setVisibility(View.GONE);
+                loadingPanel.setVisibility(View.GONE);
+                if (!mainFrameFailed) {
+                    offlinePanel.setVisibility(View.GONE);
+                    hasLoadedPage = true;
+                }
             }
 
             @Override
@@ -123,6 +174,7 @@ public final class MainActivity extends Activity {
                                            SslError error) {
                 handler.cancel(); // Nunca ignorar certificado inválido.
                 mainFrameFailed = true;
+                loadingPanel.setVisibility(View.GONE);
                 offlinePanel.setVisibility(View.VISIBLE);
             }
 
@@ -139,6 +191,8 @@ public final class MainActivity extends Activity {
 
         progress = new ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal);
         progress.setMax(100);
+        progress.setProgressTintList(ColorStateList.valueOf(Color.rgb(233, 200, 120)));
+        progress.setProgressBackgroundTintList(ColorStateList.valueOf(Color.rgb(38, 62, 72)));
         FrameLayout.LayoutParams progressParams = new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, dp(3), Gravity.TOP);
         root.addView(progress, progressParams);
@@ -171,6 +225,8 @@ public final class MainActivity extends Activity {
         retry.setText("Tentar novamente");
         retry.setOnClickListener(v -> {
             offlinePanel.setVisibility(View.GONE);
+            hasLoadedPage = false;
+            loadingPanel.setVisibility(View.VISIBLE);
             if (webView != null) webView.loadUrl(GAME_URL);
         });
         offlinePanel.addView(retry);
