@@ -60,7 +60,7 @@ test("mercado aparece na navegação e fica disponível no shell offline", async
   const page = await read("market.html");
   assert.match(nav, /Mercador & Heróis/);
   assert.match(nav, /\/market\.html/);
-  assert.match(sw, /clash-of-izzy-shell-v39/);
+  assert.match(sw, /clash-of-izzy-shell-v44/);
   for (const asset of ["/market.html","/market.js","/market.css"]) assert.ok(sw.includes('"'+asset+'"'), "asset offline ausente: "+asset);
   assert.match(page, /lang="pt-BR"/);
   assert.match(page, /id="market-status"/);
