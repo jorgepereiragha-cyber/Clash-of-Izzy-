@@ -63,3 +63,6 @@ scripts/diagnose-production-endpoint.js
 scripts/production-smoke.js
 scripts/validate-3d-assets.js
 scripts/validate-core-loop.sh
+
+# Durable Object server implementation must not be a public static asset.
+eldoria-room.js
