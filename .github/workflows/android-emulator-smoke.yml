@@ -1,5 +1,11 @@
 name: Android emulator launch smoke (staging only)
 on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'android-sideload/**'
+      - '.github/workflows/android-emulator-smoke.yml'
+      - 'scripts/android-emulator-smoke.sh'
   push:
     branches:
       - integration/full-eldoria-candidate-20261121

@@ -21,14 +21,14 @@ test("world map page loads authenticated territory and march interface", () => {
 
 test("world map presents an isometric 3D strategy view instead of a free-roaming arena hero", async () => {
   const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
-  for (const marker of ['id="world3d"', 'Mapa estratégico 3D', 'world-map-3d.js']) assert.ok(html.includes(marker), "missing 3D map presentation: " + marker);
+  for (const marker of ['id="world3d"', 'Mapa estratégico 3D', 'world-map-visual-boot.js']) assert.ok(html.includes(marker), "missing 3D map presentation: " + marker);
   for (const marker of ['OrthographicCamera', 'createCastle', 'createTerritoryFeature', 'createMarchFormation', 'updateMarchPositions', 'projectTerritories']) assert.ok(scene.includes(marker), "missing strategic scene feature: " + marker);
   assert.ok(scene.includes('march.status === "marching"'));
   assert.ok(script.includes('window.__coiWorldMap3D.update(visualState)'));
 });
 
 test("strategic 3D world map and territory controls parse before deployment", () => {
-  for (const file of ["../world-map.js", "../world-map-3d.js"]) {
+  for (const file of ["../world-map.js", "../world-map-3d.js", "../scripts/world-map-visual-boot.js"]) {
     const target = fileURLToPath(new URL(file, import.meta.url));
     const result = spawnSync(process.execPath, ["--check", target], { encoding: "utf8" });
     assert.equal(result.status, 0, result.stderr || result.stdout || ("Syntax check failed: " + file));

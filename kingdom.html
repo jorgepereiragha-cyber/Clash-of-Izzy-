@@ -93,6 +93,24 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <div class="city" id="city"></div>
   <div class="coi-city-stage-corner" aria-hidden="true">Toque em um edifício para ver melhorias</div>
  </div>
+ <div class="coi-graphics-controls" aria-label="Configurações de imagem">
+  <div class="coi-graphics-description">
+   <strong>Imagem e desempenho</strong>
+   <small id="coiGraphicsStatus" role="status" aria-live="polite">Detectando capacidade gráfica…</small>
+  </div>
+  <div class="coi-graphics-form">
+   <label for="coiGraphicsPreset">Qualidade</label>
+   <select id="coiGraphicsPreset" aria-describedby="coiGraphicsHint">
+    <option value="auto">Automático (recomendado)</option>
+    <option value="low">Economia (3D leve)</option>
+    <option value="balanced">Equilibrado (3D)</option>
+    <option value="high">Máximo (GPU avançada)</option>
+    <option value="2d">2D (compatibilidade)</option>
+   </select>
+   <button id="coiGraphicsApply" type="button" disabled>Aplicar</button>
+  </div>
+  <small class="coi-graphics-hint" id="coiGraphicsHint">Preferência salva apenas neste dispositivo. Perfis exigentes podem ser reduzidos conforme a GPU.</small>
+ </div>
  <div class="grid2" id="summary"></div>
  <div class="events" id="castleSkins" aria-live="polite"></div>
 </section>
@@ -508,7 +526,7 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-3d.js"></script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
 <script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>

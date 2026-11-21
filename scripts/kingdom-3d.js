@@ -6,6 +6,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler } from "./kingdom-quality.js";
+import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 
@@ -811,11 +812,18 @@ if (host && "WebGLRenderingContext" in window) {
   }
   try {
     const deviceMemory = Number(navigator.deviceMemory || 0);
+    const preferredTier = readGraphicsChoice(window.localStorage);
+    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+    const cores = Number(navigator.hardwareConcurrency || 0);
+    const safeForHighGpu = connection?.saveData !== true
+      && (deviceMemory === 0 || deviceMemory >= 6)
+      && (cores === 0 || cores >= 6);
+    const highGpuRequested = preferredTier === "high" && safeForHighGpu;
     renderer = new THREE.WebGLRenderer({
-      alpha: true, antialias: false, powerPreference: "low-power",
+      alpha: true, antialias: highGpuRequested,
+      powerPreference: highGpuRequested ? "high-performance" : "default",
       depth: true, stencil: false, preserveDrawingBuffer: false
     });
-    const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const prefersReducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
     qualityProfile = selectKingdomQualityProfile({
       deviceMemory,
@@ -823,10 +831,12 @@ if (host && "WebGLRenderingContext" in window) {
       viewportWidth: host.clientWidth || window.innerWidth,
       maxTextureSize: renderer.capabilities.maxTextureSize,
       saveData: connection?.saveData === true,
+      preferredTier,
       prefersReducedMotion
     });
     window.__coiKingdomQuality = Object.freeze({
       tier: qualityProfile.tier,
+      preference: preferredTier,
       dataSaver: !qualityProfile.loadOptionalAssets,
       prefersReducedMotion: qualityProfile.prefersReducedMotion
     });
@@ -1002,6 +1012,7 @@ if (host && "WebGLRenderingContext" in window) {
       getValhallaMode: () => valhallaModeActive
     });
     window.__coiKingdomCinematic = cinematicApi;
+    window.dispatchEvent(new CustomEvent("coi:kingdom-cinematic-ready"));
 
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
     else { resizeHandler = resize; window.addEventListener("resize", resizeHandler, { passive: true }); }

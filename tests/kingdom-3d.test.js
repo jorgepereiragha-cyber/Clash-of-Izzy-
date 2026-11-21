@@ -8,7 +8,7 @@ const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 
 test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
-  assert.match(kingdom, /type="module" src="\/scripts\/kingdom-3d\.js"/);
+  assert.match(kingdom, /type="module" src="\/scripts\/kingdom-visual-boot\.js"/);
   assert.match(kingdom, /drawKingdomScene\(buildings,Number\(k\.equipped_skin_id\|\|0\)\)/);
   assert.match(renderer, /new THREE\.WebGLRenderer/);
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
@@ -38,7 +38,7 @@ test("quality profile uses the real viewport while the kingdom panel is initiall
 });
 
 test("3D scene is mobile-conscious and does not run an unnecessary animation loop", () => {
-  assert.match(renderer, /powerPreference: "low-power"/);
+  assert.match(renderer, /powerPreference: highGpuRequested \? "high-performance" : "default"/);
   assert.match(renderer, /calculateKingdomPixelRatio\(\{ width: host\.clientWidth, height: host\.clientHeight, devicePixelRatio: window\.devicePixelRatio \|\| 1, profile: qualityProfile \}\)/);
   assert.match(renderer, /renderer\.shadowMap\.enabled = qualityProfile\.shadows/);
   assert.match(renderer, /ResizeObserver/);
