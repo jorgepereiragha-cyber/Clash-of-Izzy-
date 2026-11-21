@@ -1,0 +1,56 @@
+name: Clash of Izzy - staging load probe (read only)
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_url:
+        description: "Origin HTTPS de staging/preview do Clash of Izzy (nunca producao)"
+        type: string
+        required: true
+      confirm_staging:
+        description: "Confirmo que e staging isolado e autorizo ate 1000 GETs /api/health"
+        type: boolean
+        required: true
+        default: false
+      requests:
+        description: "Requisicoes GET (maximo 1000)"
+        type: choice
+        required: true
+        default: '1000'
+        options: ['50', '100', '250', '500', '1000']
+      concurrency:
+        description: "Requisicoes simultaneas (maximo 50)"
+        type: choice
+        required: true
+        default: '25'
+        options: ['5', '10', '25', '50']
+
+permissions:
+  contents: read
+
+jobs:
+  bounded-staging-probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Requer confirmacao explicita de ambiente
+        env:
+          CONFIRMED: ${{ inputs.confirm_staging }}
+        run: |
+          test "$CONFIRMED" = "true" || {
+            echo "::error::Teste recusado: staging nao confirmado."
+            exit 1
+          }
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Testar restricoes e metricas do probe (sem requisicoes externas)
+        run: node --test tests/staging-load-smoke.test.js
+      - name: Executar probe read-only em staging
+        env:
+          CONFIRM_STAGING_LOAD: 'true'
+          LOAD_TARGET_URL: ${{ inputs.target_url }}
+          LOAD_REQUESTS: ${{ inputs.requests }}
+          LOAD_CONCURRENCY: ${{ inputs.concurrency }}
+        run: node scripts/staging-load-smoke.mjs
