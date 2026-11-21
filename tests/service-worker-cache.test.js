@@ -15,7 +15,7 @@ function makeResponse({ status = 200, headers = {}, type = "basic" } = {}) {
   };
 }
 
-function makeHarness(responder = () => makeResponse()) {
+function makeHarness(responder = () => makeResponse(), { failCacheWrites = false } = {}) {
   const listeners = {};
   const stores = new Map();
   const networkCalls = [];
@@ -34,7 +34,7 @@ function makeHarness(responder = () => makeResponse()) {
           for (const path of paths) store.set(path, makeResponse());
         },
         async match(key) { return store.get(key); },
-        async put(key, response) { store.set(key, response); },
+        async put(key, response) { if (failCacheWrites) throw new Error("QuotaExceeded"); store.set(key, response); },
         async keys() { return [...store.keys()]; },
         async delete(key) { return store.delete(key); },
       };
@@ -182,4 +182,12 @@ test("PWA bounds its runtime asset cache and retires older named caches", async 
   assert.equal(h.stores.has("clash-of-izzy-shell-v26"), false);
   assert.equal(h.stores.has("clash-of-izzy-runtime-v0"), false);
   assert.equal(h.stores.has("clash-of-izzy-runtime-v1"), true);
+});
+
+test("network success is returned even when cache storage rejects writes", async () => {
+  const h = makeHarness(() => makeResponse(), { failCacheWrites: true });
+  const navigation = await h.dispatch("/world.html", { mode: "navigate" });
+  assert.equal(navigation.result.status, 200);
+  const asset = await h.dispatch("/assets/3d/house.glb");
+  assert.equal(asset.result.status, 200);
 });
