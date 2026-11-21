@@ -16,6 +16,7 @@ import android.net.http.SslError;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceError;
 import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
@@ -95,6 +96,17 @@ public final class MainActivity extends Activity {
             public void onReceivedError(WebView view, WebResourceRequest request,
                                         WebResourceError error) {
                 if (request.isForMainFrame()) {
+                    mainFrameFailed = true;
+                    offlinePanel.setVisibility(View.VISIBLE);
+                }
+            }
+
+            @Override
+            public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                                            WebResourceResponse errorResponse) {
+                // Falhas de backend não acionam onReceivedError.
+                // Não bloquear a interface por falhas de subrecursos ou APIs.
+                if (request.isForMainFrame() && errorResponse.getStatusCode() >= 500) {
                     mainFrameFailed = true;
                     offlinePanel.setVisibility(View.VISIBLE);
                 }
