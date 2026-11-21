@@ -248,6 +248,8 @@ test.describe("Mobile kingdom rendering", () => {
     expect(saved.width).toBeLessThanOrEqual(saved.viewport + 1);
     await page.setViewportSize({width: 1120, height: 850});
     await expect(page.locator(".coi-city-panel")).toBeVisible();
+    const desktopBounds = await page.locator(".coi-city-panel").boundingBox();
+    expect(desktopBounds.height).toBeLessThan(1200); // No full-sidebar-height blank panel.
     await page.locator(".coi-city-panel").screenshot({
       path: "test-results/visual-preview/cidade-desktop-equilibrio.png"
     });
