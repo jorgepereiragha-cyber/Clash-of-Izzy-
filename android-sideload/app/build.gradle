@@ -1,0 +1,52 @@
+plugins {
+    id 'com.android.application'
+}
+
+def signingStore = System.getenv('ANDROID_KEYSTORE_PATH')
+def signingPassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+def signingAlias = System.getenv('ANDROID_KEY_ALIAS')
+def signingKeyPassword = System.getenv('ANDROID_KEY_PASSWORD')
+def releaseSigningAvailable = signingStore && signingPassword && signingAlias && signingKeyPassword
+
+android {
+    namespace 'com.clashofizzy.android'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.clashofizzy.android'
+        minSdk 24
+        targetSdk 35
+        versionCode 1
+        versionName '1.0.0'
+    }
+
+    signingConfigs {
+        if (releaseSigningAvailable) {
+            release {
+                storeFile file(signingStore)
+                storePassword signingPassword
+                keyAlias signingAlias
+                keyPassword signingKeyPassword
+            }
+        }
+    }
+
+    buildTypes {
+        debug {
+            // Builds de teste não substituem o APK estável assinado.
+            applicationIdSuffix '.debug'
+            versionNameSuffix '-teste'
+        }
+        release {
+            minifyEnabled false
+            if (releaseSigningAvailable) {
+                signingConfig signingConfigs.release
+            }
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+}
