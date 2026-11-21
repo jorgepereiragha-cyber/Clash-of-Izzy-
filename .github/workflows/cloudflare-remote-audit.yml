@@ -1,0 +1,36 @@
+name: Cloudflare Remote Audit (read-only)
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/cloudflare-remote-audit.yml"
+      - ".github/workflows/deploy-cloudflare.yml"
+      - "scripts/cloudflare-remote-audit.mjs"
+      - "tests/cloudflare-remote-audit.test.js"
+      - "wrangler.jsonc"
+      - "wrangler.preview-migrations.jsonc"
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: clash-of-izzy-readonly-remote-audit
+  cancel-in-progress: false
+jobs:
+  remote-audit:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify audit safety locally
+        run: node --test tests/cloudflare-remote-audit.test.js
+      - name: Read-only Cloudflare audit
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/cloudflare-remote-audit.mjs
