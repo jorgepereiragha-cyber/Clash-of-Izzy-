@@ -4,18 +4,23 @@ import { readFile } from 'node:fs/promises';
 
 const read = path => readFile(new URL('../' + path, import.meta.url), 'utf8');
 
-test('player portal provides browser game, PWA, Android build and a clearly labelled shop', async () => {
+test('browser portal is promotion and signed-APK distribution only, not web gameplay or PWA', async () => {
   const [portal, index, navigation, sw] = await Promise.all([
     read('portal.html'), read('index.html'), read('navigation.js'), read('sw.js')
   ]);
-  assert.match(portal, /href="\/kingdom\.html"/);
-  assert.match(portal, /beforeinstallprompt/);
-  assert.match(portal, /actions\/workflows\/android-apk\.yml/);
-  assert.match(portal, /APK de teste não equivale/);
-  assert.match(portal, /Nubank/);
-  assert.match(portal, /Mercado Pago/);
+  assert.match(portal, /id="download-apk"/);
+  assert.match(portal, /releases\/latest/);
+  assert.match(portal, /clash-of-izzy-android\.apk/);
+  assert.match(portal, /\.sha256/);
+  assert.match(portal, /aria-disabled="true"/);
+  assert.match(portal, /asset\.state !== "uploaded"/);
+  assert.match(portal, /url\.hostname === "github\.com"/);
+  assert.doesNotMatch(portal, /href="\/(?:kingdom|world|arena|events|alliance)\.html"/);
+  assert.doesNotMatch(portal, /beforeinstallprompt|install-pwa|href="\/manifest\.json"/);
+  assert.match(index, /http-equiv="refresh" content="0;url=\/portal\.html"/);
   assert.match(index, /href="\/portal\.html"/);
-  assert.match(navigation, /href:"\/portal\.html"/);
+  assert.doesNotMatch(index, /href="\/(?:kingdom|world|arena|events|alliance)\.html"/);
+  assert.match(navigation, /path === "\/index\.html" \|\| path === "\/portal\.html"/);
   assert.match(sw, /"\/portal\.html"/);
 });
 
@@ -49,9 +54,10 @@ test('Pix requests remain pending and never call Mercado Pago checkout or auto-f
   assert.doesNotMatch(pix, /NUBANK_PIX_COPY_PASTE|pixKey|chave pix/);
 });
 
-test('portal does not hardcode banking details or imply online payment is active', async () => {
+test('public portal does not publish account details, banking data or payment controls', async () => {
   const portal = await read('portal.html');
   assert.doesNotMatch(portal, /(?:\b\d{11}\b|\b\d{14}\b)/);
-  assert.match(portal, /cobrança Pix gerada na conta do recebedor/);
-  assert.match(portal, /só pode operar depois de habilitada/);
+  assert.doesNotMatch(portal, /NUBANK_PIX_ENABLED|MP_ACCESS_TOKEN|chave pix|Pix copia e cola/i);
+  assert.doesNotMatch(portal, /href="\/arena\.html"|checkout|beforeinstallprompt/i);
+  assert.match(portal, /Baixar aplicativo Android/);
 });
