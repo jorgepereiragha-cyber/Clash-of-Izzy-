@@ -39,3 +39,11 @@ test('release nunca e publicada unsigned e nao toca D1', () => {
   assert.doesNotMatch(workflow, /wrangler|d1 migrations|deploy-cloudflare/);
   assert.match(workflow, /actions\/upload-artifact@v4/);
 });
+
+test('APK client keeps city navigation and official game backend separate', () => {
+  const city = read('kingdom.html');
+  assert.match(city, /coi:command-state/);
+  assert.match(city, /href="\/world\.html"/);
+  assert.match(city, /src="\/scripts\/kingdom-command-hud\.js"/);
+  assert.match(activity, /https:\/\/clash-of-izzy\.jorgepereiragha\.workers\.dev\/kingdom\.html/);
+});

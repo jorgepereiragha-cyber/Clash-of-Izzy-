@@ -1,0 +1,183 @@
+/* Clash of Izzy | Original medieval 4X command layer.
+   Uses existing authoritative game UI; no decorative fake currencies or controls. */
+.coi-fourx{
+  --fourx-gold:#f4d28e;
+  --fourx-bronze:#926e36;
+  --fourx-panel:rgba(12,24,38,.94);
+  background:
+    radial-gradient(ellipse at 52% -20%,rgba(79,115,108,.28),transparent 60%),
+    linear-gradient(165deg,#0b1725,#111f2b 52%,#07121c);
+}
+.coi-fourx header{
+  border-bottom:1px solid rgba(244,210,142,.44);
+  background:linear-gradient(180deg,rgba(8,20,31,.98),rgba(18,33,49,.97));
+  box-shadow:0 10px 30px rgba(0,0,0,.45);
+}
+.coi-fourx .resources{gap:7px}
+.coi-fourx .resource{
+  background:linear-gradient(165deg,rgba(76,65,46,.83),rgba(27,39,47,.98));
+  border:1px solid rgba(237,189,103,.55);
+  border-radius:7px;
+  font-weight:700;
+  box-shadow:inset 0 1px rgba(255,246,216,.10),0 3px 8px #0004;
+}
+.coi-fourx .resource b{font-size:clamp(12px,1.5vw,16px);color:#ffe5a9}
+.coi-fourx .hero{margin:12px auto 16px}
+.coi-fourx .hero h1{font-family:Georgia,"Times New Roman",serif;letter-spacing:.03em}
+.coi-fourx .panel{
+  background:linear-gradient(155deg,rgba(28,47,57,.98),rgba(10,22,37,.97));
+  border:1px solid rgba(212,168,91,.55);
+  box-shadow:0 14px 34px #0006,inset 0 1px #fff1;
+}
+.coi-fourx .panel h2{
+  font-family:Georgia,"Times New Roman",serif;
+  letter-spacing:.025em;
+  font-size:clamp(17px,2vw,21px);
+}
+.coi-fourx button:focus-visible,.coi-fourx a:focus-visible,
+.coi-fourx input:focus-visible,.coi-fourx select:focus-visible{
+  outline:3px solid #ffe5a9;
+  outline-offset:3px;
+}
+.coi-command-deck{
+  position:relative;overflow:hidden;
+  display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);
+  gap:12px;padding:18px 19px;
+  margin:0 0 14px;
+  border:1px solid rgba(245,213,145,.7);
+  border-radius:14px;
+  background:
+    radial-gradient(circle at 100% 0%,rgba(199,157,85,.22),transparent 48%),
+    linear-gradient(140deg,#253a40,#121e2d 72%);
+  box-shadow:0 14px 28px #0006,inset 0 2px #fff1;
+}
+.coi-command-deck::before{
+  content:"";position:absolute;inset:5px;pointer-events:none;
+  border:1px solid rgba(238,195,109,.20);border-radius:9px;
+}
+.coi-command-identity{display:flex;flex-direction:column;justify-content:center;gap:3px;min-width:0}
+.coi-command-kicker{font-size:10px;font-weight:900;letter-spacing:.18em;color:#e7c786}
+.coi-command-identity strong{font:700 clamp(20px,3vw,28px)/1.25 Georgia,serif;color:#fff4d3;text-shadow:0 2px 8px #0009}
+.coi-command-identity>span:last-child{font-size:12px;color:#cbdae0}
+.coi-command-metrics{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;align-items:stretch}
+.coi-command-metrics>div{
+  display:flex;flex-direction:column;justify-content:center;gap:5px;
+  min-width:0;padding:9px 7px;text-align:center;border-radius:8px;
+  background:#0b1a29cc;border:1px solid #c49b596b;
+}
+.coi-command-metrics small{font-size:10px;letter-spacing:.04em;color:#c4d3df}
+.coi-command-metrics strong{font-size:clamp(15px,2vw,21px);color:#ffda95;font-variant-numeric:tabular-nums}
+.coi-command-orders{
+  grid-column:1/-1;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px 12px;background:#070f1da8;border:1px solid rgba(207,169,99,.35);
+  border-radius:8px;font-size:12px;color:#e5edf4;
+}
+.coi-command-orders span{min-width:0;line-height:1.4}
+.coi-command-orders a{
+  color:#ffe4a0;text-decoration:none;font-weight:800;
+  padding:8px 10px;border:1px solid #be8b4f;border-radius:7px;
+  white-space:nowrap;background:#23374a;
+}
+.coi-fourx .layout{grid-template-columns:minmax(0,1.65fr) minmax(265px,.85fr)}
+.coi-city-panel{min-width:0}
+.coi-city-stage{position:relative;isolation:isolate;margin-bottom:10px}
+.coi-fourx .coi-city-stage .city{
+  min-height:clamp(390px,44vw,530px);
+  border:2px solid #aa894e;
+  border-radius:11px;
+  background:linear-gradient(#9aa581 0%,#567f56 48%,#274437 100%);
+  box-shadow:inset 0 0 0 3px #0a1721,0 12px 28px #0007;
+}
+.coi-city-stage-label{
+  position:absolute;z-index:4;top:12px;left:12px;pointer-events:none;
+  display:flex;flex-direction:column;gap:2px;
+  padding:8px 11px;border:1px solid #c9a45f;border-radius:7px;
+  background:linear-gradient(#132837eb,#0c1927eb);
+  box-shadow:0 4px 12px #0008;
+}
+.coi-city-stage-label span{font:700 13px Georgia,serif;color:#ffe2a4;letter-spacing:.12em}
+.coi-city-stage-label small{font-size:9px;color:#d6e3e6;letter-spacing:.09em}
+.coi-city-stage-corner{
+  position:absolute;z-index:4;bottom:12px;right:12px;pointer-events:none;
+  max-width:55%;padding:6px 9px;border-radius:5px;
+  color:#fff2d9;background:#0b1a2cdb;border:1px solid #dbb47788;
+  font-size:10px;line-height:1.4;text-align:right;
+}
+.coi-fourx .building-row{background:linear-gradient(90deg,#1b3040,#0c1c2c);border-color:#b18e5166}
+.coi-fourx .queue-card{border-color:#bd9c5b88}
+.coi-fourx .building.castle{box-shadow:0 0 0 2px #ffe1a03d,0 10px 22px #0009}
+.coi-mobile-dock{display:none}
+@media(max-width:900px){
+  .coi-fourx .layout{grid-template-columns:1fr}
+}
+@media(max-width:760px){
+  .coi-fourx header{padding-top:max(8px,env(safe-area-inset-top));}
+  .coi-fourx header .top{gap:8px}
+  .coi-fourx header .brand img{max-width:130px!important;height:auto}
+  .coi-fourx #status{max-width:54vw;font-size:10px;text-align:right}
+  .coi-fourx .resources{
+    display:flex;grid-template-columns:none;gap:6px;
+    overflow-x:auto;overscroll-behavior-x:contain;
+    scrollbar-width:none;padding-bottom:3px;
+    scroll-snap-type:x proximity;
+  }
+  .coi-fourx .resources::-webkit-scrollbar{display:none}
+  .coi-fourx .resource{flex:0 0 96px;scroll-snap-align:start;font-size:10px;padding:7px 5px}
+  .coi-fourx .resource b{font-size:14px}
+  .coi-fourx main{
+    margin:12px auto;
+    padding-left:9px;padding-right:9px;
+    padding-bottom:calc(104px + env(safe-area-inset-bottom));
+  }
+  .coi-fourx .hero{gap:4px}
+  .coi-fourx .hero h1{font-size:24px}
+  .coi-fourx .hero .toolbar{margin-top:7px}
+  .coi-command-deck{grid-template-columns:1fr;padding:13px;gap:9px}
+  .coi-command-identity strong{font-size:21px}
+  .coi-command-metrics{gap:6px}
+  .coi-command-metrics>div{padding:9px 5px}
+  .coi-command-metrics strong{font-size:16px}
+  .coi-command-orders{grid-column:1;gap:8px}
+  .coi-command-orders a{white-space:normal;text-align:center}
+  .coi-fourx .coi-city-stage .city{min-height:clamp(330px,52vh,500px)}
+  .coi-fourx .coi-city-panel{padding:10px}
+  .coi-fourx .coi-city-panel h2{margin:0 0 10px}
+  .coi-city-stage-label{top:9px;left:9px;padding:6px 8px}
+  .coi-city-stage-corner{bottom:9px;right:9px;font-size:9px}
+  .coi-fourx .building-row button,.coi-fourx #trainButton,
+  .coi-fourx #researchButton{min-height:44px}
+  .coi-mobile-dock{
+    position:fixed;z-index:20;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));
+    left:0;right:0;bottom:0;
+    padding:7px max(5px,env(safe-area-inset-right)) calc(7px + env(safe-area-inset-bottom)) max(5px,env(safe-area-inset-left));
+    gap:3px;border-top:1px solid #c9a35e;
+    background:linear-gradient(180deg,#233544f7,#0b1624fa);
+    box-shadow:0 -10px 24px #0009;
+    backdrop-filter:blur(10px);
+  }
+  .coi-mobile-dock a{
+    display:flex;flex-direction:column;justify-content:center;align-items:center;
+    min-width:0;min-height:56px;gap:3px;
+    border:1px solid #b68c4859;border-radius:9px;
+    background:#101c2c;color:#f4e2be;
+    text-decoration:none;font-size:10px;font-weight:800;
+    touch-action:manipulation;
+  }
+  .coi-mobile-dock a span:first-child{font-size:23px;line-height:1.1}
+  .coi-mobile-dock a:active,.coi-mobile-dock a:focus-visible{background:#40513a;border-color:#f4d28e}
+  .coi-fourx #city,.coi-fourx #buildings,.coi-fourx #queues,
+  .coi-fourx #trainingForm{scroll-margin-top:180px}
+  .coi-fourx #trailer-recorder-panel{
+    bottom:calc(92px + env(safe-area-inset-bottom));right:8px;
+    max-width:calc(100vw - 16px);
+  }
+}
+@media(max-width:360px){
+  .coi-fourx .resource{flex-basis:85px}
+  .coi-command-orders{flex-direction:column;align-items:stretch}
+  .coi-city-stage-corner{display:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .coi-fourx *{scroll-behavior:auto!important}
+  .coi-fourx .coi-command-deck,.coi-fourx .coi-mobile-dock a{transition:none!important}
+}
