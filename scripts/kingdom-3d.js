@@ -1012,6 +1012,7 @@ if (host && "WebGLRenderingContext" in window) {
       getValhallaMode: () => valhallaModeActive
     });
     window.__coiKingdomCinematic = cinematicApi;
+    window.dispatchEvent(new CustomEvent("coi:kingdom-cinematic-ready"));
 
     if ("ResizeObserver" in window) { resizeObserver = new ResizeObserver(resize); resizeObserver.observe(host); }
     else { resizeHandler = resize; window.addEventListener("resize", resizeHandler, { passive: true }); }

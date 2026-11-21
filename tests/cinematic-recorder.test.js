@@ -412,3 +412,14 @@ test("low-memory devices reject unsafe recording duration before resizing the ki
     harness.restore();
   }
 });
+
+test("lazy kingdom GPU initialization publishes recorder availability without duplicate panels", async () => {
+  const rendererSource = await import("node:fs/promises").then(fs =>
+    fs.readFile(new URL("../scripts/kingdom-3d.js",import.meta.url),"utf8"));
+  const uiSource = await import("node:fs/promises").then(fs =>
+    fs.readFile(new URL("../scripts/cinematic/recorder-ui.js",import.meta.url),"utf8"));
+  assert.match(rendererSource, /new CustomEvent\("coi:kingdom-cinematic-ready"\)/);
+  assert.match(uiSource, /window\.addEventListener\("coi:kingdom-cinematic-ready", ensureTrailerRecorder\)/);
+  assert.match(uiSource, /window\.trailerRecorder/);
+  assert.match(uiSource, /if \(typeof window === "undefined" \|\| !window\.__coiKingdomCinematic \|\| window\.trailerRecorder\) return/);
+});
