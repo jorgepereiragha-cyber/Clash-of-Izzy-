@@ -17,6 +17,8 @@ test("altar and nest are visible in the city and link only to existing authentic
   assert.match(city, /id="dragonCollection"/);
   assert.match(city, /state\?\.dragon\?\.level/);
   assert.match(city, /state\?\.dragon\?\.bond/);
+  assert.match(city, /data\.dragonUpgrade="true"/);
+  assert.match(city, /runKingdomPanelAction\(\{type:"dragon_upgrade"\}/);
   assert.match(styles, /\.coi-recruitment-site:focus-visible/);
   assert.match(styles, /@media\(max-width:650px\)/);
 });
