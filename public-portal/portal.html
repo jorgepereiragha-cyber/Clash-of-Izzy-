@@ -6,7 +6,13 @@
 <meta name="theme-color" content="#081831">
 <meta name="description" content="Clash of Izzy: estratégia medieval para Android. Conheça o jogo e baixe o APK oficial assinado quando estiver disponível.">
 <meta property="og:title" content="Clash of Izzy — Jogo para Android">
-<meta property="og:description" content="Construa seu reino, forme alianças e conquiste Eldoria. Instale o jogo no Android.">
+<meta property="og:description" content="Conheça Clash of Izzy: construa seu reino, recrute heróis e forme alianças. O download oficial será liberado após os testes finais.">
+<meta property="og:url" content="https://clash-of-izzy-portal.jorgepereiragha.workers.dev/portal.html">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:title" content="Clash of Izzy — Seu reino, seu legado">
+<meta name="twitter:description" content="Estratégia medieval 4X para Android. Acompanhe o lançamento do APK oficial.">
+<meta name="twitter:image" content="https://clash-of-izzy-portal.jorgepereiragha.workers.dev/assets/brand/royal-king.webp">
+<link rel="canonical" href="https://clash-of-izzy-portal.jorgepereiragha.workers.dev/portal.html">
 <meta property="og:type" content="website">
 <meta property="og:image" content="https://clash-of-izzy-portal.jorgepereiragha.workers.dev/assets/brand/royal-king.webp">
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
@@ -73,6 +79,10 @@ h1 .golden{display:block;color:#f6c96c;text-shadow:0 1px 0 #ffe9b0,0 5px 18px #0
 .download[aria-disabled="true"]{background:linear-gradient(#283d59,#19283e);color:#d2dfef;border-color:#6c819d;cursor:not-allowed;box-shadow:none}
 .status{min-height:48px;max-width:610px;margin:0;color:#e8d7b4;font-size:13px}
 .hash{color:#f6d590;font-size:14px}
+.share-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:14px}
+.share-link{display:inline-flex;align-items:center;justify-content:center;min-height:48px;min-width:105px;padding:10px 14px;border:1px solid #cda45f;border-radius:10px;background:#1b365c;color:#fff4dc;text-decoration:none;font:700 13px/1.4 system-ui,sans-serif;cursor:pointer}
+.share-link:focus-visible{outline:3px solid white;outline-offset:3px}
+.share-link:hover{background:#284d7c}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:12px auto 28px}
 .tile{position:relative;padding:24px 22px;background:linear-gradient(145deg,#1e3e6c,#0b1c37);border:1px solid #a8824899;border-radius:16px;box-shadow:inset 0 1px #ffe6ab20,0 11px 25px #0004}
 .tile::before{content:"";position:absolute;top:0;left:22px;width:54px;height:3px;background:linear-gradient(90deg,#ffd47e,transparent)}
@@ -122,6 +132,13 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
 <p class="status" id="download-status" role="status" aria-live="polite">Verificando se existe uma versão oficial assinada disponível para download…</p>
 <a class="hash" id="checksum-link" hidden>Verificar arquivo SHA-256 da versão</a>
 <a class="hash" id="official-release-page" href="https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases" target="_blank" rel="noopener noreferrer">Consultar versões oficiais publicadas</a>
+<div class="share-row" aria-label="Divulgação do jogo">
+  <button class="share-link" id="share-portal" type="button">Compartilhar</button>
+  <a class="share-link" id="share-whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+  <a class="share-link" id="share-facebook" target="_blank" rel="noopener noreferrer">Facebook</a>
+  <button class="share-link" id="copy-portal" type="button">Copiar link</button>
+</div>
+<p class="status" id="share-status" role="status" aria-live="polite">Divulgue a página oficial de apresentação do jogo. O download será habilitado somente após a publicação do APK aprovado.</p>
 </div>
 </div>
 </header>
@@ -147,6 +164,29 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
   const status = document.getElementById("download-status");
   const checksum = document.getElementById("checksum-link");
   const prefix = "/" + repo + "/releases/download/";
+  const publicUrl = "https://clash-of-izzy-portal.jorgepereiragha.workers.dev/portal.html";
+  const shareStatus = document.getElementById("share-status");
+  const shareText = "Clash of Izzy: construa seu reino, convoque heróis e forme alianças. Acompanhe o lançamento oficial!";
+  document.getElementById("share-whatsapp").href =
+    "https://wa.me/?text=" + encodeURIComponent(shareText + " " + publicUrl + "?utm_source=whatsapp&utm_medium=social&utm_campaign=eldoria_pre_lancamento");
+  document.getElementById("share-facebook").href =
+    "https://www.facebook.com/sharer/sharer.php?u=" +
+    encodeURIComponent(publicUrl + "?utm_source=facebook&utm_medium=social&utm_campaign=eldoria_pre_lancamento");
+  async function copyPortalLink() {
+    const link = publicUrl + "?utm_source=compartilhamento&utm_medium=social&utm_campaign=eldoria_pre_lancamento";
+    try {
+      await navigator.clipboard.writeText(link);
+      shareStatus.textContent = "Link oficial copiado. Compartilhe nas redes sociais sem anunciar que o APK já está disponível.";
+    } catch {
+      shareStatus.textContent = "Link para compartilhar: " + link;
+    }
+  }
+  document.getElementById("copy-portal").addEventListener("click", copyPortalLink);
+  document.getElementById("share-portal").addEventListener("click", async () => {
+    if (!navigator.share) return copyPortalLink();
+    try { await navigator.share({ title: "Clash of Izzy", text: shareText, url: publicUrl }); }
+    catch { shareStatus.textContent = "Compartilhamento não concluído. Você pode copiar o link."; }
+  });
   function validAsset(asset, expectedName) {
     if (!asset || asset.name !== expectedName || asset.state !== "uploaded") return false;
     try {
