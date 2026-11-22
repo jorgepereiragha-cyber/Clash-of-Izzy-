@@ -6,7 +6,7 @@ on:
       target_branch:
         description: "Branch do código que será validada sem publicar"
         required: true
-        default: release/one-shared-realm-early-access
+        default: main
         type: string
       owner_confirmed_paid_plan:
         description: "Confirme no Dashboard que Workers Paid está ativo e os limites de gastos/alertas foram revisados"
