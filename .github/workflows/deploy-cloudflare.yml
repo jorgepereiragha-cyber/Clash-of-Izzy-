@@ -168,12 +168,13 @@ jobs:
               json.dump(record, output, indent=2)
               output.write(chr(10))
           with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
-              output.write("bookmark=" + bookmark + chr(10))
-          print("D1 Time Travel restore point captured. Bookmark: " + bookmark)
+              output.write("captured=true" + chr(10))
+          print("::add-mask::" + bookmark)
+          print("D1 Time Travel restore point captured; bookmark omitted from logs.")
           PY
 
       - name: Archive D1 pre-deployment restore point
-        if: steps.capture_d1.outputs.bookmark != ''
+        if: steps.capture_d1.outputs.captured == 'true'
         uses: actions/upload-artifact@v4
         with:
           name: clash-of-izzy-d1-pre-migration-restore-point-${{ github.run_id }}
