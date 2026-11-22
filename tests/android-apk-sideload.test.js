@@ -67,7 +67,7 @@ test('Tela de abertura nativa usa a identidade do jogo e libera acesso quando a 
   assert.match(activity, /GradientDrawable\.Orientation\.TOP_BOTTOM/);
   assert.match(activity, /loadingTitle\.setText\("CLASH OF IZZY"\)/);
   assert.match(activity, /loadingPanel\.setVisibility\(View\.GONE\)/);
-  assert.match(activity, /if \(!hasLoadedPage\) loadingPanel\.setVisibility\(View\.VISIBLE\)/);
+  assert.match(activity, /if \(!hasLoadedPage\) \{\s*loadingPanel\.setVisibility\(View\.VISIBLE\);\s*scheduleStartupTimeout\(\);/);
   assert.match(activity, /progress\.setProgressTintList/);
   assert.match(activity, /offlinePanel\.setVisibility\(View\.VISIBLE\)/);
   assert.doesNotMatch(activity, /WebView\.setWebContentsDebuggingEnabled\(true\)/);
@@ -106,4 +106,15 @@ test('Checkout Mercado Pago abre navegador externo sem substituir o reino no Web
   assert.match(activity, /popupSettings\.setJavaScriptEnabled\(false\)/);
   assert.match(activity, /popupSettings\.setAllowFileAccess\(false\)/);
   assert.match(activity, /popupSettings\.setAllowContentAccess\(false\)/);
+});
+
+test('Abertura WebView tem limite de espera, cancela em sucesso e recupera conexao', () => {
+  assert.match(activity, /STARTUP_TIMEOUT_MS = 45_000L/);
+  assert.match(activity, /void scheduleStartupTimeout\(\)/);
+  assert.match(activity, /root\.postDelayed\(pendingLoadTimeout, STARTUP_TIMEOUT_MS\)/);
+  assert.match(activity, /root\.removeCallbacks\(pendingLoadTimeout\)/);
+  assert.match(activity, /if \(isFinishing\(\) \|\| webView == null \|\| hasLoadedPage \|\| mainFrameFailed\) return/);
+  assert.match(activity, /loadingPanel\.setVisibility\(View\.GONE\);\s*offlinePanel\.setVisibility\(View\.VISIBLE\)/);
+  assert.match(activity, /onPageFinished\(WebView view, String url\) \{\s*cancelStartupTimeout\(\)/);
+  assert.match(activity, /onDestroy\(\) \{\s*cancelStartupTimeout\(\)/);
 });
