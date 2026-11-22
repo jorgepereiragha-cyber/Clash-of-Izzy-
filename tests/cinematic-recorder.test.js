@@ -243,7 +243,7 @@ test("recorder uses the renderer API instead of an assumed window.map3d global",
 
 test("PWA does not preload the trailer recorder; cached overlays are hidden", () => {
   const cacheVersion = Number(serviceWorker.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
-  assert.ok(cacheVersion >= 50, "expected new service worker cache version");
+  assert.ok(cacheVersion >= 51, "expected new service worker cache version");
   for (const path of [
     "/scripts/cinematic/capture-system.js",
     "/scripts/cinematic/media-recorder-support.js",
