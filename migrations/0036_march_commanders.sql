@@ -6,3 +6,5 @@ ALTER TABLE marches ADD COLUMN march_capacity_at_dispatch INTEGER NOT NULL DEFAU
  CHECK(march_capacity_at_dispatch>=0);
 CREATE INDEX IF NOT EXISTS idx_marches_kingdom_commander
  ON marches(kingdom_id,commander_hero_key,status);
+CREATE INDEX IF NOT EXISTS idx_marches_kingdom_status_arrival
+ ON marches(kingdom_id,status,arrives_at);
