@@ -11,6 +11,12 @@ export function normalizeToken(raw){
   return /\s/.test(token)?"":token;
 }
 
+export function normalizeAccountId(raw){
+  let id=String(raw||"").trim();
+  if(id.length>=2&&id[0]===id[id.length-1]&&(id[0]==='"'||id[0]==="'"))id=id.slice(1,-1).trim();
+  return id.toLowerCase();
+}
+
 export function validateIds(prod,preview){
   const p=prod?.d1_databases?.find(x=>x.binding==="DB");
   const t=preview?.d1_databases?.find(x=>x.binding==="PREVIEW_DB");
@@ -32,6 +38,7 @@ async function req(url,{fetchImpl,token=""}={}){
 }
 export async function audit({fetchImpl=fetch,production,staging,token="",accountId="",allowPending0030=false}={}){
   const result=[];
+  const normalizedAccountId=normalizeAccountId(accountId);
   const run=async(name,fn,required=true)=>{
     try{const detail=await fn();result.push({name,required,ok:true,detail:detail||"OK"});return true}
     catch(err){result.push({name,required,ok:false,detail:err instanceof Error?err.message.slice(0,135):"Falha"});return false}
@@ -83,8 +90,9 @@ export async function audit({fetchImpl=fetch,production,staging,token="",account
     return "HTTP 401";
   });
   const credentials=await run("Secrets GitHub",()=>{
-    if(!token.trim()||!/^[a-f0-9]{32}$/i.test(accountId))
-      throw Error("CLOUDFLARE_API_TOKEN ou CLOUDFLARE_ACCOUNT_ID ausente/inválido");
+    if(!token.trim())throw Error("CLOUDFLARE_API_TOKEN ausente ou inválido");
+    if(!/^[a-f0-9]{32}$/.test(normalizedAccountId))
+      throw Error("CLOUDFLARE_ACCOUNT_ID ausente ou inválido (esperados 32 caracteres hexadecimais)");
     return "Configurados";
   });
   let active=false;
@@ -96,7 +104,7 @@ export async function audit({fetchImpl=fetch,production,staging,token="",account
   if(valid&&active){
     for(const [label,db] of [["D1 produção",ids.prod],["D1 Preview",ids.preview]]){
       await run(label,async()=>{
-        const a=await req(API+"/accounts/"+accountId+"/d1/database/"+db.database_id,{fetchImpl,token});
+        const a=await req(API+"/accounts/"+normalizedAccountId+"/d1/database/"+db.database_id,{fetchImpl,token});
         const d=a.result||{};
         if((d.uuid||d.id)!==db.database_id||(d.name&&d.name!==db.database_name))
           throw Error("UUID/nome não corresponde ao configurado");
@@ -104,12 +112,12 @@ export async function audit({fetchImpl=fetch,production,staging,token="",account
       });
     }
     await run("D1 Time Travel",async()=>{
-      const a=await req(API+"/accounts/"+accountId+"/d1/database/"+ids.prod.database_id+"/time_travel/bookmark",{fetchImpl,token});
+      const a=await req(API+"/accounts/"+normalizedAccountId+"/d1/database/"+ids.prod.database_id+"/time_travel/bookmark",{fetchImpl,token});
       if(!a.result?.bookmark)throw Error("Bookmark não disponível");
       return "Disponível (bookmark ocultado)";
     });
     await run("Workers Paid - Billing",async()=>{
-      const a=await req(API+"/accounts/"+accountId+"/subscriptions",{fetchImpl,token});
+      const a=await req(API+"/accounts/"+normalizedAccountId+"/subscriptions",{fetchImpl,token});
       const list=Array.isArray(a.result)?a.result:[];
       if(!list.some(s=>/workers/i.test([s.rate_plan?.id,s.rate_plan?.name].join(" "))&&
             /^(paid|active)$/i.test(String(s.state))))throw Error("Assinatura Paid não confirmada pela API.");
