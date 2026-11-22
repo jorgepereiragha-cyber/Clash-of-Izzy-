@@ -9,6 +9,10 @@ if(root){
  const stock=document.getElementById("coiIndustryStock");
  const progress=document.getElementById("coiProgressionStatus");
  const defenseList=document.getElementById("coiDefenseList");
+ const heroRole=document.getElementById("coiHeroRole"),heroCandidate=document.getElementById("coiHeroCandidate");
+ const heroAssign=document.getElementById("coiHeroAssign"),heroUnassign=document.getElementById("coiHeroUnassign");
+ const heroSummary=document.getElementById("coiHeroSummary"),heroFeedback=document.getElementById("coiHeroFeedback");
+ const roleTypes={"industry:mill":["suporte"],"defense:tower":["arqueiro","infantaria"]};
  const state=()=>window.__coiCityLayoutState?.();
  let pending=false,positionDirty=false;
  const f=n=>Number(n||0).toLocaleString("pt-BR");
@@ -59,6 +63,32 @@ if(root){
   }
   place.disabled=pending||!p.valid;
  }
+ function renderHeroRoles(s){
+  const slot=heroRole.value,allowed=roleTypes[slot]||[];
+  const eligible=(s.heroInventory||[]).filter(h=>allowed.includes(h.type));
+  const validKeys=eligible.map(h=>h.hero_key).join("|");
+  const previous=heroCandidate.value;
+  if(Array.from(heroCandidate.options).map(option=>option.value).join("|")!==validKeys){
+   heroCandidate.replaceChildren();
+   for(const hero of eligible){
+    const option=document.createElement("option");
+    option.value=hero.hero_key;
+    option.textContent=hero.name+" · Nv. "+f(hero.level);
+    heroCandidate.append(option);
+   }
+   if(eligible.some(h=>h.hero_key===previous))heroCandidate.value=previous;
+  }
+  const assigned=(s.heroes||[]).find(h=>h.assigned_to===slot);
+  const selected=eligible.find(h=>h.hero_key===heroCandidate.value);
+  const ready=slot==="industry:mill"
+   ?(s.buildings||[]).some(b=>b.building_type==="farm")
+   :(s.cityDefenses||[]).some(d=>d.defense_type==="tower");
+  heroSummary.textContent=assigned
+   ?"Alocado: "+assigned.hero_name+" · Nv. "+f(assigned.level)
+   :"Posto livre"+(ready?".":" (construa primeiro o edifício necessário).");
+  heroAssign.disabled=pending||!ready||Boolean(assigned)||!selected;
+  heroUnassign.disabled=pending||!assigned;
+ }
  function render(){
   const s=state();
   if(!s?.advanced4xEnabled){root.hidden=true;return;}
@@ -94,17 +124,31 @@ if(root){
    button.textContent=(kind==="mill"?"Evoluir moinho":"Evoluir padaria")+
     " · Nv. "+(lv+1)+" · madeira "+f((lv+1)*120)+" · pedra "+f((lv+1)*80);
   }
+  renderHeroRoles(s);
   draw();
  }
- async function submit(payload,success){
+ async function submit(payload,success,output=status){
   if(pending||typeof window.__coi4xAction!=="function")return;
-  pending=true;status.textContent="Sincronizando com o servidor…";render();
+  pending=true;output.textContent="Sincronizando com o servidor…";render();
   try{
    await window.__coi4xAction(payload);
-   status.textContent=success;positionDirty=false;
-  }catch(e){status.textContent=String(e?.message||"Operação rejeitada.");}
+   output.textContent=success;positionDirty=false;
+  }catch(e){output.textContent=String(e?.message||"Operação rejeitada.");}
   finally{pending=false;render();}
  }
+ heroRole.addEventListener("change",render);
+ heroAssign.addEventListener("click",()=>{
+  const slot=heroRole.value,heroKey=heroCandidate.value;
+  if(!heroKey||!Object.hasOwn(roleTypes,slot))return;
+  const payload=slot==="industry:mill"
+   ?{type:"assign_hero_to_building",building:"mill",heroKey}
+   :{type:"assign_hero_to_defense",defense:"tower",heroKey};
+  void submit(payload,"Herói alocado ao posto.",heroFeedback);
+ });
+ heroUnassign.addEventListener("click",()=>{
+  const slot=heroRole.value,assigned=(state()?.heroes||[]).find(h=>h.assigned_to===slot);
+  if(assigned)void submit({type:"unassign_hero_4x",heroKey:assigned.hero_key},"Posto liberado.",heroFeedback);
+ });
  place.addEventListener("click",()=>{const p=position();if(p.valid)void submit({type:"city_defense_place",defense:type.value,gridX:p.cx,gridZ:p.cz},"Defesa registrada e sincronizada.");});
  for(const button of root.querySelectorAll("[data-coi-industry]"))
   button.addEventListener("click",()=>void submit({type:"industry_upgrade",industry:button.dataset.coiIndustry},"Indústria evoluída."));
