@@ -19,6 +19,9 @@ test("production migration audit fails closed on any historical gap or divergenc
   assert.match(audit, /names == expected\[:len\(names\)\]/);
   assert.match(audit, /if not prefix_valid:/);
   assert.match(audit, /Migration history divergent/);
+  assert.match(audit, /firstHistoryDivergence/);
+  assert.match(audit, /for index, observed in enumerate\(names\)/);
+  assert.match(audit, /unexpectedAppliedFilenames/);
   for (const name of [
     "0036_4x_read_indexes.sql",
     "0037_daily_login_rewards.sql",
