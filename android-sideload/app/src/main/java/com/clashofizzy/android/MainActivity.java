@@ -237,9 +237,9 @@ public final class MainActivity extends Activity {
             @Override
             public void onReceivedHttpError(WebView view, WebResourceRequest request,
                                             WebResourceResponse errorResponse) {
-                // Falhas de backend não acionam onReceivedError.
+                // Falhas HTTP da pagina principal (inclusive 404) nao acionam onReceivedError.
                 // Não bloquear a interface por falhas de subrecursos ou APIs.
-                if (request.isForMainFrame() && errorResponse.getStatusCode() >= 500) {
+                if (request.isForMainFrame() && errorResponse.getStatusCode() >= 400) {
                     cancelStartupTimeout();
                     mainFrameFailed = true;
                     loadingPanel.setVisibility(View.GONE);
