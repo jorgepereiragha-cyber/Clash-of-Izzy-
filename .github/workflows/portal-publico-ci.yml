@@ -9,6 +9,7 @@ on:
       - wrangler.portal.jsonc
       - public-portal/**
       - tests/portal-isolation.test.js
+      - tests/portal-support.test.js
       - .github/workflows/portal-publico-ci.yml
   workflow_dispatch:
 
