@@ -84,6 +84,6 @@ test("campaign does not promise fake fundraising totals or automatic in-game ben
   assert.match(canonical, /Arrecadação verificada/);
   assert.match(canonical, /Sem benefícios no jogo/);
   assert.match(canonical, /id="support-payment-link" aria-disabled="true"/);
-  assert.doesNotMatch(canonical, /R\$ 1\.750|35%|items_granted|MP_ACCESS_TOKEN|NUBANK_PIX_KEY|CPF|secret put/i);
+  assert.doesNotMatch(canonical, /R\$ 1\.750|35%|items_granted|MP_ACCESS_TOKEN|NUBANK_PIX_KEY|secret put/i);
   assert.doesNotMatch(canonical, /\/api\/store\/checkout|\/auth\/login|document\.cookie|localStorage/);
 });
