@@ -39,10 +39,8 @@ jobs:
             fi
           done
           normalized="$(printf '%s' "$FINGERPRINT" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
-          if ! [[ "$normalized" =~ ^[0-9a-f]{64}$ ]]; then
-            echo "::error::ANDROID_RELEASE_CERT_SHA256 não configurado/ inválido."
-            missing=1
-          fi
+          # Mesmo sem o pin, conferimos a keystore antes de exibir somente o
+          # SHA-256 publico do certificado. O diagnostico continua falhando.
           if test "$missing" = "1"; then
             echo "Assinatura comercial Android: PENDENTE. Nenhum segredo foi divulgado."
             echo "APK oficial bloqueado: credenciais e/ou pin ausentes." >> "$GITHUB_STEP_SUMMARY"
@@ -83,6 +81,18 @@ jobs:
             exit 1
           fi
           actual="$(sha256sum "$tmp/cert.der" | cut -d' ' -f1)"
+          if ! [[ "$normalized" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::notice::Fingerprint publico do certificado: $actual"
+            {
+              echo "### Configurar a variavel de assinatura"
+              echo "O certificado e as senhas foram conferidos, mas o pin ainda nao foi configurado."
+              echo "Em Settings > Secrets and variables > Actions > Variables, configure:"
+              echo "\`ANDROID_RELEASE_CERT_SHA256\` = \`$actual\`"
+              echo "Depois execute este diagnostico novamente. Nenhuma senha ou chave privada foi exibida."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::ANDROID_RELEASE_CERT_SHA256 ausente ou invalido. Veja o SHA-256 publico no resumo da execucao."
+            exit 1
+          fi
           if [[ "$actual" != "$normalized" ]]; then
             echo "::error::Certificado da keystore nao corresponde ao pin SHA-256 de release."
             echo "APK oficial bloqueado: divergencia no certificado de assinatura." >> "$GITHUB_STEP_SUMMARY"
