@@ -1,0 +1,46 @@
+name: Diagnostico seguro dos requisitos de assinatura Android
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnostico-assinatura-android.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - name: Validar apenas presença de credenciais e pin de certificado
+        env:
+          KS: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          SP: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          KP: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          FINGERPRINT: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          for name in KS SP ALIAS KP; do
+            if test -z "${!name}"; then
+              echo "::warning::Credencial de release não configurada: $name"
+              missing=1
+            fi
+          done
+          normalized="$(printf '%s' "$FINGERPRINT" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          if ! [[ "$normalized" =~ ^[0-9a-f]{64}$ ]]; then
+            echo "::warning::ANDROID_RELEASE_CERT_SHA256 não configurado/ inválido."
+            missing=1
+          fi
+          if test "$missing" = "1"; then
+            echo "Assinatura comercial Android: PENDENTE. Nenhum segredo foi divulgado."
+            echo "APK oficial não pode ser liberado sem as credenciais." >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "Assinatura comercial Android: todas as cinco configurações estão presentes."
+            echo "Configurações presentes; a validade do certificado ainda depende do workflow oficial." >> "$GITHUB_STEP_SUMMARY"
+          fi
+          # Diagnóstico não é uma release: a ausência de configuração não é falha da CI geral.
