@@ -1994,10 +1994,11 @@ export default {
         env.DB.prepare("SELECT COUNT(*) AS total FROM players"),
         env.DB.prepare("SELECT COUNT(*) AS total FROM battle_reports WHERE created_at>=datetime('now','-1 day')"),
         env.DB.prepare("SELECT COUNT(*) AS total FROM alliances"),
-        env.DB.prepare("SELECT COALESCE(ROUND(SUM(price_brl*100)),0) AS total_cents FROM purchase_requests WHERE status='approved' AND product_kind='vip_package' AND product_name IN ('Apoio Escudeiro','Apoio Cavaleiro','Apoio Senhor Feudal')")
+        env.DB.prepare("SELECT COALESCE(ROUND(SUM(price_brl*100)),0) AS total_cents FROM purchase_requests WHERE status='approved' AND product_kind='vip_package' AND product_name IN ('Apoio Escudeiro','Apoio Cavaleiro','Apoio Senhor Feudal')"),
+        env.DB.prepare("SELECT COALESCE(SUM(amount_cents),0) AS total_cents FROM support_orders WHERE status='approved'")
       ]);
       const headers={"Access-Control-Allow-Origin":"https://clash-of-izzy-portal.jorgepereiragha.workers.dev","Vary":"Origin","Cache-Control":"public, max-age=60"};
-      return json({totalPlayers:Number(results[0]?.results?.[0]?.total||0),battles24h:Number(results[1]?.results?.[0]?.total||0),totalAlliances:Number(results[2]?.results?.[0]?.total||0),supportTotalCents:Number(results[3]?.results?.[0]?.total_cents||0),verified:true},200,headers);
+      return json({totalPlayers:Number(results[0]?.results?.[0]?.total||0),battles24h:Number(results[1]?.results?.[0]?.total||0),totalAlliances:Number(results[2]?.results?.[0]?.total||0),supportTotalCents:Number(results[3]?.results?.[0]?.total_cents||0)+Number(results[4]?.results?.[0]?.total_cents||0),supportPackagesTotalCents:Number(results[3]?.results?.[0]?.total_cents||0),supportVoluntaryTotalCents:Number(results[4]?.results?.[0]?.total_cents||0),verified:true},200,headers);
     }catch(error){
       console.error("public_stats_failed",String(error?.message||error));
       return json({error:"Estatísticas temporariamente indisponíveis."},503);
@@ -2008,23 +2009,6 @@ export default {
   const mpRouteResponse=await handleMercadoPagoRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   if(mpRouteResponse)return mpRouteResponse;
   if(url.pathname==="/api/support/checkout")return await createSupportCheckout(request,env,{json,readBody,gameIdentity,rateLimitDecision});
-   if(url.pathname==="/api/public/stats"&&request.method==="GET"){
-     const [players,battles,alliances,support]=await env.DB.batch([
-       env.DB.prepare("SELECT COUNT(*) AS total FROM players"),
-       env.DB.prepare("SELECT COUNT(*) AS total FROM battle_reports WHERE created_at>=datetime('now','-1 day')"),
-       env.DB.prepare("SELECT COUNT(*) AS total FROM alliances"),
-       env.DB.prepare("SELECT COALESCE(SUM(amount_cents),0) AS total FROM support_orders WHERE status='approved'")
-     ]);
-     const origin=request.headers.get("Origin");
-     const headers={"Content-Type":"application/json; charset=utf-8","Cache-Control":"public, max-age=60, s-maxage=60"};
-     if(origin==="https://clash-of-izzy-portal.jorgepereiragha.workers.dev")headers["Access-Control-Allow-Origin"]=origin;
-     return new Response(JSON.stringify({
-       totalPlayers:Number(players.results?.[0]?.total||0),
-       battles24h:Number(battles.results?.[0]?.total||0),
-       totalAlliances:Number(alliances.results?.[0]?.total||0),
-       supportTotalCents:Number(support.results?.[0]?.total||0)
-     }),{headers});
-   }
    if(url.pathname==="/api/config/valhalla"&&request.method==="GET")return await handleValhallaConfig(request,env);
   if(url.pathname==="/api/beta/signup"&&request.method==="POST"){
     const ip=request.headers.get("CF-Connecting-IP")||"unknown";
