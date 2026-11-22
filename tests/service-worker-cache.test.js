@@ -5,6 +5,8 @@ import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../sw.js", import.meta.url), "utf8");
 const ORIGIN = "https://clash-of-izzy.example";
+const SHELL_CACHE = source.match(/const CACHE_NAME="([^"]+)"/)?.[1];
+assert.ok(SHELL_CACHE, "Service Worker shell cache identifier missing");
 
 function makeResponse({ status = 200, headers = {}, type = "basic" } = {}) {
   return {
@@ -118,7 +120,7 @@ test("PWA fetches query-bearing navigation but never stores its parameters or re
   assert.equal(h.stores.size, 0);
   assert.equal(h.networkCalls.length, 1);
 
-  await (await h.caches.open("clash-of-izzy-shell-v51"))
+  await (await h.caches.open(SHELL_CACHE))
     .put("/world.html", makeResponse());
   h.offline();
   const offline = await h.dispatch("/world.html?search=private-player", { mode: "navigate" });
@@ -131,11 +133,11 @@ test("PWA shell responses are cached by pathname and serve offline fallback", as
   const first = await h.dispatch("/kingdom.html", { mode: "navigate" });
   assert.equal(first.handled, true);
   assert.equal(first.result.status, 200);
-  assert.ok(h.stores.get("clash-of-izzy-shell-v51").has("/kingdom.html"));
+  assert.ok(h.stores.get(SHELL_CACHE).has("/kingdom.html"));
   h.offline();
   const fallback = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
   assert.equal(fallback.result, undefined);
-  await (await h.caches.open("clash-of-izzy-shell-v51"))
+  await (await h.caches.open(SHELL_CACHE))
     .put("/offline.html", makeResponse());
   const offline = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
   assert.equal(offline.result.status, 200);
