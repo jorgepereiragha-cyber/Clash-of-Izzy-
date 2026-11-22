@@ -182,19 +182,25 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
       batch.instanceMatrix.needsUpdate = true;
       batch.castShadow = quality !== "low";
       batch.receiveShadow = false;
+      batch.computeBoundingBox();
       batch.computeBoundingSphere();
+      batch.frustumCulled = true;
       parent.add(batch);
     }
   }
 
   function clearGroup(group) {
+    const geometries = new Set();
     while (group.children.length) {
       const child = group.children[group.children.length - 1];
       child.traverse(node => {
-        if (node.geometry) node.geometry.dispose();
+        if (node.isInstancedMesh) node.dispose();
+        if (node.geometry) geometries.add(node.geometry);
       });
       group.remove(child);
     }
+    // Crowns of both color variants may share the same geometry.
+    geometries.forEach(geometry => geometry.dispose());
   }
 
   function createGround() {
@@ -330,7 +336,7 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     box(parent, .65, 1.05, .12, material, x + .5, y + .62, z + 1.1);
   }
 
-  function createTerritoryFeature(parent, territory) {
+  function createTerritoryFeature(parent, territory, forestPositions) {
     const x = Number(territory.x) || 0;
     const z = Number(territory.z) || 0;
     const y = terrainHeight(x, z);
@@ -359,9 +365,11 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
         cone(parent, .72 + i * .09, 1.55 + i * .25, shared.stone, rockX, y + 1.1 + i * .1, rockZ, 5);
       }
     } else if (territory.terrain === "forest") {
-      addTree(parent, x - .9, z - .1, .74, 2);
-      addTree(parent, x + .95, z + .45, .68, 3);
-      addTree(parent, x, z - 1.05, .62, 4);
+      forestPositions.push(
+        { x: x - .9, z: z - .1, scale: .74, variant: 2 },
+        { x: x + .95, z: z + .45, scale: .68, variant: 3 },
+        { x, z: z - 1.05, scale: .62, variant: 4 }
+      );
     } else {
       box(parent, 1.25, .58, 1.15, shared.food, x, y + .78, z);
       cone(parent, .9, .55, shared.roof, x, y + 1.32, z, 4);
@@ -378,7 +386,9 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   function rebuildTerritories() {
     clearGroup(territoryRoot);
     const rows = Array.isArray(worldState?.territories) ? worldState.territories : [];
-    for (const territory of rows) createTerritoryFeature(territoryRoot, territory);
+    const forestPositions = [];
+    for (const territory of rows) createTerritoryFeature(territoryRoot, territory, forestPositions);
+    addInstancedForest(territoryRoot, forestPositions);
   }
 
   function rebuildRoads() {
@@ -570,7 +580,10 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     // Release geometry buffers of the scene on page navigation; all batches are
     // shared by the same renderer and must be disposed only once.
     const geometries = new Set();
-    worldRoot.traverse(node => { if (node.geometry) geometries.add(node.geometry); });
+    worldRoot.traverse(node => {
+      if (node.isInstancedMesh) node.dispose();
+      if (node.geometry) geometries.add(node.geometry);
+    });
     for (const geometry of geometries) geometry.dispose();
     if (renderer) {
       renderer.setAnimationLoop(null);
