@@ -28,7 +28,7 @@ test("portal isolado redireciona a raiz para a propaganda, sem abrir o jogo", as
 
 test("portal isolado só publica os arquivos essenciais de marketing",async()=>{
   const env=mockEnv();
-  const allow=["/portal","/portal.html","/favicon.svg","/styles/coi-theme.css","/assets/brand/hero-emblem.svg","/assets/brand/royal-king.webp"];
+  const allow=["/portal","/portal.html","/apoie","/apoie.html","/favicon.svg","/styles/coi-theme.css","/assets/brand/hero-emblem.svg","/assets/brand/royal-king.webp"];
   for(const path of allow){
     const response=await portalWorker.fetch(req(path),env);
     assert.equal(response.status,200,path);
