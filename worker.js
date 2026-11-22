@@ -20,6 +20,7 @@ import { handleMercadoPagoRoute } from "./mercadopago-orders.js";
 import { PANTHEON_SKIN_ITEMS, buildSkinSetGallery } from "./skin-sets.js";
 import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "./dragon-catalog.js";
 import { MASTER_PACK_NAME, MASTER_PACK_BONUSES, masterGrantStatements } from "./master-pack.js";
+import { CASTLE_MAX_LEVEL, CASTLE_VIP_MAX_LEVEL, getCastleVipBonuses, getCastleVipState } from "./castle-vip.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -428,7 +429,7 @@ async function applyProduction(env,kingdomId){
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
   ]);
   const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).resourcePercent/100;
-  const prestigeBonus=(1+Math.max(0,Number(row.prestige||0))*.10)*(1+equipmentProductionBonus);
+  const prestigeBonus=(1+getCastleVipBonuses(row.prestige).productionPercent/100)*(1+equipmentProductionBonus);
   const [valhallaMultipliers,valhallaBuffs,petBonuses]=await Promise.all([
     getValhallaMultipliers(env),getValhallaBuffMultipliers(env,kingdomId),getPetBonuses(env,kingdomId)
   ]);
@@ -484,7 +485,7 @@ async function processMarches(env,kingdomId,batchSize=50){
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={},replayData={};
    if(target&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
-     env.DB.prepare("SELECT castle_level,equipped_skin_id FROM kingdoms WHERE id=?").bind(kingdomId).first(),
+     env.DB.prepare("SELECT castle_level,prestige,equipped_skin_id FROM kingdoms WHERE id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
      env.DB.prepare("SELECT dragon_key,level,bond FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
@@ -505,6 +506,7 @@ async function processMarches(env,kingdomId,batchSize=50){
      army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      dragonAttackBonusPercent:getDragonCombatBonuses(dragon).attackPercent,dragonDefenseBonusPercent:getDragonCombatBonuses(dragon).defensePercent,
+     castleVipAttackBonusPercent:getCastleVipBonuses(kingdom?.prestige).attackPercent,castleVipDefenseBonusPercent:getCastleVipBonuses(kingdom?.prestige).defensePercent,
      researchLevel:Number(military?.level||0),
      defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
      equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
@@ -817,7 +819,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,source_key,title,body,reward_key,read_at,claimed_at,created_at FROM kingdom_mailbox WHERE kingdom_id=? ORDER BY id DESC LIMIT 50").bind(kingdom.id)
   ]);
   const dragonCollection=getDragonCollectionView((dragonOwnedRows.results||[]).map(row=>row.dragon_key),dragon?.dragon_key,dragon?.level,dragon?.bond);
-  return {dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
+  return {castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -1333,18 +1335,22 @@ async function gameAction(env,playerId,body){
     ]);
     if(!result[0]?.meta?.changes)return json({error:"Recursos insuficientes ou herói alterado por outra ação."},409);
     if(!result[2]?.meta?.changes||!result[3]?.meta?.changes)return json({error:"Não foi possível sincronizar o treinamento do herói."},409);
-  }else if(type==="prestige"){
+  }else if(type==="castle_vip_upgrade"||type==="prestige"){
     const current=Number(k.prestige||0),castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
-    if(!castle||Number(castle.level)<30||Number(k.castle_level)<30)return json({error:"Seu castelo precisa atingir o nível 30."},409);
-    if(current>=7)return json({error:"Prestígio máximo atingido."},409);
-    const costs=[1000,2500,5000,10000,20000,40000,80000],cost=costs[current];
-    const debit=await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(cost,p.id,cost).run();
-    if(!debit.meta.changes)return json({error:"Gemas insuficientes para prestigiar."},409);
-    await env.DB.batch([
-      env.DB.prepare("UPDATE kingdoms SET prestige=prestige+1,castle_level=1,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(k.id),
-      env.DB.prepare("UPDATE kingdom_buildings SET level=1,upgraded_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND building_type='castle'").bind(k.id),
-      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"castle_prestige",JSON.stringify({prestige:current+1,cost,resourceBonus:(current+1)*10}))
+    if(!castle||Number(castle.level)!==CASTLE_MAX_LEVEL||Number(k.castle_level)!==CASTLE_MAX_LEVEL)return json({error:"Alcance o castelo nível 30 para iniciar ou continuar o VIP do Castelo."},409);
+    if(current>=CASTLE_VIP_MAX_LEVEL)return json({error:"VIP 7 já alcançado: evolução máxima do castelo."},409);
+    // O cliente envia o nível que viu. Repetição, clique duplo ou estado antigo não compra outro VIP.
+    const expected=Number(body.expectedVipLevel);
+    if(!Number.isSafeInteger(expected)||expected!==current)return json({error:"Nível VIP desatualizado. Atualize o castelo antes de confirmar."},409);
+    const state=getCastleVipState(k),cost=state.next.gemCost,target=current+1;
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET prestige=prestige+1,updated_at=CURRENT_TIMESTAMP WHERE id=? AND prestige=? AND castle_level=30 AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle' AND level=30) AND EXISTS(SELECT 1 FROM players WHERE id=? AND gems>=?)")
+        .bind(k.id,current,k.id,p.id,cost),
+      env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=? AND changes()=1").bind(cost,p.id,cost),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1")
+        .bind(k.id,"castle_vip_upgraded",JSON.stringify({vipLevel:target,gemsSpent:cost,bonuses:getCastleVipBonuses(target),castleLevel:CASTLE_MAX_LEVEL}))
     ]);
+    if(!result[0]?.meta?.changes||!result[1]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Evolução VIP não concluída: gemas insuficientes ou estado alterado."},409);
   }else if(type==="upgrade"){
     const key=String(body.building||"");
     if(!Object.hasOwn(BUILDINGS,key))return json({error:"Edifício inválido."},400);
@@ -1536,6 +1542,7 @@ async function gameAction(env,playerId,body){
       army:armyRows,castleLevel:Number(k.castle_level||1),
       heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      dragonAttackBonusPercent:getDragonCombatBonuses(dragon).attackPercent,dragonDefenseBonusPercent:getDragonCombatBonuses(dragon).defensePercent,
+      castleVipAttackBonusPercent:getCastleVipBonuses(k.prestige).attackPercent,castleVipDefenseBonusPercent:getCastleVipBonuses(k.prestige).defensePercent,
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
       equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),skinAttackBonusPercent:skinBonus.attackPercent,skinDefenseBonusPercent:skinBonus.defensePercent,skinSetAttackBonusPercent:cosmeticState.skinSetBonuses.attackPercent,skinSetDefenseBonusPercent:cosmeticState.skinSetBonuses.defensePercent,skinSetHealthBonusPercent:cosmeticState.skinSetBonuses.healthPercent,skinSetCriticalChancePercent:cosmeticState.skinSetBonuses.criticalChancePercent,equipmentHealthBonusPercent:gear.healthPercent,
      heroAttackBonusPercent:heroCombat.attackPercent,heroDefenseBonusPercent:heroCombat.defensePercent,heroHealthBonusPercent:heroCombat.healthPercent,heroCriticalChancePercent:heroCombat.criticalChancePercent,
