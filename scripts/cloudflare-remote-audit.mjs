@@ -36,7 +36,7 @@ async function req(url,{fetchImpl,token=""}={}){
   if(token&&value?.success!==true)throw Error("API Cloudflare não confirmou sucesso");
   return value;
 }
-export async function audit({fetchImpl=fetch,production,staging,token="",accountId="",allowPending0030=false,allowPending0033=false}={}){
+export async function audit({fetchImpl=fetch,production,staging,token="",accountId="",allowPending0030=false,allowPending0033=false,allowPending0034=false}={}){
   const result=[];
   const normalizedAccountId=normalizeAccountId(accountId);
   const run=async(name,fn,required=true)=>{
@@ -48,28 +48,32 @@ export async function audit({fetchImpl=fetch,production,staging,token="",account
     ids=validateIds(production,staging);return "UUIDs distintos";
   });
   await run("Worker público e D1",async()=>{
-    if(allowPending0030||allowPending0033){
-      // Somente o deploy protegido pode aceitar exatamente os esquemas pendentes de 0030 ou 0033.
-      // Outros objetos ausentes, falhas de sessão ou DB continuam bloqueando o deploy.
+    if(allowPending0030||allowPending0033||allowPending0034){
+      // Somente pré-deploy protegido: aceitar uniões exatas das migrações 0030/0033/0034.
+      // Nunca relaxar DB, sessão, objetos desconhecidos ou o health pós-deploy.
       const response=await fetchImpl(PUBLIC+"/api/health",{
         method:"GET",redirect:"error",signal:AbortSignal.timeout(15000),
         headers:{Accept:"application/json"}
       });
       if(response.status===503){
         const h=await response.json();
-        const allowed=[];
-        if(allowPending0030)allowed.push({migration:"0030",tables:["kingdom_dragons","kingdom_mailbox","master_bonus_claims"]});
-        if(allowPending0033)allowed.push({migration:"0033",tables:["google_account_links","google_auth_challenges"]});
+        const pending=[];
+        if(allowPending0030)pending.push({id:"0030",tables:["kingdom_dragons","kingdom_mailbox","master_bonus_claims"]});
+        if(allowPending0033)pending.push({id:"0033",tables:["google_account_links","google_auth_challenges"]});
+        if(allowPending0034)pending.push({id:"0034",tables:["realm_openings"]});
         const actual=Array.isArray(h?.missingTables)?[...h.missingTables].sort():[];
-        const matching=allowed.find(({tables})=>{
-          const expected=[...tables].sort();
-          return actual.length===expected.length&&actual.every((name,index)=>name===expected[index]);
-        });
+        const combinations=[];
+        for(let mask=1;mask<(1<<pending.length);mask++){
+          const selected=pending.filter((_,index)=>mask&(1<<index));
+          combinations.push({ids:selected.map(x=>x.id).join("+"),tables:selected.flatMap(x=>x.tables).sort()});
+        }
+        const matching=combinations.find(({tables})=>
+          actual.length===tables.length&&actual.every((name,index)=>name===tables[index]));
         if(h?.ok===false&&h?.status==="not_ready"&&h.checks?.database===true&&
            h.checks?.session===true&&h.checks?.schema===false&&matching){
-          return "D1 e sessão OK; somente tabelas de "+matching.migration+" pendentes (esperado antes da migration)";
+          return "D1 e sessão OK; somente tabelas de "+matching.ids+" pendentes (esperado antes da migration)";
         }
-        throw Error("Health 503 não corresponde exclusivamente às migrations previstas 0030/0033.");
+        throw Error("Health 503 contém objetos ou falhas fora de 0030/0033/0034.");
       }
       if(!response.ok)throw Error("HTTP "+response.status);
       const h=await response.json();
@@ -152,7 +156,8 @@ async function main(){
     report=await audit({production:JSON.parse(production),staging:JSON.parse(staging),
       token:normalizeToken(process.env.CLOUDFLARE_API_TOKEN),accountId:process.env.CLOUDFLARE_ACCOUNT_ID||"",
       allowPending0030:process.env.COI_ALLOW_PENDING_0030==="true",
-      allowPending0033:process.env.COI_ALLOW_PENDING_0033==="true"});
+      allowPending0033:process.env.COI_ALLOW_PENDING_0033==="true",
+      allowPending0034:process.env.COI_ALLOW_PENDING_0034==="true"});
   }catch(e){report={ready:false,checks:[{ok:false,required:true,name:"Configuração",detail:e.message}]}};
   const text=summary(report);console.log(text);
   if(process.env.GITHUB_STEP_SUMMARY)await appendFile(process.env.GITHUB_STEP_SUMMARY,text);
