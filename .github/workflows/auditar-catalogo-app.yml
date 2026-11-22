@@ -64,6 +64,7 @@ jobs:
           const h=health.data;
           const ready=health.code===200&&h?.ok===true&&h?.status==='ready'&&h?.checks?.database===true&&h?.checks?.schema===true&&h?.checks?.session===true&&h?.androidApiContract==='eldoria-android-v1';
           lines.push('Backend Android: '+(ready?'pronto':'não confirmado')+' (HTTP '+health.code+').');
+          lines.push('Tabelas obrigatórias faltando: '+(Array.isArray(h?.missingTables)?h.missingTables.join(', ')||'nenhuma':'não informadas')+'.');
           lines.push('Portal de instalação: '+(portal.code===200&&portal.body.includes('id="download-apk"')?'publicado':'não confirmado')+' (HTTP '+portal.code+').');
           const assets=Array.isArray(release.data?.assets)?release.data.assets:[];
           const official=release.code===200&&!release.data?.draft&&!release.data?.prerelease&&['clash-of-izzy-android.apk','clash-of-izzy-android.apk.sha256'].every(n=>assets.some(a=>a.name===n&&a.state==='uploaded'&&a.size>0));

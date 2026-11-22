@@ -71,6 +71,18 @@ test("auditoria pré-migração 0030 aceita somente três tabelas faltando com D
   assert.ok(valid.visits.every(x=>x.method==="GET"));
   const strict=await audit({...args,allowPending0030:false,fetchImpl:mockFor(base).fetchImpl});
   assert.equal(strict.ready,false);
+  const missingGoogle={...base,missingTables:["google_account_links","google_auth_challenges"]};
+  const approvedGoogle=await audit({...args,allowPending0033:true,fetchImpl:mockFor(missingGoogle).fetchImpl});
+  assert.equal(approvedGoogle.ready,true,JSON.stringify(approvedGoogle.checks));
+  assert.ok(approvedGoogle.checks.find(row=>row.name==="Worker público e D1").detail.includes("0033"));
+  const rejectedWithoutFlag=await audit({...args,fetchImpl:mockFor(missingGoogle).fetchImpl});
+  assert.equal(rejectedWithoutFlag.ready,false);
+  for(const invalid of [
+    ["google_account_links"],["google_auth_challenges"],["google_account_links","outra_tabela"]
+  ]){
+    const denied=await audit({...args,allowPending0033:true,fetchImpl:mockFor({...missingGoogle,missingTables:invalid}).fetchImpl});
+    assert.equal(denied.ready,false,JSON.stringify(invalid));
+  }
   for(const health of [
     {...base,missingTables:["kingdom_dragons","kingdom_mailbox","outro"]},
     {...base,missingTables:["kingdom_dragons","kingdom_mailbox"]},
@@ -93,9 +105,10 @@ test("deploy não relaxa a validação de saúde pós-migração",async()=>{
   const deploy=workflow.indexOf("Deploy Worker and static assets");
   assert.ok(old>=0&&migrate>old&&deploy>migrate&&newCheck>deploy);
   const strict=workflow.slice(newCheck,workflow.indexOf("Smoke test production Worker",newCheck));
-  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030/);
+  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030|COI_ALLOW_PENDING_0033/);
   assert.match(strict,/check-android-release-server\.mjs/);
   assert.match(source,/allowPending0030:process\.env\.COI_ALLOW_PENDING_0030==="true"/);
+  assert.match(source,/allowPending0033:process\.env\.COI_ALLOW_PENDING_0033==="true"/);
 });
 
 test("normaliza account ID sem expor valor e mantém formato de 32 caracteres",()=>{
