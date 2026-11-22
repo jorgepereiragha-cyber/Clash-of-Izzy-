@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
-test("launch keeps one player settlement in Eldoria and resumes it inside the shared realm", async () => {
+test("launch preserves one kingdom per player and existing kingdoms in map 1", async () => {
   const worker = await read("worker.js");
   const schema = await read("migrations/0002_world.sql");
   const sharedRealm = await read("migrations/0026_single_shared_realm.sql");
@@ -14,6 +14,9 @@ test("launch keeps one player settlement in Eldoria and resumes it inside the sh
   assert.ok(worker.includes("payload.av=Number(account.session_version)"));
   assert.ok(worker.includes("resumed:true"));
   assert.ok(sharedRealm.includes("map_region = 1"));
+  const progressive=await read("migrations/0034_progressive_realms.sql");
+  assert.ok(progressive.includes("realm_openings"));
+  assert.doesNotMatch(progressive,/DROP TABLE|DELETE FROM kingdoms/i);
 });
 
 test("the launch store exposes only six paid skins and blocks new requests for unreleased skins", async () => {
