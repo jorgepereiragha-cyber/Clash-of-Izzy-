@@ -17,6 +17,8 @@ test('release Android requires main, explicit publication confirmation and perma
   assert.match(flow, /apksigner" verify --verbose/);
   // Falhar se certificado trocado ou se applicationId/versionCode/versionName divergem.
   assert.match(flow, /ANDROID_RELEASE_CERT_SHA256/);
+  assert.doesNotMatch(flow.split('steps:')[0], /GH_TOKEN:/, 'write token must not be a job-wide environment variable');
+  assert.equal((flow.match(/GH_TOKEN:/g) || []).length, 2, 'token should only be present in validation and publish steps');
   assert.match(flow, /actual_cert/);
   assert.match(flow, /normalized_cert/);
   assert.match(flow, /Certificado APK diferente do aprovado/);
