@@ -15,8 +15,9 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   await page.goto("/");
   await expect(page.locator("h1")).toContainText("CLASH OF IZZY");
 
-  // The landing page registers /sw.js after load. Wait for activation, then
-  // reload once so this document is controlled by the newly installed worker.
+  // The promotional portal never auto-installs the WebView cache. Register it
+  // explicitly for this isolated cache/lifecycle regression test.
+  await page.evaluate(() => navigator.serviceWorker.register("/sw.js"));
   await page.waitForFunction(async () => {
     const registration = await navigator.serviceWorker.getRegistration("/");
     return registration?.active?.state === "activated";
@@ -60,8 +61,9 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(shellState.marketShell).toBe(true);
   expect(shellState.marketRuntime).toBe(true);
 
-  const landingArtwork = await page.locator(".landing-kingdom-art").evaluate(image => ({ complete: image.complete, naturalWidth: image.naturalWidth }));
-  expect(landingArtwork).toEqual({ complete: true, naturalWidth: 900 });
+  const portalEmblem = await page.locator(".hero-art").evaluate(image => ({ complete: image.complete, naturalWidth: image.naturalWidth }));
+  expect(portalEmblem.complete).toBe(true);
+  expect(portalEmblem.naturalWidth).toBeGreaterThan(100);
 
   // GLBs are cached at runtime by the existing same-origin Cache API strategy.
   const onlineModel = await page.evaluate(async url => {
@@ -106,7 +108,7 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(offlineShell.status).toBe(200);
   expect(offlineShell.body).toContain("<h1>Você está sem conexão</h1>");
 
-  // Verify first-time module resolution while offline. The landing document
+  // Verify first-time module resolution while offline. The promo document
   // has not imported any modules yet, so its import map can be registered before
   // resolving the same-origin Three.js addon graph.
   const offlineThreeModules = await page.evaluate(async () => {

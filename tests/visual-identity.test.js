@@ -59,14 +59,15 @@ test("tema compartilhado define tokens da marca e acessibilidade básica", async
 });
 
 
-test("entrada do jogo apresenta arte própria do reino em vez de ampliar o brasão", async () => {
-  const landing = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  const artwork = await readFile(new URL("../assets/art/landing-kingdom.svg", import.meta.url), "utf8");
-  assert.match(landing, /class="landing-kingdom-art" src="\/assets\/art\/landing-kingdom\.svg"/);
-  assert.match(artwork, /Castelo medieval de pedra com telhados azul-real/);
-  assert.match(artwork, /id="river"/);
+test("portal de download apresenta o emblema original com herói e espada", async () => {
+  const portal = await readFile(new URL("../portal.html", import.meta.url), "utf8");
+  const art = await readFile(new URL("../assets/brand/hero-emblem.svg", import.meta.url), "utf8");
+  assert.match(portal, /src="\/assets\/brand\/hero-emblem\.svg"/);
+  assert.match(art, /<svg/);
+  assert.match(art, /Herói de coroa dourada/);
+  assert.match(art, /espada/);
+  assert.doesNotMatch(portal, /href="\/kingdom\.html"/);
 });
-
 
 test("PBR map derivation wraps samples at texture edges and emits bounded linear data", async () => {
   const { derivePbrTextureData } = await import("../scripts/kingdom-materials.js");
