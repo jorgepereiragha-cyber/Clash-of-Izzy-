@@ -1,6 +1,7 @@
 /* Progressive Three.js kingdom renderer. Canvas art remains as offline/WebGL fallback. */
 import * as THREE from "three";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+import { getCastleTier } from "../castle-progression.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
@@ -354,11 +355,13 @@ if (host && "WebGLRenderingContext" in window) {
     group.userData.coIType = type;
     group.userData.coIProcedural = true;
     const castleSkin=type==="castle"?(castleSkinPalettes[Number(castleSkinId)]||null):null;
+    const castleTier=type==="castle"?getCastleTier(level):0;
+    if(castleTier)group.userData.coICastleTier=castleTier;
     const colors = castleSkin ? [castleSkin.wall,castleSkin.roof] : (palettes[type] || palettes.warehouse);
     const seed = [...String(type)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-    const wall = surfaceMaterial(colors[0], "stone", seed);
+    const wall = surfaceMaterial(colors[0],castleTier===1?"wood":"stone",seed);
     const roof = surfaceMaterial(colors[1], "roof", seed + 101);
-    const castleStone=castleSkin?surfaceMaterial(castleSkin.stone,"stone",seed+207):mats.stone;
+    const castleStone=castleSkin?surfaceMaterial(castleSkin.stone,"stone",seed+207):(castleTier===1?mats.wood:mats.stone);
     const castleRoof=castleSkin?surfaceMaterial(castleSkin.roof,"roof",seed+309):mats.roof;
     const castleAccent=castleSkin?material(castleSkin.accent,.52):mats.gold;
     const height = 1.0 + Math.min(30, Math.max(1, Number(level) || 1)) * .035;
@@ -415,6 +418,33 @@ if (host && "WebGLRenderingContext" in window) {
       sealCore.position.set(0, 1.02, .668);
       group.add(sealCore);
       box(group, .62, .24, .24, castleAccent, 0, height + .08, .76);
+      // Four silhouettes without relying on nonexistent tier-specific GLB files.
+      if(castleTier===1){
+        for(const z of [-.88,.88])box(group,2.12,.48,.11,mats.wood,0,.24,z);
+        for(const x of [-1.04,1.04])box(group,.11,.48,1.7,mats.wood,x,.24,0);
+        box(group,.48,.8,.18,mats.wood,0,.4,1.02);
+      }
+      if(castleTier>=2){
+        box(group,.72,.68,.26,castleStone,0,.34,.94);
+        box(group,.84,.15,.32,castleAccent,0,.74,.94);
+      }
+      if(castleTier>=3){
+        for(const z of [-1.07,1.07])box(group,2.42,.58,.17,castleStone,0,.29,z);
+        for(const x of [-1.19,1.19])box(group,.17,.58,2.0,castleStone,x,.29,0);
+        for(const x of [-1.14,1.14])for(const z of [-1.02,1.02]){
+          box(group,.3,.94,.3,castleStone,x,.47,z);
+          box(group,.35,.12,.35,castleAccent,x,1.0,z);
+        }
+      }
+      if(castleTier===4){
+        for(const x of [-.58,.58])for(const z of [-.43,.43]){
+          const spire=new THREE.Mesh(new THREE.ConeGeometry(.22,.95,6),castleAccent);
+          spire.position.set(x,2.12,z);spire.castShadow=true;group.add(spire);
+        }
+        box(group,.54,.12,.54,castleAccent,0,height+.63,0);
+        const pinnacle=new THREE.Mesh(new THREE.ConeGeometry(.24,.66,6),castleRoof);
+        pinnacle.position.set(0,height+1.0,0);pinnacle.castShadow=true;group.add(pinnacle);
+      }
     } else if (type === "watchtower") {
       box(group, .16, .95, .16, mats.wood, 0, height + .42, 0);
       const flag = new THREE.Mesh(new THREE.PlaneGeometry(.48, .28), material("#A9433B"));
@@ -613,7 +643,8 @@ if (host && "WebGLRenderingContext" in window) {
     frameCityBuildings(list);
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
-      const template = glbTemplates.get(b.building_type);
+      // Castle visuals must reflect their actual level even when a generic GLB exists.
+      const template = b.building_type==="castle"?null:glbTemplates.get(b.building_type);
       const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });

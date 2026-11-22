@@ -7,6 +7,8 @@ import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
 import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
 import { cityLayoutConfig, moveCityBuilding } from "./city-layout-rules.js";
+import { getCastleProgression } from "./castle-progression.js";
+import { getPlayerProgression, experienceForCompletedQueue } from "./player-progression.js";
 import { processEmailQueue, requestEmailVerification, verifyEmailToken, getEmailPreferences, updateEmailPreferences, getEmailHistory, queueEmailForInternalPlayer } from "./email-system.js";
 import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaConfig } from "./valhalla-config.js";
 import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
@@ -791,7 +793,8 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT item_key,quantity FROM inventory_items WHERE kingdom_id=? AND quantity>0 ORDER BY item_key").bind(kingdom.id),
     env.DB.prepare("SELECT id,event_type,payload_json FROM kingdom_events WHERE kingdom_id=? AND event_type!='__internal_action_guard' ORDER BY id DESC LIMIT 15").bind(kingdom.id),
     env.DB.prepare("SELECT id,queue_type,queue_slot,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at,completed_at FROM kingdom_queues WHERE kingdom_id=? ORDER BY CASE WHEN status='running' THEN 0 ELSE 1 END,queue_type,queue_slot,id DESC LIMIT 20").bind(kingdom.id),
-    env.DB.prepare("SELECT s.id,s.name,s.price_brl,s.attack_bonus_percent,s.defense_bonus_percent,ps.unlocked_at FROM player_skins ps JOIN skins s ON s.id=ps.skin_id WHERE ps.player_id=? ORDER BY s.id").bind(p.id)
+    env.DB.prepare("SELECT s.id,s.name,s.price_brl,s.attack_bonus_percent,s.defense_bonus_percent,ps.unlocked_at FROM player_skins ps JOIN skins s ON s.id=ps.skin_id WHERE ps.player_id=? ORDER BY s.id").bind(p.id),
+    env.DB.prepare("SELECT total_xp FROM kingdom_player_progression WHERE kingdom_id=?").bind(kingdom.id)
   ]);
   const fresh=stateResults[0]?.results?.[0]||null;
   const buildings=stateResults[1],troops=stateResults[2],heroes=stateResults[3];
@@ -857,7 +860,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,source_key,title,body,reward_key,read_at,claimed_at,created_at FROM kingdom_mailbox WHERE kingdom_id=? ORDER BY id DESC LIMIT 50").bind(kingdom.id)
   ]);
   const dragonCollection=getDragonCollectionView((dragonOwnedRows.results||[]).map(row=>row.dragon_key),dragon?.dragon_key,dragon?.level,dragon?.bond);
-  return {castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
+  return {castleProgression:getCastleProgression(fresh?.castle_level),playerProgression:getPlayerProgression(stateResults[15]?.results?.[0]?.total_xp||0),castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -1866,6 +1869,12 @@ async function processDueKingdomQueues(env,kingdomId=null){
         : {research:queue.target_key,level:queue.to_level,queueId:queue.id};
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard)
       .bind(queue.kingdom_id,eventType,JSON.stringify(eventPayload),queue.id,completionToken));
+    // Queue completion token guards the XP grant within the same transactional batch.
+    const queueXP=experienceForCompletedQueue(queue);
+    if(queueXP>0){
+      statements.push(env.DB.prepare("INSERT INTO kingdom_player_progression(kingdom_id,total_xp,updated_at) SELECT ?,?,CURRENT_TIMESTAMP WHERE "+guard+" ON CONFLICT(kingdom_id) DO UPDATE SET total_xp=MIN(1000000000000,kingdom_player_progression.total_xp+excluded.total_xp),updated_at=CURRENT_TIMESTAMP")
+        .bind(queue.kingdom_id,queueXP,queue.id,completionToken));
+    }
     statements.push(env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,?,? WHERE "+guard)
       .bind(queue.kingdom_id,queue.queue_type+"_completed",JSON.stringify(eventPayload),queue.id,completionToken));
     try{
