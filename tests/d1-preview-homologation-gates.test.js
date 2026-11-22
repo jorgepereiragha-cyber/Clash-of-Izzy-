@@ -46,3 +46,15 @@ test("Homologacao valida primeiro reino e escudo real de 35 dias", () => {
   assert.match(workflow, /datetime\(r\.unlocked_at,'\+35 days'\)/);
   assert.match(workflow, /int\(row\["mundos"\]\)!=1 or int\(row\["tronos"\]\)!=1/);
 });
+
+test("Preview parcial so avanca de 0030 sem jogadores ou cobrancas", () => {
+  assert.match(workflow, /history\[0\]\.get\("name"\)!="0030_dragons_master_mailbox\.sql"/);
+  for (const table of ["players", "kingdoms", "player_accounts", "purchase_requests",
+    "mercadopago_orders", "world_territories"]) {
+    assert.match(workflow, new RegExp("COUNT\\(\\*\\) FROM " + table));
+  }
+  assert.match(workflow, /any\(int\(value\)!=0 for value in count\.values\(\)\)/);
+  assert.match(workflow, /names & forbidden/);
+  assert.match(workflow, /0031-0035/);
+  assert.match(workflow, /Preview contem jogadores, reinos, territorios ou pagamentos/);
+});
