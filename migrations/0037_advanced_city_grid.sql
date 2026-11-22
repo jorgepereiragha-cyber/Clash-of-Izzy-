@@ -143,8 +143,8 @@ CREATE TABLE IF NOT EXISTS city_economy_clock(
 INSERT OR IGNORE INTO city_population(kingdom_id) SELECT id FROM kingdoms;
 INSERT OR IGNORE INTO city_economy_clock(kingdom_id) SELECT id FROM kingdoms;
 INSERT OR IGNORE INTO city_stock(kingdom_id,resource)
- SELECT k.id,r.resource FROM kingdoms k CROSS JOIN
- (SELECT 'wheat' AS resource UNION ALL SELECT 'flour' UNION ALL SELECT 'iron_ore' UNION ALL SELECT 'weapons' UNION ALL SELECT 'food_credit' UNION ALL SELECT 'iron_credit') r;
+ SELECT k.id,r.column1 FROM kingdoms k CROSS JOIN
+ (VALUES ('wheat'),('flour'),('iron_ore'),('weapons'),('food_credit'),('iron_credit')) AS r;
 -- Somente trabalhadores: nenhuma cópia das posições originais é gravada.
 INSERT OR IGNORE INTO city_core_workers(kingdom_id,building_type)
  SELECT kingdom_id,building_type FROM kingdom_buildings
