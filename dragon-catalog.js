@@ -124,7 +124,7 @@ export function getDragonCombatBonuses(row={}){
  if(!dragon)return {attackPercent:0,defensePercent:0};
  const level=Math.max(1,Math.min(100,Number(row.level)||1));
  const bond=Math.max(1,Math.min(100,Number(row.bond)||1));
- const factor=.65+.25*((level-1)/99)+.1*((bond-1)/99);
+ const factor=dragon.rarity==="gold"?.85+.1*((level-1)/99)+.05*((bond-1)/99):.65+.25*((level-1)/99)+.1*((bond-1)/99);
  return {
    attackPercent:Math.min(DRAGON_BONUS_CAP,Number((dragon.attack*factor).toFixed(2))),
    defensePercent:Math.min(DRAGON_BONUS_CAP,Number((dragon.defense*factor).toFixed(2)))

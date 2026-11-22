@@ -1,3 +1,4 @@
+import {MASTER_PACK_NAME,masterGrantStatements} from "./master-pack.js";
 function toBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -162,7 +163,7 @@ async function handleWebhook(request, env, ctx) {
   }
 
   const purchase = await env.DB.prepare(
-    "SELECT id,player_id,product_kind,product_id,price_brl,currency,status,mp_order_id,mp_external_reference " +
+    "SELECT id,player_id,product_kind,product_id,product_name,price_brl,currency,status,mp_order_id,mp_external_reference " +
     "FROM purchase_requests WHERE mp_external_reference=? AND mp_order_id=?"
   ).bind(String(providerOrder.external_reference || ""), orderId).first();
   if (!purchase) return ctx.json({ received: true, ignored: true });
@@ -208,6 +209,7 @@ async function handleWebhook(request, env, ctx) {
     common.push(env.DB.prepare(
       "UPDATE players SET gems=gems+(SELECT gems_amount FROM purchase_requests WHERE id=?) WHERE id=? AND changes()=1"
     ).bind(purchase.id, purchase.player_id));
+    if(purchase.product_name===MASTER_PACK_NAME)common.push(...masterGrantStatements(env.DB,purchase.id));
   } else if (purchase.product_kind === "skin") {
     common.push(env.DB.prepare(
       "INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT ?,? WHERE changes()=1"
