@@ -182,7 +182,9 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
       batch.instanceMatrix.needsUpdate = true;
       batch.castShadow = quality !== "low";
       batch.receiveShadow = false;
+      batch.computeBoundingBox();
       batch.computeBoundingSphere();
+      batch.frustumCulled = true;
       parent.add(batch);
     }
   }
@@ -191,6 +193,7 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     while (group.children.length) {
       const child = group.children[group.children.length - 1];
       child.traverse(node => {
+        if (node.isInstancedMesh) node.dispose();
         if (node.geometry) node.geometry.dispose();
       });
       group.remove(child);
@@ -570,7 +573,10 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     // Release geometry buffers of the scene on page navigation; all batches are
     // shared by the same renderer and must be disposed only once.
     const geometries = new Set();
-    worldRoot.traverse(node => { if (node.geometry) geometries.add(node.geometry); });
+    worldRoot.traverse(node => {
+      if (node.isInstancedMesh) node.dispose();
+      if (node.geometry) geometries.add(node.geometry);
+    });
     for (const geometry of geometries) geometry.dispose();
     if (renderer) {
       renderer.setAnimationLoop(null);
