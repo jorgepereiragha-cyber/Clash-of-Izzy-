@@ -17,7 +17,7 @@ test("altar and nest are visible in the city and link only to existing authentic
   assert.match(city, /id="dragonCollection"/);
   assert.match(city, /state\?\.dragon\?\.level/);
   assert.match(city, /state\?\.dragon\?\.bond/);
-  assert.match(city, /data\.dragonUpgrade="true"/);
+  assert.match(city, /upgrade\.dataset\.dragonUpgrade\s*=\s*["\x27]true["\x27]/);
   assert.match(city, /runKingdomPanelAction\(\{type:"dragon_upgrade"\}/);
   assert.match(styles, /\.coi-recruitment-site:focus-visible/);
   assert.match(styles, /@media\(max-width:650px\)/);
@@ -34,7 +34,7 @@ test("recruitment landmarks do not bypass the D1 building allowlist, economy or 
   assert.match(city, /id="coiDragonNest"/);
   assert.match(worker, /type==="dragon_unlock"/);
   assert.match(worker, /type==="dragon_upgrade"/);
-  assert.match(worker, /bond=MIN\(100,bond\+2\)/);
+  assert.match(worker, /bond\s*=\s*MIN\(\s*100\s*,\s*bond\s*\+\s*2\s*\)/);
   assert.match(city, /costs=\{food:250\*level,wood:150\*level,stone:100\*level,iron:25\*level\}/);
   assert.match(worker, /type==="hero_summon"/);
   assert.doesNotMatch(city, /type:"dragon_hatch"|type:"dragon_feed"|type:"hero_summon"/);
