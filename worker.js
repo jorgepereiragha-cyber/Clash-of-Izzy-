@@ -13,6 +13,7 @@ import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
 import {realmStatusView} from "./realm-progression.js";
+import {throneStatus,throneAction,ThroneWarError} from "./throne-war.js";
 import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
@@ -483,6 +484,12 @@ async function seedWorld(env,region=1){
   ["old_mine","Mina Abandonada","mountain",-35,28,"iron"]
  ];
  await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate,map_region) VALUES(?,?,?,?,?,?,?,?)").bind(n[0]+(region===1?"":"_realm_"+region),...n.slice(1),90,region)));
+ // Trono central e escudo de 35 dias contados da abertura do mundo.
+ await env.DB.prepare(
+   "INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,owner_kingdom_id,level,resource_type,resource_rate,territory_kind,map_region,shield_until) "+
+   "SELECT 'royal_throne_realm_'||realm_id,'Trono de Eldoria','plains',0,0,NULL,30,NULL,0,'throne',realm_id,datetime(unlocked_at,'+35 days') "+
+   "FROM realm_openings WHERE realm_id=?"
+ ).bind(region).run();
 }
 async function processMarches(env,kingdomId,batchSize=50){
  const now=new Date().toISOString();
@@ -1491,6 +1498,7 @@ async function gameAction(env,playerId,body){
     const marchType=String(body.marchType||"gather");
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
     if(marchType==="attack"&&(target.owner_kingdom_id||target.territory_kind==="castle"))return json({error:"O castelo de outro comandante está visível no mapa. O combate PvP será habilitado na Fase 10; por enquanto, ataque apenas territórios neutros."},409);
+    if(target.territory_kind==="throne")return json({error:"O Trono só pode ser atacado ou reforçado durante a Guerra do Trono."},409);
     if(target.territory_kind==="castle"&&marchType!=="attack")return json({error:"Castelos de jogadores não podem ser coletados nem usados como ponto de exploração."},409);
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
     const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
@@ -1926,7 +1934,7 @@ export default {
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
+    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","throne_sieges","throne_crowns","throne_siege_actions","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -2472,6 +2480,20 @@ export default {
         const rallyBody=isWrite?await readBody(request,8192):{};
         if(rallyBody.__bodyError)return json({error:"Solicitação de guerra inválida."},rallyBody.__bodyError==="payload_too_large"?413:400);
         return await handleRally(request,env,playerId,rallyPath,rallyBody);
+      }
+      if(url.pathname==="/api/game/throne"&&request.method==="GET"){
+        const limit=await rateLimitDecision(env,"throne-state-player",playerId,30,60);
+        if(limit)return limit;
+        try{return json(await throneStatus(env,playerId))}
+        catch(e){if(e instanceof ThroneWarError)return json({error:e.message},e.status);throw e;}
+      }
+      if(url.pathname==="/api/game/throne/action"&&request.method==="POST"){
+        const limit=await rateLimitDecision(env,"throne-action-player",playerId,8,60);
+        if(limit)return limit;
+        const body=await readBody(request,4096);
+        if(body.__bodyError)return json({error:"Ação inválida."},400);
+        try{return json(await throneAction(env,playerId,body,UNITS))}
+        catch(e){if(e instanceof ThroneWarError||e instanceof RangeError)return json({error:e.message},e.status||400);throw e;}
       }
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);
