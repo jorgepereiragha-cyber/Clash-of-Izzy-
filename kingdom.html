@@ -148,6 +148,9 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 </section>
 <section class="panel"><h2>🛡️ Poder do reino</h2><div class="grid2" id="army"></div><div class="toolbar"><button class="secondary" id="goMap">🌍 Explorar territórios</button></div></section>
 <section class="panel"><h2>📜 Crônicas do reino</h2><div class="events" id="events"></div></section>
+<section class="panel" id="coiDragonPanel"><h2>🐉 Dragões de Eldoria · Azul, Roxo e Dourado</h2><p class="muted">Colecione nove dragões exclusivos; somente o equipado participa dos bônus do combate. Os três dourados pertencem ao pacote Master confirmado.</p><div id="dragonCollection" class="events" aria-live="polite"></div></section>
+<section class="panel" id="coiMailboxPanel"><h2>✉️ Caixa de mensagens</h2><p class="muted">Mensagens do seu reino, recompensas pendentes e confirmações. Resgates protegidos contra duplicação.</p><div id="kingdomMailbox" class="events" aria-live="polite"></div></section>
+<section class="panel" id="coiBackpackPanel"><h2>🎒 Mochila do reino</h2><p class="muted">Materiais do castelo, itens e recursos conquistados. Inventário salvo no servidor.</p><div id="kingdomBackpack" class="events" aria-live="polite"></div></section>
 <section class="panel"><h2>🐾 Companhia de mascotes</h2><p class="muted">Desbloqueie, ative e evolua um mascote. As habilidades passivas são aplicadas pelo servidor.</p><div class="events" id="petsList"></div><div class="muted" id="petStatus" role="status" aria-live="polite"></div></section>
 <section class="panel"><h2>📜 Relatórios e replays de batalha</h2><div class="events" id="battleReplayList"></div><div class="events" id="battleReplayView" aria-live="polite"></div></section>
 </div></div>
@@ -306,7 +309,83 @@ async function equipCastleSkin(skinId){
  }catch(error){setStatus(error.message||"Não foi possível equipar esta skin.",true);}
  finally{busy=false;render();}
 }
-function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();
+function renderDragonCollection(){
+ const root=document.getElementById("dragonCollection");if(!root)return;
+ root.replaceChildren();
+ const dragons=Array.isArray(state?.dragonCollection)?state.dragonCollection:[];
+ const colors={blue:"Azul · Raro",purple:"Roxo · Épico",gold:"Dourado · Master"};
+ for(const dragon of dragons){
+  const card=document.createElement("div");card.className="event";
+  card.style.borderLeft=dragon.rarity==="gold"?"4px solid #eac571":dragon.rarity==="purple"?"4px solid #b386ed":"4px solid #68a9e2";
+  const name=document.createElement("strong");name.textContent=dragon.name+" · "+colors[dragon.rarity];
+  const stats=document.createElement("p");stats.className="muted";
+  stats.textContent=dragon.element+" · Ataque +"+Number(dragon.attackPercent||0).toFixed(2)+"% · Defesa +"+Number(dragon.defensePercent||0).toFixed(2)+"%";
+  card.append(name,stats);
+  const action=document.createElement("button");action.type="button";
+  action.disabled=busy||dragon.equipped||Boolean(dragon.master&&!dragon.owned);
+  if(dragon.equipped)action.textContent="✓ Equipado";
+  else if(dragon.owned)action.textContent="Equipar";
+  else if(dragon.master)action.textContent="Exclusivo Master";
+  else action.textContent="Liberar · Castelo nível "+Number(dragon.castle||1);
+  if(dragon.owned&&!dragon.equipped)action.addEventListener("click",()=>runKingdomPanelAction({type:"dragon_equip",dragonKey:dragon.key},"Dragão equipado."));
+  else if(!dragon.owned&&!dragon.master)action.addEventListener("click",()=>runKingdomPanelAction({type:"dragon_unlock",dragonKey:dragon.key},"Dragão desbloqueado."));
+  card.append(action);root.append(card);
+ }
+ if(!dragons.length){const empty=document.createElement("div");empty.className="muted";empty.textContent="Nenhum dragão carregado. Atualize o reino.";root.append(empty);}
+}
+function renderKingdomMailbox(){
+ const root=document.getElementById("kingdomMailbox");if(!root)return;
+ root.replaceChildren();
+ const messages=Array.isArray(state?.mailbox)?state.mailbox:[];
+ if(!messages.length){const msg=document.createElement("div");msg.className="muted";msg.textContent="Caixa de mensagens vazia.";root.append(msg);return;}
+ for(const mail of messages){
+  const card=document.createElement("div");card.className="event";
+  const title=document.createElement("strong");title.textContent=mail.title+(mail.read_at?"":" · Nova");
+  const body=document.createElement("p");body.textContent=mail.body;
+  card.append(title,body);
+  if(mail.reward_key==="welcome_v1"){
+   const button=document.createElement("button");button.type="button";
+   button.disabled=busy||Boolean(mail.claimed_at);
+   button.textContent=mail.claimed_at?"✓ Recompensa resgatada":"Resgatar 1.000 comida + 500 madeira";
+   if(!mail.claimed_at)button.addEventListener("click",()=>runKingdomPanelAction({type:"mail_claim",mailId:mail.id},"Bônus do correio recebido na mochila do reino."));
+   card.append(button);
+  }else if(!mail.read_at){
+   const button=document.createElement("button");button.type="button";button.className="secondary";button.disabled=busy;button.textContent="Marcar como lida";
+   button.addEventListener("click",()=>runKingdomPanelAction({type:"mail_read",mailId:mail.id},"Mensagem lida."));
+   card.append(button);
+  }
+  root.append(card);
+ }
+}
+function renderKingdomBackpack(){
+ const root=document.getElementById("kingdomBackpack");if(!root)return;
+ root.replaceChildren();
+ const list=(Array.isArray(state?.inventoryItems)?state.inventoryItems:[]).filter(row=>Number(row.quantity)>0);
+ const other=(Array.isArray(state?.shop?.inventory)?state.shop.inventory:[]).filter(row=>Number(row.quantity)>0);
+ if(!list.length&&!other.length){const empty=document.createElement("div");empty.className="muted";empty.textContent="A mochila está vazia. Exploração, eventos e melhorias rendem materiais.";root.append(empty);return;}
+ for(const row of list){
+  const card=document.createElement("div");card.className="event";
+  const meta=state?.castleMaterials?.[String(row.item_key)]||{};
+  const label=document.createElement("strong");label.textContent=(meta.name||String(row.item_key).replaceAll("_"," "))+" · "+fmt(row.quantity);
+  const description=document.createElement("div");description.className="muted";description.textContent=meta.description||"Material guardado no reino";
+  card.append(label,description);root.append(card);
+ }
+ for(const row of other){
+  const card=document.createElement("div");card.className="event";
+  card.textContent="Item "+String(row.item_id)+" · quantidade "+fmt(row.quantity);
+  root.append(card);
+ }
+}
+async function runKingdomPanelAction(payload,successMessage){
+ if(busy)return;busy=true;setStatus("Sincronizando seu reino…");
+ try{
+  const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  state=result.state||state;
+  setStatus(successMessage);
+ }catch(error){setStatus(error.message||"Operação não concluída.",true);}
+ finally{busy=false;render();}
+}
+function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();
 const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings,Number(k.equipped_skin_id||0));if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],castleSkinId:Number(k.equipped_skin_id||0)}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
