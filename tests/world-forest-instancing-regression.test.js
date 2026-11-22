@@ -8,7 +8,7 @@ const renderer = await readFile(new URL("../world-map-3d.js", import.meta.url), 
 
 test("forest vegetation uses GPU instancing instead of building one mesh per tree", () => {
   assert.ok(renderer.includes("function addInstancedForest(parent, positions)"));
-  assert.equal((renderer.match(/new THREE\\.InstancedMesh/g) || []).length, 4);
+  assert.equal((renderer.match(/new THREE[.]InstancedMesh/g) || []).length, 4);
   assert.ok(renderer.includes("const forestPositions = []"));
   assert.ok(renderer.includes("addInstancedForest(terrainRoot, forestPositions)"));
   assert.ok(renderer.includes("addInstancedForest(territoryRoot, forestPositions)"));
