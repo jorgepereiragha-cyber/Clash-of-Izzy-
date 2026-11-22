@@ -37,6 +37,7 @@ public final class MainActivity extends Activity {
 
     private FrameLayout root;
     private WebView webView;
+    private WebView popupWebView;
     private LinearLayout offlinePanel;
     private LinearLayout loadingPanel;
     private boolean hasLoadedPage;
@@ -63,7 +64,9 @@ public final class MainActivity extends Activity {
         settings.setAllowUniversalAccessFromFileURLs(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
         settings.setJavaScriptCanOpenWindowsAutomatically(false);
-        settings.setSupportMultipleWindows(false);
+        // Checkout Mercado Pago abre uma janela apos o clique e recebe a URL depois da API.
+        // O destino HTTPS e enviado ao navegador externo, nunca renderizado no app.
+        settings.setSupportMultipleWindows(true);
         settings.setMediaPlaybackRequiresUserGesture(true);
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -127,6 +130,53 @@ public final class MainActivity extends Activity {
                 if (progress == null) return;
                 progress.setProgress(newProgress);
                 progress.setVisibility(newProgress >= 100 ? View.GONE : View.VISIBLE);
+            }
+
+            @Override
+            public boolean onCreateWindow(WebView view, boolean isDialog,
+                                          boolean isUserGesture, android.os.Message resultMsg) {
+                // O checkout primeiro abre about:blank de forma sincrona ao toque.
+                // O destino e recebido em seguida; nao o carregue dentro da WebView do jogo.
+                if (!isUserGesture || resultMsg == null || popupWebView != null) return false;
+                WebView popup = new WebView(MainActivity.this);
+                popupWebView = popup;
+                WebSettings popupSettings = popup.getSettings();
+                popupSettings.setJavaScriptEnabled(false);
+                popupSettings.setAllowFileAccess(false);
+                popupSettings.setAllowContentAccess(false);
+                popupSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
+                popup.setVisibility(View.INVISIBLE);
+                final boolean[] handled = { false };
+                popup.setWebChromeClient(new WebChromeClient() {
+                    @Override
+                    public void onCloseWindow(WebView window) {
+                        root.post(() -> closePopup(window));
+                    }
+                });
+                popup.setWebViewClient(new WebViewClient() {
+                    @Override
+                    public boolean shouldOverrideUrlLoading(WebView child, WebResourceRequest request) {
+                        if (!request.isForMainFrame()) return true;
+                        return handlePopupNavigation(popup, request.getUrl(), handled);
+                    }
+
+                    @Override
+                    public void onPageStarted(WebView child, String url, android.graphics.Bitmap favicon) {
+                        // Fallback quando a navegacao da janela nao chama o override.
+                        handlePopupNavigation(popup, Uri.parse(url), handled);
+                    }
+                });
+                // Manter a janela tecnica associada a hierarquia, sem exibir o checkout no app.
+                root.addView(popup, new FrameLayout.LayoutParams(1, 1));
+                WebView.WebViewTransport transport = (WebView.WebViewTransport) resultMsg.obj;
+                transport.setWebView(popup);
+                resultMsg.sendToTarget();
+                return true;
+            }
+
+            @Override
+            public void onCloseWindow(WebView window) {
+                root.post(() -> closePopup(window));
             }
         });
         webView.setWebViewClient(new WebViewClient() {
@@ -314,6 +364,29 @@ public final class MainActivity extends Activity {
                 && (uri.getPort() == -1 || uri.getPort() == 443);
     }
 
+    private boolean handlePopupNavigation(WebView popup, Uri uri, boolean[] handled) {
+        if (uri != null && "about".equalsIgnoreCase(uri.getScheme())
+                && "blank".equalsIgnoreCase(uri.getSchemeSpecificPart())) return false;
+        if (handled[0]) return true;
+        handled[0] = true;
+        if (uri != null && isGameUrl(uri)) {
+            if (webView != null) webView.loadUrl(uri.toString());
+        } else if (uri != null) {
+            openOutsideApp(uri);
+        }
+        // Postergue destroy para nao destruir uma WebView dentro do proprio callback.
+        root.post(() -> closePopup(popup));
+        return true;
+    }
+
+    private void closePopup(WebView popup) {
+        if (popup == null || popup != popupWebView) return;
+        popupWebView = null;
+        root.removeView(popup);
+        popup.stopLoading();
+        popup.destroy();
+    }
+
     private void openOutsideApp(Uri uri) {
         String scheme = uri.getScheme();
         if (!"https".equalsIgnoreCase(scheme)
@@ -359,6 +432,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (popupWebView != null) closePopup(popupWebView);
         if (webView != null) {
             root.removeView(webView);
             webView.destroy();

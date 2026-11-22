@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - ".github/workflows/diagnostico-assinatura-android.yml"
+      - "android-sideload/**"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -14,7 +16,12 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 4
     steps:
-      - name: Validar apenas presença de credenciais e pin de certificado
+      - name: Preparar keytool JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Validar credenciais, chave e certificado sem revelar segredos
         env:
           KS: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
           SP: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
@@ -38,9 +45,36 @@ jobs:
           fi
           if test "$missing" = "1"; then
             echo "Assinatura comercial Android: PENDENTE. Nenhum segredo foi divulgado."
-            echo "APK oficial não pode ser liberado sem as credenciais." >> "$GITHUB_STEP_SUMMARY"
-          else
-            echo "Assinatura comercial Android: todas as cinco configurações estão presentes."
-            echo "Configurações presentes; a validade do certificado ainda depende do workflow oficial." >> "$GITHUB_STEP_SUMMARY"
+            echo "APK oficial bloqueado: credenciais e/ou pin ausentes." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
           fi
-          # Diagnóstico não é uma release: a ausência de configuração não é falha da CI geral.
+          tmp="$(mktemp -d "$RUNNER_TEMP/android-signing-check.XXXXXX")"
+          chmod 700 "$tmp"
+          trap 'rm -rf "$tmp"' EXIT
+          if ! printf '%s' "$KS" | base64 --decode > "$tmp/release.jks" 2>/dev/null; then
+            echo "::warning::Keystore invalida: base64 nao decodifica."
+            echo "APK oficial bloqueado: keystore invalida." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          chmod 600 "$tmp/release.jks"
+          if ! keytool -exportcert -alias "$ALIAS" -keystore "$tmp/release.jks" \
+                   -storepass "$SP" > "$tmp/cert.der" 2>/dev/null; then
+            echo "::warning::Keystore, senha ou alias nao correspondem."
+            echo "APK oficial bloqueado: certificado inacessivel." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if ! keytool -certreq -alias "$ALIAS" -keystore "$tmp/release.jks" \
+                   -storepass "$SP" -keypass "$KP" -file "$tmp/key-check.csr" >/dev/null 2>&1; then
+            echo "::warning::Chave privada ou senha da chave nao corresponde."
+            echo "APK oficial bloqueado: chave privada inacessivel." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          actual="$(sha256sum "$tmp/cert.der" | cut -d' ' -f1)"
+          if [[ "$actual" != "$normalized" ]]; then
+            echo "::warning::Certificado da keystore nao corresponde ao pin SHA-256 de release."
+            echo "APK oficial bloqueado: divergencia no certificado de assinatura." >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          echo "Assinatura comercial Android: credenciais e certificado verificados."
+          echo "Chave privada, senha, alias e pin SHA-256 validados. Ainda faltam build oficial e testes em aparelho." >> "$GITHUB_STEP_SUMMARY"
+          # Diagnostico informativo: nunca altera keystore, GitHub secrets, D1 ou release.

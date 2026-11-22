@@ -90,3 +90,20 @@ test('Android pausa a renderização WebView em segundo plano e retoma sem recar
   const resume = activity.slice(activity.indexOf('protected void onResume()'),activity.indexOf('protected void onDestroy()'));
   assert.doesNotMatch(resume,/loadUrl\(|recreate\(/);
 });
+
+test('Checkout Mercado Pago abre navegador externo sem substituir o reino no WebView', () => {
+  const arena = read('arena.html');
+  assert.match(arena, /window\.open\('about:blank','_blank'\)/);
+  assert.match(arena, /checkoutWindow\.location\.href=checkoutUrl\.href/);
+  assert.match(activity, /settings\.setSupportMultipleWindows\(true\)/);
+  assert.match(activity, /settings\.setJavaScriptCanOpenWindowsAutomatically\(false\)/);
+  assert.match(activity, /boolean onCreateWindow\(WebView view, boolean isDialog,/);
+  assert.match(activity, /if \(!isUserGesture \|\| resultMsg == null \|\| popupWebView != null\) return false/);
+  assert.match(activity, /transport\.setWebView\(popup\)/);
+  assert.match(activity, /handlePopupNavigation\(popup, request\.getUrl\(\), handled\)/);
+  assert.match(activity, /openOutsideApp\(uri\)/);
+  assert.match(activity, /if \(popupWebView != null\) closePopup\(popupWebView\)/);
+  assert.match(activity, /popupSettings\.setJavaScriptEnabled\(false\)/);
+  assert.match(activity, /popupSettings\.setAllowFileAccess\(false\)/);
+  assert.match(activity, /popupSettings\.setAllowContentAccess\(false\)/);
+});
