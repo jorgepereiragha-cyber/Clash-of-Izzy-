@@ -80,8 +80,21 @@ jobs:
                   expected.append(migration.name)
           expected.sort()
 
-          # The latest migration alone cannot detect an earlier missing file.
+          # Audit both chronological ordering and historical membership.
+          # Old D1 migrations can be registered in nonalphabetical order.
           prefix_valid = bool(expected) and bool(names) and names == expected[:len(names)]
+          baseline = [file for file in expected if int(file[:4]) <= 36]
+          observed_set = set(names)
+          missing_historical = sorted(set(baseline) - observed_set)
+          unexpected_historical = sorted(observed_set - set(expected))
+          advanced_applied = sorted(name for name in names if re.match(r"^00(?:3[7-9]|4[0-9])_", name))
+          duplicate_names = len(names) != len(observed_set)
+          baseline_complete = (
+              len(baseline) > 0 and not missing_historical
+              and not unexpected_historical and not advanced_applied
+              and not duplicate_names and len(names) == len(baseline)
+              and names[-1] == "0036_4x_read_indexes.sql"
+          )
           first_divergence = None
           for index, observed in enumerate(names):
               canonical = expected[index] if index < len(expected) else None
@@ -107,16 +120,20 @@ jobs:
                "0038_onboarding_bonus.sql", "0039_support_orders.sql"],
           )
           exact_repair_candidate = (
-              prefix_valid
-              and last in {"0035_throne_war.sql", "0036_4x_read_indexes.sql"}
-              and pending in repair_candidates
+              baseline_complete
               and set(missing_tables) == required_tables
+              and not advanced_applied
           )
           report = {
               "mode": "read-only",
               "writesPerformed": 0,
               "latestMigration": last,
               "coreHistoryExactPrefix": prefix_valid,
+              "coreHistoryCompleteRegardlessOfOrder": baseline_complete,
+              "missingHistoricalMigrations": missing_historical,
+              "unexpectedMigrationNames": unexpected_historical,
+              "alreadyAppliedAdvancedMigrations": advanced_applied,
+              "duplicateMigrationNames": duplicate_names,
               "appliedHistoryCount": len(names),
               "expectedCoreFileCount": len(expected),
               "firstHistoryDivergence": first_divergence,
@@ -133,11 +150,15 @@ jobs:
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
               output.write("## D1 production history (read-only)\n")
               output.write("- Exact migration prefix: " + str(prefix_valid) + "\n")
+              output.write("- Complete baseline set before 0037: " + str(baseline_complete) + "\n")
+              output.write("- Missing historical files: " + ", ".join(missing_historical) + "\n")
               output.write("- First divergence: " + json.dumps(first_divergence, sort_keys=True) + "\n")
               output.write("- Latest migration: " + str(last) + "\n")
               output.write("- Missing core tables: " + ", ".join(missing_tables) + "\n")
               output.write("- Candidate for protected repair review: " + str(exact_repair_candidate) + "\n")
               output.write("- No game accounts, payment records, or player data queried.\n")
-          if not prefix_valid:
-              raise SystemExit("Migration history divergent: production write must remain blocked.")
+          # Noncanonical ordering requires investigation but is not by itself a
+          # missing migration. A missing/extra/duplicated file is a hard failure.
+          if not baseline_complete:
+              raise SystemExit("Historical migration SET incomplete: any production repair remains blocked.")
           PY

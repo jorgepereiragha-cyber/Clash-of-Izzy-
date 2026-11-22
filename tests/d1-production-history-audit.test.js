@@ -17,8 +17,15 @@ test("production migration audit is a read-only GitHub workflow", () => {
 test("production migration audit fails closed on any historical gap or divergence", () => {
   assert.match(audit, /SELECT name FROM d1_migrations ORDER BY id/);
   assert.match(audit, /names == expected\[:len\(names\)\]/);
-  assert.match(audit, /if not prefix_valid:/);
-  assert.match(audit, /Migration history divergent/);
+  assert.match(audit, /if not baseline_complete:/);
+  assert.match(audit, /Historical migration SET incomplete/);
+  assert.match(audit, /len\(names\) == len\(baseline\)/);
+  assert.match(audit, /not missing_historical/);
+  assert.match(audit, /not unexpected_historical/);
+  assert.match(audit, /not advanced_applied/);
+  assert.match(audit, /not duplicate_names/);
+  assert.match(audit, /coreHistoryCompleteRegardlessOfOrder/);
+  assert.match(audit, /missingHistoricalMigrations/);
   assert.match(audit, /firstHistoryDivergence/);
   assert.match(audit, /for index, observed in enumerate\(names\)/);
   assert.match(audit, /unexpectedAppliedFilenames/);
