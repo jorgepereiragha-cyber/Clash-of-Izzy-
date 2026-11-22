@@ -59,6 +59,7 @@ test("Worker valida propriedade dos dragões e bloqueia resgate duplicado de men
  assert.match(worker,/if\(dragon\.master\)return json\(/);
  assert.match(worker,/EXISTS\(SELECT 1 FROM kingdom_dragons WHERE kingdom_id=\? AND dragon_key=\?\)/);
  assert.match(worker,/reward_key='welcome_v1' AND claimed_at IS NULL/);
+ for(const table of ["kingdom_dragons","kingdom_mailbox","master_bonus_claims"])assert.ok(worker.includes('"'+table+'"'),"health schema missing "+table);
  assert.match(worker,/UPDATE kingdoms SET food=food\+1000,wood=wood\+500 WHERE id=\? AND changes\(\)=1/);
  assert.match(worker,/dragonAttackBonusPercent:getDragonCombatBonuses\(dragon\)/);
  assert.match(worker,/dragonDefenseBonusPercent:getDragonCombatBonuses\(dragon\)/);
