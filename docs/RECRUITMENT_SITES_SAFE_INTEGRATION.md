@@ -5,6 +5,8 @@ A cidade oferece dois locais de entrada clicáveis, responsivos e navegáveis po
 - **Altar de Convocação** abre `/equipment-ui.html#hero-summon-title`, reutilizando a convocação de 1 herói por 100 gemas ou 10 por 900 gemas, com sorteio no Worker.
 - **Ninho de Dragões** abre `#coiDragonPanel`, reutilizando o desbloqueio e a coleção de dragões autenticados existentes.
 
+A coleção passa a mostrar o **nível e o vínculo do dragão equipado** usando o estado retornado pelo Worker; esses valores são apenas leitura, sem botão fictício de alimentação.
+
 São **entradas visuais no painel da cidade**, não construções persistidas nem footprints 3×3 no grid. Não exibem ovos/incubação inexistentes e não concedem dragões dourados.
 
 ## Por que a criação física ficou separada
