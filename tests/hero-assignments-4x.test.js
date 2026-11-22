@@ -63,3 +63,13 @@ test("UI e Worker usam /game/action e heróis do banco real sem migração 0037 
   assert.match(ui,/type:"assign_hero_to_defense"/);
   assert.match(ui,/type:"assign_hero_to_building"/);
 });
+
+test("renderizador mantém LOD, cache de materiais e emissivo por nível sem luz dinâmica",async()=>{
+  const source=await readFile(new URL("../scripts/kingdom-3d.js",import.meta.url),"utf8");
+  assert.match(source,/surfaceMaterialCache\.set\(key,mat\)/);
+  assert.match(source,/const distantByType=new Map\(\)/);
+  assert.match(source,/new THREE\.InstancedMesh\(geometry,material,list\.length\)/);
+  assert.match(source,/function renderAssignedHeroFigures/);
+  assert.match(source,/emissiveIntensity:level>=10/);
+  assert.match(source,/renderAssignedHeroFigures\(latestHeroAssignments\)/);
+});
