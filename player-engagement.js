@@ -88,9 +88,9 @@
     latestRefresh = Date.now();
     const [onboarding,rewards] = await Promise.allSettled([api("onboarding"),api("daily-reward")]);
     if (onboarding.status==="fulfilled") drawOnboarding(onboarding.value);
-    else $("onboardingStatus").textContent = "O tutorial está temporariamente indisponível.";
+    else { tutorial.hidden=true; $("onboardingClaim").disabled=true; }
     if (rewards.status==="fulfilled") drawDaily(rewards.value);
-    else {daily.hidden=false;$("dailyStatus").textContent = "Recompensas ainda não disponíveis. Atualize o jogo após a publicação do servidor.";$("dailyClaim").disabled=true;}
+    else { daily.hidden=true; $("dailyClaim").disabled=true; }
   }
   async function claim(endpoint,statusId,event) {
     if (busy) return;
