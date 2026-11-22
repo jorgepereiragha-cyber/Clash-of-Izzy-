@@ -119,6 +119,7 @@ test.describe("Mobile kingdom rendering", () => {
     // In-game overlays must never block the main actions or display capture tools.
     await expect(page.locator("#trailer-recorder-panel")).toHaveCount(0);
     await expect(page.locator(".coi-command-seal")).toBeVisible();
+    await expect(page.locator("#coiActionNotice")).toBeHidden();
     await expect(page.locator(".coi-command-seal")).toHaveAttribute("src", "/assets/brand/royal-king.webp");
     await expect(page.locator(".coi-mobile-dock")).toBeVisible();
 
@@ -209,6 +210,9 @@ test.describe("Mobile kingdom rendering", () => {
 
     await expect.poll(() => actions.length).toBe(2);
     expect(actions[1]).toEqual({ type: "train", unit: "archer", quantity: 4 });
+    await expect(page.locator("#coiActionNotice")).toContainText("Treinamento iniciado");
+    await expect(page.locator("#status")).toContainText("Reino sincronizado");
+
   });
 
   test("graphics preferences persist and 2D mode keeps mobile controls usable", async ({ page }) => {
