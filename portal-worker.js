@@ -69,7 +69,7 @@ export default {
       if (url.search) return new Response('{"available":false}', {
         status: 400, headers: { ...publicHeaders, "Content-Type": "application/json" }
       });
-      // Cache positivo na borda por 60 segundos, nunca cachear erros/ausencia.
+      // Cache de 60 s para release valida e 30 s para ausencia (404); falhas transitorias nao sao cacheadas.
       const cache = globalThis.caches?.default;
       const key = new Request(url.origin + url.pathname);
       try {
