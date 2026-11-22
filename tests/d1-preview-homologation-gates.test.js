@@ -17,7 +17,8 @@ test("Preview remoto executa somente codigo integrado na main", () => {
 test("D1 Preview e isolado de producao e exige base descartavel", () => {
   assert.match(workflow, /6674c0ac-3636-4e57-bff8-23cf60ab9637/);
   assert.match(workflow, /7e63af59-d9ff-4159-a9cf-b02e35b92605/);
-  assert.match(workflow, /if names - \{"d1_migrations","_cf_KV"\}:/);
+  assert.match(workflow, /if not \(names - \{"d1_migrations","_cf_KV"\}\):/);
+  assert.match(workflow, /required\.issubset\(names\)/);
   assert.match(workflow, /d1 migrations apply PREVIEW_DB --remote/);
   assert.doesNotMatch(workflow, /d1 migrations apply clash-of-izzy-db --remote/);
   assert.doesNotMatch(workflow, /wrangler\.jsonc deploy/);
