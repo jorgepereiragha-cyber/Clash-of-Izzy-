@@ -29,7 +29,7 @@ test("ledger de resgates usa chave única e créditos protegidos por changes()",
   assert.match(onboardingMigration,/player_id INTEGER PRIMARY KEY/);
   assert.match(tutorial,/INSERT OR IGNORE INTO onboarding_bonus_claims/);
   assert.match(tutorial,/UPDATE players SET gems=gems\+500 WHERE player_id=\? AND changes\(\)=1/);
-  assert.match(tutorial,/queue_type='construction' AND target_key='farm'/);
+  assert.match(tutorial,/queue_type='construction' AND q\.target_key='farm'/);
   assert.match(tutorial,/queue_type='training'/);
 });
 
@@ -40,7 +40,7 @@ test("UI de reino e rotas autenticadas estão integradas",async()=>{
   for(const id of ["onboardingPanel","onboardingClaim","dailyRewardsPanel","dailyClaim","onboardingStatus"])
     assert.ok(html.includes('id="'+id+'"'),"missing "+id);
   assert.match(html,/src="\/player-engagement\.js"/);
-  assert.match(ui,/Authorization:"Bearer "\+auth/);
+  assert.match(ui,/Authorization:"Bearer "\s*\+\s*auth/);
   assert.match(ui,/\/api\/game\/analytics/);
   assert.match(worker,/\/api\/game\/onboarding/);
   assert.match(worker,/\/api\/game\/daily-reward/);
