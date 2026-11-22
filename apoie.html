@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0b1930">
+<meta name="description" content="Apoie o desenvolvimento de Clash of Izzy com pacotes transparentes e pagamento seguro pelo Mercado Pago.">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Apoie o Clash of Izzy — Desenvolvimento medieval">
+<meta property="og:description" content="Ajude a expandir Eldoria. Acompanhe metas verificadas e conheça os pacotes de apoio.">
+<meta property="og:image" content="https://clash-of-izzy-portal.jorgepereiragha.workers.dev/assets/brand/royal-king.webp">
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<title>Apoie o desenvolvimento — Clash of Izzy</title>
+<style>
+:root{color-scheme:dark;--gold:#f0c472;--ink:#f8f1df;--muted:#c9d3e5;--night:#08162b}
+*{box-sizing:border-box}html{scroll-behavior:smooth}
+body{margin:0;background:radial-gradient(ellipse at 10% 5%,#224675,#071327 68%);font:16px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif;color:var(--ink)}
+main,header,footer{width:min(1050px,calc(100% - 32px));margin-inline:auto}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 0}
+header a{color:var(--gold);font-weight:800}
+.hero{text-align:center;padding:40px 10px 25px}
+.eyebrow{text-transform:uppercase;color:#f3dba9;letter-spacing:.12em;font-size:12px;font-weight:800}
+h1{font:900 clamp(38px,7vw,64px)/1.1 Georgia,serif;color:#f7d58f;margin:15px 0}
+h2{font:700 29px/1.2 Georgia,serif;color:#f4cf84;margin:0 0 15px}
+p{margin:10px 0;color:var(--muted)}
+section{margin:30px 0;padding:24px;border:1px solid #aa8853;background:linear-gradient(145deg,#142f51,#0b1a31);border-radius:16px}
+.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.package,.goal{padding:18px;border-radius:12px;background:#0b1b35;border:1px solid #697792}
+.package h3{color:var(--gold);font-size:21px;margin:0}
+.price{font-size:32px;font-weight:900;margin:10px 0}
+button,.button{display:inline-flex;align-items:center;justify-content:center;min-height:48px;padding:10px 18px;border-radius:10px;background:linear-gradient(#ffe1a6,#d6a151);color:#101827;border:1px solid #f4ca78;font:800 15px system-ui;text-decoration:none;cursor:pointer}
+button:disabled{opacity:.55;cursor:not-allowed}
+.button.secondary,button.secondary{background:#1b3556;color:var(--ink);border-color:#a58c5d}
+.actions{display:flex;flex-wrap:wrap;gap:9px;margin-top:16px}
+.goal small{display:block;margin-top:5px;color:#c2d0e4}
+.progress{height:14px;background:#23364c;border-radius:9px;overflow:hidden;margin-top:12px}
+.progress span{display:block;height:100%;width:0;background:#deb467}
+#supportStatus,#pixInfo,#statsStatus{font-size:14px;white-space:pre-wrap}
+#pixInfo[hidden]{display:none}
+#pixKey{width:100%;padding:12px;color:#f5daa3;background:#091527;border:1px solid #756d5b;border-radius:7px;font:14px monospace}
+details{border:1px solid #6c7890;padding:15px;margin-top:10px;border-radius:10px}
+summary{cursor:pointer;color:#f7dca6;font-weight:700}
+footer{padding:15px 0 50px;color:#a4b8d2;font-size:13px;text-align:center}
+:focus-visible{outline:3px solid white;outline-offset:3px}
+@media(max-width:700px){.grid{grid-template-columns:1fr}.hero{padding:24px 5px}section{padding:17px}}
+</style>
+</head>
+<body>
+<header><strong>CLASH OF IZZY</strong><a href="/portal.html" id="backLink">Voltar ao portal</a></header>
+<main>
+<div class="hero"><div class="eyebrow">Desenvolvimento independente</div><h1>Apoie a construção de Eldoria</h1><p>Servidor, eventos e arte evoluem com recursos reais. O apoio é opcional e a compra dos pacotes concede apenas os benefícios especificados abaixo, após confirmação do pagamento.</p></div>
+<section aria-labelledby="goals-title"><h2 id="goals-title">Metas verificáveis</h2><p>Contabilizamos somente compras dos três pacotes de apoio cujo pagamento foi aprovado. Cada real é alocado à próxima meta na ordem indicada.</p>
+<div class="grid">
+<article class="goal"><h3>Servidor e estabilidade</h3><strong id="goal0amount">Aguardando dados…</strong><div class="progress" role="progressbar" aria-label="Meta servidor" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="goal0bar"></span></div><small>Meta: R$ 2.000</small></article>
+<article class="goal"><h3>Eventos do mundo</h3><strong id="goal1amount">Aguardando dados…</strong><div class="progress" role="progressbar" aria-label="Meta eventos" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="goal1bar"></span></div><small>Meta: R$ 500</small></article>
+<article class="goal"><h3>Arte 3D e texturas</h3><strong id="goal2amount">Aguardando dados…</strong><div class="progress" role="progressbar" aria-label="Meta arte" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="goal2bar"></span></div><small>Meta: R$ 3.000</small></article>
+</div><p id="statsStatus" role="status" aria-live="polite">Consultando contadores reais do banco do jogo…</p></section>
+<section id="pacotes" aria-labelledby="tier-title"><h2 id="tier-title">Pacotes de apoio</h2><p>O pagamento é uma compra de gemas com valor definido, não uma doação sem contrapartida. Não há heróis, skins ou acesso VIP prometidos além do que o jogo efetivamente entrega.</p>
+<div class="grid">
+<article class="package"><h3>Escudeiro</h3><div class="price">R$ 10,00</div><p>500 gemas confirmadas no inventário após o pagamento.</p><div class="actions"><button type="button" data-support="Apoio Escudeiro">Adquirir</button></div></article>
+<article class="package"><h3>Cavaleiro</h3><div class="price">R$ 50,00</div><p>3.000 gemas confirmadas no inventário após o pagamento.</p><div class="actions"><button type="button" data-support="Apoio Cavaleiro">Adquirir</button></div></article>
+<article class="package"><h3>Senhor Feudal</h3><div class="price">R$ 200,00</div><p>15.000 gemas confirmadas no inventário após o pagamento.</p><div class="actions"><button type="button" data-support="Apoio Senhor Feudal">Adquirir</button></div></article>
+</div>
+<div class="actions"><label for="supportMethod">Forma de pagamento</label><select id="supportMethod" style="background:#111e32;color:white;border:1px solid #aaa;padding:10px;border-radius:8px"><option value="mercadopago_link">Mercado Pago</option><option value="pix" disabled>Pix Nubank (sujeito a configuração)</option></select></div>
+<p id="supportStatus" role="status" aria-live="polite">Para comprar, é necessário estar conectado à sua conta no Worker do jogo. O portal promocional nunca processa pagamentos.</p>
+<div id="pixInfo" hidden><p>Pedido Pix criado, mas ainda não pago. Confirme o recebedor no seu aplicativo bancário. A entrega só ocorrerá após conciliação do extrato pela administração.</p><label for="pixKey">Chave Pix fornecida pelo servidor após autenticação</label><input id="pixKey" readonly><button type="button" id="copyPix" class="secondary">Copiar chave Pix</button><p id="pixAmount"></p></div>
+</section>
+<section aria-labelledby="roadmap-title"><h2 id="roadmap-title">Roteiro de evolução</h2>
+<div class="grid"><div><strong>Validação</strong><p>Instalação Android, tutorial e primeiros jogadores reais.</p></div><div><strong>Comunidade</strong><p>Feedback, correção de problemas e eventos mundiais.</p></div><div><strong>Escala</strong><p>Melhorias visuais, balanceamento e novos mapas conforme a base de jogadores crescer.</p></div></div></section>
+<section><h2>Perguntas frequentes</h2>
+<details><summary>O jogo é gratuito?</summary><p>O acesso básico foi planejado como gratuito. Os pacotes são opcionais e não substituem a publicação do APK oficial assinado.</p></details>
+<details><summary>Posso pagar sem criar conta?</summary><p>Não. Para conceder gemas à pessoa certa, o sistema exige uma sessão válida e um reino criado.</p></details>
+<details><summary>Quando recebo as gemas?</summary><p>Mercado Pago: somente após verificação do webhook e do valor aprovado no provedor. Pix Nubank: somente após conferência manual do crédito efetivo no extrato.</p></details>
+<details><summary>As metas representam dinheiro já recebido?</summary><p>Sim. Apenas transações de pacotes de apoio aprovadas no sistema são contabilizadas. O indicador não inclui outras receitas do jogo.</p></details>
+</section>
+</main>
+<footer>© 2026 Clash of Izzy · Projeto independente · Sem associação a editoras de outros jogos.</footer>
+<script>
+(() => {
+"use strict";
+const mainOrigin="https://clash-of-izzy.jorgepereiragha.workers.dev";
+const portalOrigin="https://clash-of-izzy-portal.jorgepereiragha.workers.dev";
+const isPortal=location.origin===portalOrigin;
+const gameOrigin=isPortal?mainOrigin:location.origin;
+const status=document.getElementById("supportStatus");
+const method=document.getElementById("supportMethod");
+const currency=cents=>(Number(cents)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
+const token=()=>{try{return localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token")||""}catch{return ""}};
+async function loadStats(){
+ try{
+  const response=await fetch(gameOrigin+"/api/public/stats",{cache:"no-store"});
+  if(!response.ok)throw Error("Dados indisponíveis");
+  const stats=await response.json();
+  if(stats.verified!==true)throw Error("Estatísticas sem confirmação");
+  let remaining=Math.max(0,Number(stats.supportTotalCents)||0);
+  [200000,50000,300000].forEach((target,index)=>{
+   const allocated=Math.min(remaining,target);remaining=Math.max(0,remaining-target);
+   document.getElementById("goal"+index+"amount").textContent=currency(allocated)+" / "+currency(target);
+   const percent=Math.round(100*allocated/target);
+   document.getElementById("goal"+index+"bar").style.width=percent+"%";
+   document.getElementById("goal"+index+"bar").parentElement.setAttribute("aria-valuenow",String(percent));
+  });
+  document.getElementById("statsStatus").textContent="Dados reais: "+Number(stats.totalPlayers).toLocaleString("pt-BR")+" jogadores registrados, "+Number(stats.battles24h).toLocaleString("pt-BR")+" batalhas nas últimas 24h e "+Number(stats.totalAlliances).toLocaleString("pt-BR")+" alianças.";
+ }catch {
+  document.getElementById("statsStatus").textContent="Os dados financeiros não puderam ser verificados. Nenhum valor estimado será exibido.";
+ }
+}
+async function jsonPost(path,payload,authToken){
+ const response=await fetch(gameOrigin+path,{method:"POST",headers:{"Content-Type":"application/json",Authorization:"Bearer "+authToken},body:JSON.stringify(payload)});
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok)throw Error(result.error||"Solicitação não concluída.");
+ return result;
+}
+async function paymentMethods(){
+ if(isPortal)return;
+ try{
+  const response=await fetch("/api/store/payment-methods",{cache:"no-store"});
+  if(!response.ok)throw Error("Métodos indisponíveis");
+  const methods=await response.json();
+  method.querySelector('option[value="pix"]').disabled=methods.nubankPix!==true;
+  method.querySelector('option[value="mercadopago_link"]').disabled=methods.mercadoPago!==true;
+  if(methods.mercadoPago!==true && methods.nubankPix===true)method.value="pix";
+  if(methods.mercadoPago!==true&&methods.nubankPix!==true) status.textContent="Pagamentos indisponíveis até a configuração e aprovação das credenciais.";
+ }catch{status.textContent="Não foi possível verificar os métodos de pagamento. Nenhuma cobrança foi iniciada.";}
+}
+async function purchase(name,button){
+ if(isPortal){location.href=mainOrigin+"/apoie.html?pacote="+encodeURIComponent(name);return;}
+ const auth=token();
+ if(!auth){status.textContent="Faça login no aplicativo para vincular sua compra. Depois, volte a esta página.";return;}
+ if(method.selectedOptions[0]?.disabled){status.textContent="O meio de pagamento selecionado ainda não está habilitado.";return;}
+ button.disabled=true;
+ document.getElementById("pixInfo").hidden=true;
+ status.textContent="Consultando catálogo autenticado…";
+ try{
+  const response=await fetch("/api/store/catalog",{cache:"no-store"});
+  if(!response.ok)throw Error("Catálogo temporariamente indisponível");
+  const catalog=await response.json();
+  const product=(catalog.packages||[]).find(item=>item.name===name);
+  if(!product || !Number.isSafeInteger(Number(product.id)))throw Error("Pacote ainda não publicado no catálogo do jogo.");
+  const key=crypto.randomUUID().replaceAll("-","");
+  status.textContent="Criando pedido no servidor…";
+  const purchaseResult=await jsonPost("/api/store/purchase-request",{kind:"vip_package",itemId:Number(product.id),requestKey:key,paymentMethod:method.value},auth);
+  const id=Number(purchaseResult.request?.id);
+  if(!Number.isSafeInteger(id)||id<1)throw Error("Pedido sem identificação válida.");
+  if(method.value==="pix"){
+   const instructions=await jsonPost("/api/store/pix-instructions",{requestId:id},auth);
+   const el=document.getElementById("pixInfo");el.hidden=false;
+   document.getElementById("pixKey").value=String(instructions.pixKey||"");
+   document.getElementById("pixAmount").textContent="Pedido #"+id+" · "+currency(Number(instructions.amountBRL)*100)+" · Status: aguardando conciliação bancária.";
+   status.textContent="Pix pendente. Não serão creditadas gemas antes da confirmação pelo banco.";
+   return;
+  }
+  const checkout=await jsonPost("/api/store/checkout",{requestId:id},auth);
+  const checkoutUrl=new URL(String(checkout.checkoutUrl||""));
+  const host=checkoutUrl.hostname.toLowerCase();
+  if(checkoutUrl.protocol!=="https:"||!(host==="mercadopago.com.br"||host.endsWith(".mercadopago.com.br")||host==="mercadopago.com"||host.endsWith(".mercadopago.com")))throw Error("Destino de pagamento não autorizado");
+  status.textContent="Abrindo o checkout oficial do Mercado Pago…";
+  location.assign(checkoutUrl.href);
+ }catch(error){status.textContent=String(error?.message||"Erro ao preparar pagamento.");}
+ finally{button.disabled=false;}
+}
+document.querySelectorAll("[data-support]").forEach(button=>button.addEventListener("click",()=>purchase(button.dataset.support,button)));
+document.getElementById("copyPix").addEventListener("click",async()=>{
+ try{await navigator.clipboard.writeText(document.getElementById("pixKey").value);status.textContent="Chave Pix copiada. Confira o destinatário antes de pagar."}
+ catch{document.getElementById("pixKey").select();status.textContent="Selecione e copie a chave exibida."}
+});
+if(isPortal){
+ status.textContent="Selecione um pacote para continuar no sistema autenticado de compras do jogo. Não há pagamento no portal público.";
+}else{
+ document.getElementById("backLink").href="/portal.html";
+ void paymentMethods();
+ const selected=new URLSearchParams(location.search).get("pacote");
+ const option=Array.from(document.querySelectorAll("[data-support]")).find(item=>item.dataset.support===selected);
+ if(option){option.focus();status.textContent="Pacote selecionado. Escolha o método de pagamento e confirme Adquirir.";}
+}
+void loadStats();
+})();
+</script>
+</body>
+</html>
