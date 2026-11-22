@@ -40,6 +40,8 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 public final class MainActivity extends Activity {
+    private static final String BROWSER_STATE_KEY = "coi.saved.webview";
+    private static final String BROWSER_URL_KEY = "coi.saved.webview.url";
     private static final String GAME_URL =
             "https://clash-of-izzy.jorgepereiragha.workers.dev/kingdom.html";
     private static final String GAME_HOST = "clash-of-izzy.jorgepereiragha.workers.dev";
@@ -108,6 +110,8 @@ public final class MainActivity extends Activity {
         // never a Google OAuth redirect embedded in Android WebView.
         settings.setUserAgentString(settings.getUserAgentString() + " ClashOfIzzyAndroid/1");
         settings.setDomStorageEnabled(true); // Sessão e preferências da conta.
+        // HUD HTML usa escalonamento responsivo CSS; validar acessibilidade em aparelhos reais.
+        settings.setTextZoom(100);
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
         settings.setAllowFileAccessFromFileURLs(false);
@@ -121,6 +125,8 @@ public final class MainActivity extends Activity {
         settings.setCacheMode(WebSettings.LOAD_DEFAULT);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             settings.setSafeBrowsingEnabled(true);
+            // Prioridade de renderer apenas enquanto a atividade estiver visível.
+            webView.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, true);
         }
         root.addView(webView, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT,
@@ -461,7 +467,23 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT,
                 ViewGroup.LayoutParams.MATCH_PARENT));
         offlinePanel.setVisibility(View.GONE);
-        webView.loadUrl(GAME_URL);
+        // Restaurar exclusivamente navegacao salva do host HTTPS do jogo.
+        // DOM e sessoes remotas continuam sendo reconstruidos pelo servidor.
+        boolean restored = false;
+        if (state != null) {
+            Bundle saved = state.getBundle(BROWSER_STATE_KEY);
+            String trustedUrl = state.getString(BROWSER_URL_KEY);
+            if (saved != null && trustedUrl != null && isGameUrl(Uri.parse(trustedUrl))) {
+                try {
+                    android.webkit.WebBackForwardList history = webView.restoreState(saved);
+                    restored = history != null && history.getCurrentItem() != null
+                            && trustedUrl.equals(history.getCurrentItem().getUrl());
+                } catch (RuntimeException ignored) {
+                    restored = false;
+                }
+            }
+        }
+        if (!restored) webView.loadUrl(GAME_URL);
     }
 
     private void scheduleStartupTimeout() {
@@ -590,6 +612,19 @@ public final class MainActivity extends Activity {
 
     private int dp(int value) {
         return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
+    @Override
+    protected void onSaveInstanceState(Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (webView == null || webView.getUrl() == null) return;
+        String currentUrl = webView.getUrl();
+        if (!isGameUrl(Uri.parse(currentUrl))) return;
+        Bundle navigation = new Bundle();
+        if (webView.saveState(navigation) != null) {
+            outState.putBundle(BROWSER_STATE_KEY, navigation);
+            outState.putString(BROWSER_URL_KEY, currentUrl);
+        }
     }
 
     @Override
