@@ -6,8 +6,8 @@ import assert from 'node:assert/strict';
 export function validatePublicAndroidRelease(release) {
   if (!release || typeof release !== 'object' || release.draft || release.prerelease || !release.published_at) return false;
   const assets = Array.isArray(release.assets) ? release.assets : [];
-  const apk = assets.filter(a => a && typeof a.name === 'string' && /\\.apk$/i.test(a.name));
-  const checksums = assets.filter(a => a && typeof a.name === 'string' && /(?:sha256(?:sums?)?|checksums?)(?:[.-].*)?\\.(?:txt|sha256)$/i.test(a.name));
+  const apk = assets.filter(a => a && typeof a.name === 'string' && /\.apk$/i.test(a.name));
+  const checksums = assets.filter(a => a && typeof a.name === 'string' && /(?:sha256(?:sums?)?|checksums?)(?:[.-].*)?\.(?:txt|sha256)$/i.test(a.name));
   const valid = a => a.state === 'uploaded' && Number.isSafeInteger(a.size) && a.size > 0 &&
     typeof a.browser_download_url === 'string' &&
     a.browser_download_url.startsWith('https://github.com/') &&
