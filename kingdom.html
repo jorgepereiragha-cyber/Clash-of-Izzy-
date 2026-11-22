@@ -199,6 +199,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 </section>
 <div class="notice" style="margin-top:14px">O tempo e os recursos são processados pelo servidor. Fechar o jogo não interrompe a evolução do reino; ao retornar, o estado é sincronizado novamente.</div>
 </div></main>
+<div id="coiActionNotice" role="status" aria-live="polite" hidden></div>
 <script>
 const API="/api";let token=null,state=null,busy=false;let lastResourceSnapshot=null;
 function renderResourceHud(kingdom){
@@ -215,6 +216,17 @@ const names={castle:["Castelo","🏰"],barracks:["Quartel","⚔️"],farm:["Faze
 const fmt=n=>Number(n||0).toLocaleString("pt-BR");
 const esc=value=>String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll(String.fromCharCode(34),"&quot;").replaceAll(String.fromCharCode(39),"&#39;");
 function setStatus(message,error=false){const el=document.getElementById("status");el.textContent=message;el.classList.toggle("error",error)}
+let coiActionNoticeTimer = 0;
+function showActionNotice(message) {
+ const notice = document.getElementById("coiActionNotice");
+ if (!notice) { setStatus(message); return; }
+ window.clearTimeout(coiActionNoticeTimer);
+ notice.textContent = message;
+ notice.hidden = false;
+ setStatus("● Reino sincronizado");
+ coiActionNoticeTimer = window.setTimeout(() => { notice.hidden = true; }, 5000);
+}
+
 async function request(path,options={}){const response=await fetch(API+path,{...options,headers:{...(options.headers||{}),...(token?{Authorization:"Bearer "+token}:{})}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||"Falha na comunicação com o servidor.");return data}
 const analyticsSessionId=globalThis.crypto?.randomUUID?.()||("session_"+Date.now()+"_"+Math.random().toString(36).slice(2,10));
 let analyticsStarted=false;
@@ -315,7 +327,7 @@ async function equipCastleSkin(skinId){
  try{
   await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"castle_skin_equip",skinId})});
   const fresh=await request("/game/state");state=fresh.state;
-  setStatus(skinId===null?"Aparência original restaurada.":"Skin equipada no reino compartilhado.");
+  showActionNotice(skinId===null?"Aparência original restaurada.":"Skin equipada no reino compartilhado.");
  }catch(error){setStatus(error.message||"Não foi possível equipar esta skin.",true);}
  finally{busy=false;render();}
 }
@@ -391,7 +403,7 @@ async function runKingdomPanelAction(payload,successMessage){
  try{
   const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
   state=result.state||state;
-  setStatus(successMessage);
+  showActionNotice(successMessage);
  }catch(error){setStatus(error.message||"Operação não concluída.",true);}
  finally{busy=false;render();}
 }
@@ -428,7 +440,7 @@ async function upgradeCastleVip(expectedVipLevel){
  try{
   const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"castle_vip_upgrade",expectedVipLevel})});
   state=result.state||state;
-  setStatus("Castelo VIP "+Number(state.castleVip?.level||0)+" alcançado. Edifícios preservados.");
+  showActionNotice("Castelo VIP "+Number(state.castleVip?.level||0)+" alcançado. Edifícios preservados.");
  }catch(error){setStatus(error.message||"Não foi possível evoluir o VIP.",true);}
  finally{busy=false;render();}
 }
@@ -482,7 +494,7 @@ async function sendPetAction(action,payload){
  try{
   const result=await request("/game/pets/"+action,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
   const fresh=await request("/game/state");state=fresh.state;render();
-  setStatus(result.message||"Mascote atualizado.");
+  showActionNotice(result.message||"Mascote atualizado.");
  }catch(error){setStatus(error.message||"Não foi possível atualizar o mascote.",true);}
  finally{busy=false;render();}
 }
@@ -554,7 +566,7 @@ async function submitQueue(type,payload,message){
  busy=true;setStatus("Enviando ordem ao servidor…");
  try{
    await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type,...payload})});
-   const fresh=await request("/game/state");state=fresh.state;render();setStatus(message);
+   const fresh=await request("/game/state");state=fresh.state;render();showActionNotice(message);
  }catch(error){setStatus(error.message,true);}
  finally{busy=false;render();}
 }
@@ -568,7 +580,7 @@ async function startResearch(event){
  event.preventDefault();
  await submitQueue("research",{research:document.getElementById("researchKey").value},"Pesquisa iniciada. O bônus será ativado ao concluir.");
 }
-async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;busy=false;render();setStatus("Construção iniciada. O nível será atualizado ao concluir.");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
+async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;busy=false;render();showActionNotice("Construção iniciada. O nível será atualizado ao concluir.");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
 async function setNickname(event){
  event.preventDefault();
  const input=document.getElementById("nicknameInput"),status=document.getElementById("nicknameStatus");
