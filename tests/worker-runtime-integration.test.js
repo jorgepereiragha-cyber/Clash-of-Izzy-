@@ -1030,6 +1030,76 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(last.kingdom.castle_level,30);
     });
     
+    await t.test("cidade 4X: grade, economia, trabalhadores, concorrência e defesas reais", async () => {
+      const initial=expectStatus(await api("/api/game/city",{token:tokenB}),200,"grade de reino existente");
+      assert.equal(initial.gridSize,50);
+      assert.ok(initial.unlockedSize>=20);
+      assert.equal(initial.buildings.filter(b=>b.core_building_type==="castle").length,1);
+      assert.ok(initial.buildings.length>=16,"a migração preserva os edifícios originais");
+      const castle=initial.buildings.find(b=>b.core_building_type==="castle");
+      const occupied=expectStatus(await api("/api/game/city/validate",{token:tokenB,method:"POST",
+        body:{buildingType:"house",gridX:15,gridY:18,rotation:0}}),200,"evita sobreposição");
+      assert.equal(occupied.valid,false);
+      expectStatus(await api("/api/game/city/validate",{token:tokenB,method:"POST",
+        body:{buildingType:"house",gridX:-1,gridY:0,rotation:0}}),200,"coordenadas negativas rejeitadas");
+      const originalWood=Number(initial.resourceBalances.wood);
+      const originalStone=Number(initial.resourceBalances.stone);
+      const newHouse={buildingType:"house",gridX:19,gridY:23,rotation:90,requestKey:"city-integration-house-001"};
+      const placed=expectStatus(await api("/api/game/city/place",{token:tokenB,method:"POST",body:newHouse}),201,"casa instalada");
+      assert.ok(placed.structureId>0);
+      const replay=expectStatus(await api("/api/game/city/place",{token:tokenB,method:"POST",body:newHouse}),200,"chave idempotente");
+      assert.equal(replay.structureId,placed.structureId);
+      expectStatus(await api("/api/game/city/place",{token:tokenB,method:"POST",
+        body:{...newHouse,requestKey:"city-integration-house-002"}}),409,"sem duplicação na mesma célula");
+      const withHouse=expectStatus(await api("/api/game/city",{token:tokenB}),200,"população com casa pronta");
+      assert.equal(Number(withHouse.resourceBalances.wood),originalWood-150);
+      assert.equal(Number(withHouse.resourceBalances.stone),originalStone-50);
+      assert.equal(withHouse.population.total,10,"casa em construção não aumenta capacidade antes da conclusão");
+      const farm=withHouse.buildings.find(b=>b.building_type==="farm");
+      expectStatus(await api("/api/game/city/workers",{token:tokenB,method:"POST",
+        body:{structureId:farm.id,workers:1}}),200,"trabalhador alocado");
+      expectStatus(await api("/api/game/city/workers",{token:tokenB,method:"POST",
+        body:{structureId:farm.id,workers:2}}),409,"alocação acima do limite");
+      const migrated=await runCli(["--config","wrangler.jsonc","d1","execute","clash-of-izzy-db",
+        "--local","--persist-to",persistDir,
+        "--command","UPDATE city_economy_clock SET last_tick_at=datetime('now','-3600 seconds') WHERE kingdom_id="+Number(startB.state.kingdom.id)+";"]);
+      assert.ok(migrated!==undefined);
+      const produced=expectStatus(await api("/api/game/city",{token:tokenB}),200,"produção de trigo registrada");
+      assert.ok(Number(produced.stock.wheat)>=90,"1h de trabalho deve produzir trigo");
+      const again=expectStatus(await api("/api/game/city",{token:tokenB}),200,"repetição de leitura sem duplicar");
+      assert.equal(again.stock.wheat,produced.stock.wheat);
+      const moved=expectStatus(await api("/api/game/city/move",{token:tokenB,method:"POST",
+        body:{structureId:placed.structureId,gridX:19,gridY:29,rotation:0}}),200,"casa reposicionada");
+      assert.equal(moved.ok,true);
+      expectStatus(await api("/api/game/city/remove",{token:tokenA,method:"POST",
+        body:{structureId:placed.structureId}}),404,"outra conta não remove estruturas");
+      expectStatus(await api("/api/game/city/remove",{token:tokenB,method:"POST",
+        body:{structureId:castle.id}}),409,"não é possível demolir castelo");
+      const demolished=expectStatus(await api("/api/game/city/remove",{token:tokenB,method:"POST",
+        body:{structureId:placed.structureId}}),200,"casa removida");
+      assert.deepEqual(demolished.refund,{wood:75,stone:25,iron:0,food:0});
+      expectStatus(await api("/api/game/city/remove",{token:tokenB,method:"POST",
+        body:{structureId:placed.structureId}}),404,"reembolso não duplicado");
+      const after=expectStatus(await api("/api/game/city",{token:tokenB}),200,"saldo após remoção");
+      assert.equal(after.resourceBalances.wood,originalWood-75);
+      assert.equal(after.resourceBalances.stone,originalStone-25);
+      const beforeDefense=expectStatus(await api("/api/game/state",{token:tokenB}),200,"força de defesa inicial").state.kingdom.defense_power;
+      const tower=expectStatus(await api("/api/game/city/place",{token:tokenB,method:"POST",
+        body:{buildingType:"arrow_tower",gridX:19,gridY:23,rotation:0,requestKey:"city-integration-tower-001"}}),201,"torre de defesa");
+      assert.ok(tower.structureId);
+      await runCli(["--config","wrangler.jsonc","d1","execute","clash-of-izzy-db",
+        "--local","--persist-to",persistDir,
+        "--command","UPDATE city_structures SET finishes_at=datetime('now','-1 second') WHERE id="+tower.structureId+";"]);
+      const defended=expectStatus(await api("/api/game/state",{token:tokenB}),200,"defesas aplicadas no combate").state;
+      assert.ok(Number(defended.kingdom.defense_power)>=Number(beforeDefense)+50);
+      const town=expectStatus(await api("/api/game/city",{token:tokenB}),200,"torre persistida");
+      assert.ok(town.buildings.some(b=>b.id===tower.structureId&&b.damage===50&&b.attack_range===10));
+      expectStatus(await api("/api/game/city/remove",{token:tokenB,method:"POST",
+        body:{structureId:tower.structureId}}),200,"demolição da torre");
+      const afterTower=expectStatus(await api("/api/game/state",{token:tokenB}),200,"força defensiva restaurada").state;
+      assert.equal(Number(afterTower.kingdom.defense_power),Number(beforeDefense));
+    });
+
     await t.test("todas as 40 ações previstas foram alcançadas no fluxo de integração", async () => {
       const actionTypes = [
         "set_nickname","equipment_craft","equipment_upgrade","equipment_equip","equipment_unequip","equipment_lock",

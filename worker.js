@@ -27,6 +27,7 @@ import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "
 import { MASTER_PACK_NAME, MASTER_PACK_BONUSES, masterGrantStatements } from "./master-pack.js";
 import { isDailyPackage, DAILY_PACKAGE_COOLDOWN_HOURS } from "./daily-package-offers.js";
 import { CASTLE_MAX_LEVEL, CASTLE_VIP_MAX_LEVEL, getCastleVipBonuses, getCastleVipState } from "./castle-vip.js";
+import { handleCityRoute, processCityCycle, cityDefensePower, cityAttackBonus, cityStorageBonus } from "./advanced-city.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -394,8 +395,10 @@ async function recalculateKingdomStats(env,kingdomId){
     iron:25000+warehouse*12000+(levels.iron_mine||1)*750,
     gold:20000+warehouse*8000+(levels.market||1)*500
   };
+  const cityStorage=await cityStorageBonus(env,kingdomId);
+  for(const key of Object.keys(capacities))capacities[key]=Math.floor(capacities[key]*(1+cityStorage));
   const wallMax=5000+(levels.wall||1)*5000;
-  const defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number(kingdom.castle_level)||1)*10;
+  const defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number(kingdom.castle_level)||1)*10+await cityDefensePower(env,kingdomId);
   await env.DB.prepare(
     "UPDATE kingdoms SET food_capacity=MAX(?,food),wood_capacity=MAX(?,wood),stone_capacity=MAX(?,stone),iron_capacity=MAX(?,iron),gold_capacity=MAX(?,gold),wall_max_hp=?,wall_hp=MIN(wall_hp,?),defense_power=? WHERE id=?"
   ).bind(capacities.food,capacities.wood,capacities.stone,capacities.iron,capacities.gold,wallMax,wallMax,defense,kingdomId).run();
@@ -535,7 +538,7 @@ async function processMarches(env,kingdomId,batchSize=50){
      castleVipAttackBonusPercent:getCastleVipBonuses(kingdom?.prestige).attackPercent,castleVipDefenseBonusPercent:getCastleVipBonuses(kingdom?.prestige).defensePercent,
      researchLevel:Number(military?.level||0),
      defenseBonusPercent:Math.min(30,Math.max(0,Number(defense?.level||0)+gear.defensePercent)),
-     equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),
+     equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100)+Math.round((await cityAttackBonus(env,kingdomId))*100),
      skinAttackBonusPercent:skinBonus.attackPercent,skinDefenseBonusPercent:skinBonus.defensePercent,
      skinSetAttackBonusPercent:cosmeticState.skinSetBonuses.attackPercent,skinSetDefenseBonusPercent:cosmeticState.skinSetBonuses.defensePercent,
      skinSetHealthBonusPercent:cosmeticState.skinSetBonuses.healthPercent,skinSetCriticalChancePercent:cosmeticState.skinSetBonuses.criticalChancePercent,
@@ -1600,7 +1603,7 @@ async function gameAction(env,playerId,body){
      dragonAttackBonusPercent:getDragonCombatBonuses(dragon).attackPercent,dragonDefenseBonusPercent:getDragonCombatBonuses(dragon).defensePercent,
       castleVipAttackBonusPercent:getCastleVipBonuses(k.prestige).attackPercent,castleVipDefenseBonusPercent:getCastleVipBonuses(k.prestige).defensePercent,
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
-      equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),skinAttackBonusPercent:skinBonus.attackPercent,skinDefenseBonusPercent:skinBonus.defensePercent,skinSetAttackBonusPercent:cosmeticState.skinSetBonuses.attackPercent,skinSetDefenseBonusPercent:cosmeticState.skinSetBonuses.defensePercent,skinSetHealthBonusPercent:cosmeticState.skinSetBonuses.healthPercent,skinSetCriticalChancePercent:cosmeticState.skinSetBonuses.criticalChancePercent,equipmentHealthBonusPercent:gear.healthPercent,
+      equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100)+Math.round((await cityAttackBonus(env,k.id))*100),skinAttackBonusPercent:skinBonus.attackPercent,skinDefenseBonusPercent:skinBonus.defensePercent,skinSetAttackBonusPercent:cosmeticState.skinSetBonuses.attackPercent,skinSetDefenseBonusPercent:cosmeticState.skinSetBonuses.defensePercent,skinSetHealthBonusPercent:cosmeticState.skinSetBonuses.healthPercent,skinSetCriticalChancePercent:cosmeticState.skinSetBonuses.criticalChancePercent,equipmentHealthBonusPercent:gear.healthPercent,
      heroAttackBonusPercent:heroCombat.attackPercent,heroDefenseBonusPercent:heroCombat.defensePercent,heroHealthBonusPercent:heroCombat.healthPercent,heroCriticalChancePercent:heroCombat.criticalChancePercent,
       infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
       criticalChancePercent:gear.criticalChancePercent,criticalDamageMultiplier:1.5,
@@ -1755,7 +1758,7 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   const simulation=simulateAngelDeathAttack({
     army:selected,castleLevel:kingdom.castle_level,heroLevel:hero?.level||1,
     dragonLevel:dragon?.level||1,militaryLevel:tech?.level||0,
-    attackBonusPercent:gear.attackPercent+skinBonus.attackPercent+heroCombat.attackPercent,
+    attackBonusPercent:gear.attackPercent+skinBonus.attackPercent+heroCombat.attackPercent+Math.round((await cityAttackBonus(env,kingdom.id))*100),
     defenseBonusPercent:gear.defensePercent+skinBonus.defensePercent+heroCombat.defensePercent,
     seed
   });
@@ -1896,6 +1899,7 @@ async function processDueMarches(env){
 
 export default {
  async scheduled(controller,env){
+  try{await processCityCycle(env,12);}catch(error){console.error("scheduled_city_production_failed",String(error?.message||error));}
   try{await processDueKingdomQueues(env);}
   catch(error){console.error("scheduled_kingdom_queue_resolution_failed",String(error?.message||error));}
   try{
@@ -1966,7 +1970,7 @@ export default {
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
+    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","city_building_types","city_structures","city_core_workers","city_population","city_stock","city_economy_clock","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -2169,6 +2173,16 @@ export default {
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     try{
+      if(url.pathname==="/api/game/city"||url.pathname.startsWith("/api/game/city/")){
+        const supported=(url.pathname==="/api/game/city"&&request.method==="GET")||
+          (request.method==="POST"&&["validate","place","move","remove","workers"].includes(url.pathname.slice("/api/game/city/".length)));
+        if(!supported)return json({error:"Rota ou método da cidade inválido."},405);
+        const limited=await rateLimitDecision(env,request.method==="GET"?"city-read":"city-write",playerId,request.method==="GET"?60:20,60);
+        if(limited)return limited;
+        const body=request.method==="POST"?await readBody(request,4096):{};
+        if(body.__bodyError)return json({error:"Dados de construção inválidos."},body.__bodyError==="payload_too_large"?413:400);
+        return await handleCityRoute(request,env,playerId,body);
+      }
       if(url.pathname==="/api/game/referral/link"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"referral-link-player",playerId,15,60);
         if(limited)return limited;

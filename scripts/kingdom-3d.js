@@ -14,6 +14,8 @@ const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
   let renderer, scene, camera, resizeObserver, sceneVisibilityObserver, visibilityChangeHandler, ktx2, draco, gltfLoader, resizeHandler, qualityProfile;
   let latestBuildings = [];
+  let cityExtensionRows = Array.isArray(window.__coiAdvancedCityStructures)?window.__coiAdvancedCityStructures:[];
+  let cityExtensionHandler = null;
   let latestTroops = [];
   let latestCastleSkinId = 0;
   let activeModels = [];
@@ -51,7 +53,14 @@ if (host && "WebGLRenderingContext" in window) {
     wall: ["#a1a69c", "#52677D"], hospital: ["#c9c2aa", "#31577D"],
     watchtower: ["#9c927b", "#24476B"], stable: ["#98734e", "#31577D"],
     archery_range: ["#a49a6c", "#456B4E"], siege_workshop: ["#827466", "#52677D"],
-    embassy: ["#b0a18a", "#31577D"], warehouse: ["#9b886a", "#24476B"]
+    embassy: ["#b0a18a", "#31577D"], warehouse: ["#9b886a", "#24476B"],
+    house:["#c7b48f","#b7663f"],mill:["#cba67f","#765c39"],
+    bakery:["#cf946b","#b55d32"],smelter:["#655c53","#373b48"],
+    forge:["#4f545a","#9d5b3c"],blacksmith:["#877663","#525964"],
+    arrow_tower:["#9b957d","#4f6472"],cannon_tower:["#787e85","#424d52"],
+    trap_spikes:["#6a594b","#4a3b38"],trap_boulder:["#8d8776","#49443f"],
+    oil_pot:["#654e37","#312d29"],gate:["#a18c6b","#735539"],
+    wall_segment:["#8b8d88","#545d5b"]
   };
   const castleSkinPalettes = {
     1:{wall:"#c7a86f",roof:"#9b6627",stone:"#ead5a3",accent:"#f1d078",banner:"#8d401f",seal:"#f6dc92"},
@@ -356,7 +365,8 @@ if (host && "WebGLRenderingContext" in window) {
     const castleSkin=type==="castle"?(castleSkinPalettes[Number(castleSkinId)]||null):null;
     const colors = castleSkin ? [castleSkin.wall,castleSkin.roof] : (palettes[type] || palettes.warehouse);
     const seed = [...String(type)].reduce((sum, char) => sum + char.charCodeAt(0), 0);
-    const wall = surfaceMaterial(colors[0], "stone", seed);
+    const castleTier=type==="castle"?(Number(level)<=3?1:Number(level)<=6?2:Number(level)<=9?3:4):0;
+    const wall = type==="castle"&&castleTier===1?mats.wood:surfaceMaterial(colors[0], "stone", seed);
     const roof = surfaceMaterial(colors[1], "roof", seed + 101);
     const castleStone=castleSkin?surfaceMaterial(castleSkin.stone,"stone",seed+207):mats.stone;
     const castleRoof=castleSkin?surfaceMaterial(castleSkin.roof,"roof",seed+309):mats.roof;
@@ -384,15 +394,36 @@ if (host && "WebGLRenderingContext" in window) {
     }
 
     if (type === "castle") {
-      // Four corner keeps, crenellated parapet, royal standards and a heraldic seal.
+      // Quatro fases visuais: madeira (1–3), pedra (4–6),
+      // fortaleza (7–9) e cidadela régia (10–30).
+      group.userData.coICastleTier=castleTier;
+      const turretHeight=([0,.94,1.28,1.58,1.9])[castleTier];
+      const turretStone=castleTier===1?mats.wood:castleStone;
       for (const tx of [-.56, .56]) for (const tz of [-.43, .43]) {
-        box(group, .36, 1.5, .36, castleStone, tx, .75, tz);
-        const turret = new THREE.Mesh(new THREE.ConeGeometry(.27, .54, 4), castleRoof);
-        turret.position.set(tx, 1.78, tz);
-        turret.rotation.y = Math.PI / 4;
-        turret.castShadow = true;
+        box(group, .36, turretHeight, .36, turretStone, tx, turretHeight/2, tz);
+        const turret = new THREE.Mesh(new THREE.ConeGeometry(.27,.54,4),castleRoof);
+        turret.position.set(tx,turretHeight+.27,tz);
+        turret.rotation.y=Math.PI/4;
+        turret.castShadow=true;
         group.add(turret);
-        box(group, .4, .09, .4, castleAccent, tx, 1.51, tz);
+        if(castleTier>=3)box(group,.44,.13,.44,castleAccent,tx,turretHeight+.05,tz);
+      }
+      if(castleTier>=2){
+        box(group,.52,.75,.18,castleStone,0,.4,.73);
+        box(group,.27,.60,.035,mats.wood,0,.35,.835);
+      }
+      if(castleTier>=3){
+        for(const sx of [-1,1]){
+          box(group,.3,.84,.72,castleStone,sx*.82,.42,.15);
+          box(group,.34,.14,.77,mats.darkStone,sx*.82,.84,.15);
+        }
+      }
+      if(castleTier>=4){
+        box(group,.46,1.55,.46,castleStone,0,height+.79,0);
+        const crown=new THREE.Mesh(new THREE.ConeGeometry(.45,.62,6),castleAccent);
+        crown.position.y=height+1.86;
+        crown.castShadow=true;group.add(crown);
+        box(group,.8,.10,.8,castleAccent,0,height+.20,0);
       }
       for (let i = -2; i <= 2; i++) {
         box(group, .18, .22, .18, castleStone, i * .24, height + .16, -.58);
@@ -422,6 +453,30 @@ if (host && "WebGLRenderingContext" in window) {
       flag.rotation.y = Math.PI / 2;
       group.add(flag);
       box(group, .48, .12, .48, mats.gold, 0, height + .82, 0);
+    } else if (["arrow_tower","cannon_tower","gate","wall_segment"].includes(type)) {
+      const heavy=type==="cannon_tower";
+      const gate=type==="gate";
+      const wallPiece=type==="wall_segment";
+      if(!wallPiece)box(group,.36,heavy?1.7:1.2,.36,mats.darkStone,0,.8,0);
+      if(gate){
+        box(group,1.0,.34,.35,mats.wood,0,.6,.68);
+        box(group,.25,.95,.3,mats.darkStone,-.55,.47,.68);
+        box(group,.25,.95,.3,mats.darkStone,.55,.47,.68);
+      }else if(!wallPiece){
+        const cap=new THREE.Mesh(new THREE.ConeGeometry(.42,.52,4),roof);
+        cap.position.y=heavy?1.98:1.63;cap.rotation.y=Math.PI/4;group.add(cap);
+        box(group,heavy?.6:.32,.14,.36,mats.gold,0,heavy?1.65:1.3,.24);
+      }
+    } else if (["trap_spikes","trap_boulder","oil_pot"].includes(type)) {
+      if(type==="trap_spikes"){
+        for(const px of [-.42,0,.42])for(const pz of [-.42,.42]){
+          const spike=new THREE.Mesh(new THREE.ConeGeometry(.09,.5,4),mats.darkStone);
+          spike.position.set(px,.25,pz);group.add(spike);
+        }
+      }else if(type==="trap_boulder"){
+        const boulder=new THREE.Mesh(new THREE.DodecahedronGeometry(.54,0),mats.stone);
+        boulder.position.set(0,.42,.2);group.add(boulder);
+      }else box(group,.76,.31,.8,mats.darkStone,0,.54,.18);
     } else if (type === "farm") {
       // Crop beds with raised furrows and golden grain heads.
       for (let i = -1; i <= 1; i++) {
@@ -616,10 +671,28 @@ if (host && "WebGLRenderingContext" in window) {
       const template = glbTemplates.get(b.building_type);
       const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
+      if(template&&b.building_type==="castle"){
+        const tier=Number(b.level)<=3?1:Number(b.level)<=6?2:Number(b.level)<=9?3:4;
+        group.scale.multiplyScalar(1+(tier-1)*.085);
+        group.userData.coICastleTier=tier;
+      }
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       scene.add(group);
       activeModels.push(group);
     });
+    // Extensões compartilham o espaço 3D canônico; limite de LOD para Android.
+    const complete=cityExtensionRows.filter(b=>!b.core_building_type&&
+      Date.parse(String(b.finishes_at).replace(" ","T").replace(/Z?$/,"Z"))<=Date.now());
+    const budget=Math.max(0,Math.min(8,qualityProfile?.maxBuildings||8));
+    for(const b of complete.slice(0,budget)){
+      const x=(Number(b.grid_x)-25)*.53,z=(Number(b.grid_y)-25)*.53;
+      if(!Number.isFinite(x)||!Number.isFinite(z))continue;
+      const addon=createBuilding(b.building_type,Number(b.level)||1,x,z,0);
+      addon.position.set(x,0,z);
+      addon.scale.setScalar(b.category==="defense"?.55:.7);
+      addon.userData.coIExtensionId=b.id;
+      scene.add(addon);activeModels.push(addon);
+    }
     renderer.render(scene, camera);
     publishBuildingHitTargets(list);
   }
@@ -964,6 +1037,7 @@ if (host && "WebGLRenderingContext" in window) {
       visibilityChangeHandler = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+    if (cityExtensionHandler) window.removeEventListener("coi:advanced-city-state",cityExtensionHandler);
       disposeSceneResources();
       ktx2?.dispose();
       draco?.dispose();
@@ -987,6 +1061,11 @@ if (host && "WebGLRenderingContext" in window) {
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
     };
     window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
+    cityExtensionHandler=event=>{
+      cityExtensionRows=Array.isArray(event.detail?.buildings)?event.detail.buildings:[];
+      renderBuildings(latestBuildings,latestCastleSkinId);
+    };
+    window.addEventListener("coi:advanced-city-state",cityExtensionHandler);
     if (Array.isArray(window.__coiKingdomBuildings)) {
       latestTroops = Array.isArray(window.__coiKingdomTroops) ? window.__coiKingdomTroops : [];
       latestCastleSkinId=Number(window.__coiKingdomCastleSkin)||0;
@@ -1078,6 +1157,7 @@ if (host && "WebGLRenderingContext" in window) {
     visibilityChangeHandler = null;
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+    if (cityExtensionHandler) window.removeEventListener("coi:advanced-city-state",cityExtensionHandler);
     disposeSceneResources();
     ktx2?.dispose();
       draco?.dispose();

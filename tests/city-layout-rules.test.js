@@ -32,6 +32,7 @@ test("atomic SQL checks ownership, old position, bounds and server-side collisio
   assert.match(sql,/WHERE kingdom_id=\? AND building_type=\? AND position_x=\? AND position_z=\?/);
   assert.match(sql,/NOT EXISTS \(SELECT 1 FROM kingdom_buildings other/);
   assert.match(sql,/CASE other.building_type/);
+  assert.match(sql,/NOT EXISTS\(SELECT 1 FROM city_structures addition/);
   assert.deepEqual(binds.slice(0,8),[6,7,51,"farm",-3.5,-7,51,"farm"]);
   changes=0;
   assert.equal((await moveCityBuilding(env,51,{building:"farm",gridX:6,gridZ:7,fromX:-3.5,fromZ:-7})).status,409);
