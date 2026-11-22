@@ -1,11 +1,13 @@
 name: Primeiro lancamento protegido - banco sem contas cadastradas
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/primeiro-lancamento-clash-izzy.yml
   workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: "Autoriza iniciar o deploy protegido somente após revisar D1, Workers Paid e orçamento"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -17,6 +19,9 @@ concurrency:
 
 jobs:
   verificar-e-iniciar:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_production == true }}
+    environment:
+      name: production
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -92,7 +97,7 @@ jobs:
           subscriptions=subscriptions if isinstance(subscriptions,list) else []
           if not any("workers" in str((s.get("rate_plan") or {}).get("id","")).lower()+" "+str((s.get("rate_plan") or {}).get("name","")).lower() and str(s.get("state","")).lower() in ("paid","active") for s in subscriptions):
             raise SystemExit("Workers Paid nao confirmado (ou token sem Billing Read). Verifique Billing Read e assinatura no Cloudflare; publicacao bloqueada.")
-          print("Workers Paid verificado e banco D1 sem jogadores/reinos. Producao podera passar pelo gate protegido.")
+          print("Workers Paid verificado, contas e pedidos zerados; players/reinos existentes preservados. Producao exige revisao e gate protegido.")
           PY
       - name: Iniciar workflow EXISTENTE com bookmark D1 e protecao do ambiente
         env:
