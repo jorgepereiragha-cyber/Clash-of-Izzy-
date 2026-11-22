@@ -69,6 +69,10 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 #throneAssault{min-height:48px;border-color:#f8d78d;
  background:linear-gradient(180deg,#ba8747,#75502a);color:#fff4de;font-weight:800}
 #throneAssault:disabled{filter:grayscale(.55);opacity:.55}
+.formation-presets{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:11px 0}
+.formation-presets button{min-height:44px;border:1px solid #8196aa;border-radius:9px;background:#19344f;color:#f6efe1;font-weight:700}
+.formation-presets button:focus-visible{outline:3px solid #ffda91;outline-offset:2px}
+
 
 .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;color:var(--muted);font-size:11px}
 .legend span{display:inline-flex;align-items:center;gap:5px}
@@ -131,6 +135,12 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
     <h2>📍 Território selecionado</h2>
     <div id="territoryDetails"><div id="empty">Escolha um ponto no mapa.</div></div>
     <p id="marchCapacity" class="muted" role="status" aria-live="polite">Calculando capacidade de marcha…</p>
+    <div class="formation-presets" aria-label="Formações rápidas">
+      <button type="button" id="presetGather">Coleta</button>
+      <button type="button" id="presetBalanced">Equilibrada</button>
+      <button type="button" id="presetFill">Preencher</button>
+      <button type="button" id="presetClear">Limpar</button>
+    </div>
     <div id="troops" class="troop-list"></div>
     <div class="actions">
      <button id="gather" disabled>🌾 Coletar</button>
