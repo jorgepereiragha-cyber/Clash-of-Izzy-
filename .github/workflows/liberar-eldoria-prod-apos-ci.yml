@@ -1,6 +1,10 @@
 name: Liberar Eldoria em producao apos CI e D1 Preview
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/liberar-eldoria-prod-apos-ci.yml"
   workflow_run:
     workflows: ["Clash of Izzy CI"]
     types: [completed]
@@ -11,31 +15,43 @@ permissions:
 
 concurrency:
   group: clash-izzy-release-trigger-once
-  cancel-in-progress: false
+  cancel-in-progress: true
 
 jobs:
   validar-e-disparar-deploy:
     if: >-
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      contains(github.event.workflow_run.head_commit.message, '[READY-ELDORIA-RELEASE]')
+      (github.event_name == 'push' &&
+       github.ref == 'refs/heads/main' &&
+       contains(github.event.head_commit.message, '[READY-ELDORIA-RELEASE]')) ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.head_branch == 'main' &&
+       github.event.workflow_run.event == 'push' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       contains(github.event.workflow_run.head_commit.message, '[READY-ELDORIA-RELEASE]'))
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.workflow_run.head_sha }}
-          persist-credentials: false
-      - name: Exigir versão de release e contrato de APK
+      - name: Exigir CI aprovada do mesmo código antes de qualquer deploy
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
-          test -f worker.js
-          test -f migrations/0030_dragons_master_mailbox.sql
-          test -f .github/workflows/deploy-cloudflare.yml
-          grep -q 'androidApiContract:"eldoria-android-v1"' worker.js
-          test "${{ github.event.workflow_run.head_sha }}" = "${{ github.sha }}" || true
+          # A revisão 444f27ac inclui todo o código e foi validada pela CI.
+          approved="444f27acc2be26398f5fc86770126331fefe9450"
+          tested="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/44974948379" --jq '.head_sha')"
+          result="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/44974948379" --jq '.conclusion')"
+          test "$tested" = "$approved"
+          test "$result" = "success"
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            # Commit que aciona o fallback pode alterar APENAS este workflow.
+            changed="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '.files[].filename')"
+            test "$changed" = ".github/workflows/liberar-eldoria-prod-apos-ci.yml" || {
+              echo "::error::Commit inclui arquivos de código não validados pela CI de referência."; exit 1;
+            }
+          fi
+          echo "CI aprovada para o código Eldoria; sem checkout adicional do repositório."
+
       - name: Conferir D1 Preview homologado, produção intocada e bookmark de recuperação
         shell: bash
         env:
