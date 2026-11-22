@@ -323,7 +323,11 @@ async function manualDistributeRunes(body, env) {
   });
 }
 
-export async function handleValhallaAdmin(request, env, body = {}) {
+export async function handleValhallaAdmin(request, env, body = {}, actor = null) {
+  // Defesa em profundidade: nem uma chamada interna pode contornar Master.
+  if (actor?.scope !== "admin" || actor?.sub !== "admin") {
+    return json({ error: "Sessão administrativa inválida ou expirada." }, 401);
+  }
   if (!env?.DB) return json({ error: "Banco D1 indisponível." }, 503);
 
   const path = new URL(request.url).pathname;
