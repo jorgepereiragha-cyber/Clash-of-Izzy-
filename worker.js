@@ -30,7 +30,7 @@ import { PANTHEON_SKIN_ITEMS, buildSkinSetGallery } from "./skin-sets.js";
 import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "./dragon-catalog.js";
 import { MASTER_PACK_NAME, MASTER_PACK_BONUSES, masterGrantStatements } from "./master-pack.js";
 import { isDailyPackage, DAILY_PACKAGE_COOLDOWN_HOURS } from "./daily-package-offers.js";
-import { getLevelPackByName, publicLevelPack } from "./level-packs.js";
+import { getLevelPackByName, publicLevelPack, levelPacksEnabledForPlayer } from "./level-packs.js";
 import { CASTLE_MAX_LEVEL, CASTLE_VIP_MAX_LEVEL, getCastleVipBonuses, getCastleVipState } from "./castle-vip.js";
 import { handleDailyReward } from "./daily-rewards.js";
 import { handleOnboarding } from "./onboarding-bonus.js";
@@ -2133,11 +2133,13 @@ export default {
       const ip=request.headers.get("CF-Connecting-IP")||"unknown";
       const limited=await rateLimitDecision(env,"store-catalog-ip",ip,60,60);
       if(limited)return limited;
+      const levelPackPlayerId=env.LEVEL_PACKS_PUBLIC_ENABLED==="true"?null:request.headers.get("Authorization")?await gameIdentity(request,env):null;
+      const levelPacksVisible=levelPacksEnabledForPlayer(env,levelPackPlayerId);
       const [skins,packages]=await Promise.all([
         env.DB.prepare("SELECT id,name,price_brl,attack_bonus_percent,defense_bonus_percent FROM skins ORDER BY id LIMIT ?").bind(INITIAL_PAID_SKIN_LIMIT).all(),
         env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages ORDER BY price_brl,name").all()
       ]);
-      return json({skins:skins.results||[],packages:(packages.results||[]).filter(item=>(item.name!==MASTER_PACK_NAME||env.MASTER_PACK_ENABLED==="true")&&(!getLevelPackByName(item.name)||env.LEVEL_PACKS_ENABLED==="true")).map(item=>{const levelPack=getLevelPackByName(item.name);return levelPack?{...item,levelPack:publicLevelPack(levelPack)}:item.name===MASTER_PACK_NAME?{...item,bonus:MASTER_PACK_BONUSES,oneTime:true}:isDailyPackage(item.name)?{...item,dailyLimitHours:DAILY_PACKAGE_COOLDOWN_HOURS}:item;}),skin_edition:"initial",skin_limit:INITIAL_PAID_SKIN_LIMIT,whatsapp:"+5547996531437"});
+      return json({skins:skins.results||[],packages:(packages.results||[]).filter(item=>(item.name!==MASTER_PACK_NAME||env.MASTER_PACK_ENABLED==="true")&&(!getLevelPackByName(item.name)||levelPacksVisible)).map(item=>{const levelPack=getLevelPackByName(item.name);return levelPack?{...item,levelPack:publicLevelPack(levelPack)}:item.name===MASTER_PACK_NAME?{...item,bonus:MASTER_PACK_BONUSES,oneTime:true}:isDailyPackage(item.name)?{...item,dailyLimitHours:DAILY_PACKAGE_COOLDOWN_HOURS}:item;}),skin_edition:"initial",skin_limit:INITIAL_PAID_SKIN_LIMIT,whatsapp:"+5547996531437"});
     }catch(e){return json({error:"Catálogo indisponível no momento."},503)}
   }
   if(url.pathname==="/api/game/start"&&request.method==="POST"){
@@ -2223,7 +2225,7 @@ export default {
     if(!item)return json({error:kind==="skin"?"Esta skin está bloqueada para uma atualização futura.":"Produto não encontrado no catálogo."},404);
     const levelPack=kind==="vip_package"?getLevelPackByName(item.name):null;
     if(levelPack){
-      if(env.LEVEL_PACKS_ENABLED!=="true")return json({error:"Pacotes de progressão ainda não liberados.",code:"LEVEL_PACKS_DISABLED"},503);
+      if(!levelPacksEnabledForPlayer(env,playerId))return json({error:"Pacotes de progressão não liberados para esta conta.",code:"LEVEL_PACKS_DISABLED"},503);
       if(paymentMethod!=="mercadopago_link")return json({error:"Pacotes por nível exigem checkout vinculado e confirmado no Mercado Pago."},400);
       if(Math.round(Number(item.price_brl)*100)!==levelPack.priceCents||Number(item.gems)!==levelPack.gems)
         return json({error:"O preço ou a recompensa não coincide com o catálogo oficial.",code:"LEVEL_PACK_CATALOG_MISMATCH"},409);
