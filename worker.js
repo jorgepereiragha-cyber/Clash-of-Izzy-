@@ -1930,6 +1930,7 @@ export default {
       return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
+  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),nubankPix:env.NUBANK_PIX_ENABLED==="true"});
   if(url.pathname==="/api/store/purchase-request"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);
@@ -1941,8 +1942,9 @@ export default {
     const kind=String(body.kind||""),itemId=Number(body.itemId),requestKey=String(body.requestKey||"").slice(0,64);
     if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
     const requestedPaymentMethod=String(body.paymentMethod||"mercadopago_link");
-    if(!["mercadopago_link","manual_whatsapp"].includes(requestedPaymentMethod))return json({error:"Método de pagamento inválido."},400);
-    const paymentMethod=requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":"manual";
+    if(!["mercadopago_link","manual_whatsapp","pix"].includes(requestedPaymentMethod))return json({error:"Método de pagamento inválido."},400);
+    if(requestedPaymentMethod==="pix" && env.NUBANK_PIX_ENABLED!=="true")return json({error:"O Pix Nubank ainda não está habilitado para pedidos.",code:"NUBANK_PIX_NOT_CONFIGURED"},503);
+    const paymentMethod=requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":requestedPaymentMethod==="pix"?"pix":"manual";
     const paymentReference=null;
     const player=await env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first();
     if(!player)return json({error:"Jogador não encontrado."},404);
@@ -1976,7 +1978,7 @@ export default {
       throw error;
     }
     const created=await env.DB.prepare("SELECT id,status,product_name,price_brl,currency,payment_method,payment_reference,created_at FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
-    return json({success:true,request:created,message:paymentMethod==="mercadopago_link"?"Pedido registrado. Finalize o pagamento no checkout seguro.":"Pedido registrado para conferência manual."},201);
+    return json({success:true,request:created,message:paymentMethod==="mercadopago_link"?"Pedido registrado. Finalize o pagamento no checkout seguro.":paymentMethod==="pix"?"Pedido Pix Nubank registrado e ainda não pago. Solicite cobrança no suporte e aguarde a conciliação bancária.":"Pedido registrado para conferência manual."},201);
   }
   const isGamePath=url.pathname.startsWith("/api/game/");
   if(isGamePath){
@@ -2379,6 +2381,7 @@ export default {
       if(pending.payment_method==="mercadopago_link"||pending.mp_order_id){
         return json({error:"Pedido Mercado Pago: alterações manuais bloqueadas. O estado é controlado pela confirmação ou operação de estorno no provedor."},409);
       }
+      if(decision==="approve"&&pending.payment_method==="pix"&&body.bankStatementConfirmed!==true)return json({error:"Confirme no extrato da conta autorizada o recebimento real do Pix antes de liberar."},400);
       let result;
       if(decision==="reject"){
         result=await env.DB.prepare("UPDATE purchase_requests SET status='rejected',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending'").bind(id).run();
