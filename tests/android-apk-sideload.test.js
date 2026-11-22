@@ -152,3 +152,13 @@ test("Renderizador WebGL tem limite de reinicializacao para impedir loop", () =>
   assert.ok(activity.includes("Atualize o Android System WebView"));
   assert.ok(activity.includes("finish();"));
 });
+
+test('Modo imersivo Android restaura tela cheia sem bloquear gestos do sistema', () => {
+  assert.match(activity, /void enterImmersiveGameMode\(\)/);
+  assert.match(activity, /BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE/);
+  assert.match(activity, /WindowInsets\.Type\.statusBars\(\)/);
+  assert.match(activity, /WindowInsets\.Type\.navigationBars\(\)/);
+  assert.match(activity, /SYSTEM_UI_FLAG_IMMERSIVE_STICKY/);
+  assert.match(activity, /onWindowFocusChanged\(boolean hasFocus\)/);
+  assert.match(manifest, /android:screenOrientation="unspecified"/);
+});
