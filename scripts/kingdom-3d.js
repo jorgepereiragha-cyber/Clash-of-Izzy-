@@ -72,6 +72,9 @@ if (host && "WebGLRenderingContext" in window) {
   const surfaceMaterialCache = new Map();
   let disposed = false;
   let kingdomRenderHandler = null;
+  let valhallaModeHandler = null;
+  let developmentStatsBadge = null;
+  let developmentStatsTimer = null;
   let cinematicCaptureActive = false;
   let cinematicApi = null;
   let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
@@ -98,9 +101,37 @@ if (host && "WebGLRenderingContext" in window) {
       scene.add(valhallaAuroraLight);
     }
   }
-  window.addEventListener("coi:valhalla-mode", event => {
-    setKingdomValhallaMode(event.detail?.active === true);
-  });
+  valhallaModeHandler = event => setKingdomValhallaMode(event.detail?.active === true);
+  window.addEventListener("coi:valhalla-mode", valhallaModeHandler);
+
+  // Métricas apenas no ambiente de desenvolvimento, sem render loop extra.
+  function stopDevelopmentStats() {
+    if (developmentStatsTimer !== null) clearInterval(developmentStatsTimer);
+    developmentStatsTimer = null;
+    developmentStatsBadge?.remove();
+    developmentStatsBadge = null;
+  }
+  function startDevelopmentStats() {
+    if (window.ENVIRONMENT !== "development" || developmentStatsBadge || !renderer) return;
+    const output = document.createElement("output");
+    output.setAttribute("aria-label", "Métricas do renderizador 3D");
+    output.style.cssText = "position:absolute;left:6px;top:6px;z-index:4;" +
+      "pointer-events:none;padding:4px 7px;border-radius:5px;" +
+      "background:rgba(5,12,20,.8);color:#e9f1f5;font:11px monospace";
+    output.textContent = "FPS — · draw calls —";
+    host.appendChild(output);
+    developmentStatsBadge = output;
+    developmentStatsTimer = window.setInterval(() => {
+      if (!renderer || disposed || document.hidden) return;
+      const timing = animationFrameTiming.snapshot();
+      // Cenas estáticas não produzem um FPS mensurável.
+      const fps = animationFrame && timing.sampleCount >= 5 && timing.p50Ms > 0
+        ? Math.round(1000 / timing.p50Ms) : null;
+      output.textContent = (fps ?? "—") + " FPS · " +
+        renderer.info.render.calls + " draw calls · " +
+        renderer.info.memory.geometries + " geometrias";
+    }, 1000);
+  }
 
   // Explicitly release GPU-backed resources on WebGL context loss. Three.js
   // resources are not reclaimed by the browser's garbage collector.
@@ -762,6 +793,19 @@ if (host && "WebGLRenderingContext" in window) {
         part(new THREE.ConeGeometry(.21,.23,6),armor,0,1.19,0);
         part(new THREE.BoxGeometry(.35,.45,.045),armor,0,.47,-.17);
       }
+      // Sinalização de buff sem partículas nem luz dinâmica (até 2 heróis).
+      // Removido e liberado com activeHeroFigures/disposeDetachedObject3D.
+      const buffRing=new THREE.Mesh(
+        new THREE.RingGeometry(.30,.40,16),
+        new THREE.MeshBasicMaterial({
+          color:glowColor,transparent:true,
+          opacity:qualityProfile?.tier==="low"?.26:.40,
+          side:THREE.DoubleSide,depthWrite:false
+        })
+      );
+      buffRing.rotation.x=-Math.PI/2;
+      buffRing.position.y=.025;
+      figure.add(buffRing);
       figure.position.set(anchor.x,0,anchor.z);
       figure.userData.coIHeroKey=hero.hero_key;
       scene.add(figure);
@@ -1093,6 +1137,7 @@ if (host && "WebGLRenderingContext" in window) {
     gltfLoader.setMeshoptDecoder(MeshoptDecoder);
     host.classList.add("has-3d");
     host.dataset.qualityTier = qualityProfile.tier;
+    startDevelopmentStats();
     const diagnostics = () => {
       if (!renderer) return { available: false, tier: qualityProfile?.tier || "unavailable" };
       const info = renderer.info;
@@ -1134,6 +1179,9 @@ if (host && "WebGLRenderingContext" in window) {
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
       if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
+      if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
+      valhallaModeHandler = null;
+      stopDevelopmentStats();
       disposeSceneResources();
       ktx2?.dispose();
       draco?.dispose();
@@ -1259,6 +1307,9 @@ if (host && "WebGLRenderingContext" in window) {
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
     if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
+    if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
+    valhallaModeHandler = null;
+    stopDevelopmentStats();
     disposeSceneResources();
     ktx2?.dispose();
       draco?.dispose();
