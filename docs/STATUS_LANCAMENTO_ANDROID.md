@@ -1,5 +1,21 @@
 # Clash of Izzy — status de lançamento Android
 
+## Situação operacional mais recente — 22/11/2026
+
+A auditoria histórica de 21/11 abaixo descreve uma situação **anterior** ao deploy de produção. O estado confirmado após a atualização é:
+
+- **Backend em produção:** ativo, com migrações D1 até `0035_throne_war.sql`, contrato `eldoria-android-v1`, esquema e sessão verificados e smoke test aprovado. [Deploy oficial #45018496723](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/45018496723).
+- **Recuperação:** bookmark D1 pré-migração capturado e arquivado no artifact do deploy. Não restaurar sem avaliar perda de mudanças posteriores.
+- **Portal:** publicado e respondendo HTTP 200 na auditoria de 22/11.
+- **Catálogo:** oito pacotes disponíveis e com preços/gemas esperados; seis skins expostas. **Pacote Master não aparece** enquanto a flag de habilitação não estiver configurada.
+- **Recebimentos reais:** Mercado Pago ainda não habilitado; `MP_ACCESS_TOKEN` e `MP_WEBHOOK_SECRET` ausentes nas configurações do Worker. Pix Nubank ainda não habilitado; `NUBANK_PIX_KEY`, `NUBANK_PIX_ENABLED` e `NUBANK_PIX_RECEIVER_VERIFIED` ausentes. Não definir flags de confirmação sem conferir titularidade, credenciais, pedidos, conciliação e reembolso.
+- **Outras flags:** `MASTER_PACK_ENABLED` e `GOOGLE_WEB_CLIENT_ID` ausentes na auditoria. O backend de conta via senha permanece uma opção independente.
+- **APK:** o candidato Android interno assinado passou na CI, mas **não há release comercial oficial** com APK e SHA-256 (GitHub Releases HTTP 404 na auditoria). O portal não deve prometer download comercial até existir uma release real e validada.
+- **Fonte dos diagnósticos:** [auditoria automática #45018890376](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/45018890376) — leitura da API pública e somente dos nomes/tipos de bindings, sem divulgar valores.
+- **Limite da verificação:** API com status de habilitação não substitui teste bancário ponta a ponta; executar pedido, pagamento, confirmação oficial, entrega única e estorno antes de vender.
+
+A relação abaixo é preservada como histórico e **não representa o estado atual do banco**.
+
 **Auditoria: 21 de novembro de 2026 (horário de Brasília).** Os logs de CI e Cloudflare usam UTC e podem aparecer com a data 22/11/2026.
 
 ## Objetivo final
