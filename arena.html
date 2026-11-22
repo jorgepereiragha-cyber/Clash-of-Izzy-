@@ -722,7 +722,7 @@ async function requestOfficialPurchase(item,kind,button){
 async function loadCatalog(){
  const box=document.getElementById('catalog');
  try{
-  const res=await fetch('/api/store/catalog');if(!res.ok)throw new Error('Catálogo indisponível');
+  const token=chatToken();const res=await fetch('/api/store/catalog',{cache:'no-store',headers:token?{Authorization:'Bearer '+token}:{}});if(!res.ok)throw new Error('Catálogo indisponível');
   const data=await res.json();box.replaceChildren();
   if(data.skin_edition==="initial"&&Number(data.skin_limit)>0){
    const note=document.createElement('p');note.className='muted';
