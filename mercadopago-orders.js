@@ -1,5 +1,6 @@
 import { finalizeSupportOrder } from "./support-orders.js";
 import {MASTER_PACK_NAME,masterGrantStatements} from "./master-pack.js";
+import {getLevelPackByName,levelPackMatchesOrder,levelPackGrantStatements} from "./level-packs.js";
 function toBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -77,6 +78,7 @@ async function createCheckout(request, env, ctx) {
     "FROM purchase_requests r JOIN players p ON p.id=r.player_id WHERE r.id=? AND p.player_id=?"
   ).bind(requestId, playerId).first();
   if (!order) return ctx.json({ error: "Pedido não encontrado para este reino." }, 404);
+  if (getLevelPackByName(order.product_name) && env.LEVEL_PACKS_ENABLED !== "true") return ctx.json({error:"Os pacotes por nível ainda estão desativados.",code:"LEVEL_PACKS_DISABLED"},503);
   if (order.status !== "pending") return ctx.json({ error: "Este pedido não está mais aguardando pagamento." }, 409);
   if (order.payment_method !== "mercadopago_link") return ctx.json({ error: "Este pedido foi criado para conferência manual e não pode ser convertido em checkout automático." }, 409);
   if (order.mp_checkout_url && order.mp_order_id) {
@@ -171,10 +173,15 @@ async function handleWebhook(request, env, ctx) {
   }
 
   const purchase = await env.DB.prepare(
-    "SELECT id,player_id,product_kind,product_id,product_name,price_brl,currency,status,mp_order_id,mp_external_reference " +
+    "SELECT id,player_id,kingdom_id,product_kind,product_id,product_name,price_brl,gems_amount,currency,status,mp_order_id,mp_external_reference " +
     "FROM purchase_requests WHERE mp_external_reference=? AND mp_order_id=?"
   ).bind(String(providerOrder.external_reference || ""), orderId).first();
   if (!purchase) return await finalizeSupportOrder(env, orderId, providerOrder, ctx);
+  const levelPack = getLevelPackByName(purchase.product_name);
+  if (levelPack && !levelPackMatchesOrder(levelPack, purchase)) {
+    console.error("level_pack_catalog_mismatch", purchase.id, orderId);
+    return ctx.json({error:"Conciliação pendente: dados do pacote divergem do pedido original."},409);
+  }
   const expectedCents = moneyToCents(purchase.price_brl);
   const actualCents = moneyToCents(providerOrder.total_amount);
   const paidCents = moneyToCents(providerOrder.total_paid_amount);
@@ -214,10 +221,14 @@ async function handleWebhook(request, env, ctx) {
     ).bind(purchase.id, orderId, purchase.mp_external_reference)
   ];
   if (purchase.product_kind === "vip_package") {
-    common.push(env.DB.prepare(
-      "UPDATE players SET gems=gems+(SELECT gems_amount FROM purchase_requests WHERE id=?) WHERE id=? AND changes()=1"
-    ).bind(purchase.id, purchase.player_id));
-    if(purchase.product_name===MASTER_PACK_NAME)common.push(...masterGrantStatements(env.DB,purchase.id));
+    if (levelPack) {
+      common.push(...levelPackGrantStatements(env.DB, purchase.id, purchase.product_id, levelPack));
+    } else {
+      common.push(env.DB.prepare(
+        "UPDATE players SET gems=gems+(SELECT gems_amount FROM purchase_requests WHERE id=?) WHERE id=? AND changes()=1"
+      ).bind(purchase.id, purchase.player_id));
+      if(purchase.product_name===MASTER_PACK_NAME)common.push(...masterGrantStatements(env.DB,purchase.id));
+    }
   } else if (purchase.product_kind === "skin") {
     common.push(env.DB.prepare(
       "INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT ?,? WHERE changes()=1"
@@ -225,10 +236,17 @@ async function handleWebhook(request, env, ctx) {
   }
   common.push(env.DB.prepare(
     "UPDATE mercadopago_orders SET fulfilled_at=CURRENT_TIMESTAMP WHERE order_id=? AND fulfilled_at IS NULL " +
-    "AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')"
-  ).bind(orderId, purchase.id));
+    "AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')" +
+    (levelPack ? " AND EXISTS(SELECT 1 FROM level_pack_claims WHERE request_id=?)" : "")
+  ).bind(...(levelPack ? [orderId,purchase.id,purchase.id] : [orderId,purchase.id])));
   try {
-    await env.DB.batch(common);
+    const results = await env.DB.batch(common);
+    // Quando dois pedidos distintos foram pagos para um pacote de compra unica,
+    // nao conceder duas vezes nem marcar a segunda order como entregue.
+    if (levelPack && purchase.status === "pending" && !results[2]?.meta?.changes) {
+      console.error("level_pack_duplicate_payment_requires_reconciliation", orderId, purchase.id);
+      return ctx.json({received:true,processed:true,manualReview:true});
+    }
   } catch (error) {
     console.error("mercadopago_fulfillment_failed", orderId, String(error?.message || error));
     return ctx.json({ error: "A confirmação foi recebida, mas a liberação precisa ser reprocessada." }, 503);
