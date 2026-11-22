@@ -20,7 +20,7 @@ function moneyToCents(value) {
   return Math.round(amount * 100);
 }
 
-export async function validateWebhookSignature(request, orderId, secret) {
+export async function validateWebhookSignature(request, orderId, secret, nowMs = Date.now()) {
   const signatureHeader = request.headers.get("x-signature") || "";
   const requestId = request.headers.get("x-request-id") || "";
   const fields = Object.fromEntries(signatureHeader.split(",").map(part => {
@@ -29,7 +29,14 @@ export async function validateWebhookSignature(request, orderId, secret) {
   }));
   const timestamp = fields.ts;
   const received = fields.v1;
-  if (!timestamp || !received || !requestId || !orderId) return false;
+  if (!timestamp || !received || !requestId || !orderId || !secret) return false;
+  // Mercado Pago envia ts em segundos ou milissegundos. Evite replay de
+  // notificacoes antigas preservando o valor textual original no HMAC.
+  // A tolerancia de 300s segue o SDK oficial de webhooks do Mercado Pago.
+  if (!/^\d{10}(?:\d{3})?$/.test(timestamp)) return false;
+  const timestampMs = Number(timestamp) * (timestamp.length === 10 ? 1000 : 1);
+  if (!Number.isFinite(timestampMs) || !Number.isFinite(nowMs) ||
+      Math.abs(nowMs - timestampMs) > 300_000) return false;
   const manifest = "id:" + String(orderId).toLowerCase() + ";request-id:" + requestId + ";ts:" + timestamp + ";";
   const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(secret), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
   const digest = await crypto.subtle.sign("HMAC", key, new TextEncoder().encode(manifest));
