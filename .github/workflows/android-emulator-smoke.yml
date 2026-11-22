@@ -9,6 +9,7 @@ on:
   push:
     branches:
       - integration/full-eldoria-candidate-20261121
+      - feat/4x-industries-defenses-p1-p8
     paths:
       - .github/workflows/android-emulator-smoke.yml
   workflow_dispatch:
