@@ -7,7 +7,9 @@ const read=path=>readFile(new URL("../"+path,import.meta.url),"utf8");
 
 test("Master gems reject malformed, huge and unauthenticated grants",async()=>{
   const good={playerId:"izzy_0123456789abcdef0123456789abcdef",amount:500,reason:"Premiação auditada",request_key:"admin-gem-request-0000001"};
-  assert.deepEqual(validateAdminGemGrant(good),good);
+  assert.deepEqual(validateAdminGemGrant(good),{
+    playerId:good.playerId,amount:good.amount,reason:good.reason,requestKey:good.request_key
+  });
   for(const bad of [
     {...good,amount:0},{...good,amount:1.5},{...good,amount:MAX_ADMIN_GEM_GRANT+1},
     {...good,request_key:""},{...good,reason:"abc"},{...good,playerId:"a' OR 1=1"}
