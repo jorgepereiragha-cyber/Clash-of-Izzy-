@@ -113,7 +113,8 @@ jobs:
           curl -LfsS --max-time 20 "$base/" > "$RUNNER_TEMP/index-check.html"
           grep -q 'url=/portal.html' "$RUNNER_TEMP/index-check.html" || grep -q 'id="download-apk"' "$RUNNER_TEMP/index-check.html"
           for path in /kingdom.html /api/health; do
-            status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base$path")"
+            # Cloudflare canoniza /kingdom.html para /kingdom via HTTP 307.
+            status="$(curl -L -s -o /dev/null -w '%{http_code}' --max-time 20 "$base$path")"
             test "$status" = "200" || { echo "::error::$path indisponivel apos deploy ($status)"; exit 1; }
           done
           echo "Endereco antigo agora mostra divulgacao/download; backend e D1 preservados."
