@@ -94,8 +94,7 @@ test("catalogo P1-P8 segue os valores solicitados e migracao 0043 nao substitui 
   assert.doesNotMatch(sql,/^\s*(?:INSERT|REPLACE|DELETE|DROP|ALTER)\b/im);
   assert.doesNotMatch(sql,/WHERE name IN\s*\(/i);
   for (const p of LEVEL_PACKS.slice(3)) {
-    const name = p.name.replace(/[.*+?^$\{\}()|[\]\\]/g, "\\$&");
-    assert.match(sql,new RegExp("WHERE name='"+name+"'"));
+    assert.match(sql,new RegExp("WHERE name='"+p.name+"'"));
     assert.match(sql,new RegExp("SET price_brl="+(p.priceCents/100).toFixed(2).replace(".","\\.")+", gems="+p.gems));
   }
   assert.match(sql,/ROUND\(price_brl\*100\)=/);
