@@ -65,3 +65,11 @@ antes de declarar acesso exclusivamente via APK.
 - Ferramenta `apksigner verify --print-certs`: https://developer.android.com/tools/apksigner
 - WebView seguro (conteudo controlado, HTTPS, JavaScript): https://developer.android.com/privacy-and-security/risks/insecure-webview-native-bridges
 - Play Integrity e instalacao fora da Play Store: https://developer.android.com/google/play/integrity/verdicts
+
+## Quando o botao de download nao funciona
+
+O site **nao fornece um APK ficticio** nem instala builds de teste como se fossem comerciais. O botao e liberado automaticamente somente depois de existir uma GitHub Release publica estavel com os dois arquivos `clash-of-izzy-android.apk` e `clash-of-izzy-android.apk.sha256`. O portal tambem oferece um link permanente para consultar as Releases oficiais.
+
+Se ainda nao existe release, consulte [o workflow oficial](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/publicar-apk-android.yml). O preflight verifica **antes** de testes demorados a presenca dos quatro GitHub Actions Secrets de assinatura e da variable `ANDROID_RELEASE_CERT_SHA256`; o certificado sera comparado com o arquivo assinado no final da compilacao. Configure a keystore e as senhas somente no gerenciador privado de Secrets do GitHub, nunca no codigo-fonte, no portal ou em mensagens. Nao use certificado de debug para uma release comercial.
+
+O workflow oficial continua exigindo autorizacao explicita, `main`, CI, APK assinado, verificacao de hash e contrato de backend antes de publicar. Se o workflow nao tiver sido executado ou falhar, **nenhum download comercial deve ser anunciado**. Builds de teste ficam apenas nos artefatos privados/temporarios de GitHub Actions.
