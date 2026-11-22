@@ -21,3 +21,8 @@ Não efetua merge na main, migrações remotas, checkout real ou deploy.
 3. Homologar checkout sandbox real, HMAC de notificação, valor pago, replay e conciliação. Aprovar comercialmente os preços P4–P8 (e eventual pacote de R$3,99) antes de ativar flags.
 4. Validar APK assinado no Android físico e retorno do WebGL após suspensão; monitorar taxa de erro e desempenho.
 5. Implantação gradual e reversível por contas permitidas, sem liberar novas compras ao público até validação.
+
+## Alinhamento comercial do protocolo 7777x
+- O catálogo canônico P4–P8 foi alinhado aos valores recebidos: R$99,90 / R$149,90 / R$199,90 / R$299,90 / R$499,90, incluindo gemas e recursos especificados.
+- `0042` foi atualizado para instalações novas; `0043_fix_vip_catalog.sql` usa `UPDATE` com condições para conciliar apenas valores antigos conhecidos, sem `INSERT OR REPLACE` e sem modificar IDs.
+- Novos testes impedem divergência entre catálogo, sementes SQL e migração corretiva. **A loja pública e o deploy de produção permanecem bloqueados.**
