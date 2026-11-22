@@ -37,7 +37,7 @@ test("Homologacao so aprova esquema completo ate 0035", () => {
     "google_account_links", "google_auth_challenges",
     "realm_openings", "realm_thrones", "throne_assaults"
   ]) assert.ok(workflow.includes(table), table);
-  assert.match(workflow, /\["total"\]\s*!=6/);
+  assert.match(workflow, /\["total"\]\)\s*!=6/);
 });
 
 test("Homologacao valida primeiro reino e escudo real de 35 dias", () => {
