@@ -20,7 +20,7 @@ test('release Android requires main, explicit publication confirmation and perma
   assert.match(flow, /actual_cert/);
   assert.match(flow, /normalized_cert/);
   assert.match(flow, /Certificado APK diferente do aprovado/);
-  assert.match(flow, /com\\.clashofizzy\\.android/);
+  assert.match(flow, /com[.]clashofizzy[.]android/);
   assert.match(flow, /package_info/);
   assert.match(flow, /npm test/);
   assert.match(flow, /npm run test:e2e/);
