@@ -68,10 +68,6 @@ jobs:
               raise SystemExit("Auditoria Cloudflare indisponivel ("+type(e).__name__+"); nao iniciar implantacao.")
             if not obj.get("success"): raise SystemExit("Cloudflare respondeu erro; nao iniciar implantacao.")
             return obj.get("result")
-          subscriptions=call(prefix+"/subscriptions")
-          subscriptions=subscriptions if isinstance(subscriptions,list) else []
-          if not any("workers" in str((s.get("rate_plan") or {}).get("id","")).lower()+" "+str((s.get("rate_plan") or {}).get("name","")).lower() and str(s.get("state","")).lower() in ("paid","active") for s in subscriptions):
-            raise SystemExit("Workers Paid nao confirmado na API; publicacao bloqueada.")
           db_id="7e63af59-d9ff-4159-a9cf-b02e35b92605"
           result=call(prefix+"/d1/database/"+db_id+"/query","POST",{
             "sql":"SELECT (SELECT COUNT(*) FROM players) AS jogadores, (SELECT COUNT(*) FROM kingdoms) AS reinos"
@@ -85,6 +81,11 @@ jobs:
             raise SystemExit("Consulta D1 incompleta; nao iniciar implantacao.")
           if jogadores!=0 or reinos!=0:
             raise SystemExit("D1 possui registros de jogadores ou reinos. Lancamento automatico bloqueado.")
+          print("D1 remoto confirmado sem jogadores e sem reinos; verificando Workers Paid.")
+          subscriptions=call(prefix+"/subscriptions") # exige permissao Billing Read
+          subscriptions=subscriptions if isinstance(subscriptions,list) else []
+          if not any("workers" in str((s.get("rate_plan") or {}).get("id","")).lower()+" "+str((s.get("rate_plan") or {}).get("name","")).lower() and str(s.get("state","")).lower() in ("paid","active") for s in subscriptions):
+            raise SystemExit("Workers Paid nao confirmado (ou token sem Billing Read). Verifique Billing Read e assinatura no Cloudflare; publicacao bloqueada.")
           print("Workers Paid verificado e banco D1 sem jogadores/reinos. Producao podera passar pelo gate protegido.")
           PY
       - name: Iniciar workflow EXISTENTE com bookmark D1 e protecao do ambiente
