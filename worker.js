@@ -1982,6 +1982,26 @@ export default {
     // O Worker antigo não expõe o marcador e não deve passar no gate de release.
     return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables,androidApiContract:"eldoria-android-v1"},ready?200:503);
   }
+  // Contadores públicos reais: não publicar números inventados ou dados de jogadores.
+  if(url.pathname==="/api/public/stats"){
+    if(request.method!=="GET")return json({error:"Método não permitido."},405);
+    if(!env.DB)return json({error:"Estatísticas temporariamente indisponíveis."},503);
+    const limited=await rateLimitDecision(env,"public-stats-ip",request.headers.get("CF-Connecting-IP")||"unknown",60,60);
+    if(limited)return limited;
+    try{
+      const results=await env.DB.batch([
+        env.DB.prepare("SELECT COUNT(*) AS total FROM players"),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM battle_reports WHERE created_at>=datetime('now','-1 day')"),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM alliances"),
+        env.DB.prepare("SELECT COALESCE(ROUND(SUM(price_brl*100)),0) AS total_cents FROM purchase_requests WHERE status='approved' AND product_kind='vip_package' AND product_name IN ('Apoio Escudeiro','Apoio Cavaleiro','Apoio Senhor Feudal')")
+      ]);
+      const headers={"Access-Control-Allow-Origin":"https://clash-of-izzy-portal.jorgepereiragha.workers.dev","Vary":"Origin","Cache-Control":"public, max-age=60"};
+      return json({totalPlayers:Number(results[0]?.results?.[0]?.total||0),battles24h:Number(results[1]?.results?.[0]?.total||0),totalAlliances:Number(results[2]?.results?.[0]?.total||0),supportTotalCents:Number(results[3]?.results?.[0]?.total_cents||0),verified:true},200,headers);
+    }catch(error){
+      console.error("public_stats_failed",String(error?.message||error));
+      return json({error:"Estatísticas temporariamente indisponíveis."},503);
+    }
+  }
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
   if(url.pathname.startsWith("/api/account/"))return await handlePlayerAccountRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   const mpRouteResponse=await handleMercadoPagoRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
