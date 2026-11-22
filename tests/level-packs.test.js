@@ -64,7 +64,7 @@ test("migracao e integracao proíbem compra sem progresso e mantêm habilitacao 
   const mp=await read("mercadopago-orders.js");
   const arena=await read("arena.html");
   assert.match(migration,/UNIQUE \(kingdom_id,pack_level\)/);
-  assert.match(worker,/LEVEL_PACKS_ENABLED/);
+  assert.match(worker,/levelPacksEnabledForPlayer/);
   assert.match(worker,/getKingdomProgression\(env,kingdom.id\)/);
   assert.match(worker,/progression.level < levelPack.level/);
   assert.match(worker,/FROM level_pack_claims WHERE kingdom_id=\? AND pack_level=\?/);
