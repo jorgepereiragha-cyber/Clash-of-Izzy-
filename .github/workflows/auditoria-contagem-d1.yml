@@ -1,0 +1,46 @@
+name: Auditoria D1 - contagem sem dados pessoais
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/auditoria-contagem-d1.yml
+
+permissions:
+  contents: read
+
+jobs:
+  leitura:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Consultar apenas contagens de producao
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          token=os.environ.get("RAW_TOKEN","").strip()
+          if token[:7].lower()=="bearer ": token=token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):
+            token=token[1:-1].strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if not token or not account: raise SystemExit("Credenciais Cloudflare ausentes.")
+          print("::add-mask::"+token)
+          db="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          url="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/"+db+"/query"
+          query="SELECT (SELECT COUNT(*) FROM players) AS jogadores, (SELECT COUNT(*) FROM kingdoms) AS reinos, (SELECT COUNT(*) FROM player_accounts) AS contas, (SELECT COUNT(*) FROM purchase_requests) AS pedidos, (SELECT COUNT(*) FROM mercadopago_orders) AS ordens"
+          request=urllib.request.Request(url,data=json.dumps({"sql":query}).encode(),method="POST",
+            headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+          try:
+            with urllib.request.urlopen(request,timeout=25) as response:
+              payload=json.loads(response.read().decode())
+          except urllib.error.HTTPError as error:
+            raise SystemExit("Consulta D1 recusada, HTTP "+str(error.code))
+          if not payload.get("success"): raise SystemExit("D1 retornou resposta sem sucesso.")
+          try: row=payload["result"][0]["results"][0]
+          except (KeyError,IndexError,TypeError): raise SystemExit("Contagens D1 incompletas.")
+          keys=("jogadores","reinos","contas","pedidos","ordens")
+          counts={key:int(row[key]) for key in keys}
+          print("Contagens D1 produção (sem dados pessoais): "+json.dumps(counts,ensure_ascii=False))
+          PY
