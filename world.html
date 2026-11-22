@@ -23,6 +23,18 @@ button{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#68451f);colo
 button:disabled{opacity:.45;cursor:not-allowed}
 .secondary{background:#243a55;border-color:#71839a;text-decoration:none;display:inline-flex;align-items:center}
 main{max-width:1180px;margin:18px auto;padding:0 12px 30px}
+.realm-strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin:0 0 16px}
+.realm-tile{position:relative;border:1px solid #917648;border-radius:11px;background:linear-gradient(155deg,#253d58,#111f33);padding:12px;min-width:0}
+.realm-tile strong,.realm-tile span{display:block}
+.realm-tile strong{color:#ffe4a9;font:700 15px Georgia,serif}
+.realm-tile span{margin-top:5px;font-size:12px;color:#ced9e7}
+.realm-tile.is-current{border-color:#f8df9f;box-shadow:0 0 0 2px #f8df9f33}
+.realm-tile.is-locked{border-color:#55677b;background:#142237}
+.realm-tile.is-locked strong{color:#d8dce6}
+.realm-tile progress{display:block;width:100%;height:8px;margin:9px 0 3px;accent-color:#e9bd66}
+.realm-notice{margin:0 0 10px;color:#c9d5e3;font-size:12px}
+@media(max-width:600px){.realm-strip{grid-template-columns:1fr}}
+
 h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 .muted,small{color:var(--muted)}
 #status{font-size:12px;color:#d8e2ee}#status.error{color:#ffb4a9}
@@ -79,6 +91,12 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
  <div class="resources" id="resources" aria-label="Recursos do reino"></div>
 </header>
 <main>
+ <section aria-labelledby="realmHeading">
+  <h2 id="realmHeading">Mundos de Eldoria</h2>
+  <div id="realmStatus" role="status" aria-live="polite" class="realm-notice">Consultando desbloqueio dos mapas…</div>
+  <div id="realmGrid" class="realm-strip" role="list" aria-label="Abertura progressiva dos mapas"></div>
+  <p class="realm-notice">Cada reino permanece em seu mapa. Os novos jogadores entram automaticamente no mapa mais recente desbloqueado.</p>
+ </section>
  <div class="layout">
   <section class="panel">
    <h1>🌍 Mapa estratégico 3D de Eldoria</h1>
