@@ -24,6 +24,8 @@ const UNIT_NAMES = {
 let state = null;
 let selectedTerritoryId = null;
 let selectedUnits = {};
+let selectedMarchHeroKey = "";
+let lastCommanderMenuKey = null;
 let busy = false;
 let mapViewport = { zoom: 1, panX: 0, panY: 0 };
 const activeMapPointers = new Map();
@@ -154,6 +156,54 @@ function addStat(root, label, value) {
   stat.append(make("span", "", label), make("b", "", value));
   root.append(stat);
 }
+function selectedMarchCapacity(){
+  const options=state?.marchHeroOptions||[];
+  const picked=selectedMarchHeroKey?options.find(hero=>hero.heroKey===selectedMarchHeroKey):null;
+  return Number((picked||state?.marchCapacity)?.capacity)||0;
+}
+function renderMarchCommander(){
+  const selector=$("marchHero"),options=state?.marchHeroOptions||[];
+  if(!selector)return;
+  if(selectedMarchHeroKey&&!options.some(hero=>hero.heroKey===selectedMarchHeroKey))
+    selectedMarchHeroKey="";
+  const signature=options.map(hero=>hero.heroKey+"="+hero.capacity).join("|");
+  if(signature!==lastCommanderMenuKey){
+    selector.replaceChildren();
+    const automatic=make("option","","Automático — maior capacidade");
+    automatic.value="";
+    selector.append(automatic);
+    for(const hero of options){
+      const option=make("option","",
+        hero.heroName+" · nv. "+fmt(hero.level)+" · "+fmt(hero.capacity)+" tropas");
+      option.value=hero.heroKey;
+      selector.append(option);
+    }
+    lastCommanderMenuKey=signature;
+  }
+  if(selector.value!==selectedMarchHeroKey)selector.value=selectedMarchHeroKey;
+  selector.disabled=busy||options.length===0;
+  renderMarchCapacity();
+}
+function renderMarchCapacity(){
+  const output=$("marchCapacityInfo");if(!output)return;
+  const total=Object.values(selectedUnits).reduce((sum,count)=>sum+Number(count||0),0);
+  const capacity=selectedMarchCapacity();
+  const details=state?.marchCapacity?.components||{};
+  output.textContent="Tropas selecionadas: "+fmt(total)+" / "+fmt(capacity)+
+    " · Castelo "+fmt(details.castle||0)+
+    " · Quartel "+fmt(details.barracks||0)+
+    " · Academia "+fmt(details.academy||0)+
+    " · Pesquisa "+fmt(details.military||0)+
+    " · Herói "+fmt(selectedMarchHeroKey?
+        state.marchHeroOptions.find(hero=>hero.heroKey===selectedMarchHeroKey)?.heroBonus||0
+        :details.hero||0);
+  output.classList.toggle("over-limit",capacity>0&&total>capacity);
+}
+$("marchHero").addEventListener("change",event=>{
+  selectedMarchHeroKey=event.target.value;
+  updateActionButtons();
+});
+
 function renderTroops() {
   const root = $("troops");
   root.replaceChildren();
@@ -192,19 +242,23 @@ function renderTroops() {
 }
 function updateActionButtons() {
   const territory = getSelectedTerritory();
-  const hasTroops = Object.values(selectedUnits).some(quantity => Number(quantity) > 0);
+  const count=Object.values(selectedUnits).reduce((total,quantity)=>total+Number(quantity||0),0);
+  const hasTroops=count>0;
+  const limit=selectedMarchCapacity();
+  const overCapacity=limit<=0||count>limit;
   const isCastle = territory?.territory_kind === "castle";
   const isThrone = territory?.territory_kind === "throne";
   const canVisit = Boolean(territory && !isCastle && !isThrone && territoryOwner(territory) !== "Outro reino");
-  $("gather").disabled = busy || !canVisit || !hasTroops;
-  $("scout").disabled = busy || !canVisit || !hasTroops;
-  $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  $("gather").disabled = busy || !canVisit || !hasTroops || overCapacity;
+  $("scout").disabled = busy || !canVisit || !hasTroops || overCapacity;
+  $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops || overCapacity;
   const siegeTotal=Object.values(selectedUnits).reduce((n,q)=>n+Number(q||0),0);
   $("throneAssault").hidden=!isThrone;
   $("throneAssault").disabled=busy||!isThrone||state?.throne?.phase!=="contest"||
     Boolean(state?.throne?.kingAllianceId)||
     !state?.alliance?.id||Number(state?.kingdom?.castle_level||0)<10||
-    siegeTotal<200||siegeTotal>10000;
+    siegeTotal<200||siegeTotal>10000||overCapacity;
+  renderMarchCapacity();
 }
 function renderDetails() {
   const root = $("territoryDetails");
@@ -311,6 +365,7 @@ async function updateRealmCards(){
   }
 }
 function render() {
+  renderMarchCommander();
   renderResources();
   renderMap();
   renderDetails();
@@ -346,7 +401,7 @@ async function sendThroneAssault(){
   try{
     const outcome=await request("/game/action",{
       method:"POST",headers:{"Content-Type":"application/json"},
-      body:JSON.stringify({type:"throne_assault",units,requestId:crypto.randomUUID()})
+      body:JSON.stringify({type:"throne_assault",units,heroKey:selectedMarchHeroKey||null,requestId:crypto.randomUUID()})
     });
     selectedUnits={};
     await refreshState();
@@ -364,6 +419,10 @@ async function sendMarch(marchType) {
   const territory = getSelectedTerritory();
   const units = Object.fromEntries(Object.entries(selectedUnits).filter(([, quantity]) => Number(quantity) > 0));
   if (!territory || !Object.keys(units).length) return;
+  if(Object.values(units).reduce((n,v)=>n+Number(v),0)>selectedMarchCapacity()){
+    $("marchNotice").textContent="Capacidade de marcha excedida. Selecione outro herói ou reduza as tropas.";
+    return;
+  }
   busy = true;
   updateActionButtons();
   $("marchNotice").textContent = "Enviando ordem de marcha ao servidor…";
@@ -371,7 +430,7 @@ async function sendMarch(marchType) {
     const result = await request("/game/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "march", targetId: territory.id, marchType, units }),
+      body: JSON.stringify({ type: "march", targetId: territory.id, marchType, units, heroKey:selectedMarchHeroKey||null }),
     });
     selectedUnits = {};
     await refreshState();
