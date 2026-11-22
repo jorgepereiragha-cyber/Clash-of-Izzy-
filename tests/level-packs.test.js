@@ -66,6 +66,6 @@ test("migracao e integracao proíbem compra sem progresso e mantêm habilitacao 
   assert.match(worker,/FROM level_pack_claims WHERE kingdom_id=\? AND pack_level=\?/);
   assert.match(mp,/levelPackGrantStatements/);
   assert.match(mp,/levelPackMatchesOrder/);
-  assert.match(mp,/LEVEL_PACKS_ENABLED/);
+  assert.match(mp,/levelPacksEnabledForPlayer/);
   assert.match(arena,/item.levelPack/);
 });
