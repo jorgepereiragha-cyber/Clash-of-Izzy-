@@ -116,6 +116,7 @@ jobs:
       - name: Verify remote Cloudflare before any D1 write (read-only)
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          COI_ALLOW_PENDING_0030: "true"
         run: node scripts/cloudflare-remote-audit.mjs
 
       - name: Capture D1 pre-deployment restore point
@@ -199,6 +200,13 @@ jobs:
           echo "WORKER_BASE_URL=$WORKER_BASE_URL" >> "$GITHUB_ENV"
         env:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+
+      - name: Verify live D1 schema and Android API contract after Worker deploy
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node scripts/cloudflare-remote-audit.mjs
+          node scripts/check-android-release-server.mjs
 
       - name: Smoke test production Worker
         run: node scripts/production-smoke.js
