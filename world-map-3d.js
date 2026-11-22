@@ -275,6 +275,30 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     box(parent, .65, 1.05, .12, material, x + .5, y + .62, z + 1.1);
   }
 
+  function createRoyalThrone(parent,x,z){
+    // Arquitetura original leve: apenas geometrias simples reutilizáveis.
+    // Não depende de texturas externas, shaders ou animações contínuas.
+    const y=terrainHeight(x,z);
+    const royal=new THREE.Group();
+    royal.position.set(x,y+.25,z);
+    parent.add(royal);
+    makeMesh(new THREE.CylinderGeometry(3.55,3.85,.65,8),shared.stoneLight,royal,0,.08,0);
+    makeMesh(new THREE.CylinderGeometry(2.9,3.05,.22,8),shared.gold,royal,0,.49,0);
+    for(const [tx,tz] of [[-2.8,-2.8],[2.8,-2.8],[-2.8,2.8],[2.8,2.8]]){
+      box(royal,.5,4.6,.5,shared.stone,tx,2.65,tz);
+      cone(royal,.55,1.1,shared.gold,tx,5.55,tz,4);
+    }
+    box(royal,2.2,.9,1.35,shared.gold,0,1.52,0);
+    box(royal,2.55,3.15,.55,shared.roof,0,3.22,-.7);
+    box(royal,2.32,.32,.67,shared.gold,0,4.9,-.7);
+    box(royal,.37,1.1,.37,shared.gold,-.8,5.6,-.7);
+    box(royal,.37,1.35,.37,shared.gold,0,5.7,-.7);
+    box(royal,.37,1.1,.37,shared.gold,.8,5.6,-.7);
+    box(royal,.15,5.2,.15,shared.gold,0,8.3,-1.45);
+    box(royal,1.35,.65,.08,shared.banner,.65,9.6,-1.45);
+    return royal;
+  }
+
   function createTerritoryFeature(parent, territory) {
     const x = Number(territory.x) || 0;
     const z = Number(territory.z) || 0;
@@ -288,6 +312,10 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     const inset = makeMesh(new THREE.CylinderGeometry(2.1, 2.2, .12, 6), shared.stoneLight, parent, x, y + .31, z);
     inset.rotation.y = Math.PI / 6;
 
+    if (territory.territory_kind === "throne") {
+      createRoyalThrone(parent,x,z);
+      return;
+    }
     if (territory.territory_kind === "castle") {
       createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home", territory.castle_skin_id);
       return;
