@@ -1,6 +1,6 @@
 # Clash of Izzy
 
-**Distribuição Android:** o endereço público já abre a página promocional. O aplicativo Android carrega o jogo por WebView; a versão completa de Eldoria ainda depende das migrações e do deploy do backend. O APK oficial assinado **não foi publicado**.
+**Distribuição Android:** o portal promocional e o Worker principal estão publicados. Em 22/11/2026, o backend de Eldoria recebeu as migrações D1 até 0035 e passou na auditoria remota, no contrato Android e no smoke test de produção. O aplicativo Android utiliza WebView. O **APK oficial assinado ainda não está publicado**; o APK interno de teste não equivale à distribuição comercial.
 
 Veja [guia de distribuição](docs/DISTRIBUICAO_APK_OFICIAL.md), [auditoria da candidata](docs/AUDITORIA_COMPLETA_2026-11-21.md) [monetização segura](docs/MONETIZACAO_SEGURA.md) e [status auditado do lançamento](docs/STATUS_LANCAMENTO_ANDROID.md).
 
@@ -14,8 +14,8 @@ Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e p
 - **Portal isolado:** [Clash of Izzy — instalação](https://clash-of-izzy-portal.jorgepereiragha.workers.dev)
 - **APK oficial:** [GitHub Releases](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases) — nenhuma release assinada disponível na última auditoria.
 - 📘 **Relatório oficial:** [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
-- ⚙️ **Deploy final validado:** [GitHub Actions — run #43872671573](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671573)
-- ✅ **CI final validada:** [GitHub Actions — run #43872671700](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671700)
+- ⚙️ **Deploy Cloudflare atualizado e validado (22/11/2026):** [GitHub Actions — run #45018496723](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/45018496723) — migrações remotas 0031–0035, Worker/assets, auditoria de schema Android e smoke test de produção aprovados. Bookmark de recuperação D1 arquivado como artifact da execução.
+- ✅ **CI validada (22/11/2026):** [GitHub Actions — run #45018277023](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/45018277023)
 
 Histórico: Release Visual Premium e Gravador Cinematográfico publicada em 16/11/2026. O deploy final aprovou 224 testes automatizados, publicação do Worker/assets e smoke test de produção. O cache atual do Service Worker na branch `main` auditada é v26. A validação automática confirma que os módulos do gravador estão publicados; a gravação física pós-deploy no Android continua sendo uma conferência recomendada.
 
@@ -40,7 +40,7 @@ Comandos úteis:
 
 ## Deploy manual protegido
 
-O workflow `.github/workflows/deploy-cloudflare.yml` **não publica automaticamente em um push para `main`**. A publicação só pode ser iniciada manualmente em GitHub Actions (`workflow_dispatch`) e exige marcar `confirm_paid_plan` e `confirm_production` como `true`, seleção da branch `main`, auditoria remota prévia e aprovação do ambiente protegido `production`. O fluxo executa testes, validação do bundle, migrações D1 locais, captura e arquivamento de um bookmark Time Travel, migrações D1 remotas, publicação do Worker/assets e smoke test de produção somente de leitura. Um push para `main` executa a CI de qualidade, não o deploy de produção.
+O workflow `.github/workflows/deploy-cloudflare.yml` **não publica automaticamente em um push para `main`**. Exige `workflow_dispatch` com `confirm_paid_plan` e `confirm_production` como `true`, branch `main`, auditoria remota prévia e aprovação do ambiente protegido `production`, quando configurada. A liberação excepcional pode ser acionada pelo workflow `.github/workflows/liberar-eldoria-prod-apos-ci.yml` após uma CI aprovada, **somente** para um commit exclusivo daquele workflow marcado `[READY-ELDORIA-RELEASE]`, após conferir o estado remoto D1. A liberação delega todas as escritas ao deploy oficial, com captura e arquivamento de bookmark Time Travel, migrações D1 remotas, publicação do Worker/assets e smoke test somente de leitura. Commits comuns em `main` executam CI e não iniciam o deploy completo.
 
 O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação. **Restaurar Time Travel sobrescreve o estado atual do banco**; não execute uma restauração sem plano de recuperação e autorização.
 
