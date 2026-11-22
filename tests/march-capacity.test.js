@@ -103,7 +103,7 @@ test("Worker aplica limite antes de debitar e registra herói da expedição",as
  assert.match(march,/marchLimit\.heroKey,marchLimit\.capacity/);
  assert.match(worker,/m\.commander_hero_key/);
  assert.match(worker,/marchCapacity,marchHeroOptions,marchSlots/);
- assert.match(worker,/SELECT COUNT\(\*\) AS total FROM marches WHERE kingdom_id=\? AND status='marching'/);
+ assert.match(worker,/COUNT\(\*\) FROM marches WHERE kingdom_id=kingdoms\.id AND status='marching'/);
  assert.match(march,/calculateMarchSlots/);
  assert.match(march,/SELECT COUNT\(\*\) FROM marches WHERE kingdom_id=\? AND status='marching'/);
  assert.match(ui,/formationBalanced/);
