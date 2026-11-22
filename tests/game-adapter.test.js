@@ -144,3 +144,16 @@ test("passivo de ataque do herói respeita o teto global de 30%", () => {
   const over = simulateBattle({ army, castleLevel: 5, defenderLevel: 8, roll: 1, equipmentAttackBonusPercent: 30, heroAttackBonusPercent: 3 });
   assert.deepEqual(over, capped);
 });
+
+test("herói dourado supera o teto antigo de 3% e bônus do dragão são aplicados uma única vez",()=>{
+ const army=[{unit_type:"knight",tier:3,quantity:80}];
+ const args={army,castleLevel:4,defenderLevel:16,roll:1,criticalSeed:111};
+ const base=simulateBattle(args);
+ const gold=simulateBattle({...args,heroAttackBonusPercent:20,heroDefenseBonusPercent:20});
+ const withDragon=simulateBattle({...args,heroAttackBonusPercent:20,heroDefenseBonusPercent:20,dragonAttackBonusPercent:5.5,dragonDefenseBonusPercent:5.5});
+ const capped=simulateBattle({...args,heroAttackBonusPercent:999,heroDefenseBonusPercent:999,dragonAttackBonusPercent:999,dragonDefenseBonusPercent:999});
+ const exactlyCapped=simulateBattle({...args,heroAttackBonusPercent:20,heroDefenseBonusPercent:20,dragonAttackBonusPercent:5.5,dragonDefenseBonusPercent:5.5});
+ assert.ok(gold.attackerPower>base.attackerPower);
+ assert.ok(withDragon.attackerPower>gold.attackerPower);
+ assert.deepEqual(capped,exactlyCapped);
+});

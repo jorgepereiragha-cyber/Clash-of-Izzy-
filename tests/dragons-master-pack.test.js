@@ -50,3 +50,19 @@ test("Master só é concedido com compra aprovada e ledger único",async()=>{
  assert.ok(sql.some(s=>s.includes("AND changes()=1")));
  assert.equal(sql.filter(s=>s.includes("INSERT OR IGNORE INTO kingdom_dragons")).length,3);
 });
+
+test("Worker valida propriedade dos dragões e bloqueia resgate duplicado de mensagens",async()=>{
+ const worker=await readFile(new URL("../worker.js",import.meta.url),"utf8");
+ const game=await readFile(new URL("../game-adapter.js",import.meta.url),"utf8");
+ const page=await readFile(new URL("../kingdom.html",import.meta.url),"utf8");
+ for(const type of ["dragon_unlock","dragon_equip","mail_read","mail_claim"])assert.ok(worker.includes('type==="'+type+'"'));
+ assert.match(worker,/if\(dragon\.master\)return json\(/);
+ assert.match(worker,/EXISTS\(SELECT 1 FROM kingdom_dragons WHERE kingdom_id=\? AND dragon_key=\?\)/);
+ assert.match(worker,/reward_key='welcome_v1' AND claimed_at IS NULL/);
+ assert.match(worker,/UPDATE kingdoms SET food=food\+1000,wood=wood\+500 WHERE id=\? AND changes\(\)=1/);
+ assert.match(worker,/dragonAttackBonusPercent:getDragonCombatBonuses\(dragon\)/);
+ assert.match(worker,/dragonDefenseBonusPercent:getDragonCombatBonuses\(dragon\)/);
+ assert.match(game,/heroAttackBonusPercent\) \|\| 0, 0, 20/);
+ assert.match(game,/dragonAttackBonusPercent\) \|\| 0, 0, 5\.5/);
+ for(const id of ["dragonCollection","kingdomMailbox","kingdomBackpack"])assert.ok(page.includes('id="'+id+'"'));
+});

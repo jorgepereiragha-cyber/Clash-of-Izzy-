@@ -319,7 +319,7 @@ function renderDragonCollection(){
   card.style.borderLeft=dragon.rarity==="gold"?"4px solid #eac571":dragon.rarity==="purple"?"4px solid #b386ed":"4px solid #68a9e2";
   const name=document.createElement("strong");name.textContent=dragon.name+" · "+colors[dragon.rarity];
   const stats=document.createElement("p");stats.className="muted";
-  stats.textContent=dragon.element+" · Ataque +"+Number(dragon.attackPercent||0).toFixed(2)+"% · Defesa +"+Number(dragon.defensePercent||0).toFixed(2)+"%";
+  stats.textContent=dragon.element+" · Ataque +"+Number(dragon.attackPercent||0).toFixed(2)+"% · Defesa +"+Number(dragon.defensePercent||0).toFixed(2)+"%"+(dragon.owned?"":dragon.master?" · Oferta Master":" · Custo: "+fmt(dragon.food||0)+" comida, "+fmt(dragon.wood||0)+" madeira, "+fmt(dragon.stone||0)+" pedra, "+fmt(dragon.gold||0)+" ouro");
   card.append(name,stats);
   const action=document.createElement("button");action.type="button";
   action.disabled=busy||dragon.equipped||Boolean(dragon.master&&!dragon.owned);
