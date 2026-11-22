@@ -53,7 +53,14 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .city.has-3d .building small{font-size:10px;text-shadow:0 2px 4px #000}
 .city.has-3d .building.castle{background:linear-gradient(180deg,#0c172500 34%,#142b44d9 100%);border:1px solid #ffe09a;box-shadow:inset 0 0 0 1px #f4d78e55,0 4px 12px #0007}
 @media(prefers-reduced-motion:no-preference){.city .building{transition:transform .18s ease,border-color .18s ease}.city .building:hover{transform:translateY(-3px) scale(1.025)}}
-  #feedbackForm{display:grid;gap:10px;max-width:620px}
+  .coi-castle-vip{margin-top:14px;background:linear-gradient(145deg,#13263b,#2c2940);border:1px solid #d1a958;border-radius:10px;padding:12px}
+.coi-castle-vip h3{margin:0 0 8px;color:#f1d38b;font-size:15px}
+.coi-vip-badge{display:inline-block;border:1px solid #e5c470;color:#f7dc9c;border-radius:999px;padding:4px 9px;font-weight:800}
+.coi-vip-detail{font-size:12px;color:#e8dfce;line-height:1.5}
+.coi-vip-steps{display:flex;gap:4px;margin:10px 0;flex-wrap:wrap}
+.coi-vip-step{flex:1;min-width:26px;text-align:center;border-radius:6px;padding:5px 3px;background:#142436;border:1px solid #516177;color:#b8c3d4;font-size:10px;font-weight:700}
+.coi-vip-step.completed{background:#62491d;border-color:#e6bd69;color:#fff2d2}
+#feedbackForm{display:grid;gap:10px;max-width:620px}
   #feedbackForm select,#feedbackForm textarea{width:100%;padding:10px;border:1px solid #71839a;border-radius:8px;background:#0e1a2a;color:#fff;font:inherit}
   #feedbackForm textarea{resize:vertical;min-height:84px}
   #feedbackForm button{justify-self:start}
@@ -113,6 +120,9 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
  </div>
  <div class="grid2" id="summary"></div>
  <div class="events" id="castleSkins" aria-live="polite"></div>
+<section class="coi-castle-vip" aria-label="Evolução VIP do Castelo">
+<h3>Castelo VIP · Até nível 7</h3><p class="muted">A partir do castelo nível 30. Evolução permanente sem reiniciar edifícios.</p><div id="castleVipProgress" class="events" aria-live="polite"></div>
+</section>
 </section>
 <div class="stack">
 <section class="panel"><h2>🏗️ Edifícios e melhorias</h2><div class="building-list" id="buildings"></div></section>
@@ -385,9 +395,46 @@ async function runKingdomPanelAction(payload,successMessage){
  }catch(error){setStatus(error.message||"Operação não concluída.",true);}
  finally{busy=false;render();}
 }
-function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();
+function renderCastleVip(){
+ const root=document.getElementById("castleVipProgress");if(!root)return;
+ root.replaceChildren();
+ const vip=state?.castleVip;
+ if(!vip){const msg=document.createElement("p");msg.textContent="Progressão VIP indisponível. Atualize seu reino.";root.append(msg);return;}
+ const level=Math.max(0,Math.min(7,Number(vip.level)||0));
+ const badge=document.createElement("strong");badge.className="coi-vip-badge";badge.textContent=level>0?"Castelo VIP "+level:"Castelo normal";
+ const progress=document.createElement("div");progress.className="coi-vip-steps";
+ for(let n=1;n<=7;n++){const step=document.createElement("span");step.className="coi-vip-step"+(n<=level?" completed":"");step.textContent="VIP "+n;progress.append(step);}
+ const values=document.createElement("p");values.className="coi-vip-detail";
+ const buffs=vip.bonuses||{};
+ values.textContent="Bônus permanentes: produção +"+Number(buffs.productionPercent||0).toFixed(0)+"% · ataque +"+Number(buffs.attackPercent||0).toFixed(1)+"% · defesa +"+Number(buffs.defensePercent||0).toFixed(1)+"%.";
+ const note=document.createElement("p");note.className="muted";note.textContent=vip.note||"";
+ root.append(badge,progress,values,note);
+ if(vip.next){
+  const next=document.createElement("p");next.className="coi-vip-detail";
+  next.textContent="Próximo VIP "+Number(vip.next.level)+" · "+fmt(vip.next.gemCost)+" gemas · produção +"+Number(vip.next.bonuses?.productionPercent||0)+"% · ataque +"+Number(vip.next.bonuses?.attackPercent||0).toFixed(1)+"% · defesa +"+Number(vip.next.bonuses?.defensePercent||0).toFixed(1)+"%.";
+  const action=document.createElement("button");action.type="button";
+  const enough=Number(state?.player?.gems||0)>=Number(vip.next.gemCost||0);
+  action.disabled=busy||!vip.eligible||!enough;
+  action.textContent=!vip.eligible?"Libera no castelo 30":!enough?"Gemas insuficientes":"Evoluir para VIP "+Number(vip.next.level);
+  if(vip.eligible&&enough)action.addEventListener("click",()=>upgradeCastleVip(level));
+  root.append(next,action);
+ }
+}
+async function upgradeCastleVip(expectedVipLevel){
+ if(busy)return;
+ const vip=state?.castleVip;
+ if(!vip?.eligible||Number(vip.level)!==expectedVipLevel)return;
+ busy=true;renderCastleVip();setStatus("Confirmando a ascensão VIP do castelo…");
+ try{
+  const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"castle_vip_upgrade",expectedVipLevel})});
+  state=result.state||state;
+  setStatus("Castelo VIP "+Number(state.castleVip?.level||0)+" alcançado. Edifícios preservados.");
+ }catch(error){setStatus(error.message||"Não foi possível evoluir o VIP.",true);}
+ finally{busy=false;render();}
+}
+function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderCastleVip();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();
 const buildings=state.buildings||[];const city=document.getElementById("city");const kingdom3d=city.querySelector("#kingdom3d");city.innerHTML=buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join("");drawKingdomScene(buildings,Number(k.equipped_skin_id||0));if(kingdom3d)city.append(kingdom3d);watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],castleSkinId:Number(k.equipped_skin_id||0)}}));
-document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["🏅 Prestígio",fmt(k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
+document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["👑 VIP do Castelo",fmt(state.castleVip?.level??k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const blocked=maxed||activeConstructionCount>=2||alreadyQueued||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
 renderQueues();
