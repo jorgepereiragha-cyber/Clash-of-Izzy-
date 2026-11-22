@@ -2,7 +2,19 @@ name: Qualidade completa 4X (branch isolada)
 on:
   push:
     branches: [feat/4x-industries-defenses-p1-p8]
-    paths: [.github/workflows/4x-quality-gate.yml]
+    paths:
+      - .github/workflows/4x-quality-gate.yml
+      - worker.js
+      - intermediate-production.js
+      - city-defense-rules.js
+      - player-progression-4x.js
+      - city-layout-rules.js
+      - kingdom.html
+      - scripts/kingdom-3d.js
+      - scripts/kingdom-4x-systems.js
+      - migrations/**
+      - tests/**
+      - package.json
 permissions:
   contents: read
 concurrency:
