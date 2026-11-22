@@ -1,0 +1,75 @@
+name: Auditar pacotes, pagamentos e APK publico (somente leitura)
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/auditar-catalogo-app.yml"
+permissions:
+  contents: read
+jobs:
+  auditoria:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Consultar catalogo e releases sem mudar producao
+        shell: bash
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          node --input-type=module <<'NODE'
+          import fs from 'node:fs';
+          const host='https://clash-of-izzy.jorgepereiragha.workers.dev';
+          const packages=[
+            ['Pacote Inicial de Eldoria',3.99,35],['Pacote Diário de Eldoria',9.99,100],
+            ['Pacote Premium Diário de Eldoria',49.99,600],['VIP Bronze',50,500],
+            ['VIP Prata',100,1200],['VIP Ouro',250,3500],['VIP Diamante',500,8000],
+            ['VIP Lendário',1000,18000],['Pacote Master de Eldoria',399,10000]
+          ];
+          async function get(url,headers={}){
+            try{
+              const response=await fetch(url,{headers,method:'GET',signal:AbortSignal.timeout(12000)});
+              const body=await response.text();
+              let data=null;
+              try{data=JSON.parse(body);}catch{}
+              return {code:response.status,data,body};
+            }catch(e){return {code:0,data:null,body:'',error:String(e?.name||'network')};}
+          }
+          const [catalog,payment,health,portal,release]=await Promise.all([
+            get(host+'/api/store/catalog'),
+            get(host+'/api/store/payment-methods'),
+            get(host+'/api/health'),
+            get('https://clash-of-izzy-portal.jorgepereiragha.workers.dev/portal.html'),
+            get('https://api.github.com/repos/jorgepereiragha-cyber/Clash-of-Izzy-/releases/latest',{
+              'Accept':'application/vnd.github+json','User-Agent':'Izzy-Commercial-ReadOnly-Audit',
+              ...(process.env.GH_TOKEN?{'Authorization':'Bearer '+process.env.GH_TOKEN}:{})
+            })
+          ]);
+          const rows=Array.isArray(catalog.data?.packages)?catalog.data.packages:[];
+          const map=new Map(rows.map(x=>[x.name,x]));
+          const lines=['## Auditoria de catálogo e instalação (somente leitura)','','| Produto | Preço previsto | Situação na API de produção |','|---|---:|---|'];
+          for(const [name,price,gems] of packages){
+            const found=map.get(name);
+            const ok=found&&Math.abs(Number(found.price_brl)-price)<.001&&Number(found.gems)===gems;
+            const state=ok?'Cadastrado corretamente':found?'Preço ou quantidade de gemas divergente':'Não encontrado no catálogo público';
+            lines.push('| '+name+' | R$ '+price.toFixed(2).replace('.',',')+' | '+state+' |');
+          }
+          lines.push('','Pacotes devolvidos pelo servidor: '+rows.length+'; HTTP '+catalog.code+'.');
+          lines.push('Skins expostas: '+(Array.isArray(catalog.data?.skins)?catalog.data.skins.length:'não confirmado')+'.');
+          lines.push('Mercado Pago habilitado pelo backend: '+(payment.data?.mercadoPago===true?'sim':'não confirmado')+'.');
+          lines.push('Pix Nubank habilitado pelo backend: '+(payment.data?.nubankPix===true?'sim':'não confirmado')+'.');
+          const h=health.data;
+          const ready=health.code===200&&h?.ok===true&&h?.status==='ready'&&h?.checks?.database===true&&h?.checks?.schema===true&&h?.checks?.session===true&&h?.androidApiContract==='eldoria-android-v1';
+          lines.push('Backend Android: '+(ready?'pronto':'não confirmado')+' (HTTP '+health.code+').');
+          lines.push('Portal de instalação: '+(portal.code===200&&portal.body.includes('id="download-apk"')?'publicado':'não confirmado')+' (HTTP '+portal.code+').');
+          const assets=Array.isArray(release.data?.assets)?release.data.assets:[];
+          const official=release.code===200&&!release.data?.draft&&!release.data?.prerelease&&['clash-of-izzy-android.apk','clash-of-izzy-android.apk.sha256'].every(n=>assets.some(a=>a.name===n&&a.state==='uploaded'&&a.size>0));
+          lines.push('APK comercial oficial: '+(official?'publicado, APK e SHA-256 presentes':'não publicado/verificável')+' (HTTP '+release.code+').');
+          lines.push('','Obs.: meios de pagamento marcados como habilitados não constituem teste de recebimento ou conciliação. Nenhuma compra foi iniciada.');
+          const summary=lines.join('\n')+'\n';
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,summary);
+          console.log(summary);
+          NODE
