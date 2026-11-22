@@ -50,14 +50,14 @@ public final class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle state) {
         super.onCreate(state);
-        getWindow().setStatusBarColor(Color.rgb(16, 26, 43));
-        getWindow().setNavigationBarColor(Color.rgb(16, 26, 43));
+        getWindow().setStatusBarColor(Color.rgb(8, 24, 49));
+        getWindow().setNavigationBarColor(Color.rgb(8, 24, 49));
         root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(16, 26, 43));
+        root.setBackgroundColor(Color.rgb(8, 24, 49));
         setContentView(root);
 
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.rgb(16, 26, 43));
+        webView.setBackgroundColor(Color.rgb(8, 24, 49));
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true); // O motor web do jogo requer JavaScript.
         settings.setDomStorageEnabled(true); // Sessão e preferências da conta.
@@ -87,20 +87,41 @@ public final class MainActivity extends Activity {
         loadingPanel.setPadding(dp(30), dp(24), dp(30), dp(24));
         GradientDrawable loadingGradient = new GradientDrawable(
                 GradientDrawable.Orientation.TOP_BOTTOM,
-                new int[] { Color.rgb(7, 18, 29), Color.rgb(28, 49, 59) });
+                new int[] { Color.rgb(3, 13, 32), Color.rgb(15, 49, 103), Color.rgb(4, 17, 36) });
         loadingPanel.setBackground(loadingGradient);
 
+        TextView royalOverline = new TextView(this);
+        royalOverline.setText("A ERA DOS REIS");
+        royalOverline.setTextColor(Color.rgb(245, 207, 134));
+        royalOverline.setTextSize(12);
+        royalOverline.setLetterSpacing(0.19f);
+        royalOverline.setGravity(Gravity.CENTER);
+        LinearLayout.LayoutParams royalParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        royalParams.bottomMargin = dp(18);
+        loadingPanel.addView(royalOverline, royalParams);
+
+        // Moldura de ouro leve, nativa e sem imagens remotas ou contexto WebGL extra.
+        GradientDrawable emblemBorder = new GradientDrawable(
+                GradientDrawable.Orientation.TL_BR,
+                new int[] { Color.rgb(255, 232, 169), Color.rgb(197, 136, 42), Color.rgb(119, 72, 24) });
+        emblemBorder.setCornerRadius(dp(26));
+        FrameLayout royalFrame = new FrameLayout(this);
+        royalFrame.setPadding(dp(5), dp(5), dp(5), dp(5));
+        royalFrame.setBackground(emblemBorder);
         ImageView heroEmblem = new ImageView(this);
         heroEmblem.setImageResource(R.drawable.ic_launcher);
         heroEmblem.setContentDescription("Emblema de Clash of Izzy, herói com espada e coroa");
         heroEmblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
-        LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(dp(118), dp(118));
-        heroParams.bottomMargin = dp(14);
-        loadingPanel.addView(heroEmblem, heroParams);
+        royalFrame.addView(heroEmblem, new FrameLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(dp(152), dp(152));
+        heroParams.bottomMargin = dp(20);
+        loadingPanel.addView(royalFrame, heroParams);
 
         TextView loadingTitle = new TextView(this);
         loadingTitle.setText("CLASH OF IZZY");
-        loadingTitle.setTextColor(Color.rgb(242, 206, 133));
+        loadingTitle.setTextColor(Color.rgb(255, 219, 147));
         loadingTitle.setTextSize(29);
         loadingTitle.setLetterSpacing(0.08f);
         loadingTitle.setGravity(Gravity.CENTER);

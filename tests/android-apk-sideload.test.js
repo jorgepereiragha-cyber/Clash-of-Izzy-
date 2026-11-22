@@ -118,3 +118,14 @@ test('Abertura WebView tem limite de espera, cancela em sucesso e recupera conex
   assert.match(activity, /onPageFinished\(WebView view, String url\) \{\s*cancelStartupTimeout\(\)/);
   assert.match(activity, /onDestroy\(\) \{\s*cancelStartupTimeout\(\)/);
 });
+
+test('tela nativa segue o visual rei guerreiro azul e ouro sem downloads na abertura',()=>{
+  assert.match(activity,/royalOverline\.setText\("A ERA DOS REIS"\)/);
+  assert.match(activity,/Color\.rgb\(15, 49, 103\)/);
+  assert.match(activity,/GradientDrawable emblemBorder/);
+  assert.match(activity,/Color\.rgb\(255, 232, 169\)/);
+  assert.match(activity,/heroEmblem\.setImageResource\(R\.drawable\.ic_launcher\)/);
+  const start=activity.slice(activity.indexOf('loadingPanel = new LinearLayout'),activity.indexOf('webView.setWebChromeClient'));
+  assert.doesNotMatch(start,/https?:\/\//);
+  assert.match(read('android-sideload/app/src/main/res/values/styles.xml'),/#081831/);
+});

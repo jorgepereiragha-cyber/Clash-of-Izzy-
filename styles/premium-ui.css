@@ -1,13 +1,22 @@
 /* Clash of Izzy — camada visual premium compatível com a identidade azul-real/dourado. */
 :root{
- --coi-premium-gold:#e7bd68;--coi-premium-gold-hi:#f5d995;
+ --coi-premium-gold:#f1c467;--coi-premium-gold-hi:#ffe3a1;
  --coi-premium-shadow:0 12px 32px rgba(0,0,0,.38);
- --coi-premium-glow:0 0 18px rgba(231,189,104,.22);
+ --coi-premium-glow:0 0 18px rgba(241,196,103,.22);
+}
+body:not(.valhalla-mode-active) > header{
+ background-color:#091b3a;
+ background-image:linear-gradient(110deg,rgba(7,22,48,.98),rgba(14,50,107,.94),rgba(7,22,48,.98));
+ border-bottom-color:rgba(241,196,103,.68);
+}
+body:not(.valhalla-mode-active) .brand{
+ color:var(--coi-premium-gold-hi);
+ text-shadow:0 1px 0 #000,0 0 18px rgba(241,196,103,.18);
 }
 .panel,.premium-panel{
  position:relative;isolation:isolate;
- background:linear-gradient(145deg,rgba(31,54,79,.97),rgba(12,25,42,.98));
- border-color:rgba(231,189,104,.62);
+ background:linear-gradient(145deg,rgba(18,54,104,.97),rgba(7,22,47,.98));
+ border-color:rgba(241,196,103,.62);
  box-shadow:var(--coi-premium-shadow),inset 0 1px rgba(255,255,255,.06);
 }
 .panel h2,.premium-panel-title{
