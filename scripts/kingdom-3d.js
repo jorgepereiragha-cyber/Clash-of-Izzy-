@@ -438,6 +438,7 @@ if (host && "WebGLRenderingContext" in window) {
         banner.castShadow = true;
         group.add(banner);
       }
+      // The heraldic seal stays visible across all four castle evolution tiers.
       const seal = new THREE.Mesh(new THREE.CircleGeometry(.2, 8), castleAccent);
       seal.position.set(0, 1.02, .66);
       seal.castShadow = true;
