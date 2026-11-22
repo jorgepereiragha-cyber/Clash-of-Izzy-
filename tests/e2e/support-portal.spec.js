@@ -13,7 +13,7 @@ test("campaign stays transparent and cannot collect payments before configuratio
   await expect(link).toHaveAttribute("aria-disabled", "true");
   await expect(link).not.toHaveAttribute("href");
   await expect(page.getByText(/Contribuições financeiras ainda não estão habilitadas/)).toBeVisible();
-  await expect(page.locator('a[href="/portal"]')).toHaveCount(2);
+  await expect(page.locator('a[href="/portal"]')).toHaveCount(3);
 });
 
 test("only an explicitly configured official Mercado Pago link enables voluntary payment", async ({ page }) => {
