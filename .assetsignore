@@ -62,6 +62,7 @@ assets/3d/licenses/
 scripts/diagnose-production-endpoint.js
 scripts/production-smoke.js
 scripts/check-android-release-server.mjs
+scripts/check-commercial-store.mjs
 scripts/validate-3d-assets.js
 scripts/validate-core-loop.sh
 
