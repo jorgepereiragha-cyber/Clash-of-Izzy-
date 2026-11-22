@@ -637,6 +637,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
       const catalog = expectStatus(await api("/api/store/catalog"), 200, "catálogo atualizado");
       const vip = catalog.packages.find(item => item.name === "Pacote de integração");
+      const entry = catalog.packages.find(item => item.name === "Pacote Inicial de Eldoria");
+      assert.ok(entry?.id, "pacote inicial R$ 3,99 consta do catálogo D1");
+      assert.equal(Number(entry.price_brl), 3.99, "preço do pacote inicial é R$ 3,99");
+      assert.equal(Number(entry.gems), 35, "o pacote inicial credita 35 gemas após a liquidação");
       const skin = catalog.skins[0];
       assert.equal(catalog.skins.length, 6, "catálogo de lançamento permanece limitado a seis skins");
       assert.ok(vip?.id, "pacote VIP aparece no catálogo");

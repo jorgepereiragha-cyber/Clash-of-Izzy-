@@ -32,7 +32,7 @@ footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
 <div class="toolbar"><h2>👑 Jogadores do reino</h2><button class="secondary" id="logout" type="button">Sair</button></div>
 <section id="purchaseQueue" style="margin:18px 0;padding:16px;border:1px solid #a98245;border-radius:12px;background:#0b1728">
  <div class="toolbar"><h2>🔔 Pedidos de compra <span id="pendingCount">0</span></h2><button class="secondary" id="refreshPurchases" type="button">Atualizar</button></div>
- <p class="sub">Novos pedidos aparecem automaticamente. Os pedidos abrem uma conversa no WhatsApp. Confira o recebimento por fora e toque em ✓ Liberar pacote para entregar as gemas ou a skin ao jogador.</p>
+ <p class="sub">Pedidos Mercado Pago são confirmados pelo provedor, sem liberação manual. Para Nubank Pix, confira no extrato da conta autorizada o valor, o destinatário e o EndToEndId antes de liberar. Comprovantes enviados pelo jogador não bastam.</p>
  <div id="purchaseRequests" class="results" aria-live="polite">Carregando pedidos…</div>
 </section>
 <section id="valhalla-admin-section" aria-labelledby="valhalla-admin-title">
@@ -160,14 +160,25 @@ function renderPurchaseRequests(requests){
   }else{
    const approve=document.createElement("button");approve.type="button";approve.className="approve";approve.textContent="✓ Liberar pacote";
    let bankStatementConfirmation=null;
+   let bankStatementReference=null;
    if(request.payment_method==="pix"){
     const label=document.createElement("label");label.style.cssText="display:flex;gap:8px;align-items:flex-start;margin:12px 0;color:#eed19a";
     bankStatementConfirmation=document.createElement("input");bankStatementConfirmation.type="checkbox";
     label.append(bankStatementConfirmation,document.createTextNode("Conferi no extrato Nubank da conta autorizada o crédito efetivamente recebido, o valor e o identificador do pedido, não apenas o comprovante do jogador."));
-    info.append(label);approve.disabled=true;
-    bankStatementConfirmation.addEventListener("change",()=>{approve.disabled=!bankStatementConfirmation.checked;});
+    const referenceLabel=document.createElement("label");
+    referenceLabel.textContent="EndToEndId Pix recebido no extrato (32 caracteres):";
+    referenceLabel.style.cssText="display:grid;gap:6px;margin:10px 0;color:#eed19a";
+    bankStatementReference=document.createElement("input");
+    bankStatementReference.type="text";bankStatementReference.maxLength=32;
+    bankStatementReference.autocomplete="off";bankStatementReference.spellcheck=false;
+    bankStatementReference.placeholder="E + ISPB + identificador da transação";
+    bankStatementReference.setAttribute("aria-label","EndToEndId confirmado no extrato Nubank");
+    referenceLabel.append(bankStatementReference);info.append(label,referenceLabel);approve.disabled=true;
+    const validatePix=()=>{approve.disabled=!bankStatementConfirmation.checked||!/^E[0-9]{8}[A-Za-z0-9]{23}$/i.test(bankStatementReference.value.trim());};
+    bankStatementConfirmation.addEventListener("change",validatePix);
+    bankStatementReference.addEventListener("input",validatePix);
    }
-   approve.addEventListener("click",()=>reviewPurchase(request.id,"approve",approve,Boolean(bankStatementConfirmation?.checked)));
+   approve.addEventListener("click",()=>reviewPurchase(request.id,"approve",approve,Boolean(bankStatementConfirmation?.checked),bankStatementReference?.value||""));
    const reject=document.createElement("button");reject.type="button";reject.className="secondary";reject.textContent="Recusar";
    reject.addEventListener("click",()=>reviewPurchase(request.id,"reject",reject));
    actions.append(approve,reject);
@@ -179,11 +190,11 @@ async function refreshPurchaseRequests(){
  const data=await api("/admin/purchase-requests",{});
  renderPurchaseRequests(data.requests||[]);
 }
-async function reviewPurchase(id,decision,button,bankStatementConfirmed=false){
+async function reviewPurchase(id,decision,button,bankStatementConfirmed=false,bankStatementReference=""){
  if(decision==="approve"&&!confirm("Confirma que o pagamento entrou na conta autorizada e deseja liberar este pacote agora?"))return;
  if(decision==="reject"&&!confirm("Deseja recusar este pedido?"))return;
  button.disabled=true;
- try{const result=await api("/admin/purchase-requests/review",{requestId:id,decision,bankStatementConfirmed});showNotice(result.message);await refreshPurchaseRequests()}
+ try{const result=await api("/admin/purchase-requests/review",{requestId:id,decision,bankStatementConfirmed,bankStatementReference});showNotice(result.message);await refreshPurchaseRequests()}
  catch(error){showNotice(error.message);button.disabled=false}
 }
 function renderPlayers(players){
