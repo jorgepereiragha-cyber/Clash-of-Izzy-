@@ -14,6 +14,7 @@ import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
 import {realmStatusView} from "./realm-progression.js";
 import {getThroneStatus,assaultThrone} from "./throne-war.js";
+import {calculateMarchCapacity,loadMarchCapacity,assertWithinMarchCapacity} from "./march-capacity.js";
 import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
@@ -493,7 +494,7 @@ async function seedWorld(env,region=1){
 }
 async function processMarches(env,kingdomId,batchSize=50){
  const now=new Date().toISOString();
- const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT ?").bind(kingdomId,now,Math.max(1,Math.min(50,Math.floor(Number(batchSize)||50)))).all();
+ const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id,commander_hero_key,march_capacity_at_dispatch FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT ?").bind(kingdomId,now,Math.max(1,Math.min(50,Math.floor(Number(batchSize)||50)))).all();
  for(const m of due.results||[]){
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
   const resolvedAt=new Date().toISOString(),resolutionToken=crypto.randomUUID();
@@ -509,7 +510,7 @@ async function processMarches(env,kingdomId,batchSize=50){
    if(target&&!target.territory_key?.startsWith("royal_throne_")&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level,prestige,equipped_skin_id FROM kingdoms WHERE id=?").bind(kingdomId).first(),
-     env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
+     env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY CASE WHEN hi.hero_key=? THEN 0 ELSE 1 END,hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId,m.commander_hero_key).first(),
      env.DB.prepare("SELECT dragon_key,level,bond FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
@@ -776,7 +777,7 @@ async function gameState(env,playerId){
     ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,Number(kingdom.map_region)||1,kingdom.id,
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45),
-    env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id),
+    env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json,commander_hero_key,march_capacity_at_dispatch FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id),
     env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at,CASE WHEN replay_expires_at>unixepoch() AND replay_json<>'{}' THEN 1 ELSE 0 END AS has_replay FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id),
     env.DB.prepare(
       "SELECT hi.*,vhc.hero_name AS seasonal_hero_name,vhc.rarity AS seasonal_rarity,"+
@@ -819,6 +820,24 @@ async function gameState(env,playerId){
   },0);
   const queuedTraining=(queues.results||[]).filter(row=>row.queue_type==="training"&&row.status==="running").reduce((sum,row)=>sum+Math.max(0,Number(row.quantity)||0),0);
   const armyCount=totalTroops+fieldTroops+queuedTraining;
+  // This limit applies per expedition and does not replace overall troop capacity.
+  const marchLeaders=(heroInventory.results||[]).map(row=>({
+    hero_key:row.hero_key,hero_name:((heroes.results||[]).find(h=>h.hero_key===row.hero_key)?.hero_name)||
+      row.seasonal_hero_name||row.hero_key,
+    level:row.level,stars:row.stars,rarity:row.rarity
+  }));
+  const marchFactors={
+    castleLevel:Number(fresh?.castle_level)||1,barracksLevel,
+    academyLevel:Number((buildings.results||[]).find(row=>row.building_type==="academy")?.level||1),
+    militaryLevel:Number((research.results||[]).find(row=>row.research_key==="military")?.level||0),
+    heroes:marchLeaders
+  };
+  const marchCapacity=calculateMarchCapacity(marchFactors);
+  const marchHeroOptions=marchLeaders.map(hero=>{
+    const detail=calculateMarchCapacity({...marchFactors,heroKey:hero.hero_key});
+    return {heroKey:hero.hero_key,heroName:hero.hero_name,level:hero.level,stars:hero.stars,
+      rarity:hero.rarity,capacity:detail.capacity,heroBonus:detail.components.hero};
+  }).sort((a,b)=>b.capacity-a.capacity||a.heroName.localeCompare(b.heroName));
   const shop=await getShopState(env,kingdom.id);
   const heroShop=await getHeroShopState(env,kingdom.id,shop.cycle);
   const cosmetics=await getCosmeticState(env,kingdom.id);
@@ -843,7 +862,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,source_key,title,body,reward_key,read_at,claimed_at,created_at FROM kingdom_mailbox WHERE kingdom_id=? ORDER BY id DESC LIMIT 50").bind(kingdom.id)
   ]);
   const dragonCollection=getDragonCollectionView((dragonOwnedRows.results||[]).map(row=>row.dragon_key),dragon?.dragon_key,dragon?.level,dragon?.bond);
-  return {castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
+  return {castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],marchCapacity,marchHeroOptions,battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -1517,10 +1536,18 @@ async function gameAction(env,playerId,body){
     }
     const unitTypes=Object.keys(selected);
     if(!unitTypes.length)return json({error:"Selecione pelo menos uma tropa válida."},400);
+    let marchLimit;
+    try{
+      marchLimit=await loadMarchCapacity(env,k.id,body.heroKey??null);
+      assertWithinMarchCapacity(selected,marchLimit.capacity);
+    }catch(error){
+      if(error instanceof RangeError)return json({error:error.message},409);
+      throw error;
+    }
     const unitsJson=JSON.stringify(selected);
     const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
     await ensureEquipmentTables(env,k.id);
-    const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(k.id).first();
+    const activeHero=marchLimit.heroKey?await env.DB.prepare("SELECT h.id FROM heroes h WHERE h.kingdom_id=? AND h.hero_key=?").bind(k.id,marchLimit.heroKey).first():null;
     const [equippedRows,gearResearchRows]=await Promise.all([
       activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,activeHero.id).all():Promise.resolve({results:[]}),
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
@@ -1534,13 +1561,13 @@ async function gameAction(env,playerId,body){
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
     const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=?")
       .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length);
-    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at) SELECT ?,?,?,?,?,? WHERE changes()=?")
-      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,unitTypes.length);
+    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at,commander_hero_key,march_capacity_at_dispatch) SELECT ?,?,?,?,?,?,?,? WHERE changes()=?")
+      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,marchLimit.heroKey,marchLimit.capacity,unitTypes.length);
     const result=await env.DB.batch([
       debit,
       createMarch,
       env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,?,?,? WHERE changes()>0")
-        .bind(k.id,p.id,"march_started",JSON.stringify({targetId,marchType,units:selected}))
+        .bind(k.id,p.id,"march_started",JSON.stringify({targetId,marchType,units:selected,commanderHeroKey:marchLimit.heroKey,marchCapacity:marchLimit.capacity}))
     ]);
     if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes ou exército alterado por outra marcha. Atualize o reino e tente novamente."},409);
   }else if(type==="battle"){
