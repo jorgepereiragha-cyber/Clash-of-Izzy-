@@ -14,6 +14,14 @@ test("produção completa 1h: trigo -> farinha -> comida sem criação dupla",()
     wheat:0,flour:0,food:0,processedWheat:0,harvestedWheat:0,remainders:{wheat:0,mill:0,bakery:0}
   });
 });
+test("multiplicador zero não cria trigo, farinha nem comida",()=>{
+  const paused=calculateChainProduction({
+    elapsedSeconds:3600,multiplier:0,foodFreeSpace:100,wheat:4,flour:6
+  });
+  assert.deepEqual([paused.harvestedWheat,paused.processedWheat,paused.food,paused.wheat,paused.flour],[0,0,0,4,6]);
+  const half=calculateChainProduction({elapsedSeconds:3600,multiplier:0.5,foodFreeSpace:100});
+  assert.deepEqual([half.harvestedWheat,half.processedWheat,half.food],[6,6,6]);
+});
 test("capacidade dos processadores limita a cadeia; estoques e frações persistem",()=>{
   const wheat=calculateChainProduction({elapsedSeconds:3600,farmLevel:3,millLevel:1,bakeryLevel:1,foodFreeSpace:100});
   assert.equal(wheat.wheat,24);assert.equal(wheat.flour,0);assert.equal(wheat.food,12);
