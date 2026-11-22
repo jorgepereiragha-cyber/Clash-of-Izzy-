@@ -131,18 +131,24 @@ test('tela nativa segue o visual rei guerreiro azul e ouro sem downloads na aber
 });
 
 
-test("TLS de subrecurso e rejeitado sem bloquear o jogo, e HTTP externo fica bloqueado", () => {
-  assert.match(activity, /handler\\.cancel\\(\\)/);
-  assert.match(activity, /String failedUrl = error != null \\? error\\.getUrl\\(\\) : null/);
-  assert.match(activity, /!failedUrl\\.equals\\(pageUrl\\) && !failedUrl\\.equals\\(originalUrl\\)\\) return/);
-  assert.match(activity, /if \\(!"https"\\.equalsIgnoreCase\\(scheme\\)/);
-  assert.doesNotMatch(activity, /!"http"\\.equalsIgnoreCase\\(scheme\\)/);
+test("TLS invalido de subrecurso nao bloqueia o jogo, e URL HTTP externa fica bloqueada", () => {
+  const ssl = activity.slice(activity.indexOf("public void onReceivedSslError("),
+    activity.indexOf("public boolean onRenderProcessGone("));
+  assert.ok(ssl.includes("handler.cancel()"));
+  assert.ok(ssl.includes("String failedUrl = error != null ? error.getUrl() : null;"));
+  assert.ok(ssl.includes("!failedUrl.equals(pageUrl) && !failedUrl.equals(originalUrl)) return;"));
+  const external = activity.slice(activity.indexOf("private void openOutsideApp("),
+    activity.indexOf("private int dp("));
+  assert.ok(external.includes('"https".equalsIgnoreCase(scheme)'));
+  assert.ok(external.includes('"mailto".equalsIgnoreCase(scheme)'));
+  assert.ok(!external.includes('"http".equalsIgnoreCase(scheme)'));
 });
 
-test("Falhas repetidas do renderizador WebGL nao causam loop ilimitado de relancamento", () => {
-  assert.match(activity, /RENDERER_RESTART_WINDOW_MS = 60_000L/);
-  assert.match(activity, /recentRendererFailures <= 2/);
-  assert.match(activity, /lastRendererFailureMs = now/);
-  assert.match(activity, /if \\(recentRendererFailures <= 2\\) \\{\\s*recreate\\(\\);/);
-  assert.match(activity, /Atualize o Android System WebView/);
+test("Renderizador WebGL tem limite de reinicializacao para impedir loop", () => {
+  assert.ok(activity.includes("RENDERER_RESTART_WINDOW_MS = 60_000L"));
+  assert.ok(activity.includes("lastRendererFailureMs = now"));
+  assert.ok(activity.includes("if (recentRendererFailures <= 2) {"));
+  assert.ok(activity.includes("recreate();"));
+  assert.ok(activity.includes("Atualize o Android System WebView"));
+  assert.ok(activity.includes("finish();"));
 });
