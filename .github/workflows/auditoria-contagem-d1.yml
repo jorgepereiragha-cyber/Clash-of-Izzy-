@@ -44,4 +44,16 @@ jobs:
           counts={key:int(row[key]) for key in keys}
           print("Contagens D1 produção (sem dados pessoais): "+json.dumps(counts,ensure_ascii=False))
           print("Tabelas novas 0030 identificadas: "+str(counts["tabelas_0030"])+"/3; consulta somente leitura.")
+          # A consulta aos metadados evita aplicar migrations fora de ordem.
+          request=urllib.request.Request(url,data=json.dumps({
+            "sql":"SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 8"
+          }).encode(),method="POST",headers={
+            "Authorization":"Bearer "+token,"Content-Type":"application/json"})
+          try:
+            with urllib.request.urlopen(request,timeout=25) as response:
+              migration_payload=json.loads(response.read().decode())
+            applied=[str(row.get("name","")) for row in migration_payload["result"][0]["results"]]
+          except (urllib.error.HTTPError,KeyError,IndexError,TypeError,ValueError) as error:
+            raise SystemExit("Historico D1 remoto indisponivel ("+type(error).__name__+"); nao migrar.")
+          print("Ultimas migrations D1 (somente nome, sem dados): "+json.dumps(applied,ensure_ascii=False))
           PY
