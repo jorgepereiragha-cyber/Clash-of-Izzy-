@@ -1,0 +1,24 @@
+name: Diagnostico HTTP do portal publico
+on:
+  pull_request:
+    paths:
+      - .github/workflows/diagnostico-http-portal.yml
+permissions:
+  contents: read
+jobs:
+  consultar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Consultar pagina e rotas promocionais e bloqueadas
+        shell: bash
+        run: |
+          set -euo pipefail
+          base="https://clash-of-izzy-portal.jorgepereiragha.workers.dev"
+          for path in "/" "/portal.html" "/portal" "/favicon.svg" "/styles/coi-theme.css" "/assets/brand/hero-emblem.svg" "/kingdom.html" "/api/health"; do
+            echo "PROBE $path"
+            curl --retry 2 --max-time 15 --silent --show-error -L \
+              -o "/tmp/portal-response" -w 'HTTP=%{http_code} URL=%{url_effective} TYPE=%{content_type}\n' "$base$path" || true
+            head -c 180 /tmp/portal-response || true
+            echo
+          done
