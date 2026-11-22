@@ -113,10 +113,10 @@ test("passivos dos heróis escalam de forma limitada por nível e estrelas", () 
   assert.deepEqual(card.combat_bonuses, maxed);
 });
 
-test("23 heróis canônicos e sazonais possuem aura própria e história de Eldoria",async()=>{
+test("70 heróis invocáveis e sazonais possuem aura própria e história de Eldoria",async()=>{
   const {HERO_IDENTITIES}=await import("../hero-identities.js");
   const ids=[...Object.keys(HERO_TEMPLATES),"odin_awakened","thor_ragnarok","freya_vanir","loki_chaos","valhalla_king"];
-  assert.equal(ids.length,23);
+  assert.equal(ids.length,70);
   assert.equal(new Set(ids).size,23);
   assert.equal(new Set(ids.map(key=>HERO_IDENTITIES[key]?.aura)).size,23);
   for(const key of ids){
