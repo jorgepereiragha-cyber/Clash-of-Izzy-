@@ -40,9 +40,9 @@ test('release nunca e publicada unsigned e nao toca D1', () => {
   assert.match(workflow, /actions\/upload-artifact@v4/);
 });
 
-test('Falhas HTTP 5xx da pagina principal mostram recuperacao sem bloquear APIs', () => {
+test('Falhas HTTP 4xx/5xx da pagina principal mostram recuperacao sem bloquear APIs', () => {
   assert.match(activity, /void onReceivedHttpError\(/);
-  assert.match(activity, /request\.isForMainFrame\(\) && errorResponse\.getStatusCode\(\) >= 500/);
+  assert.match(activity, /request\.isForMainFrame\(\) && errorResponse\.getStatusCode\(\) >= 400/);
   assert.match(activity, /offlinePanel\.setVisibility\(View\.VISIBLE\)/);
 });
 
