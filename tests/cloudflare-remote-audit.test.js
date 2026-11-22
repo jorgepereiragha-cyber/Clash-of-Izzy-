@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
-import {validateIds,audit,summary,normalizeToken} from "../scripts/cloudflare-remote-audit.mjs";
+import {validateIds,audit,summary,normalizeToken,normalizeAccountId} from "../scripts/cloudflare-remote-audit.mjs";
 const read=async p=>readFile(new URL("../"+p,import.meta.url),"utf8");
 const prod=JSON.parse(await read("wrangler.jsonc"));
 const staging=JSON.parse(await read("wrangler.preview-migrations.jsonc"));
@@ -96,4 +96,26 @@ test("deploy não relaxa a validação de saúde pós-migração",async()=>{
   assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030/);
   assert.match(strict,/check-android-release-server\.mjs/);
   assert.match(source,/allowPending0030:process\.env\.COI_ALLOW_PENDING_0030==="true"/);
+});
+
+test("normaliza account ID sem expor valor e mantém formato de 32 caracteres",()=>{
+  const upper="A".repeat(32);
+  assert.equal(normalizeAccountId('  "'+upper+'"  '),"a".repeat(32));
+  assert.equal(normalizeAccountId(" ID inválido "),"id inválido");
+});
+
+test("auditoria identifica qual secret Cloudflare precisa de correção",async()=>{
+  const unauthorized=async()=>new Response("Unauthorized",{status:401});
+  const accountId="a".repeat(32);
+  const tokenMissing=await audit({fetchImpl:unauthorized,production:prod,staging,token:"",accountId});
+  const first=tokenMissing.checks.find(c=>c.name==="Secrets GitHub");
+  assert.equal(first.ok,false);
+  assert.match(first.detail,/CLOUDFLARE_API_TOKEN/);
+  assert.doesNotMatch(first.detail,/CLOUDFLARE_ACCOUNT_ID/);
+
+  const accountMissing=await audit({fetchImpl:unauthorized,production:prod,staging,token:"token",accountId:"bad"});
+  const second=accountMissing.checks.find(c=>c.name==="Secrets GitHub");
+  assert.equal(second.ok,false);
+  assert.match(second.detail,/CLOUDFLARE_ACCOUNT_ID/);
+  assert.doesNotMatch(second.detail,/CLOUDFLARE_API_TOKEN/);
 });
