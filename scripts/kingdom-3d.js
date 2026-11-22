@@ -669,8 +669,9 @@ if (host && "WebGLRenderingContext" in window) {
       const template = glbTemplates.get(b.building_type);
       const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
-      if (b.building_type === "castle") applyCastleVisualUpgrades(group, b.level, latestCastleVipLevel);
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
+      // Adicionar acessórios depois das sombras: ornamentos mobile não projetam sombras.
+      if (b.building_type === "castle") applyCastleVisualUpgrades(group, b.level, latestCastleVipLevel);
       scene.add(group);
       activeModels.push(group);
     });
