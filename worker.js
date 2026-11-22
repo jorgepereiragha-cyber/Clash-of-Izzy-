@@ -6,6 +6,7 @@ import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
 import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
+import { cityLayoutConfig, moveCityBuilding } from "./city-layout-rules.js";
 import { processEmailQueue, requestEmailVerification, verifyEmailToken, getEmailPreferences, updateEmailPreferences, getEmailHistory, queueEmailForInternalPlayer } from "./email-system.js";
 import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaConfig } from "./valhalla-config.js";
 import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
@@ -859,7 +860,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,source_key,title,body,reward_key,read_at,claimed_at,created_at FROM kingdom_mailbox WHERE kingdom_id=? ORDER BY id DESC LIMIT 50").bind(kingdom.id)
   ]);
   const dragonCollection=getDragonCollectionView((dragonOwnedRows.results||[]).map(row=>row.dragon_key),dragon?.dragon_key,dragon?.level,dragon?.bond);
-  return {castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
+  return {castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -1392,6 +1393,10 @@ async function gameAction(env,playerId,body){
         .bind(k.id,"castle_vip_upgraded",JSON.stringify({vipLevel:target,gemsSpent:cost,bonuses:getCastleVipBonuses(target),castleLevel:CASTLE_MAX_LEVEL}))
     ]);
     if(!result[0]?.meta?.changes||!result[1]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Evolução VIP não concluída: gemas insuficientes ou estado alterado."},409);
+  }else if(type==="city_layout_move"){
+    const move=await moveCityBuilding(env,k.id,body);
+    if(!move.ok)return json({error:move.error},move.status);
+    await logKingdomAction(env,k.id,p.id,"city_layout_moved",{building:move.building,gridX:move.gridX,gridZ:move.gridZ});
   }else if(type==="upgrade"){
     const key=String(body.building||"");
     if(!Object.hasOwn(BUILDINGS,key))return json({error:"Edifício inválido."},400);

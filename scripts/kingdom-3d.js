@@ -537,9 +537,9 @@ if (host && "WebGLRenderingContext" in window) {
     return group;
   }
   function buildGround() {
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(14, 11), mats.grass);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(32, 32), mats.grass);
     ground.rotation.x = -Math.PI / 2; ground.position.y = -.08; ground.receiveShadow = true; scene.add(ground);
-    const grid = new THREE.GridHelper(14, 14, "#91a36d", "#91a36d");
+    const grid = new THREE.GridHelper(32, 50, "#91a36d", "#91a36d");
     grid.position.y = -.055; grid.material.transparent = true; grid.material.opacity = .12; scene.add(grid);
     // A winding stone road crosses the settlement.
     const points = [
@@ -555,13 +555,31 @@ if (host && "WebGLRenderingContext" in window) {
     // Forest is batched into three instanced draw calls instead of one per tree part.
     addForestInstances();
   }
+  function cityWorldPoint(building, index) {
+    const x = Number(building?.position_x), z = Number(building?.position_z);
+    if (building?.position_x != null && building?.position_z != null &&
+        Number.isFinite(x) && Number.isFinite(z)) return { x: x * .53, z: z * .53 };
+    return { x: (index % 3 - 1) * 4.15, z: (Math.floor(index / 3) - 1) * 3.15 };
+  }
+  function frameCityBuildings(buildings) {
+    if (!camera || !buildings.length) return;
+    const points = buildings.map(cityWorldPoint);
+    const xs = points.map(p => p.x), zs = points.map(p => p.z);
+    const minX = Math.min(...xs), maxX = Math.max(...xs);
+    const minZ = Math.min(...zs), maxZ = Math.max(...zs);
+    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
+    const span = Math.max(maxX - minX + 4, maxZ - minZ + 4);
+    camera.zoom = Math.min(1, 13 / span);
+    camera.position.set(cx + 10, 13, cz + 11);
+    camera.lookAt(cx, .2, cz);
+    camera.updateProjectionMatrix();
+  }
   function publishBuildingHitTargets(buildings = latestBuildings) {
     if (!host || !camera || !renderer || disposed) return;
     camera.updateMatrixWorld(true);
     const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
     const positions = list.map((building, index) => {
-      const col = index % 3, row = Math.floor(index / 3);
-      const x = (col - 1) * 4.15, z = (row - 1) * 3.15;
+      const { x, z } = cityWorldPoint(building, index);
       const projected = new THREE.Vector3(x, .18, z).project(camera);
       const visible = projected.z >= -1 && projected.z <= 1
         && projected.x >= -1 && projected.x <= 1
@@ -592,9 +610,9 @@ if (host && "WebGLRenderingContext" in window) {
     // Keep deterministic world-space building anchors. HTML hit targets are
     // projected into screen coordinates from this same camera below.
     const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
+    frameCityBuildings(list);
     list.forEach((b, i) => {
-      const col = i % 3, row = Math.floor(i / 3);
-      const x = (col - 1) * 4.15, z = (row - 1) * 3.15;
+      const { x, z } = cityWorldPoint(b, i);
       const template = glbTemplates.get(b.building_type);
       const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
