@@ -62,7 +62,7 @@ test("tema compartilhado define tokens da marca e acessibilidade básica", async
 test("portal de download apresenta o emblema original com herói e espada", async () => {
   const portal = await readFile(new URL("../portal.html", import.meta.url), "utf8");
   const art = await readFile(new URL("../assets/brand/hero-emblem.svg", import.meta.url), "utf8");
-  assert.match(portal, /src="\/assets\/brand\/hero-emblem\.svg"/);
+  assert.match(portal, /src="\/assets\/brand\/royal-king\.webp"/);
   assert.match(art, /<svg/);
   assert.match(art, /Herói de coroa dourada/);
   assert.match(art, /espada/);

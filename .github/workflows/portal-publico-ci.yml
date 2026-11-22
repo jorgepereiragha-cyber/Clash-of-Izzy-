@@ -40,10 +40,11 @@ jobs:
               "favicon.svg",
               "styles/coi-theme.css",
               "assets/brand/hero-emblem.svg",
+              "assets/brand/royal-king.webp",
           }
           public = Path("public-portal")
           found = {p.relative_to(public).as_posix() for p in public.rglob("*") if p.is_file()}
           assert found == allowed, f"Asset inesperado ou ausente: {found ^ allowed}"
           assert (public / "portal.html").read_bytes() == Path("portal.html").read_bytes(), "Copia da propaganda desatualizada"
-          print("Portal contém exclusivamente os quatro assets promocionais permitidos.")
+          print("Portal contém exclusivamente os cinco assets promocionais permitidos.")
           PY

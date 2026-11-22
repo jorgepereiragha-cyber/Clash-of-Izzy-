@@ -124,7 +124,7 @@ test('tela nativa segue o visual rei guerreiro azul e ouro sem downloads na aber
   assert.match(activity,/Color\.rgb\(15, 49, 103\)/);
   assert.match(activity,/GradientDrawable emblemBorder/);
   assert.match(activity,/Color\.rgb\(255, 232, 169\)/);
-  assert.match(activity,/heroEmblem\.setImageResource\(R\.drawable\.ic_launcher\)/);
+  assert.match(activity,/heroEmblem\.setImageResource\(R\.drawable\.royal_king\)/);
   const start=activity.slice(activity.indexOf('loadingPanel = new LinearLayout'),activity.indexOf('webView.setWebChromeClient'));
   assert.doesNotMatch(start,/https?:\/\//);
   assert.match(read('android-sideload/app/src/main/res/values/styles.xml'),/#081831/);

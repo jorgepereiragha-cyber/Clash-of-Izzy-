@@ -28,7 +28,7 @@ test("portal isolado redireciona a raiz para a propaganda, sem abrir o jogo", as
 
 test("portal isolado só publica os arquivos essenciais de marketing",async()=>{
   const env=mockEnv();
-  const allow=["/portal","/portal.html","/favicon.svg","/styles/coi-theme.css","/assets/brand/hero-emblem.svg"];
+  const allow=["/portal","/portal.html","/favicon.svg","/styles/coi-theme.css","/assets/brand/hero-emblem.svg","/assets/brand/royal-king.webp"];
   for(const path of allow){
     const response=await portalWorker.fetch(req(path),env);
     assert.equal(response.status,200,path);
@@ -90,7 +90,7 @@ test("identidade rei guerreiro usa capa real responsiva sem ativar download inex
   assert.match(publicHtml,/class="royal-art"/);
   assert.match(publicHtml,/--gold:#f1c467/);
   assert.match(publicHtml,/@media\(max-width:800px\)/);
-  assert.match(publicHtml,/alt="Rei guerreiro com coroa/);
+  assert.match(publicHtml,/alt="Rei guerreiro de coroa dourada/);
   assert.match(publicHtml,/id="download-apk" aria-disabled="true"/);
   assert.match(publicHtml,/id="checksum-link" hidden/);
   assert.match(publicHtml,/function validAsset\(asset, expectedName\)/);
