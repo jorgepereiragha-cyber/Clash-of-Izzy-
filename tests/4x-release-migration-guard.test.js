@@ -21,7 +21,7 @@ test("P1-P8 migration 0043 has only one approved canonical file", async () => {
       "Change this release gate only after commercial and D1 Preview approval");
     const sql = await readFile(new URL("../migrations/" + names[0], import.meta.url), "utf8");
     assert.doesNotMatch(sql, /INSERT\s+OR\s+REPLACE/i);
-    const statements = sql.split(";").map(s => s.trim()).filter(s => /^UPDATE\s+vip_packages\b/i.test(s));
+    const statements = sql.replace(/^\s*--.*$/gm, "").split(";").map(s => s.trim()).filter(s => /^UPDATE\s+vip_packages\b/i.test(s));
     assert.equal(statements.length, 5);
     for (const stmt of statements) {
       assert.match(stmt, /WHERE\s+name='[^']+'\s+AND\s+ROUND\(price_brl\*100\)=\d+\s+AND\s+gems=\d+\s*$/i,
