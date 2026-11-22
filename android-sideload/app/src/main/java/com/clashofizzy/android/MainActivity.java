@@ -29,11 +29,22 @@ import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
+import org.json.JSONObject;
+import androidx.credentials.CredentialManager;
+import androidx.credentials.CredentialManagerCallback;
+import androidx.credentials.GetCredentialRequest;
+import androidx.credentials.GetCredentialResponse;
+import androidx.credentials.CustomCredential;
+import androidx.credentials.exceptions.GetCredentialException;
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 public final class MainActivity extends Activity {
     private static final String GAME_URL =
             "https://clash-of-izzy.jorgepereiragha.workers.dev/kingdom.html";
     private static final String GAME_HOST = "clash-of-izzy.jorgepereiragha.workers.dev";
+    private boolean googleSignInInProgress = false;
+
 
     private FrameLayout root;
     private WebView webView;
@@ -60,6 +71,9 @@ public final class MainActivity extends Activity {
         webView.setBackgroundColor(Color.rgb(8, 24, 49));
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true); // O motor web do jogo requer JavaScript.
+        // The trusted site detects the Android shell and requests Credential Manager,
+        // never a Google OAuth redirect embedded in Android WebView.
+        settings.setUserAgentString(settings.getUserAgentString() + " ClashOfIzzyAndroid/1");
         settings.setDomStorageEnabled(true); // Sessão e preferências da conta.
         settings.setAllowFileAccess(false);
         settings.setAllowContentAccess(false);
@@ -208,6 +222,14 @@ public final class MainActivity extends Activity {
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 if (!request.isForMainFrame()) return false;
                 Uri uri = request.getUrl();
+                if ("clashofizzy-google".equalsIgnoreCase(uri.getScheme())) {
+                    if (isGameUrl(Uri.parse(view.getUrl())) && "signin".equalsIgnoreCase(uri.getHost())) {
+                        startNativeGoogleSignIn(uri);
+                    } else {
+                        googleError("Solicitação Google fora da página oficial bloqueada.");
+                    }
+                    return true;
+                }
                 if (isGameUrl(uri)) return false;
                 openOutsideApp(uri);
                 return true;
@@ -408,6 +430,67 @@ public final class MainActivity extends Activity {
             root.removeCallbacks(pendingLoadTimeout);
         }
         pendingLoadTimeout = null;
+    }
+
+    private void googleError(String message) {
+        if (webView == null || !isGameUrl(Uri.parse(webView.getUrl()))) return;
+        webView.evaluateJavascript("window.clashOfIzzyGoogleError && window.clashOfIzzyGoogleError(" +
+                JSONObject.quote(message) + ")", null);
+    }
+
+    private void startNativeGoogleSignIn(Uri uri) {
+        if (googleSignInInProgress || webView == null) return;
+        String nonce = uri.getQueryParameter("nonce");
+        String clientId = uri.getQueryParameter("clientId");
+        // Reject malformed cross-frame or external requests; no credentials are hardcoded.
+        if (nonce == null || !nonce.matches("(?i)^[0-9a-f-]{73}$") ||
+                clientId == null || !clientId.matches("^[0-9]{6,}-[A-Za-z0-9_-]+\\.apps\\.googleusercontent\\.com$")) {
+            googleError("Configuração Google inválida. Atualize o aplicativo.");
+            return;
+        }
+        googleSignInInProgress = true;
+        try {
+            GetSignInWithGoogleOption googleOption =
+                    new GetSignInWithGoogleOption.Builder(clientId).setNonce(nonce).build();
+            GetCredentialRequest credentialRequest = new GetCredentialRequest.Builder()
+                    .addCredentialOption(googleOption).build();
+            CredentialManager.create(this).getCredentialAsync(
+                    this, credentialRequest, null, command -> runOnUiThread(command),
+                    new CredentialManagerCallback<GetCredentialResponse, GetCredentialException>() {
+                        @Override
+                        public void onResult(GetCredentialResponse result) {
+                            googleSignInInProgress = false;
+                            if (webView == null || !isGameUrl(Uri.parse(webView.getUrl()))) return;
+                            if (!(result.getCredential() instanceof CustomCredential)) {
+                                googleError("O Android não retornou uma conta Google válida.");
+                                return;
+                            }
+                            CustomCredential credential = (CustomCredential) result.getCredential();
+                            if (!GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL.equals(credential.getType())) {
+                                googleError("Credencial Google não reconhecida.");
+                                return;
+                            }
+                            try {
+                                String idToken = GoogleIdTokenCredential.createFrom(credential.getData()).getIdToken();
+                                // Forward only to the trusted top-level game page, never third-party frames.
+                                webView.evaluateJavascript(
+                                        "window.clashOfIzzyGoogleCredential && window.clashOfIzzyGoogleCredential(" +
+                                                JSONObject.quote(idToken) + ")", null);
+                            } catch (RuntimeException error) {
+                                googleError("Não foi possível validar a credencial no aplicativo.");
+                            }
+                        }
+
+                        @Override
+                        public void onError(GetCredentialException error) {
+                            googleSignInInProgress = false;
+                            googleError("A seleção da conta Google não foi concluída.");
+                        }
+                    });
+        } catch (RuntimeException error) {
+            googleSignInInProgress = false;
+            googleError("O seletor Google do Android não está disponível.");
+        }
     }
 
     private boolean isGameUrl(Uri uri) {

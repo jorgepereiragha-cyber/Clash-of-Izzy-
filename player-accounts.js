@@ -1,3 +1,4 @@
+import { isGoogleWebClientId, verifyGoogleIdToken } from "./google-identity.js";
 const DEFAULT_ITERATIONS = 310000;
 const MIN_PASSWORD_LENGTH = 12;
 const MAX_PASSWORD_LENGTH = 128;
@@ -105,6 +106,90 @@ export async function handlePlayerAccountRoute(request, env, ctx) {
   if (!url.pathname.startsWith("/api/account/")) return null;
   if (!env.DB || !env.SESSION_SECRET) return ctx.json({ error: "Contas indisponíveis no momento." }, 503);
 
+  if (url.pathname === "/api/account/google/config" && request.method === "GET") {
+    const clientId = isGoogleWebClientId(env.GOOGLE_WEB_CLIENT_ID) ? env.GOOGLE_WEB_CLIENT_ID : null;
+    return ctx.json({ enabled: Boolean(clientId), clientId });
+  }
+
+  if (url.pathname === "/api/account/google/challenge" && request.method === "POST") {
+    if (!isGoogleWebClientId(env.GOOGLE_WEB_CLIENT_ID)) return ctx.json({error:"Google ainda não configurado para este jogo."},503);
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    const ipLimit = await limited(ctx, env, "google-challenge-ip", ip, 12, 900);
+    if (ipLimit) return ipLimit;
+    const body = await ctx.readBody(request, 2048);
+    if (body.__bodyError || !["link","login"].includes(body.purpose)) return ctx.json({error:"Finalidade de autenticação inválida."},400);
+    let player = null;
+    if (body.purpose === "link") {
+      const playerId = await ctx.gameIdentity(request, env);
+      if (!playerId) return ctx.json({error:"Entre no reino existente antes de vincular o Google."},401);
+      const playerLimit = await limited(ctx,env,"google-link-player",playerId,5,3600);
+      if (playerLimit) return playerLimit;
+      player = await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
+      if (!player) return ctx.json({error:"Reino não encontrado."},404);
+    }
+    const nonce = crypto.randomUUID() + "-" + crypto.randomUUID();
+    const expiresAt = Math.floor(Date.now()/1000) + 300;
+    await env.DB.prepare(
+      "INSERT INTO google_auth_challenges(nonce,purpose,player_id,expires_at) VALUES(?,?,?,?)"
+    ).bind(nonce,body.purpose,player?.id || null,expiresAt).run();
+    return ctx.json({nonce,expiresAt,clientId:env.GOOGLE_WEB_CLIENT_ID},201);
+  }
+
+  if (url.pathname === "/api/account/google/complete" && request.method === "POST") {
+    if (!isGoogleWebClientId(env.GOOGLE_WEB_CLIENT_ID)) return ctx.json({error:"Google ainda não configurado."},503);
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    const ipLimit = await limited(ctx,env,"google-complete-ip",ip,12,900);
+    if (ipLimit) return ipLimit;
+    const body = await ctx.readBody(request, 16384);
+    if (body.__bodyError || !["link","login"].includes(body.purpose)
+        || typeof body.nonce !== "string" || !/^[0-9a-f-]{73}$/i.test(body.nonce)
+        || typeof body.idToken !== "string") return ctx.json({error:"Credencial Google inválida."},400);
+    let player = null;
+    if (body.purpose === "link") {
+      const playerId = await ctx.gameIdentity(request,env);
+      if (!playerId) return ctx.json({error:"Sessão do reino inválida. Não é possível vincular."},401);
+      player = await env.DB.prepare("SELECT id,player_id,name FROM players WHERE player_id=?").bind(playerId).first();
+      if (!player) return ctx.json({error:"Reino não encontrado."},404);
+    }
+    let verified;
+    try {
+      verified = await verifyGoogleIdToken(body.idToken,env.GOOGLE_WEB_CLIENT_ID,body.nonce);
+    } catch (error) {
+      if (String(error?.message||"").includes("keys_unavailable")) return ctx.json({error:"Google temporariamente indisponível."},503);
+      return ctx.json({error:"Falha na validação segura da conta Google."},401);
+    }
+    const now = Math.floor(Date.now()/1000);
+    // One-use challenge consumed atomically; another request cannot replay a valid ID token.
+    const consumed = await env.DB.prepare(
+      "UPDATE google_auth_challenges SET consumed_at=? WHERE nonce=? AND purpose=? AND consumed_at IS NULL AND expires_at>? AND " +
+      "((purpose='login' AND player_id IS NULL) OR (purpose='link' AND player_id=?))"
+    ).bind(now,body.nonce,body.purpose,now,player?.id || null).run();
+    if (consumed.meta?.changes !== 1) return ctx.json({error:"Confirmação Google expirada ou já utilizada. Tente novamente."},409);
+    const owner = await env.DB.prepare(
+      "SELECT l.player_id,p.player_id AS public_player_id,p.name FROM google_account_links l " +
+      "JOIN players p ON p.id=l.player_id WHERE l.google_sub=?"
+    ).bind(verified.sub).first();
+    if (body.purpose === "login") {
+      if (!owner) return ctx.json({error:"Esta conta Google ainda não está vinculada a um reino. Abra o reino original e escolha Vincular Google.",code:"GOOGLE_NOT_LINKED"},404);
+      player = {id:owner.player_id,player_id:owner.public_player_id,name:owner.name};
+    } else {
+      if (owner && owner.player_id !== player.id) return ctx.json({error:"Esta conta Google já protege outro reino. Faça login na conta correta."},409);
+      const existing = await env.DB.prepare("SELECT google_sub FROM google_account_links WHERE player_id=?").bind(player.id).first();
+      if (existing && existing.google_sub !== verified.sub) return ctx.json({error:"Este reino já está vinculado a outra conta Google."},409);
+      if (!existing) await env.DB.prepare("INSERT OR IGNORE INTO google_account_links(player_id,google_sub) VALUES(?,?)")
+        .bind(player.id,verified.sub).run();
+      const linked = await env.DB.prepare("SELECT google_sub FROM google_account_links WHERE player_id=?").bind(player.id).first();
+      if (!linked || linked.google_sub !== verified.sub) return ctx.json({error:"O vínculo Google não foi concluído. Nenhum reino foi substituído."},409);
+    }
+    const account = await env.DB.prepare("SELECT session_version FROM player_accounts WHERE player_id=?").bind(player.id).first();
+    const google = await env.DB.prepare("SELECT session_version FROM google_account_links WHERE player_id=? AND google_sub=?")
+      .bind(player.id,verified.sub).first();
+    if (!google) return ctx.json({error:"Vínculo Google não encontrado."},409);
+    const sessionVersion = Number(account?.session_version ?? google.session_version);
+    const token = await issueGameToken(String(player.player_id),sessionVersion,env.SESSION_SECRET);
+    return ctx.json({success:true,token,googleLinked:true,player:{player_id:player.player_id,name:player.name}});
+  }
+
   if (url.pathname === "/api/account/login" && request.method === "POST") {
     const body = await ctx.readBody(request, 8192);
     if (body.__bodyError) return ctx.json({ error: "Solicitação de login inválida." }, 400);
@@ -143,9 +228,13 @@ export async function handlePlayerAccountRoute(request, env, ctx) {
       "SELECT a.username,a.email,a.created_at FROM player_accounts a " +
       "JOIN players p ON p.id=a.player_id WHERE p.player_id=?"
     ).bind(playerId).first();
-    return ctx.json({ hasAccount: Boolean(account), account: account ? {
-      username: account.username, emailMasked: maskAccountEmail(account.email), created_at: account.created_at
-    } : null });
+    const googleLink = await env.DB.prepare(
+      "SELECT l.linked_at FROM google_account_links l JOIN players p ON p.id=l.player_id WHERE p.player_id=?"
+    ).bind(playerId).first();
+    return ctx.json({ hasAccount: Boolean(account || googleLink), googleLinked: Boolean(googleLink), account: account ? {
+      username: account.username, emailMasked: maskAccountEmail(account.email), created_at: account.created_at,
+      googleLinked: Boolean(googleLink)
+    } : googleLink ? {username:null,emailMasked:null,created_at:googleLink.linked_at,googleLinked:true} : null });
   }
 
   if (url.pathname === "/api/account/register" && request.method === "POST") {
@@ -193,10 +282,16 @@ export async function handlePlayerAccountRoute(request, env, ctx) {
   if (url.pathname === "/api/account/logout" && request.method === "POST") {
     const playerId = await ctx.gameIdentity(request, env);
     if (!playerId) return ctx.json({ error: "Sessão do jogador inválida." }, 401);
-    await env.DB.prepare(
-      "UPDATE player_accounts SET session_version=session_version+1,updated_at=CURRENT_TIMESTAMP " +
-      "WHERE player_id=(SELECT id FROM players WHERE player_id=?)"
-    ).bind(playerId).run();
+    await env.DB.batch([
+      env.DB.prepare(
+        "UPDATE player_accounts SET session_version=session_version+1,updated_at=CURRENT_TIMESTAMP " +
+        "WHERE player_id=(SELECT id FROM players WHERE player_id=?)"
+      ).bind(playerId),
+      env.DB.prepare(
+        "UPDATE google_account_links SET session_version=session_version+1 " +
+        "WHERE player_id=(SELECT id FROM players WHERE player_id=?)"
+      ).bind(playerId)
+    ]);
     return ctx.json({ success: true });
   }
 

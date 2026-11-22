@@ -303,13 +303,19 @@ async function gameIdentity(request,env){
   const token=header.startsWith("Bearer ")?header.slice(7):"";
   const p=env.SESSION_SECRET?await verify(token,env.SESSION_SECRET):false;
   if(!p||p.scope!=="game"||!p.sub)return null;
-  const account=await env.DB.prepare(
-    "SELECT a.session_version FROM player_accounts a JOIN players p ON p.id=a.player_id WHERE p.player_id=?"
-  ).bind(String(p.sub)).first();
-  // Reinos sem conta continuam com a sessão anônima existente. Depois do vínculo,
-  // somente tokens emitidos com a versão de sessão da conta permanecem válidos.
-  if(account){
-    if(!Number.isInteger(Number(p.av))||Number(p.av)!==Number(account.session_version))return null;
+  const [account,googleLink]=await Promise.all([
+    env.DB.prepare(
+      "SELECT a.session_version FROM player_accounts a JOIN players p ON p.id=a.player_id WHERE p.player_id=?"
+    ).bind(String(p.sub)).first(),
+    env.DB.prepare(
+      "SELECT g.session_version FROM google_account_links g JOIN players p ON p.id=g.player_id WHERE p.player_id=?"
+    ).bind(String(p.sub)).first()
+  ]);
+  // A conta com senha prevalece. O Google permite recuperação sem criar outro reino.
+  // Tokens anônimos antigos são rejeitados assim que Google é vinculado.
+  const version=account?.session_version ?? googleLink?.session_version;
+  if(version!==undefined){
+    if(!Number.isSafeInteger(p.av)||p.av!==Number(version))return null;
   }else if(p.av!==undefined)return null;
   return String(p.sub);
 }
@@ -1912,7 +1918,7 @@ export default {
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","player_accounts","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
+    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{

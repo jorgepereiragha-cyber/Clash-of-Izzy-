@@ -54,8 +54,8 @@ test("account routes bind credentials to existing public player identity and ver
   assert.match(accountRoutes, /emailMasked: maskAccountEmail\(account\.email\)/);
   assert.match(accountRoutes, /emailMasked: maskAccountEmail\(email\.display\)/);
   assert.doesNotMatch(accountRoutes, /email:\s*(?:account\.email|email\.display)/);
-  assert.match(worker, /account\.session_version/);
-  assert.match(worker, /Number\(p\.av\)!==Number\(account\.session_version\)/);
+  assert.match(worker, /account\?\.session_version \?\? googleLink\?\.session_version/);
+  assert.match(worker, /p\.av!==Number\(version\)/);
   assert.match(migration, /player_id INTEGER NOT NULL UNIQUE REFERENCES players\(id\)/);
   assert.match(migration, /password_salt TEXT NOT NULL/);
   assert.match(migration, /password_iterations INTEGER NOT NULL/);

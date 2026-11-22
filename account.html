@@ -58,6 +58,17 @@ button:disabled{opacity:.5;cursor:wait}
 </form>
 <p class="small">A senha é derivada com PBKDF2-SHA-256 e salt aleatório no servidor. O e-mail ainda não ativa recuperação automática de senha.</p>
 </section>
+<section class="panel" id="googlePanel">
+<h2>Conta Google · vincular e recuperar</h2>
+<p>Vincule seu reino atual a uma conta Google. Depois, use essa mesma conta em outro aparelho para recuperar exatamente o mesmo castelo e progresso.</p>
+<div class="googleActions">
+<button type="button" id="googleLoginButton" class="secondary" disabled>ENTRAR COM GOOGLE</button>
+<button type="button" id="googleLinkButton" disabled hidden>VINCULAR GOOGLE AO REINO ATUAL</button>
+</div>
+<div id="googleOfficialButton" style="margin-top:12px"></div>
+<p id="googleStatus" class="small" role="status" aria-live="polite">Verificando se o Google está disponível neste jogo…</p>
+<p class="small">A vinculação exige uma sessão do reino existente. A conta Google não substitui outro reino com base apenas no endereço de e-mail.</p>
+</section>
 <div id="accountStatus" class="status" role="status" aria-live="polite">Verificando a sessão deste dispositivo…</div>
 <div class="actions">
 <a class="btn secondary" href="/kingdom.html">🏰 Abrir meu reino</a>
@@ -70,6 +81,87 @@ button:disabled{opacity:.5;cursor:wait}
  const $ = id => document.getElementById(id);
  let token = localStorage.getItem("coi_game_token") || sessionStorage.getItem("coi_game_token") || "";
  let linkedAccount = false;
+ let googleConfig = null, googlePending = null, googleBusy = false;
+ const isNativeAndroid = navigator.userAgent.includes("ClashOfIzzyAndroid/");
+ function googleNotice(message){$("googleStatus").textContent=message;}
+ async function completeGoogle(idToken) {
+   if(googleBusy || !googlePending || typeof idToken!=="string" || !idToken) return;
+   googleBusy=true;
+   const attempt=googlePending;
+   googleNotice("Verificando a conta Google e o vínculo no servidor…");
+   try {
+     const result=await api("/account/google/complete",{method:"POST",body:{
+       purpose:attempt.purpose,nonce:attempt.nonce,idToken
+     }});
+     if(!result.success||!result.token)throw Error("O servidor não confirmou o Google.");
+     saveToken(result.token);
+     googlePending=null;
+     googleNotice("Conta Google validada. Abrindo o reino protegido…");
+     location.href="/kingdom.html";
+   } catch(error) {
+     googlePending=null;
+     googleNotice(error.message);
+   } finally {
+     googleBusy=false;
+     $("googleOfficialButton").replaceChildren();
+   }
+ }
+ // Called only after a user-initiated native Android Credential Manager interaction.
+ window.clashOfIzzyGoogleCredential = idToken => {void completeGoogle(idToken);};
+ window.clashOfIzzyGoogleError = message => {
+   googlePending=null;
+   googleBusy=false;
+   googleNotice(typeof message==="string" && message ? message : "A escolha da conta Google não foi concluída.");
+ };
+ async function loadGoogleScript() {
+   if(window.google?.accounts?.id)return;
+   await new Promise((resolve,reject)=>{
+     const script=document.createElement("script");
+     script.src="https://accounts.google.com/gsi/client";
+     script.async=true;
+     script.onload=resolve;
+     script.onerror=()=>reject(Error("O seletor Google não carregou no navegador."));
+     document.head.append(script);
+   });
+ }
+ async function startGoogle(purpose) {
+   if(googleBusy)return;
+   if(!googleConfig?.enabled)return googleNotice("Google ainda não configurado pelo administrador.");
+   if(purpose==="link"&&!token)return googleNotice("Entre no reino existente para vinculá-lo ao Google.");
+   googleBusy=true;
+   try {
+     const challenge=await api("/account/google/challenge",{method:"POST",body:{purpose}});
+     googlePending={nonce:challenge.nonce,purpose};
+     if(isNativeAndroid){
+       const parameters=new URLSearchParams({nonce:challenge.nonce,clientId:googleConfig.clientId});
+       googleNotice("Selecione sua conta na janela nativa do Android.");
+       location.href="clashofizzy-google://signin?"+parameters.toString();
+     }else{
+       await loadGoogleScript();
+       window.google.accounts.id.initialize({
+         client_id:googleConfig.clientId,nonce:challenge.nonce,
+         callback:response=>{void completeGoogle(response.credential);}
+       });
+       const holder=$("googleOfficialButton");
+       holder.replaceChildren();
+       window.google.accounts.id.renderButton(holder,{type:"standard",theme:"outline",size:"large",text:"continue_with",shape:"rectangular"});
+       googleNotice("Toque no botão oficial do Google exibido acima para confirmar.");
+     }
+   }catch(error){googlePending=null;googleNotice(error.message);}
+   finally{googleBusy=false;}
+ }
+ async function loadGoogleConfig(){
+   try{
+     const config=await api("/account/google/config");
+     googleConfig=config;
+     $("googleLoginButton").disabled=!config.enabled;
+     $("googleLinkButton").disabled=!config.enabled;
+     googleNotice(config.enabled?"Google disponível. Escolha entrar ou vincular seu reino atual.":"Google ainda não configurado para este jogo.");
+   }catch(error){googleNotice(error.message);}
+ }
+ $("googleLoginButton").addEventListener("click",()=>{void startGoogle("login");});
+ $("googleLinkButton").addEventListener("click",()=>{void startGoogle("link");});
+
  function setStatus(message, kind="") {
   const node=$("accountStatus");node.textContent=message;node.className="status "+kind;
  }
@@ -86,15 +178,16 @@ button:disabled{opacity:.5;cursor:wait}
   return data;
  }
  async function inspectSession() {
-  if(!token){setStatus("Nenhum reino está conectado neste dispositivo. Você pode entrar em uma conta existente ou criar uma conta e um novo reino.");return;}
+  if(!token){$("googleLinkButton").hidden=true;setStatus("Nenhum reino está conectado neste dispositivo. Você pode entrar em uma conta existente ou criar uma conta e um novo reino.");return;}
   try{
    const data=await api("/account/status");
    linkedAccount=Boolean(data.hasAccount);
+   $("googleLinkButton").hidden=Boolean(data.googleLinked);
    if(linkedAccount){
     $("registerForm").hidden=true;
     $("registerIntro").textContent="Este reino já está protegido por uma conta persistente.";
     $("logoutButton").hidden=false;
-    setStatus("Conta vinculada: "+data.account.username+(data.account.emailMasked?" · "+data.account.emailMasked:"")+". Seu reino está protegido. Use o login em outros dispositivos.","success");
+    setStatus("Conta vinculada: "+(data.account.username||"Conta Google")+(data.account.emailMasked?" · "+data.account.emailMasked:"")+(data.googleLinked?" · Google vinculado":"")+". Seu reino está protegido. Use o login em outros dispositivos.","success");
    }else{
     $("logoutButton").hidden=true;
     setStatus("Reino existente encontrado neste dispositivo. Criar uma conta agora vai protegê-lo sem apagar construções, tropas, recursos ou progresso.","success");
@@ -102,6 +195,7 @@ button:disabled{opacity:.5;cursor:wait}
   }catch(error){
    if(error.status===401){
     token="";localStorage.removeItem("coi_game_token");sessionStorage.removeItem("coi_game_token");
+    $("googleLinkButton").hidden=true;
     setStatus("A sessão salva expirou ou foi substituída. Entre com sua conta para recuperar o reino; não crie outro reino por engano.","error");
    }else setStatus(error.message,"error");
   }
@@ -143,6 +237,7 @@ button:disabled{opacity:.5;cursor:wait}
   $("registerForm").hidden=false;$("logoutButton").hidden=true;
   setStatus("Sessão encerrada neste dispositivo. Entre novamente para recuperar seu reino.");
  });
+ void loadGoogleConfig();
  void inspectSession();
  if("serviceWorker" in navigator)navigator.serviceWorker.register("/sw.js").catch(()=>{});
 })();
