@@ -15,7 +15,7 @@ test("escudo 35 dias por mapa; 24h de preparação ainda protegidas",()=>{
  assert.equal(THRONE_PREPARATION_HOURS,24);
  assert.equal(THRONE_CONTEST_HOURS,8);
  assert.equal(THRONE_CYCLE_DAYS,7);
- assert.equal(THRONE_HOLD_MINUTES,30);
+ assert.equal(THRONE_HOLD_MINUTES,150);
  assert.deepEqual([at(0),at(33),at(34,0)].map(t=>throneTimeline(origin,t).phase),["shield","shield","preparation"]);
  assert.equal(throneTimeline(origin,at(34,23)).shielded,true);
  assert.equal(throneTimeline(origin,at(35)).phase,"contest");
@@ -28,10 +28,11 @@ test("escudo 35 dias por mapa; 24h de preparação ainda protegidas",()=>{
  assert.throws(()=>throneTimeline("invalid",at(35)));
 });
 
-test("ocupação 30 minutos coroa só antes do fim da etapa de disputa",()=>{
+test("ocupação contínua de 150 minutos coroa apenas dentro da disputa",()=>{
  const row={occupation_cycle:0,occupying_alliance_id:7,occupied_since:at(35,1).toISOString(),crowned_cycle:null};
  assert.equal(mayCoronate(row,origin,at(35,1.4)),false);
- assert.equal(mayCoronate(row,origin,at(35,1.5)),true);
+ assert.equal(mayCoronate(row,origin,at(35,1.5)),false);
+ assert.equal(mayCoronate(row,origin,at(35,3.5)),true);
  assert.equal(mayCoronate({...row,crowned_cycle:0},origin,at(35,2)),false);
  assert.equal(mayCoronate({...row,occupied_since:at(35,7.8).toISOString()},origin,at(35,8.5)),false);
  assert.equal(mayCoronate({...row,occupying_alliance_id:null},origin,at(35,2)),false);
@@ -63,7 +64,7 @@ test("estado público separa mapa protegido, ocupante e monarca sem revelar toke
  assert.equal(view.shielded,false);
  assert.equal(view.occupantAllianceTag,"IZZ");
  assert.equal(view.kingAllianceId,4);
- assert.equal(view.holdRequiredMinutes,30);
+ assert.equal(view.holdRequiredMinutes,150);
  assert.equal(view.minimumCastleLevel,10);
  assert.equal(thronePublicView({realm_id:2,unlocked_at:origin},{},at(20)).status,"protected");
 });
@@ -72,7 +73,11 @@ function fakeDb(row,membership={alliance_id:10},captureResult=true){
  const calls=[];
  const make=sql=>({
   bind(...args){return {
-    first:async()=>sql.includes("FROM realm_openings r JOIN realm_thrones t")?row:
+    first:async()=>sql.includes("SELECT castle_level FROM kingdoms")?{castle_level:10}:
+      sql.includes("FROM kingdom_buildings")?{level:10}:
+      sql.includes("FROM research")?{level:10}:
+      sql.includes("FROM hero_inventory hi")?{level:40,stars:4,rarity:"purple"}:
+      sql.includes("FROM realm_openings r JOIN realm_thrones t")?row:
       sql.includes("FROM alliance_members am")?membership:null,
     run:async()=>({meta:{changes:1}}),
     all:async()=>({results:[]}),
