@@ -4,7 +4,7 @@ Estado: **NO-GO comercial**. Este documento não autoriza merge, deploy, migraç
 
 ## 1. Flags do Worker — não confundir strings e booleanos
 
-A branch `main` define explicitamente em `wrangler.jsonc` como **strings**:
+A PR #240 propõe adicionar à branch `main`, após revisão e merge, os seguintes valores explícitos em `wrangler.jsonc` como **strings**:
 `GAME_4X_SYSTEMS_ENABLED="false"`,
 `LEVEL_PACKS_ENABLED="false"`,
 `LEVEL_PACKS_PUBLIC_ENABLED="false"` e
@@ -18,6 +18,10 @@ A branch de feature `level-packs.js` compara com `=== "true"`. Nunca ativar as f
 `.github/workflows/deploy-cloudflare.yml` só tem `workflow_dispatch`, não `push`. Os inputs `confirm_paid_plan` e `confirm_production` são checkboxes booleanas da tela **Actions → Deploy Clash of Izzy to Cloudflare → Run workflow**, não Environment Variables. O job só roda na `main` com ambas verdadeiras e usa o ambiente protegido `production`.
 
 Não marcar essas confirmações antes de atestar o plano/budget no Dashboard Cloudflare, os checks da CI, o ponto de recuperação, os preços e a janela de lançamento. Sem confirmação o job é ignorado, não é um job de testes seguro por si só.
+
+**Erro operacional concreto:** marcar `confirm_paid_plan=true` e deixar `confirm_production=false` **NÃO** implanta uma versão desativada. O job inteiro é ignorado; não há backup, migração ou deploy. O único caminho de auditoria sem mudanças é o workflow `Cloudflare Paid Readiness (read-only)`.
+
+**Disparos indiretos:** o repositório antes continha `liberar-eldoria-prod-apos-ci.yml` e `publicar-visual-real-apos-ci.yml` com gatilho `workflow_run` que podia solicitar deploy após CI bem-sucedida com marcador de commit. A PR #240 aposenta esses dois bridges e remove suas permissões de escrita em Actions. Seus workflows legados continuam acessíveis, mas apenas para informar a desativação, sem chamar `deploy-cloudflare.yml`. O fluxo manual antigo `primeiro-lancamento-clash-izzy.yml` permanece separado e não é um mecanismo de homologação 4X.
 
 A inspeção inicial sem escrita já existe em **Actions → Cloudflare Paid Readiness (read-only)**, workflow `.github/workflows/cloudflare-paid-readiness.yml`. Escolher `target_branch=main` e deixar a confirmação de Paid desmarcada caso o plano ainda não tenha sido verificado. Esse workflow consulta acesso à conta, metadados, migrações e Time Travel sem aplicar migrações nem publicar Worker; requer GitHub Secrets válidos. O resultado não equivale a ensaio de recuperação.
 
@@ -39,7 +43,7 @@ Documentação: https://developers.cloudflare.com/d1/reference/time-travel/ e ht
 
 ## 4. PRs empilhadas
 
-No momento desta auditoria: `#223` base `main`, `#229` base branch de `#223`, `#233` base branch de `#229`, `#236` base branch de `#233`. As três últimas são Draft. Depois de integrar cada dependência, verificar a base da PR filha, ajustar a base para `main` quando apropriado, conferir cuidadosamente o diff para não duplicar commits e executar CI no novo SHA. A disponibilidade do botão `Update branch` não assegura correção de uma cadeia de PRs empilhadas. Não fazer merges apenas porque a CI antiga estava verde.
+No momento desta auditoria: `#223` base `main`, `#229` base branch de `#223`, `#233` base branch de `#229`, `#236` base branch de `#233`. As três últimas são Draft. Há ainda outras branches Draft (#237 para a assinatura Android e #238 para preços/migração 0043) que requerem análise de conflitos e eventual integração controlada, sem assumir que todo o trabalho está nas quatro PRs principais. Depois de integrar cada dependência, verificar a base da PR filha, ajustar a base para `main` quando apropriado, conferir cuidadosamente o diff para não duplicar commits e executar CI no novo SHA. A disponibilidade do botão `Update branch` não assegura correção de uma cadeia de PRs empilhadas. Não fazer merges apenas porque a CI antiga estava verde.
 
 ## 5. SQL de conferência — chaves internas vs. públicas
 
@@ -66,9 +70,21 @@ WHERE p.player_id = 'PUBLIC_PLAYER_ID_DE_TESTE'
   AND r.mp_order_id = 'MP_ORDER_ID_DE_TESTE';
 ```
 
+**Consulta incorreta (não executar):** `WHERE p.id = 'ID_PUBLICO_DO_JOGADOR'`. `p.id` é inteiro, portanto a pesquisa correta compara o ID público com `p.player_id`. O relacionamento de pagamento é `level_pack_claims.request_id = purchase_requests.id`, enquanto `purchase_requests.mp_order_id` é a referência externa da Order.
+
 Use identificadores sintéticos e mantenha resultados privados. A evidência requer verificar o estado aprovado no provedor, autenticidade do webhook, integridade da entrega e ausência de crédito em replays, transações recusadas e pedidos duplicados; uma linha em `level_pack_claims` sozinha não prova atomicidade.
 
-## 6. Critérios antes de qualquer GO
+## 6. Etapas separadas para Preview, produção e publicidade
+
+**Fase A — auditoria:** executar apenas `Cloudflare Paid Readiness (read-only)` em `main`, sem marcar Paid se não comprovado. Registrar metadados, `d1_migrations` e Time Travel; não inferir que há restore testado.
+
+**Fase B — homologação isolada:** validar migrações em Preview descartável autorizado e realizar pagamento do Mercado Pago Sandbox **somente no ambiente isolado com credenciais de teste**. Não usar o Worker público com credenciais reais para simular Sandbox. Verificar sessão, status via API do provedor, webhook, ledger, saldos anteriores/depois, retries, estornos e ausência de crédito indevido.
+
+**Fase C — integração:** com evidências da Fase B e CI aprovada no SHA exato, revisar/retarget as PRs e os conflitos. Preservar flags comerciais desligadas e aprovar a janela para `deploy-cloudflare.yml`. Nessa execução, **ambos os inputs booleanos precisam estar verdadeiros**, caso contrário o job será ignorado. O pipeline captura bookmark e migra remotamente; mudanças no D1 exigem janela e plano de reversão.
+
+**Fase D — liberação comercial:** validar o Worker público, APK assinado no Android físico, preços P4–P8, testes de canary e métricas. `LEVEL_PACKS_PUBLIC_ENABLED` continuará `"false"` depois de um deploy com as flags de proteção; o workflow não a liga automaticamente. A abertura comercial exige mudança de configuração e novo deploy protegido, com aprovação explícita e reexecução dos gates. Não publicar anúncio de lançamento com base apenas em SQL ou CI verdes.
+
+## 7. Critérios antes de qualquer GO
 
 - Revisar a issue #234 e cada PR/CI atualizada; confirmar também o catálogo e a migração 0043 da #236.
 - Obter auditoria autenticada read-only de produção e Preview; validar o ponto de restauração e o plano de recuperação.
