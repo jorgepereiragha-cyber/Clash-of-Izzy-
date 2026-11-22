@@ -1,6 +1,11 @@
 name: Android APK - instalacao direta
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - "android-sideload/**"
+      - ".github/workflows/android-apk.yml"
   pull_request:
     paths:
       - "android-sideload/**"
@@ -58,11 +63,11 @@ jobs:
       - name: Testar invariantes de seguranca e distribuicao
         run: node --test tests/android-apk-sideload.test.js
       - name: Compilar APK de teste
-        if: ${{ github.event_name == 'pull_request' || inputs.tipo == 'teste' }}
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.tipo == 'teste' }}
         working-directory: android-sideload
         run: gradle --no-daemon assembleDebug
       - name: Verificar assinatura e SHA-256 do APK de teste
-        if: ${{ github.event_name == 'pull_request' || inputs.tipo == 'teste' }}
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.tipo == 'teste' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -71,7 +76,7 @@ jobs:
           (cd "$dir" && sha256sum app-debug.apk > app-debug.apk.sha256)
           echo "APK de teste SHA-256: $(cut -d' ' -f1 "$dir/app-debug.apk.sha256")" >> "$GITHUB_STEP_SUMMARY"
       - name: Publicar APK de teste (ZIP no GitHub Actions)
-        if: ${{ github.event_name == 'pull_request' || inputs.tipo == 'teste' }}
+        if: ${{ github.event_name != 'workflow_dispatch' || inputs.tipo == 'teste' }}
         uses: actions/upload-artifact@v4
         with:
           name: clash-of-izzy-android-apk-teste
