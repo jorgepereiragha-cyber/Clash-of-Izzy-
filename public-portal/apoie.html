@@ -102,7 +102,11 @@ async function loadStats(){
   if(!response.ok)throw Error("Dados indisponíveis");
   const stats=await response.json();
   if(stats.verified!==true)throw Error("Estatísticas sem confirmação");
-  let remaining=Math.max(0,Number(stats.supportTotalCents)||0);
+  if(stats.supportVerified!==true || !Number.isSafeInteger(stats.supportTotalCents) || stats.supportTotalCents<0){
+   document.getElementById("statsStatus").textContent="Contadores verificados: "+Number(stats.totalPlayers).toLocaleString("pt-BR")+" jogadores, "+Number(stats.battles24h).toLocaleString("pt-BR")+" batalhas nas últimas 24h e "+Number(stats.totalAlliances).toLocaleString("pt-BR")+" alianças. Totais financeiros ainda não verificados.";
+   return;
+  }
+  let remaining=Math.max(0,stats.supportTotalCents);
   [200000,50000,300000].forEach((target,index)=>{
    const allocated=Math.min(remaining,target);remaining=Math.max(0,remaining-target);
    document.getElementById("goal"+index+"amount").textContent=currency(allocated)+" / "+currency(target);

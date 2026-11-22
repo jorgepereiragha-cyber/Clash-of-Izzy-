@@ -267,8 +267,14 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
         if(!Number.isSafeInteger(value)||value<0)throw new Error("invalid_stats");
         document.getElementById(id).textContent=value.toLocaleString("pt-BR");
       }
-      const totalCents=Number(data.supportTotalCents);
-      if(!Number.isSafeInteger(totalCents)||totalCents<0)throw new Error("invalid_total");
+      // Contadores 4X podem estar completos antes da migração do ledger de apoio.
+      // Nunca converter total financeiro não verificado (null) em zero.
+      if(data.supportVerified!==true || !Number.isSafeInteger(data.supportTotalCents) || data.supportTotalCents<0){
+        document.getElementById("support-amount").textContent="Apoios confirmados: aguardando validação do banco.";
+        status.textContent="Jogadores, batalhas e alianças verificados. Total de apoios temporariamente indisponível.";
+        return;
+      }
+      const totalCents=data.supportTotalCents;
       const amount=Math.min(2000,totalCents/100);
       document.getElementById("support-goal").value=amount;
       document.getElementById("support-amount").textContent=(totalCents/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})+" confirmados de R$ 2.000";
