@@ -103,7 +103,7 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
           name: "Merlin",
           title: "O Arquimago Supremo",
           rarity: "purple",
-          rarity_label: "Roxo · Lendário",
+          rarity_label: "Roxo · Épico",
           level: 1,
           max_level: 70,
           stars: 1,
@@ -161,4 +161,42 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
   await expect(page.locator(".hero-summon-result")).toContainText("Merlin");
   await expect(page.locator(".hero-roster-card").nth(1).locator(".hero-roster-portrait use")).toHaveAttribute("href", "/assets/art/heroes/portraits.svg#mage");
   expect(actions).toEqual([{ type: "hero_summon", quantity: 1 }]);
+});
+
+test("summon result keeps white, blue, purple and gold labels and matching visual tiers", async ({ page }) => {
+  const state = makeHeroState();
+  await page.addInitScript(token => {
+    window.localStorage.setItem("coi_game_token", token);
+  }, TOKEN);
+
+  await page.route("**/api/game/state", route => route.fulfill({
+    status: 200, contentType: "application/json", body: JSON.stringify({ state }),
+  }));
+  await page.route("**/api/game/action", route => route.fulfill({
+    status: 200,
+    contentType: "application/json",
+    body: JSON.stringify({
+      success: true,
+      state: { ...state, player: { ...state.player, gems: 100 } },
+      battle: {
+        summons: [
+          { hero_key: "common_fixture", name: "Comum QA", rarity: "white", result_type: "new" },
+          { hero_key: "rare_fixture", name: "Raro QA", rarity: "blue", result_type: "new" },
+          { hero_key: "epic_fixture", name: "Épico QA", rarity: "purple", result_type: "new" },
+          { hero_key: "gold_fixture", name: "Dourado QA", rarity: "gold", result_type: "new" },
+        ],
+      },
+    }),
+  }));
+
+  await page.goto("/equipment-ui.html");
+  await expect(page.locator("#rarity-badge.comum")).toHaveCSS("background-color", "rgb(104, 121, 139)");
+  await page.locator("#hero-summon-ten").click();
+  for (const [tier, label] of [
+    ["white", "Comum"], ["blue", "Raro"], ["purple", "Épico"], ["gold", "Lendário dourado"],
+  ]) {
+    await expect(page.locator(".hero-summon-result.rarity-" + tier + " span")).toHaveText(label);
+  }
+  await expect(page.locator(".hero-summon-result.rarity-gold")).toHaveCSS("border-top-color", "rgb(255, 215, 0)");
+  await expect(page.locator("#hero-summon-status")).toContainText("4 herói(s) novo(s)");
 });
