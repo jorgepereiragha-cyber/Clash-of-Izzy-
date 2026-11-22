@@ -24,6 +24,13 @@ antes de declarar acesso exclusivamente via APK.
    secrets: `ANDROID_RELEASE_KEYSTORE_BASE64`,
    `ANDROID_RELEASE_STORE_PASSWORD`, `ANDROID_RELEASE_KEY_ALIAS` e
    `ANDROID_RELEASE_KEY_PASSWORD`. Nunca publicar secrets nem chave.
+   Identifique o SHA-256 do certificado de assinatura da keystore em ambiente
+   privado (por exemplo, `keytool -list -v -keystore arquivo.jks`). Configure
+   **Actions > Variables** com `ANDROID_RELEASE_CERT_SHA256` (64 hexadecimais,
+   sem os dois-pontos). Nao use o SHA-256 do arquivo APK ou da keystore no lugar
+   do fingerprint do **certificado**. O workflow cancela o release se a variavel
+   estiver ausente ou nao corresponder a assinatura do APK. O fingerprint nao
+   e uma senha, mas a keystore e suas credenciais devem continuar privadas.
 4. Em GitHub Actions, executar `Publicar APK Android oficial` na `main`,
    informando `versao` (ex.: 1.0.0), `codigo_versao` crescente e
    `PUBLICAR_APK_OFICIAL` como confirmacao.
@@ -50,3 +57,10 @@ antes de declarar acesso exclusivamente via APK.
 - A loja, Mercado Pago e Nubank nao aparecem no portal, apenas dentro
   do jogo. Pix continua desabilitado no servidor por padrao e depende
   de reconciliacao verificavel. Nenhuma conta bancaria foi alterada.
+
+
+## Pesquisa de referencia
+- Assinatura e atualizacoes de APK: https://developer.android.com/studio/publish/app-signing
+- Ferramenta `apksigner verify --print-certs`: https://developer.android.com/tools/apksigner
+- WebView seguro (conteudo controlado, HTTPS, JavaScript): https://developer.android.com/privacy-and-security/risks/insecure-webview-native-bridges
+- Play Integrity e instalacao fora da Play Store: https://developer.android.com/google/play/integrity/verdicts
