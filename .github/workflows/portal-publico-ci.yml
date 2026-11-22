@@ -29,7 +29,7 @@ jobs:
       - name: Sintaxe do Worker promocional
         run: node --check portal-worker.js
       - name: Testes de isolamento e seguranca
-        run: node --test tests/portal-isolation.test.js
+        run: node --test tests/portal-isolation.test.js tests/portal-support.test.js
       - name: Auditar arquivos publicados
         shell: bash
         run: |
