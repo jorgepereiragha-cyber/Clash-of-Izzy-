@@ -184,6 +184,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
     const catalogBefore = expectStatus(await api("/api/store/catalog"), 200, "catálogo público");
     assert.ok(Array.isArray(catalogBefore.skins));
+    assert.equal(catalogBefore.skins.length, 6, "a loja libera somente seis skins na edição inicial");
+    assert.equal(catalogBefore.skin_edition, "initial");
+    assert.equal(catalogBefore.skin_limit, 6);
     assert.ok(Array.isArray(catalogBefore.packages));
 
     const betaWithoutConsent = expectStatus(await api("/api/beta/signup", {
@@ -199,6 +202,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     }), 409, "inscrição beta duplicada");
 
     const startA = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do primeiro reino");
+    const resumedA = expectStatus(await api("/api/game/start", { method: "POST", token: startA.token, body: {} }), 200, "reentrada não cria um segundo reino");
+    assert.equal(resumedA.resumed, true);
+    assert.equal(resumedA.state.kingdom.id, startA.state.kingdom.id, "o mesmo jogador mantém o mesmo único reino");
+    assert.equal(resumedA.state.player.player_id, startA.state.player.player_id);
     const startB = expectStatus(await api("/api/game/start", { method: "POST", body: { referrer_code: startA.state.player.player_id } }), 201, "fundação do segundo reino por convite");
     assert.equal(startB.referral_recorded, true, "o convite é atribuído apenas após criar o novo reino");
     const startC = expectStatus(await api("/api/game/start", { method: "POST", body: {} }), 201, "fundação do terceiro reino");
@@ -229,6 +236,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const kingdomB = Number(startB.state.kingdom.id);
     const kingdomC = Number(startC.state.kingdom.id);
     const playerA = stateA.player.player_id;
+    const playerC = startC.state.player.player_id;
     const referralSummary = expectStatus(await api("/api/game/referral/link", { token: tokenA }), 200, "link autenticado de indicação");
     assert.equal(referralSummary.referral_code, playerA);
     assert.equal(referralSummary.referral_count, 1);
@@ -509,10 +517,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const admin = (route, body) => api(route, { method: "POST", token: adminToken, body });
     const adminGet = route => api(route, { method: "GET", token: adminToken });
     const adminHealth = expectStatus(await adminGet("/api/admin/health"), 200, "health administrativo com sessão Master");
-    assert.equal(adminHealth.hasDB, true);
-    assert.equal(adminHealth.hasSESSION_SECRET, true);
-    assert.equal(adminHealth.hasADMIN_EMAIL, true);
-    assert.equal(adminHealth.hasADMIN_PASSWORD, true);
+    assert.equal(adminHealth.hasDB,true);
+    assert.equal(adminHealth.hasSESSION_SECRET,true);
+    assert.equal(adminHealth.hasADMIN_EMAIL,true);
+    assert.equal(adminHealth.hasADMIN_PASSWORD,true);
 
     await t.test("controle Master da Ascensão de Valhalla", async () => {
       expectStatus(await api("/api/valhalla-admin/status"), 401, "Valhalla admin exige sessão Master");
@@ -630,36 +638,48 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const catalog = expectStatus(await api("/api/store/catalog"), 200, "catálogo atualizado");
       const vip = catalog.packages.find(item => item.name === "Pacote de integração");
       const skin = catalog.skins[0];
+      assert.equal(catalog.skins.length, 6, "catálogo de lançamento permanece limitado a seis skins");
       assert.ok(vip?.id, "pacote VIP aparece no catálogo");
       assert.ok(skin?.id && skin?.name, "skin existente aparece no catálogo");
+      assert.ok(Number(skin.attack_bonus_percent) >= 0.35 && Number(skin.attack_bonus_percent) <= 2.34, "skin apresenta bônus de ataque individual");
+      assert.ok(Number(skin.defense_bonus_percent) >= 0.35 && Number(skin.defense_bonus_percent) <= 2.34, "skin apresenta bônus de defesa individual");
 
       expectStatus(await admin("/api/admin/unlock-skin", {
         playerId: playerA, skin: skin.name,
       }), 200, "desbloqueio Master de skin");
+      expectStatus(await api("/api/game/action",{method:"POST",token:tokenB,body:{type:"castle_skin_equip",skinId:skin.id}}),404,"outro jogador não equipa skin alheia");
+      expectStatus(await api("/api/game/action",{method:"POST",token:tokenA,body:{type:"castle_skin_equip",skinId:skin.id}}),200,"dono equipa skin liberada");
+      const equippedState=expectStatus(await api("/api/game/state",{token:tokenA}),200,"estado após equipar skin").state;
+      assert.equal(Number(equippedState.kingdom.equipped_skin_id),Number(skin.id));
+      assert.ok(equippedState.castleSkins.some(item=>Number(item.id)===Number(skin.id)));
+      expectStatus(await api("/api/game/action",{method:"POST",token:tokenA,body:{type:"castle_skin_equip",skinId:999999}}),404,"skin inexistente não pode ser equipada");
+      expectStatus(await api("/api/game/action",{method:"POST",token:tokenA,body:{type:"castle_skin_equip",skinId:null}}),200,"remover aparência equipada");
       expectStatus(await admin("/api/admin/unlock-skin", {
         playerId: playerA, skin: "Skin inexistente",
       }), 404, "skin inexistente não é liberada");
 
-      expectStatus(await api("/api/store/purchase-request", {
+      const disabledPix=await api("/api/store/purchase-request", {
         method: "POST", token: tokenA,
         body: {
           kind: "vip_package", itemId: vip.id,
           requestKey: "integration-vip-request-01",
           paymentMethod: "pix",
         },
-      }), 400, "bloqueio do PIX direto");
+      });
+      assert.equal(disabledPix.status,503,"Pix disabled must reject purchases");
+      assert.equal(disabledPix.data.code,"NUBANK_PIX_NOT_CONFIGURED");
 
       const purchase = expectStatus(await api("/api/store/purchase-request", {
         method: "POST", token: tokenA,
         body: {
           kind: "vip_package", itemId: vip.id,
           requestKey: "integration-vip-request-01",
-          paymentMethod: "mercadopago_link", paymentReference: "TESTE-NAO-PAGO",
+          paymentMethod: "manual_whatsapp",
         },
       }), 201, "criação de pedido VIP");
       assert.ok(purchase.request?.id);
       assert.equal(purchase.request.status, "pending");
-      assert.equal(purchase.request.payment_method, "mercadopago_link");
+      assert.equal(purchase.request.payment_method, "manual");
 
       const pending = expectStatus(await admin("/api/admin/purchase-requests", {}), 200, "fila Master de pedidos");
       assert.ok(pending.requests.some(item => Number(item.id) === Number(purchase.request.id)));
@@ -671,12 +691,31 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         requestId: purchase.request.id, decision: "approve",
       }), 409, "bloqueio de aprovação duplicada");
 
+      const hiddenSkinRows = rowsFromD1Json(await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "SELECT id,name FROM skins ORDER BY id LIMIT 1 OFFSET 6;",
+      ]));
+      if (hiddenSkinRows.length) {
+        expectStatus(await api("/api/store/purchase-request", {
+          method: "POST", token: tokenC,
+          body: {
+            kind: "skin", itemId: hiddenSkinRows[0].id,
+            requestKey: "integration-locked-skin-01",
+            paymentMethod: "manual_whatsapp",
+          },
+        }), 404, "skin fora das seis liberadas não pode gerar pedido");
+        expectStatus(await admin("/api/admin/unlock-skin", {
+          playerId: playerC, skin: hiddenSkinRows[0].name,
+        }), 404, "painel Master não libera skin ainda bloqueada");
+      }
+
       const skinPurchase = expectStatus(await api("/api/store/purchase-request", {
         method: "POST", token: tokenB,
         body: {
           kind: "skin", itemId: skin.id,
           requestKey: "integration-skin-request-01",
-          paymentMethod: "mercadopago_link",
+          paymentMethod: "manual_whatsapp",
         },
       }), 201, "pedido de skin de outro jogador");
       expectStatus(await admin("/api/admin/purchase-requests/review", {
@@ -701,10 +740,102 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "cosmetic_claim", collection: "col_medieval" }, 200);
       await action(tokenA, { type: "cosmetic_claim", collection: "col_medieval" }, 409, "recompensa de coleção duplicada");
       await action(tokenA, { type: "cosmetic_buy", skin: "c7" }, 200);
+
+      // Isolated local D1 fixture: fund the test account, then exercise the complete
+      // five-piece Egypt set through the authenticated game-action contract.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE players SET gems=12000 WHERE player_id='" + playerA + "';",
+      ]);
+      const egyptianPieces = [
+        "eg_ra_crown",
+        "eg_anubis_armor",
+        "eg_horus_blade",
+        "eg_isis_ankh",
+        "eg_sekhmet_aura",
+      ];
+      for (const skin of egyptianPieces) {
+        await action(tokenA, { type: "cosmetic_buy", skin }, 200, "compra da relíquia " + skin);
+      }
+      await action(tokenB, { type: "skin_set_equip", itemId: "eg_ra_crown" }, 404,
+        "outro reino não equipa relíquia alheia");
+      for (const itemId of egyptianPieces) {
+        await action(tokenA, { type: "skin_set_equip", itemId }, 200, "equipar relíquia " + itemId);
+      }
+      let pantheonState = expectStatus(
+        await api("/api/game/state", { token: tokenA }), 200, "estado após equipar o Panteão Egípcio"
+      ).state;
+      let egyptianSet = pantheonState.cosmetics.skinSets.find(set => set.id === "egyptian_solar_court");
+      assert.equal(egyptianSet.equippedCount, 5, "as cinco relíquias devem permanecer equipadas");
+      assert.deepEqual(egyptianSet.activeThresholds.map(item => item.pieces), [2, 3, 5]);
+      assert.equal(egyptianSet.activeBonuses.attackPercent, 2.25);
+      assert.equal(egyptianSet.activeBonuses.defensePercent, 2);
+      await action(tokenA, { type: "skin_set_unequip", slot: "aura" }, 200, "desequipar aura egípcia");
+      pantheonState = expectStatus(
+        await api("/api/game/state", { token: tokenA }), 200, "estado após remover uma relíquia"
+      ).state;
+      egyptianSet = pantheonState.cosmetics.skinSets.find(set => set.id === "egyptian_solar_court");
+      assert.equal(egyptianSet.equippedCount, 4);
+      assert.equal(egyptianSet.activeThreshold.pieces, 3,
+        "remover a quinta peça deve desligar apenas o marco de conjunto completo");
+      await action(tokenA, { type: "skin_set_equip", itemId: "eg_sekhmet_aura" }, 200,
+        "reequipar aura egípcia");
+
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c2", "c3"] }, 200);
       await action(tokenA, { type: "skin_fuse", inputs: ["c1", "c1", "c2"] }, 400, "fusão com skins repetidas");
       await action(tokenA, { type: "shop_buy", item: "acc_5min", source: "shop" }, 200);
+      // End-to-end economy assertions use a disposable local D1 only.
+      const baseline = (await api("/api/game/state", { token: tokenA })).data.state;
+      const resources = ["food","wood","stone","iron","gold"];
+      const beforeMarket = Object.fromEntries(resources.map(key => [key, Number(baseline.kingdom[key] || 0)]));
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE kingdoms SET food=1000000,wood=1000000,stone=1000000,iron=1000000,gold=1000000 WHERE id=" + Number(kingdomA) + ";",
+      ]);
+      try {
+        let marketState = (await api("/api/game/state", { token: tokenA })).data.state;
+        const exchange = marketState.shop.exchangeOffers[0];
+        assert.ok(exchange?.id && exchange?.reward?.item, "servidor envia ofertas do mercador");
+        const qtyBefore = Number(marketState.shop.inventory.find(x => x.item_id === exchange.reward.item)?.quantity || 0);
+        await action(tokenA, { type: "merchant_exchange", offerId: exchange.id }, 200);
+        marketState = (await api("/api/game/state", { token: tokenA })).data.state;
+        const qtyAfter = Number(marketState.shop.inventory.find(x => x.item_id === exchange.reward.item)?.quantity || 0);
+        assert.equal(qtyAfter - qtyBefore, Number(exchange.reward.quantity), "recompensa creditada uma vez");
+        await action(tokenA, { type: "merchant_exchange", offerId: "oferta_invalida" }, 409);
+
+        const offer = marketState.heroShop.offers[0];
+        assert.ok(offer?.heroKey && offer?.quantity > 0, "loja apresenta herói já recrutado");
+        await action(tokenA, { type: "hero_shop_buy", heroKey: "heroi_inexistente" }, 404);
+        await action(tokenA, { type: "hero_shop_buy", heroKey: offer.heroKey }, 200);
+        const next = (await api("/api/game/state", { token: tokenA })).data.state;
+        const updated = next.heroShop.offers.find(x => x.heroKey === offer.heroKey);
+        assert.equal(Number(updated?.fragments) - Number(offer.fragments), Number(offer.quantity),
+          "fragmentos creditados no herói canônico");
+        await action(tokenA, { type: "queue_speedup", queueId: 999999, itemId: "acc_5min", quantity: 1 }, 404);
+      } finally {
+        await runCli([
+          "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+          "--local", "--persist-to", persistDir,
+          "--command", "UPDATE kingdoms SET " + resources.map(key => key + "=" + beforeMarket[key]).join(",") +
+            " WHERE id=" + Number(kingdomA) + ";",
+        ]);
+      }
+      // The Egypt fixture deliberately funds five relic purchases; restore the
+      // insufficient-balance condition before asserting seasonal purchase rejection.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE players SET gems=0 WHERE player_id='" + playerA + "';",
+      ]);
       await action(tokenA, { type: "seasonal_buy", skin: "s1" }, 409, "compra sazonal sem gemas suficientes");
+      // Restore the funded test balance so later hero-summon coverage is independent.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE players SET gems=12000 WHERE player_id='" + playerA + "';",
+      ]);
       await action(tokenA, { type: "cosmetic_buy", skin: "skin_inexistente" }, 400, "skin cosmética inválida");
     });
 
@@ -713,11 +844,11 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const heroId = Number(stateA.heroes?.[0]?.id);
       assert.ok(heroId > 0, "herói inicial tem identidade persistente");
 
-      await action(tokenA, { type: "equipment_upgrade", itemId: "espada_guerreiro" }, 200);
-      await action(tokenA, { type: "equipment_equip", itemId: "espada_guerreiro", heroId }, 200);
-      await action(tokenA, { type: "equipment_unequip", itemId: "espada_guerreiro", heroId }, 200);
-      await action(tokenA, { type: "equipment_lock", itemId: "espada_guerreiro" }, 200);
-      await action(tokenA, { type: "equipment_lock", itemId: "espada_guerreiro" }, 200);
+      await action(tokenA, { type: "equipment_upgrade", itemId: "iron_sword" }, 200);
+      await action(tokenA, { type: "equipment_equip", itemId: "iron_sword", heroId }, 200);
+      await action(tokenA, { type: "equipment_unequip", itemId: "iron_sword", heroId }, 200);
+      await action(tokenA, { type: "equipment_lock", itemId: "iron_sword" }, 200);
+      await action(tokenA, { type: "equipment_lock", itemId: "iron_sword" }, 200);
       await action(tokenA, { type: "equipment_craft", itemId: "rune_spear" }, [400, 409], "forja com pré-requisitos não concluídos");
       await action(tokenA, { type: "equipment_equip", itemId: "item_inexistente", heroId }, 400, "equipamento inexistente");
 
@@ -812,6 +943,10 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenB, { type: "alliance_accept_invite", inviteId: invite.id }, 200);
       await action(tokenA, { type: "alliance_promote", targetKingdomId: kingdomB, rank: "oficial" }, 200);
       await action(tokenB, { type: "alliance_chat", message: "Teste de comunicação entre aliados" }, 200);
+      const chatFeed = await api("/api/game/alliance/chat", { token: tokenB });
+      expectStatus(chatFeed, 200, "feed compacto do chat da aliança");
+      assert.equal(chatFeed.data.alliance?.name, "Guardioes Alfa");
+      assert.ok(chatFeed.data.chat?.some(message => message.message === "Teste de comunicação entre aliados"));
       await action(tokenA, { type: "alliance_donate", resource: "food", amount: 1000 }, 200);
       await action(tokenA, { type: "alliance_donate", resource: "wood", amount: 1000 }, 200);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomB }, 200);
@@ -840,17 +975,57 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(await api("/api/admin/purchase-requests", { method: "POST", body: {} }), 401, "fila Master sem sessão");
     });
 
-    await t.test("todas as 34 ações previstas foram alcançadas no fluxo de integração", async () => {
+    await t.test("castelo 30 permanece 30 após sete ascensões VIP; transações idempotentes", async () => {
+      // Fixture isolada, aplicada somente no banco D1 local do teste.
+      await runCli([
+        "--config","wrangler.jsonc","d1","execute","clash-of-izzy-db",
+        "--local","--persist-to",persistDir,
+        "--command",
+        "UPDATE kingdoms SET castle_level=30 WHERE id="+kingdomA+";"+
+        "UPDATE kingdom_buildings SET level=30 WHERE kingdom_id="+kingdomA+" AND building_type='castle';"+
+        "UPDATE players SET gems=200000 WHERE id=(SELECT player_id FROM kingdoms WHERE id="+kingdomA+");"
+      ]);
+      let vipState=expectStatus(await api("/api/game/state",{token:tokenA}),200,"estado do castelo 30").state;
+      assert.equal(vipState.kingdom.castle_level,30);
+      assert.equal(vipState.castleVip.level,0);
+      assert.equal(vipState.castleVip.eligible,true);
+      let remaining=200000;
+      const costs=[1000,2500,5000,10000,20000,40000,80000];
+      for(let level=1;level<=7;level++){
+        const result=await action(tokenA,{type:"castle_vip_upgrade",expectedVipLevel:level-1},200,"ascensão VIP "+level);
+        const next=result.state;
+        remaining-=costs[level-1];
+        assert.equal(next.castleVip.level,level);
+        assert.equal(next.kingdom.castle_level,30);
+        assert.equal(next.buildings.find(row=>row.building_type==="castle")?.level,30);
+        assert.equal(next.player.gems,remaining);
+        assert.equal(next.castleVip.bonuses.productionPercent,level*10);
+        if(level===1||level===7){
+          const duplicate=await action(tokenA,{type:"castle_vip_upgrade",expectedVipLevel:level-1},409,"repetição VIP "+level);
+          assert.match(duplicate.error,/desatualizado|VIP 7 já alcançado/i);
+          const after=expectStatus(await api("/api/game/state",{token:tokenA}),200,"saldo após repetição VIP "+level).state;
+          assert.equal(after.player.gems,remaining);
+          assert.equal(after.castleVip.level,level);
+        }
+      }
+      await action(tokenA,{type:"castle_vip_upgrade",expectedVipLevel:7},409,"bloqueio VIP acima de sete");
+      const last=expectStatus(await api("/api/game/state",{token:tokenA}),200,"VIP 7 final").state;
+      assert.equal(last.castleVip.completed,true);
+      assert.equal(last.castleVip.next,null);
+      assert.equal(last.kingdom.castle_level,30);
+    });
+    
+    await t.test("todas as 40 ações previstas foram alcançadas no fluxo de integração", async () => {
       const actionTypes = [
         "set_nickname","equipment_craft","equipment_upgrade","equipment_equip","equipment_unequip","equipment_lock",
-        "cosmetic_buy","cosmetic_claim","seasonal_buy","skin_fuse","shop_buy","alliance_create","alliance_join",
+        "cosmetic_buy","cosmetic_claim","skin_set_equip","skin_set_unequip","seasonal_buy","skin_fuse","shop_buy","merchant_exchange","hero_shop_buy","queue_speedup","alliance_create","alliance_join",
         "alliance_invite","alliance_accept_invite","alliance_promote","alliance_kick","alliance_donate","alliance_help",
         "alliance_chat","alliance_war_declare","alliance_claim_territory","alliance_leave","dragon_upgrade","hero_summon",
-        "hero_evolve","hero_train","prestige","upgrade","train","research","march","battle","rename",
+        "hero_evolve","hero_train","prestige","castle_vip_upgrade","upgrade","train","research","march","battle","rename",
       ];
-      assert.equal(actionTypes.length, 34);
+      assert.equal(actionTypes.length, 40);
       assert.deepEqual([...executedActions].sort(), [...actionTypes].sort(),
-        "cada um dos 34 tipos de ação deve ter sido enviado ao Worker autenticado");
+        "cada um dos 40 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
   } finally {
     if (workerProcess && workerProcess.exitCode === null) {

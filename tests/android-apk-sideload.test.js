@@ -62,3 +62,22 @@ test('APK client keeps city navigation and official game backend separate', () =
   assert.match(city, /src="\/scripts\/kingdom-command-hud\.js"/);
   assert.match(activity, /https:\/\/clash-of-izzy\.jorgepereiragha\.workers\.dev\/kingdom\.html/);
 });
+
+test('Tela de abertura nativa usa a identidade do jogo e libera acesso quando a pagina conclui', () => {
+  assert.match(activity, /GradientDrawable\.Orientation\.TOP_BOTTOM/);
+  assert.match(activity, /loadingTitle\.setText\("CLASH OF IZZY"\)/);
+  assert.match(activity, /loadingPanel\.setVisibility\(View\.GONE\)/);
+  assert.match(activity, /if \(!hasLoadedPage\) loadingPanel\.setVisibility\(View\.VISIBLE\)/);
+  assert.match(activity, /progress\.setProgressTintList/);
+  assert.match(activity, /offlinePanel\.setVisibility\(View\.VISIBLE\)/);
+  assert.doesNotMatch(activity, /WebView\.setWebContentsDebuggingEnabled\(true\)/);
+});
+
+test('A recuperação offline usa cartão medieval, botão acessível e largura limitada', () => {
+  assert.match(activity, /recoveryCardBackground\.setCornerRadius\(dp\(18\)\)/);
+  assert.match(activity, /recoveryCardBackground\.setStroke\(dp\(1\)/);
+  assert.match(activity, /retry\.setMinimumHeight\(dp\(54\)\)/);
+  assert.match(activity, /retry\.setBackground\(retryBackground\)/);
+  assert.match(activity, /Math\.min\(dp\(420\), availableWidth\)/);
+  assert.match(activity, /hasLoadedPage = false;/);
+});

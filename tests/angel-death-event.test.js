@@ -90,7 +90,9 @@ test("leaderboard ties follow the same stable ordering as final reward payout", 
   assert.ok(worker.includes("last_attack_at<?"));
   assert.ok(worker.includes("kingdom_id<?"));
   assert.ok(worker.includes("ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC"));
-  assert.ok(worker.includes("offset+=15"));
+  assert.ok(worker.includes("ROW_NUMBER() OVER (ORDER BY ep.score DESC,ep.damage DESC,ep.last_attack_at ASC,ep.kingdom_id ASC) AS final_rank"));
+  assert.ok(worker.includes("ORDER BY ranked.final_rank LIMIT 10"));
+  assert.ok(worker.includes("Number(participant.final_rank)||index+1"));
 });
 
 test("the browser reuses a pending attack request ID after a network retry", async () => {
@@ -131,3 +133,30 @@ test("Anjo da Morte top rewards exceed the largest existing gem collection rewar
   assert.ok(first.deathEssence>top10.deathEssence&&top10.deathEssence>participation.deathEssence);
 });
 
+test("Anjo da Morte distribui as baixas pelo exército inteiro, sem punir pilhas pequenas", () => {
+  const seed = 98765;
+  const singleStack = simulateAngelDeathAttack({
+    army: [{ unit_type: "militia", tier: 1, quantity: 10 }],
+    castleLevel: 12,
+    seed
+  });
+  const splitStacks = simulateAngelDeathAttack({
+    army: Array.from({ length: 10 }, (_, index) => ({
+      unit_type: "militia",
+      tier: index + 1,
+      quantity: 1
+    })),
+    castleLevel: 12,
+    seed
+  });
+
+  assert.equal(splitStacks.totalTroops, 10);
+  assert.equal(splitStacks.troopsLost, singleStack.troopsLost);
+  assert.equal(splitStacks.troopsLost, Math.max(1, Math.floor(splitStacks.totalTroops * splitStacks.lossRate)));
+  assert.equal(
+    Object.values(splitStacks.losses).reduce((total, loss) => total + loss, 0),
+    splitStacks.troopsLost
+  );
+  assert.ok(splitStacks.troopsLost < splitStacks.totalTroops);
+  assert.ok(Object.values(splitStacks.losses).every(loss => loss === 0 || loss === 1));
+});

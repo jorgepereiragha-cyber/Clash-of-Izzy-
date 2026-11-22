@@ -7,9 +7,11 @@ const files = [
   "../navigation.js",
   "../events.js",
   "../world-map.js",
+  "../world-map-3d.js",
   "../equipment-system.js",
   "../scripts/kingdom-3d.js",
   "../scripts/kingdom-quality.js",
+  "../scripts/ambient-particles.js",
   "../scripts/cinematic/capture-system.js",
   "../scripts/cinematic/media-recorder-support.js",
   "../scripts/cinematic/trailer-script.js",
@@ -17,6 +19,7 @@ const files = [
   "../engine/asset-loader.js",
   "../engine/resource-disposal.js",
   "../engine/texture-manager.js"
+
 ];
 
 test("browser game modules parse before deployment", () => {

@@ -2,6 +2,7 @@ import { AnimationMixer } from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
 import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
+import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { disposeGLTFResources } from './resource-disposal.js';
 
@@ -14,7 +15,7 @@ let ktx2Loader = null;
 let loaderGeneration = 0;
 let disposed = true;
 
-const THREE_CDN = 'https://cdn.jsdelivr.net/npm/three@0.187.0/examples/jsm/libs/';
+const THREE_VENDOR_PATH = '/vendor/three/examples/jsm/libs/';
 
 function validateModelUrl(url) {
   const parsed = new URL(String(url), window.location.href);
@@ -31,16 +32,17 @@ export function initAssetLoader(renderer, options = {}) {
   loaderGeneration += 1;
   disposed = false;
   dracoLoader = new DRACOLoader();
-  dracoLoader.setDecoderPath(options.dracoPath || `${THREE_CDN}draco/gltf/`);
+  dracoLoader.setDecoderPath(options.dracoPath || `${THREE_VENDOR_PATH}draco/`);
 
   ktx2Loader = new KTX2Loader();
-  ktx2Loader.setTranscoderPath(options.basisPath || `${THREE_CDN}basis/`);
+  ktx2Loader.setTranscoderPath(options.basisPath || `${THREE_VENDOR_PATH}basis/`);
   ktx2Loader.detectSupport(renderer);
 
   gltfLoader = new GLTFLoader();
   gltfLoader.setCrossOrigin('anonymous');
   gltfLoader.setDRACOLoader(dracoLoader);
   gltfLoader.setKTX2Loader(ktx2Loader);
+  gltfLoader.setMeshoptDecoder(MeshoptDecoder);
   return gltfLoader;
 }
 

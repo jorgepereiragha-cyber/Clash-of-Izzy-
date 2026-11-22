@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 test("Worker processa marchas vencidas sem depender do login do jogador", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   assert.ok(worker.includes("async function processDueMarches(env)"));
-  assert.ok(worker.includes("SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 100"));
+  assert.ok(worker.includes("SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 1"));
   const schedulerStart = worker.indexOf("async scheduled(controller,env){");
   const schedulerEnd = worker.indexOf("async fetch(request,env)", schedulerStart);
   const scheduler = worker.slice(schedulerStart, schedulerEnd);

@@ -29,6 +29,14 @@ jobs:
     steps:
       - name: Checkout da versao solicitada
         uses: actions/checkout@v4
+      - name: Nao assinar release fora da branch principal
+        if: ${{ github.event_name == 'workflow_dispatch' && inputs.tipo == 'assinado' }}
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF" != "refs/heads/main" ]]; then
+            echo "::error::APK comercial assinado requer codigo aprovado na main."
+            exit 1
+          fi
       - name: JDK 17
         uses: actions/setup-java@v4
         with:
@@ -38,12 +46,15 @@ jobs:
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
-      - name: Android SDK
-        uses: android-actions/setup-android@v3
-        with:
-          packages: platform-tools
-      - name: Plataforma Android e ferramentas de assinatura
-        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Android SDK preinstalado no GitHub runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ANDROID_HOME:?Android SDK nao encontrado no runner}"
+          sdkmanager_cmd="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$sdkmanager_cmd"
+          yes | "$sdkmanager_cmd" --licenses > /dev/null || true
+          "$sdkmanager_cmd" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
       - name: Testar invariantes de seguranca e distribuicao
         run: node --test tests/android-apk-sideload.test.js
       - name: Compilar APK de teste

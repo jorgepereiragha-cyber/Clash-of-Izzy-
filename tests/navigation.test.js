@@ -134,6 +134,8 @@ test("skin results are highlighted in the equipment catalog after navigation", a
   const equipment = await read("equipment-system.js");
   assert.ok(equipment.includes("requestedSkinSearch"));
   assert.ok(equipment.includes("searchFocusApplied"));
-  assert.ok(equipment.includes("matches[0].scrollIntoView"));
+  assert.ok(equipment.includes("match.scrollIntoView"));
+  assert.ok(equipment.includes('$("pantheon-skin-set-grid")'));
+  assert.ok(equipment.includes('".norse-skin-card,.pantheon-relic-card"'));
   assert.ok(equipment.includes("normalizeSearch(card.textContent).includes(needle)"));
 });

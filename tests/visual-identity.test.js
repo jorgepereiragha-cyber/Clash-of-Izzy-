@@ -17,7 +17,7 @@ test("cidade 3D segue a bíblia visual com telhados azul-real e detalhes dourado
   assert.match(bible, /telhados azul-real e detalhes dourados/i);
   assert.match(renderer, /roof: material\("#24476B"\)/);
   assert.match(renderer, /\[mats\.roof, "#24476B", "roof"/);
-  assert.match(renderer, /color: "#E7BD68"/);
+  assert.match(renderer, /color: castleSkin \? castleSkin\.banner : "#E7BD68"/);
   assert.match(renderer, /heraldic seal/);
 });
 
@@ -56,4 +56,39 @@ test("tema compartilhado define tokens da marca e acessibilidade básica", async
   }
   assert.match(css, /:focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
+});
+
+
+test("portal de download apresenta o emblema original com herói e espada", async () => {
+  const portal = await readFile(new URL("../portal.html", import.meta.url), "utf8");
+  const art = await readFile(new URL("../assets/brand/hero-emblem.svg", import.meta.url), "utf8");
+  assert.match(portal, /src="\/assets\/brand\/hero-emblem\.svg"/);
+  assert.match(art, /<svg/);
+  assert.match(art, /Herói de coroa dourada/);
+  assert.match(art, /espada/);
+  assert.doesNotMatch(portal, /href="\/kingdom\.html"/);
+});
+
+test("PBR map derivation wraps samples at texture edges and emits bounded linear data", async () => {
+  const { derivePbrTextureData } = await import("../scripts/kingdom-materials.js");
+  const width = 8, height = 8;
+  const luminance = new Uint8Array(width * height);
+  for (let y = 0; y < height; y++) for (let x = 0; x < width; x++) {
+    luminance[y * width + x] = Math.min(255, x * 24 + y * 9);
+  }
+  const result = derivePbrTextureData({ luminance, width, height, kind: "stone" });
+  assert.equal(result.normalData.length, width * height * 4);
+  assert.equal(result.roughnessData.length, width * height * 4);
+  assert.ok(result.normalData.every(value => Number.isFinite(value) && value >= 0 && value <= 255));
+  assert.ok(result.roughnessData.every(value => Number.isFinite(value) && value >= 0 && value <= 255));
+  assert.ok(result.normalData.some((value, index) => index % 4 === 0 && value !== 128));
+  assert.equal(result.normalData[3], 255);
+  assert.equal(result.roughnessData[3], 255);
+});
+
+test("PBR map generation rejects malformed or excessive image dimensions", async () => {
+  const { derivePbrTextureData } = await import("../scripts/kingdom-materials.js");
+  assert.throws(() => derivePbrTextureData({ width: 1, height: 4, luminance: new Uint8Array(4) }), RangeError);
+  assert.throws(() => derivePbrTextureData({ width: 4, height: 4, luminance: new Uint8Array(8) }), TypeError);
+  assert.throws(() => derivePbrTextureData({ width: 4096, height: 4096, luminance: new Uint8Array(1) }), RangeError);
 });

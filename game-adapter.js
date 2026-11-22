@@ -87,14 +87,14 @@ function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, met
   }
 }
 
-export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, infantryAttackBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1 }) {
+export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, skinAttackBonusPercent = 0, skinDefenseBonusPercent = 0, skinSetAttackBonusPercent = 0, skinSetDefenseBonusPercent = 0, skinSetHealthBonusPercent = 0, skinSetCriticalChancePercent = 0, heroAttackBonusPercent = 0, heroDefenseBonusPercent = 0, dragonAttackBonusPercent = 0, dragonDefenseBonusPercent = 0, castleVipAttackBonusPercent = 0, castleVipDefenseBonusPercent = 0, heroHealthBonusPercent = 0, heroCriticalChancePercent = 0, infantryAttackBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1 }) {
   const attackers = (army || [])
     .filter(row => Number(row.quantity) > 0)
     .map((row, index) => makeStack(row, "attacker", index));
-  const defenseBonus = clamp(Number(defenseBonusPercent) || 0, 0, 30);
-  const attackGearBonus = clamp(Number(equipmentAttackBonusPercent) || 0, 0, 30) / 100;
+  const defenseBonus = clamp((Number(defenseBonusPercent) || 0) + clamp(Number(skinDefenseBonusPercent) || 0, 0, 2.5) + clamp(Number(skinSetDefenseBonusPercent) || 0, 0, 2.5) + clamp(Number(heroDefenseBonusPercent) || 0, 0, 20) + clamp(Number(dragonDefenseBonusPercent) || 0, 0, 5.5) + clamp(Number(castleVipDefenseBonusPercent) || 0, 0, 7), 0, 30);
+  const attackGearBonus = clamp((Number(equipmentAttackBonusPercent) || 0) + clamp(Number(skinAttackBonusPercent) || 0, 0, 2.5) + clamp(Number(skinSetAttackBonusPercent) || 0, 0, 2.5) + clamp(Number(heroAttackBonusPercent) || 0, 0, 20) + clamp(Number(dragonAttackBonusPercent) || 0, 0, 5.5) + clamp(Number(castleVipAttackBonusPercent) || 0, 0, 3.5), 0, 30) / 100;
   const infantryAttackBonus = clamp(Number(infantryAttackBonusPercent) || 0, 0, 30) / 100;
-  const healthGearBonus = clamp(Number(equipmentHealthBonusPercent) || 0, 0, 30) / 100;
+  const healthGearBonus = clamp((Number(equipmentHealthBonusPercent) || 0) + clamp(Number(skinSetHealthBonusPercent) || 0, 0, 2) + clamp(Number(heroHealthBonusPercent) || 0, 0, 3), 0, 30) / 100;
   const castlePowerBonus = clamp(Number(castlePowerBonusPercent ?? castleLevel) || 0, 0, 30) / 100;
   for (const stack of attackers) {
     stack.defenseBonusPercent = defenseBonus;
@@ -119,7 +119,7 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   const log = [];
   const metrics = { criticalHits: 0 };
   const critical = {
-    chance: clamp(Number(criticalChancePercent) || 0, 0, 100),
+    chance: clamp((Number(criticalChancePercent) || 0) + clamp(Number(heroCriticalChancePercent) || 0, 0, 2) + clamp(Number(skinSetCriticalChancePercent) || 0, 0, 0.75), 0, 100),
     multiplier: clamp(Number(criticalDamageMultiplier) || 1.5, 1.25, 2.5),
     seed: Number(criticalSeed) >>> 0
   };

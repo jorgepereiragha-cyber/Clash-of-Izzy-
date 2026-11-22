@@ -7,6 +7,9 @@ def signingPassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
 def signingAlias = System.getenv('ANDROID_KEY_ALIAS')
 def signingKeyPassword = System.getenv('ANDROID_KEY_PASSWORD')
 def releaseSigningAvailable = signingStore && signingPassword && signingAlias && signingKeyPassword
+// Preserve signing key and increment the version code for install-over updates.
+def androidVersionCode = (System.getenv('ANDROID_VERSION_CODE') ?: '1').toInteger()
+def androidVersionName = System.getenv('ANDROID_VERSION_NAME') ?: '1.0.0'
 
 android {
     namespace 'com.clashofizzy.android'
@@ -16,8 +19,8 @@ android {
         applicationId 'com.clashofizzy.android'
         minSdk 24
         targetSdk 35
-        versionCode 1
-        versionName '1.0.0'
+        versionCode androidVersionCode
+        versionName androidVersionName
     }
 
     signingConfigs {

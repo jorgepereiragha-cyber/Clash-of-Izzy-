@@ -1,4 +1,5 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.module.js";
+import * as THREE from "three";
+import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -16,18 +17,34 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
 
   const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)")?.matches === true;
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
-  const lowMemory = Number(navigator.deviceMemory || 4) <= 2;
+  const memory = Number(navigator.deviceMemory || 0);
+  const cores = Number(navigator.hardwareConcurrency || 0);
+  const lowMemory = memory > 0 && memory <= 2;
   const saveData = connection?.saveData === true;
-  const quality = lowMemory || saveData ? "low" : Number(navigator.deviceMemory || 4) >= 8 ? "high" : "balanced";
+  const preference = readGraphicsChoice(window.localStorage);
+  const automatic = lowMemory ? "low" : memory >= 8 ? "high" : "balanced";
+  const highUnsafe = (memory > 0 && memory < 6) || (cores > 0 && cores < 6);
+  const quality = lowMemory || saveData ? "low"
+    : preference === "low" ? "low"
+    : preference === "balanced" ? "balanced"
+    : preference === "high" ? (highUnsafe ? "balanced" : "high")
+    : automatic;
+  window.__coiWorldGraphicsQuality = quality;
 
   let renderer = null;
   let scene = null;
   let camera = null;
   let resizeObserver = null;
+  let sceneVisibilityObserver = null;
+  let visibilityChangeHandler = null;
+  let resizeHandler = null;
   let frame = 0;
   let disposed = false;
+  let contextLost = false;
+  let sceneInViewport = true;
   let worldState = null;
   let activeMarches = [];
+  let homeCastleGroup = null;
   let projectionButtons = new Map();
   let lastFrameTime = 0;
   let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
@@ -88,6 +105,15 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     skin: new THREE.MeshStandardMaterial({ color: 0xd9ad82, roughness: .9 }),
     spear: new THREE.MeshStandardMaterial({ color: 0x9ca9a5, metalness: .38, roughness: .55 })
   };
+  const castleSkinMaterials = {
+    1:{wall:new THREE.MeshStandardMaterial({color:0xc7a86f,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xead5a3,roughness:.82}),roof:new THREE.MeshStandardMaterial({color:0x9b6627,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x8d401f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xf1d078,metalness:.25,roughness:.48})},
+    2:{wall:new THREE.MeshStandardMaterial({color:0xd2d0c5,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xf1ead4,roughness:.82}),roof:new THREE.MeshStandardMaterial({color:0x264d77,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x17385f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xe4bd68,metalness:.25,roughness:.48})},
+    3:{wall:new THREE.MeshStandardMaterial({color:0x887767,roughness:.9}),wallLight:new THREE.MeshStandardMaterial({color:0xb69b75,roughness:.82}),roof:new THREE.MeshStandardMaterial({color:0x5a3828,roughness:.72}),banner:new THREE.MeshStandardMaterial({color:0x5a2724,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xc6a15d,metalness:.25,roughness:.5})},
+    4:{wall:new THREE.MeshStandardMaterial({color:0xaaa2c8,roughness:.86}),wallLight:new THREE.MeshStandardMaterial({color:0xd8cbed,roughness:.8}),roof:new THREE.MeshStandardMaterial({color:0x5a4b8c,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x342d6f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xe2caef,metalness:.22,roughness:.5})},
+    5:{wall:new THREE.MeshStandardMaterial({color:0x9fb8ca,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xd9e8ee,roughness:.8}),roof:new THREE.MeshStandardMaterial({color:0x3e6b91,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x264869,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xc2e1ec,metalness:.22,roughness:.5})},
+    6:{wall:new THREE.MeshStandardMaterial({color:0xd29b65,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xf2c68a,roughness:.8}),roof:new THREE.MeshStandardMaterial({color:0x9e3d27,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x7c241f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xf5cf63,metalness:.28,roughness:.46})}
+  };
+
 
   function seeded(seed) {
     let value = (Number(seed) || 1) >>> 0;
@@ -215,26 +241,28 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     box(parent, .8, .42, .06, shared.banner, x + .61, y + height + 1.82, z);
   }
 
-  function createCastle(parent, x, z, scale = 1, color = "home") {
+  function createCastle(parent, x, z, scale = 1, color = "home", skinId = 0) {
     const group = new THREE.Group();
     group.position.set(x, terrainHeight(x, z), z);
     group.scale.setScalar(scale);
-    const wall = color === "enemy" ? shared.enemy : shared.stone;
-    const banner = color === "enemy" ? shared.enemy : shared.banner;
-    box(group, 5.6, 1.35, 4.5, wall, 0, .76, 0);
-    box(group, 3.2, 2.8, 3.1, shared.stoneLight, 0, 2.55, 0);
-    box(group, 1.15, 1.9, .18, shared.wood, 0, 1.1, 1.64);
-    for (const [tx, tz] of [[-2.5, -1.9], [2.5, -1.9], [-2.5, 1.9], [2.5, 1.9]]) {
-      const tower = new THREE.Group();
-      tower.position.set(tx, 0, tz);
-      group.add(tower);
-      box(tower, 1.25, 2.6, 1.25, shared.stone, 0, 1.3, 0);
-      box(tower, 1.42, .2, 1.42, shared.stoneLight, 0, 2.65, 0);
-      cone(tower, 1.05, 1.45, shared.roof, 0, 3.45, 0, 4);
+    const theme=castleSkinMaterials[Number(skinId)]||null;
+    const wall=theme?.wall||(color==="enemy"?shared.enemy:shared.stone);
+    const wallLight=theme?.wallLight||shared.stoneLight;
+    const roof=theme?.roof||shared.roof;
+    const banner=theme?.banner||(color==="enemy"?shared.enemy:shared.banner);
+    const accent=theme?.accent||shared.gold;
+    box(group,5.6,1.35,4.5,wall,0,.76,0);
+    box(group,3.2,2.8,3.1,wallLight,0,2.55,0);
+    box(group,1.15,1.9,.18,shared.wood,0,1.1,1.64);
+    for(const [tx,tz] of [[-2.5,-1.9],[2.5,-1.9],[-2.5,1.9],[2.5,1.9]]){
+      const tower=new THREE.Group();tower.position.set(tx,0,tz);group.add(tower);
+      box(tower,1.25,2.6,1.25,wall,0,1.3,0);
+      box(tower,1.42,.2,1.42,wallLight,0,2.65,0);
+      cone(tower,1.05,1.45,roof,0,3.45,0,4);
     }
-    cone(group, 1.8, 1.25, shared.roof, 0, 4.55, 0, 4);
-    box(group, .08, 1.85, .08, shared.gold, .55, 5.45, 0);
-    box(group, 1.0, .48, .07, banner, 1.02, 5.83, 0);
+    cone(group,1.8,1.25,roof,0,4.55,0,4);
+    box(group,.08,1.85,.08,accent,.55,5.45,0);
+    box(group,1.0,.48,.07,banner,1.02,5.83,0);
     parent.add(group);
     return group;
   }
@@ -261,7 +289,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     inset.rotation.y = Math.PI / 6;
 
     if (territory.territory_kind === "castle") {
-      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home");
+      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home", territory.castle_skin_id);
       return;
     }
 
@@ -402,17 +430,34 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     projectTerritories();
   }
 
+  function canAnimateMarches() {
+    return !disposed && !contextLost && !reduceMotion && !document.hidden && sceneInViewport;
+  }
+
+  function stopMarchAnimation() {
+    if (frame) cancelAnimationFrame(frame);
+    frame = 0;
+    lastFrameTime = 0;
+  }
+
+  function syncMarchAnimation() {
+    if (canAnimateMarches() && activeMarches.some(march => Date.now() < march.endAt)) animateMarches();
+    else stopMarchAnimation();
+  }
+
   function animateMarches() {
-    if (frame || disposed || reduceMotion || !activeMarches.length) return;
+    if (frame || !canAnimateMarches() || !activeMarches.length) return;
     lastFrameTime = 0;
     const tick = timestamp => {
       frame = 0;
-      if (disposed || !renderer || !scene) return;
+      if (!canAnimateMarches() || !renderer || !scene) return;
       const now = Date.now();
       updateMarchPositions(now);
       renderer.render(scene, camera);
       projectTerritories();
-      if (activeMarches.some(march => now < march.endAt)) frame = requestAnimationFrame(tick);
+      if (activeMarches.some(march => now < march.endAt) && canAnimateMarches()) {
+        frame = requestAnimationFrame(tick);
+      }
     };
     frame = requestAnimationFrame(tick);
   }
@@ -420,6 +465,11 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
   function setWorldState(nextState) {
     if (!nextState || !Array.isArray(nextState.territories)) return;
     worldState = nextState;
+    if(homeCastleGroup){
+      terrainRoot.remove(homeCastleGroup);
+      homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
+    }
+    homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(worldState.castleSkinId)||0);
     rebuildTerritories();
     rebuildRoads();
     rebuildMarches();
@@ -437,21 +487,28 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
     camera.top = viewHeight / 2;
     camera.bottom = -viewHeight / 2;
     camera.updateProjectionMatrix();
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, quality === "high" ? 1.6 : 1.15));
+    const maxPixelCount = quality === "high" ? 3200000 : quality === "balanced" ? 1800000 : 1000000;
+    const pixelBudgetRatio = Math.sqrt(maxPixelCount / (width * height));
+    const profileRatioCap = quality === "high" ? 1.5 : quality === "balanced" ? 1.15 : 1;
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, profileRatioCap, pixelBudgetRatio));
     renderer.setSize(width, height, false);
     draw();
   }
 
   function dispose() {
     disposed = true;
-    if (frame) cancelAnimationFrame(frame);
+    stopMarchAnimation();
     resizeObserver?.disconnect();
+    sceneVisibilityObserver?.disconnect();
+    if (visibilityChangeHandler) document.removeEventListener("visibilitychange", visibilityChangeHandler);
+    if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (renderer) {
       renderer.setAnimationLoop(null);
       renderer.dispose();
       renderer.domElement.remove();
     }
     Object.values(shared).forEach(material => material.dispose());
+    Object.values(castleSkinMaterials).forEach(theme => Object.values(theme).forEach(material => material.dispose()));
   }
 
   function init() {
@@ -460,7 +517,7 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
         canvas,
         alpha: false,
         antialias: quality !== "low",
-        powerPreference: "low-power",
+        powerPreference: preference === "high" ? "high-performance" : "default",
         stencil: false,
         depth: true
       });
@@ -487,13 +544,25 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       scene.add(worldRoot);
       worldRoot.add(terrainRoot, routeRoot, territoryRoot, armyRoot);
       createGround();
-      createCastle(terrainRoot, 0, 0, 1.4, "home");
+      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(window.__coiWorldMapState?.castleSkinId)||0);
       resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
       resizeObserver?.observe(host);
-      window.addEventListener("resize", resize, { passive: true });
+      resizeHandler = resize;
+      window.addEventListener("resize", resizeHandler, { passive: true });
+      visibilityChangeHandler = syncMarchAnimation;
+      document.addEventListener("visibilitychange", visibilityChangeHandler);
+      if ("IntersectionObserver" in window) {
+        sceneVisibilityObserver = new IntersectionObserver(entries => {
+          const entry = entries[entries.length - 1];
+          sceneInViewport = entry?.isIntersecting === true;
+          syncMarchAnimation();
+        }, { threshold: 0.01 });
+        sceneVisibilityObserver.observe(host);
+      }
       canvas.addEventListener("webglcontextlost", event => {
         event.preventDefault();
-        if (frame) cancelAnimationFrame(frame);
+        contextLost = true;
+        stopMarchAnimation();
         canvas.hidden = true;
         host.classList.add("map-3d-fallback");
         console.warn("Clash of Izzy: WebGL do mapa indisponível; marcadores táticos continuam ativos.");
@@ -512,7 +581,16 @@ import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.187.0/build/three.m
       if (window.__coiWorldMapState) setWorldState(window.__coiWorldMapState);
       if (window.__coiWorldMapButtons) projectionButtons = window.__coiWorldMapButtons;
       projectTerritories();
-      window.addEventListener("pagehide", dispose, { once: true });
+      window.addEventListener("pagehide", event => {
+        if (!event.persisted) dispose();
+      });
+      window.addEventListener("pageshow", event => {
+        if (event.persisted && !disposed) {
+          resize();
+          draw();
+          syncMarchAnimation();
+        }
+      });
     } catch (error) {
       canvas.hidden = true;
       host.classList.add("map-3d-fallback");

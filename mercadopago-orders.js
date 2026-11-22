@@ -1,3 +1,4 @@
+import {MASTER_PACK_NAME,masterGrantStatements} from "./master-pack.js";
 function toBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -19,20 +20,6 @@ function moneyToCents(value) {
   return Math.round(amount * 100);
 }
 
-// Checkout links must remain on an HTTPS domain controlled by Mercado Pago.
-// Do not redirect players to an arbitrary URL, even if it appeared in a gateway response.
-export function isTrustedMercadoPagoCheckoutUrl(value) {
-  try {
-    const checkout = new URL(String(value || ""));
-    const host = checkout.hostname.toLowerCase();
-    const trusted = ["mercadopago.com.br", "mercadopago.com"]
-      .some(domain => host === domain || host.endsWith("." + domain));
-    return checkout.protocol === "https:" && trusted && !checkout.username && !checkout.password && !checkout.port;
-  } catch {
-    return false;
-  }
-}
-
 export async function validateWebhookSignature(request, orderId, secret) {
   const signatureHeader = request.headers.get("x-signature") || "";
   const requestId = request.headers.get("x-request-id") || "";
@@ -50,6 +37,22 @@ export async function validateWebhookSignature(request, orderId, secret) {
   return constantTimeHexEqual(calculated, received);
 }
 
+function isTrustedCheckoutUrl(value) {
+  try {
+    const url = new URL(String(value || ""));
+    const host = url.hostname.toLowerCase();
+    const trustedHost = host === "mercadopago.com.br"
+      || host.endsWith(".mercadopago.com.br")
+      || host === "mercadopago.com"
+      || host.endsWith(".mercadopago.com");
+    return url.protocol === "https:" && trustedHost && !url.username && !url.password && !url.port;
+  } catch {
+    return false;
+  }
+}
+
+export const isTrustedMercadoPagoCheckoutUrl = isTrustedCheckoutUrl;
+
 async function createCheckout(request, env, ctx) {
   if (!env.MP_ACCESS_TOKEN || !env.MP_WEBHOOK_SECRET) return ctx.json({ error: "Checkout automático ainda não configurado por completo; o link Mercado Pago atual continua disponível.", code: "MP_NOT_CONFIGURED" }, 503);
   const playerId = await ctx.gameIdentity(request, env);
@@ -62,13 +65,14 @@ async function createCheckout(request, env, ctx) {
   if (!Number.isSafeInteger(requestId) || requestId < 1) return ctx.json({ error: "Pedido inválido." }, 400);
 
   const order = await env.DB.prepare(
-    "SELECT r.id,r.player_id,r.product_kind,r.product_id,r.product_name,r.price_brl,r.currency,r.status,r.mp_external_reference,r.mp_idempotency_key,r.mp_order_id,r.mp_checkout_url,r.mp_checkout_lock,r.mp_checkout_lock_expires_at,p.player_id AS public_player_id " +
+    "SELECT r.id,r.player_id,r.product_kind,r.product_id,r.product_name,r.price_brl,r.currency,r.status,r.payment_method,r.mp_external_reference,r.mp_idempotency_key,r.mp_order_id,r.mp_checkout_url,r.mp_checkout_lock,r.mp_checkout_lock_expires_at,p.player_id AS public_player_id " +
     "FROM purchase_requests r JOIN players p ON p.id=r.player_id WHERE r.id=? AND p.player_id=?"
   ).bind(requestId, playerId).first();
   if (!order) return ctx.json({ error: "Pedido não encontrado para este reino." }, 404);
   if (order.status !== "pending") return ctx.json({ error: "Este pedido não está mais aguardando pagamento." }, 409);
+  if (order.payment_method !== "mercadopago_link") return ctx.json({ error: "Este pedido foi criado para conferência manual e não pode ser convertido em checkout automático." }, 409);
   if (order.mp_checkout_url && order.mp_order_id) {
-    if (!isTrustedMercadoPagoCheckoutUrl(order.mp_checkout_url)) return ctx.json({ error: "Checkout armazenado com destino inválido; solicite revisão do suporte." }, 409);
+    if (!isTrustedCheckoutUrl(order.mp_checkout_url)) return ctx.json({ error: "O checkout salvo não pertence a um domínio oficial do Mercado Pago." }, 502);
     return ctx.json({ success: true, checkoutUrl: order.mp_checkout_url, orderId: order.mp_order_id, reused: true });
   }
 
@@ -83,7 +87,7 @@ async function createCheckout(request, env, ctx) {
   if (!claimed.meta?.changes) {
     const current = await env.DB.prepare("SELECT mp_order_id,mp_checkout_url,mp_checkout_lock_expires_at FROM purchase_requests WHERE id=?").bind(requestId).first();
     if (current?.mp_checkout_url && current?.mp_order_id) {
-      if (!isTrustedMercadoPagoCheckoutUrl(current.mp_checkout_url)) return ctx.json({ error: "Checkout armazenado com destino inválido; solicite revisão do suporte." }, 409);
+      if (!isTrustedCheckoutUrl(current.mp_checkout_url)) return ctx.json({ error: "Checkout salvo com destino não confiável.", code: "MP_UNTRUSTED_URL" }, 409);
       return ctx.json({ success: true, checkoutUrl: current.mp_checkout_url, orderId: current.mp_order_id, reused: true });
     }
     return ctx.json({ error: "O checkout deste pedido já está sendo preparado. Tente novamente em instantes." }, 409);
@@ -118,8 +122,8 @@ async function createCheckout(request, env, ctx) {
       await env.DB.prepare("UPDATE purchase_requests SET mp_checkout_lock=NULL,mp_checkout_lock_expires_at=NULL WHERE id=? AND mp_checkout_lock=?").bind(requestId, lockToken).run();
       return ctx.json({ error: "O Mercado Pago não conseguiu criar o checkout. O pedido foi preservado para nova tentativa." }, 502);
     }
-    if (!isTrustedMercadoPagoCheckoutUrl(result.checkout_url)) throw new Error("untrusted_checkout_url");
     const checkout = new URL(String(result.checkout_url));
+    if (!isTrustedCheckoutUrl(checkout.href)) throw new Error("invalid_checkout_url");
     const saved = await env.DB.prepare(
       "UPDATE purchase_requests SET mp_order_id=?,mp_checkout_url=?,mp_payment_status=?,mp_checkout_lock=NULL,mp_checkout_lock_expires_at=NULL " +
       "WHERE id=? AND status='pending' AND mp_checkout_lock=? AND mp_external_reference=?"
@@ -159,7 +163,7 @@ async function handleWebhook(request, env, ctx) {
   }
 
   const purchase = await env.DB.prepare(
-    "SELECT id,player_id,product_kind,product_id,price_brl,currency,status,mp_order_id,mp_external_reference " +
+    "SELECT id,player_id,product_kind,product_id,product_name,price_brl,currency,status,mp_order_id,mp_external_reference " +
     "FROM purchase_requests WHERE mp_external_reference=? AND mp_order_id=?"
   ).bind(String(providerOrder.external_reference || ""), orderId).first();
   if (!purchase) return ctx.json({ received: true, ignored: true });
@@ -205,6 +209,7 @@ async function handleWebhook(request, env, ctx) {
     common.push(env.DB.prepare(
       "UPDATE players SET gems=gems+(SELECT gems_amount FROM purchase_requests WHERE id=?) WHERE id=? AND changes()=1"
     ).bind(purchase.id, purchase.player_id));
+    if(purchase.product_name===MASTER_PACK_NAME)common.push(...masterGrantStatements(env.DB,purchase.id));
   } else if (purchase.product_kind === "skin") {
     common.push(env.DB.prepare(
       "INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT ?,? WHERE changes()=1"

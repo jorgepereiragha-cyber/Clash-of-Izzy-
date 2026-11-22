@@ -8,12 +8,38 @@
   <link rel="stylesheet" href="/styles/coi-theme.css">
   <link rel="stylesheet" href="/equipment-styles.css">
   <link rel="stylesheet" href="/styles/navigation.css">
+  <link rel="stylesheet" href="/styles/heroes.css">
 </head>
 <body style="background:#0f0f1e;padding:10px">
   <main class="mobile-equipment-container">
+    <section class="hero-summon-section" aria-labelledby="hero-summon-title">
+      <header class="hero-roster-header">
+        <h2 id="hero-summon-title">Convocar Heróis</h2>
+        <span id="hero-gem-balance" class="hero-roster-count">Gemas: —</span>
+      </header>
+      <p class="hero-summon-intro">Cada convocação usa o sorteio do servidor. Heróis repetidos são convertidos em fragmentos para evolução.</p>
+      <div id="hero-summon-rates" class="hero-summon-rates" aria-label="Probabilidades de convocação">
+        <p>Carregando probabilidades oficiais do servidor…</p>
+      </div>
+      <div class="hero-summon-actions">
+        <button id="hero-summon-one" type="button">Convocar 1 · 100 gemas</button>
+        <button id="hero-summon-ten" type="button">Convocar 10 · 900 gemas</button>
+      </div>
+      <p id="hero-summon-status" class="hero-summon-status" role="status" aria-live="polite">Dourado: 2% por convocação, sem garantia em quantidade fixa. Os cinco heróis sazonais não fazem parte do sorteio comum.</p>
+      <div id="hero-summon-results" class="hero-summon-results" aria-live="polite"></div>
+    </section>
+    <section class="hero-roster-section" aria-labelledby="hero-roster-title">
+      <header class="hero-roster-header">
+        <h2 id="hero-roster-title">Heróis do Reino</h2>
+        <span id="hero-roster-count" class="hero-roster-count">Sincronizando coleção…</span>
+      </header>
+      <div id="hero-roster-grid" class="hero-roster-grid" aria-live="polite">
+        <p>Carregando heróis e atributos do servidor…</p>
+      </div>
+    </section>
     <header class="item-header">
       <h2 id="item-name">Carregando...</h2>
-      <span id="rarity-badge" class="rarity-badge lendario">Lendário</span>
+      <span id="rarity-badge" class="rarity-badge comum">Comum</span>
       <button class="lock-btn" type="button" id="lock-btn">🔓 Destravado</button>
     </header>
     <label for="hero-select">Herói que usará o equipamento</label>
@@ -41,6 +67,16 @@
       <button id="unequip-btn" type="button" class="secondary">DESEQUIPAR</button>
       <button id="upgrade-btn" type="button" class="upgrade-btn-mobile">⚒️ EVOLUIR EQUIPAMENTO</button>
     </div>
+      <section class="pantheon-skin-sets" aria-labelledby="pantheon-skin-set-title">
+      <header class="pantheon-skin-header">
+        <div>
+          <h2 id="pantheon-skin-set-title">Relíquias dos Panteões</h2>
+          <p>Egito, Suméria, Mesopotâmia e os Sete Mares. Adquira as cinco peças, equipe cada espaço e ative os marcos de conjunto.</p>
+        </div>
+      </header>
+      <div id="pantheon-skin-set-grid" class="pantheon-set-grid" aria-live="polite"></div>
+      <p id="pantheon-set-bonus-summary" class="pantheon-set-bonus-summary" aria-live="polite">Sincronizando os bônus dos panteões…</p>
+    </section>
       <section class="norse-skins" aria-labelledby="norse-title">
       <header class="norse-skins-header">
         <div><h2 id="norse-title">Panteão de Asgard</h2><p>Skins visuais de Odin, Thor, Freyja, Loki, Týr e Heimdall. Nenhuma skin altera ataque ou defesa.</p></div>
@@ -62,7 +98,13 @@
       .skin-buy-btn:disabled{opacity:.6}
       #claim-norse-collection{width:100%;margin-top:6px}
     </style>
+    <p id="castle-skin-bonus-summary" class="equipment-bonus-summary skin-bonus-summary" aria-live="polite">Sincronizando bônus da skin de castelo…</p>
     <p id="equipment-bonus-summary" class="equipment-bonus-summary" aria-live="polite"></p>
+    <section class="forge-section" aria-labelledby="equipment-progression-title">
+      <h2 id="equipment-progression-title">Hierarquia de Equipamentos</h2>
+      <p>Cada espaço evolui em quatro raridades: Comum → Raro → Épico → Lendário. A peça anterior é necessária para liberar a próxima. As peças anteriores ficam no inventário e podem ser usadas por outros heróis.</p>
+      <div id="equipment-progression-grid" class="equipment-progression-grid"></div>
+    </section>
     <section class="forge-section" aria-labelledby="forge-research-title">
       <h2 id="forge-research-title">Ciência da Forja</h2>
       <p>Pesquisas permanentes aprimoram os equipamentos do herói ativo. É necessário evoluir o Centro de Pesquisa Militar.</p>
