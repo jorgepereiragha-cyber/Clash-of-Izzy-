@@ -100,3 +100,32 @@ test("migracao e integracao proíbem compra sem progresso e mantêm habilitacao 
   assert.match(mp,/levelPacksEnabledForPlayer/);
   assert.match(arena,/item.levelPack/);
 });
+
+test("catalogo P1-P8 segue os valores solicitados e migracao 0044 nao substitui IDs",async()=>{
+  const expected=[
+    [10,990,500,5000,5000,0,0,0],
+    [20,2990,2000,20000,0,10000,5000,0],
+    [30,5990,5000,50000,0,30000,15000,5000],
+    [40,9990,10000,100000,50000,50000,25000,10000],
+    [50,14990,20000,200000,100000,100000,50000,20000],
+    [60,19990,35000,350000,150000,150000,75000,30000],
+    [70,29990,60000,500000,250000,250000,100000,50000],
+    [80,49990,100000,1000000,500000,500000,200000,100000]
+  ];
+  assert.deepEqual(LEVEL_PACKS.map(p=>[
+    p.level,p.priceCents,p.gems,p.resources.wood,p.resources.food,
+    p.resources.stone,p.resources.iron,p.resources.gold
+  ]),expected);
+  const sql=await read("migrations/0044_reconcile_level_packs.sql");
+  assert.match(sql,/UPDATE vip_packages/);
+  assert.doesNotMatch(sql,/^\s*(?:INSERT|REPLACE|DELETE|DROP|ALTER)\b/im);
+  assert.doesNotMatch(sql,/WHERE name IN\s*\(/i);
+  for (const p of LEVEL_PACKS.slice(3)) {
+    assert.match(sql,new RegExp("WHERE name='"+p.name+"'"));
+    assert.match(sql,new RegExp("SET price_brl="+(p.priceCents/100).toFixed(2).replace(".","\\.")+", gems="+p.gems));
+  }
+  assert.match(sql,/ROUND\(price_brl\*100\)=/);
+  assert.match(sql,/AND gems=\d+/);
+  assert.match(sql,/AND NOT EXISTS\s*\(/);
+  assert.equal(levelPackPriceApproved({},LEVEL_PACKS[7]),false);
+});

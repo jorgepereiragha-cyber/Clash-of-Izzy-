@@ -1,0 +1,37 @@
+name: Catalogo P1-P8 v54 - gate sem deploy
+on:
+  push:
+    branches: [fix/level-packs-catalog-alignment-20261122, fix/pr238-safe-0044-reconcile-20261122]
+  pull_request:
+    branches: [fix/blueprint-mobile-visual-cache-v53, fix/level-packs-catalog-alignment-20261122]
+permissions:
+  contents: read
+concurrency:
+  group: coi-level-catalog-v54-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar dependencias
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Aplicar migracoes apenas localmente
+        run: |
+          npm run db:migrate:local
+          npm run db:migrate:preview:local
+      - name: Verificar sintaxe e contrato de pagamento
+        run: |
+          node --check level-packs.js
+          node --check mercadopago-orders.js
+          node --test tests/level-packs.test.js tests/mercadopago-4x-integration.test.js
+      - name: Executar todos os testes unitarios
+        run: npm test
+      - name: Build Worker apenas dry-run
+        run: npm run check
