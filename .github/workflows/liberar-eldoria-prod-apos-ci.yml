@@ -1,138 +1,20 @@
-name: Liberar Eldoria em producao apos CI e D1 Preview
+name: Legado Eldoria auto-release (desativado)
 
+# Workflow antigo aposentado: nunca disparar deploy por workflow_run ou commit marcador.
+# Use Cloudflare Paid Readiness (read-only) e, apos os gates comerciais,
+# Deploy Clash of Izzy to Cloudflare com confirmacoes explicitas na UI.
 on:
-  workflow_run:
-    workflows: ["Clash of Izzy CI"]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
-  actions: write
-
-concurrency:
-  group: clash-izzy-release-trigger-once
-  cancel-in-progress: true
 
 jobs:
-  validar-e-disparar-deploy:
-    if: >-
-      github.event_name == 'workflow_run' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.event == 'push' &&
-      github.event.workflow_run.conclusion == 'success' &&
-      contains(github.event.workflow_run.head_commit.message, '[READY-ELDORIA-RELEASE]')
+  legacy-disabled:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 2
     steps:
-      - name: Exigir CI aprovada do commit exato e autorizar somente mudança deste workflow
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
-          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
+      - name: Informar desativacao do disparo automatico
         run: |
-          set -euo pipefail
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TRIGGER_RUN_ID" --jq '.head_sha')" = "$TRIGGER_SHA"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TRIGGER_RUN_ID" --jq '.conclusion')" = "success"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TRIGGER_RUN_ID" --jq '.event')" = "push"
-          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')" = "$TRIGGER_SHA" || {
-            echo "::error::Main avançou após a CI; liberação antiga bloqueada."; exit 1;
-          }
-          # A CI validou o commit exato. O commit de liberação não pode
-          # incluir alteração de Worker, migrations, scripts ou assets.
-          changed="$(gh api "repos/$GITHUB_REPOSITORY/commits/$TRIGGER_SHA" --jq '.files[].filename')"
-          test "$changed" = ".github/workflows/liberar-eldoria-prod-apos-ci.yml" || {
-            echo "::error::Liberação exige commit exclusivo deste workflow."; exit 1;
-          }
-          echo "CI do mesmo commit aprovada; main atual; nenhuma alteração de código de jogo no gatilho."
-
-      - name: Conferir D1 Preview homologado, produção intocada e bookmark de recuperação
-        shell: bash
-        env:
-          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json,os,urllib.request,urllib.error
-          account=os.environ.get("ACCOUNT_ID","").strip()
-          token=os.environ.get("RAW_TOKEN","").strip()
-          if token.lower().startswith("bearer "): token=token[7:].strip()
-          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):token=token[1:-1].strip()
-          if not account or not token or any(c.isspace() for c in token):
-            raise SystemExit("Credenciais Cloudflare indisponíveis: sem deploy.")
-          print("::add-mask::"+token)
-          base="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/"
-          prod="7e63af59-d9ff-4159-a9cf-b02e35b92605"
-          preview="6674c0ac-3636-4e57-bff8-23cf60ab9637"
-          if prod==preview:raise SystemExit("IDs de produção e Preview coincidem.")
-          def cloud(url,sql=None):
-            data=json.dumps({"sql":sql}).encode() if sql else None
-            req=urllib.request.Request(url,data=data,
-              method="POST" if sql else "GET",
-              headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
-            try:
-              with urllib.request.urlopen(req,timeout=25) as response: obj=json.loads(response.read().decode())
-            except urllib.error.HTTPError as e:
-              raise SystemExit("Cloudflare negou auditoria HTTP "+str(e.code)+"; deploy bloqueado.")
-            if not obj.get("success"):raise SystemExit("Cloudflare não confirmou sucesso; deploy bloqueado.")
-            return obj["result"]
-          staging=cloud(base+preview+"/query",
-            "SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")
-          latestPreview=staging[0]["results"][0]["name"]
-          if latestPreview!="0035_throne_war.sql":
-            raise SystemExit("D1 Preview não está homologado na migração 0035; sem deploy.")
-          # As cinco tabelas novas devem estar presentes no Preview antes de
-          # sequer considerar qualquer alteração no banco de produção.
-          rows=cloud(base+preview+"/query",
-            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('google_account_links','google_auth_challenges','realm_openings','realm_thrones','throne_assaults')")
-          present={row["name"] for row in rows[0]["results"]}
-          expected={"google_account_links","google_auth_challenges","realm_openings","realm_thrones","throne_assaults"}
-          if present!=expected:
-            raise SystemExit("D1 Preview 0035 incompleto; sem deploy.")
-          realm=cloud(base+preview+"/query",
-            "SELECT (SELECT COUNT(*) FROM realm_openings) AS mundos, (SELECT COUNT(*) FROM realm_thrones) AS tronos")
-          if int(realm[0]["results"][0]["mundos"])!=1 or int(realm[0]["results"][0]["tronos"])!=1:
-            raise SystemExit("D1 Preview não preserva um único mundo e trono; sem deploy.")
-          prodRows=cloud(base+prod+"/query",
-            "SELECT (SELECT COUNT(*) FROM players) AS jogadores,(SELECT COUNT(*) FROM kingdoms) AS reinos,(SELECT COUNT(*) FROM player_accounts) AS contas,(SELECT COUNT(*) FROM purchase_requests) AS pedidos,(SELECT COUNT(*) FROM mercadopago_orders) AS ordens")
-          row=prodRows[0]["results"][0]
-          counts={k:int(v) for k,v in row.items()}
-          print("D1 produção, contagens agregadas: "+json.dumps(counts,ensure_ascii=False))
-          # Contagens podem crescer sem indicar corrupção. Nunca zerar dados
-          # ou exigir snapshots de jogadores que já ficaram obsoletos.
-          if (counts["jogadores"]<counts["reinos"] or
-              counts["reinos"]<1 or
-              any(number<0 for number in counts.values())):
-            raise SystemExit("Contagens D1 produção inconsistentes; sem deploy.")
-          migration=cloud(base+prod+"/query",
-            "SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")[0]["results"][0]["name"]
-          if migration!="0030_dragons_master_mailbox.sql":
-            raise SystemExit("D1 produção não está na base 0030 verificada; sem deploy.")
-          # 0033-0035 só podem ser criadas pelo deploy original com bookmark.
-          prodTables=cloud(base+prod+"/query",
-            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('kingdom_dragons','kingdom_mailbox','master_bonus_claims','google_account_links','google_auth_challenges','realm_openings','realm_thrones','throne_assaults')")
-          names={r["name"] for r in prodTables[0]["results"]}
-          if names!={"kingdom_dragons","kingdom_mailbox","master_bonus_claims"}:
-            raise SystemExit("Esquema D1 produção divergiu da base 0030; sem deploy.")
-          tt=cloud(base+prod+"/time_travel/bookmark")
-          if not str(tt.get("bookmark","")).strip():
-            raise SystemExit("Time Travel de produção sem bookmark; sem deploy.")
-          print("OK: Preview homologado na 0035; produção na 0030 sem tabelas parciais; bookmark disponível.")
-          print("O workflow oficial captura e arquiva outro bookmark antes da migração 0031-0035.")
-          print("Plano Workers Paid declarado pelo proprietário. A API Billing retornou 403 em auditoria anterior; não foi confirmado por Billing Read.")
-          PY
-      - name: Acionar deploy original protegido e arquivamento D1
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          # Somente o deploy oficial arquiva bookmark, aplica migrations e publica Worker.
-          # A autorização de plano Pago e produção foi concedida pelo proprietário
-          # no pedido de lançamento e na confirmação de serviço Cloudflare pago.
-          gh workflow run deploy-cloudflare.yml --repo "$GITHUB_REPOSITORY" --ref main \
-            -f confirm_paid_plan=true \
-            -f confirm_production=true
-          echo "Workflow protegido solicitado. Aprovação de environment production, se configurada, permanece exigida."
-          echo "APK comercial e pagamentos reais não foram ativados por esta etapa."
+          echo '::error::O disparo automatizado Eldoria foi desativado. Use a auditoria read-only e o workflow oficial de producao com autorizacao explicita.'
+          exit 1
