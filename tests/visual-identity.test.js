@@ -37,7 +37,8 @@ test("edifícios 3D possuem silhuetas e marcos próprios por função", async ()
 test("alvos dos edifícios seguem a projeção isométrica real, inclusive após resize", async () => {
   const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
   const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
-  assert.match(renderer, /const col = i % 3, row = Math\.floor\(i \/ 3\)/);
+  assert.match(renderer, /const \{ x, z \} = cityWorldPoint\(b, i\)/);
+  assert.match(renderer, /frameCityBuildings\(list\)/);
   assert.match(renderer, /Math\.min\(9, qualityProfile\?\.maxBuildings \|\| 9\)/);
   assert.match(renderer, /function publishBuildingHitTargets\(buildings = latestBuildings\)/);
   assert.match(renderer, /new THREE\.Vector3\(x, \.18, z\)\.project\(camera\)/);
