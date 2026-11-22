@@ -2560,7 +2560,7 @@ export default {
     }catch(e){console.error("game_request_failed",String(e?.message||e));return json({error:"Falha ao processar o jogo. Tente novamente."},500)}
   }
   const valhallaAdminPath=url.pathname.startsWith("/api/valhalla-admin/");
-  if(request.method!=="POST"&&!(request.method==="GET"&&valhallaAdminPath))return json({error:"Método não permitido."},405);
+  if(request.method!=="POST"&&!(request.method==="GET"&&(valhallaAdminPath||url.pathname==="/api/admin/launch-metrics")))return json({error:"Método não permitido."},405);
   const body=request.method==="POST"?await readBody(request):{};if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);
   if(url.pathname==="/api/admin/login"){
     if(!env.ADMIN_EMAIL||!env.ADMIN_PASSWORD||!env.SESSION_SECRET)return json({error:"Configure ADMIN_EMAIL, ADMIN_PASSWORD e SESSION_SECRET nos segredos do Worker."},503);
