@@ -223,7 +223,8 @@ public final class MainActivity extends Activity {
                 if (!request.isForMainFrame()) return false;
                 Uri uri = request.getUrl();
                 if ("clashofizzy-google".equalsIgnoreCase(uri.getScheme())) {
-                    if (isGameUrl(Uri.parse(view.getUrl())) && "signin".equalsIgnoreCase(uri.getHost())) {
+                    if (view.getUrl() != null && isGameUrl(Uri.parse(view.getUrl())) &&
+                            "signin".equalsIgnoreCase(uri.getHost())) {
                         startNativeGoogleSignIn(uri);
                     } else {
                         googleError("Solicitação Google fora da página oficial bloqueada.");
@@ -433,7 +434,7 @@ public final class MainActivity extends Activity {
     }
 
     private void googleError(String message) {
-        if (webView == null || !isGameUrl(Uri.parse(webView.getUrl()))) return;
+        if (webView == null || webView.getUrl() == null || !isGameUrl(Uri.parse(webView.getUrl()))) return;
         webView.evaluateJavascript("window.clashOfIzzyGoogleError && window.clashOfIzzyGoogleError(" +
                 JSONObject.quote(message) + ")", null);
     }
@@ -460,7 +461,7 @@ public final class MainActivity extends Activity {
                         @Override
                         public void onResult(GetCredentialResponse result) {
                             googleSignInInProgress = false;
-                            if (webView == null || !isGameUrl(Uri.parse(webView.getUrl()))) return;
+                            if (webView == null || webView.getUrl() == null || !isGameUrl(Uri.parse(webView.getUrl()))) return;
                             if (!(result.getCredential() instanceof CustomCredential)) {
                                 googleError("O Android não retornou uma conta Google válida.");
                                 return;
@@ -494,7 +495,7 @@ public final class MainActivity extends Activity {
     }
 
     private boolean isGameUrl(Uri uri) {
-        return "https".equalsIgnoreCase(uri.getScheme())
+        return uri != null && "https".equalsIgnoreCase(uri.getScheme())
                 && GAME_HOST.equalsIgnoreCase(uri.getHost())
                 && (uri.getPort() == -1 || uri.getPort() == 443);
     }
