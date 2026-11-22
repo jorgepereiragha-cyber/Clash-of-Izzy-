@@ -80,6 +80,8 @@ jobs:
               assert value==expected,(sql,value)
           print("D1 Preview ready: migration 0041 applied, no players before synthetic test.")
           PY
+      - name: Instalar Chromium para a validacao visual mobile 4X
+        run: npx playwright install --with-deps chromium
       - name: Iniciar Worker remotamente, testar API real e encerrar o runner
         shell: bash
         run: |
@@ -99,5 +101,13 @@ jobs:
             sleep 3
           done
           test "$ready" = 1 || { echo "::error::Remote preview did not start on localhost"; exit 1; }
-          STAGING_CONFIG_PATH=wrangler.4x-smoke.generated.jsonc GAME_SMOKE_BASE=http://127.0.0.1:8787 node scripts/4x-preview-live-smoke.mjs
-          echo "Worker remoto homologado em Preview D1; nenhuma alteracao no Worker publico."
+          RUN_4X_BROWSER_SMOKE=true STAGING_CONFIG_PATH=wrangler.4x-smoke.generated.jsonc GAME_SMOKE_BASE=http://127.0.0.1:8787 node scripts/4x-preview-live-smoke.mjs
+          echo "Worker remoto e tela mobile 4X homologados em Preview D1, sem deploy publico."
+      - name: Arquivar capturas da interface 4X (dados sinteticos)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash-of-izzy-4x-preview-mobile-ui
+          path: test-results/4x-mobile-preview/
+          retention-days: 14
+          if-no-files-found: ignore
