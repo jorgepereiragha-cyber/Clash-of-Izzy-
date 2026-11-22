@@ -22,6 +22,8 @@ const UNIT_NAMES = {
   ram: "Aríete", trebuchet: "Trabuquete",
 };
 let state = null;
+let throneState=null;
+let throneBusy=false;
 let selectedTerritoryId = null;
 let selectedUnits = {};
 let busy = false;
@@ -106,12 +108,14 @@ function renderMap() {
   const buttonRefs = new Map();
   for (const territory of state.territories || []) {
     const isCastle = territory.territory_kind === "castle";
-    const resource = isCastle ? { icon: "🏰", label: "Castelo de jogador" } : (RESOURCE[territory.resource_type] || { icon: "📍", label: "Território" });
+    const isThrone = territory.territory_kind === "throne";
+    const resource = isThrone?{icon:"👑",label:"Trono Real"}:
+      isCastle ? { icon: "🏰", label: "Castelo de jogador" } : (RESOURCE[territory.resource_type] || { icon: "📍", label: "Território" });
     const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
     const owner = territoryOwner(territory);
     const button = make("button", "territory-pin" +
       (owner === "Seu reino" ? " owned" : owner === "Outro reino" ? " enemy" : "") +
-      (isCastle ? " castle" : "") +
+      (isCastle ? " castle" : "") + (isThrone ? " throne" : "") +
       (Number(territory.id) === Number(selectedTerritoryId) ? " selected" : ""));
     button.type = "button";
     button.dataset.territoryId = String(territory.id);
@@ -190,10 +194,10 @@ function updateActionButtons() {
   const territory = getSelectedTerritory();
   const hasTroops = Object.values(selectedUnits).some(quantity => Number(quantity) > 0);
   const isCastle = territory?.territory_kind === "castle";
-  const canVisit = Boolean(territory && !isCastle && territoryOwner(territory) !== "Outro reino");
+  const canVisit = Boolean(territory && !isCastle && territory.territory_kind !== "throne" && territoryOwner(territory) !== "Outro reino");
   $("gather").disabled = busy || !canVisit || !hasTroops;
   $("scout").disabled = busy || !canVisit || !hasTroops;
-  $("attack").disabled = busy || !territory || isCastle || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  $("attack").disabled = busy || !territory || isCastle || territory.territory_kind==="throne" || Boolean(territory.owner_kingdom_id) || !hasTroops;
 }
 function renderDetails() {
   const root = $("territoryDetails");
@@ -205,13 +209,19 @@ function renderDetails() {
     updateActionButtons();
     return;
   }
-  const resource = RESOURCE[territory.resource_type] || { icon: "📍", label: "Recurso" };
+  const isThrone=territory.territory_kind==="throne";
+  const resource = isThrone?{icon:"👑",label:"Trono Real"}:
+    RESOURCE[territory.resource_type] || { icon: "📍", label: "Recurso" };
   const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
   root.append(make("div", "territory-title", resource.icon + " " + territory.name));
   root.append(make("p", "muted", territoryOwner(territory)));
   const grid = make("div", "detail-grid");
   const isCastle = territory.territory_kind === "castle";
-  if (isCastle) {
+  if (isThrone) {
+    addStat(grid,"Mapa",""+(state?.kingdom?.map_region||1));
+    addStat(grid,"Centro","(0,0)");
+    addStat(grid,"Proteção",throneState?.phase==="shield"?"Escudo ativo":"Estado: "+(throneState?.phase||"consultando"));
+  } else if (isCastle) {
     addStat(grid, "Comandante", territory.commander_name || "Comandante");
     addStat(grid, "Poder", fmt(territory.power));
     addStat(grid, "Nível do castelo", fmt(territory.castle_level || territory.level || 1));
@@ -223,12 +233,14 @@ function renderDetails() {
     addStat(grid, "Nível", fmt(territory.level || 1));
   }
   root.append(grid);
-  $("marchNotice").textContent = isCastle
+  $("marchNotice").textContent = isThrone
+    ? "Ataques, reforços e coroações do Trono só ocorrem na Guerra do Trono, sob validação do servidor."
+    : isCastle
     ? "Castelo de outro comandante detectado. Você pode consultar comandante, poder e aliança; o envio de ataques PvP será ativado na Fase 10."
     : territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
       ? "Este território pertence a outro jogador e não está disponível para coleta."
       : "Escolha as tropas e uma ação. O servidor confirma custos, disponibilidade e resultado.";
-  if (isCastle) {
+  if (isCastle||isThrone) {
     $("troops").replaceChildren();
     updateActionButtons();
   } else {
@@ -282,6 +294,89 @@ async function updateRealmCards(){
     label.textContent="Não foi possível consultar o desbloqueio dos mapas.";
   }
 }
+function throneClock(seconds){
+  const n=Math.max(0,Math.ceil(Number(seconds)||0));
+  const days=Math.floor(n/86400),h=Math.floor((n%86400)/3600),
+    m=Math.floor((n%3600)/60);
+  return (days?days+"d ":"")+h+"h "+m+"min";
+}
+function renderThrone(){
+  const phase=$("thronePhase"),holder=$("throneHolder"),king=$("throneKing");
+  if(!phase||!holder||!king)return;
+  if(!throneState){
+    phase.textContent="Consultando o Trono protegido…";
+    return;
+  }
+  const labels={shield:"Proteção inicial",preparation:"Preparação",
+    contest:"Disputa",recovery:"Recuperação"};
+  phase.textContent="Mapa "+throneState.realm+" · "+(labels[throneState.phase]||"Indisponível")+
+    " · "+throneClock(throneState.remainingSeconds);
+  holder.textContent=throneState.holder
+    ?"Trono ocupado pela aliança "+throneState.holder.allianceId+
+      " · Guarnição "+fmt(throneState.holder.garrisonPower)+
+      " · Faltam "+throneClock(throneState.holder.remainingHoldSeconds)+" para a coroação."
+    :"Trono sem ocupante. Guarda inicial: 250 pontos de poder.";
+  king.textContent=throneState.crown
+    ?"Rei: "+throneState.crown.kingName+" · Aliança ["+throneState.crown.allianceTag+"]"
+    :"O reino ainda não possui Rei coroado.";
+  const hasAlliance=Boolean(throneState.alliance),canAttack=throneState.canAttack&&!throneBusy;
+  const own=hasAlliance&&Number(throneState.holder?.allianceId)===Number(throneState.alliance.id);
+  $("throneAttack").disabled=!canAttack||own;
+  $("throneReinforce").disabled=!canAttack||!own;
+  $("throneAppoint").disabled=throneBusy||!hasAlliance||!throneState.alliance.canNominate
+    ||Number(throneState.crown?.allianceId)!==Number(throneState.alliance.id);
+  const select=$("throneUnit"),before=select.value;
+  select.replaceChildren();
+  for(const troop of (state?.troops||[])){
+    if(Number(troop.tier)!==1||Number(troop.quantity)<1)continue;
+    const opt=make("option","",(UNIT_NAMES[troop.unit_type]||troop.unit_type)+
+      " · "+fmt(troop.quantity)+" disponíveis");
+    opt.value=troop.unit_type;
+    select.append(opt);
+  }
+  if([...select.options].some(o=>o.value===before))select.value=before;
+  if(!select.value){$("throneAttack").disabled=true;$("throneReinforce").disabled=true;}
+}
+async function refreshThrone(){
+  try{throneState=await request("/game/throne");
+    renderThrone();
+  }catch(error){
+    throneState=null;
+    $("thronePhase").textContent="Não foi possível consultar o Trono.";
+    $("throneMessage").textContent=error.message;
+    $("throneAttack").disabled=true;
+    $("throneReinforce").disabled=true;
+    $("throneAppoint").disabled=true;
+  }
+}
+async function sendThroneAction(intent){
+  if(throneBusy||!throneState)return;
+  const payload={intent,requestId:crypto.randomUUID()};
+  if(intent==="appoint"){
+    payload.kingdomId=Number($("throneNominee").value);
+  }else{
+    payload.unitType=$("throneUnit").value;
+    payload.quantity=Number($("throneQuantity").value);
+  }
+  throneBusy=true;renderThrone();
+  $("throneMessage").textContent="Enviando comando real ao servidor…";
+  try{
+    const answer=await request("/game/throne/action",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify(payload)
+    });
+    $("throneMessage").textContent=answer.message||(
+      answer.duplicate?"Batalha já registrada.":
+      "Comando confirmado; baixas: "+fmt(answer.casualties||0)+".");
+    throneState=answer.state||null;
+    await refreshState();
+    await refreshThrone();
+  }catch(error){$("throneMessage").textContent=error.message;await refreshThrone();}
+  finally{throneBusy=false;renderThrone();}
+}
+$("throneAttack").addEventListener("click",()=>sendThroneAction("attack"));
+$("throneReinforce").addEventListener("click",()=>sendThroneAction("reinforce"));
+$("throneAppoint").addEventListener("click",()=>sendThroneAction("appoint"));
 function render() {
   renderResources();
   renderMap();
@@ -432,7 +527,7 @@ async function connect() {
   setStatus("Sincronizando territórios…");
   try {
     await refreshState();
-    await updateRealmCards();
+    await Promise.all([updateRealmCards(),refreshThrone()]);
     setStatus("● Reino sincronizado");
   } catch (error) {
     setStatus(error.message, true);
@@ -444,7 +539,7 @@ window.setInterval(() => {
   if (document.hidden || busy || !token) return;
   refreshState().catch(error => setStatus(error.message, true));
 }, 15000);
-window.setInterval(() => { if(!document.hidden&&!busy&&token) updateRealmCards(); },60000);
+window.setInterval(() => { if(!document.hidden&&!busy&&token) {updateRealmCards();refreshThrone();} },60000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && !busy && token) refreshState().catch(error => setStatus(error.message, true));
 });
