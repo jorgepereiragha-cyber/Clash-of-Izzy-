@@ -25,13 +25,14 @@ test("Worker-only modules stay in the Worker bundle and out of public static ass
     "player-accounts.js",
     "rally.js",
     "search-ranking.js",
-    "shared-world-coordinates.js",
+    "realm-progression.js",
     "valhalla-admin.js",
     "valhalla-config.js",
     "valhalla-rewards.js",
     "valhalla-shop.js",
   ];
 
+  assert.ok(ignore.split("\n").includes("shared-world-coordinates.js"),"legacy map helper stays private");
   for (const path of workerOnlyModules) {
     assert.ok(worker.includes("./" + path), "Worker import missing: " + path);
     assert.ok(ignore.split("\n").some(line => line.trim() === path),

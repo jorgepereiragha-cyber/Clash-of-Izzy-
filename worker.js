@@ -12,7 +12,7 @@ import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
-import { getSharedWorldCoordinates } from "./shared-world-coordinates.js";
+import {realmStatusView} from "./realm-progression.js";
 import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
@@ -327,12 +327,17 @@ async function ensureKingdom(env,playerId){
   }
   let k=await env.DB.prepare("SELECT id FROM kingdoms WHERE player_id=?").bind(p.id).first();
   if(!k){
-    const created=await env.DB.prepare("INSERT INTO kingdoms(player_id,kingdom_name,food,wood,stone,iron,gold,last_production_at) VALUES(?,?,?,?,?,?,?,?)")
-      .bind(p.id,"Reino de Eldoria",5000,5000,3000,1000,1000,new Date().toISOString()).run();
+    // A região e a posição são reservadas no mesmo INSERT para evitar
+    // dois castelos na mesma coordenada. Nunca remapear reinos antigos.
+    const created=await env.DB.prepare(
+      "WITH destination AS (SELECT MAX(COALESCE((SELECT MAX(realm_id) FROM realm_openings),1),"+
+      "CASE WHEN (SELECT COUNT(*) FROM kingdoms)>=1000 THEN 3 WHEN (SELECT COUNT(*) FROM kingdoms)>=700 THEN 2 ELSE 1 END) AS realm_id), "+
+      "next_slot AS (SELECT realm_id,COALESCE((SELECT MAX(map_slot)+1 FROM kingdoms WHERE map_region=destination.realm_id),0) AS slot FROM destination) "+
+      "INSERT INTO kingdoms(player_id,kingdom_name,food,wood,stone,iron,gold,last_production_at,map_region,map_slot,map_x,map_z) "+
+      "SELECT ?,?,?,?,?,?,?,?,realm_id,slot,((slot%20)-10)*5,(CAST(slot/20 AS INTEGER)-10)*5 FROM next_slot"
+    ).bind(p.id,"Reino de Eldoria",5000,5000,3000,1000,1000,new Date().toISOString()).run();
     const id=Number(created.meta.last_row_id);
-    const worldPosition=getSharedWorldCoordinates(id);
-    await env.DB.prepare("UPDATE kingdoms SET map_x=?,map_z=?,map_region=? WHERE id=?")
-      .bind(worldPosition.mapX,worldPosition.mapZ,worldPosition.mapRegion,id).run();
+    if(!Number.isSafeInteger(id)||id<1)throw new Error("Não foi possível reservar o castelo");
     const buildingRows=Object.keys(BUILDINGS).map((key,i)=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_buildings(kingdom_id,building_type,level,position_x,position_z) VALUES(?,?,1,?,?)").bind(id,key,((i%4)-1.5)*7,Math.floor(i/4)*7-7));
     const unitRows=Object.keys(UNITS).map((key)=>env.DB.prepare("INSERT OR IGNORE INTO army_units(kingdom_id,unit_type,tier,quantity) VALUES(?,?,1,?)").bind(id,key,key==="militia"?30:0));
     await env.DB.batch([
@@ -341,14 +346,17 @@ async function ensureKingdom(env,playerId){
       env.DB.prepare("INSERT OR IGNORE INTO dragons(kingdom_id,dragon_key,dragon_name) VALUES(?,?,?)").bind(id,"ember_wyrm","Brasa"),
       env.DB.prepare("INSERT OR IGNORE INTO kingdom_dragons(kingdom_id,dragon_key,source) VALUES(?,'ember_wyrm','starter')").bind(id),
       env.DB.prepare("INSERT OR IGNORE INTO kingdom_mailbox(kingdom_id,source_key,title,body,reward_key) VALUES(?,'welcome:v1','Boas-vindas a Eldoria','Abra a mochila e receba 1.000 comida e 500 madeira.','welcome_v1')").bind(id),
-      env.DB.prepare("INSERT OR IGNORE INTO kingdom_pets(kingdom_id,pet_id,level,experience,is_active) SELECT ?,'pet_raven',1,0,1 WHERE EXISTS(SELECT 1 FROM pet_catalog WHERE id='pet_raven' AND active=1)").bind(id)
+      env.DB.prepare("INSERT OR IGNORE INTO kingdom_pets(kingdom_id,pet_id,level,experience,is_active) SELECT ?,'pet_raven',1,0,1 WHERE EXISTS(SELECT 1 FROM pet_catalog WHERE id='pet_raven' AND active=1)").bind(id),
+      // Marcos permanentes: 700 reinos liberam o mapa 2; 1.000 liberam o mapa 3.
+      env.DB.prepare("INSERT OR IGNORE INTO realm_openings(realm_id) SELECT 2 WHERE (SELECT COUNT(*) FROM kingdoms)>=700"),
+      env.DB.prepare("INSERT OR IGNORE INTO realm_openings(realm_id) SELECT 3 WHERE (SELECT COUNT(*) FROM kingdoms)>=1000")
     ]);
     k={id};
   }
-  const kingdom=await env.DB.prepare("SELECT id,kingdom_name,castle_level,map_x,map_z FROM kingdoms WHERE id=?").bind(k.id).first();
+  const kingdom=await env.DB.prepare("SELECT id,kingdom_name,castle_level,map_x,map_z,map_region FROM kingdoms WHERE id=?").bind(k.id).first();
   await env.DB.prepare(
-    "INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,owner_kingdom_id,level,resource_type,resource_rate,territory_kind) VALUES(?,?,'plains',?,?,?,?,'castle',0,'castle')"
-  ).bind("kingdom_castle_"+k.id,"Castelo de "+(kingdom?.kingdom_name||"Eldoria"),kingdom?.map_x||0,kingdom?.map_z||0,k.id,kingdom?.castle_level||1).run();
+    "INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,owner_kingdom_id,level,resource_type,resource_rate,territory_kind,map_region) VALUES(?,?,'plains',?,?,?,?,'castle',0,'castle',?)"
+  ).bind("kingdom_castle_"+k.id,"Castelo de "+(kingdom?.kingdom_name||"Eldoria"),kingdom?.map_x||0,kingdom?.map_z||0,k.id,kingdom?.castle_level||1,Number(kingdom?.map_region)||1).run();
   await recalculateKingdomStats(env,k.id);
   await recalculateKingdomPower(env,k.id);
   return k.id;
@@ -463,7 +471,7 @@ async function applyProduction(env,kingdomId){
   // Produção e extrato são confirmados no mesmo lote; chamadas concorrentes não duplicam nenhum dos dois.
   await env.DB.batch(ledgerInsert?[productionUpdate,ledgerInsert]:[productionUpdate]);
 }
-async function seedWorld(env){
+async function seedWorld(env,region=1){
  const nodes=[
   ["forest_east","Bosque Antigo","forest",18,12,"wood"],
   ["forest_west","Bosque Nebuloso","forest",-22,8,"wood"],
@@ -474,7 +482,7 @@ async function seedWorld(env){
   ["iron_vein","Veio de Ferro","mountain",34,-25,"iron"],
   ["old_mine","Mina Abandonada","mountain",-35,28,"iron"]
  ];
- await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate) VALUES(?,?,?,?,?,?,?)").bind(...n,90)));
+ await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate,map_region) VALUES(?,?,?,?,?,?,?,?)").bind(n[0]+(region===1?"":"_realm_"+region),...n.slice(1),90,region)));
 }
 async function processMarches(env,kingdomId,batchSize=50){
  const now=new Date().toISOString();
@@ -730,7 +738,7 @@ async function gameState(env,playerId){
   if(!kingdom)return null;
   await syncHeroSystems(env,kingdom.id);
   await applyProduction(env,kingdom.id);
-  await seedWorld(env);
+  await seedWorld(env,Number(kingdom.map_region)||1);
   await processMarches(env,kingdom.id);
   await processDueKingdomQueues(env,kingdom.id);
   await recalculateKingdomStats(env,kingdom.id);
@@ -755,9 +763,9 @@ async function gameState(env,playerId){
       "COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=owner.id),'') AS alliance_tag "+
       "FROM world_territories wt LEFT JOIN kingdoms owner ON owner.id=wt.owner_kingdom_id "+
       "LEFT JOIN players op ON op.id=owner.player_id LEFT JOIN player_nicknames n ON n.player_id=op.id "+
-      "WHERE wt.territory_kind='resource' OR (wt.territory_kind='castle' AND wt.owner_kingdom_id<>? "+
-      "AND wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?) ORDER BY wt.territory_kind,wt.id LIMIT 250"
-    ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,kingdom.id,
+      "WHERE wt.map_region=? AND (wt.territory_kind='resource' OR (wt.territory_kind='castle' AND wt.owner_kingdom_id<>? "+
+      "AND wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?)) ORDER BY wt.territory_kind,wt.id LIMIT 250"
+    ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,Number(kingdom.map_region)||1,kingdom.id,
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45),
     env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id),
@@ -1229,7 +1237,7 @@ async function gameAction(env,playerId,body){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const territoryId=Number(body.territoryId);
     if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não pode reivindicar território."},403);
-    const t=await env.DB.prepare("SELECT id,alliance_id,owner_kingdom_id FROM world_territories WHERE id=?").bind(territoryId).first();
+    const t=await env.DB.prepare("SELECT id,alliance_id,owner_kingdom_id FROM world_territories WHERE id=? AND map_region=?").bind(territoryId,Number(k.map_region)||1).first();
     if(!t)return json({error:"Território não encontrado."},404);
     if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
     const cost=await env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000").bind(member.alliance_id).run();
@@ -1478,7 +1486,7 @@ async function gameAction(env,playerId,body){
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
-    const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id,territory_kind FROM world_territories WHERE id=?").bind(targetId).first();
+    const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id,territory_kind FROM world_territories WHERE id=? AND map_region=?").bind(targetId,Number(k.map_region)||1).first();
     if(!target)return json({error:"Território não encontrado."},404);
     const marchType=String(body.marchType||"gather");
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
@@ -1918,7 +1926,7 @@ export default {
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
+    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1962,7 +1970,18 @@ export default {
       return json({error:"Não foi possível concluir a inscrição."},500);
     }
   }
-  if(url.pathname==="/api/store/catalog"&&request.method==="GET"){
+  if(url.pathname==="/api/realms/status"&&request.method==="GET"){
+     const limited=await rateLimitDecision(env,"realms-status-ip",request.headers.get("CF-Connecting-IP")||"unknown",30,60);
+     if(limited)return limited;
+     const [population,opened,counts]=await Promise.all([
+       env.DB.prepare("SELECT COUNT(*) AS total FROM kingdoms").first(),
+       env.DB.prepare("SELECT realm_id FROM realm_openings ORDER BY realm_id").all(),
+       env.DB.prepare("SELECT map_region,COUNT(*) AS total FROM kingdoms GROUP BY map_region").all()
+     ]);
+     const perRealm=Object.fromEntries((counts.results||[]).map(row=>[row.map_region,Number(row.total)||0]));
+     return json(realmStatusView(Number(population?.total)||0,(opened.results||[]).map(row=>row.realm_id),perRealm));
+   }
+   if(url.pathname==="/api/store/catalog"&&request.method==="GET"){
     try{
       const ip=request.headers.get("CF-Connecting-IP")||"unknown";
       const limited=await rateLimitDecision(env,"store-catalog-ip",ip,60,60);

@@ -5,7 +5,7 @@ import { getSharedWorldCoordinates } from "../shared-world-coordinates.js";
 
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
-test("all player castles stay in one shared realm, including beyond the first 400", () => {
+test("legacy shared-map coordinates remain unchanged for existing castles", () => {
   const expected = new Map([
     [1, { mapX: -50, mapZ: -50 }],
     [20, { mapX: 45, mapZ: -50 }],
@@ -45,9 +45,13 @@ test("migration consolidates existing castles without deleting player or progres
   assert.doesNotMatch(migration, /DROP TABLE|DELETE FROM (players|kingdoms|world_territories)/i);
 });
 
-test("new castles use the shared coordinate policy and map lookup no longer partitions by region", async () => {
+test("new castles use the progressive realm policy without moving legacy castles", async () => {
   const worker = await read("worker.js");
-  assert.ok(worker.includes("getSharedWorldCoordinates(id)"));
+  assert.ok(worker.includes("realm_openings"));
+  assert.ok(worker.includes("MAX(map_slot)+1"));
+  assert.ok(worker.includes("WHERE wt.map_region=?"));
+  assert.ok(worker.includes("SELECT COUNT(*) FROM kingdoms"));
+  assert.ok(!worker.includes("getSharedWorldCoordinates(id)"));
   assert.ok(!worker.includes("mapRegion=Math.floor(mapSlot/400)+1"));
   assert.ok(!worker.includes("owner.map_region=?"));
   assert.ok(worker.includes("wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?"));

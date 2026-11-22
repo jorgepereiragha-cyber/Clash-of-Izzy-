@@ -25,6 +25,7 @@ player-accounts.js
 rally.js
 search-ranking.js
 shared-world-coordinates.js
+realm-progression.js
 valhalla-admin.js
 valhalla-config.js
 valhalla-rewards.js
