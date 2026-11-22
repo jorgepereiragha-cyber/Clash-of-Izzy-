@@ -34,3 +34,15 @@ test('private keystore cleanup runs even on failure', () => {
   assert.match(cleanup.body, /if: always\(\)/);
   assert.match(cleanup.body, /rm -f/);
 });
+
+test('production backend and payment readiness are rechecked before official APK publication', () => {
+  const backend = step('Revalidar backend imediatamente antes de disponibilizar APK');
+  const payments = step('Revalidar catalogo e pagamentos imediatamente antes de liberar APK');
+  const publish = step('Publicar release oficial com APK e checksum');
+  assert.ok(backend.index < payments.index && payments.index < publish.index);
+  assert.match(workflow, /ANDROID_RELEASE_KEYSTORE_BASE64/);
+  assert.match(workflow, /ANDROID_RELEASE_STORE_PASSWORD/);
+  assert.match(workflow, /ANDROID_RELEASE_KEY_ALIAS/);
+  assert.match(workflow, /ANDROID_RELEASE_KEY_PASSWORD/);
+  assert.match(workflow, /ANDROID_RELEASE_CERT_SHA256/);
+});
