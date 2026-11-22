@@ -75,7 +75,7 @@ test("Mercado Pago webhook signature accepts the official HMAC manifest and reje
   const secret = "test-only-webhook-secret";
   const orderId = "ORDER-TEST-123";
   const requestId = "request-test-456";
-  const timestamp = "1794859200";
+  const timestamp = String(Math.floor(Date.now() / 1000));
   const manifest = `id:${orderId.toLowerCase()};request-id:${requestId};ts:${timestamp};`;
   const validSignature = await signManifest(manifest, secret);
   const request = new Request(
@@ -134,4 +134,36 @@ test("checkout fails closed when provider secrets are absent and webhook remains
   const legacyWebhookResponse = await handleMercadoPagoRoute(webhookRequest, {}, ctx);
   assert.equal(legacyWebhookResponse.status, 503);
   assert.equal((await legacyWebhookResponse.json()).error, "Webhook de pagamento não configurado.");
+});
+
+
+test("webhook rejects replay outside 300 seconds and accepts timestamp seconds/milliseconds", async () => {
+  const secret = "webhook-test-secret-only";
+  const orderId = "ORDER-FRESHNESS-TEST";
+  const requestId = "request-freshness-test";
+  const nowMs = Date.UTC(2026, 10, 22, 12, 0, 0);
+  const nowSeconds = Math.floor(nowMs / 1000);
+  async function verify(ts) {
+    const manifest = `id:${orderId.toLowerCase()};request-id:${requestId};ts:${ts};`;
+    const hash = await signManifest(manifest, secret);
+    const request = new Request(
+      `https://example.invalid/api/webhook/mp?type=order&data.id=${orderId}`,
+      {method: "POST", headers: {
+        "x-signature": `ts=${ts},v1=${hash}`,
+        "x-request-id": requestId
+      }}
+    );
+    return validateWebhookSignature(request, orderId, secret, nowMs);
+  }
+  assert.equal(await verify(String(nowSeconds)), true);
+  assert.equal(await verify(String(nowSeconds - 299)), true);
+  assert.equal(await verify(String(nowSeconds + 299)), true);
+  assert.equal(await verify(String(nowMs)), true);
+  assert.equal(await verify(String(nowMs - 299_000)), true);
+  assert.equal(await verify(String(nowSeconds - 301)), false);
+  assert.equal(await verify(String(nowSeconds + 301)), false);
+  assert.equal(await verify(String(nowMs - 300_001)), false);
+  assert.equal(await verify(String(nowMs + 300_001)), false);
+  assert.equal(await verify("invalid"), false);
+  assert.equal(await verify("0"), false);
 });
