@@ -185,7 +185,7 @@ test("auditoria identifica qual secret Cloudflare precisa de correção",async()
   assert.doesNotMatch(second.detail,/CLOUDFLARE_API_TOKEN/);
 });
 
-test("core-only production D1 workflow is manually authorized, limits SQL to <=0039, and records a restore point",async()=>{
+test("core-only production D1 workflow stages exclusively 0037-0039 and records restore point",async()=>{
   const workflow=await read(".github/workflows/repair-production-d1-core.yml");
   const fullDeploy=await read(".github/workflows/deploy-cloudflare.yml");
   assert.match(workflow,/workflow_dispatch:/);
@@ -194,12 +194,12 @@ test("core-only production D1 workflow is manually authorized, limits SQL to <=0
   assert.match(workflow,/inputs\.confirm_database_id == '7e63af59-d9ff-4159-a9cf-b02e35b92605'/);
   assert.match(workflow,/environment:\s*\n\s*name: production/);
   assert.match(workflow,/group: clash-of-izzy-cloudflare-production/);
-  assert.match(workflow,/int\(match\.group\(1\)\)<=39/);
-  assert.match(workflow,/migrations_dir"\]="\.coi-core-migrations"/);
+  assert.match(workflow,/int\(match\.group\(1\)\)<=36/);
+  assert.match(workflow,/migrations_dir"\]="\.coi-essential-0037-0039"/);
   assert.match(workflow,/0037_daily_login_rewards\.sql/);
   assert.match(workflow,/0038_onboarding_bonus\.sql/);
   assert.match(workflow,/0039_support_orders\.sql/);
-  assert.match(workflow,/last not in \("0035_throne_war\.sql","0036_4x_read_indexes\.sql"\)/);
+  assert.match(workflow,/last!="0036_4x_read_indexes\.sql"/);
   assert.match(workflow,/time_travel\/bookmark/);
   const preflight=workflow.indexOf("Auditar Worker, isolamento");
   const history=workflow.indexOf("Verificar historico remoto");
