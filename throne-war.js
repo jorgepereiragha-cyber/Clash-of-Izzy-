@@ -1,3 +1,4 @@
+import {loadMarchCapacity,assertWithinMarchCapacity} from "./march-capacity.js";
 // Rules for the Throne War. Dates are computed from the per-realm unlock
 // timestamp kept in D1; browser clocks do not authorize combat or coronations.
 export const THRONE_SHIELD_DAYS=35;
@@ -136,6 +137,14 @@ export async function assaultThrone(env,kingdom,body,now=new Date()){
     return {ok:false,status:409,error:"O trono já foi conquistado nesta guerra"};
   if(Number(row.occupation_cycle)===timeline.cycle&&Number(row.occupying_alliance_id)===Number(membership.alliance_id))
     return {ok:false,status:409,error:"Sua aliança já ocupa o Trono"};
+  let marchLimit;
+  try{
+    marchLimit=await loadMarchCapacity(env,kingdomId,body?.heroKey??null);
+    assertWithinMarchCapacity(selection.units,marchLimit.capacity);
+  }catch(error){
+    if(error instanceof RangeError)return {ok:false,status:409,error:error.message};
+    throw error;
+  }
   const defender=Number(row.occupation_cycle)===timeline.cycle&&row.occupying_alliance_id
     ?Math.max(1200,Math.ceil(Number(row.occupying_power)*.8)):1200;
   const combat=throneCombat(selection.power,defender);
