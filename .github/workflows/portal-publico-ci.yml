@@ -1,0 +1,49 @@
+name: Portal publico - divulgacao e download apenas
+on:
+  push:
+    branches:
+      - distribution/portal-publico-isolado-20261121
+  pull_request:
+    paths:
+      - portal-worker.js
+      - wrangler.portal.jsonc
+      - public-portal/**
+      - tests/portal-isolation.test.js
+      - .github/workflows/portal-publico-ci.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validar-portal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Sintaxe do Worker promocional
+        run: node --check portal-worker.js
+      - name: Testes de isolamento e seguranca
+        run: node --test tests/portal-isolation.test.js
+      - name: Auditar arquivos publicados
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          allowed = {
+              "portal.html",
+              "favicon.svg",
+              "styles/coi-theme.css",
+              "assets/brand/hero-emblem.svg",
+          }
+          public = Path("public-portal")
+          found = {p.relative_to(public).as_posix() for p in public.rglob("*") if p.is_file()}
+          assert found == allowed, f"Asset inesperado ou ausente: {found ^ allowed}"
+          assert (public / "portal.html").read_bytes() == Path("portal.html").read_bytes(), "Copia da propaganda desatualizada"
+          print("Portal contém exclusivamente os quatro assets promocionais permitidos.")
+          PY
