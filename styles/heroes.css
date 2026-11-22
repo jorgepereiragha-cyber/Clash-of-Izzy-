@@ -80,3 +80,57 @@
 .hero-roster-card[data-hero-aura="aura-trickster"] .hero-roster-portrait{box-shadow:0 0 0 1px #95e8b2,0 0 13px #468a69}
 .hero-roster-card[data-hero-aura="aura-starlight"] .hero-roster-portrait{box-shadow:0 0 0 1px #ead99c,0 0 13px #9278c0}
 @media(prefers-reduced-motion:reduce){.hero-roster-card[data-hero-aura] .hero-roster-portrait{animation:none}}
+
+/* 70 heróis: borda por raridade; dourados têm assinatura luminosa mais forte. */
+.hero-roster-card:has(.hero-roster-meta) {border-color:#56677d}
+.hero-roster-card[data-hero-rarity="white"]{border-color:#d9e0ec}
+.hero-roster-card[data-hero-rarity="blue"]{border-color:#51a5f3}
+.hero-roster-card[data-hero-rarity="purple"]{border-color:#ba85ff}
+.hero-roster-card[data-hero-rarity="gold"]{border:2px solid #f4cb69;background:linear-gradient(145deg,#302714,#151c2e)}
+.hero-roster-card[data-hero-aura="aura-eldoria-01"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-02"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-03"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-04"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-05"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-06"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-07"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-08"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-09"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-10"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-11"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-12"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-13"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-14"] .hero-roster-portrait{box-shadow:0 0 0 1px #d9e0ec,0 0 12px #d9e0ec55}
+.hero-roster-card[data-hero-aura="aura-eldoria-15"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-16"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-17"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-18"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-19"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-20"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-21"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-22"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-23"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-24"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-25"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-26"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-27"] .hero-roster-portrait{box-shadow:0 0 0 1px #51a5f3,0 0 12px #51a5f355}
+.hero-roster-card[data-hero-aura="aura-eldoria-28"] .hero-roster-portrait{box-shadow:0 0 0 1px #ba85ff,0 0 12px #ba85ff55}
+.hero-roster-card[data-hero-aura="aura-eldoria-29"] .hero-roster-portrait{box-shadow:0 0 0 1px #ba85ff,0 0 12px #ba85ff55}
+.hero-roster-card[data-hero-aura="aura-eldoria-30"] .hero-roster-portrait{box-shadow:0 0 0 1px #ba85ff,0 0 12px #ba85ff55}
+.hero-roster-card[data-hero-aura="aura-eldoria-31"] .hero-roster-portrait{box-shadow:0 0 0 1px #ba85ff,0 0 12px #ba85ff55}
+.hero-roster-card[data-hero-aura="aura-eldoria-32"] .hero-roster-portrait{box-shadow:0 0 0 1px #ba85ff,0 0 12px #ba85ff55}
+.hero-roster-card[data-hero-aura="aura-eldoria-33"] .hero-roster-portrait{box-shadow:0 0 0 1px #ba85ff,0 0 12px #ba85ff55}
+.hero-roster-card[data-hero-aura="aura-eldoria-34"] .hero-roster-portrait{box-shadow:0 0 0 1px #ba85ff,0 0 12px #ba85ff55}
+.hero-roster-card[data-hero-aura="aura-eldoria-35"] .hero-roster-portrait{box-shadow:0 0 0 1px #ba85ff,0 0 12px #ba85ff55}
+.hero-roster-card[data-hero-aura="aura-eldoria-36"] .hero-roster-portrait{box-shadow:0 0 0 1px #ba85ff,0 0 12px #ba85ff55}
+.hero-roster-card[data-hero-aura="aura-eldoria-37"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-38"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-39"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-40"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-41"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-42"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-43"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-44"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-45"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-46"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+.hero-roster-card[data-hero-aura="aura-eldoria-47"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}

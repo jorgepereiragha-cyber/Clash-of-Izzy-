@@ -1,3 +1,4 @@
+import { EXPANSION_HERO_TEMPLATES } from "./hero-expansion.js";
 import { HERO_IDENTITIES } from "./hero-identities.js";
 const HERO_TEMPLATES = Object.freeze({
   soldado_basico:{name:"Darian Ferrovale",title:"Sentinela do Primeiro Muro",rarity:"white",type:"infantaria",portrait:"guard",stats:{hp:500,attack:80,defense:60,speed:30},skill:"Golpe Rápido",skillDesc:"Ataque básico simples",skillPower:1.2},
@@ -17,16 +18,18 @@ const HERO_TEMPLATES = Object.freeze({
   anubis_duat:{name:"Anúbis",title:"Guardião das Balanças do Duat",rarity:"purple",type:"infantaria",portrait:"anubis",theme:"egypt",aura:"duat",stats:{hp:4700,attack:430,defense:650,speed:50},skill:"Vigília do Duat",skillDesc:"Passivo de comandante: reforça a resistência da linha de frente",skillPower:4.5},
   isis_eternal_wings:{name:"Ísis",title:"Senhora das Asas Eternas",rarity:"purple",type:"suporte",portrait:"isis",theme:"egypt",aura:"wings",stats:{hp:4300,attack:520,defense:560,speed:60},skill:"Manto de Ísis",skillDesc:"Passivo de comandante: fortalece a proteção e a sobrevivência do exército",skillPower:4.6},
   horus_eternal_eye:{name:"Hórus",title:"Olho da Eternidade",rarity:"purple",type:"arqueiro",portrait:"horus",theme:"egypt",aura:"falcon",stats:{hp:3900,attack:700,defense:420,speed:70},skill:"Olho Celeste",skillDesc:"Passivo de comandante: favorece o ataque preciso e os golpes críticos",skillPower:4.8},
-  sekhmet_crimson_lioness:{name:"Sekhmet",title:"A Leoa Carmesim",rarity:"purple",type:"cavalaria",portrait:"sekhmet",theme:"egypt",aura:"crimson",stats:{hp:4500,attack:690,defense:450,speed:76},skill:"Fúria da Leoa",skillDesc:"Passivo de comandante: intensifica o ataque de choque",skillPower:4.9}
+  sekhmet_crimson_lioness:{name:"Sekhmet",title:"A Leoa Carmesim",rarity:"purple",type:"cavalaria",portrait:"sekhmet",theme:"egypt",aura:"crimson",stats:{hp:4500,attack:690,defense:450,speed:76},skill:"Fúria da Leoa",skillDesc:"Passivo de comandante: intensifica o ataque de choque",skillPower:4.9},
+  ...EXPANSION_HERO_TEMPLATES
 });
 
 const HERO_RARITY = Object.freeze({
   white:{label:"Branco · Comum",fragments:5,maxLevel:30,maxStars:5},
   blue:{label:"Azul · Raro",fragments:15,maxLevel:50,maxStars:6},
-  purple:{label:"Roxo · Lendário",fragments:40,maxLevel:70,maxStars:7}
+  purple:{label:"Roxo · Épico",fragments:40,maxLevel:70,maxStars:7},
+  gold:{label:"Dourado · Lendário",fragments:65,maxLevel:90,maxStars:8}
 });
-const HERO_STAR_COST = Object.freeze({2:10,3:20,4:40,5:80,6:150,7:300});
-const HERO_SUMMON_RARITY_ODDS = Object.freeze({white:70,blue:25,purple:5});
+const HERO_STAR_COST = Object.freeze({2:10,3:20,4:40,5:80,6:150,7:300,8:600});
+const HERO_SUMMON_RARITY_ODDS = Object.freeze({white:55,blue:30,purple:13,gold:2});
 export function getHeroSummonOdds() {
   const counts = Object.fromEntries(Object.keys(HERO_SUMMON_RARITY_ODDS).map(key => [key, 0]));
   for (const hero of Object.values(HERO_TEMPLATES)) {
@@ -66,20 +69,40 @@ const HERO_COMBAT_PROFILES = Object.freeze({
   sekhmet_crimson_lioness:{attack:2.8,defense:1.2,health:1.1,critical:0.6}
 });
 
+const HERO_COMBAT_BANDS=Object.freeze({
+ white:{attack:[0.6,2.5],defense:[0.6,2.5]},
+ blue:{attack:[3.0,6.0],defense:[3.0,6.0]},
+ purple:{attack:[7.0,11.0],defense:[7.0,11.0]},
+ gold:{attack:[13.0,20.0],defense:[13.0,20.0]}
+});
 export function getHeroCombatBonuses(hero = {}) {
-  const key = String(hero.hero_key || "");
-  const profile = HERO_COMBAT_PROFILES[key] || {attack:0,defense:0,health:0,critical:0};
-  const rarity = HERO_RARITY[normalizedRarity(hero.rarity)];
-  const level = integerInRange(hero.level, 1, 1, rarity.maxLevel);
-  const stars = integerInRange(hero.stars, 1, 1, rarity.maxStars);
-  const levelProgress = rarity.maxLevel > 1 ? (level - 1) / (rarity.maxLevel - 1) : 1;
-  const starProgress = rarity.maxStars > 1 ? (stars - 1) / (rarity.maxStars - 1) : 1;
-  const progression = 0.45 + levelProgress * 0.35 + starProgress * 0.20;
+  const key=String(hero.hero_key||"");
+  const profile=HERO_COMBAT_PROFILES[key] || {attack:1,defense:1,health:0.8,critical:0.2};
+  const zero={attackPercent:0,defensePercent:0,healthPercent:0,criticalChancePercent:0};
+  if(!HERO_TEMPLATES[key]&&!HERO_COMBAT_PROFILES[key])return zero;
+  // Preserve rarity for old heroes rows (gold is stored as 'legendary' in the
+  // legacy heroes table but is gold in the canonical template/inventory).
+  const rarityKey=HERO_TEMPLATES[key]?.rarity||normalizedRarity(hero.rarity);
+  const rarity=HERO_RARITY[rarityKey]||HERO_RARITY.white;
+  const level=integerInRange(hero.level,1,1,rarity.maxLevel);
+  const stars=integerInRange(hero.stars,1,1,rarity.maxStars);
+  const levelProgress=rarity.maxLevel>1?(level-1)/(rarity.maxLevel-1):1;
+  const starProgress=rarity.maxStars>1?(stars-1)/(rarity.maxStars-1):1;
+  const progression=levelProgress*.62+starProgress*.38;
+  // Deterministic small variation keeps each hero distinct without stacking
+  // duplicate rarity multipliers or trusting a client-supplied percentage.
+  const seed=[...key].reduce((n,ch)=>(n*31+ch.charCodeAt(0))%997,17)/997;
+  const bands=HERO_COMBAT_BANDS[rarityKey]||HERO_COMBAT_BANDS.white;
+  const value=(kind,offset)=>{
+    const [min,max]=bands[kind];
+    const variation=.3+.7*((seed+offset)%1);
+    return Number((min+(max-min)*variation*(.25+.75*progression)).toFixed(2));
+  };
   return {
-    attackPercent: Number((profile.attack * progression).toFixed(2)),
-    defensePercent: Number((profile.defense * progression).toFixed(2)),
-    healthPercent: Number((profile.health * progression).toFixed(2)),
-    criticalChancePercent: Number((profile.critical * progression).toFixed(2))
+    attackPercent:value("attack",0),
+    defensePercent:value("defense",.37),
+    healthPercent:Number((Math.max(0,profile.health)*(.45+.55*progression)).toFixed(2)),
+    criticalChancePercent:Number((Math.max(0,profile.critical)*(.45+.55*progression)).toFixed(2))
   };
 }
 
@@ -108,7 +131,7 @@ function parseStats(value) {
 }
 
 function normalizedRarity(value) {
-  if (value === "white" || value === "blue" || value === "purple") return value;
+  if (value === "white" || value === "blue" || value === "purple" || value === "gold") return value;
   if (value === "rare") return "blue";
   if (value === "legendary" || value === "mythic" || value === "epic") return "purple";
   return "white";

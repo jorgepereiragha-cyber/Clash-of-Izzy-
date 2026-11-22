@@ -1,3 +1,4 @@
+import { EXPANSION_HERO_IDENTITIES } from "./hero-expansion.js";
 // Identidade narrativa, auras e referências culturais do universo Clash of Izzy.
 // Chaves hero_key permanecem estáveis para preservar inventários já existentes.
 export const HERO_IDENTITIES=Object.freeze({
@@ -23,5 +24,6 @@ export const HERO_IDENTITIES=Object.freeze({
   thor_ragnarok:Object.freeze({faction:"Lendas de Valhalla",aura_label:"Trovão Antigo",lore:"Releitura da figura mitológica nórdica Thor para a temporada de Valhalla.",motto:"O céu responde aos valentes.",aura:"aura-thunder"}),
   freya_vanir:Object.freeze({faction:"Lendas de Valhalla",aura_label:"Aurora Vanir",lore:"Releitura da figura mitológica nórdica Freyja para a temporada de Valhalla.",motto:"A esperança renova a força.",aura:"aura-vanir"}),
   loki_chaos:Object.freeze({faction:"Lendas de Valhalla",aura_label:"Sombra do Ardil",lore:"Releitura da figura mitológica nórdica Loki para a temporada de Valhalla.",motto:"A resposta pode ser um enigma.",aura:"aura-trickster"}),
-  valhalla_king:Object.freeze({faction:"Lendas de Valhalla",aura_label:"Trono Estelar",lore:"Comandante lendário da temporada de Valhalla; protege as memórias dos combatentes.",motto:"Nenhuma canção é esquecida.",aura:"aura-starlight"})
+  valhalla_king:Object.freeze({faction:"Lendas de Valhalla",aura_label:"Trono Estelar",lore:"Comandante lendário da temporada de Valhalla; protege as memórias dos combatentes.",motto:"Nenhuma canção é esquecida.",aura:"aura-starlight"}),
+  ...EXPANSION_HERO_IDENTITIES
 });

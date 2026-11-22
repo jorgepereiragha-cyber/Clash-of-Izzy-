@@ -158,7 +158,8 @@ const MERCHANT_EXCHANGE_POOL=[
 const HERO_FRAGMENT_SHOP={
  white:{quantity:5,costs:{gold:1800,food:2500},stock:2},
  blue:{quantity:5,costs:{gold:5200,food:7000},stock:2},
- purple:{quantity:5,costs:{gold:14500,food:18000},stock:1}
+ purple:{quantity:5,costs:{gold:14500,food:18000},stock:1},
+ gold:{quantity:5,costs:{gold:42000,food:36000},stock:1}
 };
 function rotatingPick(pool,cycle,count){
  const values=[...pool],seed=(cycle*2246822519+3266489917)>>>0;
@@ -205,7 +206,15 @@ async function getShopState(env,kingdomId){
   items:SHOP_ITEMS,inventory:inventory.results||[]
  };
 }
-function rollHeroRarity(){const n=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296*100,common=HERO_SUMMON_RARITY_ODDS.white,rare=common+HERO_SUMMON_RARITY_ODDS.blue;return n<common?"white":n<rare?"blue":"purple";}
+function rollHeroRarity(){
+ const n=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296*100;
+ let cumulative=0;
+ for(const [rarity,percentage] of Object.entries(HERO_SUMMON_RARITY_ODDS)){
+  cumulative+=percentage;
+  if(n<cumulative)return rarity;
+ }
+ return "gold";
+}
 const TROOP_CAPACITY_PER_BARRACKS_LEVEL = 500;
 const UNITS = {
   militia:{label:"Milícia",food:12,wood:2,iron:0,power:2},
@@ -1244,7 +1253,7 @@ async function gameAction(env,playerId,body){
         statements.push(env.DB.prepare("INSERT INTO hero_inventory(kingdom_id,hero_key,rarity,level,experience,stars,skill_level,fragments) SELECT ?,?,?,1,0,1,1,0 WHERE "+guard+" ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET fragments=hero_inventory.fragments+?").bind(k.id,heroKey,rarity,k.id,actionId,fragmentGain));
         owned.add(heroKey);
       }
-      const tableRarity=rarity==="white"?"common":rarity==="blue"?"rare":"legendary";
+      const tableRarity=rarity==="white"?"common":rarity==="blue"?"rare":"legendary"; // gold maps to legacy heroes.rarity CHECK, while inventory stores gold
       statements.push(env.DB.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) SELECT ?,?,?,1,0,? WHERE "+guard+" ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END").bind(k.id,heroKey,HERO_TEMPLATES[heroKey].name,tableRarity,k.id,actionId));
       statements.push(env.DB.prepare("INSERT INTO hero_summon_history(kingdom_id,hero_key,rarity,result_type) SELECT ?,?,?,? WHERE "+guard).bind(k.id,heroKey,rarity,duplicate?"duplicate":"new",k.id,actionId));
       results.push({hero_key:heroKey,name:HERO_TEMPLATES[heroKey].name,rarity,result_type:duplicate?"duplicate":"new",fragments:duplicate?fragmentGain:0});

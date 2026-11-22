@@ -333,6 +333,7 @@
       card.className="hero-roster-card"+(selected?" is-selected":"");
       if(hero.theme_key)card.dataset.heroTheme=String(hero.theme_key);
       if(hero.aura_key)card.dataset.heroAura=String(hero.aura_key);
+      if(hero.rarity_key)card.dataset.heroRarity=String(hero.rarity_key);
       const portrait=document.createElementNS("http://www.w3.org/2000/svg","svg");
       portrait.setAttribute("class","hero-roster-portrait");
       portrait.setAttribute("viewBox","0 0 320 480");
@@ -427,7 +428,7 @@
     const root=$("hero-summon-rates");
     if(!root)return;
     const rows=Array.isArray(state?.heroSummonOdds)?state.heroSummonOdds:[];
-    const labels={white:"Comum",blue:"Raro",purple:"Lendário"};
+    const labels={white:"Comum",blue:"Raro",purple:"Épico",gold:"Lendário dourado"};
     root.replaceChildren();
     for(const row of rows){
       const card=document.createElement("div");
