@@ -1,0 +1,162 @@
+name: Reparar schema essencial D1 producao (ate 0039, protegido)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: "Autorizo migracoes REMOTAS apenas do schema essencial no D1 producao"
+        required: true
+        type: boolean
+        default: false
+      confirm_preview:
+        description: "Confirmei homologacao das migracoes essenciais em Preview isolado"
+        required: true
+        type: boolean
+        default: false
+      confirm_database_id:
+        description: "Digite o UUID do D1 de producao para confirmar o destino"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clash-of-izzy-cloudflare-production
+  cancel-in-progress: false
+
+jobs:
+  repair-core:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_production == true && inputs.confirm_preview == true && inputs.confirm_database_id == '7e63af59-d9ff-4159-a9cf-b02e35b92605' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    environment:
+      name: production
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar codigo e migracoes localmente
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          npm test
+          npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
+
+      - name: Normalizar credenciais para runner efemero
+        shell: bash
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,re
+          token=os.environ.get("RAW_TOKEN","").strip()
+          if token.lower().startswith("bearer "): token=token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):token=token[1:-1].strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if not token or any(c.isspace() for c in token) or not re.fullmatch(r"[a-fA-F0-9]{32}",account):
+              raise SystemExit("Cloudflare credentials invalid; no production write authorized.")
+          print("::add-mask::"+token)
+          with open(os.environ["GITHUB_ENV"],"a") as f:
+              f.write("CLOUDFLARE_API_TOKEN="+token+"\n")
+              f.write("CLOUDFLARE_ACCOUNT_ID="+account+"\n")
+          PY
+
+      - name: Auditar Worker, isolamento, token e Time Travel antes de escrita (somente leitura)
+        env:
+          COI_ALLOW_PENDING_0037_0039: "true"
+        run: node scripts/cloudflare-remote-audit.mjs
+
+      - name: Verificar historico remoto e preparar diretorio de migrations limitado
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,re,urllib.request,pathlib,shutil
+          prod="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          preview="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          root=pathlib.Path.cwd()
+          cfg=json.loads((root/"wrangler.jsonc").read_text())
+          binding=next(item for item in cfg["d1_databases"] if item["binding"]=="DB")
+          assert binding["database_id"]==prod and prod!=preview
+          token=os.environ["CLOUDFLARE_API_TOKEN"]
+          account=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          url=f"https://api.cloudflare.com/client/v4/accounts/{account}/d1/database/{prod}/query"
+          query=json.dumps({"sql":"SELECT name FROM d1_migrations ORDER BY id"}).encode()
+          request=urllib.request.Request(url,data=query,method="POST",
+              headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+          with urllib.request.urlopen(request,timeout=30) as response:reply=json.load(response)
+          if not reply.get("success") or not reply.get("result"):raise SystemExit("Cannot audit D1 migrations; no write.")
+          names=[x["name"] for x in reply["result"][0].get("results",[])]
+          last=names[-1] if names else None
+          if last not in ("0035_throne_war.sql","0036_4x_read_indexes.sql"):
+              raise SystemExit("Unexpected migration history: production core repair aborted.")
+          essential=("0037_daily_login_rewards.sql","0038_onboarding_bonus.sql","0039_support_orders.sql")
+          if any(item in names for item in essential):
+              raise SystemExit("Partial/advanced migration history: investigate manually before any write.")
+          if any(re.match(r"^004[0-9]_",name) for name in names):
+              raise SystemExit("Commercial migrations detected in production history: abort.")
+          output=root/".coi-core-migrations"
+          output.mkdir(exist_ok=False)
+          copied=[]
+          for file in sorted((root/"migrations").glob("*.sql")):
+              match=re.match(r"^(\d{4})_",file.name)
+              if match and int(match.group(1))<=39:
+                  shutil.copy2(file,output/file.name)
+                  copied.append(file.name)
+          if not all(item in copied for item in essential):
+              raise SystemExit("Essential migration files missing: no write.")
+          binding["migrations_dir"]=".coi-core-migrations"
+          (root/"wrangler.core.generated.jsonc").write_text(json.dumps(cfg,indent=2)+"\n")
+          print("PROD_D1_HISTORY_LAST="+str(last))
+          print("CORE_MIGRATIONS_MAX=0039; production target UUID verified.")
+          print("No commercial 0040-0044 SQL is present in the generated migration directory.")
+          PY
+
+      - name: Listar migrations de producao pendentes (somente leitura)
+        run: npx wrangler --config wrangler.core.generated.jsonc d1 migrations list clash-of-izzy-db --remote
+
+      - name: Capturar bookmark Time Travel de producao ANTES de qualquer escrita
+        id: bookmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,urllib.request,datetime,pathlib
+          account=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          database="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          url=f"https://api.cloudflare.com/client/v4/accounts/{account}/d1/database/{database}/time_travel/bookmark"
+          req=urllib.request.Request(url,method="GET",headers={"Authorization":"Bearer "+os.environ["CLOUDFLARE_API_TOKEN"]})
+          with urllib.request.urlopen(req,timeout=30) as response:payload=json.load(response)
+          bookmark=((payload.get("result") or {}).get("bookmark") or "").strip()
+          if not payload.get("success") or not bookmark:raise SystemExit("No D1 restore point: migration blocked.")
+          dest=pathlib.Path(os.environ["RUNNER_TEMP"])/"d1-core-before-migration.json"
+          dest.write_text(json.dumps({"database_id":database,"bookmark":bookmark,
+              "captured_at":datetime.datetime.now(datetime.timezone.utc).isoformat(),
+              "restore_warning":"Restoring this bookmark overwrites the database including subsequent player writes."},indent=2))
+          print("::add-mask::"+bookmark)
+          with open(os.environ["GITHUB_OUTPUT"],"a") as out:out.write("captured=true\n")
+          print("D1 Time Travel bookmark captured; value masked.")
+          PY
+
+      - name: Arquivar ponto de recuperacao antes de migrar
+        if: steps.bookmark.outputs.captured == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: d1-core-pre-migration-${{ github.run_id }}
+          path: ${{ runner.temp }}/d1-core-before-migration.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Aplicar somente migrations essenciais ate 0039 em producao
+        run: npx wrangler --config wrangler.core.generated.jsonc d1 migrations apply clash-of-izzy-db --remote
+
+      - name: Verificar prontidao remota SEM allowlist (somente leitura)
+        run: |
+          node scripts/cloudflare-remote-audit.mjs
+          node scripts/check-android-release-server.mjs
+          echo "D1 core repaired. No Worker deploy or commercial catalog migration was executed."

@@ -69,6 +69,32 @@ test("auditoria pré-migração 0030 aceita somente três tabelas faltando com D
   assert.equal(accepted.ready,true,JSON.stringify(accepted.checks));
   assert.ok(accepted.checks.find(row=>row.name==="Worker público e D1").detail.includes("0030"));
   assert.ok(valid.visits.every(x=>x.method==="GET"));
+  const dailyOnboardingSupport={...base,missingTables:["daily_reward_claims","onboarding_bonus_claims","support_orders"]};
+  const pendingCore={...args,allowPending0037to0039:true};
+  const coreApproved=await audit({...pendingCore,fetchImpl:mockFor(dailyOnboardingSupport).fetchImpl});
+  assert.equal(coreApproved.ready,true,JSON.stringify(coreApproved.checks));
+  assert.ok(coreApproved.checks.find(row=>row.name==="Worker público e D1").detail.includes("0037-0039"));
+  const coreNotAuthorized=await audit({...args,fetchImpl:mockFor(dailyOnboardingSupport).fetchImpl});
+  assert.equal(coreNotAuthorized.ready,false);
+  for(const missing of [
+    ["daily_reward_claims"],
+    ["daily_reward_claims","onboarding_bonus_claims"],
+    ["daily_reward_claims","onboarding_bonus_claims","support_orders","unknown_table"],
+  ]){
+    const denied=await audit({...pendingCore,fetchImpl:mockFor({...base,missingTables:missing}).fetchImpl});
+    assert.equal(denied.ready,false,"only the complete authorized 0037-0039 group is accepted");
+  }
+  for(const checks of [
+    {...base.checks,database:false},
+    {...base.checks,session:false},
+    {...base.checks,schema:true},
+  ]){
+    const denied=await audit({...pendingCore,fetchImpl:mockFor({...dailyOnboardingSupport,checks}).fetchImpl});
+    assert.equal(denied.ready,false,"readiness protections remain mandatory");
+  }
+  const combinedOldAndNew=await audit({...pendingCore,allowPending0034:true,
+    fetchImpl:mockFor({...base,missingTables:["realm_openings",...dailyOnboardingSupport.missingTables]}).fetchImpl});
+  assert.equal(combinedOldAndNew.ready,true,"authorized legacy and current groups can coexist");
   const strict=await audit({...args,allowPending0030:false,fetchImpl:mockFor(base).fetchImpl});
   assert.equal(strict.ready,false);
   const missingGoogle={...base,missingTables:["google_account_links","google_auth_challenges"]};
@@ -127,12 +153,14 @@ test("deploy não relaxa a validação de saúde pós-migração",async()=>{
   const deploy=workflow.indexOf("Deploy Worker and static assets");
   assert.ok(old>=0&&migrate>old&&deploy>migrate&&newCheck>deploy);
   const strict=workflow.slice(newCheck,workflow.indexOf("Smoke test production Worker",newCheck));
-  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030|COI_ALLOW_PENDING_0033|COI_ALLOW_PENDING_0034|COI_ALLOW_PENDING_0035/);
+  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030|COI_ALLOW_PENDING_0033|COI_ALLOW_PENDING_0034|COI_ALLOW_PENDING_0035|COI_ALLOW_PENDING_0037_0039/);
+  assert.match(workflow.slice(old,migrate),/COI_ALLOW_PENDING_0037_0039: "true"/);
   assert.match(strict,/check-android-release-server\.mjs/);
   assert.match(source,/allowPending0030:process\.env\.COI_ALLOW_PENDING_0030==="true"/);
   assert.match(source,/allowPending0033:process\.env\.COI_ALLOW_PENDING_0033==="true"/);
   assert.match(source,/allowPending0034:process\.env\.COI_ALLOW_PENDING_0034==="true"/);
   assert.match(source,/allowPending0035:process\.env\.COI_ALLOW_PENDING_0035==="true"/);
+  assert.match(source,/allowPending0037to0039:process\.env\.COI_ALLOW_PENDING_0037_0039==="true"/);
 });
 
 test("normaliza account ID sem expor valor e mantém formato de 32 caracteres",()=>{
@@ -155,4 +183,35 @@ test("auditoria identifica qual secret Cloudflare precisa de correção",async()
   assert.equal(second.ok,false);
   assert.match(second.detail,/CLOUDFLARE_ACCOUNT_ID/);
   assert.doesNotMatch(second.detail,/CLOUDFLARE_API_TOKEN/);
+});
+
+test("core-only production D1 workflow is manually authorized, limits SQL to <=0039, and records a restore point",async()=>{
+  const workflow=await read(".github/workflows/repair-production-d1-core.yml");
+  const fullDeploy=await read(".github/workflows/deploy-cloudflare.yml");
+  assert.match(workflow,/workflow_dispatch:/);
+  assert.match(workflow,/github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow,/confirm_production == true && inputs\.confirm_preview == true/);
+  assert.match(workflow,/inputs\.confirm_database_id == '7e63af59-d9ff-4159-a9cf-b02e35b92605'/);
+  assert.match(workflow,/environment:\s*\n\s*name: production/);
+  assert.match(workflow,/group: clash-of-izzy-cloudflare-production/);
+  assert.match(workflow,/int\(match\.group\(1\)\)<=39/);
+  assert.match(workflow,/migrations_dir"\]="\.coi-core-migrations"/);
+  assert.match(workflow,/0037_daily_login_rewards\.sql/);
+  assert.match(workflow,/0038_onboarding_bonus\.sql/);
+  assert.match(workflow,/0039_support_orders\.sql/);
+  assert.match(workflow,/last not in \("0035_throne_war\.sql","0036_4x_read_indexes\.sql"\)/);
+  assert.match(workflow,/time_travel\/bookmark/);
+  const preflight=workflow.indexOf("Auditar Worker, isolamento");
+  const history=workflow.indexOf("Verificar historico remoto");
+  const backup=workflow.indexOf("Capturar bookmark Time Travel");
+  const apply=workflow.indexOf("Aplicar somente migrations essenciais");
+  const verify=workflow.indexOf("Verificar prontidao remota SEM allowlist");
+  assert.ok(preflight>=0&&history>preflight&&backup>history&&apply>backup&&verify>apply);
+  assert.match(workflow.slice(verify),/node scripts\/cloudflare-remote-audit\.mjs/);
+  assert.doesNotMatch(workflow.slice(verify),/COI_ALLOW_PENDING_/);
+  assert.doesNotMatch(workflow,/wrangler[^\n]* deploy(?! --dry-run)/);
+  assert.match(fullDeploy,/Bloquear migrations comerciais pendentes/);
+  assert.match(fullDeploy,/0044_reconcile_level_packs\.sql/);
+  assert.ok(fullDeploy.indexOf("Bloquear migrations comerciais pendentes")<
+    fullDeploy.indexOf("Apply D1 migrations remotely"));
 });

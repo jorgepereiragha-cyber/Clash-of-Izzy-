@@ -36,7 +36,7 @@ async function req(url,{fetchImpl,token=""}={}){
   if(token&&value?.success!==true)throw Error("API Cloudflare não confirmou sucesso");
   return value;
 }
-export async function audit({fetchImpl=fetch,production,staging,token="",accountId="",allowPending0030=false,allowPending0033=false,allowPending0034=false,allowPending0035=false}={}){
+export async function audit({fetchImpl=fetch,production,staging,token="",accountId="",allowPending0030=false,allowPending0033=false,allowPending0034=false,allowPending0035=false,allowPending0037to0039=false}={}){
   const result=[];
   const normalizedAccountId=normalizeAccountId(accountId);
   const run=async(name,fn,required=true)=>{
@@ -48,8 +48,8 @@ export async function audit({fetchImpl=fetch,production,staging,token="",account
     ids=validateIds(production,staging);return "UUIDs distintos";
   });
   await run("Worker público e D1",async()=>{
-    if(allowPending0030||allowPending0033||allowPending0034||allowPending0035){
-      // Somente pré-deploy protegido: aceitar uniões exatas das migrações 0030/0033/0034/0035.
+    if(allowPending0030||allowPending0033||allowPending0034||allowPending0035||allowPending0037to0039){
+      // Somente pré-deploy protegido: aceitar grupos exatos de tabelas pendentes autorizadas.
       // Nunca relaxar DB, sessão, objetos desconhecidos ou o health pós-deploy.
       const response=await fetchImpl(PUBLIC+"/api/health",{
         method:"GET",redirect:"error",signal:AbortSignal.timeout(15000),
@@ -62,6 +62,7 @@ export async function audit({fetchImpl=fetch,production,staging,token="",account
         if(allowPending0033)pending.push({id:"0033",tables:["google_account_links","google_auth_challenges"]});
         if(allowPending0034)pending.push({id:"0034",tables:["realm_openings"]});
         if(allowPending0035)pending.push({id:"0035",tables:["realm_thrones","throne_assaults"]});
+        if(allowPending0037to0039)pending.push({id:"0037-0039",tables:["daily_reward_claims","onboarding_bonus_claims","support_orders"]});
         const actual=Array.isArray(h?.missingTables)?[...h.missingTables].sort():[];
         const combinations=[];
         for(let mask=1;mask<(1<<pending.length);mask++){
@@ -74,7 +75,7 @@ export async function audit({fetchImpl=fetch,production,staging,token="",account
            h.checks?.session===true&&h.checks?.schema===false&&matching){
           return "D1 e sessão OK; somente tabelas de "+matching.ids+" pendentes (esperado antes da migration)";
         }
-        throw Error("Health 503 contém objetos ou falhas fora de 0030/0033/0034/0035.");
+        throw Error("Health 503 contém objetos ou falhas fora dos grupos de migração autorizados.");
       }
       if(!response.ok)throw Error("HTTP "+response.status);
       const h=await response.json();
@@ -159,7 +160,8 @@ async function main(){
       allowPending0030:process.env.COI_ALLOW_PENDING_0030==="true",
       allowPending0033:process.env.COI_ALLOW_PENDING_0033==="true",
       allowPending0034:process.env.COI_ALLOW_PENDING_0034==="true",
-      allowPending0035:process.env.COI_ALLOW_PENDING_0035==="true"});
+      allowPending0035:process.env.COI_ALLOW_PENDING_0035==="true",
+      allowPending0037to0039:process.env.COI_ALLOW_PENDING_0037_0039==="true"});
   }catch(e){report={ready:false,checks:[{ok:false,required:true,name:"Configuração",detail:e.message}]}};
   const text=summary(report);console.log(text);
   if(process.env.GITHUB_STEP_SUMMARY)await appendFile(process.env.GITHUB_STEP_SUMMARY,text);

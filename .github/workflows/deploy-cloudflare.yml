@@ -122,7 +122,40 @@ jobs:
           COI_ALLOW_PENDING_0033: "true"
           COI_ALLOW_PENDING_0034: "true"
           COI_ALLOW_PENDING_0035: "true"
+          COI_ALLOW_PENDING_0037_0039: "true"
         run: node scripts/cloudflare-remote-audit.mjs
+
+      - name: Bloquear migrations comerciais pendentes no deploy completo (somente leitura)
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,urllib.request
+          account=os.environ["CLOUDFLARE_ACCOUNT_ID"]
+          database="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          url=f"https://api.cloudflare.com/client/v4/accounts/{account}/d1/database/{database}/query"
+          data=json.dumps({"sql":"SELECT name FROM d1_migrations ORDER BY id"}).encode()
+          request=urllib.request.Request(url,data=data,method="POST",
+            headers={"Authorization":"Bearer "+os.environ["CLOUDFLARE_API_TOKEN"],"Content-Type":"application/json"})
+          with urllib.request.urlopen(request,timeout=30) as response:payload=json.load(response)
+          if not payload.get("success") or not payload.get("result"):
+              raise SystemExit("D1 history not verified; full production deploy refused.")
+          applied={x["name"] for x in payload["result"][0].get("results",[])}
+          commercial={
+            "0040_support_packages.sql",
+            "0042_level_packs_p1_p8.sql",
+            "0043_fix_vip_catalog.sql",
+            "0044_reconcile_level_packs.sql"
+          }
+          pending=commercial-applied
+          if pending:
+              print("::error::Full deploy blocked: unapproved commercial D1 migrations are pending.")
+              print("Use protected repair-production-d1-core.yml for schema only through 0039.")
+              raise SystemExit(1)
+          print("Commercial migration history complete; full deploy requires separate existing approval gates.")
+          PY
 
       - name: Capture D1 pre-deployment restore point
         id: capture_d1
