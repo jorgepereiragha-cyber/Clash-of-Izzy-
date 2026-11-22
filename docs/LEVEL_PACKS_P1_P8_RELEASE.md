@@ -1,7 +1,7 @@
-# Clash of Izzy — Pacotes P1–P8 (0042): homologacao antes de comercializar
+# Clash of Izzy — Pacotes P1–P8 (0042 + 0043): homologacao antes de comercializar
 
 ## Escopo implementado
-- Branch empilhada sobre PR #229; nao executa qualquer migracao remota, deploy ou pagamento.
+- Revisao do catalogo empilhada sobre a PR #236, que depende da #233, #229 e #223; nao executa qualquer migracao remota, deploy ou pagamento.
 - Reutiliza `vip_packages`, `purchase_requests`, o checkout `/v1/orders` e o webhook HMAC existentes.
 - Pacotes novos diferenciados pelo nome canonico em `level-packs.js`, com limiar de progressao 10,20,...80. P1-P8 do jogo permanecem separados de VIP 1-7.
 - Gemas creditadas exclusivamente em `players.gems`; madeira, comida, pedra, ferro e ouro em `kingdoms`.
@@ -12,16 +12,19 @@
 - A compra de pacote por nivel depende de sessao autenticada, nivel real de `kingdom_progression` no D1, preco e gemas congruentes com a configuracao, e Mercado Pago configurado. Pix manual e aprovacao manual nao criam novos pedidos de nivel.
 - Se dois pedidos pagos distintos tentarem reivindicar a mesma faixa, a concessao nao se repete. A segunda order fica sem `fulfilled_at` e demanda conciliacao/estorno manual; nao prometer reembolso automatico.
 
-## Precos para aprovar
-Valores P1-P3 fornecidos: P1 R$9,90; P2 R$29,90; P3 R$59,90.
-**P4-P8 sao PROPOSTAS NAO APROVADAS**: P4 R$89,90; P5 R$129,90; P6 R$179,90; P7 R$229,90; P8 R$299,90. O servidor e a interface bloqueiam compras P4-P8 enquanto `LEVEL_PACKS_PROPOSED_PRICES_APPROVED` nao estiver igual a `true`.
+## Valores do protocolo de 22/11/2026 (ainda bloqueados para venda)
+- P1: R$9,90 · 500 gemas; P2: R$29,90 · 2.000 gemas; P3: R$59,90 · 5.000 gemas.
+- P4: R$99,90 · 10.000 gemas; P5: R$149,90 · 20.000 gemas; P6: R$199,90 · 35.000 gemas.
+- P7: R$299,90 · 60.000 gemas; P8: R$499,90 · 100.000 gemas.
+Os recursos de cada fase estao em `level-packs.js`, nao na tabela `vip_packages`. O usuario forneceu os valores, mas **a liberacao comercial continua condicionada** a testes de checkout, aprovacao e flags: `LEVEL_PACKS_PROPOSED_PRICES_APPROVED` nao deve ser ativada automaticamente.
+Antes de aplicar 0043, consultar pedidos P4-P8 pendentes no D1 (nome, valor, status, sem dados privados). Mudanca de catalogo nao altera pedidos ja criados; as orders antigas com preco divergente devem ser conciliadas/encerradas pelo procedimento do provedor antes da ativacao, nunca receber credito automatico de pacote com valor diferente. A migracao `0043_align_level_pack_catalog.sql` usa `UPDATE` somente das cinco ofertas; preserva IDs e historico. Rodar em Preview e inspecionar os cinco registros antes de producao.
 Atribuicoes e quantidades definitivas devem ser revisadas para equilibrar a economia, protecao do consumidor e nao prometer itens nao entregues.
 Nenhuma flag pode ser ativada antes da aprovacao comercial de TODOS os valores vigentes.
 
 ## Checklist de liberacao
 1. PR #223 revista e aprovada; #229 homologada e revisada. Rebase/retarget desta PR apos a ordem de merges. Validar testes e conflitos antes de qualquer merge.
 2. Criar backup D1 de producao, verificar integridade e capacidade de restaurar. Conferir nomes de tabelas e migracoes atuais de producao e preview, sem inferir a partir de documentacao antiga.
-3. Aplicar `0037–0042` sequencialmente somente via pipeline protegido aprovado, apos teste em Preview. Obter evidencias `PRAGMA table_info` e SELECT de valores e indexes relevantes. Nunca rodar comandos de producao automaticamente.
+3. Aplicar `0037–0043` sequencialmente somente via pipeline protegido aprovado, apos teste em Preview. Obter evidencias `PRAGMA table_info` e SELECT de valores e indexes relevantes. Nunca rodar comandos de producao automaticamente.
 4. Rodar `node --test tests/level-packs.test.js tests/mercadopago-4x-integration.test.js`, `npm test`, `npm run check` e testes Android. O teste simulado **nao substitui** pagamento real do Sandbox do provedor.
 5. Configurar credenciais Mercado Pago de teste apenas em ambiente isolado, validar autenticacao do webhook, divergencia de valores, replay e pagamento duplicado entre pedidos distintos. Usar dados sinteticos; verificar os balances efetivos no D1 Preview.
 6. Testar troca de fase P1–P8, niveis 9/10, 19/20, 79/80, compra unica, concorrencia, compra pendente, pagamento recusado, cancelamento, disputa e estorno. Verificar que a ordem duplicada exige conciliacao.
