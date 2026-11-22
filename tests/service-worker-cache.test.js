@@ -11,6 +11,7 @@ assert.ok(SHELL_CACHE, "Service Worker shell cache identifier missing");
 function makeResponse({ status = 200, headers = {}, type = "basic" } = {}) {
   return {
     status,
+    ok: status >= 200 && status < 300,
     type,
     headers: new Headers(headers),
     clone() { return makeResponse({ status, headers, type }); },
