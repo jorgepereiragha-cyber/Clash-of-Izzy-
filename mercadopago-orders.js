@@ -1,6 +1,6 @@
 import { finalizeSupportOrder } from "./support-orders.js";
 import {MASTER_PACK_NAME,masterGrantStatements} from "./master-pack.js";
-import {getLevelPackByName,levelPackMatchesOrder,levelPackGrantStatements} from "./level-packs.js";
+import {getLevelPackByName,levelPackMatchesOrder,levelPackGrantStatements,levelPacksEnabledForPlayer} from "./level-packs.js";
 function toBase64Url(bytes) {
   let binary = "";
   for (const byte of bytes) binary += String.fromCharCode(byte);
@@ -78,7 +78,7 @@ async function createCheckout(request, env, ctx) {
     "FROM purchase_requests r JOIN players p ON p.id=r.player_id WHERE r.id=? AND p.player_id=?"
   ).bind(requestId, playerId).first();
   if (!order) return ctx.json({ error: "Pedido não encontrado para este reino." }, 404);
-  if (getLevelPackByName(order.product_name) && env.LEVEL_PACKS_ENABLED !== "true") return ctx.json({error:"Os pacotes por nível ainda estão desativados.",code:"LEVEL_PACKS_DISABLED"},503);
+  if (getLevelPackByName(order.product_name) && !levelPacksEnabledForPlayer(env,playerId)) return ctx.json({error:"Os pacotes por nível ainda não estão liberados para esta conta.",code:"LEVEL_PACKS_DISABLED"},503);
   if (order.status !== "pending") return ctx.json({ error: "Este pedido não está mais aguardando pagamento." }, 409);
   if (order.payment_method !== "mercadopago_link") return ctx.json({ error: "Este pedido foi criado para conferência manual e não pode ser convertido em checkout automático." }, 409);
   if (order.mp_checkout_url && order.mp_order_id) {
