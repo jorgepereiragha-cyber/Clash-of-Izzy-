@@ -82,6 +82,21 @@ jobs:
 
           # The latest migration alone cannot detect an earlier missing file.
           prefix_valid = bool(expected) and bool(names) and names == expected[:len(names)]
+          first_divergence = None
+          for index, observed in enumerate(names):
+              canonical = expected[index] if index < len(expected) else None
+              if observed != canonical:
+                  first_divergence = {
+                      "position": index + 1,
+                      "expectedFilename": canonical,
+                      "appliedFilename": observed,
+                  }
+                  break
+          if not names:
+              first_divergence = {
+                  "position": 1, "expectedFilename": expected[0] if expected else None,
+                  "appliedFilename": None,
+              }
           pending = expected[len(names):] if prefix_valid else []
           last = names[-1] if names else None
           required_tables = {"daily_reward_claims", "onboarding_bonus_claims", "support_orders"}
@@ -102,6 +117,11 @@ jobs:
               "writesPerformed": 0,
               "latestMigration": last,
               "coreHistoryExactPrefix": prefix_valid,
+              "appliedHistoryCount": len(names),
+              "expectedCoreFileCount": len(expected),
+              "firstHistoryDivergence": first_divergence,
+              "recentAppliedFilenames": names[-8:],
+              "unexpectedAppliedFilenames": sorted(set(names) - set(expected))[:12],
               "pendingCoreMigrationNames": pending,
               "missingRequiredTables": missing_tables,
               "eligibleForCoreRepairReview": exact_repair_candidate,
@@ -113,6 +133,7 @@ jobs:
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
               output.write("## D1 production history (read-only)\n")
               output.write("- Exact migration prefix: " + str(prefix_valid) + "\n")
+              output.write("- First divergence: " + json.dumps(first_divergence, sort_keys=True) + "\n")
               output.write("- Latest migration: " + str(last) + "\n")
               output.write("- Missing core tables: " + ", ".join(missing_tables) + "\n")
               output.write("- Candidate for protected repair review: " + str(exact_repair_candidate) + "\n")
