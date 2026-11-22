@@ -8,7 +8,7 @@ on:
         type: string
         required: true
       codigo_versao:
-        description: "VersionCode minimo: 2 (atualiza o APK candidato 0.9.0)"
+        description: "VersionCode minimo: 3 (atualiza o APK candidato 0.9.1)"
         type: string
         required: true
       confirmacao:
@@ -46,7 +46,7 @@ jobs:
           [[ "$RELEASE_CONFIRMATION" == "PUBLICAR_APK_OFICIAL" ]] || { echo "::error::Confirmacao obrigatoria"; exit 1; }
           [[ "$ANDROID_VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Versao semver invalida"; exit 1; }
           [[ "$ANDROID_VERSION_CODE" =~ ^[1-9][0-9]{0,8}$ ]] || { echo "::error::VersionCode invalido"; exit 1; }
-          (( ANDROID_VERSION_CODE > 1 )) || { echo "::error::VersionCode deve ser >= 2 para atualizar o APK candidato interno (versionCode 1)"; exit 1; }
+          (( ANDROID_VERSION_CODE > 2 )) || { echo "::error::VersionCode deve ser >= 3 para atualizar o APK candidato interno (versionCode 2)"; exit 1; }
           tag="v$ANDROID_VERSION_NAME"
           if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
             echo "::error::Release $tag ja publicada; nao sobrescrever"
