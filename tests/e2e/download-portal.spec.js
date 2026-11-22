@@ -7,7 +7,8 @@ const apk = "clash-of-izzy-android.apk";
 test("Android: homepage is a promotional download portal, never a web-game entry", async ({ page }) => {
   await page.route(releases, route => route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: "{}" }));
   await page.goto("/");
-  await expect(page).toHaveURL(/\/portal\.html$/);
+  // Workers Static Assets canonicalizes /portal.html to /portal.
+  await expect(page).toHaveURL(/\/portal(?:\.html)?$/);
   await expect(page.locator("h1")).toHaveText("CLASH OF IZZY");
   const button = page.locator("#download-apk");
   await expect(button).toHaveAttribute("aria-disabled", "true");
