@@ -79,6 +79,18 @@ test("migracao e integracao proíbem compra sem progresso e mantêm habilitacao 
     const price = (pack.priceCents / 100).toFixed(2);
     assert.ok(migration.includes(`('${pack.name}',${price},${pack.gems})`), `Migração 0042 divergente: ${pack.phase}`);
   }
+  const correction = await read("migrations/0043_fix_vip_catalog.sql");
+  assert.doesNotMatch(correction, /INSERT\s+OR\s+REPLACE/i);
+  for (const [name, formerCents, formerGems, cents, gems] of [
+    ["Pacote Marques Real",8990,8000,9990,10000],
+    ["Pacote Duque Imperial",12990,12000,14990,20000],
+    ["Pacote Principe Soberano",17990,17000,19990,35000],
+    ["Pacote Rei Supremo",22990,23000,29990,60000],
+    ["Pacote Imperador Eterno",29990,30000,49990,100000]
+  ]) {
+    assert.ok(correction.includes(`SET price_brl=${(cents/100).toFixed(2)},gems=${gems}`));
+    assert.ok(correction.includes(`name='${name}' AND ROUND(price_brl*100)=${formerCents} AND gems=${formerGems}`));
+  }
   assert.match(worker,/levelPacksEnabledForPlayer/);
   assert.match(worker,/getKingdomProgression\(env,kingdom.id\)/);
   assert.match(worker,/progression.level < levelPack.level/);
