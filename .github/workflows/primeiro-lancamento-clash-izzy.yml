@@ -1,0 +1,99 @@
+name: Primeiro lancamento protegido - sem jogadores
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/primeiro-lancamento-clash-izzy.yml
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: primeiro-lancamento-clash-izzy
+  cancel-in-progress: false
+
+jobs:
+  verificar-e-iniciar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verificar versao candidata integrada
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in portal.html portal-worker.js wrangler.portal.jsonc migrations/0030_dragons_master_mailbox.sql .github/workflows/deploy-cloudflare.yml; do
+            test -f "$file" || { echo "::error::Versao candidata incompleta: $file"; exit 1; }
+          done
+      - name: Dependencias e checagens antes de iniciar a release
+        run: |
+          npm install --ignore-scripts --no-audit --no-fund
+          node --test tests/portal-isolation.test.js tests/production-smoke-test.test.js
+          npx wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist
+      - name: Validar Cloudflare Paid e vazio do banco remoto ANTES de liberar producao
+        shell: bash
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json, os, urllib.request, urllib.error
+          token=os.environ.get("RAW_TOKEN","").strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if token[:7].lower()=="bearer ": token=token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):
+            token=token[1:-1].strip()
+          if not account or not token or any(c.isspace() for c in token):
+            raise SystemExit("Credenciais Cloudflare ausentes; nao iniciar implantacao.")
+          print("::add-mask::"+token)
+          prefix="https://api.cloudflare.com/client/v4/accounts/"+account
+          def call(url, method="GET", body=None):
+            data=json.dumps(body).encode() if body is not None else None
+            req=urllib.request.Request(url,data=data,method=method,headers={
+              "Authorization":"Bearer "+token,
+              "Content-Type":"application/json"
+            })
+            try:
+              with urllib.request.urlopen(req,timeout=25) as res: obj=json.loads(res.read().decode())
+            except urllib.error.HTTPError as e:
+              raise SystemExit("Cloudflare bloqueou auditoria (HTTP "+str(e.code)+"); nao iniciar implantacao.")
+            except Exception as e:
+              raise SystemExit("Auditoria Cloudflare indisponivel ("+type(e).__name__+"); nao iniciar implantacao.")
+            if not obj.get("success"): raise SystemExit("Cloudflare respondeu erro; nao iniciar implantacao.")
+            return obj.get("result")
+          db_id="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          result=call(prefix+"/d1/database/"+db_id+"/query","POST",{
+            "sql":"SELECT (SELECT COUNT(*) FROM players) AS jogadores, (SELECT COUNT(*) FROM kingdoms) AS reinos"
+          })
+          try:
+            rows=result[0]["results"]
+            row=rows[0]
+            jogadores=int(row["jogadores"])
+            reinos=int(row["reinos"])
+          except Exception:
+            raise SystemExit("Consulta D1 incompleta; nao iniciar implantacao.")
+          if jogadores!=0 or reinos!=0:
+            raise SystemExit("D1 possui registros de jogadores ou reinos. Lancamento automatico bloqueado.")
+          print("D1 remoto confirmado sem jogadores e sem reinos; verificando Workers Paid.")
+          subscriptions=call(prefix+"/subscriptions") # exige permissao Billing Read
+          subscriptions=subscriptions if isinstance(subscriptions,list) else []
+          if not any("workers" in str((s.get("rate_plan") or {}).get("id","")).lower()+" "+str((s.get("rate_plan") or {}).get("name","")).lower() and str(s.get("state","")).lower() in ("paid","active") for s in subscriptions):
+            raise SystemExit("Workers Paid nao confirmado (ou token sem Billing Read). Verifique Billing Read e assinatura no Cloudflare; publicacao bloqueada.")
+          print("Workers Paid verificado e banco D1 sem jogadores/reinos. Producao podera passar pelo gate protegido.")
+          PY
+      - name: Iniciar workflow EXISTENTE com bookmark D1 e protecao do ambiente
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          gh workflow run deploy-cloudflare.yml --ref main \
+            -f confirm_paid_plan=true -f confirm_production=true
+          echo "Solicitado workflow de producao protegido. Esta etapa NAO publica APK ou ativa pagamentos."
