@@ -32,7 +32,7 @@ test("bundled CC0 models can render props and only display units present in the 
   assert.match(renderer, /cloneSkinned\(asset\.template\)/);
   assert.match(renderer, /new THREE\.AnimationMixer\(root\)/);
   assert.match(kingdom, /window\.__coiKingdomTroops=state\.troops\|\|\[\]/);
-  assert.match(kingdom, /detail:\{buildings,troops:state\.troops\|\|\[\],defenses:state\.cityDefenses\|\|\[\],heroes:window\.__coiKingdomHeroAssignments,castleSkinId:Number\(k\.equipped_skin_id\|\|0\)\}/);
+  assert.match(kingdom, /detail:\{buildings,troops:state\.troops\|\|\[\],defenses:state\.cityDefenses\|\|\[\],heroes:window\.__coiKingdomHeroAssignments,castleSkinId:Number\(k\.equipped_skin_id\|\|0\),castleVipLevel:window\.__coiKingdomCastleVipLevel\}/);
 });
 
 test("quality profile uses the real viewport while the kingdom panel is initially hidden", () => {
