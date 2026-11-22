@@ -159,10 +159,41 @@ function updateMarchCapacityLabel(){
  if(!label)return;
  const cap=Math.max(0,Number(state?.marchCapacity?.maximum)||0);
  const total=Object.values(selectedUnits).reduce((sum,value)=>sum+Math.max(0,Math.floor(Number(value)||0)),0);
- label.textContent="Formação: "+fmt(total)+" / "+fmt(cap)+" tropas. "+
+ const slots=state?.marchSlots||{active:0,max:1,available:1};
+ label.textContent="Formação: "+fmt(total)+" / "+fmt(cap)+" tropas. "+fmt(slots.active)+" / "+fmt(slots.max)+" marchas em andamento. "+
    "Castelo, academia, herói "+(state?.marchCapacity?.heroRarity||"")+
    " e pesquisa militar aumentam esse limite.";
  label.style.color=total>cap?"#ffc1ac":"#d6e2f0";
+}
+function applyMarchPreset(mode){
+  if(busy||!state)return;
+  if(mode==="clear"){selectedUnits={};renderTroops();return;}
+  const troops=(state.troops||[]).filter(x=>Number(x.tier)===1&&Number(x.quantity)>0)
+    .map(x=>({...x,usable:Math.min(10000,Math.floor(Number(x.quantity)))}));
+  const cap=Math.max(0,Math.floor(Number(state?.marchCapacity?.maximum)||0));
+  let remaining=mode==="gather"?Math.min(cap,50):cap;
+  const preference=["militia","spearman","swordsman","archer","crossbowman","cavalry","knight","catapult","ram","trebuchet","mage"];
+  troops.sort((a,b)=>(preference.indexOf(a.unit_type)+1||99)-(preference.indexOf(b.unit_type)+1||99));
+  const chosen={};
+  if(mode==="balanced"&&troops.length){
+    const share=Math.floor(remaining/troops.length);
+    for(const troop of troops){
+      const qty=Math.min(share,troop.usable);
+      if(qty>0){chosen[troop.unit_type]=qty;remaining-=qty;}
+    }
+  }
+  for(const troop of troops){
+    if(remaining<1)break;
+    const used=chosen[troop.unit_type]||0;
+    const qty=Math.min(remaining,troop.usable-used);
+    if(qty>0){chosen[troop.unit_type]=used+qty;remaining-=qty;}
+  }
+  selectedUnits=chosen;
+  renderTroops();
+}
+for(const [id,mode] of [["presetGather","gather"],["presetBalanced","balanced"],
+  ["presetFill","fill"],["presetClear","clear"]]){
+  $(id).addEventListener("click",()=>applyMarchPreset(mode));
 }
 function renderTroops() {
   const root = $("troops");
@@ -206,14 +237,16 @@ function updateActionButtons() {
   const territory = getSelectedTerritory();
   const total=Object.values(selectedUnits).reduce((sum,value)=>sum+Math.max(0,Math.floor(Number(value)||0)),0);
   const hasTroops=total>0&&total<=Number(state?.marchCapacity?.maximum||0);
+  const marchAvailable=Number(state?.marchSlots?.available??1)>0;
   const isCastle = territory?.territory_kind === "castle";
   const isThrone = territory?.territory_kind === "throne";
   const canVisit = Boolean(territory && !isCastle && !isThrone && territoryOwner(territory) !== "Outro reino");
-  $("gather").disabled = busy || !canVisit || !hasTroops;
-  $("scout").disabled = busy || !canVisit || !hasTroops;
-  $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  $("gather").disabled = busy || !canVisit || !hasTroops || !marchAvailable;
+  $("scout").disabled = busy || !canVisit || !hasTroops || !marchAvailable;
+  $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops || !marchAvailable;
   const siegeTotal=Object.values(selectedUnits).reduce((n,q)=>n+Number(q||0),0);
   $("throneAssault").hidden=!isThrone;
+  for(const id of ["presetGather","presetBalanced","presetFill","presetClear"])$(id).disabled=busy;
   $("throneAssault").disabled=busy||!isThrone||state?.throne?.phase!=="contest"||
     Boolean(state?.throne?.kingAllianceId)||
     !state?.alliance?.id||Number(state?.kingdom?.castle_level||0)<10||
@@ -379,6 +412,10 @@ async function sendMarch(marchType) {
   if (!territory || !Object.keys(units).length) return;
   const total=Object.values(units).reduce((sum,value)=>sum+Number(value||0),0);
   const max=Number(state?.marchCapacity?.maximum||0);
+  if(Number(state?.marchSlots?.available??1)<1){
+    $("marchNotice").textContent="Todas as filas de marcha estão ocupadas. Aguarde a conclusão das expedições.";
+    return;
+  }
   if(total>max){
     $("marchNotice").textContent="Capacidade excedida: "+fmt(total)+"/"+fmt(max)+
       ". Evolua heróis, castelo, academia e pesquisa militar.";
