@@ -55,6 +55,25 @@ jobs:
             echo "::error::Tag $tag ja existe"
             exit 1
           fi
+      - name: Conferir assinatura comercial antes dos testes demorados
+        shell: bash
+        env:
+          ANDROID_RELEASE_KEYSTORE_BASE64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          ANDROID_RELEASE_STORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_RELEASE_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_RELEASE_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+          ANDROID_RELEASE_CERT_SHA256: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          for item in ANDROID_RELEASE_KEYSTORE_BASE64 ANDROID_RELEASE_STORE_PASSWORD ANDROID_RELEASE_KEY_ALIAS ANDROID_RELEASE_KEY_PASSWORD; do
+            if [[ -z "${!item}" ]]; then
+              echo "::error::Assinatura comercial pendente: configure $item em Settings > Secrets and variables > Actions."
+              exit 1
+            fi
+          done
+          cert="$(printf "%s" "$ANDROID_RELEASE_CERT_SHA256" | tr -d ":" | tr "[:upper:]" "[:lower:]")"
+          [[ "$cert" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::Configure a variavel ANDROID_RELEASE_CERT_SHA256 (fingerprint SHA-256 do certificado)."; exit 1; }
+          echo "Credenciais presentes; o certificado ainda sera validado no APK assinado."
       - uses: actions/setup-node@v4
         with:
           node-version: "22"

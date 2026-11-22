@@ -45,3 +45,17 @@ test('published APK URL contract matches portal and includes SHA-256 asset', () 
   assert.match(gradle, /versionCode androidVersionCode/);
   assert.match(gradle, /versionName androidVersionName/);
 });
+
+test('release falha cedo sem secrets comerciais e mantém link oficial acessível', () => {
+  const workflow = read('.github/workflows/publicar-apk-android.yml');
+  const portal = read('portal.html');
+  const isolated = read('public-portal/portal.html');
+  const gate = workflow.indexOf('Conferir assinatura comercial antes dos testes demorados');
+  assert.ok(gate > 0, 'preflight comercial obrigatório');
+  assert.ok(gate < workflow.indexOf('Instalar dependencias'), 'nunca gastar tempo de CI sem assinatura');
+  assert.match(workflow, /Configure a variavel ANDROID_RELEASE_CERT_SHA256/);
+  assert.match(workflow, /Assinatura comercial pendente/);
+  assert.equal(portal, isolated, 'portal principal e isolado devem continuar idênticos');
+  assert.match(portal, /id="official-release-page" href="https:\/\/github\.com\/jorgepereiragha-cyber\/Clash-of-Izzy-\/releases"/);
+  assert.match(portal, /id="download-apk" aria-disabled="true"/);
+});

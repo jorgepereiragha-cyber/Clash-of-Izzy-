@@ -14,7 +14,7 @@ test("Android: homepage is a promotional download portal, never a web-game entry
   await expect(button).toHaveAttribute("aria-disabled", "true");
   await expect(button).not.toHaveAttribute("href", /./);
   await expect(page.locator("a[href='/kingdom.html'],a[href='/world.html'],a[href='/arena.html']")).toHaveCount(0);
-  await expect(page.getByText("O APK oficial ainda não está disponível")).toBeVisible();
+  await expect(page.getByText("O APK comercial ainda não está disponível")).toBeVisible();
 });
 
 test("Android: only signed release names on official GitHub download host are offered", async ({ page }) => {

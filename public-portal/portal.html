@@ -121,6 +121,7 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
 <a class="download" id="download-apk" aria-disabled="true" tabindex="-1">Baixar aplicativo Android (APK)</a>
 <p class="status" id="download-status" role="status" aria-live="polite">Verificando se existe uma versão oficial assinada disponível para download…</p>
 <a class="hash" id="checksum-link" hidden>Verificar arquivo SHA-256 da versão</a>
+<a class="hash" id="official-release-page" href="https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases" target="_blank" rel="noopener noreferrer">Consultar versões oficiais publicadas</a>
 </div>
 </div>
 </header>
@@ -178,7 +179,7 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
       button.removeAttribute("href");
       button.setAttribute("aria-disabled", "true");
       button.setAttribute("tabindex", "-1");
-      status.textContent = "O APK oficial ainda não está disponível ou não foi possível verificar a versão. Não há download de teste nesta página.";
+      status.textContent = "O APK comercial ainda não está disponível ou não foi possível verificar a publicação oficial. Consulte as versões no GitHub; builds de teste não substituem uma versão assinada.";
     }
   }
   void findOfficialApk();
