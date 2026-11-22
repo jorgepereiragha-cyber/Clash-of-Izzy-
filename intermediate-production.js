@@ -4,15 +4,17 @@ export const INTERMEDIATE_STORAGE_CAP=100000;
 export function advanced4xEnabled(env){return env?.GAME_4X_SYSTEMS_ENABLED==="true";}
 const nonnegative=n=>Math.max(0,Math.floor(Number(n)||0));
 const level=n=>Math.max(1,Math.min(30,nonnegative(n)||1));
-export function calculateChainProduction({elapsedSeconds=0,farmLevel=1,millLevel=1,bakeryLevel=1,wheat=0,flour=0,foodFreeSpace=0,multiplier=1,remainders={}}={}){
+export function calculateChainProduction({elapsedSeconds=0,farmLevel=1,millLevel=1,bakeryLevel=1,wheat=0,flour=0,foodFreeSpace=0,multiplier=1,millMultiplier=1,remainders={}}={}){
   const seconds=Math.max(0,Math.min(7*86400,nonnegative(elapsedSeconds)));
   // Um multiplicador zero deve interromper a produção, não ativar o padrão 1.
   const requestedFactor=multiplier==null?1:Number(multiplier);
   const factor=Number.isFinite(requestedFactor)?Math.max(0,Math.min(50,requestedFactor)):1;
+  const millRequested=millMultiplier==null?1:Number(millMultiplier);
+  const millFactor=Number.isFinite(millRequested)?Math.max(0,Math.min(2,millRequested)):1;
   const remainder=k=>Math.max(0,Math.min(3599,Number(remainders[k])||0));
-  const potential=(l,k)=>{const t=12*level(l)*factor*seconds+remainder(k);return {units:Math.floor(t/3600),remainder:t%3600};};
+  const potential=(l,k,extra=1)=>{const t=12*level(l)*factor*extra*seconds+remainder(k);return {units:Math.floor(t/3600),remainder:t%3600};};
   const grown=potential(farmLevel,"wheat");
-  const milled=potential(millLevel,"mill");
+  const milled=potential(millLevel,"mill",millFactor);
   const baked=potential(bakeryLevel,"bakery");
   const stockWheat=Math.min(INTERMEDIATE_STORAGE_CAP,nonnegative(wheat));
   const stockFlour=Math.min(INTERMEDIATE_STORAGE_CAP,nonnegative(flour));
