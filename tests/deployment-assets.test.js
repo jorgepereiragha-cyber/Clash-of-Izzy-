@@ -26,6 +26,8 @@ test("Worker-only modules stay in the Worker bundle and out of public static ass
     "rally.js",
     "search-ranking.js",
     "realm-progression.js",
+    "throne-war-rules.js",
+    "throne-war.js",
     "valhalla-admin.js",
     "valhalla-config.js",
     "valhalla-rewards.js",
