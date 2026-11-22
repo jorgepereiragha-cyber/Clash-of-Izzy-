@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { LEVEL_PACKS,getLevelPackByName,getPackForLevel,publicLevelPack,levelPackMatchesOrder,levelPackGrantStatements,levelPacksEnabledForPlayer } from "../level-packs.js";
+import { LEVEL_PACKS,getLevelPackByName,getPackForLevel,publicLevelPack,levelPackMatchesOrder,levelPackGrantStatements,levelPacksEnabledForPlayer,levelPackPriceApproved } from "../level-packs.js";
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
 test("P1-P8 possuem precos positivos, recompensas deterministicas e limites 10-80", () => {
@@ -14,6 +14,10 @@ test("P1-P8 possuem precos positivos, recompensas deterministicas e limites 10-8
     assert.equal(getLevelPackByName(pack.name),pack);
     assert.equal(publicLevelPack(pack).oneTime,true);
   }
+  assert.equal(levelPackPriceApproved({},LEVEL_PACKS[2]),true);
+  assert.equal(levelPackPriceApproved({},LEVEL_PACKS[3]),false);
+  assert.equal(levelPackPriceApproved({LEVEL_PACKS_PROPOSED_PRICES_APPROVED:"true"},LEVEL_PACKS[7]),true);
+  assert.equal(publicLevelPack(LEVEL_PACKS[3],{}).priceProvisional,true);
   assert.equal(getPackForLevel(9),null);
   assert.equal(getPackForLevel("20").phase,"P2");
   assert.equal(getPackForLevel(80).phase,"P8");
