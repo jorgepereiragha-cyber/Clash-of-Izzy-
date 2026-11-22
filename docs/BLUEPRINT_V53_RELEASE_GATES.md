@@ -1,6 +1,6 @@
 # Clash of Izzy — Blueprint v53: revisão segura de pré-lançamento
 
-Este patch é **somente código em branch de revisão** sobre a PR #233 (Draft).
+Este patch é **somente código em branch de revisão**. As PRs #223, #229 e #233 foram integradas à `main`; esta PR #236 precisa de CI atualizada antes do merge.
 Não efetua merge na main, migrações remotas, checkout real ou deploy.
 
 ## Integrado neste patch
@@ -16,7 +16,7 @@ Não efetua merge na main, migrações remotas, checkout real ou deploy.
 - **NÃO** assumir que `wrangler.toml` existe: este repositório usa `wrangler.jsonc`; flags ficam desligadas por padrão.
 
 ## Bloqueios para produção
-1. PRs #223, #229 e #233 precisam revisão e integração em ordem, respeitando os estados Draft e a CI de cada novo SHA.
+1. PRs #223, #229 e #233 integradas; confirmar CI desta PR #236 no SHA atual e revisar a PR #238 empilhada antes de qualquer lançamento.
 2. Backup e teste de restauração D1; conferir migrações aplicadas. Nenhum `d1 migrations apply --remote` neste patch.
 3. Homologar checkout sandbox real, HMAC de notificação, valor pago, replay e conciliação. Aprovar comercialmente os preços P4–P8 (e eventual pacote de R$3,99) antes de ativar flags.
 4. Validar APK assinado no Android físico e retorno do WebGL após suspensão; monitorar taxa de erro e desempenho.
@@ -24,5 +24,5 @@ Não efetua merge na main, migrações remotas, checkout real ou deploy.
 
 ## Alinhamento comercial do protocolo 7777x
 - O catálogo canônico P4–P8 foi alinhado aos valores recebidos: R$99,90 / R$149,90 / R$199,90 / R$299,90 / R$499,90, incluindo gemas e recursos especificados.
-- `0042` foi atualizado para instalações novas; `0043_fix_vip_catalog.sql` usa `UPDATE` com condições para conciliar apenas valores antigos conhecidos, sem `INSERT OR REPLACE` e sem modificar IDs.
+- `0042` foi atualizado para instalações novas; `0043_fix_vip_catalog.sql` usa `UPDATE` com condições para conciliar apenas valores antigos conhecidos, **excluindo pacotes com pedidos pendentes**, sem `INSERT OR REPLACE` e sem modificar IDs. A PR #238 adiciona `0044_reconcile_level_packs.sql`, mas ainda precisa de reconciliação Git e homologação D1 Preview.
 - Novos testes impedem divergência entre catálogo, sementes SQL e migração corretiva. **A loja pública e o deploy de produção permanecem bloqueados.**
