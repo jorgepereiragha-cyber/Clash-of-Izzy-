@@ -743,6 +743,7 @@ async function loadCatalog(){
      :item.productKind==='vip_package'?(item.oneTime?'MASTER · '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas + 3 dragões dourados + 175 mil recursos (uma vez por reino)':' '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação'):'Skin de castelo · Ataque +'+Number(item.attack_bonus_percent||0).toFixed(2)+'% · Defesa +'+Number(item.defense_bonus_percent||0).toFixed(2)+'%';
    if(item.dailyLimitHours===24)detail.textContent+=' · limite: 1 compra a cada 24 horas';
    price.textContent='R$ '+Number(item.price_brl).toFixed(2).replace('.',',');
+   b.disabled=Boolean(item.levelPack?.priceProvisional);
    b.append(label,detail,price);b.addEventListener('click',()=>requestOfficialPurchase(item,item.productKind,b));
    box.appendChild(b);
   }
