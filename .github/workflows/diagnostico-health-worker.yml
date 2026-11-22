@@ -1,0 +1,36 @@
+name: Diagnostico de saude sem dados pessoais do Worker
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/diagnostico-health-worker.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Consultar apenas saude publica e lista de tabelas ausentes
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://clash-of-izzy.jorgepereiragha.workers.dev/api/health"
+          status="$(curl --silent --show-error --max-time 20 -o "$RUNNER_TEMP/coi-health.json" -w '%{http_code}' "$url")"
+          echo "HTTP: $status"
+          python3 - <<'PY'
+          import json,os
+          path=os.path.join(os.environ["RUNNER_TEMP"],"coi-health.json")
+          try:
+            with open(path,encoding="utf-8") as f: data=json.load(f)
+          except (ValueError,OSError): raise SystemExit("Worker nao retornou JSON.")
+          sanitized={
+            "ok": data.get("ok"),
+            "status": data.get("status"),
+            "checks":data.get("checks"),
+            "missingTables":data.get("missingTables")
+          }
+          print(json.dumps(sanitized,sort_keys=True,ensure_ascii=False))
+          PY
