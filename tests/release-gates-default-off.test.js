@@ -26,7 +26,7 @@ test("production deploy stays manual and requires both dispatch confirmations", 
   assert.match(workflow, /confirm_paid_plan:[\s\S]*?type: boolean/);
   assert.match(workflow, /confirm_production:[\s\S]*?type: boolean/);
   assert.match(workflow,
-    /github\\.ref == 'refs\\/heads\\/main' && inputs\\.confirm_paid_plan == true && inputs\\.confirm_production == true/);
+    /github\.ref == 'refs\/heads\/main' && inputs\.confirm_paid_plan == true && inputs\.confirm_production == true/);
   assert.ok(workflow.includes("name: production"));
 });
 
@@ -36,18 +36,18 @@ test("legacy CI-completion workflows cannot start production deploy", async () =
     ".github/workflows/publicar-visual-real-apos-ci.yml"
   ]) {
     const workflow = await read(path);
-    assert.match(workflow, /^on:\\s*\\n  workflow_dispatch:/m, path);
+    assert.match(workflow, /^on:\s*\n  workflow_dispatch:/m, path);
     assert.doesNotMatch(workflow, /workflow_run:|gh workflow run deploy-cloudflare/, path);
-    assert.doesNotMatch(workflow, /actions:\\s*write/, path);
+    assert.doesNotMatch(workflow, /actions:\s*write/, path);
     assert.match(workflow, /exit 1/, path);
   }
 });
 
 test("readiness workflow does not apply remote migrations or deploy", async () => {
   const workflow = await read(".github/workflows/cloudflare-paid-readiness.yml");
-  assert.match(workflow, /^on:\\s*\\n  workflow_dispatch:/m);
+  assert.match(workflow, /^on:\s*\n  workflow_dispatch:/m);
   assert.match(workflow, /d1 time-travel info clash-of-izzy-db --json/);
   assert.match(workflow, /d1 migrations list clash-of-izzy-db --remote/);
   assert.doesNotMatch(workflow, /d1 migrations apply|d1 time-travel restore|gh workflow run deploy-cloudflare/);
-  assert.doesNotMatch(workflow, /wrangler[^\\n]* deploy(?! --dry-run)/);
+  assert.doesNotMatch(workflow, /wrangler[^\n]* deploy(?! --dry-run)/);
 });
