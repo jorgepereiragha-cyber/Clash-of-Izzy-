@@ -61,7 +61,7 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(shellState.marketShell).toBe(true);
   expect(shellState.marketRuntime).toBe(true);
 
-  const portalEmblem = await page.locator(".hero-art").evaluate(image => ({ complete: image.complete, naturalWidth: image.naturalWidth }));
+  const portalEmblem = await page.locator(".royal-art img.crest").evaluate(image => ({ complete: image.complete, naturalWidth: image.naturalWidth }));
   expect(portalEmblem.complete).toBe(true);
   expect(portalEmblem.naturalWidth).toBeGreaterThan(100);
 
