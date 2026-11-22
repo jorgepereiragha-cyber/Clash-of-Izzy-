@@ -98,6 +98,15 @@ jobs:
           [[ "$page_status" == "200" ]] && grep -q 'id="download-apk"' "$page" || {
             echo "::error::Portal não entregou HTML de propaganda após tentativas HTTP"; exit 1;
           }
+          # Nova página de apoio: o site permanece público, sem requisições de compra.
+          support_status="$(curl -L --silent --show-error --max-time 20 -o "$RUNNER_TEMP/portal-support.html" -w '%{http_code}' "$base/support.html")"
+          test "$support_status" = "200" && grep -q 'id="support-payment-link"' "$RUNNER_TEMP/portal-support.html" || {
+            echo "::error::Página de apoio não publicada corretamente"; exit 1;
+          }
+          link_status="$(curl -sS -o "$RUNNER_TEMP/support-link.json" -w '%{http_code}' --max-time 20 "$base/support-link.json")"
+          test "$link_status" = "200" && grep -q '"enabled":' "$RUNNER_TEMP/support-link.json" || {
+            echo "::error::Disponibilidade do link não foi respondida em JSON"; exit 1;
+          }
           for path in /kingdom.html /api/game/state /arena.html /sw.js; do
             status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base$path")"
             test "$status" = "404" || { echo "::error::$path respondeu $status, esperado 404"; exit 1; }
