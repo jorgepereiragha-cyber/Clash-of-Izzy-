@@ -137,27 +137,13 @@ export async function runProductionSmokeTests({
   assert(kingdom.includes('kingdom.opened') && kingdom.includes('/game/analytics'),
     "Instrumentação de analytics não está publicada.");
 
-  assert(kingdom.includes('type="module" src="/scripts/cinematic/recorder-ui.js"'),
-    "O gravador cinematográfico não foi conectado à página do reino.");
-
-  for (const assetPath of [
-    "/scripts/cinematic/capture-system.js",
-    "/scripts/cinematic/media-recorder-support.js",
-    "/scripts/cinematic/trailer-script.js",
-    "/scripts/cinematic/recorder-ui.js"
-  ]) {
-    const assetResponse = await get(assetPath);
-    assert(assetResponse.status === 200, assetPath + " não está publicado.");
-    assert((assetResponse.headers.get("content-type") || "").includes("javascript"),
-      assetPath + " não foi servido como JavaScript.");
-    const assetBody = await assetResponse.text();
-    assert(assetBody.length > 200, assetPath + " está vazio ou incompleto.");
-  }
-
+  assert(!kingdom.includes('/scripts/cinematic/recorder-ui.js'),
+    "O painel de gravação não pode ser carregado no jogo.");
   const premiumCssResponse = await get("/styles/premium-ui.css");
-  assert(premiumCssResponse.status === 200, "Estilos do gravador cinematográfico indisponíveis.");
+  assert(premiumCssResponse.status === 200, "Estilos do jogo indisponíveis.");
   const premiumCss = await premiumCssResponse.text();
-  assert(premiumCss.includes("CINEMATIC TRAILER RECORDER"), "Estilos do gravador não foram publicados.");
+  assert(premiumCss.includes("#trailer-recorder-panel{display:none!important}"),
+    "Proteção visual contra a interface de gravação em cache ausente.");
 
   const arenaResponse = await get("/arena.html");
   assert(arenaResponse.status === 200, "Página da arena respondeu HTTP " + arenaResponse.status + ".");
@@ -255,11 +241,8 @@ export async function runProductionSmokeTests({
   assert(serviceWorker.includes("/landing.js"), "PWA não inclui o controlador da landing page.");
   assert(serviceWorker.includes("/valhalla-shop-ui.js"), "PWA não inclui a interface da Loja de Valhalla.");
   assert(serviceWorker.includes("/styles/valhalla-shop.css"), "PWA não inclui os estilos da Loja de Valhalla.");
-  assert(serviceWorker.includes("/scripts/cinematic/capture-system.js"), "PWA não inclui o motor de captura cinematográfica.");
-  assert(serviceWorker.includes("/scripts/cinematic/media-recorder-support.js"), "PWA não inclui a negociação de codecs e proteção de memória.");
-  assert(serviceWorker.includes("/scripts/cinematic/trailer-script.js"), "PWA não inclui o roteiro do trailer.");
-  assert(serviceWorker.includes("/scripts/cinematic/recorder-ui.js"), "PWA não inclui a interface do gravador.");
-
+  assert(!serviceWorker.includes("/scripts/cinematic/recorder-ui.js"),
+    "O cache da PWA não deve instalar o gravador de trailer.");
 
   return {
     baseUrl: base.origin,
@@ -282,7 +265,7 @@ export async function runProductionSmokeTests({
       worldMapNavigation: true,
       worldMap3D: true,
       threeVendorRuntime: true,
-      cinematicTrailerRecorder: true,
+      trailerRecorderRemovedFromGameplay: true,
     },
   };
 }
