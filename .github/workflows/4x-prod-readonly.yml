@@ -1,0 +1,59 @@
+name: Diagnostico de readiness D1 producao 4X (somente leitura)
+on:
+  push:
+    branches: [feat/4x-industries-defenses-p1-p8]
+    paths: [.github/workflows/4x-prod-readonly.yml]
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 7
+    steps:
+      - name: Consultar somente nomes de tabelas e sequencia de migracoes de producao
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,re,urllib.request
+          prod="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          preview="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          assert prod!=preview
+          token=os.environ.get("RAW_TOKEN","").strip()
+          if token.lower().startswith("bearer "):token=token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):token=token[1:-1].strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if not token or any(c.isspace() for c in token) or not re.fullmatch(r"[0-9a-fA-F]{32}",account):
+              raise SystemExit("Cloudflare credentials invalid; production not queried")
+          print("::add-mask::"+token)
+          url=f"https://api.cloudflare.com/client/v4/accounts/{account}/d1/database/{prod}/query"
+          def query(sql):
+              if not sql.startswith("SELECT "):raise SystemExit("Somente SELECT em producao")
+              req=urllib.request.Request(url,method="POST",data=json.dumps({"sql":sql}).encode(),
+                  headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+              with urllib.request.urlopen(req,timeout=25) as response:value=json.load(response)
+              if not value.get("success"):raise SystemExit("Prod D1 read failed")
+              return value["result"][0]["results"]
+          tables={x["name"] for x in query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+          last=[x["name"] for x in query("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 9")] if "d1_migrations" in tables else []
+          expected=["0036_4x_read_indexes.sql","0037_daily_login_rewards.sql",
+                    "0038_onboarding_bonus.sql","0039_support_orders.sql",
+                    "0040_support_packages.sql","0041_4x_industries_defenses_progression.sql"]
+          current=last[0] if last else None
+          report={"target":"production-read-only","latestMigration":current,
+                  "pendingCandidateNames":[x for x in expected if x not in last],
+                  "coreTablesPresent":{"players","kingdoms","kingdom_buildings"}.issubset(tables),
+                  "advanced4xTablesPresent":all(x in tables for x in (
+                    "intermediate_resources","city_defenses","kingdom_progression","progression_xp_ledger")),
+                  "writesPerformed":0,"playerDataRead":False}
+          print("PRODUCTION_4X_READINESS="+json.dumps(report,sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as out:
+              out.write("## D1 producao 4X — somente leitura\n")
+              out.write("- Ultima migration conhecida: "+str(current)+"\n")
+              out.write("- Tabelas 4X presentes: "+str(report["advanced4xTablesPresent"])+"\n")
+              out.write("- Nenhuma conta, pedido, saldo ou dado pessoal consultado.\n")
+              out.write("- Nenhuma escrita, migracao ou deploy efetuado.\n")
+          PY
