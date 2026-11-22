@@ -35,16 +35,16 @@ test("ledger de resgates usa chave única e créditos protegidos por changes()",
 
 test("UI de reino e rotas autenticadas estão integradas",async()=>{
   const [html,ui,worker,sw]=await Promise.all([
-    read("kingdom.html"),read("engagement-ui.js"),read("worker.js"),read("sw.js")
+    read("kingdom.html"),read("player-engagement.js"),read("worker.js"),read("sw.js")
   ]);
-  for(const id of ["coi-onboarding","coi-onboarding-claim","coi-daily","coi-daily-claim","coi-reward-status"])
+  for(const id of ["onboardingPanel","onboardingClaim","dailyRewardsPanel","dailyClaim","onboardingStatus"])
     assert.ok(html.includes('id="'+id+'"'),"missing "+id);
-  assert.match(html,/src="\/engagement-ui\.js"/);
+  assert.match(html,/src="\/player-engagement\.js"/);
   assert.match(ui,/Authorization:"Bearer "\+auth/);
   assert.match(ui,/\/api\/game\/analytics/);
   assert.match(worker,/\/api\/game\/onboarding/);
   assert.match(worker,/\/api\/game\/daily-reward/);
-  assert.match(sw,/engagement-ui\.js/);
+  assert.match(sw,/player-engagement\.js/);
   assert.match(sw,/clash-of-izzy-shell-v52/);
 });
 
