@@ -190,14 +190,17 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   }
 
   function clearGroup(group) {
+    const geometries = new Set();
     while (group.children.length) {
       const child = group.children[group.children.length - 1];
       child.traverse(node => {
         if (node.isInstancedMesh) node.dispose();
-        if (node.geometry) node.geometry.dispose();
+        if (node.geometry) geometries.add(node.geometry);
       });
       group.remove(child);
     }
+    // Crowns of both color variants may share the same geometry.
+    geometries.forEach(geometry => geometry.dispose());
   }
 
   function createGround() {
