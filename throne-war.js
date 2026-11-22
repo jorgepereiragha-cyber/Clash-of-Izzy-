@@ -64,7 +64,7 @@ export function mayCoronate(throne,openedAt,now=new Date()){
   const contestEnd=opened+THRONE_SHIELD_DAYS*DAY+cycle*THRONE_CYCLE_DAYS*DAY+THRONE_CONTEST_HOURS*HOUR;
   const finish=since+THRONE_HOLD_MINUTES*60000;
   return Number.isFinite(opened)&&finish<=contestEnd&&
-    new Date(now).getTime()>=finish&&Number(throne.crowned_cycle)!==cycle;
+    new Date(now).getTime()>=finish&&!(throne.crowned_cycle!=null&&Number(throne.crowned_cycle)===cycle);
 }
 export function thronePublicView(opening,throne,at=new Date()){
   const timeline=throneTimeline(opening.unlocked_at,at);
