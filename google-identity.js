@@ -20,7 +20,10 @@ export async function verifyGoogleIdToken(jwt, clientId, nonce, fetchKeys = fetc
   const [header, claims] = parts.slice(0, 2).map(decodeJson);
   if (!header || header.alg !== "RS256" || typeof header.kid !== "string" || !/^[A-Za-z0-9_-]{1,128}$/.test(header.kid)) throw Error("invalid_google_header");
   if (!claims || !["https://accounts.google.com","accounts.google.com"].includes(claims.iss)
-      || claims.aud !== clientId || (claims.azp !== undefined && claims.azp !== clientId)
+      || claims.aud !== clientId
+      // Android may have a different authorized-party client than the Web audience.
+      // Google's signed audience remains the authoritative backend check.
+      || (claims.azp !== undefined && typeof claims.azp !== "string")
       || claims.nonce !== nonce || !/^[0-9]{6,64}$/.test(String(claims.sub || ""))
       || !Number.isSafeInteger(claims.iat) || claims.iat > nowSeconds + 60 || claims.iat < nowSeconds - 3700
       || !Number.isSafeInteger(claims.exp) || claims.exp <= nowSeconds || claims.exp > nowSeconds + 3700
