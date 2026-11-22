@@ -34,18 +34,18 @@ export function checkedCliArgs(args) {
 
 function cli(args) {
   checkedCliArgs(args);
-  const process = spawnSync(wrangler, args, {
+  const result = spawnSync(wrangler, args, {
     cwd: root,
     encoding: "utf8",
     timeout: 180000,
     maxBuffer: 8 * 1024 * 1024,
     env: { ...process.env, CI: "true" }
   });
-  if (process.error || process.status !== 0) {
+  if (result.error || result.status !== 0) {
     throw new Error("Offline Wrangler command failed: " +
-      (process.error?.message || process.stderr?.slice(-2500) || process.stdout?.slice(-2500)));
+      (result.error?.message || result.stderr?.slice(-2500) || result.stdout?.slice(-2500)));
   }
-  return process.stdout;
+  return result.stdout;
 }
 
 function resultsFromWrangler(jsonText) {
