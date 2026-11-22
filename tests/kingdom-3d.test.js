@@ -92,9 +92,11 @@ test("building hit targets are projected from the isometric camera and refreshed
   assert.match(kingdom, /coi:kingdom-2d-fallback/);
 });
 
-test("state refresh keeps the live WebGL canvas mounted in the kingdom", () => {
-  assert.match(kingdom, /const kingdom3d=city\.querySelector\("#kingdom3d"\)/);
-  assert.match(kingdom, /if\(kingdom3d\)city\.append\(kingdom3d\)/);
+test("state refresh preserves the WebGL, 2D and ambient scene DOM nodes", () => {
+  assert.match(kingdom, /city\.querySelectorAll\(":scope > \.building"\)/);
+  assert.match(kingdom, /city\.insertAdjacentHTML\("beforeend"/);
+  assert.doesNotMatch(kingdom, /city\.innerHTML=buildings/);
+  assert.doesNotMatch(kingdom, /city\.append\(kingdom3d\)/);
 });
 
 
