@@ -129,3 +129,26 @@ test('tela nativa segue o visual rei guerreiro azul e ouro sem downloads na aber
   assert.doesNotMatch(start,/https?:\/\//);
   assert.match(read('android-sideload/app/src/main/res/values/styles.xml'),/#081831/);
 });
+
+
+test("TLS invalido de subrecurso nao bloqueia o jogo, e URL HTTP externa fica bloqueada", () => {
+  const ssl = activity.slice(activity.indexOf("public void onReceivedSslError("),
+    activity.indexOf("public boolean onRenderProcessGone("));
+  assert.ok(ssl.includes("handler.cancel()"));
+  assert.ok(ssl.includes("String failedUrl = error != null ? error.getUrl() : null;"));
+  assert.ok(ssl.includes("!failedUrl.equals(pageUrl) && !failedUrl.equals(originalUrl)) return;"));
+  const external = activity.slice(activity.indexOf("private void openOutsideApp("),
+    activity.indexOf("private int dp("));
+  assert.ok(external.includes('"https".equalsIgnoreCase(scheme)'));
+  assert.ok(external.includes('"mailto".equalsIgnoreCase(scheme)'));
+  assert.ok(!external.includes('"http".equalsIgnoreCase(scheme)'));
+});
+
+test("Renderizador WebGL tem limite de reinicializacao para impedir loop", () => {
+  assert.ok(activity.includes("RENDERER_RESTART_WINDOW_MS = 60_000L"));
+  assert.ok(activity.includes("lastRendererFailureMs = now"));
+  assert.ok(activity.includes("if (recentRendererFailures <= 2) {"));
+  assert.ok(activity.includes("recreate();"));
+  assert.ok(activity.includes("Atualize o Android System WebView"));
+  assert.ok(activity.includes("finish();"));
+});

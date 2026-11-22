@@ -23,8 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 75
     env:
-      ANDROID_VERSION_CODE: "1"
-      ANDROID_VERSION_NAME: "0.9.0"
+      ANDROID_VERSION_CODE: "2"
+      ANDROID_VERSION_NAME: "0.9.1"
     steps:
       - name: Checkout da main
         uses: actions/checkout@v4
@@ -114,7 +114,7 @@ jobs:
           cp "$src" "$RUNNER_TEMP/clash-of-izzy-android-candidato-interno.apk"
           (cd "$RUNNER_TEMP" && sha256sum clash-of-izzy-android-candidato-interno.apk > clash-of-izzy-android-candidato-interno.apk.sha256)
           (cd "$RUNNER_TEMP" && sha256sum -c clash-of-izzy-android-candidato-interno.apk.sha256)
-          echo "APK interno assinado verificado; versao oficial futura exige versionCode maior que 1." >> "$GITHUB_STEP_SUMMARY"
+          echo "APK interno assinado verificado; versao oficial futura exige versionCode maior que 2." >> "$GITHUB_STEP_SUMMARY"
           echo "Esta rotina NAO ativa cobrancas, NAO migra D1 e NAO publica GitHub Releases." >> "$GITHUB_STEP_SUMMARY"
       - name: Guardar APK interno instalavel por 14 dias
         uses: actions/upload-artifact@v4

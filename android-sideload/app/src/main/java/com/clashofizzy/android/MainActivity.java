@@ -44,6 +44,10 @@ public final class MainActivity extends Activity {
             "https://clash-of-izzy.jorgepereiragha.workers.dev/kingdom.html";
     private static final String GAME_HOST = "clash-of-izzy.jorgepereiragha.workers.dev";
     private boolean googleSignInInProgress = false;
+    // Evita loop de reinicio quando o processo WebView falha repetidamente (ex.: GPU sem memoria).
+    private static final long RENDERER_RESTART_WINDOW_MS = 60_000L;
+    private static long lastRendererFailureMs = 0L;
+    private static int recentRendererFailures = 0;
 
 
     private FrameLayout root;
@@ -285,6 +289,12 @@ public final class MainActivity extends Activity {
             public void onReceivedSslError(WebView view, SslErrorHandler handler,
                                            SslError error) {
                 handler.cancel(); // Nunca ignorar certificado inválido.
+                // Uma imagem/recurso externo com TLS invalido nao deve derrubar a pagina principal.
+                String failedUrl = error != null ? error.getUrl() : null;
+                String pageUrl = view.getUrl();
+                String originalUrl = view.getOriginalUrl();
+                if (failedUrl != null && pageUrl != null &&
+                        !failedUrl.equals(pageUrl) && !failedUrl.equals(originalUrl)) return;
                 cancelStartupTimeout();
                 mainFrameFailed = true;
                 loadingPanel.setVisibility(View.GONE);
@@ -294,11 +304,22 @@ public final class MainActivity extends Activity {
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
                 cancelStartupTimeout();
+                long now = android.os.SystemClock.elapsedRealtime();
+                recentRendererFailures = now - lastRendererFailureMs <= RENDERER_RESTART_WINDOW_MS
+                        ? recentRendererFailures + 1 : 1;
+                lastRendererFailureMs = now;
                 root.removeView(view);
                 view.destroy();
                 webView = null;
-                // Recuperação controlada após encerramento do processo WebView.
-                recreate();
+                // No maximo duas recuperacoes em um minuto: evita loop e aquecimento do aparelho.
+                if (recentRendererFailures <= 2) {
+                    recreate();
+                } else {
+                    Toast.makeText(MainActivity.this,
+                            "O motor gráfico foi encerrado repetidamente. Atualize o Android System WebView e abra o jogo novamente.",
+                            Toast.LENGTH_LONG).show();
+                    finish();
+                }
                 return true;
             }
         });
@@ -526,7 +547,6 @@ public final class MainActivity extends Activity {
     private void openOutsideApp(Uri uri) {
         String scheme = uri.getScheme();
         if (!"https".equalsIgnoreCase(scheme)
-                && !"http".equalsIgnoreCase(scheme)
                 && !"mailto".equalsIgnoreCase(scheme)) {
             Toast.makeText(this, "Link externo não suportado.", Toast.LENGTH_SHORT).show();
             return;
