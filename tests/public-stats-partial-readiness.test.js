@@ -39,3 +39,11 @@ test("support page does not present unavailable contributions as R$0", async () 
   assert.match(a, /stats\.supportVerified!==true/);
   assert.match(a, /Totais financeiros ainda não verificados/);
 });
+
+test("Cloudflare readiness inspects the remote stats schema without data mutation", async () => {
+  const workflow = await read(".github/workflows/cloudflare-paid-readiness.yml");
+  assert.match(workflow, /Inspect public stats schema names without player records/);
+  assert.match(workflow, /d1 execute clash-of-izzy-db --remote --json --command="SELECT name FROM sqlite_master/);
+  const segment = workflow.slice(workflow.indexOf("Inspect public stats schema names"), workflow.indexOf("Inspect Preview migration status"));
+  assert.doesNotMatch(segment, /--command="(?:UPDATE|DELETE|INSERT|ALTER|DROP|REPLACE)/i);
+});
