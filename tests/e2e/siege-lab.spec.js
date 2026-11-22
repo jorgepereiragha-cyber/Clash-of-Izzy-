@@ -1,9 +1,12 @@
 import { test, expect } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
 
 test("siege lab has functional mobile controls and an isolated deterministic outcome", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   await page.goto("/siege-lab.html");
   await expect(page.locator("#siegeViewport")).toBeVisible();
+  await mkdir("test-results/visual-preview", { recursive: true });
+  await page.locator("#siegeViewport").screenshot({ path: "test-results/visual-preview/cerco-android-360px.png" });
   await expect(page.locator("#gateValue")).toHaveText("1.300");
   await expect(page.locator("#towerValue")).toHaveText("600");
   await page.locator("#attackGate").click();
