@@ -242,7 +242,7 @@ test("recorder uses the renderer API instead of an assumed window.map3d global",
 });
 
 test("PWA does not preload the trailer recorder; cached overlays are hidden", () => {
-  const cacheVersion = Number(serviceWorker.match(/const CACHE_NAME="clash-of-izzy-shell-v(\\d+)"/)?.[1] || 0);
+  const cacheVersion = Number(serviceWorker.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
   assert.ok(cacheVersion >= 50, "expected new service worker cache version");
   for (const path of [
     "/scripts/cinematic/capture-system.js",
@@ -250,7 +250,7 @@ test("PWA does not preload the trailer recorder; cached overlays are hidden", ()
     "/scripts/cinematic/trailer-script.js",
     "/scripts/cinematic/recorder-ui.js"
   ]) assert.ok(!serviceWorker.includes(path), "Nenhum módulo de gravação deve ser pré-carregado: " + path);
-  assert.match(premiumCss, /#trailer-recorder-panel\\{display:none!important\\}/);
+  assert.match(premiumCss, /#trailer-recorder-panel\{display:none!important\}/);
   assert.match(ui, /URL\\.revokeObjectURL\\(url\\)/);
 });
 
