@@ -21,6 +21,8 @@ if (host && "WebGLRenderingContext" in window) {
   let defensePreviewMesh = null;
   let defensePreviewHandler = null;
   let latestDefenses = [];
+  let latestHeroAssignments = [];
+  let activeHeroFigures = [];
   let activeProps = [];
   let activeTroops = [];
   let armyMixers = [];
@@ -154,6 +156,8 @@ if (host && "WebGLRenderingContext" in window) {
     glbUnitTemplates.clear();
     activeModels = [];
     activeDefenseModels = [];
+    activeHeroFigures = [];
+    latestHeroAssignments = [];
     defensePreviewMesh = null;
     activeProps = [];
     activeTroops = [];
@@ -712,6 +716,59 @@ if (host && "WebGLRenderingContext" in window) {
     }
     renderer.render(scene,camera);
   }
+  function renderAssignedHeroFigures(assignments=[]) {
+    if(!scene||!renderer||disposed)return;
+    for(const figure of activeHeroFigures){
+      scene.remove(figure);
+      disposeDetachedObject3D(figure);
+    }
+    activeHeroFigures=[];
+    // Até dois postos. Figuras procedurais evitam novos GLBs e luzes dinâmicas.
+    for(const hero of (Array.isArray(assignments)?assignments:[]).filter(h=>
+      h?.assigned_to==="industry:mill"||h?.assigned_to==="defense:tower").slice(0,2)){
+      const role=hero.assigned_to,level=Math.min(100,Math.max(1,Number(hero.level)||1));
+      let anchor=null;
+      if(role==="industry:mill"){
+        const idx=latestBuildings.findIndex(b=>b.building_type==="farm");
+        if(idx>=0){const p=cityWorldPoint(latestBuildings[idx],idx);anchor={x:p.x+.9,z:p.z-.6};}
+      }else{
+        const tower=latestDefenses.find(d=>d.defense_type==="tower");
+        if(tower)anchor={
+          x:(Number(tower.grid_x)+Number(tower.width)/2)*.53+.6,
+          z:(Number(tower.grid_z)+Number(tower.height)/2)*.53
+        };
+      }
+      if(!anchor||![anchor.x,anchor.z].every(Number.isFinite))continue;
+      const figure=new THREE.Group();
+      const baseColor=role==="industry:mill"?0x88755a:0x3e5f85;
+      const glowColor=role==="industry:mill"?0xffcb68:0x74c9ff;
+      const armor=new THREE.MeshStandardMaterial({color:baseColor,roughness:.68,metalness:.22});
+      const skin=new THREE.MeshStandardMaterial({color:0xd3aa85,roughness:.88});
+      const spell=new THREE.MeshStandardMaterial({
+        color:glowColor,emissive:glowColor,emissiveIntensity:level>=10 ? 0.65 : 0,
+        roughness:.35,metalness:.45
+      });
+      const part=(geometry,material,x,y,z)=>{
+        const mesh=new THREE.Mesh(geometry,material);
+        mesh.position.set(x,y,z);
+        mesh.castShadow=true;
+        figure.add(mesh);
+        return mesh;
+      };
+      part(new THREE.BoxGeometry(.38,.62,.24),armor,0,.52,0);
+      part(new THREE.SphereGeometry(.17,8,6),skin,0,.99,0);
+      part(new THREE.BoxGeometry(.09,.66,.09),spell,.30,.66,0);
+      if(level>=20 && qualityProfile?.tier!=="low"){
+        part(new THREE.ConeGeometry(.21,.23,6),armor,0,1.19,0);
+        part(new THREE.BoxGeometry(.35,.45,.045),armor,0,.47,-.17);
+      }
+      figure.position.set(anchor.x,0,anchor.z);
+      figure.userData.coIHeroKey=hero.hero_key;
+      scene.add(figure);
+      activeHeroFigures.push(figure);
+    }
+    renderer.render(scene,camera);
+  }
   function updateDefensePreview(detail) {
     if (!scene || !renderer || disposed) return;
     if (defensePreviewMesh) {
@@ -1094,9 +1151,11 @@ if (host && "WebGLRenderingContext" in window) {
       const list = detail.buildings || [];
       latestTroops = Array.isArray(detail.troops) ? detail.troops : [];
       latestDefenses = Array.isArray(detail.defenses) ? detail.defenses : [];
+      latestHeroAssignments = Array.isArray(detail.heroes) ? detail.heroes : [];
       latestCastleSkinId=Number(detail.castleSkinId)||0;
       renderBuildings(list,latestCastleSkinId);
       renderCityDefenses(latestDefenses);
+      renderAssignedHeroFigures(latestHeroAssignments);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
@@ -1107,9 +1166,11 @@ if (host && "WebGLRenderingContext" in window) {
     if (Array.isArray(window.__coiKingdomBuildings)) {
       latestTroops = Array.isArray(window.__coiKingdomTroops) ? window.__coiKingdomTroops : [];
       latestDefenses = Array.isArray(window.__coiKingdomDefenses) ? window.__coiKingdomDefenses : [];
+      latestHeroAssignments = Array.isArray(window.__coiKingdomHeroAssignments) ? window.__coiKingdomHeroAssignments : [];
       latestCastleSkinId=Number(window.__coiKingdomCastleSkin)||0;
       renderBuildings(window.__coiKingdomBuildings,latestCastleSkinId);
       renderCityDefenses(latestDefenses);
+      renderAssignedHeroFigures(latestHeroAssignments);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops);
