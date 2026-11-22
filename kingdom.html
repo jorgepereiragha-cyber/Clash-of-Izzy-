@@ -512,6 +512,11 @@ function renderDragonCollection(){
   const name=document.createElement("strong");name.textContent=dragon.name+" · "+colors[dragon.rarity];
   const stats=document.createElement("p");stats.className="muted";
   stats.textContent=dragon.element+" · Ataque +"+Number(dragon.attackPercent||0).toFixed(2)+"% · Defesa +"+Number(dragon.defensePercent||0).toFixed(2)+"%"+(dragon.owned?"":dragon.master?" · Oferta Master":" · Custo: "+fmt(dragon.food||0)+" comida, "+fmt(dragon.wood||0)+" madeira, "+fmt(dragon.stone||0)+" pedra, "+fmt(dragon.gold||0)+" ouro");
+  if(dragon.owned&&dragon.equipped){
+   const level=Math.max(1,Math.min(100,Math.floor(Number(state?.dragon?.level)||1)));
+   const bond=Math.max(1,Math.min(100,Math.floor(Number(state?.dragon?.bond)||1)));
+   stats.textContent+=" · Nível "+level+"/100 · Vínculo "+bond+"/100";
+  }
   card.append(name,stats);
   const action=document.createElement("button");action.type="button";
   action.disabled=busy||dragon.equipped||Boolean(dragon.master&&!dragon.owned);
