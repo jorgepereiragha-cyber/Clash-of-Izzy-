@@ -621,9 +621,13 @@ public final class MainActivity extends Activity {
         String currentUrl = webView.getUrl();
         if (!isGameUrl(Uri.parse(currentUrl))) return;
         Bundle navigation = new Bundle();
-        if (webView.saveState(navigation) != null) {
-            outState.putBundle(BROWSER_STATE_KEY, navigation);
-            outState.putString(BROWSER_URL_KEY, currentUrl);
+        try {
+            if (webView.saveState(navigation) != null) {
+                outState.putBundle(BROWSER_STATE_KEY, navigation);
+                outState.putString(BROWSER_URL_KEY, currentUrl);
+            }
+        } catch (RuntimeException ignored) {
+            // Renderer indisponível: próximo início recarrega GAME_URL com sessão persistida.
         }
     }
 
