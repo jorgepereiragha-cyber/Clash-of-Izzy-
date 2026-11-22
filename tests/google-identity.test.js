@@ -34,7 +34,8 @@ test("Google validator enforces RS256 signature, audience, nonce, issuer, and ex
   const valid=await sign(claims),chunks=valid.split(".");
   const forged=chunks[0]+"."+encoded({...claims,sub:"99999999999999999999"})+"."+chunks[2];
   await assert.rejects(()=>verifyGoogleIdToken(forged,clientId,nonce,readKeys,now));
-  await assert.rejects(()=>verifyGoogleIdToken(await sign(claims,{alg:"none",kid:"test-google-rotating-key"}),clientId,nonce,readKeys,now));
+  const noneAlgorithm=await sign(claims,{alg:"none",kid:"test-google-rotating-key"});
+  await assert.rejects(()=>verifyGoogleIdToken(noneAlgorithm,clientId,nonce,readKeys,now));
   assert.equal(isGoogleWebClientId(clientId),true);
   assert.equal(isGoogleWebClientId("https://google.com"),false);
 });
