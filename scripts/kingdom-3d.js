@@ -647,12 +647,20 @@ if (host && "WebGLRenderingContext" in window) {
     }
     activeDefenseModels = [];
     const entries = (Array.isArray(defenses) ? defenses : []).slice(0, 32);
+    const distantByType=new Map();
     for (const item of entries) {
       const type = item?.defense_type;
       const x = Number(item.grid_x), z = Number(item.grid_z);
       const w = Number(item.width), h = Number(item.height);
       if (!["tower","trap","gate"].includes(type) ||
           ![x,z,w,h].every(Number.isFinite) || w<1 || h<1 || w>5 || h>5) continue;
+      const worldX=(x+w/2)*.53,worldZ=(z+h/2)*.53;
+      const threshold=qualityProfile?.tier==="low"?22:30;
+      if(camera.position.distanceToSquared(new THREE.Vector3(worldX,0,worldZ))>threshold*threshold){
+        if(!distantByType.has(type))distantByType.set(type,[]);
+        distantByType.get(type).push({x:worldX,z:worldZ,sx:w*.53,sz:h*.53});
+        continue;
+      }
       const group = new THREE.Group();
       const stone = new THREE.MeshStandardMaterial({color:"#89959c",roughness:.87});
       const wood = new THREE.MeshStandardMaterial({color:"#6d4834",roughness:.9});
@@ -677,9 +685,30 @@ if (host && "WebGLRenderingContext" in window) {
         for(const dx of [-.12,0,.12])for(const dz of [-.12,.12])
           add(new THREE.ConeGeometry(.072,.35,4),accent,dx,.29,dz);
       }
-      group.position.set((x+w/2)*.53,0,(z+h/2)*.53);
+      group.position.set(worldX,0,worldZ);
       group.userData.coIDefenseId = item.id;
       scene.add(group); activeDefenseModels.push(group);
+    }
+    // Defesas distantes compartilham geometria e material por tipo (uma draw call por tipo).
+    for(const [type,list] of distantByType){
+      const geometry=new THREE.BoxGeometry(1,1,1);
+      const material=new THREE.MeshStandardMaterial({
+        color:type==="trap"?0xa3694a:type==="tower"?0x89959c:0xc4a45e,
+        roughness:.9
+      });
+      const instanced=new THREE.InstancedMesh(geometry,material,list.length);
+      const dummy=new THREE.Object3D();
+      list.forEach((item,i)=>{
+        const height=type==="tower"?1.45:type==="gate"?.98:.22;
+        dummy.position.set(item.x,height/2,item.z);
+        dummy.scale.set(item.sx*.8,height,item.sz*.8);
+        dummy.updateMatrix();
+        instanced.setMatrixAt(i,dummy.matrix);
+      });
+      instanced.instanceMatrix.needsUpdate=true;
+      instanced.computeBoundingSphere();
+      scene.add(instanced);
+      activeDefenseModels.push(instanced);
     }
     renderer.render(scene,camera);
   }
