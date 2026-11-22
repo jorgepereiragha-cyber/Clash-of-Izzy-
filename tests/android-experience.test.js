@@ -118,7 +118,7 @@ test("Android native launcher presents the independent hero emblem and promo por
   const activity = await readFile(new URL("../android-sideload/app/src/main/java/com/clashofizzy/android/MainActivity.java", import.meta.url), "utf8");
   const icon = await readFile(new URL("../android-sideload/app/src/main/res/drawable/ic_launcher.xml", import.meta.url), "utf8");
   const portal = await readFile(new URL("../portal.html", import.meta.url), "utf8");
-  assert.match(activity, /heroEmblem\.setImageResource\(R\.drawable\.ic_launcher\)/);
+  assert.match(activity, /heroEmblem\.setImageResource\(R\.drawable\.royal_king\)/);
   assert.match(icon, /fillColor="#E3B865"/);
   assert.match(portal, /assets\/brand\/hero-emblem\.svg/);
   assert.doesNotMatch(portal, /\/scripts\/pwa-runtime\.js|href="\/manifest\.json"/);
