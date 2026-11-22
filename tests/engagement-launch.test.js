@@ -45,7 +45,7 @@ test("UI de reino e rotas autenticadas estão integradas",async()=>{
   assert.match(worker,/\/api\/game\/onboarding/);
   assert.match(worker,/\/api\/game\/daily-reward/);
   assert.match(sw,/player-engagement\.js/);
-  assert.match(sw,/clash-of-izzy-shell-v52/);
+  assert.match(sw,/clash-of-izzy-shell-v53/);
 });
 
 test("contribuições voluntárias são separadas de pacotes de gemas",async()=>{

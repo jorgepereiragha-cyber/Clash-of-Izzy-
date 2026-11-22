@@ -18,9 +18,12 @@ A migracao `0042_level_packs_p1_p8.sql` e os valores P4-P8 desta PR constituem u
 
 ## Precos para aprovar
 Valores P1-P3 fornecidos: P1 R$9,90; P2 R$29,90; P3 R$59,90.
-**P4-P8 sao PROPOSTAS NAO APROVADAS**: P4 R$89,90; P5 R$129,90; P6 R$179,90; P7 R$229,90; P8 R$299,90. O servidor e a interface bloqueiam compras P4-P8 enquanto `LEVEL_PACKS_PROPOSED_PRICES_APPROVED` nao estiver igual a `true`.
-Atribuicoes e quantidades definitivas devem ser revisadas para equilibrar a economia, protecao do consumidor e nao prometer itens nao entregues.
+**P4-P8 atualizados conforme o protocolo comercial recebido, mas ainda BLOQUEADOS para venda até validação de checkout e aprovação final do catálogo**: P4 R$99,90; P5 R$149,90; P6 R$199,90; P7 R$299,90; P8 R$499,90. O servidor e a interface bloqueiam compras P4-P8 enquanto `LEVEL_PACKS_PROPOSED_PRICES_APPROVED` nao estiver igual a `true`.
+Os preços e quantidades P4-P8 foram alinhados ao protocolo 7777x. Atribuicoes e quantidades definitivas devem ser revisadas para equilibrar a economia, protecao do consumidor e nao prometer itens nao entregues.
 Nenhuma flag pode ser ativada antes da aprovacao comercial de TODOS os valores vigentes.
+
+## Migração corretiva e preservação de IDs
+Se uma versão anterior da migração `0042` já foi aplicada em um ambiente de testes, `0043_fix_vip_catalog.sql` reconcilia **somente** os cinco pares de preços/gemas legados esperados. Usa `UPDATE` condicionado a nome, preço anterior e gemas anteriores; registros personalizados não coincidentes ficam intactos. **Não usar `INSERT OR REPLACE`**, porque pode substituir a linha e afetar referências. Em produção, validar esquema, estado da `d1_migrations`, backup e consultas antes de aplicar qualquer migração; nenhuma foi aplicada por esta PR.
 
 ## Checklist de liberacao
 1. PR #223 revista e aprovada; #229 homologada e revisada. Rebase/retarget desta PR apos a ordem de merges. Validar testes e conflitos antes de qualquer merge.

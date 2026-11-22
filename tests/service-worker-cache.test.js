@@ -11,9 +11,11 @@ assert.ok(SHELL_CACHE, "Service Worker shell cache identifier missing");
 function makeResponse({ status = 200, headers = {}, type = "basic" } = {}) {
   return {
     status,
+    ok: status >= 200 && status < 300,
     type,
     headers: new Headers(headers),
     clone() { return makeResponse({ status, headers, type }); },
+    async json() { return { format: 1, threeVersion: "0.187.0", assets: ["/vendor/three/build/three.module.js"] }; },
   };
 }
 
@@ -59,7 +61,7 @@ function makeHarness(responder = () => makeResponse(), { failCacheWrites = false
   };
 
   vm.runInNewContext(source, {
-    self, caches, URL, Headers,
+    self, caches, URL, Headers, Response, console: { warn() {} },
     fetch: async request => {
       networkCalls.push(request.url);
       if (shouldRejectNetwork) throw new Error("offline");
@@ -136,7 +138,7 @@ test("PWA shell responses are cached by pathname and serve offline fallback", as
   assert.ok(h.stores.get(SHELL_CACHE).has("/kingdom.html"));
   h.offline();
   const fallback = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
-  assert.equal(fallback.result, undefined);
+  assert.equal(fallback.result.status, 503);
   await (await h.caches.open(SHELL_CACHE))
     .put("/offline.html", makeResponse());
   const offline = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
@@ -196,4 +198,28 @@ test("network success is returned even when cache storage rejects writes", async
   assert.equal(navigation.result.status, 200);
   const asset = await h.dispatch("/assets/3d/house.glb");
   assert.equal(asset.result.status, 200);
+});
+
+test("shell v53 instala mesmo que uma textura opcional falhe", async () => {
+  const h = makeHarness(request => {
+    if (request === "/assets/brand/hero-emblem.svg") throw new Error("asset temporarily missing");
+    return makeResponse();
+  });
+  await h.lifecycle("install");
+  const store = h.stores.get(SHELL_CACHE);
+  assert.equal(store.has("/index.html"), true);
+  assert.equal(store.has("/kingdom.html"), true);
+  assert.equal(store.has("/offline.html"), true);
+  assert.equal(store.has("/assets/brand/hero-emblem.svg"), false);
+  assert.equal(store.has("/vendor/three/build/three.module.js"), true);
+});
+
+test("shell v53 mantém fallback se o manifesto 3D estiver indisponível", async () => {
+  const h = makeHarness(request => {
+    if (request === "/vendor/three/asset-manifest.json") throw new Error("offline manifest");
+    return makeResponse();
+  });
+  await h.lifecycle("install");
+  assert.equal(h.stores.get(SHELL_CACHE).has("/kingdom.html"), true);
+  assert.equal(h.stores.get(SHELL_CACHE).has("/offline.html"), true);
 });
