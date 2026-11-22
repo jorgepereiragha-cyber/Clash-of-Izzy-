@@ -134,17 +134,6 @@ jobs:
       - name: Inspect production migration status (read-only)
         run: npx wrangler --config wrangler.jsonc d1 migrations list clash-of-izzy-db --remote
 
-      - name: Inspect public stats schema names without player records (read-only)
-        shell: bash
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          # SQL imutável, somente SELECT de nomes de tabelas: nenhuma linha de jogador ou compra.
-          npx wrangler --config wrangler.jsonc d1 execute clash-of-izzy-db --remote --json --command="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('players','battle_reports','alliances','purchase_requests','support_orders') ORDER BY name"
-          echo "Schema de contadores inspecionado sem consultar dados pessoais." >> "$GITHUB_STEP_SUMMARY"
-          echo "A ausência de support_orders (migração 0039) não autoriza habilitar vendas." >> "$GITHUB_STEP_SUMMARY"
-
       - name: Inspect Preview migration status (read-only)
         run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations list PREVIEW_DB --remote
 
