@@ -42,7 +42,7 @@ test("Candidato nao promove release comercial, pagamentos ou migracoes", () => {
   assert.doesNotMatch(candidate, /gh release create|wrangler\s+deploy|d1 migrations apply|cloudflare.*deploy/i);
   assert.doesNotMatch(candidate, /ANDROID_RELEASE_KEYSTORE_BASE64\s*=\s*[^{$\n ]+/);
   assert.match(candidate, /NAO publica GitHub Releases/);
-  assert.match(candidate, /versionCode maior que 2/);
+  assert.match(candidate, /versionCode maior que 3/);
 });
 
 test("Login Google no APK nao tenta interpretar URL ausente do WebView", () => {
@@ -52,9 +52,9 @@ test("Login Google no APK nao tenta interpretar URL ausente do WebView", () => {
 });
 
 
-test("Candidato 0.9.1 incrementa versionCode sem alterar identidade nem certificado", () => {
-  assert.match(candidate, /ANDROID_VERSION_CODE: "2"/);
-  assert.match(candidate, /ANDROID_VERSION_NAME: "0.9.1"/);
-  assert.match(candidate, /versionCode maior que 2/);
+test("Candidato 0.9.2 incrementa versionCode sem alterar identidade nem certificado", () => {
+  assert.match(candidate, /ANDROID_VERSION_CODE: "3"/);
+  assert.match(candidate, /ANDROID_VERSION_NAME: "0.9.2"/);
+  assert.match(candidate, /versionCode maior que 3/);
   assert.match(candidate, /ANDROID_RELEASE_CERT_SHA256/);
 });
