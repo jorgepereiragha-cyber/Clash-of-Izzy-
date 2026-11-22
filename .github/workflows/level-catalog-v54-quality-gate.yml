@@ -1,9 +1,9 @@
 name: Catalogo P1-P8 v54 - gate sem deploy
 on:
   push:
-    branches: [fix/level-packs-catalog-alignment-20261122]
+    branches: [fix/level-packs-catalog-alignment-20261122, fix/pr238-safe-0044-reconcile-20261122]
   pull_request:
-    branches: [fix/blueprint-mobile-visual-cache-v53]
+    branches: [fix/blueprint-mobile-visual-cache-v53, fix/level-packs-catalog-alignment-20261122]
 permissions:
   contents: read
 concurrency:

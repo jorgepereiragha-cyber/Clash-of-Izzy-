@@ -89,12 +89,16 @@ test("catalogo P1-P8 segue os valores solicitados e migracao 0043 nao substitui 
     p.level,p.priceCents,p.gems,p.resources.wood,p.resources.food,
     p.resources.stone,p.resources.iron,p.resources.gold
   ]),expected);
-  const sql=await read("migrations/0043_align_level_pack_catalog.sql");
-  assert.match(sql,/UPDATE vip_packages SET/);
+  const sql=await read("migrations/0044_reconcile_level_packs.sql");
+  assert.match(sql,/UPDATE vip_packages/);
   assert.doesNotMatch(sql,/^\s*(?:INSERT|REPLACE|DELETE|DROP|ALTER)\b/im);
-  for(const p of LEVEL_PACKS.slice(3)){
-    assert.match(sql,new RegExp("WHEN '"+p.name+"' THEN "+(p.priceCents/100).toFixed(2).replace(".","\\.")));
-    assert.match(sql,new RegExp("WHEN '"+p.name+"' THEN "+p.gems+"\\b"));
+  assert.doesNotMatch(sql,/WHERE name IN\s*\(/i);
+  for (const p of LEVEL_PACKS.slice(3)) {
+    assert.match(sql,new RegExp("WHERE name='"+p.name+"'"));
+    assert.match(sql,new RegExp("SET price_brl="+(p.priceCents/100).toFixed(2).replace(".","\\.")+", gems="+p.gems));
   }
+  assert.match(sql,/ROUND\(price_brl\*100\)=/);
+  assert.match(sql,/AND gems=\d+/);
+  assert.match(sql,/AND NOT EXISTS\s*\(/);
   assert.equal(levelPackPriceApproved({},LEVEL_PACKS[7]),false);
 });
