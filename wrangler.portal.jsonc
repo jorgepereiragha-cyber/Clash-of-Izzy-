@@ -1,0 +1,12 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "clash-of-izzy-portal",
+  "main": "portal-worker.js",
+  "compatibility_date": "2026-11-12",
+  "workers_dev": true,
+  "assets": {
+    "directory": "./public-portal",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  }
+}
