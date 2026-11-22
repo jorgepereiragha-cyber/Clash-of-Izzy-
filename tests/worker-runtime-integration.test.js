@@ -658,14 +658,16 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         playerId: playerA, skin: "Skin inexistente",
       }), 404, "skin inexistente não é liberada");
 
-      expectStatus(await api("/api/store/purchase-request", {
+      const disabledPix=await api("/api/store/purchase-request", {
         method: "POST", token: tokenA,
         body: {
           kind: "vip_package", itemId: vip.id,
           requestKey: "integration-vip-request-01",
           paymentMethod: "pix",
         },
-      }), 400, "bloqueio do PIX direto");
+      });
+      assert.equal(disabledPix.status,503,"Pix disabled must reject purchases");
+      assert.equal(disabledPix.data.code,"NUBANK_PIX_NOT_CONFIGURED");
 
       const purchase = expectStatus(await api("/api/store/purchase-request", {
         method: "POST", token: tokenA,

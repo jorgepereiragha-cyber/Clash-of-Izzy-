@@ -41,14 +41,14 @@ test('Pix requests remain pending and never call Mercado Pago checkout or auto-f
   const [worker, mercado, arena] = await Promise.all([
     read('worker.js'), read('mercadopago-orders.js'), read('arena.html')
   ]);
-  assert.match(worker, /const paymentMethod=requestedPaymentMethod/);
+  assert.match(worker, /requestedPaymentMethod==="pix"\?"pix":"manual"/);
   assert.match(worker, /INSERT INTO purchase_requests/);
   assert.match(mercado, /order\.payment_method !== "mercadopago_link"/);
   assert.match(worker, /body\.bankStatementConfirmed!==true/);
   const admin = await read('admin.html');
   assert.match(admin, /Conferi no extrato Nubank/);
   assert.match(arena, /if\(paymentMethod==='pix'\)/);
-  const pix = arena.slice(arena.indexOf("if(paymentMethod==='pix'){"), arena.indexOf("notice.textContent='Pedido #'+requestId+' registrado. Gerando checkout individual…'"));
+  const pix = arena.slice(arena.indexOf("if(paymentMethod==='pix'){"), arena.indexOf("const checkoutResponse=await fetch(API_BASE+'/store/checkout'"));
   assert.ok(pix.length > 200);
   assert.doesNotMatch(pix, /store\/checkout|checkoutUrl/);
   assert.doesNotMatch(pix, /NUBANK_PIX_COPY_PASTE|pixKey|chave pix/);

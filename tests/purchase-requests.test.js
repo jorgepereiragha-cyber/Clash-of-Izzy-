@@ -13,8 +13,8 @@ test("purchase requests require a valid player session and a stable idempotency 
   assert.ok(worker.includes("requestKey"));
   assert.ok(worker.includes("SELECT id,status,product_name,price_brl,payment_method,mp_order_id,mp_checkout_url FROM purchase_requests"));
   assert.ok(worker.includes("payment_method,payment_reference,request_key"));
-  assert.ok(worker.includes('["mercadopago_link","manual_whatsapp"].includes(requestedPaymentMethod)'));
-  assert.ok(worker.includes('requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":"manual"'));
+  assert.ok(worker.includes('["mercadopago_link","manual_whatsapp","pix"].includes(requestedPaymentMethod)'));
+  assert.ok(worker.includes('requestedPaymentMethod==="pix"?"pix":"manual"'));
 });
 
 test("Master approval queue is protected by admin session and grants packages only once", async () => {
@@ -47,9 +47,9 @@ test("official store creates an auditable per-order Mercado Pago checkout", asyn
   assert.ok(arena.includes("/store/purchase-request"));
   assert.ok(arena.includes("requestOfficialPurchase"));
   assert.ok(arena.includes("Pedido #"));
-  assert.ok(arena.includes("paymentMethod:'mercadopago_link'"));
+  assert.ok(arena.includes("paymentMethod"));
   assert.ok(arena.includes("mercadopago_link"));
-  assert.ok(arena.includes("body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod:'mercadopago_link'})"));
+  assert.ok(arena.includes("body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod})"));
   assert.ok(arena.includes("const requestId=Number(requestData.request?.id)"));
   assert.ok(arena.includes("body:JSON.stringify({requestId})"));
   assert.ok(arena.includes("checkoutUrl.protocol!=='https:'"));
@@ -64,7 +64,8 @@ test("official store creates an auditable per-order Mercado Pago checkout", asyn
   assert.ok(arena.includes("grid-template-columns:minmax(0,1fr) auto"));
   assert.ok(arena.includes("Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis."));
   assert.doesNotMatch(arena, /paymentMethod:'manual_whatsapp'/);
-  assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i);
+  assert.ok(arena.includes('<option value="pix" disabled>'));
+  assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:bank_transfer|manual)["']/i);
   assert.ok(arena.includes('id="whatsapp"'));
 });
 
