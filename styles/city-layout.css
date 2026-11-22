@@ -1,0 +1,12 @@
+/* Editor acessível e responsivo do grid de edifícios. */
+.coi-layout-panel{margin:12px 0;border:1px solid #846d45;border-radius:10px;background:#14263a;padding:10px}
+.coi-layout-panel summary{cursor:pointer;color:#f1d38b;font-weight:800;padding:6px}
+.coi-layout-panel .layout-content{display:grid;gap:10px;padding:12px 2px 4px}
+.coi-layout-panel .layout-controls{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;align-items:end}
+.coi-layout-panel label{display:grid;gap:4px;color:#dce5ed;font-size:12px}
+.coi-layout-panel select,.coi-layout-panel input{width:100%;min-width:0;background:#0d1a2c;border:1px solid #8e805f;border-radius:6px;padding:9px;color:#f7f3ea}
+.coi-layout-panel .layout-controls label:first-child{grid-column:span 3}
+.coi-layout-panel button{grid-column:span 3;min-height:44px}
+.coi-layout-panel canvas{width:100%;max-width:480px;height:auto;aspect-ratio:1;display:block;margin:auto;border:2px solid #927e52;border-radius:8px;touch-action:manipulation;cursor:crosshair}
+.coi-layout-panel small{color:#cbd8e2;line-height:1.45}
+@media(min-width:640px){.coi-layout-panel .layout-controls{grid-template-columns:2fr 1fr 1fr auto}.coi-layout-panel .layout-controls label:first-child{grid-column:auto}.coi-layout-panel button{grid-column:auto}}
