@@ -29,8 +29,7 @@ antes de declarar acesso exclusivamente via APK.
    **Actions > Variables** com `ANDROID_RELEASE_CERT_SHA256` (64 hexadecimais,
    sem os dois-pontos).
    Se voce ja configurou as quatro credenciais em **Actions > Secrets**, mas nao tem
-   o SHA-256, execute [Diagnostico seguro dos requisitos de assinatura Android]
-   (https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/diagnostico-assinatura-android.yml)
+   o SHA-256, execute [Diagnostico seguro dos requisitos de assinatura Android](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/diagnostico-assinatura-android.yml)
    pelo botao **Run workflow**. A rotina valida a keystore e as senhas; se o
    pin estiver ausente, mostra **somente o SHA-256 publico do certificado** no
    resumo da execucao e encerra com falha ate que voce o configure em Variables.
