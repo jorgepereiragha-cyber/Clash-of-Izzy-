@@ -42,9 +42,11 @@ test("Worker uses authenticated state, completion token and additive D1 schema",
  const v=await readFile(new URL("../scripts/kingdom-3d.js",import.meta.url),"utf8");
  assert.match(w,/getPlayerProgression\(stateResults\[15\]/);
  assert.match(w,/experienceForCompletedQueue\(queue\)/);
- assert.match(w,/INSERT INTO kingdom_player_progression\(kingdom_id,total_xp,updated_at\) SELECT \?,\?,CURRENT_TIMESTAMP WHERE "\+guard/);
+ assert.match(w,/INSERT OR IGNORE INTO kingdom_progression_awards\(queue_id,kingdom_id,xp_amount\)/);
+ assert.match(w,/INSERT INTO kingdom_player_progression\(kingdom_id,total_xp,updated_at\) SELECT \?,\?,CURRENT_TIMESTAMP WHERE changes\(\)>0/);
  assert.doesNotMatch(w,/\/progression\/add-xp/);
  assert.match(m,/kingdom_id INTEGER PRIMARY KEY REFERENCES kingdoms\(id\)/);
+ assert.match(m,/queue_id INTEGER PRIMARY KEY/);
  assert.doesNotMatch(m,/DROP TABLE|ALTER TABLE players|ALTER TABLE kingdoms/i);
  assert.match(v,/getCastleTier\(level\)/);
  assert.match(v,/castleTier===4/);

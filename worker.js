@@ -1872,8 +1872,12 @@ async function processDueKingdomQueues(env,kingdomId=null){
     // Queue completion token guards the XP grant within the same transactional batch.
     const queueXP=experienceForCompletedQueue(queue);
     if(queueXP>0){
-      statements.push(env.DB.prepare("INSERT INTO kingdom_player_progression(kingdom_id,total_xp,updated_at) SELECT ?,?,CURRENT_TIMESTAMP WHERE "+guard+" ON CONFLICT(kingdom_id) DO UPDATE SET total_xp=MIN(1000000000000,kingdom_player_progression.total_xp+excluded.total_xp),updated_at=CURRENT_TIMESTAMP")
-        .bind(queue.kingdom_id,queueXP,queue.id,completionToken));
+      // The unique queue_id permanently prevents replayed grants.
+      statements.push(env.DB.prepare("INSERT OR IGNORE INTO kingdom_progression_awards(queue_id,kingdom_id,xp_amount) SELECT ?,?,? WHERE "+guard)
+        .bind(queue.id,queue.kingdom_id,queueXP,queue.id,completionToken));
+      // Only the immediately preceding successful award insert may increment XP.
+      statements.push(env.DB.prepare("INSERT INTO kingdom_player_progression(kingdom_id,total_xp,updated_at) SELECT ?,?,CURRENT_TIMESTAMP WHERE changes()>0 AND EXISTS(SELECT 1 FROM kingdom_progression_awards WHERE queue_id=? AND kingdom_id=? AND xp_amount=?) ON CONFLICT(kingdom_id) DO UPDATE SET total_xp=MIN(1000000000000,kingdom_player_progression.total_xp+excluded.total_xp),updated_at=CURRENT_TIMESTAMP")
+        .bind(queue.kingdom_id,queueXP,queue.id,queue.kingdom_id,queueXP));
     }
     statements.push(env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,?,? WHERE "+guard)
       .bind(queue.kingdom_id,queue.queue_type+"_completed",JSON.stringify(eventPayload),queue.id,completionToken));
