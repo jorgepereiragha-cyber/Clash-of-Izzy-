@@ -343,6 +343,20 @@ public final class MainActivity extends Activity {
         }
     }
 
+    // Evita manter renderização WebGL e tarefas do WebView rodando em segundo plano.
+    // onResume devolve o WebView ao estado normal sem recarregar o reino.
+    @Override
+    protected void onPause() {
+        if (webView != null) webView.onPause();
+        super.onPause();
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        if (webView != null) webView.onResume();
+    }
+
     @Override
     protected void onDestroy() {
         if (webView != null) {
