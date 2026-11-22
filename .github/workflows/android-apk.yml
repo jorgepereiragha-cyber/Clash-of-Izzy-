@@ -1,4 +1,5 @@
 name: Android APK - instalacao direta
+# PR de homologacao 4X: apenas assembleDebug, sem release assinado nem deploy.
 
 on:
   push:
