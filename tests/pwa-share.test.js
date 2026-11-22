@@ -7,7 +7,7 @@ const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 test("public landing exposes promotional Android APK download only", async () => {
   const page = await read("portal.html");
   assert.match(page, /id="download-apk"/);
-  assert.match(page, /assets\/brand\/hero-emblem\.svg/);
+  assert.match(page, /assets\/brand\/royal-king\.webp/);
   assert.doesNotMatch(page, /id="play-now"|href="\/kingdom\.html"|beforeinstallprompt/);
 });
 

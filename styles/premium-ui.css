@@ -124,3 +124,8 @@ button:active,.linkbtn:active,.btn-epic:active{transform:translateY(0)}
   .coi-recorder-indicator.is-recording{animation:none}
   .coi-recorder-progress-track span{transition:none}
 }
+
+/* A imagem enviada é usada como selo no castelo sem afetar gráficos 3D. */
+body:not(.valhalla-mode-active) .brand{display:flex;align-items:center;gap:9px;min-width:0}
+body:not(.valhalla-mode-active) .brand .brand-royal-seal{width:44px;height:44px;object-fit:cover;border-radius:9px;border:1px solid #ffe3a1;box-shadow:0 3px 12px #0007;flex:0 0 44px}
+@media(max-width:480px){body:not(.valhalla-mode-active) .brand .brand-royal-seal{width:34px;height:34px;flex-basis:34px}body:not(.valhalla-mode-active) .brand img:not(.brand-royal-seal){max-width:31vw!important}}

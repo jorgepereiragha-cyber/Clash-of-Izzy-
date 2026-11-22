@@ -110,8 +110,8 @@ public final class MainActivity extends Activity {
         royalFrame.setPadding(dp(5), dp(5), dp(5), dp(5));
         royalFrame.setBackground(emblemBorder);
         ImageView heroEmblem = new ImageView(this);
-        heroEmblem.setImageResource(R.drawable.ic_launcher);
-        heroEmblem.setContentDescription("Emblema de Clash of Izzy, herói com espada e coroa");
+        heroEmblem.setImageResource(R.drawable.royal_king);
+        heroEmblem.setContentDescription("Rei guerreiro do Clash of Izzy com espada, coroa e brasão dourado");
         heroEmblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
         royalFrame.addView(heroEmblem, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
