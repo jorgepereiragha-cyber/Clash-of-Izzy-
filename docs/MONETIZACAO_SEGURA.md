@@ -18,7 +18,7 @@ Gerar a primeira receita **depois** de validar uma compra ponta a ponta, a entre
 - Definir atendimento e prazo de entrega para Pix assistido antes de habilitar `NUBANK_PIX_ENABLED`; tratar pagamentos pendentes e duplicados.
 - Verificar compatibilidade com políticas das lojas de aplicativo antes de distribuir por Google Play. Distribuição direta/PWA segue requisitos distintos; não apresentar isso como isenção geral de leis, impostos ou regras de proteção ao consumidor.
 - Medir conversão do catálogo, transações aprovadas, receita líquida de tarifas/estornos e satisfação. Não publicar projeções como faturamento real.
-- Antes de publicizar o APK, assinar a release com keystore persistente e oferecer download por fonte oficial, com checksum. O portal leva ao workflow GitHub, **não** a um APK já publicado.
+- Antes de publicizar o APK, assinar a release com keystore persistente e oferecer download por fonte oficial, com checksum. O portal consulta somente uma release pública oficial do GitHub com APK e arquivo SHA-256. Enquanto ela não existir ou não puder ser verificada, o botão de download permanece desabilitado; o portal não processa pagamentos.
 
 ## Restrições de segurança
 
