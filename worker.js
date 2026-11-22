@@ -10,6 +10,7 @@ import { cityLayoutConfig, moveCityBuilding } from "./city-layout-rules.js";
 import { advanced4xEnabled,calculateChainProduction,ensureIntermediateResources,upgradeIndustry } from "./intermediate-production.js";
 import { DEFENSE_CATALOG,placeCityDefense,movePlacedDefense,defensePowerFromRows } from "./city-defense-rules.js";
 import { getKingdomProgression,progressionQueueStatements } from "./player-progression-4x.js";
+import { assign4xHero,unassign4xHero,assigned4xHeroLevel,millHeroMultiplier,towerHeroMultiplier } from "./hero-assignments-4x.js";
 import { processEmailQueue, requestEmailVerification, verifyEmailToken, getEmailPreferences, updateEmailPreferences, getEmailHistory, queueEmailForInternalPlayer } from "./email-system.js";
 import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaConfig } from "./valhalla-config.js";
 import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
@@ -404,7 +405,7 @@ async function recalculateKingdomStats(env,kingdomId){
   let defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number(kingdom.castle_level)||1)*10;
   if(advanced4xEnabled(env)){
     const defenseRows=await env.DB.prepare("SELECT defense_type,level FROM city_defenses WHERE kingdom_id=?").bind(kingdomId).all();
-    defense+=defensePowerFromRows(defenseRows.results||[]);
+    defense+=Math.floor(defensePowerFromRows(defenseRows.results||[])*towerHeroMultiplier(await assigned4xHeroLevel(env,kingdomId,"defense:tower")));
   }
   await env.DB.prepare(
     "UPDATE kingdoms SET food_capacity=MAX(?,food),wood_capacity=MAX(?,wood),stone_capacity=MAX(?,stone),iron_capacity=MAX(?,iron),gold_capacity=MAX(?,gold),wall_max_hp=?,wall_hp=MIN(wall_hp,?),defense_power=? WHERE id=?"
@@ -433,7 +434,7 @@ async function recalculateKingdomPower(env,kingdomId){
   power+=Math.max(0,Number(kingdom?.prestige)||0)*100;
   if(advanced4xEnabled(env)){
     const defenses=await env.DB.prepare("SELECT defense_type,level FROM city_defenses WHERE kingdom_id=?").bind(kingdomId).all();
-    power+=defensePowerFromRows(defenses.results||[]);
+    power+=Math.floor(defensePowerFromRows(defenses.results||[])*towerHeroMultiplier(await assigned4xHeroLevel(env,kingdomId,"defense:tower")));
   }
   const total=Math.max(0,Math.floor(power));
   await env.DB.prepare("UPDATE kingdoms SET power=? WHERE id=?").bind(total,kingdomId).run();
@@ -491,6 +492,7 @@ async function applyProduction(env,kingdomId){
     chainResult=calculateChainProduction({
       elapsedSeconds:elapsed,farmLevel:levels.farm||1,
       millLevel:chainState.mill_level,bakeryLevel:chainState.bakery_level,
+      millMultiplier:millHeroMultiplier(await assigned4xHeroLevel(env,kingdomId,"industry:mill")),
       wheat:chainState.wheat,flour:chainState.flour,
       foodFreeSpace:Math.max(0,capacities.food-Math.max(0,Number(row.food)||0)),
       multiplier:valhallaMultipliers.resource*valhallaBuffs.resourceProduction*petBonuses.resourceProductionMultiplier*prestigeBonus,
@@ -1434,6 +1436,22 @@ async function gameAction(env,playerId,body){
         .bind(k.id,"castle_vip_upgraded",JSON.stringify({vipLevel:target,gemsSpent:cost,bonuses:getCastleVipBonuses(target),castleLevel:CASTLE_MAX_LEVEL}))
     ]);
     if(!result[0]?.meta?.changes||!result[1]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Evolução VIP não concluída: gemas insuficientes ou estado alterado."},409);
+  }else if(type==="assign_hero_to_building"||type==="assign_hero_to_defense"||type==="unassign_hero_4x"){
+    if(!advanced4xEnabled(env))return json({error:"Sistemas 4X ainda não habilitados no servidor."},503);
+    const heroKey=typeof body.heroKey==="string"?body.heroKey:"";
+    if(type==="assign_hero_to_building"&&body.building!=="mill")
+      return json({error:"A alocação de produção atualmente aceita somente moinho."},400);
+    if(type==="assign_hero_to_defense"&&body.defense!=="tower")
+      return json({error:"A alocação militar atualmente aceita somente torres."},400);
+    const slot=type==="assign_hero_to_building"?"industry:mill":"defense:tower";
+    const result=type==="unassign_hero_4x"
+      ?await unassign4xHero(env,k.id,heroKey)
+      :await assign4xHero(env,k.id,heroKey,slot,HERO_TEMPLATES[heroKey]?.type);
+    if(!result.ok)return json({error:result.error},result.status);
+    // O jogo recalcula o valor efetivo, nunca aceita porcentagens do cliente.
+    await recalculateKingdomStats(env,k.id);
+    await recalculateKingdomPower(env,k.id);
+    await logKingdomAction(env,k.id,p.id,type,result);
   }else if(type==="city_defense_place"||type==="city_defense_move"||type==="industry_upgrade"){
     if(!advanced4xEnabled(env))return json({error:"Sistemas 4X ainda não habilitados no servidor."},503);
     const result=type==="city_defense_place"?await placeCityDefense(env,k.id,body)
