@@ -5,7 +5,7 @@ const prefix = "https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases
 const apk = "clash-of-izzy-android.apk";
 
 test("Android: homepage is a promotional download portal, never a web-game entry", async ({ page }) => {
-  await page.route(releases, route => route.fulfill({ status: 404, contentType: "application/json", body: "{}" }));
+  await page.route(releases, route => route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: "{}" }));
   await page.goto("/");
   await expect(page).toHaveURL(/\/portal\.html$/);
   await expect(page.locator("h1")).toHaveText("CLASH OF IZZY");
@@ -18,7 +18,7 @@ test("Android: homepage is a promotional download portal, never a web-game entry
 
 test("Android: only signed release names on official GitHub download host are offered", async ({ page }) => {
   await page.route(releases, route => route.fulfill({
-    status: 200, contentType: "application/json",
+    status: 200, headers: { "access-control-allow-origin": "*" }, contentType: "application/json",
     body: JSON.stringify({
       draft: false, prerelease: false, tag_name: "v1.2.3",
       assets: [
@@ -37,7 +37,7 @@ test("Android: only signed release names on official GitHub download host are of
 
 test("Android: reject download redirection to another domain even if release metadata contains an asset", async ({ page }) => {
   await page.route(releases, route => route.fulfill({
-    status: 200, contentType: "application/json",
+    status: 200, headers: { "access-control-allow-origin": "*" }, contentType: "application/json",
     body: JSON.stringify({
       draft: false, prerelease: false, tag_name: "v1.2.3",
       assets: [
