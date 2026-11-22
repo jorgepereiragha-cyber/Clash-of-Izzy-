@@ -81,11 +81,12 @@ export default {
       const {status, body} = await readOfficialRelease();
       const headers = {
         "Content-Type": "application/json; charset=utf-8",
-        "Cache-Control": status === 200 ? "public, max-age=60" : "no-store",
-        "X-Content-Type-Options": "nosniff"
+        "Cache-Control": status === 200 ? "public, max-age=60" : status === 404 ? "public, max-age=30" : "no-store",
+        "X-Content-Type-Options": "nosniff",
+        "X-COI-Release-Proxy": "v1"
       };
       const result = new Response(request.method === "HEAD" ? null : JSON.stringify(body), {status, headers});
-      if (status === 200 && cache && context?.waitUntil) {
+      if ((status === 200 || status === 404) && cache && context?.waitUntil) {
         const cacheResponse = new Response(JSON.stringify(body), {status, headers});
         context.waitUntil(cache.put(key, cacheResponse).catch(() => {}));
       }
