@@ -1,3 +1,4 @@
+import { finalizeSupportOrder } from "./support-orders.js";
 import {MASTER_PACK_NAME,masterGrantStatements} from "./master-pack.js";
 function toBase64Url(bytes) {
   let binary = "";
@@ -173,7 +174,7 @@ async function handleWebhook(request, env, ctx) {
     "SELECT id,player_id,product_kind,product_id,product_name,price_brl,currency,status,mp_order_id,mp_external_reference " +
     "FROM purchase_requests WHERE mp_external_reference=? AND mp_order_id=?"
   ).bind(String(providerOrder.external_reference || ""), orderId).first();
-  if (!purchase) return ctx.json({ received: true, ignored: true });
+  if (!purchase) return await finalizeSupportOrder(env, orderId, providerOrder, ctx);
   const expectedCents = moneyToCents(purchase.price_brl);
   const actualCents = moneyToCents(providerOrder.total_amount);
   const paidCents = moneyToCents(providerOrder.total_paid_amount);
