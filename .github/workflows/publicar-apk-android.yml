@@ -108,18 +108,20 @@ jobs:
         run: gradle --no-daemon assembleRelease
       - name: Verificar assinatura, tamanho e SHA-256
         shell: bash
+        env:
+          CERT_PIN: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
         run: |
           set -euo pipefail
           src=android-sideload/app/build/outputs/apk/release/app-release.apk
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$src"
           # A assinatura valida nao garante que a chave e a mesma de releases anteriores.
           # Requer fixar o fingerprint SHA-256 publico do certificado de release.
-          expected_cert="${{ vars.ANDROID_RELEASE_CERT_SHA256 }}"
+          expected_cert="$CERT_PIN"
           normalized_cert="$(printf '%s' "$expected_cert" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           [[ "$normalized_cert" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::Configure ANDROID_RELEASE_CERT_SHA256 como variavel de repositorio antes de publicar."; exit 1; }
-          actual_cert="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$src" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | head -n 1 | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          actual_cert="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$src" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           [[ "$actual_cert" == "$normalized_cert" ]] || { echo "::error::Certificado APK diferente do aprovado; release cancelada."; exit 1; }
-          package_info="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$src" | head -n 1)"
+          package_info="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$src" | sed -n '1p')"
           [[ "$package_info" == *"name='com.clashofizzy.android'"* && "$package_info" == *"versionCode='$ANDROID_VERSION_CODE'"* && "$package_info" == *"versionName='$ANDROID_VERSION_NAME'"* ]] || { echo "::error::Pacote ou versao Android nao corresponde ao esperado."; exit 1; }
           cp "$src" "$RUNNER_TEMP/clash-of-izzy-android.apk"
           test -s "$RUNNER_TEMP/clash-of-izzy-android.apk"
