@@ -252,6 +252,36 @@ function renderMarches() {
     root.append(card);
   }
 }
+async function updateRealmCards(){
+  const grid=$("realmGrid"),label=$("realmStatus");
+  if(!grid||!label)return;
+  try{
+    const data=await request("/realms/status");
+    if(!Array.isArray(data.realms)||data.realms.length!==3)throw new Error("resposta inválida");
+    grid.replaceChildren();
+    label.textContent="Reinos cadastrados: "+fmt(data.registeredPlayers)+" · Mapa atual: "+fmt(state?.kingdom?.map_region||1);
+    for(const realm of data.realms){
+      const current=Number(realm.id)===Number(state?.kingdom?.map_region||1);
+      const card=make("div","realm-tile"+(realm.open?"":" is-locked")+(current?" is-current":""));
+      card.setAttribute("role","listitem");
+      card.append(make("strong","",realm.name));
+      const status=realm.open?(current?"Seu mapa · aberto":"Aberto para novos reinos")
+        :"Bloqueado · faltam "+fmt(realm.playersRemaining)+" jogadores";
+      card.append(make("span","",status));
+      card.append(make("span","","Castelos neste mapa: "+fmt(realm.inhabitants)));
+      if(!realm.open){
+        const progress=make("progress");
+        progress.max=Number(realm.unlockAtPlayers)||1;
+        progress.value=Math.min(progress.max,Number(data.registeredPlayers)||0);
+        progress.setAttribute("aria-label","Progresso para abrir "+realm.name);
+        card.append(progress);
+      }
+      grid.append(card);
+    }
+  }catch{
+    label.textContent="Não foi possível consultar o desbloqueio dos mapas.";
+  }
+}
 function render() {
   renderResources();
   renderMap();
@@ -402,6 +432,7 @@ async function connect() {
   setStatus("Sincronizando territórios…");
   try {
     await refreshState();
+    await updateRealmCards();
     setStatus("● Reino sincronizado");
   } catch (error) {
     setStatus(error.message, true);
@@ -413,6 +444,7 @@ window.setInterval(() => {
   if (document.hidden || busy || !token) return;
   refreshState().catch(error => setStatus(error.message, true));
 }, 15000);
+window.setInterval(() => { if(!document.hidden&&!busy&&token) updateRealmCards(); },60000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && !busy && token) refreshState().catch(error => setStatus(error.message, true));
 });
