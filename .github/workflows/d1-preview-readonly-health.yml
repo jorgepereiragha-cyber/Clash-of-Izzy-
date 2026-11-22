@@ -1,0 +1,38 @@
+name: Verificar prontidao D1 Preview 4X (somente leitura)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/d1-preview-readonly-health.yml"
+      - "scripts/check-d1-preview-readonly.mjs"
+      - "tests/d1-preview-readonly-health.test.js"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clash-of-izzy-preview-readonly-health
+  cancel-in-progress: false
+
+jobs:
+  preview-audit:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout only for canonical migration names
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Check fail-closed no-write audit contracts
+        run: node --test tests/d1-preview-readonly-health.test.js
+      - name: Read-only remote D1 Preview 4X readiness (no mutation)
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/check-d1-preview-readonly.mjs
