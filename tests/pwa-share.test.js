@@ -4,12 +4,11 @@ import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
-test("landing page exposes an accessible direct-share control", async () => {
-  const html = await read("index.html");
-  const script = await read("landing.js");
-  assert.ok(html.includes('id="share-game-button"'));
-  assert.ok(html.includes('id="share-game-status"'));
-  assert.ok(script.includes('shareButton?.addEventListener("click", shareGame)'));
+test("public landing exposes promotional Android APK download only", async () => {
+  const page = await read("portal.html");
+  assert.match(page, /id="download-apk"/);
+  assert.match(page, /assets\/brand\/hero-emblem\.svg/);
+  assert.doesNotMatch(page, /id="play-now"|href="\/kingdom\.html"|beforeinstallprompt/);
 });
 
 test("PWA sharing uses the OS share sheet with safe fallbacks and preserves referral codes", async () => {

@@ -1,5 +1,9 @@
 # Clash of Izzy
 
+**Distribuição Android:** o site público destina-se exclusivamente à divulgação e ao download de APK assinado; não disponibiliza um botão de jogar no navegador. O cliente Android usa WebView remoto para os módulos atuais. A versão ainda não foi implantada nem publicada oficialmente.
+
+Veja [guia de distribuição](docs/DISTRIBUICAO_APK_OFICIAL.md), [auditoria da candidata](docs/AUDITORIA_COMPLETA_2026-11-21.md) e [monetização segura](docs/MONETIZACAO_SEGURA.md).
+
 Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e persistência em Cloudflare D1.
 
 - 🧭 **Manual mestre v2.0 — integração ordenada:** [docs/MANUAL_V2_INTEGRACAO_ORDENADA.md](docs/MANUAL_V2_INTEGRACAO_ORDENADA.md)

@@ -2,10 +2,11 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
-test("entrada principal prioriza o reino e preserva a arena como modo secundário", async () => {
+test("homepage redireciona para o portal, sem link para jogar no navegador", async () => {
   const html = await readFile(new URL("../index.html", import.meta.url), "utf8");
-  assert.match(html, /id="play-now" href="\.\/kingdom\.html">⚔️ ENTRAR NO REINO/);
-  assert.match(html, /href="\.\/arena\.html"/);
+  assert.match(html, /http-equiv="refresh" content="0;url=\/portal\.html"/);
+  assert.match(html, /href="\/portal\.html"/);
+  assert.doesNotMatch(html, /id="play-now"|href="\.\/kingdom\.html"/);
 });
 
 test("central do reino consome estado e melhorias pela API autenticada", async () => {

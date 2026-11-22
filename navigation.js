@@ -6,6 +6,7 @@
 
   const links = [
     {label:"Início",href:"/index.html",icon:"⌂",keywords:"home início principal"},
+    {label:"Baixar aplicativo",href:"/portal.html",icon:"📲",keywords:"instalar android app download portal divulgação"},
     {label:"Meu reino",href:"/kingdom.html",icon:"🏰",keywords:"cidade castelo construções recursos edifícios reino"},
     {label:"Mercador & Heróis",href:"/market.html",icon:"⚖️",keywords:"mercador loja trocas aceleradores fragmentos heróis recursos estoque"},
     {label:"Minha conta",href:"/account.html",icon:"👤",keywords:"login cadastro senha acesso persistente conta comandante"} ,
@@ -17,6 +18,8 @@
   ];
 
   const path = location.pathname.replace(/\/$/,"") || "/index.html";
+  // Public routes never mount gameplay navigation.
+  if (path === "/index.html" || path === "/portal.html" || path === "/portal") return;
   const root = document.createElement("nav");
   root.className = "coi-global-nav";
   root.setAttribute("aria-label","Navegação principal");

@@ -1,0 +1,147 @@
+name: Publicar APK Android oficial
+
+on:
+  workflow_dispatch:
+    inputs:
+      versao:
+        description: "Versao Android (exemplo: 1.0.0)"
+        type: string
+        required: true
+      codigo_versao:
+        description: "VersionCode crescente (exemplo: 1)"
+        type: string
+        required: true
+      confirmacao:
+        description: "Digite PUBLICAR_APK_OFICIAL apos validar Android real, servidor e cobrancas"
+        type: string
+        required: true
+
+permissions:
+  contents: write
+
+concurrency:
+  group: clash-of-izzy-android-release
+  cancel-in-progress: false
+
+jobs:
+  publicar:
+    name: Testar, assinar, verificar e publicar APK
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      ANDROID_VERSION_NAME: ${{ inputs.versao }}
+      ANDROID_VERSION_CODE: ${{ inputs.codigo_versao }}
+      RELEASE_CONFIRMATION: ${{ inputs.confirmacao }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Validar autorizacao de publicacao e identificadores
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          [[ "$RELEASE_CONFIRMATION" == "PUBLICAR_APK_OFICIAL" ]] || { echo "::error::Confirmacao obrigatoria"; exit 1; }
+          [[ "$ANDROID_VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Versao semver invalida"; exit 1; }
+          [[ "$ANDROID_VERSION_CODE" =~ ^[1-9][0-9]{0,8}$ ]] || { echo "::error::VersionCode invalido"; exit 1; }
+          tag="v$ANDROID_VERSION_NAME"
+          if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "::error::Release $tag ja publicada; nao sobrescrever"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/$tag" >/dev/null; then
+            echo "::error::Tag $tag ja existe"
+            exit 1
+          fi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Instalar dependencias
+        run: npm install --ignore-scripts
+      - name: Verificar migracoes D1 locais
+        run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
+      - name: Rodar testes de sistema, seguranca e distribuicao
+        run: npm test
+      - name: Validar manifestos de assets e pacote Worker sem deploy
+        run: |
+          npm run assets:validate
+          npm run check
+      - name: Validar interface no Chromium
+        run: |
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: "8.11.1"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+      - name: Instalar Android SDK 35
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Validar assinatura privada de release
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_RELEASE_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          SIGNING_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          test -n "$KEYSTORE_B64" && test -n "$STORE_PASS" && test -n "$SIGNING_ALIAS" && test -n "$KEY_PASS" || {
+            echo "::error::Sem chave permanente: release abortada."
+            exit 1
+          }
+          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/clash-izzy-release.jks"
+          chmod 600 "$RUNNER_TEMP/clash-izzy-release.jks"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/clash-izzy-release.jks" >> "$GITHUB_ENV"
+      - name: Compilar release assinada
+        working-directory: android-sideload
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_RELEASE_STORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_RELEASE_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_RELEASE_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleRelease
+      - name: Verificar assinatura, tamanho e SHA-256
+        shell: bash
+        env:
+          CERT_PIN: ${{ vars.ANDROID_RELEASE_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          src=android-sideload/app/build/outputs/apk/release/app-release.apk
+          "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$src"
+          # A assinatura valida nao garante que a chave e a mesma de releases anteriores.
+          # Requer fixar o fingerprint SHA-256 publico do certificado de release.
+          expected_cert="$CERT_PIN"
+          normalized_cert="$(printf '%s' "$expected_cert" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          [[ "$normalized_cert" =~ ^[0-9a-f]{64}$ ]] || { echo "::error::Configure ANDROID_RELEASE_CERT_SHA256 como variavel de repositorio antes de publicar."; exit 1; }
+          actual_cert="$("$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --print-certs "$src" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr -d ':' | tr '[:upper:]' '[:lower:]')"
+          [[ "$actual_cert" == "$normalized_cert" ]] || { echo "::error::Certificado APK diferente do aprovado; release cancelada."; exit 1; }
+          package_info="$("$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$src" | sed -n '1p')"
+          [[ "$package_info" == *"name='com.clashofizzy.android'"* && "$package_info" == *"versionCode='$ANDROID_VERSION_CODE'"* && "$package_info" == *"versionName='$ANDROID_VERSION_NAME'"* ]] || { echo "::error::Pacote ou versao Android nao corresponde ao esperado."; exit 1; }
+          cp "$src" "$RUNNER_TEMP/clash-of-izzy-android.apk"
+          test -s "$RUNNER_TEMP/clash-of-izzy-android.apk"
+          (cd "$RUNNER_TEMP" && sha256sum clash-of-izzy-android.apk > clash-of-izzy-android.apk.sha256)
+          (cd "$RUNNER_TEMP" && sha256sum -c clash-of-izzy-android.apk.sha256)
+          echo "APK SHA-256: $(cut -d' ' -f1 "$RUNNER_TEMP/clash-of-izzy-android.apk.sha256")" >> "$GITHUB_STEP_SUMMARY"
+      - name: Publicar release oficial com APK e checksum
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          tag="v$ANDROID_VERSION_NAME"
+          gh release create "$tag" \
+            "$RUNNER_TEMP/clash-of-izzy-android.apk" \
+            "$RUNNER_TEMP/clash-of-izzy-android.apk.sha256" \
+            --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "Clash of Izzy Android $tag" \
+            --notes "APK Android assinado, instalado fora da Play Store. Confira a integridade pelo SHA-256. Requer internet e backend do jogo."
+      - name: Remover chave privada do runner
+        if: always()
+        run: rm -f "$RUNNER_TEMP/clash-izzy-release.jks"
