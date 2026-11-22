@@ -31,14 +31,15 @@ antes de declarar acesso exclusivamente via APK.
    do fingerprint do **certificado**. O workflow cancela o release se a variavel
    estiver ausente ou nao corresponder a assinatura do APK. O fingerprint nao
    e uma senha, mas a keystore e suas credenciais devem continuar privadas.
-4. Em GitHub Actions, executar `Publicar APK Android oficial` na `main`,
+4. Antes da compilação assinada, a rotina consulta `/api/health` do Worker de produção e exige `androidApiContract=eldoria-android-v1`, D1 saudável e `missingTables=[]`. Repete o teste imediatamente antes de publicar a release. **O host antigo de jogo não tem esse contrato e bloqueia o APK oficial até ocorrer o deploy integral.** Um build Android de teste não é uma release pública.
+5. Em GitHub Actions, executar `Publicar APK Android oficial` na `main`,
    informando `versao` (ex.: 1.0.0), `codigo_versao` crescente e
    `PUBLICAR_APK_OFICIAL` como confirmacao.
-5. A rotina exige testes, build assinado e apksigner; publica em GitHub
+6. A rotina exige testes, build assinado e apksigner; publica em GitHub
    Releases `clash-of-izzy-android.apk` junto com
    `clash-of-izzy-android.apk.sha256`. Nao faz deploy Cloudflare,
    nao migra D1 e nao inicia pagamentos.
-6. O portal consulta somente a ultima GitHub Release publica e **nao
+7. O portal consulta somente a ultima GitHub Release publica e **nao
    libera o download** sem os dois assets oficiais com URLs dentro
    de `github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases/download/`.
    Versoes em draft, pre-release e APKs de debug ficam invisiveis.
