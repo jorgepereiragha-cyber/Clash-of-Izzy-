@@ -87,3 +87,17 @@ export async function loadMarchCapacity(env,kingdomId,heroKey=null){
   if(!levels)throw new RangeError("Reino não encontrado");
   return calculateMarchCapacity({...levels,heroes:heroRows.results||[],heroKey});
 }
+
+
+// The number of simultaneous expeditions grows with the kingdom. Includes no
+// premium or pay-to-win extras, and is independent of troop capacity per march.
+export function calculateMarchSlots({castleLevel=1,militaryLevel=0,activeMarches=0}={}){
+  if(!Number.isSafeInteger(Number(activeMarches))||Number(activeMarches)<0)
+    throw new RangeError("Quantidade de marchas ativas inválida");
+  const castle=clampInt(castleLevel,1,30);
+  const military=clampInt(militaryLevel,0,30);
+  const max=Math.min(5,1+
+    (castle>=5?1:0)+(castle>=15?1:0)+(military>=5?1:0)+(military>=15?1:0));
+  const active=Number(activeMarches);
+  return {max,active,available:Math.max(0,max-active)};
+}
