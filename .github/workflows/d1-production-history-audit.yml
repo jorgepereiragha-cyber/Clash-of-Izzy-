@@ -1,0 +1,122 @@
+name: Auditar historico D1 producao (somente leitura)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - .github/workflows/d1-production-history-audit.yml
+
+permissions:
+  contents: read
+
+jobs:
+  history-audit:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout para conferir a sequencia canonica
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Auditar apenas nomes de migrations e de tabelas
+        shell: bash
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+          import re
+          import sys
+          import urllib.request
+
+          production_id = "7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          preview_id = "6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          if production_id == preview_id:
+              raise SystemExit("Production and Preview D1 identifiers must differ.")
+
+          token = os.environ.get("RAW_TOKEN", "").strip()
+          if token.lower().startswith("bearer "):
+              token = token[7:].strip()
+          if len(token) > 1 and token[0] == token[-1] and token[0] in ("'", '"'):
+              token = token[1:-1].strip()
+          account = os.environ.get("ACCOUNT_ID", "").strip()
+          if not token or any(c.isspace() for c in token) or not re.fullmatch("[a-fA-F0-9]{32}", account):
+              raise SystemExit("Cloudflare credentials unavailable; no D1 query attempted.")
+          print("::add-mask::" + token)
+          url = "https://api.cloudflare.com/client/v4/accounts/" + account + "/d1/database/" + production_id + "/query"
+
+          history_sql = "SELECT name FROM d1_migrations ORDER BY id"
+          tables_sql = ("SELECT name FROM sqlite_master WHERE type='table' AND "
+                        "name IN ('daily_reward_claims','onboarding_bonus_claims','support_orders')")
+          allowed_sql = {history_sql, tables_sql}
+          def read_only(sql):
+              if sql not in allowed_sql or not sql.startswith("SELECT "):
+                  raise SystemExit("Only whitelisted SELECT statements are permitted.")
+              request = urllib.request.Request(
+                  url,
+                  data=json.dumps({"sql": sql}).encode("utf-8"),
+                  method="POST",
+                  headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"},
+              )
+              with urllib.request.urlopen(request, timeout=30) as response:
+                  payload = json.load(response)
+              if payload.get("success") is not True or not isinstance(payload.get("result"), list):
+                  raise SystemExit("D1 read-only audit returned an invalid response.")
+              return payload["result"][0].get("results") or []
+
+          names = [str(item["name"]) for item in read_only(history_sql)]
+          existing = {str(item["name"]) for item in read_only(tables_sql)}
+          expected = []
+          for migration in pathlib.Path("migrations").glob("*.sql"):
+              match = re.match(r"^([0-9]{4})_.+\.sql$", migration.name)
+              if match and int(match.group(1)) <= 39:
+                  expected.append(migration.name)
+          expected.sort()
+
+          # The latest migration alone cannot detect an earlier missing file.
+          prefix_valid = bool(expected) and bool(names) and names == expected[:len(names)]
+          pending = expected[len(names):] if prefix_valid else []
+          last = names[-1] if names else None
+          required_tables = {"daily_reward_claims", "onboarding_bonus_claims", "support_orders"}
+          missing_tables = sorted(required_tables - existing)
+          repair_candidates = (
+              ["0037_daily_login_rewards.sql", "0038_onboarding_bonus.sql", "0039_support_orders.sql"],
+              ["0036_4x_read_indexes.sql", "0037_daily_login_rewards.sql",
+               "0038_onboarding_bonus.sql", "0039_support_orders.sql"],
+          )
+          exact_repair_candidate = (
+              prefix_valid
+              and last in {"0035_throne_war.sql", "0036_4x_read_indexes.sql"}
+              and pending in repair_candidates
+              and set(missing_tables) == required_tables
+          )
+          report = {
+              "mode": "read-only",
+              "writesPerformed": 0,
+              "latestMigration": last,
+              "coreHistoryExactPrefix": prefix_valid,
+              "pendingCoreMigrationNames": pending,
+              "missingRequiredTables": missing_tables,
+              "eligibleForCoreRepairReview": exact_repair_candidate,
+              "cloudflareProductionUuidVerified": True,
+              "cloudflarePreviewUuidDistinct": True,
+              "playerRowsRead": False,
+          }
+          print("D1_PRODUCTION_CORE_HISTORY=" + json.dumps(report, sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as output:
+              output.write("## D1 production history (read-only)\n")
+              output.write("- Exact migration prefix: " + str(prefix_valid) + "\n")
+              output.write("- Latest migration: " + str(last) + "\n")
+              output.write("- Missing core tables: " + ", ".join(missing_tables) + "\n")
+              output.write("- Candidate for protected repair review: " + str(exact_repair_candidate) + "\n")
+              output.write("- No game accounts, payment records, or player data queried.\n")
+          if not prefix_valid:
+              raise SystemExit("Migration history divergent: production write must remain blocked.")
+          PY
