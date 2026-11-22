@@ -72,6 +72,37 @@ try{
   const afterOverlap=(await game("/api/game/state")).data.state;
   report("overlap-does-not-debit",Number(afterOverlap.kingdom.wood)===Number(state.kingdom.wood)&&
     Number(afterOverlap.kingdom.stone)===Number(state.kingdom.stone));
+  const starterHero=state.heroInventory?.find(h=>h.hero_key==="kael_sunwarden");
+  report("starter-hero-owned",starterHero?.type==="infantaria");
+  const wronglySpecialized=await game("/api/game/action","POST",{
+    type:"assign_hero_to_building",building:"mill",heroKey:"kael_sunwarden"
+  });
+  report("wrong-hero-specialty-rejected",wronglySpecialized.status===400);
+  const beforeAssignmentPower=Number(afterOverlap.kingdom.defense_power);
+  const heroAssigned=await game("/api/game/action","POST",{
+    type:"assign_hero_to_defense",defense:"tower",heroKey:"kael_sunwarden"
+  });
+  assert.equal(heroAssigned.status,200,JSON.stringify(heroAssigned.data?.error));
+  report("owned-hero-assigned-to-tower",heroAssigned.data.state?.heroes?.some(h=>
+    h.hero_key==="kael_sunwarden"&&h.assigned_to==="defense:tower"));
+  report("assigned-hero-raises-only-tower-defense",Number(heroAssigned.data.state?.kingdom?.defense_power)>beforeAssignmentPower);
+  const repeated=await game("/api/game/action","POST",{
+    type:"assign_hero_to_defense",defense:"tower",heroKey:"kael_sunwarden"
+  });
+  report("repeat-hero-assignment-not-stacked",repeated.status===200&&
+    Number(repeated.data.state?.kingdom?.defense_power)===Number(heroAssigned.data.state?.kingdom?.defense_power));
+  const unassigned=await game("/api/game/action","POST",{
+    type:"unassign_hero_4x",heroKey:"kael_sunwarden"
+  });
+  report("hero-unassign-restores-defense",unassigned.status===200&&
+    Number(unassigned.data.state?.kingdom?.defense_power)===beforeAssignmentPower);
+  await db("UPDATE heroes SET level=10 WHERE kingdom_id=? AND hero_key='kael_sunwarden'",[kingdomId]);
+  await db("UPDATE hero_inventory SET level=10 WHERE kingdom_id=? AND hero_key='kael_sunwarden'",[kingdomId]);
+  const stagedHero=await game("/api/game/action","POST",{
+    type:"assign_hero_to_defense",defense:"tower",heroKey:"kael_sunwarden"
+  });
+  report("hero-level-10-visible-in-4x-state",stagedHero.status===200&&
+    stagedHero.data.state?.heroes?.some(h=>h.hero_key==="kael_sunwarden"&&Number(h.level)>=10));
   const mill=await game("/api/game/action","POST",{type:"industry_upgrade",industry:"mill"});
   assert.equal(mill.status,200,JSON.stringify(mill.data?.error));
   report("mill-level-2",Number(mill.data.state?.intermediateResources?.mill_level)===2);
@@ -120,6 +151,9 @@ try{
       const progression=await page.locator("#coiProgressionStatus").textContent();
       report("mobile-preview-progression",progression?.includes("P1")&&progression?.includes("XP"));
       report("mobile-preview-defense-catalog",(await page.locator("#coiDefenseType option").count())===3);
+      await page.locator("#coiHeroRole").selectOption("defense:tower");
+      const summary=await page.locator("#coiHeroSummary").textContent();
+      report("mobile-preview-assigned-hero",summary?.includes("Kael")&&await page.locator("#coiHeroUnassign").isEnabled());
       await page.locator("#coiDefenseType").selectOption("tower");
       await page.locator("#coiDefenseX").fill("20");
       await page.locator("#coiDefenseZ").fill("20");
