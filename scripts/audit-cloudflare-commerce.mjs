@@ -10,6 +10,7 @@ export const BINDINGS_TO_AUDIT=Object.freeze([
   Object.freeze({name:"NUBANK_PIX_KEY",kind:"present"}),
   Object.freeze({name:"NUBANK_PIX_ENABLED",kind:"true"}),
   Object.freeze({name:"NUBANK_PIX_RECEIVER_VERIFIED",kind:"true"}),
+  Object.freeze({name:"MASTER_PACK_ENABLED",kind:"true"}),
   Object.freeze({name:"GOOGLE_WEB_CLIENT_ID",kind:"present"})
 ]);
 function normalize(raw){
