@@ -53,9 +53,10 @@ function makeHeroState() {
     heroes: [hero],
     heroInventory: [heroCard],
     heroSummonOdds: [
-      { rarity: "white", chancePercent: 70, heroCount: 4, perHeroPercent: 17.5 },
-      { rarity: "blue", chancePercent: 25, heroCount: 5, perHeroPercent: 5 },
-      { rarity: "purple", chancePercent: 5, heroCount: 4, perHeroPercent: 1.25 },
+      { rarity: "white", chancePercent: 55, heroCount: 18, perHeroPercent: 3.0556 },
+      { rarity: "blue", chancePercent: 30, heroCount: 18, perHeroPercent: 1.6667 },
+      { rarity: "purple", chancePercent: 13, heroCount: 18, perHeroPercent: 0.7222 },
+      { rarity: "gold", chancePercent: 2, heroCount: 11, perHeroPercent: 0.1818 },
     ],
     heroEquipment: [],
     equipmentCatalog: [],
@@ -146,10 +147,10 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
   await expect(page.locator(".hero-roster-name")).toHaveText("Kael");
   await expect(page.locator(".hero-roster-portrait use")).toHaveAttribute("href", /portraits\.svg#kael$/);
   await expect(page.locator(".hero-roster-combat")).toContainText("ATQ +1.0%");
-  await expect(page.locator(".hero-summon-rates")).toContainText("17,5% por herói");
-  await expect(page.locator(".hero-summon-rates")).toContainText("1,25% por herói");
-  await expect(page.locator(".hero-summon-probability-note")).toContainText("40,13%");
-  await expect(page.locator(".hero-summon-probability-note")).toContainText("11,82%");
+  await expect(page.locator(".hero-summon-rates")).toContainText("3,06% por herói");
+  await expect(page.locator(".hero-summon-rates")).toContainText("0,18% por herói");
+  await expect(page.locator(".hero-summon-probability-note")).toContainText("18,29%");
+  await expect(page.locator(".hero-summon-probability-note")).toContainText("1,80%");
   await expect(page.locator("#hero-summon-one")).toBeEnabled();
   await expect(page.locator("#hero-summon-ten")).toBeEnabled();
 

@@ -445,7 +445,7 @@
       root.append(empty);
       return;
     }
-    const legendary=rows.find(row=>row.rarity==="purple");
+    const legendary=rows.find(row=>row.rarity==="gold");
     const rarityChance=Number(legendary?.chancePercent);
     const perHeroChance=Number(legendary?.perHeroPercent);
     if(Number.isFinite(rarityChance)&&Number.isFinite(perHeroChance)&&rarityChance>0&&perHeroChance>0){
@@ -453,7 +453,7 @@
       const formatPercent=value=>value.toLocaleString("pt-BR",{minimumFractionDigits:2,maximumFractionDigits:2});
       const note=document.createElement("p");
       note.className="hero-summon-intro hero-summon-probability-note";
-      note.textContent="Pacote de 10 convocações independentes: "+formatPercent(chanceInTen(rarityChance))+"% para obter ao menos 1 Lendário; "+formatPercent(chanceInTen(perHeroChance))+"% para obter um Lendário específico. Não há garantia.";
+      note.textContent="Pacote de 10 convocações independentes: "+formatPercent(chanceInTen(rarityChance))+"% para obter ao menos 1 Dourado; "+formatPercent(chanceInTen(perHeroChance))+"% para obter um Dourado específico. Não há garantia.";
       root.append(note);
     }
   }

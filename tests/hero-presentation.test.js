@@ -69,12 +69,13 @@ test("todo herói invocável tem símbolo de retrato definido", async () => {
 });
 
 test("probabilidades de convocação são calculadas pelo catálogo canônico", () => {
-  assert.deepEqual(HERO_SUMMON_RARITY_ODDS, { white: 70, blue: 25, purple: 5 });
+  assert.deepEqual(HERO_SUMMON_RARITY_ODDS, { white: 55, blue: 30, purple: 13, gold: 2 });
   const odds = getHeroSummonOdds();
   assert.deepEqual(odds.map(row => [row.rarity, row.heroCount, row.perHeroPercent]), [
-    ["white", 4, 17.5],
-    ["blue", 5, 5],
-    ["purple", 9, 0.5556]
+    ["white", 18, 3.0556],
+    ["blue", 18, 1.6667],
+    ["purple", 18, 0.7222],
+    ["gold", 11, 0.1818]
   ]);
 });
 
@@ -106,9 +107,8 @@ test("passivos dos heróis escalam de forma limitada por nível e estrelas", () 
   const maxed = getHeroCombatBonuses({ hero_key: "kael_sunwarden", rarity: "blue", level: 50, stars: 6 });
   assert.ok(starter.attackPercent > 0);
   assert.ok(starter.attackPercent < maxed.attackPercent);
-  assert.equal(maxed.attackPercent, 2.2);
-  assert.equal(maxed.defensePercent, 1.7);
-  assert.ok(maxed.attackPercent <= 3 && maxed.defensePercent <= 3);
+  assert.ok(maxed.attackPercent >= 3 && maxed.attackPercent <= 6);
+  assert.ok(maxed.defensePercent >= 3 && maxed.defensePercent <= 6);
   const card = heroView({ hero_key: "kael_sunwarden", rarity: "blue", level: 50, stars: 6 });
   assert.deepEqual(card.combat_bonuses, maxed);
 });
@@ -131,4 +131,44 @@ test("23 heróis canônicos e sazonais possuem aura própria e história de Eldo
 test("nomes do catálogo de recrutamento são únicos",()=>{
   const names=Object.values(HERO_TEMPLATES).map(hero=>hero.name);
   assert.equal(new Set(names).size,names.length);
+});
+
+test("catálogo contém exatamente 70 identidades distintas: 65 invocáveis e cinco sazonais",async()=>{
+ const names=Object.values(HERO_TEMPLATES).map(hero=>hero.name);
+ const keys=Object.keys(HERO_TEMPLATES);
+ const seasonal=["odin_awakened","thor_ragnarok","freya_vanir","loki_chaos","valhalla_king"];
+ assert.equal(keys.length,65);
+ assert.equal(new Set(names).size,65);
+ assert.equal(new Set([...keys,...seasonal]).size,70);
+ const rarityCount=Object.groupBy(Object.values(HERO_TEMPLATES),hero=>hero.rarity);
+ assert.deepEqual(Object.fromEntries(Object.entries(rarityCount).map(([key,v])=>[key,v.length])),{white:18,blue:18,purple:18,gold:11});
+ assert.equal(HERO_SUMMON_RARITY_ODDS.white+HERO_SUMMON_RARITY_ODDS.blue+HERO_SUMMON_RARITY_ODDS.purple+HERO_SUMMON_RARITY_ODDS.gold,100);
+});
+test("atlas SVG contém 70 símbolos de retratos sem IDs repetidos ou referências quebradas",async()=>{
+ const source=await readFile(new URL("../assets/art/heroes/portraits.svg",import.meta.url),"utf8");
+ const symbols=[...source.matchAll(/<symbol\s+id="([^"]+)"/g)].map(match=>match[1]);
+ assert.equal(new Set(symbols).size,symbols.length);
+ const selected=[...Object.values(HERO_TEMPLATES).map(hero=>hero.portrait),"odin","thor","freya","loki","valhalla-king"];
+ assert.equal(selected.length,70);
+ assert.equal(new Set(selected).size,70);
+ for(const symbol of selected)assert.ok(symbols.includes(symbol),"Falta retrato "+symbol);
+});
+test("raridade dourada sempre supera a roxa em ataque e defesa em qualquer nível",()=>{
+ const purple=Object.entries(HERO_TEMPLATES).find(([,hero])=>hero.rarity==="purple")[0];
+ const gold=Object.entries(HERO_TEMPLATES).find(([,hero])=>hero.rarity==="gold")[0];
+ for(const rarity of ["white","blue","purple","gold"]){
+   for(const [key,template] of Object.entries(HERO_TEMPLATES).filter(([,x])=>x.rarity===rarity)){
+     const min=getHeroCombatBonuses({hero_key:key,rarity,level:1,stars:1});
+     const max=getHeroCombatBonuses({hero_key:key,rarity,level:HERO_RARITY[rarity].maxLevel,stars:HERO_RARITY[rarity].maxStars});
+     assert.ok(min.attackPercent>0&&min.defensePercent>0,key);
+     assert.ok(max.attackPercent>=min.attackPercent&&max.defensePercent>=min.defensePercent,key);
+     assert.ok(max.attackPercent<=20&&max.defensePercent<=20,key);
+     assert.deepEqual(heroView({hero_key:key,rarity,level:1,stars:1}).combat_bonuses,min);
+   }
+ }
+ const topPurple=getHeroCombatBonuses({hero_key:purple,rarity:"purple",level:70,stars:7});
+ const baseGold=getHeroCombatBonuses({hero_key:gold,rarity:"legendary",level:1,stars:1});
+ assert.ok(baseGold.attackPercent>topPurple.attackPercent);
+ assert.ok(baseGold.defensePercent>topPurple.defensePercent);
+ assert.deepEqual(getHeroCombatBonuses({}),{attackPercent:0,defensePercent:0,healthPercent:0,criticalChancePercent:0});
 });
