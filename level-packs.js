@@ -1,5 +1,5 @@
 // Pacotes de progressao 4X independentes do VIP. Valores em centavos de BRL.
-// Valores P4-P8 alinhados ao protocolo de 22/11/2026; bloqueados ate validacao comercial e testes de pagamento.
+// Os valores P4-P8 sao PROPOSTAS, sujeitos a aprovacao comercial antes de ativar a flag.
 export const LEVEL_PACKS = Object.freeze([
   { level: 10, phase: "P1", name: "Pacote Lord Iniciante", priceCents: 990, gems: 500, resources: { wood: 5000, food: 5000 } },
   { level: 20, phase: "P2", name: "Pacote Senhor Feudal", priceCents: 2990, gems: 2000, resources: { wood: 20000, stone: 10000, iron: 5000 } },

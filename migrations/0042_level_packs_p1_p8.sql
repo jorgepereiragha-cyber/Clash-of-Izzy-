@@ -14,8 +14,8 @@ INSERT OR IGNORE INTO vip_packages(name,price_brl,gems) VALUES
   ('Pacote Lord Iniciante',9.90,500),
   ('Pacote Senhor Feudal',29.90,2000),
   ('Pacote Conde Soberano',59.90,5000),
-  ('Pacote Marques Real',89.90,8000),
-  ('Pacote Duque Imperial',129.90,12000),
-  ('Pacote Principe Soberano',179.90,17000),
-  ('Pacote Rei Supremo',229.90,23000),
-  ('Pacote Imperador Eterno',299.90,30000);
+  ('Pacote Marques Real',99.90,10000),
+  ('Pacote Duque Imperial',149.90,20000),
+  ('Pacote Principe Soberano',199.90,35000),
+  ('Pacote Rei Supremo',299.90,60000),
+  ('Pacote Imperador Eterno',499.90,100000);

@@ -1,150 +1,22 @@
-name: Aplicar migracoes 4X apenas no D1 Preview validado
+name: Legado 4X remote Preview migrate (desativado)
+
+# Fluxo antigo aposentado: o push em branch de feature nao pode alterar D1 remoto.
+# Para aplicar migracoes no Preview, usar somente o workflow manual
+# Prepare Clash of Izzy Preview D1 (isolated), com UUID confirmado,
+# declaracao de banco descartavel e autorizacao explicita.
 on:
-  push:
-    branches: [feat/4x-industries-defenses-p1-p8]
-    paths: [.github/workflows/4x-preview-migrate.yml]
+  workflow_dispatch:
+
 permissions:
   contents: read
-concurrency:
-  group: coi-4x-preview-controlled-migration
-  cancel-in-progress: false
+
 jobs:
-  migrate-preview:
+  legacy-disabled:
     runs-on: ubuntu-latest
-    timeout-minutes: 18
+    timeout-minutes: 2
     steps:
-      - name: Checkout exato da branch de expansao
-        uses: actions/checkout@v4
-        with:
-          persist-credentials: false
-      - name: Preparar Node 22 e Wrangler fixado no lockfile
-        uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-      - run: npm install --ignore-scripts --no-audit --no-fund
-      - name: Confirmar binding Preview, branch e exclusao de producao
+      - name: Exigir caminho canonico de homologacao isolada
         shell: bash
         run: |
-          set -euo pipefail
-          test "$GITHUB_REF" = "refs/heads/feat/4x-industries-defenses-p1-p8"
-          python3 - <<'PY'
-          import json
-          with open("wrangler.preview-migrations.jsonc") as f: preview=json.load(f)["d1_databases"][0]
-          with open("wrangler.jsonc") as f: prod=json.load(f)["d1_databases"][0]
-          assert preview["database_id"]=="6674c0ac-3636-4e57-bff8-23cf60ab9637"
-          assert preview["binding"]=="PREVIEW_DB"
-          assert preview["database_id"] != prod["database_id"]
-          assert prod["database_id"] == "7e63af59-d9ff-4159-a9cf-b02e35b92605"
-          assert preview["migrations_dir"] == "migrations"
-          print("Destino autenticado: somente Preview. Nenhum banco de producao selecionado.")
-          PY
-      - name: Normalizar credenciais Cloudflare sem expor valor
-        shell: bash
-        env:
-          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import os,re
-          token=os.environ.get("RAW_TOKEN","").strip()
-          if token.lower().startswith("bearer "): token=token[7:].strip()
-          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'): token=token[1:-1].strip()
-          account=os.environ.get("ACCOUNT_ID","").strip()
-          if not token or any(c.isspace() for c in token) or not re.fullmatch(r"[0-9a-fA-F]{32}",account):
-              raise SystemExit("Credenciais indisponiveis. Nao alterar Preview.")
-          print("::add-mask::"+token)
-          with open(os.environ["GITHUB_ENV"],"a",encoding="utf8") as output:
-              output.write("CLOUDFLARE_API_TOKEN="+token+"\n")
-              output.write("CLOUDFLARE_ACCOUNT_ID="+account+"\n")
-          PY
-      - name: Preflight D1 Preview remoto - ABORTAR se houver jogador/pagamento/dado real
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json,os,urllib.request,urllib.error
-          account=os.environ["CLOUDFLARE_ACCOUNT_ID"]
-          token=os.environ["CLOUDFLARE_API_TOKEN"]
-          database="6674c0ac-3636-4e57-bff8-23cf60ab9637"
-          endpoint=f"https://api.cloudflare.com/client/v4/accounts/{account}/d1/database/{database}/query"
-          def query(sql):
-              if not sql.startswith("SELECT "):raise SystemExit("Preflight somente SELECT.")
-              req=urllib.request.Request(endpoint,method="POST",data=json.dumps({"sql":sql}).encode(),
-                  headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
-              try:
-                  with urllib.request.urlopen(req,timeout=25) as resp: res=json.load(resp)
-              except urllib.error.HTTPError as e:raise SystemExit("Falha no D1 Preview HTTP "+str(e.code))
-              if not res.get("success") or not res.get("result"):raise SystemExit("Resposta D1 Preview invalida")
-              return res["result"][0]["results"]
-          tables={r["name"] for r in query("SELECT name FROM sqlite_master WHERE type='table'")}
-          required={"d1_migrations","players","kingdoms","kingdom_buildings","world_territories","vip_packages"}
-          if not required.issubset(tables):raise SystemExit("Preview tem schema incompleto: BLOQUEADO")
-          history=[row["name"] for row in query("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")]
-          if history!=["0035_throne_war.sql"]:
-              raise SystemExit("Historico alterado ou 0041 ja aplicado; nao repetir migracao manual.")
-          for name in ("players","kingdoms","kingdom_buildings","player_accounts","purchase_requests",
-                       "mercadopago_orders","support_orders","resource_ledger","army_units",
-                       "kingdom_queues","kingdom_events"):
-              if name in tables:
-                  count=int(query("SELECT COUNT(*) AS n FROM "+name)[0]["n"])
-                  if count:raise SystemExit("Preview contem dados reais ou persistidos em "+name+"; migracao bloqueada.")
-          world=query("SELECT territory_key,owner_kingdom_id FROM world_territories ORDER BY id LIMIT 10")
-          territory_count=int(query("SELECT COUNT(*) AS n FROM world_territories")[0]["n"])
-          if territory_count>1 or any(x["owner_kingdom_id"] is not None or
-                                      not str(x["territory_key"]).startswith("royal_throne_") for x in world):
-              raise SystemExit("Territorio nao reconhecido no Preview; migracao bloqueada.")
-          print("PREVIEW_PREFLIGHT_OK: historico 0035, zero jogadores/contas/pagamentos, "+
-                str(territory_count)+" trono global sem dono. Nenhum dado real alterado.")
-          PY
-      - name: Capturar estado Time Travel do D1 Preview
-        shell: bash
-        run: |
-          set -euo pipefail
-          npx wrangler --config wrangler.preview-migrations.jsonc d1 time-travel info PREVIEW_DB --json > "$RUNNER_TEMP/coi-preview-time-travel.json"
-          test -s "$RUNNER_TEMP/coi-preview-time-travel.json"
-      - name: Salvar estado anterior do Preview em artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coi-4x-preview-time-travel-${{ github.run_id }}
-          path: ${{ runner.temp }}/coi-preview-time-travel.json
-          retention-days: 30
-          if-no-files-found: error
-      - name: Listar migracoes pendentes sem escrita
-        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations list PREVIEW_DB --remote
-      - name: Aplicar apenas migracoes sequenciais no D1 Preview
-        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --remote
-      - name: Verificar schema e historico do Preview apos migracao
-        shell: bash
-        run: |
-          set -euo pipefail
-          python3 - <<'PY'
-          import json,os,urllib.request
-          account=os.environ["CLOUDFLARE_ACCOUNT_ID"]
-          token=os.environ["CLOUDFLARE_API_TOKEN"]
-          endpoint="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/6674c0ac-3636-4e57-bff8-23cf60ab9637/query"
-          def query(sql):
-              req=urllib.request.Request(endpoint,method="POST",data=json.dumps({"sql":sql}).encode(),
-                  headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
-              with urllib.request.urlopen(req,timeout=25) as response:r=json.load(response)
-              if not r.get("success"):raise SystemExit("D1 Preview nao confirmou a verificacao final.")
-              return r["result"][0]["results"]
-          history=[x["name"] for x in query("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 6")]
-          expected=[
-            "0041_4x_industries_defenses_progression.sql","0040_support_packages.sql",
-            "0039_support_orders.sql","0038_onboarding_bonus.sql",
-            "0037_daily_login_rewards.sql","0036_4x_read_indexes.sql"]
-          if history!=expected:raise SystemExit("Historico D1 Preview nao corresponde a 0036-0041 em ordem.")
-          tables={x["name"] for x in query("SELECT name FROM sqlite_master WHERE type='table'")}
-          needed={"intermediate_resources","city_defenses","kingdom_progression","progression_xp_ledger"}
-          if not needed.issubset(tables):raise SystemExit("Migracao 0041 incompleta: tabelas ausentes.")
-          for name in ("players","kingdoms","purchase_requests","mercadopago_orders","support_orders"):
-              if name in tables and int(query("SELECT COUNT(*) AS n FROM "+name)[0]["n"])!=0:
-                  raise SystemExit("Contagem inesperada no Preview: "+name)
-          print("PREVIEW_0041_CONFIRMED: migracoes 0036-0041 em ordem, tabelas 4X presentes, nenhuma conta real; PRODUCAO INTACTA.")
-          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as f:
-              f.write("## D1 Preview 4X - migracao remota validada\n\n")
-              f.write("- 0036 a 0041 aplicadas somente ao D1 Preview isolado.\n")
-              f.write("- Tabelas 4X confirmadas; contas reais e pagamentos zero.\n")
-              f.write("- Banco D1 de producao nao recebeu consulta nem escrita.\n")
-          PY
+          echo "::error::Workflow legado desativado. Use prepare-preview-d1.yml com confirmacao explicita e banco Preview descartavel."
+          exit 1

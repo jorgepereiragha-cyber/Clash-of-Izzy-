@@ -7,6 +7,17 @@ const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 test("P1-P8 possuem precos positivos, recompensas deterministicas e limites 10-80", () => {
   assert.deepEqual(LEVEL_PACKS.map(x => x.level),[10,20,30,40,50,60,70,80]);
   assert.deepEqual(LEVEL_PACKS.map(x => x.phase),["P1","P2","P3","P4","P5","P6","P7","P8"]);
+  // Catálogo canônico definido em centavos: não aceitar deriva entre preço, gemas e recursos.
+  assert.deepEqual(LEVEL_PACKS.map(x => [x.priceCents, x.gems, ...["wood","food","stone","iron","gold"].map(key => x.resources[key])]), [
+    [990,500,5000,5000,0,0,0],
+    [2990,2000,20000,0,10000,5000,0],
+    [5990,5000,50000,0,30000,15000,5000],
+    [9990,10000,100000,50000,50000,25000,10000],
+    [14990,20000,200000,100000,100000,50000,20000],
+    [19990,35000,350000,150000,150000,75000,30000],
+    [29990,60000,500000,250000,250000,100000,50000],
+    [49990,100000,1000000,500000,500000,200000,100000]
+  ]);
   for(const pack of LEVEL_PACKS){
     assert.equal(Number.isSafeInteger(pack.priceCents),true);
     assert.ok(pack.priceCents > 0 && pack.gems > 0);
@@ -64,6 +75,22 @@ test("migracao e integracao proíbem compra sem progresso e mantêm habilitacao 
   const mp=await read("mercadopago-orders.js");
   const arena=await read("arena.html");
   assert.match(migration,/UNIQUE \(kingdom_id,pack_level\)/);
+  for (const pack of LEVEL_PACKS) {
+    const price = (pack.priceCents / 100).toFixed(2);
+    assert.ok(migration.includes(`('${pack.name}',${price},${pack.gems})`), `Migração 0042 divergente: ${pack.phase}`);
+  }
+  const correction = await read("migrations/0043_fix_vip_catalog.sql");
+  assert.doesNotMatch(correction, /INSERT\s+OR\s+REPLACE/i);
+  for (const [name, formerCents, formerGems, cents, gems] of [
+    ["Pacote Marques Real",8990,8000,9990,10000],
+    ["Pacote Duque Imperial",12990,12000,14990,20000],
+    ["Pacote Principe Soberano",17990,17000,19990,35000],
+    ["Pacote Rei Supremo",22990,23000,29990,60000],
+    ["Pacote Imperador Eterno",29990,30000,49990,100000]
+  ]) {
+    assert.ok(correction.includes(`SET price_brl=${(cents/100).toFixed(2)},gems=${gems}`));
+    assert.ok(correction.includes(`name='${name}' AND ROUND(price_brl*100)=${formerCents} AND gems=${formerGems}`));
+  }
   assert.match(worker,/levelPacksEnabledForPlayer/);
   assert.match(worker,/getKingdomProgression\(env,kingdom.id\)/);
   assert.match(worker,/progression.level < levelPack.level/);
@@ -74,7 +101,7 @@ test("migracao e integracao proíbem compra sem progresso e mantêm habilitacao 
   assert.match(arena,/item.levelPack/);
 });
 
-test("catalogo P1-P8 segue os valores solicitados e migracao 0043 nao substitui IDs",async()=>{
+test("catalogo P1-P8 segue os valores solicitados e migracao 0044 nao substitui IDs",async()=>{
   const expected=[
     [10,990,500,5000,5000,0,0,0],
     [20,2990,2000,20000,0,10000,5000,0],

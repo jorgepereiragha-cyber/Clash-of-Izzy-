@@ -33,12 +33,12 @@ test("listeners de Valhalla não permanecem após perda do WebGL", () => {
   assert.match(renderer, /valhallaModeHandler = event =>/);
   assert.match(renderer, /removeEventListener\("coi:valhalla-mode", valhallaModeHandler\)/);
 });
-test("backup D1 jamais faz deploy/migração ou escreve no banco", () => {
-  assert.match(backup, /CONFIRM_D1_PRODUCTION_BACKUP/);
-  assert.match(backup, /wrangler d1 export/);
-  assert.match(backup, /--remote/);
-  assert.doesNotMatch(backup, /wrangler d1 (migrations apply|execute|import)/);
-  assert.match(backup, /sha256sum/);
+test("backup D1 legado bloqueia export em banco FTS5 e exige workflow protegido", () => {
+  assert.match(backup, /LEGADO DESATIVADO/);
+  assert.match(backup, /Time Travel/);
+  assert.match(backup, /Cloudflare Paid Readiness/);
+  assert.match(backup, /exit 2/);
+  assert.doesNotMatch(backup, /npx .*wrangler|wrangler d1 export|wrangler d1 migrations apply/);
 });
 
 test("grid aceita arraste por pointer capture, sem touch listeners passivos", () => {

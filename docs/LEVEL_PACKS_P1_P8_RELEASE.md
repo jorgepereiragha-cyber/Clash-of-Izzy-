@@ -1,7 +1,7 @@
 # Clash of Izzy — Pacotes P1–P8 (0042–0044): homologacao antes de comercializar
 
 ## Escopo implementado
-- Revisao do catalogo empilhada sobre a PR #236, que depende da #233, #229 e #223; nao executa qualquer migracao remota, deploy ou pagamento.
+- PRs #223, #229, #233 e #236 integradas na `main`. A etapa #238 adiciona apenas reconciliacao de catalogo 0044 e testes; nao executa migracao remota, deploy ou pagamento.
 - Reutiliza `vip_packages`, `purchase_requests`, o checkout `/v1/orders` e o webhook HMAC existentes.
 - Pacotes novos diferenciados pelo nome canonico em `level-packs.js`, com limiar de progressao 10,20,...80. P1-P8 do jogo permanecem separados de VIP 1-7.
 - Gemas creditadas exclusivamente em `players.gems`; madeira, comida, pedra, ferro e ouro em `kingdoms`.
@@ -12,19 +12,29 @@
 - A compra de pacote por nivel depende de sessao autenticada, nivel real de `kingdom_progression` no D1, preco e gemas congruentes com a configuracao, e Mercado Pago configurado. Pix manual e aprovacao manual nao criam novos pedidos de nivel.
 - Se dois pedidos pagos distintos tentarem reivindicar a mesma faixa, a concessao nao se repete. A segunda order fica sem `fulfilled_at` e demanda conciliacao/estorno manual; nao prometer reembolso automatico.
 
-## Valores do protocolo de 22/11/2026 (ainda bloqueados para venda)
-- P1: R$9,90 · 500 gemas; P2: R$29,90 · 2.000 gemas; P3: R$59,90 · 5.000 gemas.
-- P4: R$99,90 · 10.000 gemas; P5: R$149,90 · 20.000 gemas; P6: R$199,90 · 35.000 gemas.
-- P7: R$299,90 · 60.000 gemas; P8: R$499,90 · 100.000 gemas.
-Os recursos de cada fase estao em `level-packs.js`, nao na tabela `vip_packages`. O usuario forneceu os valores, mas **a liberacao comercial continua condicionada** a testes de checkout, aprovacao e flags: `LEVEL_PACKS_PROPOSED_PRICES_APPROVED` nao deve ser ativada automaticamente.
-A PR #238 originalmente propunha `0043_align_level_pack_catalog.sql` com UPDATE incondicional por nome; essa variante foi RETIRADA na correção de segurança. A PR #236 tem `0043_fix_vip_catalog.sql`, que atua somente sobre preco+gemas antigos conhecidos. A nova `0044_reconcile_level_packs.sql` usa pares legados exatos, preserva valores personalizados e nao altera o pacote se houver `purchase_requests` com status `pending` para o seu `product_id`. Se `0043_fix` ja corrigiu a linha, `0044` nao altera nada. A migracao `0044` nao recupera alteracoes indevidas que outra `0043` ja tenha feito; NAO aplicar duas variantes de `0043`. Antes de qualquer execucao remota, consultar pedidos pendentes e confirmar os dados reais no D1 Preview. Se existirem Orders em processamento ou preco divergente, conciliar com o provedor antes de ativar vendas. E fundamental inspecionar as cinco linhas e os IDs antes e depois; UPDATEs condicionais podem ser no-op sem produzir erro. O SQL de 0044 nao altera pedidos historicos e nao garante por si so uma migracao comercial aprovada.
-Atribuicoes e quantidades definitivas devem ser revisadas para equilibrar a economia, protecao do consumidor e nao prometer itens nao entregues.
+## Gate de integracao em etapas
+
+As migracoes `0042_level_packs_p1_p8.sql` e `0043_fix_vip_catalog.sql` ja constam da `main`. A PR #238 propoe `0044_reconcile_level_packs.sql`, mas nenhuma dessas migracoes foi homologada na nuvem nesta revisao. **Nao executar deploy protegido da producao nem liberar loja P1–P8 ate inspecionar e homologar as migracoes finais em D1 Preview.** Manter as flags comerciais em `"false"`.
+
+## Precos para aprovar
+Valores P1-P3 fornecidos: P1 R$9,90; P2 R$29,90; P3 R$59,90.
+**P4-P8 atualizados conforme o protocolo comercial recebido, mas ainda BLOQUEADOS para venda até validação de checkout e aprovação final do catálogo**: P4 R$99,90; P5 R$149,90; P6 R$199,90; P7 R$299,90; P8 R$499,90. O servidor e a interface bloqueiam compras P4-P8 enquanto `LEVEL_PACKS_PROPOSED_PRICES_APPROVED` nao estiver igual a `true`.
+Os preços e quantidades P4-P8 foram alinhados ao protocolo 7777x. Atribuicoes e quantidades definitivas devem ser revisadas para equilibrar a economia, protecao do consumidor e nao prometer itens nao entregues.
 Nenhuma flag pode ser ativada antes da aprovacao comercial de TODOS os valores vigentes.
+
+## Migração corretiva e preservação de IDs
+Se uma versão anterior da migração `0042` já foi aplicada em um ambiente de testes, `0043_fix_vip_catalog.sql` reconcilia **somente** os cinco pares de preços/gemas legados esperados. Usa `UPDATE` condicionado a nome, preço anterior e gemas anteriores; registros personalizados não coincidentes ficam intactos. **Não usar `INSERT OR REPLACE`**, porque pode substituir a linha e afetar referências. Em produção, validar esquema, estado da `d1_migrations`, backup e consultas antes de aplicar qualquer migração; nenhuma foi aplicada por esta PR.
+
+## Reconciliacao incremental 0044 (somente apos Preview)
+
+A `0043_fix_vip_catalog.sql` canonical foi preservada e verifica nome, preco legado, gemas antigas e ausencia de pedido pendente antes de atualizar. A versao antiga `0043_align_level_pack_catalog.sql` da PR #238 foi eliminada pela PR #243: **nunca aplicar as duas variantes 0043**. A nova `0044_reconcile_level_packs.sql` atualiza apenas os pares legados exatos de preco/gemas, mantendo intactos precos personalizados e pacotes com pedidos `pending`. Se a 0043 ja atualizou o registro, a 0044 nao modifica o mesmo registro (no-op).
+
+Migração SQL registrada como aplicada nao e repetida automaticamente. Portanto, valores bloqueados por pedidos pendentes exigem conciliacao e, caso necessario, **nova migracao corretiva revisada**; nao alterar manualmente o historico `d1_migrations`. Uma linha de pagamento aprovada no banco nao substitui verificacao pela API Sandbox do Mercado Pago, webhook autentico, entrega idempotente e conciliacao de possiveis pedidos sem beneficio. Revisar sempre as linhas de `vip_packages` e seus IDs antes e depois em D1 Preview isolado.
 
 ## Checklist de liberacao
 1. PR #223 revista e aprovada; #229 homologada e revisada. Rebase/retarget desta PR apos a ordem de merges. Validar testes e conflitos antes de qualquer merge.
 2. Criar backup D1 de producao, verificar integridade e capacidade de restaurar. Conferir nomes de tabelas e migracoes atuais de producao e preview, sem inferir a partir de documentacao antiga.
-3. Aplicar `0037–0044` em ordem e apenas quando houver UMA variante canonica de `0043`, com a `0044` condicional somente via pipeline protegido aprovado, apos teste em Preview. Obter evidencias `PRAGMA table_info` e SELECT de valores e indexes relevantes. Nunca rodar comandos de producao automaticamente.
+3. Aplicar `0037–0044` sequencialmente somente via pipeline protegido aprovado, apos teste em Preview. Obter evidencias `PRAGMA table_info` e SELECT de valores e indexes relevantes. Nunca rodar comandos de producao automaticamente.
 4. Rodar `node --test tests/level-packs.test.js tests/mercadopago-4x-integration.test.js`, `npm test`, `npm run check` e testes Android. O teste simulado **nao substitui** pagamento real do Sandbox do provedor.
 5. Configurar credenciais Mercado Pago de teste apenas em ambiente isolado, validar autenticacao do webhook, divergencia de valores, replay e pagamento duplicado entre pedidos distintos. Usar dados sinteticos; verificar os balances efetivos no D1 Preview.
 6. Testar troca de fase P1–P8, niveis 9/10, 19/20, 79/80, compra unica, concorrencia, compra pendente, pagamento recusado, cancelamento, disputa e estorno. Verificar que a ordem duplicada exige conciliacao.
