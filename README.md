@@ -1,8 +1,8 @@
 # Clash of Izzy
 
-**Distribuição Android:** o site público destina-se exclusivamente à divulgação e ao download de APK assinado; não disponibiliza um botão de jogar no navegador. O cliente Android usa WebView remoto para os módulos atuais. A versão ainda não foi implantada nem publicada oficialmente.
+**Distribuição Android:** o endereço público já abre a página promocional. O aplicativo Android carrega o jogo por WebView; a versão completa de Eldoria ainda depende das migrações e do deploy do backend. O APK oficial assinado **não foi publicado**.
 
-Veja [guia de distribuição](docs/DISTRIBUICAO_APK_OFICIAL.md), [auditoria da candidata](docs/AUDITORIA_COMPLETA_2026-11-21.md) e [monetização segura](docs/MONETIZACAO_SEGURA.md).
+Veja [guia de distribuição](docs/DISTRIBUICAO_APK_OFICIAL.md), [auditoria da candidata](docs/AUDITORIA_COMPLETA_2026-11-21.md) [monetização segura](docs/MONETIZACAO_SEGURA.md) e [status auditado do lançamento](docs/STATUS_LANCAMENTO_ANDROID.md).
 
 Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e persistência em Cloudflare D1.
 
@@ -10,12 +10,14 @@ Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e p
 
 ## Produção e release
 
-- 🎮 **Jogar:** [Clash of Izzy — Produção](https://clash-of-izzy.jorgepereiragha.workers.dev)
+- **Site de divulgação Android:** [Clash of Izzy](https://clash-of-izzy.jorgepereiragha.workers.dev)
+- **Portal isolado:** [Clash of Izzy — instalação](https://clash-of-izzy-portal.jorgepereiragha.workers.dev)
+- **APK oficial:** [GitHub Releases](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases) — nenhuma release assinada disponível na última auditoria.
 - 📘 **Relatório oficial:** [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 - ⚙️ **Deploy final validado:** [GitHub Actions — run #43872671573](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671573)
 - ✅ **CI final validada:** [GitHub Actions — run #43872671700](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671700)
 
-Release Visual Premium e Gravador Cinematográfico publicada em 16/11/2026. O deploy final aprovou 224 testes automatizados, publicação do Worker/assets e smoke test de produção. O cache atual do Service Worker na branch `main` auditada é v26. A validação automática confirma que os módulos do gravador estão publicados; a gravação física pós-deploy no Android continua sendo uma conferência recomendada.
+Histórico: Release Visual Premium e Gravador Cinematográfico publicada em 16/11/2026. O deploy final aprovou 224 testes automatizados, publicação do Worker/assets e smoke test de produção. O cache atual do Service Worker na branch `main` auditada é v26. A validação automática confirma que os módulos do gravador estão publicados; a gravação física pós-deploy no Android continua sendo uma conferência recomendada.
 
 ## Desenvolvimento local
 
