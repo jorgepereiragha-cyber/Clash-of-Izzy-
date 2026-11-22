@@ -6,7 +6,9 @@
 - Pacotes novos diferenciados pelo nome canonico em `level-packs.js`, com limiar de progressao 10,20,...80. P1-P8 do jogo permanecem separados de VIP 1-7.
 - Gemas creditadas exclusivamente em `players.gems`; madeira, comida, pedra, ferro e ouro em `kingdoms`.
 - `level_pack_claims` reserva uma concessao por (kingdom_id,pack_level); insercao, gemas e recursos dentro do D1.batch transacional existente.
-- `LEVEL_PACKS_ENABLED` **desligado por padrao**. Novas ofertas nao aparecem no catalogo nem admitem checkout quando a flag esta ausente; pedidos pendentes tambem nao abrem checkout com a flag desligada.
+- `LEVEL_PACKS_ENABLED` **desligado por padrao**. Novas ofertas nao aparecem no catalogo nem admitem checkout quando a flag esta ausente.
+- Liberacao granular: habilitar `GAME_4X_SYSTEMS_ENABLED=true`, `LEVEL_PACKS_ENABLED=true` e `LEVEL_PACKS_TEST_PLAYER_IDS` como lista de IDs publicos de teste, separados por virgula. Enquanto `LEVEL_PACKS_PUBLIC_ENABLED` nao for `true`, apenas essa allowlist pode visualizar/criar checkout. **Nunca habilitar publico sem checklist concluido**.
+- O cliente envia o token autenticado ao consultar `/api/store/catalog`; nenhum token deve aparecer no HTML ou nos logs.
 - A compra de pacote por nivel depende de sessao autenticada, nivel real de `kingdom_progression` no D1, preco e gemas congruentes com a configuracao, e Mercado Pago configurado. Pix manual e aprovacao manual nao criam novos pedidos de nivel.
 - Se dois pedidos pagos distintos tentarem reivindicar a mesma faixa, a concessao nao se repete. A segunda order fica sem `fulfilled_at` e demanda conciliacao/estorno manual; nao prometer reembolso automatico.
 
@@ -24,7 +26,7 @@ Nenhuma flag pode ser ativada antes da aprovacao comercial de TODOS os valores v
 5. Configurar credenciais Mercado Pago de teste apenas em ambiente isolado, validar autenticacao do webhook, divergencia de valores, replay e pagamento duplicado entre pedidos distintos. Usar dados sinteticos; verificar os balances efetivos no D1 Preview.
 6. Testar troca de fase P1–P8, niveis 9/10, 19/20, 79/80, compra unica, concorrencia, compra pendente, pagamento recusado, cancelamento, disputa e estorno. Verificar que a ordem duplicada exige conciliacao.
 7. Revisar UX da loja, acessibilidade, desempenho e APK assinado em Android fisico. Não declarar Android apto apenas por emulador.
-8. Ativar `GAME_4X_SYSTEMS_ENABLED` no ambiente de teste primeiro. Somente depois, ativar `LEVEL_PACKS_ENABLED` nas contas de homologacao. **A flag atual e global**; segmentacao por administrador exige mecanismo adicional e NAO esta implementada por esta PR.
+8. Ativar `GAME_4X_SYSTEMS_ENABLED=true` em staging primeiro, e depois `LEVEL_PACKS_ENABLED=true` com `LEVEL_PACKS_TEST_PLAYER_IDS` definido apenas para contas de teste. Confirmar que outras contas nao visualizam nem criam checkout. `LEVEL_PACKS_PUBLIC_ENABLED=true` autoriza o publico e deve permanecer ausente ate homologacao completa.
 9. Confirmar forma de rollback de Worker e flags; monitorar logs e saldos por 24h ou janela aprovada; liberar ao publico somente apos evidencias.
 
 ## Nota de segurança
