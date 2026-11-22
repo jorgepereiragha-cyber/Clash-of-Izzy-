@@ -55,5 +55,5 @@ test("3D siege demo is independent of game transactions and playable on mobile",
   assert.match(visual, /THREE\.BoxGeometry/);
   assert.match(visual, /setPixelRatio\(Math\.min\(window\.devicePixelRatio \|\| 1, 1\.25\)\)/);
   assert.match(visual, /webglcontextlost/);
-  assert.doesNotMatch(page + visual + logic, /fetch\(|\/api\/game\/action|env\.DB|MercadoPago|PIX/i);
+  assert.doesNotMatch(page + visual + logic, /fetch\(|\/api\/game\/action|env\.DB|MercadoPago|\bPIX\b/i);
 });
