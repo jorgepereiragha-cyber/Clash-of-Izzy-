@@ -1,0 +1,78 @@
+name: Diagnostico D1 Preview - somente leitura
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/diagnostico-d1-preview-readonly.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clash-izzy-preview-readonly-diagnostic
+  cancel-in-progress: false
+
+jobs:
+  diagnosticar:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Inventariar apenas metadados e contagens do D1 Preview
+        shell: bash
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, re, urllib.error, urllib.request
+          token=os.environ.get("RAW_TOKEN","").strip()
+          if token[:7].lower()=="bearer ": token=token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):
+              token=token[1:-1].strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if not token or any(c.isspace() for c in token) or not re.fullmatch(r"[0-9a-fA-F]{32}",account):
+              raise SystemExit("Credenciais de auditoria indisponiveis.")
+          print("::add-mask::"+token)
+          preview="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          production="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          if preview==production:raise SystemExit("Erro de isolamento D1: Preview coincide com producao.")
+          url="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/"+preview+"/query"
+          def read_only(sql):
+              if not (sql.startswith("SELECT ") or sql.startswith("PRAGMA table_info(")):
+                  raise SystemExit("Diagnostico exige comando somente leitura.")
+              req=urllib.request.Request(url,method="POST",data=json.dumps({"sql":sql}).encode(),
+                  headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+              try:
+                  with urllib.request.urlopen(req,timeout=25) as response: obj=json.loads(response.read().decode())
+              except urllib.error.HTTPError as e:
+                  raise SystemExit("D1 Preview respondeu HTTP "+str(e.code))
+              if not obj.get("success"):raise SystemExit("D1 Preview recusou consulta de inventario.")
+              return obj["result"][0]["results"]
+          names={r["name"] for r in read_only(
+              "SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+          safe=sorted(x for x in names if re.fullmatch(r"[A-Za-z0-9_]{1,64}",x))
+          expected={"kingdom_dragons","kingdom_mailbox","master_bonus_claims",
+              "google_account_links","google_auth_challenges","realm_openings",
+              "realm_thrones","throne_assaults"}
+          report={"previewOnly":True,"tableNames":safe[:100],"essentialTablesPresent":sorted(expected&names),
+              "essentialTablesMissing":sorted(expected-names)}
+          if "d1_migrations" in names:
+              rows=read_only("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 12")
+              report["lastMigrations"]=[r["name"] for r in rows if
+                  isinstance(r.get("name"),str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,100}",r["name"])]
+          else:report["lastMigrations"]=[]
+          allowed=("players","kingdoms","player_accounts","purchase_requests","mercadopago_orders",
+              "world_territories","realm_openings","realm_thrones","throne_assaults")
+          counts={}
+          for name in allowed:
+              if name in names:
+                  rows=read_only("SELECT COUNT(*) AS total FROM "+name)
+                  counts[name]=int(rows[0]["total"])
+          report["aggregateCounts"]=counts
+          print(json.dumps(report,ensure_ascii=False,sort_keys=True))
+          print("Somente SELECT em D1 Preview; nenhum dado pessoal, pedido ou segredo exibido.")
+          PY
