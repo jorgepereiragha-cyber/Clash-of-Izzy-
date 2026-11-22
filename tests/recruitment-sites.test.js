@@ -33,6 +33,9 @@ test("recruitment landmarks do not bypass the D1 building allowlist, economy or 
   assert.match(city, /id="coiSummonAltar"/);
   assert.match(city, /id="coiDragonNest"/);
   assert.match(worker, /type==="dragon_unlock"/);
+  assert.match(worker, /type==="dragon_upgrade"/);
+  assert.match(worker, /bond=MIN\(100,bond\+2\)/);
+  assert.match(city, /costs=\{food:250\*level,wood:150\*level,stone:100\*level,iron:25\*level\}/);
   assert.match(worker, /type==="hero_summon"/);
   assert.doesNotMatch(city, /type:"dragon_hatch"|type:"dragon_feed"|type:"hero_summon"/);
 });
