@@ -1,4 +1,4 @@
-name: Homologar D1 Preview - migracoes ate 0030
+name: Homologar D1 Preview - migracoes ate 0035
 
 on:
   push:
@@ -112,7 +112,7 @@ jobs:
           if-no-files-found: error
       - name: Aplicar migrations ao banco Preview isolado (nunca producao)
         run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --remote
-      - name: Verificar esquema completo e 0030 no Preview
+      - name: Verificar esquema completo ate 0035 no Preview
         env:
           ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
@@ -122,19 +122,30 @@ jobs:
           account=os.environ["ACCOUNT_ID"]
           db="6674c0ac-3636-4e57-bff8-23cf60ab9637"
           url="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/"+db+"/query"
-          sql="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('players','kingdoms','player_accounts','purchase_requests','mercadopago_orders','kingdom_dragons','kingdom_mailbox','master_bonus_claims','d1_migrations')"
+          sql="SELECT name FROM sqlite_master WHERE type='table' AND name IN ('players','kingdoms','player_accounts','purchase_requests','mercadopago_orders','kingdom_dragons','kingdom_mailbox','master_bonus_claims','google_account_links','google_auth_challenges','realm_openings','realm_thrones','throne_assaults','d1_migrations')"
           req=urllib.request.Request(url,data=json.dumps({"sql":sql}).encode(),method="POST",headers={
             "Authorization":"Bearer "+token,"Content-Type":"application/json"})
           with urllib.request.urlopen(req,timeout=25) as response: value=json.loads(response.read().decode())
           if not value.get("success"): raise SystemExit("D1 Preview nao confirmou o esquema.")
           present={row["name"] for row in value["result"][0]["results"]}
-          expected={"players","kingdoms","player_accounts","purchase_requests","mercadopago_orders","kingdom_dragons","kingdom_mailbox","master_bonus_claims","d1_migrations"}
+          expected={"players","kingdoms","player_accounts","purchase_requests","mercadopago_orders","kingdom_dragons","kingdom_mailbox","master_bonus_claims","google_account_links","google_auth_challenges","realm_openings","realm_thrones","throne_assaults","d1_migrations"}
           if present!=expected: raise SystemExit("Tabelas de Preview incompletas: "+str(sorted(expected-present)))
-          sql="SELECT COUNT(*) AS total FROM d1_migrations WHERE name='0030_dragons_master_mailbox.sql'"
+          sql="SELECT COUNT(*) AS total FROM d1_migrations WHERE name IN ('0030_dragons_master_mailbox.sql','0031_entry_package_399.sql','0032_daily_packages.sql','0033_google_account_links.sql','0034_progressive_realms.sql','0035_throne_war.sql')"
           req=urllib.request.Request(url,data=json.dumps({"sql":sql}).encode(),method="POST",headers={
             "Authorization":"Bearer "+token,"Content-Type":"application/json"})
           with urllib.request.urlopen(req,timeout=25) as response: value=json.loads(response.read().decode())
-          if int(value["result"][0]["results"][0]["total"])!=1:
-            raise SystemExit("Migration 0030 nao confirmada no Preview.")
-          print("PASSOU: D1 Preview isolado com esquema 0030 e 9 tabelas esperadas; producao nao modificada.")
+          if not value.get("success") or int(value["result"][0]["results"][0]["total"])!=6:
+            raise SystemExit("Migrations 0030-0035 nao confirmadas no Preview.")
+          # Preview era vazio; validar mundo 1 desbloqueado e escudo inicial do trono por 35 dias.
+          sql=("SELECT (SELECT COUNT(*) FROM realm_openings) AS mundos, "
+               "(SELECT COUNT(*) FROM realm_thrones t JOIN realm_openings r ON r.realm_id=t.realm_id "
+               "WHERE t.realm_id=1 AND t.shield_until=datetime(r.unlocked_at,'+35 days')) AS tronos")
+          req=urllib.request.Request(url,data=json.dumps({"sql":sql}).encode(),method="POST",headers={
+            "Authorization":"Bearer "+token,"Content-Type":"application/json"})
+          with urllib.request.urlopen(req,timeout=25) as response: value=json.loads(response.read().decode())
+          if not value.get("success"): raise SystemExit("D1 Preview nao confirmou regras do trono.")
+          row=value["result"][0]["results"][0]
+          if int(row["mundos"])!=1 or int(row["tronos"])!=1:
+            raise SystemExit("Mundos ou escudo inicial de 35 dias nao conferem no D1 Preview.")
+          print("PASSOU: D1 Preview isolado, migrations 0030-0035, 14 tabelas essenciais, reino 1 e trono com escudo de 35 dias. Producao nao modificada.")
           PY
