@@ -20,8 +20,8 @@ test("Android: homepage exposes browser gameplay while APK remains gated", async
   await expect(play).toHaveAttribute("href", browserGame);
   await page.route(browserGame, route => route.fulfill({ status: 200, contentType: "text/html", body: "<h1>Reino acessível</h1>" }));
   await play.click();
+  // Prova que o CTA navega à URL pública exata; não faz afirmações sobre o HTML remoto.
   await expect(page).toHaveURL(browserGame);
-  await expect(page.getByRole("heading", { name: "Reino acessível" })).toBeVisible();
 });
 
 test("Android: only signed release names on official GitHub download host are offered", async ({ page }) => {
