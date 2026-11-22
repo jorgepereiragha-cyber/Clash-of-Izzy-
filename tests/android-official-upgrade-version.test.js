@@ -6,9 +6,9 @@ const official = readFileSync(new URL("../.github/workflows/publicar-apk-android
 const candidate = readFileSync(new URL("../.github/workflows/android-candidate-apk.yml", import.meta.url), "utf8");
 
 test("first public release upgrades the existing signed internal candidate", () => {
-  assert.ok(candidate.includes('ANDROID_VERSION_CODE: "1"'));
-  assert.ok(official.includes("ANDROID_VERSION_CODE > 1"));
-  assert.ok(official.includes("VersionCode deve ser >= 2"));
+  assert.ok(candidate.includes('ANDROID_VERSION_CODE: "2"'));
+  assert.ok(official.includes("ANDROID_VERSION_CODE > 2"));
+  assert.ok(official.includes("VersionCode deve ser >= 3"));
 });
 
 test("public release still requires manual confirmation, signed certificate, server and payment gates", () => {
