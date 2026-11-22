@@ -79,3 +79,21 @@ O site **nao fornece um APK ficticio** nem instala builds de teste como se fosse
 Se ainda nao existe release, consulte [o workflow oficial](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/publicar-apk-android.yml). O preflight verifica **antes** de testes demorados a presenca dos quatro GitHub Actions Secrets de assinatura e da variable `ANDROID_RELEASE_CERT_SHA256`; o certificado sera comparado com o arquivo assinado no final da compilacao. Configure a keystore e as senhas somente no gerenciador privado de Secrets do GitHub, nunca no codigo-fonte, no portal ou em mensagens. Nao use certificado de debug para uma release comercial.
 
 O workflow oficial continua exigindo autorizacao explicita, `main`, CI, APK assinado, verificacao de hash e contrato de backend antes de publicar. Se o workflow nao tiver sido executado ou falhar, **nenhum download comercial deve ser anunciado**. Builds de teste ficam apenas nos artefatos privados/temporarios de GitHub Actions.
+
+## Diagnóstico de assinatura de 22/11/2026
+
+O job [Diagnóstico seguro dos requisitos de assinatura Android](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/44989351914) falhou ao abrir a keystore com `ANDROID_RELEASE_STORE_PASSWORD`. A decodificação Base64 passou; **não** é seguro concluir que a senha está correta ou que o conteúdo decodificado é uma keystore válida. Antes de repetir a publicação, conferir o arquivo `.jks` ORIGINAL e a senha **localmente**, sem copiar qualquer segredo para comentários, conversas ou arquivos versionados.
+
+Somente depois de confirmar o par keystore/senha, atualizar o secret correspondente no GitHub e executar novamente o diagnóstico. Se a chave tiver sido exposta, substituir a identidade de assinatura **antes do primeiro lançamento oficial** e conservar cópia offline segura; se já houver usuários instalados com uma chave anterior, planejar a migração, pois a troca de chave normalmente impede atualização direta com a mesma identidade.
+
+A auditoria remota do Cloudflare aprovou Worker, sessão e D1, mas a confirmação de **Workers Paid** retornou HTTP 403 na consulta de Billing. Não assinalar a opção de plano pago no fluxo de deploy antes de confirmar assinatura e limites de gastos diretamente no Dashboard.
+
+## Verificação de desenvolvedor Android (Brasil, 2026–2027)
+
+O Google iniciou em **30 de setembro de 2026** a exigência de verificação para lojas participantes em regiões selecionadas, incluindo o Brasil. Na etapa inicial, o **download direto do APK pelo site não foi abrangido** pela exigência dessas lojas, mas o Google recomenda preparar o registro para a expansão global em 2027. Para distribuição comercial exclusivamente fora da Play Store, utilizar o **Android Developer Console** para registrar a identidade do desenvolvedor, nome do pacote e certificado de assinatura. Isso é uma obrigação operacional externa e não pode ser confirmado apenas pelos testes do GitHub.
+
+- Documentação oficial: https://developer.android.com/developer-verification
+- Perguntas frequentes sobre instalação direta: https://developer.android.com/developer-verification/guides/faq
+- Assinatura e continuidade de atualizações: https://developer.android.com/studio/publish/app-signing
+
+**Bloqueios mantidos até a liberação:** assinatura de release validada, versão de backend compatível, confirmação do plano/custos, testes em aparelho físico e revisão dos fluxos de pagamentos.
