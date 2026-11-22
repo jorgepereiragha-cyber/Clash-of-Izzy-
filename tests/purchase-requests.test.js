@@ -12,8 +12,9 @@ test("purchase requests require a valid player session and a stable idempotency 
   assert.ok(worker.includes("purchase-request-player"));
   assert.ok(worker.includes("requestKey"));
   assert.ok(worker.includes("payment_method,payment_reference,request_key"));
-  assert.ok(worker.includes('requestedPaymentMethod!=="mercadopago_link"'));
-  assert.ok(worker.includes('const paymentMethod="mercadopago_link"'));
+  assert.ok(worker.includes('["mercadopago_link","pix"].includes(requestedPaymentMethod)'));
+  assert.ok(worker.includes('NUBANK_PIX_ENABLED'));
+  assert.ok(worker.includes('const paymentMethod=requestedPaymentMethod'));
 });
 
 test("Master approval queue is protected by admin session and grants packages only once", async () => {
@@ -41,7 +42,8 @@ test("official store submits an auditable payment request instead of opening Wha
   assert.ok(arena.includes('id="purchaseReference"'));
   assert.ok(arena.includes("https://link.mercadopago.com.br/pagamentosskin"));
   assert.ok(arena.includes("mercadopago_link"));
-  assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i);
+  assert.ok(arena.includes('<option value="pix" disabled>'));
+  assert.doesNotMatch(arena, /<option\\b[^>]*value=["'](?:bank_transfer|manual)["']/i);
   assert.ok(arena.includes('id="whatsapp"'));
 });
 
@@ -50,7 +52,7 @@ test("purchase schema restricts products, states, payment methods and duplicate 
   assert.ok(migration.includes("CHECK (product_kind IN ('vip_package','skin'))"));
   assert.ok(migration.includes("CHECK (status IN ('pending','approved','rejected'))"));
   assert.ok(migration.includes("CHECK (payment_method IN ('mercadopago_link','pix','bank_transfer','manual'))"));
-  // Legacy payment values remain readable for historical orders; new API requests are Mercado Pago only.
+  // Legacy payment values remain readable; new requests permit Mercado Pago or gated, manual Nubank Pix.
   assert.ok(migration.includes("UNIQUE (player_id, request_key)"));
   assert.ok(migration.includes("idx_purchase_requests_status_created"));
   assert.ok(migration.includes("idx_purchase_requests_one_pending_product"));

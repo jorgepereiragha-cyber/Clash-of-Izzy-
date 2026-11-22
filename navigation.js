@@ -6,6 +6,7 @@
 
   const links = [
     {label:"Início",href:"/index.html",icon:"⌂",keywords:"home início principal"},
+    {label:"Portal do jogo",href:"/portal.html",icon:"📲",keywords:"aplicativo instalar celular android apk pwa pagamento nubank pix mercado pago loja"},
     {label:"Meu reino",href:"/kingdom.html",icon:"🏰",keywords:"cidade castelo construções recursos edifícios reino"},
     {label:"Minha conta",href:"/account.html",icon:"👤",keywords:"login cadastro senha acesso persistente conta comandante"} ,
     {label:"Mapa mundial",href:"/world.html",icon:"🌍",keywords:"territórios exploração marchas mapa mundo"},
@@ -16,6 +17,9 @@
   ];
 
   const path = location.pathname.replace(/\/$/,"") || "/index.html";
+  // As paginas publicas sao exclusivamente de divulgacao e download.
+  // A navegacao de jogo permanece apenas nas telas internas do cliente Android.
+  if (path === "/index.html" || path === "/portal.html") return;
   const root = document.createElement("nav");
   root.className = "coi-global-nav";
   root.setAttribute("aria-label","Navegação principal");
