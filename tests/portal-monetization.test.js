@@ -31,7 +31,9 @@ test('Nubank Pix cannot be selected until a server flag enables the assisted wor
   assert.match(worker, /requestedPaymentMethod==="pix" && !nubankPixReady\(env\)/);
   assert.match(worker, /"NUBANK_PIX_NOT_CONFIGURED"/);
   assert.match(arena, /<option value="pix" disabled>/);
-  assert.match(arena, /pixOption\.disabled=methods\.nubankPix!==true/);
+  assert.match(arena, /pixOption\.disabled=!paymentMethodStatus\.nubankPix/);
+  assert.match(arena, /paymentMethodStatus=\{known:true,mercadoPago:methods\.mercadoPago===true,nubankPix:methods\.nubankPix===true\}/);
+  assert.match(arena, /mpOption\.disabled=!paymentMethodStatus\.mercadoPago/);
   assert.match(arena, /if\(paymentMethod==='pix'\)/);
   assert.match(arena, /'Pedido #'/);
   assert.match(arena, /Solicitar cobrança Nubank Pix/);
