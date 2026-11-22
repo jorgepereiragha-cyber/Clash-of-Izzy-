@@ -152,3 +152,21 @@ test("production smoke refuses insecure URLs and missing authentication boundari
     /deve exigir sessão/
   );
 });
+
+test("production smoke aceita entrada exclusivamente promocional com APK oficial", async () => {
+  const { fetchImpl: legacy } = successfulFetch();
+  const fetchImpl = async url => {
+    const path = new URL(url).pathname;
+    if (path === "/index.html") return makeResponse(
+      '<html><meta http-equiv="refresh" content="0;url=/portal.html"><a href="/portal.html">Baixar aplicativo</a></html>',
+      200, "text/html; charset=utf-8");
+    if (path === "/portal.html") return makeResponse(
+      '<html><h1>CLASH OF IZZY</h1><a id="download-apk">Baixar aplicativo Android</a><script>fetch("releases/latest");const ext=".sha256";</script></html>',
+      200, "text/html; charset=utf-8");
+    if (path === "/styles/coi-theme.css") return makeResponse("body{color:white}",200,"text/css; charset=utf-8");
+    return legacy(url);
+  };
+  const result = await runProductionSmokeTests({ baseUrl: "https://clash-of-izzy.example.workers.dev", fetchImpl });
+  assert.equal(result.checks.androidPortalUi, true);
+  assert.equal(result.checks.betaSignupUi, false);
+});
