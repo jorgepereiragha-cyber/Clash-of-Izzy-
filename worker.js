@@ -28,6 +28,7 @@ import { isDailyPackage, DAILY_PACKAGE_COOLDOWN_HOURS } from "./daily-package-of
 import { CASTLE_MAX_LEVEL, CASTLE_VIP_MAX_LEVEL, getCastleVipBonuses, getCastleVipState } from "./castle-vip.js";
 import { handleDailyReward } from "./daily-rewards.js";
 import { handleOnboarding } from "./onboarding-bonus.js";
+import { createSupportCheckout } from "./support-orders.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -1963,7 +1964,7 @@ export default {
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","daily_reward_claims","onboarding_bonus_claims","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
+    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","daily_reward_claims","onboarding_bonus_claims","support_orders","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -2006,7 +2007,25 @@ export default {
   if(url.pathname.startsWith("/api/account/"))return await handlePlayerAccountRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   const mpRouteResponse=await handleMercadoPagoRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   if(mpRouteResponse)return mpRouteResponse;
-  if(url.pathname==="/api/config/valhalla"&&request.method==="GET")return await handleValhallaConfig(request,env);
+  if(url.pathname==="/api/support/checkout")return await createSupportCheckout(request,env,{json,readBody,gameIdentity,rateLimitDecision});
+   if(url.pathname==="/api/public/stats"&&request.method==="GET"){
+     const [players,battles,alliances,support]=await env.DB.batch([
+       env.DB.prepare("SELECT COUNT(*) AS total FROM players"),
+       env.DB.prepare("SELECT COUNT(*) AS total FROM battle_reports WHERE created_at>=datetime('now','-1 day')"),
+       env.DB.prepare("SELECT COUNT(*) AS total FROM alliances"),
+       env.DB.prepare("SELECT COALESCE(SUM(amount_cents),0) AS total FROM support_orders WHERE status='approved'")
+     ]);
+     const origin=request.headers.get("Origin");
+     const headers={"Content-Type":"application/json; charset=utf-8","Cache-Control":"public, max-age=60, s-maxage=60"};
+     if(origin==="https://clash-of-izzy-portal.jorgepereiragha.workers.dev")headers["Access-Control-Allow-Origin"]=origin;
+     return new Response(JSON.stringify({
+       totalPlayers:Number(players.results?.[0]?.total||0),
+       battles24h:Number(battles.results?.[0]?.total||0),
+       totalAlliances:Number(alliances.results?.[0]?.total||0),
+       supportTotalCents:Number(support.results?.[0]?.total||0)
+     }),{headers});
+   }
+   if(url.pathname==="/api/config/valhalla"&&request.method==="GET")return await handleValhallaConfig(request,env);
   if(url.pathname==="/api/beta/signup"&&request.method==="POST"){
     const ip=request.headers.get("CF-Connecting-IP")||"unknown";
     const limited=await rateLimitDecision(env,"beta-signup-ip",ip,5,3600);
