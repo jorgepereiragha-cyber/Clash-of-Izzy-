@@ -77,6 +77,16 @@ test("auditoria pré-migração 0030 aceita somente três tabelas faltando com D
   assert.ok(approvedGoogle.checks.find(row=>row.name==="Worker público e D1").detail.includes("0033"));
   const rejectedWithoutFlag=await audit({...args,fetchImpl:mockFor(missingGoogle).fetchImpl});
   assert.equal(rejectedWithoutFlag.ready,false);
+  const realmOnly={...base,missingTables:["realm_openings"]};
+  const realmAllowed=await audit({...args,allowPending0034:true,fetchImpl:mockFor(realmOnly).fetchImpl});
+  assert.equal(realmAllowed.ready,true,JSON.stringify(realmAllowed.checks));
+  const both={...base,missingTables:["realm_openings","google_account_links","google_auth_challenges"]};
+  const combined=await audit({...args,allowPending0033:true,allowPending0034:true,fetchImpl:mockFor(both).fetchImpl});
+  assert.equal(combined.ready,true,JSON.stringify(combined.checks));
+  assert.ok(combined.checks.find(row=>row.name==="Worker público e D1").detail.includes("0033+0034"));
+  const forbidden=await audit({...args,allowPending0033:true,allowPending0034:true,
+    fetchImpl:mockFor({...both,missingTables:[...both.missingTables,"unknown_table"]}).fetchImpl});
+  assert.equal(forbidden.ready,false);
   for(const invalid of [
     ["google_account_links"],["google_auth_challenges"],["google_account_links","outra_tabela"]
   ]){
@@ -105,10 +115,11 @@ test("deploy não relaxa a validação de saúde pós-migração",async()=>{
   const deploy=workflow.indexOf("Deploy Worker and static assets");
   assert.ok(old>=0&&migrate>old&&deploy>migrate&&newCheck>deploy);
   const strict=workflow.slice(newCheck,workflow.indexOf("Smoke test production Worker",newCheck));
-  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030|COI_ALLOW_PENDING_0033/);
+  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030|COI_ALLOW_PENDING_0033|COI_ALLOW_PENDING_0034/);
   assert.match(strict,/check-android-release-server\.mjs/);
   assert.match(source,/allowPending0030:process\.env\.COI_ALLOW_PENDING_0030==="true"/);
   assert.match(source,/allowPending0033:process\.env\.COI_ALLOW_PENDING_0033==="true"/);
+  assert.match(source,/allowPending0034:process\.env\.COI_ALLOW_PENDING_0034==="true"/);
 });
 
 test("normaliza account ID sem expor valor e mantém formato de 32 caracteres",()=>{
