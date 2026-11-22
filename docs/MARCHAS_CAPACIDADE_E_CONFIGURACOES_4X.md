@@ -17,6 +17,10 @@ A quantidade que pode ser enviada em **uma única expedição** não é a mesma 
 
 O servidor calcula a capacidade diretamente do D1 e rejeita formações acima do limite **antes de debitar tropas**. O usuário pode escolher um herói específico (de sua própria coleção); caso não escolha, o sistema usa o herói de maior liderança. Os bônus de vários heróis **não se somam** para aumentar artificialmente uma mesma marcha.
 
+**Filas simultâneas:** 1 inicial; +1 no castelo 5; +1 no castelo 15; +1 na pesquisa militar 5; +1 na pesquisa militar 15, até cinco filas. O Worker também confere o número de filas no mesmo débito atômico das tropas, impedindo que uma marcha rejeitada por filas lotadas desconte soldados.
+
+**Formações rápidas:** Coleta (formação econômica de até 50 tropas), Equilibrada (distribui entre tipos disponíveis), Preencher (usa até a capacidade) e Limpar, sempre sem exceder a quantidade disponível. O jogador pode editar a composição manualmente antes de enviar.
+
 O jogo salva o comandante escolhido e a capacidade validada na marcha persistente. Ao chegar ao ponto de combate, utiliza o comandante salvo (com fallback seguro para personagens antigos ou excluídos). A interface mostra as tropas selecionadas / capacidade e a decomposição por castelo, quartel, academia, pesquisa e herói; impede enviar mais que o limite. O cerco da Guerra do Trono também respeita a capacidade de marcha.
 
 ## Sistemas atuais verificados no código
@@ -30,7 +34,7 @@ O jogo salva o comandante escolhido e a capacidade validada na marcha persistent
 
 ## Próximas melhorias para paridade de categoria (ainda não concluídas)
 1. **Formações salvas (3–5 slots)** no servidor, com escolha de unidades, herói e reutilização mediante saldo e capacidade atual.
-2. **Marchas simultâneas** com limite por pesquisa/castelo, prevenindo múltiplas marchas abusivas.
+2. **Marchas simultâneas (já implementadas):** ampliar futuramente slots sazonais e condições especiais somente após testes de balanceamento.
 3. **Carga de coleta real** proporcional ao número/tipo de tropas, tempo e capacidade do nó, em vez de recompensas fixas por expedição.
 4. **Monstros de mundo**, níveis progressivos, energia, chance de drop documentada e rastreamento antiautomação.
 5. **Rallies entre mapas isolados** e entre alianças, limites por grupo, reforço e retirada segura em transações D1.
