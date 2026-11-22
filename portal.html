@@ -92,7 +92,7 @@ footer{text-align:center;padding:20px 0 38px;color:#acbdcc;font-size:13px}
       if (!response.ok) throw new Error("release indisponível");
       const release = await response.json();
       if (release.draft || release.prerelease || !Array.isArray(release.assets)) throw new Error("release não oficial");
-      const apk = release.assets.find(asset => validAsset(asset, filename) && asset.size > 1024 * 1024);
+      const apk = release.assets.find(asset => validAsset(asset, filename) && asset.size > 0);
       const hash = release.assets.find(asset => validAsset(asset, filename + ".sha256"));
       if (!apk || !hash) throw new Error("APK assinado e hash não publicados");
       button.href = apk.browser_download_url;
