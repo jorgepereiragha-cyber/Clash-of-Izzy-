@@ -153,12 +153,26 @@ if(root){
  for(const button of root.querySelectorAll("[data-coi-industry]"))
   button.addEventListener("click",()=>void submit({type:"industry_upgrade",industry:button.dataset.coiIndustry},"Indústria evoluída."));
  for(const control of [type,x,z])control.addEventListener("input",()=>{positionDirty=true;draw();});
- canvas.addEventListener("pointerdown",event=>{
+ function selectDefenseGridCell(event){
+  if(event.cancelable)event.preventDefault();
   const rect=canvas.getBoundingClientRect();
   if(!rect.width||!rect.height)return;
-  x.value=String(Math.floor((event.clientX-rect.left)/rect.width*50)-25);
-  z.value=String(Math.floor((event.clientY-rect.top)/rect.height*50)-25);
+  const cx=Math.max(0,Math.min(49,Math.floor((event.clientX-rect.left)/rect.width*50)));
+  const cz=Math.max(0,Math.min(49,Math.floor((event.clientY-rect.top)/rect.height*50)));
+  x.value=String(cx-25);
+  z.value=String(cz-25);
   positionDirty=true;draw();
+ }
+ canvas.addEventListener("pointerdown",event=>{
+  if(event.pointerType==="mouse"&&event.button!==0)return;
+  canvas.setPointerCapture?.(event.pointerId);
+  selectDefenseGridCell(event);
+ });
+ canvas.addEventListener("pointermove",event=>{
+  if(canvas.hasPointerCapture?.(event.pointerId))selectDefenseGridCell(event);
+ });
+ canvas.addEventListener("pointerup",event=>{
+  if(canvas.hasPointerCapture?.(event.pointerId))canvas.releasePointerCapture(event.pointerId);
  });
  window.addEventListener("coi:kingdom-render",render);
  render();
