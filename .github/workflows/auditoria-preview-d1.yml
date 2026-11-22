@@ -46,9 +46,16 @@ jobs:
           if isinstance(meta,dict) and meta.get("uuid",meta.get("id",preview))!=preview:
             raise SystemExit("D1 Preview aponta para UUID diferente.")
           queryUrl=base+preview+"/query"
-          tableRows=request(queryUrl,"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('players','kingdoms','player_accounts','purchase_requests','mercadopago_orders','d1_migrations','kingdom_dragons','kingdom_mailbox','master_bonus_claims')")
+          tableRows=request(queryUrl,"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
           names={str(x.get("name")) for x in tableRows[0]["results"]}
-          print("Preview: tabelas de interesse="+json.dumps(sorted(names),ensure_ascii=False))
+          print("Preview: todas as tabelas (somente nomes)="+json.dumps(sorted(names),ensure_ascii=False))
+          import re
+          other={}
+          for name in sorted(names - {"players","kingdoms","player_accounts","purchase_requests","mercadopago_orders","d1_migrations","kingdom_dragons","kingdom_mailbox","master_bonus_claims"}):
+            if not re.fullmatch(r"[a-zA-Z_][a-zA-Z_0-9]{0,127}",name): continue
+            tableCount=request(queryUrl,'SELECT COUNT(*) AS total FROM "'+name+'"')
+            other[name]=int(tableCount[0]["results"][0]["total"])
+          print("Preview: outras tabelas, apenas contagem="+json.dumps(other,ensure_ascii=False))
           counts={}
           for name in ("players","kingdoms","player_accounts","purchase_requests","mercadopago_orders"):
             if name in names:
