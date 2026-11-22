@@ -31,13 +31,17 @@ export function levelPacksEnabledForPlayer(env, publicPlayerId) {
   return Boolean(publicPlayerId) && allowlist.includes(String(publicPlayerId));
 }
 
-export function publicLevelPack(pack) {
+export function levelPackPriceApproved(env, pack) {
+  return Boolean(pack) && (pack.level < 40 || env?.LEVEL_PACKS_PROPOSED_PRICES_APPROVED === "true");
+}
+
+export function publicLevelPack(pack, env) {
   return {
     phase: pack.phase,
     requiredLevel: pack.level,
     oneTime: true,
     resources: { ...pack.resources },
-    priceProvisional: pack.level >= 40
+    priceProvisional: !levelPackPriceApproved(env, pack)
   };
 }
 
