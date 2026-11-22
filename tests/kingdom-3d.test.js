@@ -14,7 +14,9 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
   assert.match(renderer, /coi:kingdom-render/);
   assert.match(renderer, /Math\.min\(9, qualityProfile\?\.maxBuildings \|\| 9\)/);
-  assert.match(renderer, /const col = i % 3, row = Math\.floor\(i \/ 3\)/);
+  assert.match(renderer, /const \{ x, z \} = cityWorldPoint\(b, i\)/);
+  assert.match(renderer, /frameCityBuildings\(list\)/);
+  assert.match(renderer, /Number\(building\?\.position_x\)/);
   assert.ok(renderer.includes("new THREE.InstancedMesh"));
   assert.match(renderer, /addForestInstances/);
   assert.match(kingdom, /type="importmap"/);

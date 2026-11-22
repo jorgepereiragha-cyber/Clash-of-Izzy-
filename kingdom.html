@@ -4,6 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="/styles/coi-theme.css">
 <link rel="stylesheet" href="/styles/premium-ui.css">
+<link rel="stylesheet" href="/styles/city-layout.css">
 <meta name="theme-color" content="#142b44"><meta name="description" content="Comande seu reino, evolua construções e prepare seu exército em Clash of Izzy.">
 <link rel="manifest" href="/manifest.json"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>Clash of Izzy — Reino</title>
@@ -100,6 +101,20 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <div class="city" id="city"></div>
   <div class="coi-city-stage-corner" aria-hidden="true">Toque em um edifício para ver melhorias</div>
  </div>
+ <details id="coiCityLayout" class="coi-layout-panel">
+  <summary>Organizar edifícios · Grid 50×50</summary>
+  <div class="layout-content">
+   <small>Selecione o edifício, toque no mapa para escolher o local e confirme. A posição é validada e salva no servidor. Esta função reorganiza construções existentes, sem alterar seus níveis.</small>
+   <canvas id="coiCityGrid" width="500" height="500" aria-label="Mapa de ocupação da cidade; selecione também as coordenadas nos campos abaixo"></canvas>
+   <div class="layout-controls">
+    <label for="coiCityBuilding">Edifício<select id="coiCityBuilding"></select></label>
+    <label for="coiCityX">Coordenada X<input id="coiCityX" type="number" step="1" min="-25" max="24" value="0"></label>
+    <label for="coiCityZ">Coordenada Z<input id="coiCityZ" type="number" step="1" min="-25" max="24" value="0"></label>
+    <button id="coiCityMove" type="button" disabled>Salvar posição</button>
+   </div>
+   <small id="coiCityGridStatus" role="status" aria-live="polite">Carregando a cidade…</small>
+  </div>
+ </details>
  <div class="coi-graphics-controls" aria-label="Configurações de imagem">
   <div class="coi-graphics-description">
    <strong>Imagem e desempenho</strong>
@@ -213,6 +228,8 @@ function renderResourceHud(kingdom){
  lastResourceSnapshot=snapshot;
 }
 const names={castle:["Castelo","🏰"],barracks:["Quartel","⚔️"],farm:["Fazenda","🌾"],quarry:["Pedreira","🪨"],lumber_mill:["Serraria","🪵"],iron_mine:["Mina de ferro","⛓️"],market:["Mercado","🏪"],academy:["Academia","📚"],wall:["Muralha","🧱"],hospital:["Hospital","🏥"],watchtower:["Torre de vigia","🔭"],stable:["Estábulo","🐎"],archery_range:["Campo de arqueiros","🏹"],siege_workshop:["Oficina de cerco","🛠️"],embassy:["Embaixada","🏳️"],warehouse:["Armazém","📦"]};
+window.__coiCityLayoutState=()=>state;
+window.__coiCityBuildingNames=Object.fromEntries(Object.entries(names).map(([key,value])=>[key,value[0]]));
 const fmt=n=>Number(n||0).toLocaleString("pt-BR");
 const esc=value=>String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll(String.fromCharCode(34),"&quot;").replaceAll(String.fromCharCode(39),"&#39;");
 function setStatus(message,error=false){const el=document.getElementById("status");el.textContent=message;el.classList.toggle("error",error)}
@@ -662,6 +679,15 @@ async function startResearch(event){
  event.preventDefault();
  await submitQueue("research",{research:document.getElementById("researchKey").value},"Pesquisa iniciada. O bônus será ativado ao concluir.");
 }
+async function moveCityLayout(payload){
+ if(busy)throw new Error("Aguarde a ação atual terminar.");
+ busy=true;
+ try{
+  const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"city_layout_move",...payload})});
+  state=result.state;render();showActionNotice("Edifício reposicionado na cidade.");
+ }finally{busy=false;}
+}
+window.__coiCityLayoutMove=moveCityLayout;
 async function upgrade(building){if(busy)return;busy=true;setStatus("Enviando melhoria…");try{await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({type:"upgrade",building})});const fresh=await request("/game/state");state=fresh.state;busy=false;render();showActionNotice("Construção iniciada. O nível será atualizado ao concluir.");}catch(error){setStatus(error.message,true);}finally{busy=false;}}
 async function setNickname(event){
  event.preventDefault();
@@ -746,7 +772,7 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
 <script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>
