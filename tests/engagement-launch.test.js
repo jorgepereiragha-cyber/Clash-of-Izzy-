@@ -45,7 +45,8 @@ test("UI de reino e rotas autenticadas estão integradas",async()=>{
   assert.match(worker,/\/api\/game\/onboarding/);
   assert.match(worker,/\/api\/game\/daily-reward/);
   assert.match(sw,/player-engagement\.js/);
-  assert.match(sw,/clash-of-izzy-shell-v52/);
+  const cacheVersion=Number(sw.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1]||0);
+  assert.ok(cacheVersion>=53,"A versao do cache PWA deve acompanhar novas dependencias graficas.");
 });
 
 test("contribuições voluntárias são separadas de pacotes de gemas",async()=>{

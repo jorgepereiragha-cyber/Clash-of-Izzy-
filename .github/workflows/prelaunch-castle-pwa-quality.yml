@@ -1,0 +1,37 @@
+name: Prelaunch castle and PWA regressions
+on:
+  push:
+    branches:
+      - feat/prelaunch-castle-pwa-polish-20261122
+  pull_request:
+    branches:
+      - feat/level-packs-p1-p8-secure
+permissions:
+  contents: read
+concurrency:
+  group: coi-castle-pwa-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate syntax
+        run: |
+          node --check sw.js
+          node --check scripts/castle-visual-upgrades.js
+          node --check scripts/kingdom-3d.js
+      - name: Focused PWA and castle tests
+        run: node --test tests/service-worker-cache.test.js tests/castle-visual-upgrades.test.js tests/kingdom-3d.test.js
+      - name: All unit tests
+        run: npm test
+      - name: Worker build dry run
+        run: npm run check

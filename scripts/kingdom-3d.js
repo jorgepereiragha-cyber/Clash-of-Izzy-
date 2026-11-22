@@ -9,6 +9,7 @@ import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTim
 import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
+import { applyCastleVisualUpgrades, clearCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -648,6 +649,7 @@ if (host && "WebGLRenderingContext" in window) {
     latestCastleSkinId=Number(castleSkinId)||0;
     if (!renderer || !scene || !camera) return;
     for (const item of activeModels) {
+      clearCastleVisualUpgrades(item);
       scene.remove(item);
       if (item.userData.coIProcedural) item.traverse(node => {
         if (!node.isMesh) return;
@@ -665,6 +667,14 @@ if (host && "WebGLRenderingContext" in window) {
       const { x, z } = cityWorldPoint(b, i);
       const template = glbTemplates.get(b.building_type);
       const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId);
+      if (b.building_type === "castle") {
+        try {
+          applyCastleVisualUpgrades(group, b.level, { qualityTier: qualityProfile?.tier || "balanced" });
+        } catch (error) {
+          clearCastleVisualUpgrades(group);
+          console.warn("Clash of Izzy: ornamentos opcionais indisponiveis; castelo preservado.", error);
+        }
+      }
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       scene.add(group);

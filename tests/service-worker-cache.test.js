@@ -59,7 +59,7 @@ function makeHarness(responder = () => makeResponse(), { failCacheWrites = false
   };
 
   vm.runInNewContext(source, {
-    self, caches, URL, Headers,
+    self, caches, URL, Headers, Response,
     fetch: async request => {
       networkCalls.push(request.url);
       if (shouldRejectNetwork) throw new Error("offline");
@@ -136,11 +136,28 @@ test("PWA shell responses are cached by pathname and serve offline fallback", as
   assert.ok(h.stores.get(SHELL_CACHE).has("/kingdom.html"));
   h.offline();
   const fallback = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
-  assert.equal(fallback.result, undefined);
+  assert.equal(fallback.result.status, 503);
+  assert.match(await fallback.result.text(), /Sem conexão/);
   await (await h.caches.open(SHELL_CACHE))
     .put("/offline.html", makeResponse());
   const offline = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
   assert.equal(offline.result.status, 200);
+});
+
+test("PWA returns a controlled network error for offline static assets without an HTML substitution", async () => {
+  const h = makeHarness();
+  h.offline();
+  const missing = await h.dispatch("/assets/3d/missing-model.glb");
+  assert.equal(missing.handled, true);
+  assert.equal(missing.result.type, "error");
+  assert.equal(missing.result.status, 0);
+});
+
+test("PWA retains atomic shell precache instead of activating a partially installed update", () => {
+  assert.match(source, /cache\.addAll\(\[\.\.\.CORE_ASSETS, manifestPath, \.\.\.manifest\.assets\]\)/);
+  assert.doesNotMatch(source, /Promise\.allSettled\(/);
+  assert.match(source, /clash-of-izzy-shell-v53/);
+  assert.match(source, /\/scripts\/castle-visual-upgrades\.js/);
 });
 
 test("PWA only adds approved static assets without query strings", async () => {
