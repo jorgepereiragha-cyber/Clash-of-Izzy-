@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   homologar:
+    # Nao permitir que workflow_dispatch rode migracoes remotas de codigo nao integrado.
+    if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
