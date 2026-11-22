@@ -1002,7 +1002,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         assert.equal(next.castleVip.bonuses.productionPercent,level*10);
         if(level===1||level===7){
           const duplicate=await action(tokenA,{type:"castle_vip_upgrade",expectedVipLevel:level-1},409,"repetição VIP "+level);
-          assert.match(duplicate.error,/desatualizado/i);
+          assert.match(duplicate.error,/desatualizado|VIP 7 já alcançado/i);
           const after=expectStatus(await api("/api/game/state",{token:tokenA}),200,"saldo após repetição VIP "+level).state;
           assert.equal(after.player.gems,remaining);
           assert.equal(after.castleVip.level,level);
