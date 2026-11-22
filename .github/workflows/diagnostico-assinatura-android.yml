@@ -43,7 +43,7 @@ jobs:
           # SHA-256 publico do certificado. O diagnostico continua falhando.
           if test "$missing" = "1"; then
             echo "Assinatura comercial Android: PENDENTE. Nenhum segredo foi divulgado."
-            echo "APK oficial bloqueado: credenciais e/ou pin ausentes." >> "$GITHUB_STEP_SUMMARY"
+            echo "APK oficial bloqueado: credenciais de assinatura ausentes." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           tmp="$(mktemp -d "$RUNNER_TEMP/android-signing-check.XXXXXX")"
