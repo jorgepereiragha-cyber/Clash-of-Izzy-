@@ -16,6 +16,7 @@ import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaCon
 import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
+import {freeModeCommerceBlocked,freeAndroidReadiness} from "./android-free-mode.js";
 import { handleRally, processDueRallies } from "./rally.js";
 import {marchCapacity,marchCapacityForKingdom,withinMarchCapacity} from "./march-capacity.js";
 import {marchSlots} from "./march-slots.js";
@@ -1994,6 +1995,11 @@ export default {
  async fetch(request,env){
   if(request.method==="OPTIONS")return new Response(null,{status:204});
   const url=new URL(request.url);
+  // Quando o release gratuito e deliberadamente habilitado, bloquear novas
+  // solicitacoes financeiras antes de qualquer roteamento ou side effect.
+  if(freeModeCommerceBlocked(request,env))return json({error:"Compras e créditos administrativos indisponíveis no modo gratuito."},503);
+  if(url.pathname==="/api/android/free-release-readiness"&&request.method==="GET")
+    return await freeAndroidReadiness(env);
   if(url.pathname==="/api/realtime/eldoria/ticket"){
     if(request.method!=="POST")return json({error:"Método não permitido."},405);
     if(!env.ELDORIA_ROOM)return json({error:"Sala realtime ainda não implantada."},503);
