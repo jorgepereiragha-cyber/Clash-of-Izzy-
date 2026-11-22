@@ -44,11 +44,11 @@ jobs:
         if: steps.available.outputs.ready == 'true'
         run: |
           node --check portal-worker.js
-          node --test tests/portal-isolation.test.js
+          node --test tests/portal-isolation.test.js tests/portal-support.test.js
           python3 - <<'PY'
           from pathlib import Path
           root = Path("public-portal")
-          allowed = {"portal.html", "favicon.svg", "styles/coi-theme.css", "assets/brand/hero-emblem.svg", "assets/brand/royal-king.webp"}
+          allowed = {"portal.html", "support.html", "favicon.svg", "styles/coi-theme.css", "assets/brand/hero-emblem.svg", "assets/brand/royal-king.webp"}
           found = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
           assert found == allowed, f"Asset fora da allowlist: {found ^ allowed}"
           PY
@@ -97,6 +97,15 @@ jobs:
           done
           [[ "$page_status" == "200" ]] && grep -q 'id="download-apk"' "$page" || {
             echo "::error::Portal não entregou HTML de propaganda após tentativas HTTP"; exit 1;
+          }
+          # Nova página de apoio: o site permanece público, sem requisições de compra.
+          support_status="$(curl -L --silent --show-error --max-time 20 -o "$RUNNER_TEMP/portal-support.html" -w '%{http_code}' "$base/support.html")"
+          test "$support_status" = "200" && grep -q 'id="support-payment-link"' "$RUNNER_TEMP/portal-support.html" || {
+            echo "::error::Página de apoio não publicada corretamente"; exit 1;
+          }
+          link_status="$(curl -sS -o "$RUNNER_TEMP/support-link.json" -w '%{http_code}' --max-time 20 "$base/support-link.json")"
+          test "$link_status" = "200" && grep -q '"enabled":' "$RUNNER_TEMP/support-link.json" || {
+            echo "::error::Disponibilidade do link não foi respondida em JSON"; exit 1;
           }
           for path in /kingdom.html /api/game/state /arena.html /sw.js; do
             status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base$path")"
