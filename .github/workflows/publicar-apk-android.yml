@@ -118,7 +118,17 @@ jobs:
             echo "::error::Sem chave permanente: release abortada."
             exit 1
           }
-          printf '%s' "$KEYSTORE_B64" | base64 --decode > "$RUNNER_TEMP/clash-izzy-release.jks"
+          encoded="$(printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]')"
+          encoded="${encoded#\"}"
+          encoded="${encoded%\"}"
+          encoded="${encoded#\'}"
+          encoded="${encoded%\'}"
+          if ! printf '%s' "$encoded" | base64 --decode > "$RUNNER_TEMP/clash-izzy-release.jks" 2>/dev/null; then
+            rm -f "$RUNNER_TEMP/clash-izzy-release.jks"
+            echo "::error::ANDROID_RELEASE_KEYSTORE_BASE64 invalido: use o Base64 da keystore .jks original."
+            exit 1
+          fi
+          unset encoded
           chmod 600 "$RUNNER_TEMP/clash-izzy-release.jks"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/clash-izzy-release.jks" >> "$GITHUB_ENV"
       - name: Compilar release assinada

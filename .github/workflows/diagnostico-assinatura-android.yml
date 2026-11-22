@@ -51,7 +51,14 @@ jobs:
           tmp="$(mktemp -d "$RUNNER_TEMP/android-signing-check.XXXXXX")"
           chmod 700 "$tmp"
           trap 'rm -rf "$tmp"' EXIT
-          if ! printf '%s' "$KS" | base64 --decode > "$tmp/release.jks" 2>/dev/null; then
+          # A colagem pelo celular pode incluir quebras, espacos ou aspas externas.
+          # Nunca imprimir o valor: ele contem a chave privada de assinatura.
+          encoded="$(printf '%s' "$KS" | tr -d '[:space:]')"
+          encoded="${encoded#\"}"
+          encoded="${encoded%\"}"
+          encoded="${encoded#\'}"
+          encoded="${encoded%\'}"
+          if ! printf '%s' "$encoded" | base64 --decode > "$tmp/release.jks" 2>/dev/null; then
             echo "::error::Keystore invalida: base64 nao decodifica."
             echo "APK oficial bloqueado: keystore invalida." >> "$GITHUB_STEP_SUMMARY"
             exit 1
