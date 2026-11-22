@@ -45,7 +45,7 @@ test("Mercado Pago webhook authenticates, fetches and verifies the payment befor
 test("store creates an individually linked Mercado Pago order and opens the HTTPS checkout", async () => {
   const arena = await read("arena.html");
   assert.ok(arena.includes("API_BASE+'/store/purchase-request'"));
-  assert.ok(arena.includes("paymentMethod:'mercadopago_link'"));
+  assert.ok(arena.includes("const paymentMethod=document.getElementById('purchaseMethod')?.value==='pix'?'pix':'mercadopago_link'"));
   assert.ok(arena.includes("API_BASE+'/store/checkout'"));
   assert.ok(arena.includes("checkout.checkoutUrl"));
   assert.ok(arena.includes("window.open('about:blank'"));

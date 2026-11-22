@@ -60,7 +60,8 @@ test("mercado aparece na navegação e fica disponível no shell offline", async
   const page = await read("market.html");
   assert.match(nav, /Mercador & Heróis/);
   assert.match(nav, /\/market\.html/);
-  assert.match(sw, /clash-of-izzy-shell-v46/);
+  const cacheVersion = Number(sw.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
+  assert.ok(cacheVersion >= 47, `expected shell v47 or newer, got v${cacheVersion}`);
   for (const asset of ["/market.html","/market.js","/market.css"]) assert.ok(sw.includes('"'+asset+'"'), "asset offline ausente: "+asset);
   assert.match(page, /lang="pt-BR"/);
   assert.match(page, /id="market-status"/);
