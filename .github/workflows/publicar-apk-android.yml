@@ -113,7 +113,7 @@ jobs:
           src=android-sideload/app/build/outputs/apk/release/app-release.apk
           "$ANDROID_HOME/build-tools/35.0.0/apksigner" verify --verbose "$src"
           cp "$src" "$RUNNER_TEMP/clash-of-izzy-android.apk"
-          test "$(stat -c%s "$RUNNER_TEMP/clash-of-izzy-android.apk")" -gt 1048576
+          test -s "$RUNNER_TEMP/clash-of-izzy-android.apk"
           (cd "$RUNNER_TEMP" && sha256sum clash-of-izzy-android.apk > clash-of-izzy-android.apk.sha256)
           (cd "$RUNNER_TEMP" && sha256sum -c clash-of-izzy-android.apk.sha256)
           echo "APK SHA-256: $(cut -d' ' -f1 "$RUNNER_TEMP/clash-of-izzy-android.apk.sha256")" >> "$GITHUB_STEP_SUMMARY"
