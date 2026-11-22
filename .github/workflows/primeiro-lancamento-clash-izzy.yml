@@ -1,11 +1,13 @@
 name: Primeiro lancamento protegido - banco sem contas cadastradas
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/primeiro-lancamento-clash-izzy.yml
   workflow_dispatch:
+    inputs:
+      confirm_production:
+        description: "Autoriza iniciar o deploy protegido somente após revisar D1, Workers Paid e orçamento"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -17,6 +19,9 @@ concurrency:
 
 jobs:
   verificar-e-iniciar:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_production == true }}
+    environment:
+      name: production
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
