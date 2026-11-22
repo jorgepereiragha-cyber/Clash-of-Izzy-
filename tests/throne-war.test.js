@@ -73,7 +73,9 @@ function fakeDb(row,membership={alliance_id:10},captureResult=true){
  const make=sql=>({
   bind(...args){return {
     first:async()=>sql.includes("FROM realm_openings r JOIN realm_thrones t")?row:
-      sql.includes("FROM alliance_members am")?membership:null,
+      sql.includes("FROM alliance_members am")?membership:
+      sql.includes("FROM kingdoms k WHERE k.id=?")?
+        {castleLevel:10,barracksLevel:1,academyLevel:1,militaryLevel:0}:null,
     run:async()=>({meta:{changes:1}}),
     all:async()=>({results:[]}),
     args
@@ -109,6 +111,16 @@ test("cerco é bloqueado durante 35 dias e por requisitos de aliança, castelo e
  const crowned=await assaultThrone(fakeDb({...row,crowned_cycle:0,crowned_alliance_id:11}),
    {id:8,map_region:1,castle_level:10},data,at(35,1));
  assert.equal(crowned.ok,false);assert.match(crowned.error,/já foi conquistado/);
+});
+
+test("Guerra do Trono rejeita exército maior que a capacidade efetiva do comandante",async()=>{
+ const row={realm_id:1,unlocked_at:origin,territory_id:3,revision:0,crowned_cycle:null,
+   crowned_alliance_id:null,occupation_cycle:null,occupying_alliance_id:null};
+ const result=await assaultThrone(fakeDb(row),{id:8,map_region:1,castle_level:10},{
+   units:{knight:1800},requestId:"00000000-0000-4000-8000-000000000009"
+ },at(35));
+ assert.equal(result.ok,false);
+ assert.match(result.error,/Capacidade de marcha excedida/);
 });
 
 test("cerco válido usa um D1 batch transacional de perda, tentativa, ocupação e relatório",async()=>{
