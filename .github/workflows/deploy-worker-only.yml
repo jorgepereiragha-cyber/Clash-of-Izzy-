@@ -1,0 +1,129 @@
+name: Publicar Worker sem migracoes D1 (protegido)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_worker_publish:
+        description: "Confirmo a publicacao do Worker e dos assets atuais, SEM migrar D1"
+        required: true
+        default: false
+        type: boolean
+      confirm_production:
+        description: "Confirmo D1 saudavel, Preview homologado e ambiente production autorizado"
+        required: true
+        default: false
+        type: boolean
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clash-of-izzy-cloudflare-production
+  cancel-in-progress: false
+
+jobs:
+  worker-only:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_worker_publish == true && inputs.confirm_production == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    environment:
+      name: production
+    steps:
+      - name: Checkout SHA aprovado na branch main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Confirmar binding D1 e flags fechadas sem escrita
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'JS'
+          import { readFileSync } from "node:fs";
+          const config = JSON.parse(readFileSync("wrangler.jsonc","utf8"));
+          const db = config.d1_databases?.find(item => item.binding === "DB");
+          if (!db || db.database_id !== "7e63af59-d9ff-4159-a9cf-b02e35b92605") {
+            throw Error("Target is not the expected production D1 binding.");
+          }
+          const vars = config.vars || {};
+          for (const name of ["GAME_4X_SYSTEMS_ENABLED","LEVEL_PACKS_ENABLED",
+             "LEVEL_PACKS_PUBLIC_ENABLED","LEVEL_PACKS_PROPOSED_PRICES_APPROVED"]) {
+            if (vars[name] !== "false") throw Error("Unsafe feature flag in deployment: " + name);
+          }
+          if (vars.ENVIRONMENT !== "production") throw Error("Expected production environment.");
+          console.log("Production binding verified; 4X and commercial flags remain disabled.");
+          JS
+
+      - name: Testar regras de jogo e migracoes apenas no D1 local
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-audit --no-fund
+          npm test
+          npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
+          npx wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist
+
+      - name: Executar regressao Chromium mobile
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx playwright install --with-deps chromium
+          npm run test:e2e
+
+      - name: Verificar backend publico pronto antes de publicar (somente GET)
+        shell: bash
+        run: |
+          node --input-type=module - <<'JS'
+          const res = await fetch("https://clash-of-izzy.jorgepereiragha.workers.dev/api/health",{
+            method:"GET",redirect:"error",signal:AbortSignal.timeout(20000),headers:{Accept:"application/json"}
+          });
+          if(res.status !== 200)throw Error("Pre-deploy production health HTTP "+res.status);
+          const h = await res.json();
+          if(h.ok!==true || h.status!=="ready" || h.checks?.database!==true ||
+             h.checks?.session!==true || h.checks?.schema!==true ||
+             !Array.isArray(h.missingTables) || h.missingTables.length){
+            throw Error("Production backend not ready for code-only deploy.");
+          }
+          console.log("Production backend healthy before deployment; no D1 changes performed.");
+          JS
+
+      - name: Normalizar token Cloudflare sem imprimir segredo
+        shell: bash
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,re
+          token=os.environ.get("RAW_TOKEN","").strip()
+          if token.lower().startswith("bearer "):token=token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):token=token[1:-1].strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if not token or any(c.isspace() for c in token) or not re.fullmatch(r"[a-fA-F0-9]{32}",account):
+              raise SystemExit("Cloudflare token/account unavailable; no deploy.")
+          print("::add-mask::"+token)
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf8") as output:
+              output.write("CLOUDFLARE_API_TOKEN="+token+"\n")
+              output.write("CLOUDFLARE_ACCOUNT_ID="+account+"\n")
+          PY
+
+      - name: Auditar Cloudflare e Time Travel antes de publicar (somente leitura)
+        run: node scripts/cloudflare-remote-audit.mjs
+
+      - name: Publicar exclusivamente Worker e assets, sem migrar D1
+        run: npx wrangler --config wrangler.jsonc deploy
+
+      - name: Exigir health, sessao e contratos pos-publicacao (somente GET)
+        env:
+          WORKER_BASE_URL: https://clash-of-izzy.jorgepereiragha.workers.dev
+        run: |
+          set -euo pipefail
+          node scripts/cloudflare-remote-audit.mjs
+          node scripts/check-android-release-server.mjs
+          node scripts/production-smoke.js
