@@ -87,3 +87,61 @@ export function createFrameTimingSampler(maxSamples = 120) {
     }
   });
 }
+
+// Ajuste conservador de resolucao para animacoes do reino em modo Automatico.
+// Usa intervalos entre frames (proxy para fluidez, nao tempo de GPU) e evita
+// oscilacoes frequentes de tamanho do framebuffer em aparelhos Android.
+export function createAdaptivePixelScaleController({
+  sampleWindow = 90,
+  minScale = 0.7,
+  downStep = 0.1,
+  upStep = 0.05,
+  recoveryWindows = 3
+} = {}) {
+  const windowSize = Math.max(30, Math.min(240, Math.floor(sampleWindow) || 90));
+  const floor = Math.max(0.5, Math.min(0.95, Number(minScale) || 0.7));
+  const down = Math.max(0.01, Math.min(0.2, Number(downStep) || 0.1));
+  const up = Math.max(0.01, Math.min(0.15, Number(upStep) || 0.05));
+  const recovery = Math.max(2, Math.min(8, Math.floor(recoveryWindows) || 3));
+  const samples = [];
+  let scale = 1;
+  let quickWindows = 0;
+  return Object.freeze({
+    get scale() { return scale; },
+    reset() { samples.length = 0; quickWindows = 0; },
+    observe(intervalMs) {
+      const ms = Number(intervalMs);
+      // Atrasos de aba suspensa, depuracao ou navegador em segundo plano
+      // nao representam carga de GPU e nunca devem degradar a imagem.
+      if (!Number.isFinite(ms) || ms <= 0 || ms > 250) {
+        samples.length = 0;
+        quickWindows = 0;
+        return false;
+      }
+      samples.push(ms);
+      if (samples.length < windowSize) return false;
+      const sorted = samples.sort((a, b) => a - b);
+      const percentile = p => sorted[Math.min(sorted.length - 1, Math.ceil(sorted.length * p) - 1)];
+      const p50 = percentile(0.5), p95 = percentile(0.95);
+      samples.length = 0;
+      if (p50 > 21 && p95 > 28) {
+        quickWindows = 0;
+        const next = Math.max(floor, Number((scale - down).toFixed(2)));
+        if (next === scale) return false;
+        scale = next;
+        return true;
+      }
+      if (p50 < 17.5 && p95 < 19) {
+        quickWindows += 1;
+        if (quickWindows < recovery) return false;
+        quickWindows = 0;
+        const next = Math.min(1, Number((scale + up).toFixed(2)));
+        if (next === scale) return false;
+        scale = next;
+        return true;
+      }
+      quickWindows = 0;
+      return false;
+    }
+  });
+}
