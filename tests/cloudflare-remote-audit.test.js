@@ -69,6 +69,32 @@ test("auditoria pré-migração 0030 aceita somente três tabelas faltando com D
   assert.equal(accepted.ready,true,JSON.stringify(accepted.checks));
   assert.ok(accepted.checks.find(row=>row.name==="Worker público e D1").detail.includes("0030"));
   assert.ok(valid.visits.every(x=>x.method==="GET"));
+  const dailyOnboardingSupport={...base,missingTables:["daily_reward_claims","onboarding_bonus_claims","support_orders"]};
+  const pendingCore={...args,allowPending0037to0039:true};
+  const coreApproved=await audit({...pendingCore,fetchImpl:mockFor(dailyOnboardingSupport).fetchImpl});
+  assert.equal(coreApproved.ready,true,JSON.stringify(coreApproved.checks));
+  assert.ok(coreApproved.checks.find(row=>row.name==="Worker público e D1").detail.includes("0037-0039"));
+  const coreNotAuthorized=await audit({...args,fetchImpl:mockFor(dailyOnboardingSupport).fetchImpl});
+  assert.equal(coreNotAuthorized.ready,false);
+  for(const missing of [
+    ["daily_reward_claims"],
+    ["daily_reward_claims","onboarding_bonus_claims"],
+    ["daily_reward_claims","onboarding_bonus_claims","support_orders","unknown_table"],
+  ]){
+    const denied=await audit({...pendingCore,fetchImpl:mockFor({...base,missingTables:missing}).fetchImpl});
+    assert.equal(denied.ready,false,"only the complete authorized 0037-0039 group is accepted");
+  }
+  for(const checks of [
+    {...base.checks,database:false},
+    {...base.checks,session:false},
+    {...base.checks,schema:true},
+  ]){
+    const denied=await audit({...pendingCore,fetchImpl:mockFor({...dailyOnboardingSupport,checks}).fetchImpl});
+    assert.equal(denied.ready,false,"readiness protections remain mandatory");
+  }
+  const combinedOldAndNew=await audit({...pendingCore,allowPending0034:true,
+    fetchImpl:mockFor({...base,missingTables:["realm_openings",...dailyOnboardingSupport.missingTables]}).fetchImpl});
+  assert.equal(combinedOldAndNew.ready,true,"authorized legacy and current groups can coexist");
   const strict=await audit({...args,allowPending0030:false,fetchImpl:mockFor(base).fetchImpl});
   assert.equal(strict.ready,false);
   const missingGoogle={...base,missingTables:["google_account_links","google_auth_challenges"]};
@@ -127,12 +153,14 @@ test("deploy não relaxa a validação de saúde pós-migração",async()=>{
   const deploy=workflow.indexOf("Deploy Worker and static assets");
   assert.ok(old>=0&&migrate>old&&deploy>migrate&&newCheck>deploy);
   const strict=workflow.slice(newCheck,workflow.indexOf("Smoke test production Worker",newCheck));
-  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030|COI_ALLOW_PENDING_0033|COI_ALLOW_PENDING_0034|COI_ALLOW_PENDING_0035/);
+  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030|COI_ALLOW_PENDING_0033|COI_ALLOW_PENDING_0034|COI_ALLOW_PENDING_0035|COI_ALLOW_PENDING_0037_0039/);
+  assert.match(workflow.slice(old,migrate),/COI_ALLOW_PENDING_0037_0039: "true"/);
   assert.match(strict,/check-android-release-server\.mjs/);
   assert.match(source,/allowPending0030:process\.env\.COI_ALLOW_PENDING_0030==="true"/);
   assert.match(source,/allowPending0033:process\.env\.COI_ALLOW_PENDING_0033==="true"/);
   assert.match(source,/allowPending0034:process\.env\.COI_ALLOW_PENDING_0034==="true"/);
   assert.match(source,/allowPending0035:process\.env\.COI_ALLOW_PENDING_0035==="true"/);
+  assert.match(source,/allowPending0037to0039:process\.env\.COI_ALLOW_PENDING_0037_0039==="true"/);
 });
 
 test("normaliza account ID sem expor valor e mantém formato de 32 caracteres",()=>{
