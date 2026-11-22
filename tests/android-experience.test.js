@@ -128,3 +128,14 @@ test("Android native launcher presents the independent hero emblem and promo por
   assert.match(portal, /assets\/brand\/royal-king\.webp/);
   assert.doesNotMatch(portal, /\/scripts\/pwa-runtime\.js|href="\/manifest\.json"/);
 });
+
+test("kingdom state renders after it becomes visible and requests have a bounded timeout", async () => {
+  const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.match(kingdom, /game\.hidden=false;\s*render\(\);/);
+  assert.match(kingdom, /new AbortController\(\)/);
+  assert.match(kingdom, /setTimeout\(\(\)=>controller\.abort\(\),15000\)/);
+  assert.match(kingdom, /window\.clearTimeout\(timeout\)/);
+  assert.match(kingdom, /if\(kingdomConnectInFlight\)return/);
+  assert.match(kingdom, /if\(!previouslyPlayable\)\{/);
+  assert.doesNotMatch(kingdom, /game\.hidden=true;\s*render\(\)/);
+});

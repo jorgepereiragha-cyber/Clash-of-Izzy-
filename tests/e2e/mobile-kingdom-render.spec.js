@@ -172,6 +172,27 @@ test.describe("Mobile kingdom rendering", () => {
     expect(layout.cityWidth).toBeGreaterThan(300);
     expect(layout.cityHeight).toBeGreaterThan(250);
     expect(layout.canvasIds).toContain("kingdomScene");
+    // Scene canvases and ambient layers must survive refresh without detaching WebGL.
+    const before = await page.evaluate(() => {
+      window.__e2eScene2d = document.querySelector("#kingdomScene");
+      window.__e2eScene3d = document.querySelector("#kingdom3d");
+      window.__e2eAmbient = document.querySelector("#city .coi-ambient-layer");
+      const area = window.__e2eScene2d?.getBoundingClientRect();
+      return { width: window.__e2eScene2d?.width || 0, height: window.__e2eScene2d?.height || 0,
+        displayWidth: area?.width || 0, displayHeight: area?.height || 0 };
+    });
+    expect(before.width).toBeGreaterThan(0);
+    expect(before.height).toBeGreaterThan(0);
+    expect(before.displayWidth).toBeGreaterThan(0);
+    expect(before.displayHeight).toBeGreaterThan(0);
+    await page.locator("#refresh").click();
+    await expect(page.locator("#status")).toContainText("Reino sincronizado");
+    const preserved = await page.evaluate(() => ({
+      canvas2d: window.__e2eScene2d === document.querySelector("#kingdomScene"),
+      canvas3d: window.__e2eScene3d === document.querySelector("#kingdom3d"),
+      ambient: window.__e2eAmbient === document.querySelector("#city .coi-ambient-layer")
+    }));
+    expect(preserved).toEqual({ canvas2d: true, canvas3d: true, ambient: true });
     expect(stateRequests.length).toBeGreaterThan(0);
     expect(stateRequests.every(request => request.authorization === "Bearer " + SESSION_TOKEN)).toBe(true);
   });

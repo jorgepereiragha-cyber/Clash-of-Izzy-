@@ -329,3 +329,25 @@
 @media(min-width:761px){
   #coiActionNotice{bottom:20px}
 }
+
+/* Startup card: the player always sees the real game identity, never a blank spinner. */
+.coi-fourx #loading{
+ display:flex;flex-direction:column;align-items:center;justify-content:center;
+ gap:9px;width:min(100%,520px);min-height:196px;margin:20px auto;
+ padding:18px 20px;text-align:center;
+ background:linear-gradient(155deg,#20394c,#0c1b2c);
+ border:1px solid #d6ad67;border-radius:15px;box-shadow:0 12px 30px #0008;
+ color:#dfebf4;font-size:13px;line-height:1.5;
+}
+.coi-fourx #loading[hidden]{display:none!important}
+.coi-fourx #loading img{
+ width:76px;height:76px;object-fit:cover;border-radius:14px;
+ border:1px solid #dfb970;box-shadow:0 4px 18px #0008;
+}
+.coi-fourx #loading strong{font:700 21px/1.2 Georgia,serif;color:#ffe0a5}
+.coi-fourx #loading button{min-height:48px;margin-top:8px!important}
+@media(max-width:760px){
+ .coi-fourx #loading{min-height:176px;margin:9px auto;padding:15px 14px}
+ .coi-fourx .coi-city-stage .city{min-height:clamp(310px,58svh,530px)}
+ .coi-fourx .coi-city-panel h2{margin-bottom:6px}
+}
