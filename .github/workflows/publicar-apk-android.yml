@@ -11,6 +11,14 @@ on:
         description: "VersionCode minimo: 4 (atualiza o APK candidato 0.9.2)"
         type: string
         required: true
+      modo:
+        description: "Modalidade de distribuicao (gratuita exige bloqueio financeiro comprovado no Worker)"
+        type: choice
+        required: true
+        default: comercial
+        options:
+          - comercial
+          - gratuito
       confirmacao:
         description: "Digite PUBLICAR_APK_OFICIAL apos validar Android real, servidor e cobrancas"
         type: string
@@ -33,6 +41,7 @@ jobs:
       ANDROID_VERSION_NAME: ${{ inputs.versao }}
       ANDROID_VERSION_CODE: ${{ inputs.codigo_versao }}
       RELEASE_CONFIRMATION: ${{ inputs.confirmacao }}
+      RELEASE_MODE: ${{ inputs.modo }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -43,6 +52,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
+          [[ "$RELEASE_MODE" == "gratuito" || "$RELEASE_MODE" == "comercial" ]] || { echo "::error::Modo de release invalido"; exit 1; }
           [[ "$RELEASE_CONFIRMATION" == "PUBLICAR_APK_OFICIAL" ]] || { echo "::error::Confirmacao obrigatoria"; exit 1; }
           [[ "$ANDROID_VERSION_NAME" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "::error::Versao semver invalida"; exit 1; }
           [[ "$ANDROID_VERSION_CODE" =~ ^[1-9][0-9]{0,8}$ ]] || { echo "::error::VersionCode invalido"; exit 1; }
@@ -95,7 +105,11 @@ jobs:
       - name: Exigir backend de Eldoria publicado e D1 completo antes de assinar
         run: node scripts/check-android-release-server.mjs
       - name: Exigir todos pacotes e dois recebimentos habilitados antes de assinar
+        if: ${{ inputs.modo == 'comercial' }}
         run: node scripts/check-commercial-store.mjs
+      - name: Exigir bloqueio total de checkout para APK gratuito antes de assinar
+        if: ${{ inputs.modo == 'gratuito' }}
+        run: node scripts/check-android-free-release-gate.mjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -166,7 +180,11 @@ jobs:
       - name: Revalidar backend imediatamente antes de disponibilizar APK
         run: node scripts/check-android-release-server.mjs
       - name: Revalidar catalogo e pagamentos imediatamente antes de liberar APK
+        if: ${{ inputs.modo == 'comercial' }}
         run: node scripts/check-commercial-store.mjs
+      - name: Revalidar bloqueio total de checkout antes de liberar APK gratuito
+        if: ${{ inputs.modo == 'gratuito' }}
+        run: node scripts/check-android-free-release-gate.mjs
       - name: Publicar release oficial com APK e checksum
         shell: bash
         env:
