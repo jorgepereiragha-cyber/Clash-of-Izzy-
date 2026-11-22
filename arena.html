@@ -95,7 +95,7 @@
  <div id="territoryList"><div class="territoryCard">Carregando territórios…</div></div>
 </section>
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
-<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Escolha seu pacote e conclua a compra pelo checkout seguro do Mercado Pago. A liberação ocorre após a confirmação do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><label>Forma de pagamento<select id="purchaseMethod" aria-label="Forma de pagamento"><option value="mercadopago_link" selected>Mercado Pago · checkout oficial</option><option value="pix" disabled>Nubank Pix · aguardando configuração</option></select></label><p>Mercado Pago: checkout seguro e confirmação automática. Nubank Pix: pedido assistido, com cobrança do banco e conferência manual antes da entrega. Não envie senhas ou códigos de acesso.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><button id="pixSupportButton" type="button" hidden>Solicitar cobrança Nubank Pix</button><div id="pixPaymentDetails" hidden><label>Chave Pix Nubank do pedido:<input type="text" id="pixKeyValue" readonly autocomplete="off" aria-label="Chave Pix para pagar o pedido" style="width:100%;padding:10px;margin:8px 0;background:#17283c;color:#fff5de;border:1px solid #d8ad5f;border-radius:8px"></label><button id="pixCopyKey" type="button">Copiar chave Pix</button><p id="pixPaymentSummary">Confira o nome do recebedor no seu banco antes de transferir. A entrega é manual após crédito confirmado.</p></div><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
+<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Escolha seu pacote e conclua a compra pelo checkout seguro do Mercado Pago. A liberação ocorre após a confirmação do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><label>Forma de pagamento<select id="purchaseMethod" aria-label="Forma de pagamento"><option value="mercadopago_link" selected>Mercado Pago · checkout oficial</option><option value="pix" disabled>Nubank Pix · aguardando configuração</option></select></label><p>Os pagamentos são liberados apenas quando o recebedor e a integração estiverem configurados. Mercado Pago: confirmação pelo provedor. Nubank Pix: conciliação manual no extrato antes da entrega. Não envie senhas ou códigos de acesso.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><button id="pixSupportButton" type="button" hidden>Solicitar cobrança Nubank Pix</button><div id="pixPaymentDetails" hidden><label>Chave Pix Nubank do pedido:<input type="text" id="pixKeyValue" readonly autocomplete="off" aria-label="Chave Pix para pagar o pedido" style="width:100%;padding:10px;margin:8px 0;background:#17283c;color:#fff5de;border:1px solid #d8ad5f;border-radius:8px"></label><button id="pixCopyKey" type="button">Copiar chave Pix</button><p id="pixPaymentSummary">Confira o nome do recebedor no seu banco antes de transferir. A entrega é manual após crédito confirmado.</p></div><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'three';
 import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } from './engine/asset-loader.js';
@@ -647,11 +647,15 @@ async function refreshKingdomStore(){
  try{const data=await chatApi('/game/state');kingdomSession=data.state;renderKingdomStore()}
  catch(error){renderKingdomStore();const status=document.getElementById('storeStatus');if(status)status.textContent=error.message}
 }
+let paymentMethodStatus={known:false,mercadoPago:false,nubankPix:false};
 async function requestOfficialPurchase(item,kind,button){
  const notice=document.getElementById('purchaseNotice');
  const supportButton=document.getElementById('pixSupportButton');if(supportButton)supportButton.hidden=true;
  const pixDetails=document.getElementById('pixPaymentDetails');if(pixDetails)pixDetails.hidden=true;
  const paymentMethod=document.getElementById('purchaseMethod')?.value==='pix'?'pix':'mercadopago_link';
+ if(!paymentMethodStatus.known){notice.textContent='Verificando se o recebimento está habilitado. Tente novamente em instantes.';return}
+ if(paymentMethod==='pix'&&!paymentMethodStatus.nubankPix){notice.textContent='Nubank Pix indisponível até a validação do recebedor e da conta.';return}
+ if(paymentMethod==='mercadopago_link'&&!paymentMethodStatus.mercadoPago){notice.textContent='Mercado Pago indisponível até configurar o checkout e o webhook da conta autorizada.';return}
  const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
  if(!token){notice.textContent='Conecte seu reino antes de comprar.';return}
  const checkoutWindow=paymentMethod==='mercadopago_link'?window.open('about:blank','_blank'):null;
@@ -738,17 +742,28 @@ async function loadCatalog(){
 }
 loadCatalog();
 async function loadPaymentMethods(){
+ const select=document.getElementById('purchaseMethod');
  const pixOption=document.querySelector('#purchaseMethod option[value="pix"]');
- if(!pixOption)return;
+ const mpOption=document.querySelector('#purchaseMethod option[value="mercadopago_link"]');
+ if(!pixOption||!mpOption||!select)return;
  try{
   const response=await fetch('/api/store/payment-methods',{cache:'no-store'});
   if(!response.ok)throw new Error('Payment methods unavailable');
   const methods=await response.json();
-  pixOption.disabled=methods.nubankPix!==true;
-  pixOption.textContent=methods.nubankPix===true?'Nubank Pix · cobrança assistida':'Nubank Pix · aguardando configuração';
+  paymentMethodStatus={known:true,mercadoPago:methods.mercadoPago===true,nubankPix:methods.nubankPix===true};
  }catch{
-  pixOption.disabled=true;pixOption.textContent='Nubank Pix · indisponível';
+  paymentMethodStatus={known:true,mercadoPago:false,nubankPix:false};
  }
+ mpOption.disabled=!paymentMethodStatus.mercadoPago;
+ pixOption.disabled=!paymentMethodStatus.nubankPix;
+ mpOption.textContent=paymentMethodStatus.mercadoPago?'Mercado Pago · checkout oficial':'Mercado Pago · aguardando configuração';
+ pixOption.textContent=paymentMethodStatus.nubankPix?'Nubank Pix · cobrança assistida':'Nubank Pix · aguardando configuração';
+ if(!paymentMethodStatus.mercadoPago&&paymentMethodStatus.nubankPix)select.value='pix';
+ if(!paymentMethodStatus.mercadoPago&&!paymentMethodStatus.nubankPix){
+  select.disabled=true;
+  const notice=document.getElementById('purchaseNotice');
+  if(notice)notice.textContent='Compras temporariamente indisponíveis: aguardando validação da conta recebedora e dos métodos de pagamento.';
+ }else select.disabled=false;
 }
 void loadPaymentMethods();
 document.getElementById('purchaseMethod')?.addEventListener('change',()=>{
