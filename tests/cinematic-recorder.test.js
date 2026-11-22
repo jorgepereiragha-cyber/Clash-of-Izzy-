@@ -251,7 +251,7 @@ test("PWA does not preload the trailer recorder; cached overlays are hidden", ()
     "/scripts/cinematic/recorder-ui.js"
   ]) assert.ok(!serviceWorker.includes(path), "Nenhum módulo de gravação deve ser pré-carregado: " + path);
   assert.match(premiumCss, /#trailer-recorder-panel\{display:none!important\}/);
-  assert.match(ui, /URL\\.revokeObjectURL\\(url\\)/);
+  assert.match(ui, /URL\.revokeObjectURL\(url\)/);
 });
 
 test("mobile codec negotiation prefers supported VP9/VP8 and falls back to H.264 MP4", () => {
