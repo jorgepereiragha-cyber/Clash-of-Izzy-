@@ -90,10 +90,14 @@ uma versao anterior, mantenha **applicationId e certificado iguais**.
 - A sessao do WebView nao e compartilhada automaticamente com o Chrome.
   Pode ser necessario entrar/criar sessao no APK; nao apague o estado do
   navegador sem verificar que a conta esta protegida e recuperavel.
-- Links `target=_blank`, pagamentos externos, seletores de arquivo,
-  notificacoes, jogos offline, audio e captura cinematografica exigem
-  validacao manual em aparelhos Android reais; esta base nao promete
-  suporte nativo a esses recursos.
+- O WebView abre janelas solicitadas por gesto do usuario por meio de uma WebView
+  tecnica invisivel. Enderecos HTTPS externos (incluindo checkout Mercado Pago)
+  sao entregues ao navegador do Android, sem substituir o jogo. Popups automaticos
+  nao sao autorizados. A interface de pagamento permanece fora do aplicativo.
+- O fluxo de pagamento completo (retorno do navegador, webhook, entrega), seletores
+  de arquivo, notificacoes, jogos offline, audio e captura cinematografica ainda
+  exigem validacao manual em aparelhos Android reais; nao ha promessa de suporte
+  nativo aos demais recursos.
 - O APK **nao altera o backend** e nao valida se a versao recente de uma
   PR de melhorias 3D ja esta implantada no Worker de producao.
 - Teste aparelho de entrada e intermediario (WebGL, memoria, FPS,
