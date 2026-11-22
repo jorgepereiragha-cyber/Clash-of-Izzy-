@@ -24,8 +24,8 @@ test("P1-P8 migration 0043 has only one approved canonical file", async () => {
     const statements = sql.replace(/^\s*--.*$/gm, "").split(";").map(s => s.trim()).filter(s => /^UPDATE\s+vip_packages\b/i.test(s));
     assert.equal(statements.length, 5);
     for (const stmt of statements) {
-      assert.match(stmt, /WHERE\s+name='[^']+'\s+AND\s+ROUND\(price_brl\*100\)=\d+\s+AND\s+gems=\d+\s*$/i,
-        "catalog corrective UPDATE must guard both old price and old gems");
+      assert.match(stmt, /WHERE\s+name='[^']+'\s+AND\s+ROUND\(price_brl\*100\)=\d+\s+AND\s+gems=\d+\s+AND\s+NOT EXISTS\s*\(\s*SELECT 1\s+FROM purchase_requests r\s+WHERE r\.product_kind='vip_package'\s+AND r\.product_id=vip_packages\.id\s+AND r\.status='pending'\s*\)\s*$/i,
+        "catalog corrective UPDATE must guard legacy price, gems and pending payment orders");
     }
   }
 });
