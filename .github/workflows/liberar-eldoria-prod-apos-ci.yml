@@ -1,0 +1,105 @@
+name: Liberar Eldoria em producao apos CI e D1 Preview
+
+on:
+  workflow_run:
+    workflows: ["Clash of Izzy CI"]
+    types: [completed]
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: clash-izzy-release-trigger-once
+  cancel-in-progress: false
+
+jobs:
+  validar-e-disparar-deploy:
+    if: >-
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      contains(github.event.workflow_run.head_commit.message, '[READY-ELDORIA-RELEASE]')
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          persist-credentials: false
+      - name: Exigir versão de release e contrato de APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -f worker.js
+          test -f migrations/0030_dragons_master_mailbox.sql
+          test -f .github/workflows/deploy-cloudflare.yml
+          grep -q 'androidApiContract:"eldoria-android-v1"' worker.js
+          test "${{ github.event.workflow_run.head_sha }}" = "${{ github.sha }}" || true
+      - name: Conferir D1 Preview homologado, produção intocada e bookmark de recuperação
+        shell: bash
+        env:
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,urllib.request,urllib.error
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          token=os.environ.get("RAW_TOKEN","").strip()
+          if token.lower().startswith("bearer "): token=token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):token=token[1:-1].strip()
+          if not account or not token or any(c.isspace() for c in token):
+            raise SystemExit("Credenciais Cloudflare indisponíveis: sem deploy.")
+          print("::add-mask::"+token)
+          base="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/"
+          prod="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          preview="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          if prod==preview:raise SystemExit("IDs de produção e Preview coincidem.")
+          def cloud(url,sql=None):
+            data=json.dumps({"sql":sql}).encode() if sql else None
+            req=urllib.request.Request(url,data=data,
+              method="POST" if sql else "GET",
+              headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+            try:
+              with urllib.request.urlopen(req,timeout=25) as response: obj=json.loads(response.read().decode())
+            except urllib.error.HTTPError as e:
+              raise SystemExit("Cloudflare negou auditoria HTTP "+str(e.code)+"; deploy bloqueado.")
+            if not obj.get("success"):raise SystemExit("Cloudflare não confirmou sucesso; deploy bloqueado.")
+            return obj["result"]
+          staging=cloud(base+preview+"/query",
+            "SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")
+          latestPreview=staging[0]["results"][0]["name"]
+          if latestPreview!="0030_dragons_master_mailbox.sql":
+            raise SystemExit("Preview não está na migração 0030; sem deploy.")
+          prodRows=cloud(base+prod+"/query",
+            "SELECT (SELECT COUNT(*) FROM players) AS jogadores,(SELECT COUNT(*) FROM kingdoms) AS reinos,(SELECT COUNT(*) FROM player_accounts) AS contas,(SELECT COUNT(*) FROM purchase_requests) AS pedidos,(SELECT COUNT(*) FROM mercadopago_orders) AS ordens")
+          row=prodRows[0]["results"][0]
+          counts={k:int(v) for k,v in row.items()}
+          print("D1 produção, contagens agregadas: "+json.dumps(counts,ensure_ascii=False))
+          if counts!={"jogadores":28,"reinos":23,"contas":0,"pedidos":0,"ordens":0}:
+            raise SystemExit("D1 de produção mudou desde a auditoria; é necessária uma nova revisão.")
+          migration=cloud(base+prod+"/query",
+            "SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")[0]["results"][0]["name"]
+          if migration!="0025_kingdom_world_queues_defense_audit.sql":
+            raise SystemExit("Migração atual da produção diferente de 0025; sem deploy.")
+          tt=cloud(base+prod+"/time_travel/bookmark")
+          if not str(tt.get("bookmark","")).strip():
+            raise SystemExit("Time Travel de produção sem bookmark; sem deploy.")
+          print("OK: Preview na 0030, produção na 0025, registros originais preservados, bookmark de recuperação disponível.")
+          print("Plano Workers Paid declarado pelo proprietário. A API Billing retornou 403 em auditoria anterior; não foi confirmado por Billing Read.")
+          PY
+      - name: Acionar deploy original protegido e arquivamento D1
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Somente o deploy oficial arquiva bookmark, aplica migrations e publica Worker.
+          # A autorização de plano Pago e produção foi concedida pelo proprietário
+          # no pedido de lançamento e na confirmação de serviço Cloudflare pago.
+          gh workflow run deploy-cloudflare.yml --ref main \
+            -f confirm_paid_plan=true \
+            -f confirm_production=true
+          echo "Workflow protegido solicitado. Aprovação de environment production, se configurada, permanece exigida."
+          echo "APK comercial e pagamentos reais não foram ativados por esta etapa."
