@@ -157,3 +157,17 @@ test("herói dourado supera o teto antigo de 3% e bônus do dragão são aplicad
  assert.ok(withDragon.attackerPower>gold.attackerPower);
  assert.deepEqual(capped,exactlyCapped);
 });
+
+test("bônus do VIP 7 do castelo se acumulam até o teto global sem duplicação",()=>{
+ const army=[{unit_type:"knight",tier:3,quantity:70}];
+ const base={army,castleLevel:30,defenderLevel:14,roll:1,criticalSeed:2026};
+ const normal=simulateBattle(base);
+ const vip=simulateBattle({...base,castleVipAttackBonusPercent:3.5,castleVipDefenseBonusPercent:7});
+ assert.ok(vip.attackerPower>normal.attackerPower);
+ const capped=simulateBattle({...base,equipmentAttackBonusPercent:30,castleVipAttackBonusPercent:3.5});
+ const baseCapped=simulateBattle({...base,equipmentAttackBonusPercent:30});
+ assert.deepEqual(capped,baseCapped,"VIP não ultrapassa o teto global de 30%");
+ const extras=simulateBattle({...base,castleVipAttackBonusPercent:300,castleVipDefenseBonusPercent:300});
+ const exact=simulateBattle({...base,castleVipAttackBonusPercent:3.5,castleVipDefenseBonusPercent:7});
+ assert.deepEqual(extras,exact,"VIP vindo do cliente não poderia multiplicar bônus acima do limite");
+});

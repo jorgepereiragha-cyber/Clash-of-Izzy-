@@ -975,17 +975,57 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(await api("/api/admin/purchase-requests", { method: "POST", body: {} }), 401, "fila Master sem sessão");
     });
 
-    await t.test("todas as 39 ações previstas foram alcançadas no fluxo de integração", async () => {
+    await t.test("castelo 30 permanece 30 após sete ascensões VIP; transações idempotentes", async () => {
+      // Fixture isolada, aplicada somente no banco D1 local do teste.
+      await runCli([
+        "--config","wrangler.jsonc","d1","execute","clash-of-izzy-db",
+        "--local","--persist-to",persistDir,
+        "--command",
+        "UPDATE kingdoms SET castle_level=30 WHERE id="+kingdomA+";"+
+        "UPDATE kingdom_buildings SET level=30 WHERE kingdom_id="+kingdomA+" AND building_type='castle';"+
+        "UPDATE players SET gems=200000 WHERE id=(SELECT player_id FROM kingdoms WHERE id="+kingdomA+");"
+      ]);
+      let vipState=expectStatus(await api("/api/game/state",{token:tokenA}),200,"estado do castelo 30").state;
+      assert.equal(vipState.kingdom.castle_level,30);
+      assert.equal(vipState.castleVip.level,0);
+      assert.equal(vipState.castleVip.eligible,true);
+      let remaining=200000;
+      const costs=[1000,2500,5000,10000,20000,40000,80000];
+      for(let level=1;level<=7;level++){
+        const result=await action(tokenA,{type:"castle_vip_upgrade",expectedVipLevel:level-1},200,"ascensão VIP "+level);
+        const next=result.state;
+        remaining-=costs[level-1];
+        assert.equal(next.castleVip.level,level);
+        assert.equal(next.kingdom.castle_level,30);
+        assert.equal(next.buildings.find(row=>row.building_type==="castle")?.level,30);
+        assert.equal(next.player.gems,remaining);
+        assert.equal(next.castleVip.bonuses.productionPercent,level*10);
+        if(level===1||level===7){
+          const duplicate=await action(tokenA,{type:"castle_vip_upgrade",expectedVipLevel:level-1},409,"repetição VIP "+level);
+          assert.match(duplicate.error,/desatualizado/i);
+          const after=expectStatus(await api("/api/game/state",{token:tokenA}),200,"saldo após repetição VIP "+level).state;
+          assert.equal(after.player.gems,remaining);
+          assert.equal(after.castleVip.level,level);
+        }
+      }
+      await action(tokenA,{type:"castle_vip_upgrade",expectedVipLevel:7},409,"bloqueio VIP acima de sete");
+      const last=expectStatus(await api("/api/game/state",{token:tokenA}),200,"VIP 7 final").state;
+      assert.equal(last.castleVip.completed,true);
+      assert.equal(last.castleVip.next,null);
+      assert.equal(last.kingdom.castle_level,30);
+    });
+    
+    await t.test("todas as 40 ações previstas foram alcançadas no fluxo de integração", async () => {
       const actionTypes = [
         "set_nickname","equipment_craft","equipment_upgrade","equipment_equip","equipment_unequip","equipment_lock",
         "cosmetic_buy","cosmetic_claim","skin_set_equip","skin_set_unequip","seasonal_buy","skin_fuse","shop_buy","merchant_exchange","hero_shop_buy","queue_speedup","alliance_create","alliance_join",
         "alliance_invite","alliance_accept_invite","alliance_promote","alliance_kick","alliance_donate","alliance_help",
         "alliance_chat","alliance_war_declare","alliance_claim_territory","alliance_leave","dragon_upgrade","hero_summon",
-        "hero_evolve","hero_train","prestige","upgrade","train","research","march","battle","rename",
+        "hero_evolve","hero_train","prestige","castle_vip_upgrade","upgrade","train","research","march","battle","rename",
       ];
-      assert.equal(actionTypes.length, 39);
+      assert.equal(actionTypes.length, 40);
       assert.deepEqual([...executedActions].sort(), [...actionTypes].sort(),
-        "cada um dos 39 tipos de ação deve ter sido enviado ao Worker autenticado");
+        "cada um dos 40 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
   } finally {
     if (workerProcess && workerProcess.exitCode === null) {
