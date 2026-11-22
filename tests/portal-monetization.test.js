@@ -4,11 +4,12 @@ import { readFile } from 'node:fs/promises';
 
 const read = path => readFile(new URL('../' + path, import.meta.url), 'utf8');
 
-test('browser portal is promotion and signed-APK distribution only, not web gameplay or PWA', async () => {
+test('isolated portal advertises external web gameplay without hosting game routes or PWA', async () => {
   const [portal, index, navigation, sw] = await Promise.all([
     read('portal.html'), read('index.html'), read('navigation.js'), read('sw.js')
   ]);
   assert.match(portal, /id="download-apk"/);
+  assert.match(portal, /id="play-browser" href="https:\/\/clash-of-izzy\.jorgepereiragha\.workers\.dev\/kingdom\.html"/);
   assert.match(portal, /releases\/latest/);
   assert.match(portal, /clash-of-izzy-android\.apk/);
   assert.match(portal, /\.sha256/);

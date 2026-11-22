@@ -3,8 +3,9 @@ import { test, expect } from "@playwright/test";
 const releases = "https://api.github.com/repos/jorgepereiragha-cyber/Clash-of-Izzy-/releases/latest";
 const prefix = "https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases/download/v1.2.3/";
 const apk = "clash-of-izzy-android.apk";
+const browserGame = "https://clash-of-izzy.jorgepereiragha.workers.dev/kingdom.html";
 
-test("Android: homepage is a promotional download portal, never a web-game entry", async ({ page }) => {
+test("Android: homepage exposes browser gameplay while APK remains gated", async ({ page }) => {
   await page.route(releases, route => route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: "{}" }));
   await page.goto("/");
   // Workers Static Assets canonicalizes /portal.html to /portal.
@@ -15,6 +16,12 @@ test("Android: homepage is a promotional download portal, never a web-game entry
   await expect(button).not.toHaveAttribute("href", /./);
   await expect(page.locator("a[href='/kingdom.html'],a[href='/world.html'],a[href='/arena.html']")).toHaveCount(0);
   await expect(page.getByText("O APK comercial ainda não está disponível")).toBeVisible();
+  const play = page.locator("#play-browser");
+  await expect(play).toHaveAttribute("href", browserGame);
+  await page.route(browserGame, route => route.fulfill({ status: 200, contentType: "text/html", body: "<h1>Reino acessível</h1>" }));
+  await play.click();
+  // Prova que o CTA navega à URL pública exata; não faz afirmações sobre o HTML remoto.
+  await expect(page).toHaveURL(browserGame);
 });
 
 test("Android: only signed release names on official GitHub download host are offered", async ({ page }) => {
