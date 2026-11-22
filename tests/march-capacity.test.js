@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {
- MAX_MARCH_SIZE,calculateMarchCapacity,heroLeadershipBonus,
+ MAX_MARCH_SIZE,calculateMarchCapacity,calculateMarchSlots,heroLeadershipBonus,
  troopTotal,assertWithinMarchCapacity,loadMarchCapacity
 } from "../march-capacity.js";
 const read=path=>readFile(new URL("../"+path,import.meta.url),"utf8");
@@ -48,6 +48,18 @@ test("capacidade não cresce sem limite e dados inválidos não criam poderes ex
  assert.equal(heroLeadershipBonus({rarity:"wrong",level:-5,stars:-2}),108);
  assert.equal(heroLeadershipBonus(null),0);
 });
+test("a evolução libera até cinco filas de marcha sem permitir filas infinitas",()=>{
+ assert.deepEqual(calculateMarchSlots(),{max:1,active:0,available:1});
+ assert.equal(calculateMarchSlots({castleLevel:5}).max,2);
+ assert.equal(calculateMarchSlots({castleLevel:15}).max,3);
+ assert.equal(calculateMarchSlots({castleLevel:15,militaryLevel:5}).max,4);
+ assert.deepEqual(calculateMarchSlots({castleLevel:30,militaryLevel:30,activeMarches:4}),
+   {max:5,active:4,available:1});
+ assert.equal(calculateMarchSlots({castleLevel:30,militaryLevel:30,activeMarches:5}).available,0);
+ assert.equal(calculateMarchSlots({castleLevel:1,activeMarches:8}).available,0);
+ assert.throws(()=>calculateMarchSlots({activeMarches:-1}),/inválida/);
+});
+
 test("servidor rejeita marcha vazia, fraude de quantidade e excesso do limite",()=>{
  assert.equal(troopTotal({militia:100,knight:55}),155);
  assert.equal(assertWithinMarchCapacity({militia:100,knight:55},155),155);
@@ -90,7 +102,14 @@ test("Worker aplica limite antes de debitar e registra herói da expedição",as
  assert.match(march,/commander_hero_key,march_capacity_at_dispatch/);
  assert.match(march,/marchLimit\.heroKey,marchLimit\.capacity/);
  assert.match(worker,/m\.commander_hero_key/);
- assert.match(worker,/marchCapacity,marchHeroOptions/);
+ assert.match(worker,/marchCapacity,marchHeroOptions,marchSlots/);
+ assert.match(worker,/SELECT COUNT\(\*\) AS total FROM marches WHERE kingdom_id=\? AND status='marching'/);
+ assert.match(march,/calculateMarchSlots/);
+ assert.match(march,/SELECT COUNT\(\*\) FROM marches WHERE kingdom_id=\? AND status='marching'/);
+ assert.match(ui,/formationBalanced/);
+ assert.match(ui,/formationGather/);
+ assert.match(ui,/formationMax/);
+ assert.match(html,/id="formationClear"/);
  assert.match(ui,/heroKey:selectedMarchHeroKey\|\|null/);
  assert.match(ui,/selectedMarchCapacity\(\)/);
  assert.match(html,/id="marchCapacityInfo"/);
