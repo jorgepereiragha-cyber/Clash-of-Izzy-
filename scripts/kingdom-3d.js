@@ -67,6 +67,7 @@ if (host && "WebGLRenderingContext" in window) {
   };
   const sharedMaterials = new Set(Object.values(mats));
   const surfaceTextureCache = new Map();
+  const surfaceMaterialCache = new Map();
   let disposed = false;
   let kingdomRenderHandler = null;
   let cinematicCaptureActive = false;
@@ -143,9 +144,11 @@ if (host && "WebGLRenderingContext" in window) {
       resources.materials.add(mat);
       if (mat.map) resources.textures.add(mat.map);
     }
+    for(const mat of surfaceMaterialCache.values())resources.materials.add(mat);
     disposeResourceSet(resources);
     scene?.clear();
     surfaceTextureCache.clear();
+    surfaceMaterialCache.clear();
     glbTemplates.clear();
     glbPropTemplates.clear();
     glbUnitTemplates.clear();
@@ -275,13 +278,19 @@ if (host && "WebGLRenderingContext" in window) {
     return surfaceTextureCache.get(key);
   }
   function surfaceMaterial(base, kind, seed) {
+    const key=`${base}:${kind}:${seed}`;
+    if(surfaceMaterialCache.has(key))return surfaceMaterialCache.get(key);
     const maps = getSurfaceMaps(base, kind, seed);
-    return new THREE.MeshStandardMaterial({
+    const mat=new THREE.MeshStandardMaterial({
       color: "#ffffff",
       ...maps,
       roughness: kind === "roof" ? .86 : .96,
       metalness: 0.01
     });
+    // Evita recompilar materiais iguais após cada atualização de estado.
+    surfaceMaterialCache.set(key,mat);
+    sharedMaterials.add(mat);
+    return mat;
   }
   function applyProceduralSurfaceMaps() {
     const maps = [
