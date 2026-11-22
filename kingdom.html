@@ -152,6 +152,16 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <p>Fazenda produz trigo; moinho transforma trigo em farinha; padaria transforma farinha em comida. O cálculo e os estoques são mantidos no servidor.</p>
   <p id="coiIndustryStock" role="status">Aguardando estoque...</p>
   <div class="toolbar"><button type="button" data-coi-industry="mill">Evoluir moinho</button><button type="button" data-coi-industry="bakery">Evoluir padaria</button></div>
+  <h3>Heróis em postos 4X</h3>
+  <p>Heróis de suporte melhoram o moinho; arqueiros e infantaria reforçam torres construídas. Os benefícios não alteram o VIP.</p>
+  <div class="coi-hero-controls">
+   <label for="coiHeroRole">Posto<select id="coiHeroRole"><option value="industry:mill">Moinho</option><option value="defense:tower">Torres defensivas</option></select></label>
+   <label for="coiHeroCandidate">Herói disponível<select id="coiHeroCandidate"></select></label>
+   <button id="coiHeroAssign" type="button" disabled>Alocar herói</button>
+   <button id="coiHeroUnassign" type="button" disabled>Liberar posto</button>
+  </div>
+  <p id="coiHeroSummary">Nenhum herói alocado.</p>
+  <p id="coiHeroFeedback" role="status" aria-live="polite"></p>
   <h3>Defesas posicionáveis · 50×50</h3>
   <p>Azul: construções. Dourado: defesas. Verde: posição válida. Vermelho: colisão.</p>
   <canvas id="coiDefenseGrid" width="500" height="500" aria-label="Mapa de construção de defesas"></canvas>
