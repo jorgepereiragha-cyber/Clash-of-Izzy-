@@ -17,6 +17,10 @@ if (host && "WebGLRenderingContext" in window) {
   let latestTroops = [];
   let latestCastleSkinId = 0;
   let activeModels = [];
+  let activeDefenseModels = [];
+  let defensePreviewMesh = null;
+  let defensePreviewHandler = null;
+  let latestDefenses = [];
   let activeProps = [];
   let activeTroops = [];
   let armyMixers = [];
@@ -146,6 +150,8 @@ if (host && "WebGLRenderingContext" in window) {
     glbPropTemplates.clear();
     glbUnitTemplates.clear();
     activeModels = [];
+    activeDefenseModels = [];
+    defensePreviewMesh = null;
     activeProps = [];
     activeTroops = [];
     armyMixers = [];
@@ -623,6 +629,74 @@ if (host && "WebGLRenderingContext" in window) {
     renderer.render(scene, camera);
     publishBuildingHitTargets(list);
   }
+  // Defesas 4X são meshes leves; posições usam a mesma escala do castelo 3D.
+  function renderCityDefenses(defenses = []) {
+    if (!scene || !renderer || disposed) return;
+    for (const object of activeDefenseModels) {
+      scene.remove(object);
+      disposeDetachedObject3D(object);
+    }
+    activeDefenseModels = [];
+    const entries = (Array.isArray(defenses) ? defenses : []).slice(0, 32);
+    for (const item of entries) {
+      const type = item?.defense_type;
+      const x = Number(item.grid_x), z = Number(item.grid_z);
+      const w = Number(item.width), h = Number(item.height);
+      if (!["tower","trap","gate"].includes(type) ||
+          ![x,z,w,h].every(Number.isFinite) || w<1 || h<1 || w>5 || h>5) continue;
+      const group = new THREE.Group();
+      const stone = new THREE.MeshStandardMaterial({color:"#89959c",roughness:.87});
+      const wood = new THREE.MeshStandardMaterial({color:"#6d4834",roughness:.9});
+      const accent = new THREE.MeshStandardMaterial({color:type==="trap"?"#a3694a":"#c4a45e",roughness:.75});
+      const add = (geometry,material,px,py,pz) => {
+        const mesh = new THREE.Mesh(geometry,material);
+        mesh.position.set(px,py,pz);
+        mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
+      };
+      const sx=w*.53,sz=h*.53;
+      add(new THREE.BoxGeometry(sx*.88,.12,sz*.88),stone,0,.06,0);
+      if(type==="tower"){
+        add(new THREE.CylinderGeometry(.28,.34,1.05,8),stone,0,.64,0);
+        add(new THREE.CylinderGeometry(.38,.3,.16,8),accent,0,1.25,0);
+      }else if(type==="gate"){
+        const pillarHeight=.95;
+        add(new THREE.BoxGeometry(.18,pillarHeight,.22),stone,-sx*.3,.55,0);
+        add(new THREE.BoxGeometry(.18,pillarHeight,.22),stone,sx*.3,.55,0);
+        add(new THREE.BoxGeometry(sx*.75,.18,.24),accent,0,1.08,0);
+        add(new THREE.BoxGeometry(sx*.37,.6,.08),wood,0,.39,0);
+      }else{
+        for(const dx of [-.12,0,.12])for(const dz of [-.12,.12])
+          add(new THREE.ConeGeometry(.072,.35,4),accent,dx,.29,dz);
+      }
+      group.position.set((x+w/2)*.53,0,(z+h/2)*.53);
+      group.userData.coIDefenseId = item.id;
+      scene.add(group); activeDefenseModels.push(group);
+    }
+    renderer.render(scene,camera);
+  }
+  function updateDefensePreview(detail) {
+    if (!scene || !renderer || disposed) return;
+    if (defensePreviewMesh) {
+      scene.remove(defensePreviewMesh);
+      disposeDetachedObject3D(defensePreviewMesh);
+      defensePreviewMesh = null;
+    }
+    const x=Number(detail?.gridX),z=Number(detail?.gridZ),
+      w=Number(detail?.width),h=Number(detail?.height);
+    if(!detail?.type||![x,z,w,h].every(Number.isFinite)||w<1||h<1||w>5||h>5){
+      renderer.render(scene,camera);return;
+    }
+    const geometry=new THREE.PlaneGeometry(w*.53,h*.53);
+    const material=new THREE.MeshBasicMaterial({
+      color:detail.valid?0x36d47a:0xe04d57,transparent:true,opacity:.5,
+      depthWrite:false,side:THREE.DoubleSide
+    });
+    defensePreviewMesh=new THREE.Mesh(geometry,material);
+    defensePreviewMesh.rotation.x=-Math.PI/2;
+    defensePreviewMesh.position.set((x+w/2)*.53,.16,(z+h/2)*.53);
+    scene.add(defensePreviewMesh);
+    renderer.render(scene,camera);
+  }
   function canRunArmyAnimation() {
     return !disposed && !cinematicCaptureActive && !document.hidden && sceneInViewport;
   }
@@ -964,6 +1038,7 @@ if (host && "WebGLRenderingContext" in window) {
       visibilityChangeHandler = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+      if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
       disposeSceneResources();
       ktx2?.dispose();
       draco?.dispose();
@@ -980,17 +1055,23 @@ if (host && "WebGLRenderingContext" in window) {
       const detail = event.detail || {};
       const list = detail.buildings || [];
       latestTroops = Array.isArray(detail.troops) ? detail.troops : [];
+      latestDefenses = Array.isArray(detail.defenses) ? detail.defenses : [];
       latestCastleSkinId=Number(detail.castleSkinId)||0;
       renderBuildings(list,latestCastleSkinId);
+      renderCityDefenses(latestDefenses);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
     };
     window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
+    defensePreviewHandler=event=>updateDefensePreview(event.detail||{});
+    window.addEventListener("coi:defense-preview",defensePreviewHandler);
     if (Array.isArray(window.__coiKingdomBuildings)) {
       latestTroops = Array.isArray(window.__coiKingdomTroops) ? window.__coiKingdomTroops : [];
+      latestDefenses = Array.isArray(window.__coiKingdomDefenses) ? window.__coiKingdomDefenses : [];
       latestCastleSkinId=Number(window.__coiKingdomCastleSkin)||0;
       renderBuildings(window.__coiKingdomBuildings,latestCastleSkinId);
+      renderCityDefenses(latestDefenses);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops);
@@ -1078,6 +1159,7 @@ if (host && "WebGLRenderingContext" in window) {
     visibilityChangeHandler = null;
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+    if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
     disposeSceneResources();
     ktx2?.dispose();
       draco?.dispose();
