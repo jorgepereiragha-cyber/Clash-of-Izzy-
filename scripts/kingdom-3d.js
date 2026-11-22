@@ -699,7 +699,7 @@ if (host && "WebGLRenderingContext" in window) {
       const instanced=new THREE.InstancedMesh(geometry,material,list.length);
       const dummy=new THREE.Object3D();
       list.forEach((item,i)=>{
-        const height=type==="tower"?1.45:type==="gate"?.98:.22;
+        const height=type==="tower" ? 1.45 : type==="gate" ? 0.98 : 0.22;
         dummy.position.set(item.x,height/2,item.z);
         dummy.scale.set(item.sx*.8,height,item.sz*.8);
         dummy.updateMatrix();
