@@ -184,3 +184,34 @@ test("auditoria identifica qual secret Cloudflare precisa de correção",async()
   assert.match(second.detail,/CLOUDFLARE_ACCOUNT_ID/);
   assert.doesNotMatch(second.detail,/CLOUDFLARE_API_TOKEN/);
 });
+
+test("core-only production D1 workflow is manually authorized, limits SQL to <=0039, and records a restore point",async()=>{
+  const workflow=await read(".github/workflows/repair-production-d1-core.yml");
+  const fullDeploy=await read(".github/workflows/deploy-cloudflare.yml");
+  assert.match(workflow,/workflow_dispatch:/);
+  assert.match(workflow,/github\.ref == 'refs\/heads\/main'/);
+  assert.match(workflow,/confirm_production == true && inputs\.confirm_preview == true/);
+  assert.match(workflow,/inputs\.confirm_database_id == '7e63af59-d9ff-4159-a9cf-b02e35b92605'/);
+  assert.match(workflow,/environment:\s*\n\s*name: production/);
+  assert.match(workflow,/group: clash-of-izzy-cloudflare-production/);
+  assert.match(workflow,/int\(match\.group\(1\)\)<=39/);
+  assert.match(workflow,/migrations_dir"\]="\.coi-core-migrations"/);
+  assert.match(workflow,/0037_daily_login_rewards\.sql/);
+  assert.match(workflow,/0038_onboarding_bonus\.sql/);
+  assert.match(workflow,/0039_support_orders\.sql/);
+  assert.match(workflow,/last not in \("0035_throne_war\.sql","0036_4x_read_indexes\.sql"\)/);
+  assert.match(workflow,/time_travel\/bookmark/);
+  const preflight=workflow.indexOf("Auditar Worker, isolamento");
+  const history=workflow.indexOf("Verificar historico remoto");
+  const backup=workflow.indexOf("Capturar bookmark Time Travel");
+  const apply=workflow.indexOf("Aplicar somente migrations essenciais");
+  const verify=workflow.indexOf("Verificar prontidao remota SEM allowlist");
+  assert.ok(preflight>=0&&history>preflight&&backup>history&&apply>backup&&verify>apply);
+  assert.match(workflow.slice(verify),/node scripts\/cloudflare-remote-audit\.mjs/);
+  assert.doesNotMatch(workflow.slice(verify),/COI_ALLOW_PENDING_/);
+  assert.doesNotMatch(workflow,/wrangler[^\n]* deploy(?! --dry-run)/);
+  assert.match(fullDeploy,/Bloquear migrations comerciais pendentes/);
+  assert.match(fullDeploy,/0044_reconcile_level_packs\.sql/);
+  assert.ok(fullDeploy.indexOf("Bloquear migrations comerciais pendentes")<
+    fullDeploy.indexOf("Apply D1 migrations remotely"));
+});
