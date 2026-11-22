@@ -2,7 +2,7 @@
 // Nunca confiar na raridade/força enviada pelo cliente. D1 é autoritativo.
 // Não concede gemas, VIP ou recompensas comerciais.
 import {
- thronePhase,canCrownThrone,thronePowerForArmy,THRONE_NPC_POWER,
+ thronePhase,throneTimestamp,thronePowerForArmy,THRONE_NPC_POWER,
  THRONE_GARRISON_CAP,THRONE_ACTION_COOLDOWN_SECONDS
 } from "./throne-war-rules.js";
 
@@ -64,7 +64,7 @@ export async function throneStatus(env,playerId,now=Date.now()){
    allianceId:Number(siege.holding_alliance_id),
    kingdomId:Number(siege.holding_kingdom_id),garrisonPower:Number(siege.garrison_power),
    heldSince:siege.held_since,remainingHoldSeconds:Math.max(0,
-     Math.ceil((Date.parse(siege.held_since.replace(" ","T")+"Z")+9000000-now)/1000))
+     Math.ceil((throneTimestamp(siege.held_since)+9000000-now)/1000))
   }:null,
   crown:crown?{
    roundId:Number(crown.round_id),allianceId:Number(crown.alliance_id),
@@ -158,7 +158,7 @@ export async function throneAction(env,playerId,body,units,now=Date.now()){
   "AND NOT EXISTS(SELECT 1 FROM throne_siege_actions a WHERE a.realm_id=? AND a.round_id=? "+
   "AND a.kingdom_id=? AND datetime(a.created_at)>=datetime(?,'-300 seconds'))"
  ).bind(requestId,ctx.realm,phase.roundId,ctx.kingdomId,alliance.id,intent,unit,quantity,
-   casualties,power,createdAt,ctx.kingdomId,unit,casualties,alliance.id,ctx.kingdomId,
+   casualties,power,createdAt,ctx.kingdomId,unit,quantity,alliance.id,ctx.kingdomId,
    ctx.realm,phase.roundId,ctx.realm,phase.roundId,ctx.kingdomId,createdAt);
  const debit=env.DB.prepare(
   "UPDATE army_units SET quantity=quantity-? WHERE kingdom_id=? AND unit_type=? "+
