@@ -189,7 +189,9 @@ function renderMarchCapacity(){
   const total=Object.values(selectedUnits).reduce((sum,count)=>sum+Number(count||0),0);
   const capacity=selectedMarchCapacity();
   const details=state?.marchCapacity?.components||{};
+  const slots=state?.marchSlots||{active:0,max:1,available:1};
   output.textContent="Tropas selecionadas: "+fmt(total)+" / "+fmt(capacity)+
+    " · Marchas ativas: "+fmt(slots.active)+" / "+fmt(slots.max)+
     " · Castelo "+fmt(details.castle||0)+
     " · Quartel "+fmt(details.barracks||0)+
     " · Academia "+fmt(details.academy||0)+
@@ -203,6 +205,41 @@ $("marchHero").addEventListener("change",event=>{
   selectedMarchHeroKey=event.target.value;
   updateActionButtons();
 });
+
+function applyFormation(mode){
+  const available=(state?.troops||[]).filter(unit=>Number(unit.tier)===1&&Number(unit.quantity)>0);
+  const capacity=selectedMarchCapacity();
+  const selected={};
+  let remaining=mode==="gather"?Math.min(50,capacity):capacity;
+  if(mode==="clear"||!Number.isSafeInteger(remaining)||remaining<1){
+    selectedUnits={};renderTroops();return;
+  }
+  const order=mode==="gather"
+    ?["militia","spearman","swordsman","archer","crossbowman","cavalry","knight","catapult","ram","trebuchet","mage"]
+    :available.map(row=>row.unit_type);
+  const ranked=[...available].sort((a,b)=>{
+    const aa=order.indexOf(a.unit_type),bb=order.indexOf(b.unit_type);
+    return (aa<0?999:aa)-(bb<0?999:bb);
+  });
+  if(mode==="balanced"){
+    const share=Math.floor(remaining/Math.max(1,ranked.length));
+    for(const row of ranked){
+      const count=Math.min(Number(row.quantity),share);
+      if(count>0){selected[row.unit_type]=count;remaining-=count;}
+    }
+  }
+  for(const row of ranked){
+    if(remaining<1)break;
+    const count=Math.min(remaining,Number(row.quantity)-(selected[row.unit_type]||0));
+    if(count>0){selected[row.unit_type]=(selected[row.unit_type]||0)+count;remaining-=count;}
+  }
+  selectedUnits=selected;
+  renderTroops();
+}
+$("formationGather").addEventListener("click",()=>applyFormation("gather"));
+$("formationBalanced").addEventListener("click",()=>applyFormation("balanced"));
+$("formationMax").addEventListener("click",()=>applyFormation("max"));
+$("formationClear").addEventListener("click",()=>applyFormation("clear"));
 
 function renderTroops() {
   const root = $("troops");
@@ -246,18 +283,22 @@ function updateActionButtons() {
   const hasTroops=count>0;
   const limit=selectedMarchCapacity();
   const overCapacity=limit<=0||count>limit;
+  const noAvailableSlot=Number(state?.marchSlots?.available||0)<1;
   const isCastle = territory?.territory_kind === "castle";
   const isThrone = territory?.territory_kind === "throne";
   const canVisit = Boolean(territory && !isCastle && !isThrone && territoryOwner(territory) !== "Outro reino");
-  $("gather").disabled = busy || !canVisit || !hasTroops || overCapacity;
-  $("scout").disabled = busy || !canVisit || !hasTroops || overCapacity;
-  $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops || overCapacity;
+  $("gather").disabled = busy || !canVisit || !hasTroops || overCapacity || noAvailableSlot;
+  $("scout").disabled = busy || !canVisit || !hasTroops || overCapacity || noAvailableSlot;
+  $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops || overCapacity || noAvailableSlot;
   const siegeTotal=Object.values(selectedUnits).reduce((n,q)=>n+Number(q||0),0);
   $("throneAssault").hidden=!isThrone;
   $("throneAssault").disabled=busy||!isThrone||state?.throne?.phase!=="contest"||
     Boolean(state?.throne?.kingAllianceId)||
     !state?.alliance?.id||Number(state?.kingdom?.castle_level||0)<10||
     siegeTotal<200||siegeTotal>10000||overCapacity;
+  $("marchHero").disabled=busy||!(state?.marchHeroOptions||[]).length;
+  for(const id of ["formationGather","formationBalanced","formationMax","formationClear"])
+    $(id).disabled=busy;
   renderMarchCapacity();
 }
 function renderDetails() {
@@ -419,6 +460,10 @@ async function sendMarch(marchType) {
   const territory = getSelectedTerritory();
   const units = Object.fromEntries(Object.entries(selectedUnits).filter(([, quantity]) => Number(quantity) > 0));
   if (!territory || !Object.keys(units).length) return;
+  if(Number(state?.marchSlots?.available||0)<1){
+    $("marchNotice").textContent="Todas as filas de marcha estão ocupadas. Aguarde o retorno das tropas.";
+    return;
+  }
   if(Object.values(units).reduce((n,v)=>n+Number(v),0)>selectedMarchCapacity()){
     $("marchNotice").textContent="Capacidade de marcha excedida. Selecione outro herói ou reduza as tropas.";
     return;
