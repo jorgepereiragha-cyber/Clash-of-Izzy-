@@ -36,7 +36,8 @@ test("Android layouts stay within the screen and keep primary touch targets at 4
 });
 
 test("Android runtime announces offline and restored connectivity accessibly", async ({ page }) => {
-  await page.goto("/");
+  // Marketing homepage is deliberately app-free; the runtime belongs to the APK game screen.
+  await page.goto("/kingdom.html");
   const status = page.locator("#coi-runtime-status");
   await expect(status).toBeHidden();
 
