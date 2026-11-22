@@ -172,3 +172,24 @@ test("raridade dourada sempre supera a roxa em ataque e defesa em qualquer níve
  assert.ok(baseGold.defensePercent>topPurple.defensePercent);
  assert.deepEqual(getHeroCombatBonuses({}),{attackPercent:0,defensePercent:0,healthPercent:0,criticalChancePercent:0});
 });
+
+test("ficha dourada mantém raridade canônica mesmo se D1 legada gravou legendary/epic",()=>{
+  const [key,template]=Object.entries(HERO_TEMPLATES).find(([,hero])=>hero.rarity==="gold");
+  assert.ok(key&&template);
+  for(const legacy of ["legendary","epic","purple","white"]){
+    const card=heroView({hero_key:key,rarity:legacy,level:100,stars:10});
+    assert.equal(card.rarity_key,"gold",legacy);
+    assert.equal(card.rarity_label,HERO_RARITY.gold.label,legacy);
+    assert.equal(card.max_level,HERO_RARITY.gold.maxLevel,legacy);
+    assert.equal(card.max_stars,HERO_RARITY.gold.maxStars,legacy);
+    const combat=getHeroCombatBonuses({hero_key:key,rarity:legacy,level:card.level,stars:card.stars});
+    assert.deepEqual(card.combat_bonuses,combat,legacy);
+  }
+  for(const [heroKey,record] of Object.entries(HERO_TEMPLATES)){
+    const view=heroView({hero_key:heroKey,rarity:"legendary"});
+    assert.equal(view.rarity_key,record.rarity,heroKey);
+  }
+  const seasonal=heroView({hero_key:"odin_awakened",rarity:"purple",seasonal_rarity:"mythic"});
+  assert.equal(seasonal.rarity_key,"purple");
+  assert.equal(seasonal.rarity_label,"Mítico");
+});

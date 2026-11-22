@@ -8,7 +8,7 @@ const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 test("shared navigation exposes the real game sections and a responsive search", async () => {
   const nav = await read("navigation.js");
   const css = await read("styles/navigation.css");
-  for (const route of ["/index.html","/kingdom.html","/account.html","/world.html","/events.html","/equipment-ui.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
+  for (const route of ["/kingdom.html","/market.html","/account.html","/world.html","/events.html","/equipment-ui.html","/arena.html","/alliance.html"]) assert.ok(nav.includes(route), "missing route " + route);
   assert.ok(nav.includes('setAttribute("aria-label","Navegação principal")'));
   assert.ok(nav.includes("toLocaleLowerCase"));
   assert.ok(nav.includes("strong.textContent"));
@@ -138,4 +138,22 @@ test("skin results are highlighted in the equipment catalog after navigation", a
   assert.ok(equipment.includes('$("pantheon-skin-set-grid")'));
   assert.ok(equipment.includes('".norse-skin-card,.pantheon-relic-card"'));
   assert.ok(equipment.includes("normalizeSearch(card.textContent).includes(needle)"));
+});
+
+test("navegação interna do Android retorna ao castelo, não à propaganda",async()=>{
+  const nav=await read("navigation.js");
+  const portal=await read("portal.html");
+  assert.match(nav, /href="\/kingdom\.html" aria-label="Clash of Izzy — meu reino"/);
+  assert.doesNotMatch(nav, /\{label:"Início",href:"\/index\.html"/);
+  assert.doesNotMatch(nav, /\{label:"Baixar aplicativo",href:"\/portal\.html"/);
+  assert.match(nav, /const activePath = path\.endsWith\("\.html"\) \? path : path \+ "\.html"/);
+  assert.match(nav, /activePath === item\.href/);
+  assert.match(nav, /path === "\/index"/);
+  assert.doesNotMatch(portal, /href="\/kingdom\.html"/);
+});
+
+test("aliança sem sessão envia ao castelo em vez do portal de propaganda",async()=>{
+  const alliance=await read("alliance.html");
+  assert.match(alliance,/link\.href="\/kingdom\.html";link\.className="btn secondary";link\.textContent="Ir ao castelo"/);
+  assert.doesNotMatch(alliance,/link\.href="\/index\.html"/);
 });

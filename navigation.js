@@ -5,8 +5,6 @@
   window.__COI_NAV__ = true;
 
   const links = [
-    {label:"Início",href:"/index.html",icon:"⌂",keywords:"home início principal"},
-    {label:"Baixar aplicativo",href:"/portal.html",icon:"📲",keywords:"instalar android app download portal divulgação"},
     {label:"Meu reino",href:"/kingdom.html",icon:"🏰",keywords:"cidade castelo construções recursos edifícios reino"},
     {label:"Mercador & Heróis",href:"/market.html",icon:"⚖️",keywords:"mercador loja trocas aceleradores fragmentos heróis recursos estoque"},
     {label:"Minha conta",href:"/account.html",icon:"👤",keywords:"login cadastro senha acesso persistente conta comandante"} ,
@@ -18,19 +16,20 @@
   ];
 
   const path = location.pathname.replace(/\/$/,"") || "/index.html";
-  // Public routes never mount gameplay navigation.
-  if (path === "/index.html" || path === "/portal.html" || path === "/portal") return;
+  // Public routes never mount gameplay navigation. Cloudflare serves clean URLs.
+  if (path === "/index.html" || path === "/portal.html" || path === "/portal" || path === "/index") return;
+  const activePath = path.endsWith(".html") ? path : path + ".html";
   const root = document.createElement("nav");
   root.className = "coi-global-nav";
   root.setAttribute("aria-label","Navegação principal");
-  root.innerHTML = '<a class="coi-nav-brand" href="/index.html" aria-label="Clash of Izzy — início"><span aria-hidden="true">⚔</span><b>CLASH OF IZZY</b></a><button class="coi-nav-toggle" type="button" aria-expanded="false" aria-controls="coi-nav-links">☰ <span>Menu</span></button><div class="coi-nav-links" id="coi-nav-links"></div><form class="coi-nav-search" role="search"><label class="coi-sr-only" for="coi-nav-query">Buscar seções e conteúdo do jogo</label><input id="coi-nav-query" type="search" autocomplete="off" placeholder="Buscar jogador, reino, aliança, território, skin…" aria-controls="coi-nav-results"><button type="submit" aria-label="Buscar no jogo">⌕</button><div class="coi-nav-results" id="coi-nav-results" role="listbox" aria-label="Resultados da busca" hidden></div></form>';
+  root.innerHTML = '<a class="coi-nav-brand" href="/kingdom.html" aria-label="Clash of Izzy — meu reino"><span aria-hidden="true">⚔</span><b>CLASH OF IZZY</b></a><button class="coi-nav-toggle" type="button" aria-expanded="false" aria-controls="coi-nav-links">☰ <span>Menu</span></button><div class="coi-nav-links" id="coi-nav-links"></div><form class="coi-nav-search" role="search"><label class="coi-sr-only" for="coi-nav-query">Buscar seções e conteúdo do jogo</label><input id="coi-nav-query" type="search" autocomplete="off" placeholder="Buscar jogador, reino, aliança, território, skin…" aria-controls="coi-nav-results"><button type="submit" aria-label="Buscar no jogo">⌕</button><div class="coi-nav-results" id="coi-nav-results" role="listbox" aria-label="Resultados da busca" hidden></div></form>';
 
   const linksBox = root.querySelector(".coi-nav-links");
   for (const item of links) {
     const a = document.createElement("a");
     a.href = item.href;
-    a.className = path === item.href ? "active" : "";
-    if (path === item.href) a.setAttribute("aria-current","page");
+    a.className = activePath === item.href ? "active" : "";
+    if (activePath === item.href) a.setAttribute("aria-current","page");
     const icon = document.createElement("span");
     icon.setAttribute("aria-hidden","true");
     icon.textContent = item.icon;
