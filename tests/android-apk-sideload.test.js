@@ -129,3 +129,20 @@ test('tela nativa segue o visual rei guerreiro azul e ouro sem downloads na aber
   assert.doesNotMatch(start,/https?:\/\//);
   assert.match(read('android-sideload/app/src/main/res/values/styles.xml'),/#081831/);
 });
+
+
+test("TLS de subrecurso e rejeitado sem bloquear o jogo, e HTTP externo fica bloqueado", () => {
+  assert.match(activity, /handler\\.cancel\\(\\)/);
+  assert.match(activity, /String failedUrl = error != null \\? error\\.getUrl\\(\\) : null/);
+  assert.match(activity, /!failedUrl\\.equals\\(pageUrl\\) && !failedUrl\\.equals\\(originalUrl\\)\\) return/);
+  assert.match(activity, /if \\(!"https"\\.equalsIgnoreCase\\(scheme\\)/);
+  assert.doesNotMatch(activity, /!"http"\\.equalsIgnoreCase\\(scheme\\)/);
+});
+
+test("Falhas repetidas do renderizador WebGL nao causam loop ilimitado de relancamento", () => {
+  assert.match(activity, /RENDERER_RESTART_WINDOW_MS = 60_000L/);
+  assert.match(activity, /recentRendererFailures <= 2/);
+  assert.match(activity, /lastRendererFailureMs = now/);
+  assert.match(activity, /if \\(recentRendererFailures <= 2\\) \\{\\s*recreate\\(\\);/);
+  assert.match(activity, /Atualize o Android System WebView/);
+});
