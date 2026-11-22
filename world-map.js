@@ -317,8 +317,11 @@ function render() {
   renderMarches();
 }
 async function refreshState() {
+  const oldThrone=state?.throne||null;
   const response = await request("/game/state");
   state = response.state || response;
+  if(oldThrone&&Number(oldThrone.realmId)===Number(state?.kingdom?.map_region||1))
+    state.throne=oldThrone;
   if (!state.kingdom) throw new Error("O servidor não retornou o reino.");
   if (!requestedTerritoryApplied && requestedTerritorySearch) {
     const query = normalizeTerritorySearch(requestedTerritorySearch);
