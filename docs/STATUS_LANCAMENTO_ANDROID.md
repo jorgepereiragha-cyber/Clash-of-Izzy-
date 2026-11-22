@@ -42,3 +42,7 @@ O cliente Android atual utiliza **WebView**, não renderização 3D nativa. O jo
 Nenhum dado bancário, chave Pix, segredo, token ou senha deve constar de documentação ou arquivos públicos.
 
 **Estado do lançamento comercial:** código pronto para integração e validação; publicação integral, suporte ao cliente e transações reais **ainda não liberados**.
+
+## Homologação do D1 Preview
+
+A auditoria identificou somente `_cf_KV`, tabela interna reservada da Cloudflare (não pertence ao jogo). O fluxo isolado de migrações ignora apenas `_cf_KV` e `d1_migrations` vazio ao verificar se a base está pronta, mas bloqueia outros esquemas ou registros. Fonte: https://developers.cloudflare.com/d1/best-practices/import-export-data/ .

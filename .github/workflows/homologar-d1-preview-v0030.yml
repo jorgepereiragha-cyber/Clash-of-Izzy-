@@ -57,7 +57,8 @@ jobs:
           except urllib.error.HTTPError as e: raise SystemExit("D1 Preview API HTTP "+str(e.code))
           if not result.get("success"):raise SystemExit("D1 Preview indisponivel.")
           names={row["name"] for row in result["result"][0]["results"]}
-          if names - {"d1_migrations"}:
+          # _cf_KV pertence ao motor D1 e nao contem dados do aplicativo.
+          if names - {"d1_migrations","_cf_KV"}:
             raise SystemExit("Preview ja possui tabelas de aplicacao: migracao exige revisao para preservar dados.")
           if "d1_migrations" in names:
             req=urllib.request.Request(base+"/query",data=json.dumps({
