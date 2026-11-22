@@ -67,7 +67,7 @@ test('Tela de abertura nativa usa a identidade do jogo e libera acesso quando a 
   assert.match(activity, /GradientDrawable\.Orientation\.TOP_BOTTOM/);
   assert.match(activity, /loadingTitle\.setText\("CLASH OF IZZY"\)/);
   assert.match(activity, /loadingPanel\.setVisibility\(View\.GONE\)/);
-  assert.match(activity, /if \(!hasLoadedPage\) loadingPanel\.setVisibility\(View\.VISIBLE\)/);
+  assert.match(activity, /if \(!hasLoadedPage\) \{\s*loadingPanel\.setVisibility\(View\.VISIBLE\);\s*scheduleStartupTimeout\(\);/);
   assert.match(activity, /progress\.setProgressTintList/);
   assert.match(activity, /offlinePanel\.setVisibility\(View\.VISIBLE\)/);
   assert.doesNotMatch(activity, /WebView\.setWebContentsDebuggingEnabled\(true\)/);
