@@ -1,7 +1,7 @@
 # Clash of Izzy — Pacotes P1–P8 (0042): homologacao antes de comercializar
 
 ## Escopo implementado
-- Branch empilhada sobre PR #229; nao executa qualquer migracao remota, deploy ou pagamento.
+- PR #223 e PR #229 ja foram integradas na `main`. Esta PR #233 adiciona exclusivamente o modulo de pacotes sobre a base atual; nao executa migracao remota, deploy ou pagamento.
 - Reutiliza `vip_packages`, `purchase_requests`, o checkout `/v1/orders` e o webhook HMAC existentes.
 - Pacotes novos diferenciados pelo nome canonico em `level-packs.js`, com limiar de progressao 10,20,...80. P1-P8 do jogo permanecem separados de VIP 1-7.
 - Gemas creditadas exclusivamente em `players.gems`; madeira, comida, pedra, ferro e ouro em `kingdoms`.
@@ -11,6 +11,10 @@
 - O cliente envia o token autenticado ao consultar `/api/store/catalog`; nenhum token deve aparecer no HTML ou nos logs.
 - A compra de pacote por nivel depende de sessao autenticada, nivel real de `kingdom_progression` no D1, preco e gemas congruentes com a configuracao, e Mercado Pago configurado. Pix manual e aprovacao manual nao criam novos pedidos de nivel.
 - Se dois pedidos pagos distintos tentarem reivindicar a mesma faixa, a concessao nao se repete. A segunda order fica sem `fulfilled_at` e demanda conciliacao/estorno manual; nao prometer reembolso automatico.
+
+## Gate de integracao em etapas
+
+A migracao `0042_level_packs_p1_p8.sql` e os valores P4-P8 desta PR constituem uma versao intermediaria. A PR #236 atualiza o catalogo, introduz a `0043_fix_vip_catalog.sql` (agora condicionada a pedidos pendentes), e a PR #238 traz a `0044_reconcile_level_packs.sql` apos a correção #243. **Nao executar o deploy protegido da producao nem liberar loja P1–P8 ate integrar, inspecionar e homologar as migracoes finais em D1 Preview.** O codigo pode ser integrado com todas as flags comerciais ainda em `"false"`.
 
 ## Precos para aprovar
 Valores P1-P3 fornecidos: P1 R$9,90; P2 R$29,90; P3 R$59,90.
