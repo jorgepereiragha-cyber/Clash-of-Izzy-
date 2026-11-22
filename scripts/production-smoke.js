@@ -91,23 +91,39 @@ export async function runProductionSmokeTests({
   }
 
   const landingResponse = await get("/index.html");
-  assert(landingResponse.status === 200, "Landing page respondeu HTTP " + landingResponse.status + ".");
+  assert(landingResponse.status === 200, "Entrada pública respondeu HTTP " + landingResponse.status + ".");
   const landing = await landingResponse.text();
-  assert(landing.includes('id="beta-signup-form"') && landing.includes('name="consent"'),
-    "Formulário beta com consentimento não está publicado.");
-
-  const landingCssResponse = await get("/styles/landing.css");
-  assert(landingCssResponse.status === 200, "Estilos da landing page indisponíveis.");
-  assert((landingCssResponse.headers.get("content-type") || "").includes("text/css"), "Estilos da landing não foram servidos como CSS.");
-  const landingCss = await landingCssResponse.text();
-  assert(landingCss.includes(".landing-hero"), "Estilos da landing estão incompletos.");
-
-  const landingJsResponse = await get("/landing.js");
-  assert(landingJsResponse.status === 200, "JavaScript da landing page indisponível.");
-  assert((landingJsResponse.headers.get("content-type") || "").includes("javascript"), "JavaScript da landing não foi servido com tipo correto.");
-  const landingJs = await landingJsResponse.text();
-  assert(landingJs.includes("showInstallGuide") && landingJs.includes("/api/game/referral/link"),
-    "Fluxos de instalação e indicação não estão publicados.");
+  const androidPortalUi = landing.includes('href="/portal.html"') || landing.includes('id="download-apk"');
+  if (androidPortalUi) {
+    // Nova distribuição: o navegador apresenta propaganda e download, não gameplay.
+    const portalResponse = await get("/portal.html");
+    assert(portalResponse.status === 200, "Portal Android respondeu HTTP " + portalResponse.status + ".");
+    const portal = await portalResponse.text();
+    assert(portal.includes('id="download-apk"') && portal.includes("releases/latest") && portal.includes(".sha256"),
+      "Portal não contém fluxo de download da versão oficial com hash.");
+    assert(!/href=["']\/(?:kingdom|world|arena|account|admin|events)\.html/i.test(portal),
+      "Portal publica links de acesso direto ao jogo ou conta.");
+    assert(!/beforeinstallprompt|install-pwa|href=["']\/manifest\.json/i.test(portal),
+      "Portal não pode oferecer jogabilidade web ou instalação PWA.");
+    const theme = await get("/styles/coi-theme.css");
+    assert(theme.status === 200 && (theme.headers.get("content-type") || "").includes("text/css"),
+      "Estilos do portal Android indisponíveis.");
+  } else {
+    // Suporte de diagnóstico para instalações anteriores à migração de divulgação.
+    assert(landing.includes('id="beta-signup-form"') && landing.includes('name="consent"'),
+      "Entrada pública não corresponde ao portal Android nem à landing legada.");
+    const landingCssResponse = await get("/styles/landing.css");
+    assert(landingCssResponse.status === 200, "Estilos da landing page indisponíveis.");
+    assert((landingCssResponse.headers.get("content-type") || "").includes("text/css"), "Estilos da landing não foram servidos como CSS.");
+    const landingCss = await landingCssResponse.text();
+    assert(landingCss.includes(".landing-hero"), "Estilos da landing estão incompletos.");
+    const landingJsResponse = await get("/landing.js");
+    assert(landingJsResponse.status === 200, "JavaScript da landing page indisponível.");
+    assert((landingJsResponse.headers.get("content-type") || "").includes("javascript"), "JavaScript da landing não foi servido com tipo correto.");
+    const landingJs = await landingJsResponse.text();
+    assert(landingJs.includes("showInstallGuide") && landingJs.includes("/api/game/referral/link"),
+      "Fluxos de instalação e indicação não estão publicados.");
+  }
 
   const accountPageResponse = await get("/account.html");
   assert(accountPageResponse.status === 200, "Página de conta persistente respondeu HTTP " + accountPageResponse.status + ".");
@@ -258,7 +274,8 @@ export async function runProductionSmokeTests({
       staticPages: REQUIRED_PAGES.length,
       pwaManifest: true,
       serviceWorker: true,
-      betaSignupUi: true,
+      betaSignupUi: !androidPortalUi,
+      androidPortalUi,
       referralAuthBoundary: true,
       landingAssets: true,
       feedbackUiAndAnalytics: true,
