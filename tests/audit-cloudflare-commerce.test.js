@@ -12,6 +12,7 @@ const config=[
   {name:"NUBANK_PIX_KEY",type:"secret_text",text:"private-bank-identifier"},
   {name:"NUBANK_PIX_ENABLED",type:"plain_text",text:"true"},
   {name:"NUBANK_PIX_RECEIVER_VERIFIED",type:"plain_text",text:"true"},
+  {name:"MASTER_PACK_ENABLED",type:"plain_text",text:"true"},
   {name:"GOOGLE_WEB_CLIENT_ID",type:"secret_text",text:"private-google-id"}
 ];
 test("analisa todos os bindings sem copiar valor bancário/secret para o relatório",()=>{
