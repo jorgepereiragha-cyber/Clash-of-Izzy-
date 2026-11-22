@@ -30,6 +30,7 @@ import { PANTHEON_SKIN_ITEMS, buildSkinSetGallery } from "./skin-sets.js";
 import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "./dragon-catalog.js";
 import { MASTER_PACK_NAME, MASTER_PACK_BONUSES, masterGrantStatements } from "./master-pack.js";
 import { isDailyPackage, DAILY_PACKAGE_COOLDOWN_HOURS } from "./daily-package-offers.js";
+import { getLevelPackByName, publicLevelPack } from "./level-packs.js";
 import { CASTLE_MAX_LEVEL, CASTLE_VIP_MAX_LEVEL, getCastleVipBonuses, getCastleVipState } from "./castle-vip.js";
 import { handleDailyReward } from "./daily-rewards.js";
 import { handleOnboarding } from "./onboarding-bonus.js";
@@ -2136,7 +2137,7 @@ export default {
         env.DB.prepare("SELECT id,name,price_brl,attack_bonus_percent,defense_bonus_percent FROM skins ORDER BY id LIMIT ?").bind(INITIAL_PAID_SKIN_LIMIT).all(),
         env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages ORDER BY price_brl,name").all()
       ]);
-      return json({skins:skins.results||[],packages:(packages.results||[]).filter(item=>item.name!==MASTER_PACK_NAME||env.MASTER_PACK_ENABLED==="true").map(item=>item.name===MASTER_PACK_NAME?{...item,bonus:MASTER_PACK_BONUSES,oneTime:true}:isDailyPackage(item.name)?{...item,dailyLimitHours:DAILY_PACKAGE_COOLDOWN_HOURS}:item),skin_edition:"initial",skin_limit:INITIAL_PAID_SKIN_LIMIT,whatsapp:"+5547996531437"});
+      return json({skins:skins.results||[],packages:(packages.results||[]).filter(item=>(item.name!==MASTER_PACK_NAME||env.MASTER_PACK_ENABLED==="true")&&(!getLevelPackByName(item.name)||env.LEVEL_PACKS_ENABLED==="true")).map(item=>{const levelPack=getLevelPackByName(item.name);return levelPack?{...item,levelPack:publicLevelPack(levelPack)}:item.name===MASTER_PACK_NAME?{...item,bonus:MASTER_PACK_BONUSES,oneTime:true}:isDailyPackage(item.name)?{...item,dailyLimitHours:DAILY_PACKAGE_COOLDOWN_HOURS}:item;}),skin_edition:"initial",skin_limit:INITIAL_PAID_SKIN_LIMIT,whatsapp:"+5547996531437"});
     }catch(e){return json({error:"Catálogo indisponível no momento."},503)}
   }
   if(url.pathname==="/api/game/start"&&request.method==="POST"){
@@ -2220,6 +2221,18 @@ export default {
       ?await env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages WHERE id=?").bind(itemId).first()
       :await env.DB.prepare("SELECT id,name,price_brl FROM skins WHERE id=? AND id IN (SELECT id FROM skins ORDER BY id LIMIT ?)").bind(itemId,INITIAL_PAID_SKIN_LIMIT).first();
     if(!item)return json({error:kind==="skin"?"Esta skin está bloqueada para uma atualização futura.":"Produto não encontrado no catálogo."},404);
+    const levelPack=kind==="vip_package"?getLevelPackByName(item.name):null;
+    if(levelPack){
+      if(env.LEVEL_PACKS_ENABLED!=="true")return json({error:"Pacotes de progressão ainda não liberados.",code:"LEVEL_PACKS_DISABLED"},503);
+      if(paymentMethod!=="mercadopago_link")return json({error:"Pacotes por nível exigem checkout vinculado e confirmado no Mercado Pago."},400);
+      if(Math.round(Number(item.price_brl)*100)!==levelPack.priceCents||Number(item.gems)!==levelPack.gems)
+        return json({error:"O preço ou a recompensa não coincide com o catálogo oficial.",code:"LEVEL_PACK_CATALOG_MISMATCH"},409);
+      const progression=await getKingdomProgression(env,kingdom.id);
+      if(progression.level < levelPack.level)
+        return json({error:"Este pacote exige progressão nível "+levelPack.level+". Nível atual: "+progression.level+".",code:"LEVEL_REQUIRED"},403);
+      const claimed=await env.DB.prepare("SELECT 1 FROM level_pack_claims WHERE kingdom_id=? AND pack_level=?").bind(kingdom.id,levelPack.level).first();
+      if(claimed)return json({error:"Pacote já recebido neste reino. A compra é única por faixa de progressão.",code:"LEVEL_PACK_ALREADY_OWNED"},409);
+    }
     if(kind==="vip_package"&&item.name===MASTER_PACK_NAME){
       if(env.MASTER_PACK_ENABLED!=="true")return json({error:"Pacote Master ainda não liberado para comercialização."},503);
       const acquired=await env.DB.prepare("SELECT 1 FROM purchase_requests WHERE player_id=? AND product_kind='vip_package' AND product_name=? AND status='approved'").bind(player.id,MASTER_PACK_NAME).first();
