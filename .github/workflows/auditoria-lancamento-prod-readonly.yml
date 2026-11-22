@@ -1,0 +1,74 @@
+name: Auditoria de lancamento D1 producao - somente leitura
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/auditoria-lancamento-prod-readonly.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clash-izzy-prod-prelaunch-audit-readonly
+  cancel-in-progress: false
+
+jobs:
+  diagnosticar:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Conferir apenas contagens, schema e migration de producao
+        shell: bash
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, re, urllib.error, urllib.request
+          token=os.environ.get("RAW_TOKEN","").strip()
+          if token[:7].lower()=="bearer ":token=token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):
+              token=token[1:-1].strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if not token or any(c.isspace() for c in token) or not re.fullmatch(r"[0-9a-fA-F]{32}",account):
+              raise SystemExit("Credenciais Cloudflare invalidas ou indisponiveis.")
+          print("::add-mask::"+token)
+          production="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          preview="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          if production==preview:raise SystemExit("Erro de isolamento: D1 producao coincide com Preview.")
+          url="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/"+production+"/query"
+          def query(sql):
+              if not sql.startswith("SELECT "):
+                  raise SystemExit("Somente SELECT permitido no diagnostico.")
+              req=urllib.request.Request(url,method="POST",data=json.dumps({"sql":sql}).encode(),
+                  headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+              try:
+                  with urllib.request.urlopen(req,timeout=25) as response: obj=json.loads(response.read().decode())
+              except urllib.error.HTTPError as e:
+                  raise SystemExit("Cloudflare D1 respondeu HTTP "+str(e.code))
+              if not obj.get("success"):raise SystemExit("D1 de producao nao confirmou a consulta.")
+              return obj["result"][0]["results"]
+          names={r["name"] for r in query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+          counts={}
+          for name in ("players","kingdoms","player_accounts","purchase_requests","mercadopago_orders"):
+              if name not in names:raise SystemExit("Tabela basica ausente: "+name)
+              counts[name]=int(query("SELECT COUNT(*) AS total FROM "+name)[0]["total"])
+          required=("kingdom_dragons","kingdom_mailbox","master_bonus_claims",
+              "google_account_links","google_auth_challenges","realm_openings",
+              "realm_thrones","throne_assaults")
+          if "d1_migrations" not in names:raise SystemExit("Sem historico D1 de producao.")
+          history=[r["name"] for r in query("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 12")
+              if isinstance(r.get("name"),str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,100}",r["name"])]
+          pending=sorted(set(required)-names)
+          ready=bool(history) and history[0]=="0035_throne_war.sql" and not pending
+          report={"target":"production","latestMigration":history[0] if history else None,
+              "recentMigrations":history,"counts":counts,
+              "essentialTablesMissing":pending,"schemaReadyForAndroid":ready}
+          print(json.dumps(report,ensure_ascii=False,sort_keys=True))
+          if not ready:print("::warning::D1 de producao requer validacao e migracoes por deploy protegido; nenhuma escrita realizada.")
+          print("Auditoria somente leitura: nenhuma tabela ou conta foi alterada.")
+          PY
