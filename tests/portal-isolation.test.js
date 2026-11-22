@@ -78,3 +78,21 @@ test("configuração deploy isola assets sem D1, Durable Objects e segredo do jo
   assert.match(portal,/releases\/latest/);
   assert.doesNotMatch(portal,/href="\/(?:kingdom|world|arena|account|admin)\.html"/);
 });
+
+test("identidade rei guerreiro usa capa real responsiva sem ativar download inexistente",async()=>{
+  const main=await readFile(new URL("../portal.html",import.meta.url),"utf8");
+  const publicHtml=await readFile(new URL("../public-portal/portal.html",import.meta.url),"utf8");
+  const publicCss=await readFile(new URL("../public-portal/styles/coi-theme.css",import.meta.url),"utf8");
+  const sharedCss=await readFile(new URL("../styles/coi-theme.css",import.meta.url),"utf8");
+  assert.equal(main,publicHtml,"site oficial e site isolado devem ter a mesma apresentação");
+  assert.equal(publicCss,sharedCss,"tokens da marca devem estar sincronizados");
+  assert.match(publicHtml,/class="royal-hero"/);
+  assert.match(publicHtml,/class="royal-art"/);
+  assert.match(publicHtml,/--gold:#f1c467/);
+  assert.match(publicHtml,/@media\(max-width:800px\)/);
+  assert.match(publicHtml,/alt="Rei guerreiro com coroa/);
+  assert.match(publicHtml,/id="download-apk" aria-disabled="true"/);
+  assert.match(publicHtml,/id="checksum-link" hidden/);
+  assert.match(publicHtml,/function validAsset\(asset, expectedName\)/);
+  assert.doesNotMatch(publicHtml,/href="\/(?:kingdom|world|arena)\.html"/);
+});

@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#101a2b">
+<meta name="theme-color" content="#081831">
 <meta name="description" content="Clash of Izzy: estratégia medieval para Android. Conheça o jogo e baixe o APK oficial assinado quando estiver disponível.">
 <meta property="og:title" content="Clash of Izzy — Jogo para Android">
 <meta property="og:description" content="Construa seu reino, forme alianças e conquiste Eldoria. Instale o jogo no Android.">
@@ -12,45 +12,114 @@
 <link rel="stylesheet" href="/styles/coi-theme.css">
 <title>Clash of Izzy — Baixar aplicativo Android</title>
 <style>
-:root{color-scheme:dark;--gold:#e7bd68;--ink:#e9eff8;--muted:#c0cfdd}
-*{box-sizing:border-box}html{scroll-behavior:smooth}
-body{margin:0;color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(ellipse at 60% -10%,#37516b 0%,#15263a 45%,#08121f 100%)}
-.wrap{width:min(980px,calc(100% - 32px));margin:auto}
-header{padding:clamp(35px,8vw,86px) 0 48px;text-align:center}
-.crest{width:clamp(90px,18vw,144px);height:auto;filter:drop-shadow(0 15px 26px #0009)}
-.eyebrow{color:var(--gold);letter-spacing:.18em;text-transform:uppercase;font-size:12px;font-weight:800}
-h1{margin:10px 0;color:#f0d29c;letter-spacing:.045em;font-size:clamp(38px,8vw,72px);line-height:1.05}
-.lead{max-width:680px;margin:16px auto 0;font-size:clamp(17px,2.7vw,23px);color:#dae5f3}
-.hero-art{display:block;margin:28px auto 18px;max-width:240px;width:48%;height:auto}
-.actions{margin:24px auto 0;display:flex;justify-content:center;align-items:center;flex-direction:column;gap:12px}
-.download{display:inline-flex;align-items:center;justify-content:center;min-height:58px;width:min(100%,370px);padding:12px 22px;border-radius:12px;border:2px solid #f3cf86;background:linear-gradient(#f2d08e,#be8745);color:#16110b;font-size:17px;font-weight:800;text-decoration:none;text-align:center;box-shadow:0 12px 25px #0007}
+:root{
+  color-scheme:dark;--gold:#f1c467;--gold-light:#ffe3a1;--ink:#f8f1df;--muted:#c5d2e7;
+  --royal:#0b2c61;--night:#050e20
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{
+  margin:0;color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
+  background:
+    radial-gradient(ellipse at 23% 8%,#1a4a94aa,transparent 48%),
+    radial-gradient(ellipse at 92% 25%,#78522a45,transparent 36%),
+    linear-gradient(165deg,#071831,#08152b 46%,#040b19);
+  min-height:100vh
+}
+.wrap{width:min(1120px,calc(100% - 40px));margin-inline:auto}
+.royal-hero{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);align-items:center;gap:clamp(24px,5vw,64px);padding:clamp(35px,7vw,86px) 0 48px}
+.royal-art{
+  position:relative;isolation:isolate;min-height:450px;display:grid;place-items:center;
+  padding:34px;border:1px solid #e5b65c;border-radius:28px;overflow:hidden;
+  background:
+    radial-gradient(ellipse at 50% 34%,#3065a8 0%,#102d5e 35%,transparent 78%),
+    linear-gradient(145deg,#1d396a,#07142c 65%);
+  box-shadow:0 24px 65px #0009,inset 0 0 0 5px #071326,inset 0 0 0 7px #91652a
+}
+.royal-art::before{
+  content:"";position:absolute;inset:18px;border:2px solid #d9a348;
+  clip-path:polygon(0 0,15% 0,15% 2px,85% 2px,85% 0,100% 0,100% 100%,0 100%);
+  border-radius:19px;pointer-events:none
+}
+.royal-art::after{
+  content:"";position:absolute;inset:0;z-index:-1;
+  background:
+    linear-gradient(0deg,#040e24aa,transparent 52%),
+    repeating-linear-gradient(90deg,transparent 0 39px,#ffd88807 40px 41px,transparent 42px 85px);
+  pointer-events:none
+}
+.royal-sun{position:absolute;width:66%;aspect-ratio:1;top:12%;border:1px solid #ffdd905e;border-radius:50%;box-shadow:0 0 80px #ffc26439,inset 0 0 80px #f6be4c17;pointer-events:none}
+.crest{z-index:1;display:block;width:min(88%,405px);height:auto;filter:drop-shadow(0 22px 26px #000b)}
+.royal-caption{position:absolute;z-index:2;bottom:31px;left:30px;right:30px;text-align:center;font-size:12px;font-weight:850;letter-spacing:.24em;color:#ffde9e;text-shadow:0 2px 12px #000}
+.royal-titleline{display:flex;align-items:center;gap:10px;color:var(--gold-light);font-size:11px;letter-spacing:.2em;font-weight:800;text-transform:uppercase}
+.royal-titleline::before{content:"";width:25px;height:2px;background:linear-gradient(90deg,#f7d27b,transparent)}
+h1{margin:12px 0 18px;font-family:Georgia,"Times New Roman",serif;letter-spacing:.045em;font-size:clamp(44px,6.2vw,81px);font-weight:900;line-height:1.04;text-shadow:0 5px 18px #0008}
+h1 .golden{display:block;color:#f6c96c;text-shadow:0 1px 0 #ffe9b0,0 5px 18px #000a}
+.lead{max-width:640px;margin:0;color:#e2e9f5;font-size:clamp(17px,2.25vw,22px);line-height:1.5}
+.royal-features{display:flex;flex-wrap:wrap;gap:9px;margin:21px 0}
+.royal-features span{border:1px solid #b48b4e77;border-radius:30px;padding:6px 13px;background:#112a4c;color:#ebd7b1;font-size:12px;letter-spacing:.03em}
+.actions{margin:24px 0 0;display:flex;flex-direction:column;align-items:flex-start;gap:11px}
+.download{
+  display:inline-flex;align-items:center;justify-content:center;min-height:58px;
+  width:min(100%,395px);padding:12px 22px;border-radius:12px;
+  border:2px solid #ffdf95;background:linear-gradient(180deg,#ffe6ac,#d7a454 65%,#b97c28);
+  color:#16120c;font-size:16px;font-weight:900;text-decoration:none;text-align:center;
+  box-shadow:inset 0 1px 0 #fff9,0 15px 35px #0008;transition:transform .18s,filter .18s
+}
+.download[href]:hover{transform:translateY(-2px);filter:brightness(1.07)}
 .download:focus-visible,a:focus-visible{outline:3px solid white;outline-offset:4px}
-.download[aria-disabled="true"]{background:#384758;color:#d1d9e4;border-color:#748397;cursor:not-allowed;box-shadow:none}
-.status{min-height:48px;max-width:680px;color:#f0d8a6;font-size:14px}
-.hash{color:#f1d29d;font-size:14px}
+.download[aria-disabled="true"]{background:linear-gradient(#283d59,#19283e);color:#d2dfef;border-color:#6c819d;cursor:not-allowed;box-shadow:none}
+.status{min-height:48px;max-width:610px;margin:0;color:#e8d7b4;font-size:13px}
+.hash{color:#f6d590;font-size:14px}
 .grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:12px auto 28px}
-.tile{padding:20px 19px;background:linear-gradient(145deg,#233b54,#132237);border:1px solid #746448;border-radius:15px}
-.tile h2{font-size:20px;margin:0 0 8px;color:var(--gold)}
+.tile{position:relative;padding:24px 22px;background:linear-gradient(145deg,#1e3e6c,#0b1c37);border:1px solid #a8824899;border-radius:16px;box-shadow:inset 0 1px #ffe6ab20,0 11px 25px #0004}
+.tile::before{content:"";position:absolute;top:0;left:22px;width:54px;height:3px;background:linear-gradient(90deg,#ffd47e,transparent)}
+.tile h2{font-family:Georgia,"Times New Roman",serif;font-size:23px;margin:0 0 8px;color:#f7d58f}
 .tile p{margin:0;color:var(--muted);font-size:15px}
-.instructions{max-width:790px;margin:0 auto 34px;padding:22px 27px;border:1px solid #6c5b3e;border-radius:16px;background:#101e30}
-.instructions h2{margin:0 0 9px;color:var(--gold);font-size:21px}
-.instructions p{margin:8px 0;color:#d5dfec}
-footer{text-align:center;padding:20px 0 38px;color:#acbdcc;font-size:13px}
-@media(max-width:690px){.grid{grid-template-columns:1fr}.tile{padding:18px}.instructions{padding:19px}.wrap{width:min(100% - 24px,980px)}}
+.instructions{max-width:960px;margin:0 auto 36px;padding:26px 30px;border:1px solid #a7834e99;border-radius:16px;background:linear-gradient(155deg,#0f2749,#09172c);box-shadow:0 12px 32px #0004}
+.instructions h2{margin:0 0 9px;color:var(--gold-light);font-family:Georgia,"Times New Roman",serif;font-size:25px}
+.instructions p{margin:10px 0;color:#d9e4f4}
+footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
+@media(max-width:800px){
+  .royal-hero{grid-template-columns:1fr;gap:26px;padding-top:32px}
+  .royal-art{min-height:320px;max-width:520px;width:100%;margin:auto}
+  .crest{width:min(73%,300px)}
+  .royal-copy{text-align:center}
+  .royal-titleline{justify-content:center}
+  .lead{margin-inline:auto}
+  .royal-features,.actions{justify-content:center;align-items:center}
+  .grid{grid-template-columns:1fr}
+}
+@media(max-width:420px){
+  .wrap{width:calc(100% - 26px)}
+  .royal-art{min-height:274px;padding:24px}
+  .royal-caption{font-size:10px;letter-spacing:.13em;bottom:22px}
+  h1{font-size:clamp(42px,12vw,55px)}
+  .tile{padding:19px}
+  .instructions{padding:20px}
+}
+@media(prefers-reduced-motion:reduce){.download{transition:none}}
+
 </style>
 </head>
 <body>
 <main class="wrap">
-<header>
-<div class="eyebrow">Jogo de estratégia medieval para Android</div>
-<img class="crest" src="/assets/brand/hero-emblem.svg" width="128" height="128" alt="Emblema Clash of Izzy: herói com espada">
-<h1>CLASH OF IZZY</h1>
-<p class="lead">Construa sua fortaleza, fortaleça seu exército e dispute os territórios de Eldoria. A aventura começa no aplicativo instalado em seu celular.</p>
-<img class="hero-art" src="/assets/brand/hero-emblem.svg" width="240" height="240" alt="Herói medieval com espada diante de um escudo azul e dourado">
+<header class="royal-hero">
+<div class="royal-art">
+<div class="royal-sun" aria-hidden="true"></div>
+<img class="crest" src="/assets/brand/hero-emblem.svg" width="405" height="405" alt="Rei guerreiro com coroa de joias azuis, espada e armadura real diante de um escudo dourado">
+<div class="royal-caption">HONRA · GLÓRIA · CONQUISTA</div>
+</div>
+<div class="royal-copy">
+<div class="royal-titleline">Estratégia medieval para Android</div>
+<h1>CLASH OF <span class="golden">IZZY</span></h1>
+<p class="lead">Seu reino. Seu legado. Construa um castelo, convoque heróis e lidere alianças em um mundo de disputas e conquistas.</p>
+<div class="royal-features" aria-label="Destaques do jogo"><span>Castelos e reinos</span><span>Heróis e dragões</span><span>Alianças e batalhas</span></div>
 <div class="actions">
 <a class="download" id="download-apk" aria-disabled="true" tabindex="-1">Baixar aplicativo Android (APK)</a>
 <p class="status" id="download-status" role="status" aria-live="polite">Verificando se existe uma versão oficial assinada disponível para download…</p>
 <a class="hash" id="checksum-link" hidden>Verificar arquivo SHA-256 da versão</a>
+</div>
 </div>
 </header>
 <section class="grid" aria-label="Recursos do jogo">
