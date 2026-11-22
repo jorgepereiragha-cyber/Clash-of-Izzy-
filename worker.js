@@ -17,6 +17,7 @@ import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
 import { handleMercadoPagoRoute } from "./mercadopago-orders.js";
+import { normalizePixEndToEndId, preparePixApproval } from "./pix-reconciliation.js";
 import { PANTHEON_SKIN_ITEMS, buildSkinSetGallery } from "./skin-sets.js";
 import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "./dragon-catalog.js";
 import { MASTER_PACK_NAME, MASTER_PACK_BONUSES, masterGrantStatements } from "./master-pack.js";
@@ -2036,6 +2037,7 @@ export default {
     const requestedPaymentMethod=String(body.paymentMethod||"mercadopago_link");
     if(!["mercadopago_link","manual_whatsapp","pix"].includes(requestedPaymentMethod))return json({error:"Método de pagamento inválido."},400);
     if(requestedPaymentMethod==="pix" && !nubankPixReady(env))return json({error:"O Pix Nubank ainda não está habilitado para pedidos.",code:"NUBANK_PIX_NOT_CONFIGURED"},503);
+    if(requestedPaymentMethod==="mercadopago_link"&&(!env.MP_ACCESS_TOKEN||!env.MP_WEBHOOK_SECRET))return json({error:"O checkout Mercado Pago ainda não está habilitado para pedidos.",code:"MP_NOT_CONFIGURED"},503);
     const paymentMethod=requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":requestedPaymentMethod==="pix"?"pix":"manual";
     const paymentReference=null;
     const player=await env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first();
@@ -2478,23 +2480,31 @@ export default {
       if(pending.payment_method==="mercadopago_link"||pending.mp_order_id){
         return json({error:"Pedido Mercado Pago: alterações manuais bloqueadas. O estado é controlado pela confirmação ou operação de estorno no provedor."},409);
       }
-      if(decision==="approve"&&pending.payment_method==="pix"&&body.bankStatementConfirmed!==true)return json({error:"Confirme no extrato da conta autorizada o recebimento real do Pix antes de liberar."},400);
+      let pixReference=null;
+      if(decision==="approve"&&pending.payment_method==="pix"){
+        if(body.bankStatementConfirmed!==true)return json({error:"Confirme no extrato da conta autorizada o recebimento real do Pix antes de liberar."},400);
+        pixReference=normalizePixEndToEndId(body.bankStatementReference);
+        if(!pixReference)return json({error:"Informe o EndToEndId (E2E) de 32 caracteres conferido no extrato Nubank."},400);
+      }
+      const approvalStatement=decision==="approve"?(pending.payment_method==="pix"
+        ?preparePixApproval(env.DB,id,pending.product_kind,pixReference)
+        :env.DB.prepare("UPDATE purchase_requests SET status='approved',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending' AND product_kind=?").bind(id,pending.product_kind)):null;
       let result;
       if(decision==="reject"){
         result=await env.DB.prepare("UPDATE purchase_requests SET status='rejected',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending'").bind(id).run();
       }else if(pending.product_kind==="vip_package"){
         result=await env.DB.batch([
-          env.DB.prepare("UPDATE purchase_requests SET status='approved',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending' AND product_kind='vip_package'").bind(id),
+          approvalStatement,
           env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()=1 AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.gems_amount,pending.player_id,id),
           ...(pending.product_name===MASTER_PACK_NAME?masterGrantStatements(env.DB,id):[])
         ]);
-        if(!result[0]?.meta?.changes)return json({error:"Pedido já processado."},409);
+        if(!result[0]?.meta?.changes)return json({error:"Pedido já processado ou referência de pagamento duplicada."},409);
       }else{
         result=await env.DB.batch([
-          env.DB.prepare("UPDATE purchase_requests SET status='approved',reviewed_at=CURRENT_TIMESTAMP,reviewed_by='admin' WHERE id=? AND status='pending' AND product_kind='skin'").bind(id),
+          approvalStatement,
           env.DB.prepare("INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT player_id,product_id FROM purchase_requests WHERE id=? AND status='approved'").bind(id)
         ]);
-        if(!result[0]?.meta?.changes)return json({error:"Pedido já processado."},409);
+        if(!result[0]?.meta?.changes)return json({error:"Pedido já processado ou referência de pagamento duplicada."},409);
       }
       if(decision==="reject"&&!result.meta?.changes)return json({error:"Pedido já processado."},409);
       if(decision==="approve"){
