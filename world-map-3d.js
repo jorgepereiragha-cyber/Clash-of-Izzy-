@@ -147,18 +147,44 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     return makeMesh(new THREE.ConeGeometry(radius, height, sides), material, parent, x, y, z);
   }
 
-  function addTree(parent, x, z, scale = 1, variant = 0) {
-    const group = new THREE.Group();
-    group.position.set(x, terrainHeight(x, z), z);
-    group.scale.setScalar(scale);
-    const trunk = makeMesh(new THREE.CylinderGeometry(.13, .18, .85, 5), shared.trunk, group, 0, .4, 0);
-    trunk.castShadow = quality !== "low";
-    const crownA = cone(group, .72, 1.35, variant % 2 ? shared.forest : shared.forestLight, 0, 1.2, 0, 6);
-    crownA.castShadow = quality !== "low";
-    const crownB = cone(group, .48, .95, shared.forest, 0, 1.86, 0, 6);
-    crownB.castShadow = quality !== "low";
-    parent.add(group);
-    return group;
+  // One instanced batch per tree component/material instead of three draw calls
+  // per tree. Keep terrain positions deterministic and do not add GPU animations.
+  function addInstancedForest(parent, positions) {
+    if (!positions.length) return;
+    const trunkGeo = new THREE.CylinderGeometry(.13, .18, .85, 5);
+    const crownGeo = new THREE.ConeGeometry(.72, 1.35, 6);
+    const crownTopGeo = new THREE.ConeGeometry(.48, .95, 6);
+    const lightCount = positions.filter((p) => p.variant % 2 === 1).length;
+    const darkCount = positions.length - lightCount;
+    const trunks = new THREE.InstancedMesh(trunkGeo, shared.trunk, positions.length);
+    const tops = new THREE.InstancedMesh(crownTopGeo, shared.forest, positions.length);
+    const darkCrowns = darkCount ? new THREE.InstancedMesh(crownGeo, shared.forest, darkCount) : null;
+    const lightCrowns = lightCount ? new THREE.InstancedMesh(crownGeo, shared.forestLight, lightCount) : null;
+    const dummy = new THREE.Object3D();
+    let dark = 0, light = 0;
+    for (let i = 0; i < positions.length; i++) {
+      const { x, z, scale, variant } = positions[i];
+      const y = terrainHeight(x, z);
+      dummy.scale.setScalar(scale);
+      dummy.position.set(x, y + .4 * scale, z);
+      dummy.updateMatrix();
+      trunks.setMatrixAt(i, dummy.matrix);
+      dummy.position.y = y + 1.86 * scale;
+      dummy.updateMatrix();
+      tops.setMatrixAt(i, dummy.matrix);
+      dummy.position.y = y + 1.2 * scale;
+      dummy.updateMatrix();
+      if (variant % 2) lightCrowns.setMatrixAt(light++, dummy.matrix);
+      else darkCrowns.setMatrixAt(dark++, dummy.matrix);
+    }
+    for (const batch of [trunks, tops, darkCrowns, lightCrowns]) {
+      if (!batch) continue;
+      batch.instanceMatrix.needsUpdate = true;
+      batch.castShadow = quality !== "low";
+      batch.receiveShadow = false;
+      batch.computeBoundingSphere();
+      parent.add(batch);
+    }
   }
 
   function clearGroup(group) {
@@ -213,14 +239,16 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 
     const random = seeded(27011);
     const treeCount = quality === "low" ? 38 : quality === "high" ? 105 : 68;
+    const forestPositions = [];
     for (let i = 0; i < treeCount; i++) {
       const x = (random() - .5) * 96;
       const z = (random() - .5) * 72;
       // Keep the main roads and central settlement readable.
       if (Math.abs(x) < 9 && Math.abs(z) < 9) continue;
       if (Math.abs(z + 10) < 3 && x > -52 && x < 52) continue;
-      addTree(terrainRoot, x, z, .62 + random() * .58, i);
+      forestPositions.push({ x, z, scale: .62 + random() * .58, variant: i });
     }
+    addInstancedForest(terrainRoot, forestPositions);
 
     // A few ridges make the mountain belt visible even before a territory is selected.
     for (const [x, z, scale] of [[-42, -31, 1.5], [-30, 34, 1.25], [43, 28, 1.65], [47, -36, 1.15], [0, 37, .9]]) {
@@ -539,6 +567,11 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     sceneVisibilityObserver?.disconnect();
     if (visibilityChangeHandler) document.removeEventListener("visibilitychange", visibilityChangeHandler);
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+    // Release geometry buffers of the scene on page navigation; all batches are
+    // shared by the same renderer and must be disposed only once.
+    const geometries = new Set();
+    worldRoot.traverse(node => { if (node.geometry) geometries.add(node.geometry); });
+    for (const geometry of geometries) geometry.dispose();
     if (renderer) {
       renderer.setAnimationLoop(null);
       renderer.dispose();

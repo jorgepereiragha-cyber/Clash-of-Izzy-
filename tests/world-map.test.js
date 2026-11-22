@@ -125,3 +125,15 @@ test("world-map renderer caps drawing-buffer pixels and restores from Android ba
   assert.ok(scene.includes("if (!event.persisted) dispose()"));
   assert.ok(scene.includes("syncMarchAnimation()"));
 });
+
+test("map forest instancing minimizes WebGL draw calls without changing territory state", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  assert.match(scene, /function addInstancedForest\(parent, positions\)/);
+  assert.match(scene, /new THREE\.InstancedMesh\(trunkGeo/);
+  assert.match(scene, /new THREE\.InstancedMesh\(crownGeo/);
+  assert.match(scene, /batch\.instanceMatrix\.needsUpdate = true/);
+  assert.match(scene, /addInstancedForest\(terrainRoot, forestPositions\)/);
+  assert.match(scene, /quality === "low" \? 38 : quality === "high" \? 105 : 68/);
+  assert.doesNotMatch(scene, /addTree\(terrainRoot/);
+  assert.match(scene, /for \(const geometry of geometries\) geometry\.dispose\(\)/);
+});
