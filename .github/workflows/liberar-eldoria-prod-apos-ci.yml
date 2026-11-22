@@ -114,7 +114,7 @@ jobs:
           # Somente o deploy oficial arquiva bookmark, aplica migrations e publica Worker.
           # A autorização de plano Pago e produção foi concedida pelo proprietário
           # no pedido de lançamento e na confirmação de serviço Cloudflare pago.
-          gh workflow run deploy-cloudflare.yml --ref main \
+          gh workflow run deploy-cloudflare.yml --repo "$GITHUB_REPOSITORY" --ref main \
             -f confirm_paid_plan=true \
             -f confirm_production=true
           echo "Workflow protegido solicitado. Aprovação de environment production, se configurada, permanece exigida."
