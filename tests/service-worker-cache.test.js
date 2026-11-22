@@ -176,10 +176,10 @@ test("PWA bounds its runtime asset cache and retires older named caches", async 
   assert.equal(h.stores.get("clash-of-izzy-runtime-v1").size, 64);
   assert.equal(h.stores.get("clash-of-izzy-runtime-v1").has("/assets/3d/model-0.glb"), false);
   assert.equal(h.stores.get("clash-of-izzy-runtime-v1").has("/assets/3d/model-69.glb"), true);
-  await h.caches.open("clash-of-izzy-shell-v29");
+  await h.caches.open("clash-of-izzy-shell-v26");
   await h.caches.open("clash-of-izzy-runtime-v0");
   await h.lifecycle("activate");
-  assert.equal(h.stores.has("clash-of-izzy-shell-v29"), false);
+  assert.equal(h.stores.has("clash-of-izzy-shell-v26"), false);
   assert.equal(h.stores.has("clash-of-izzy-runtime-v0"), false);
   assert.equal(h.stores.has("clash-of-izzy-runtime-v1"), true);
 });
