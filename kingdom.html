@@ -526,7 +526,23 @@ function renderDragonCollection(){
   else action.textContent="Liberar · Castelo nível "+Number(dragon.castle||1);
   if(dragon.owned&&!dragon.equipped)action.addEventListener("click",()=>runKingdomPanelAction({type:"dragon_equip",dragonKey:dragon.key},"Dragão equipado."));
   else if(!dragon.owned&&!dragon.master)action.addEventListener("click",()=>runKingdomPanelAction({type:"dragon_unlock",dragonKey:dragon.key},"Dragão desbloqueado."));
-  card.append(action);root.append(card);
+  card.append(action);
+  if(dragon.owned&&dragon.equipped){
+   const level=Math.max(1,Math.min(100,Math.floor(Number(state?.dragon?.level)||1)));
+   const costs={food:250*level,wood:150*level,stone:100*level,iron:25*level};
+   const resources=state?.kingdom||{};
+   const enough=Object.entries(costs).every(([key,cost])=>Number(resources[key]||0)>=cost);
+   const upgrade=document.createElement("button");upgrade.type="button";
+   upgrade.className="secondary";
+   upgrade.dataset.dragonUpgrade="true";
+   upgrade.textContent=level>=100?"✓ Dragão no nível máximo":"Evoluir dragão · +1 nível, +2 vínculo";
+   upgrade.disabled=busy||level>=100||!enough;
+   const costLine=document.createElement("small");costLine.className="muted";
+   costLine.textContent=level>=100?"Vínculo máximo: 100.":("Custo: "+fmt(costs.food)+" comida · "+fmt(costs.wood)+" madeira · "+fmt(costs.stone)+" pedra · "+fmt(costs.iron)+" ferro. Vínculo limitado a 100.");
+   if(level<100)upgrade.addEventListener("click",()=>runKingdomPanelAction({type:"dragon_upgrade"},"Dragão evoluído. Nível e vínculo sincronizados."));
+   card.append(costLine,upgrade);
+  }
+  root.append(card);
  }
  if(!dragons.length){const empty=document.createElement("div");empty.className="muted";empty.textContent="Nenhum dragão carregado. Atualize o reino.";root.append(empty);}
 }
