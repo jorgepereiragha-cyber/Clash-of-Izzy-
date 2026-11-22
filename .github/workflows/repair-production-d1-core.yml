@@ -92,39 +92,59 @@ jobs:
           with urllib.request.urlopen(request,timeout=30) as response:reply=json.load(response)
           if not reply.get("success") or not reply.get("result"):raise SystemExit("Cannot audit D1 migrations; no write.")
           names=[x["name"] for x in reply["result"][0].get("results",[])]
-          # The newest name alone is insufficient: older missing migration names
-          # would be re-applied by Wrangler. Reject any noncanonical prefix.
-          canonical=[]
+          # Existing migrations may have been registered in another order.
+          # Require the exact BASELINE SET <=0036, not filename order.
+          # Only 0037-0039 are physically copied into the apply directory.
+          baseline=[]
           for file in (root/"migrations").glob("*.sql"):
               match=re.match(r"^(\d{4})_",file.name)
-              if match and int(match.group(1))<=39:
-                  canonical.append(file.name)
-          canonical.sort()
-          if not canonical or not names or names!=canonical[:len(names)]:
-              raise SystemExit("Noncanonical D1 migration history; no production write allowed.")
+              if match and int(match.group(1))<=36:
+                  baseline.append(file.name)
+          baseline.sort()
+          if not baseline or len(names)!=len(baseline) or set(names)!=set(baseline):
+              missing=sorted(set(baseline)-set(names))
+              unexpected=sorted(set(names)-set(baseline))
+              print("BASELINE_MISSING="+json.dumps(missing))
+              print("BASELINE_UNEXPECTED="+json.dumps(unexpected))
+              raise SystemExit("Historical D1 migration set is not complete; no production write.")
           last=names[-1]
-          if last not in ("0035_throne_war.sql","0036_4x_read_indexes.sql"):
-              raise SystemExit("Unexpected migration history: production core repair aborted.")
+          if last!="0036_4x_read_indexes.sql":
+              raise SystemExit("Unexpected latest migration: production repair aborted.")
           essential=("0037_daily_login_rewards.sql","0038_onboarding_bonus.sql","0039_support_orders.sql")
           if any(item in names for item in essential):
               raise SystemExit("Partial/advanced migration history: investigate manually before any write.")
           if any(re.match(r"^004[0-9]_",name) for name in names):
-              raise SystemExit("Commercial migrations detected in production history: abort.")
-          output=root/".coi-core-migrations"
+              raise SystemExit("Commercial migration history detected: abort.")
+
+          # Verify exactly the three missing tables, and their parent table,
+          # directly in D1 before preparing any remote write.
+          tables_query=json.dumps({"sql":"SELECT name FROM sqlite_master WHERE type='table' AND name IN ('players','daily_reward_claims','onboarding_bonus_claims','support_orders')"}).encode()
+          tables_request=urllib.request.Request(url,data=tables_query,method="POST",
+              headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+          with urllib.request.urlopen(tables_request,timeout=30) as response:tables_reply=json.load(response)
+          if not tables_reply.get("success") or not tables_reply.get("result"):
+              raise SystemExit("Cannot verify remote schema; no production write.")
+          tables={x["name"] for x in tables_reply["result"][0].get("results",[])}
+          if tables!={"players"}:
+              raise SystemExit("Unexpected D1 table state; do not repair until reviewed.")
+
+          output=root/".coi-essential-0037-0039"
           output.mkdir(exist_ok=False)
-          copied=[]
-          for file in sorted((root/"migrations").glob("*.sql")):
-              match=re.match(r"^(\d{4})_",file.name)
-              if match and int(match.group(1))<=39:
-                  shutil.copy2(file,output/file.name)
-                  copied.append(file.name)
-          if not all(item in copied for item in essential):
-              raise SystemExit("Essential migration files missing: no write.")
-          binding["migrations_dir"]=".coi-core-migrations"
+          for name in essential:
+              source=root/"migrations"/name
+              if not source.is_file():
+                  raise SystemExit("Missing required SQL file: no production write.")
+              shutil.copy2(source,output/name)
+          copied=sorted(file.name for file in output.glob("*.sql"))
+          if copied!=sorted(essential):
+              raise SystemExit("Unsafe migration staging contents; abort.")
+          binding["migrations_dir"]=".coi-essential-0037-0039"
+          binding.pop("migrations_pattern",None)
           (root/"wrangler.core.generated.jsonc").write_text(json.dumps(cfg,indent=2)+"\n")
           print("PROD_D1_HISTORY_LAST="+str(last))
-          print("CORE_MIGRATIONS_MAX=0039; production target UUID verified.")
-          print("No commercial 0040-0044 SQL is present in the generated migration directory.")
+          print("BASELINE_ALL_0036_PRESENT=true; production target UUID verified.")
+          print("ONLY_ESSENTIAL_PENDING="+json.dumps(copied))
+          print("No historical or commercial SQL exists in the generated apply directory.")
           PY
 
       - name: Listar migrations de producao pendentes (somente leitura)
