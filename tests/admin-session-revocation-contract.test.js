@@ -13,6 +13,8 @@ test("Master token TTL is 60 minutes, carries random jti and is revoked server-s
  assert.match(worker,/INSERT OR IGNORE INTO admin_session_revocations/);
  assert.match(worker,/if\(!await adminSessionActive\(env,payload\)\)/);
  assert.match(worker,/\/api\/admin\/logout/);
+ assert.match(worker,/DELETE FROM admin_session_revocations WHERE token_id IN/);
+ assert.match(worker,/if\(!await adminSessionActive\(env,payload\)\)/);
  assert.match(migration,/CREATE TABLE IF NOT EXISTS admin_session_revocations/);
  assert.match(migration,/token_id TEXT PRIMARY KEY/);
  assert.doesNotMatch(migration,/DROP TABLE|UPDATE players|DELETE FROM players/i);
