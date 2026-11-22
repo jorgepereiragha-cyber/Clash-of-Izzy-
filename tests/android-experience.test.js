@@ -120,6 +120,6 @@ test("Android native launcher presents the independent hero emblem and promo por
   const portal = await readFile(new URL("../portal.html", import.meta.url), "utf8");
   assert.match(activity, /heroEmblem\.setImageResource\(R\.drawable\.royal_king\)/);
   assert.match(icon, /fillColor="#E3B865"/);
-  assert.match(portal, /assets\/brand\/hero-emblem\.svg/);
+  assert.match(portal, /assets\/brand\/royal-king\.webp/);
   assert.doesNotMatch(portal, /\/scripts\/pwa-runtime\.js|href="\/manifest\.json"/);
 });
