@@ -6,6 +6,7 @@ const format = amount => Number(amount || 0).toLocaleString("pt-BR");
 let state = createSiegeScenario();
 let scene, renderer, camera, gate, wallLeft, wallRight, tower;
 let resizeObserver = null;
+let gpuUnavailable = false;
 const host = byId("siegeViewport");
 
 function makeBox(parent, size, position, color) {
@@ -106,12 +107,18 @@ function buildScene() {
     }
     renderer.domElement.addEventListener("webglcontextlost", event => {
       event.preventDefault();
+      gpuUnavailable = true;
+      renderer?.domElement.remove();
+      renderer?.dispose();
       renderer = null;
-      byId("siegeStatus").textContent = "Visualização 3D indisponível. Os cálculos do laboratório continuam.";
+      render();
     }, { once: true });
     resize();
   } catch {
-    byId("siegeStatus").textContent = "GPU não disponível. Use os controles e os relatórios do cenário.";
+    gpuUnavailable = true;
+    renderer?.domElement.remove();
+    renderer?.dispose();
+    renderer = null;
   }
 }
 
@@ -127,7 +134,9 @@ function render() {
   const description = state.winner === "attackers" ? "Fortificação dominada no cenário de teste."
     : state.winner === "defenders" ? "A defesa resistiu ao cerco."
     : "Rodada " + state.round + " · " + (state.gateHp === 0 || state.wallHp === 0 ? "Passagem aberta." : "Muralha protegida.");
-  byId("siegeStatus").textContent = description;
+  byId("siegeStatus").textContent = gpuUnavailable
+    ? "Visualização 3D indisponível; simulação textual ativa. " + description
+    : description;
   if (gate && renderer) {
     const gateRatio = state.gateHp / 1300;
     gate.scale.y = Math.max(.02, gateRatio);
