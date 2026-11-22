@@ -10,6 +10,7 @@ if (root) {
   const status = document.getElementById("coiCityGridStatus");
   const config = () => window.__coiCityLayoutState?.()?.cityLayout;
   const buildings = () => window.__coiCityLayoutState?.()?.buildings || [];
+  const defenses = () => window.__coiCityLayoutState?.()?.cityDefenses || [];
   const selected = () => buildings().find(item => item.building_type === selector.value);
   let moving = false;
 
@@ -32,6 +33,10 @@ if (root) {
       ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,canvas.height);ctx.stroke();
       ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(canvas.width,p);ctx.stroke();
     }
+    defenses().forEach(d => {
+      const dx=(Number(d.grid_x)-min)*unit,dz=(Number(d.grid_z)-min)*unit;
+      ctx.fillStyle="#d8aa67";ctx.fillRect(dx,dz,Number(d.width)*unit,Number(d.height)*unit);
+    });
     rows.forEach(b => {
       const fp = layout.footprints[b.building_type];
       if (!fp) return;
@@ -61,7 +66,8 @@ if (root) {
     if (!fp || !Number.isSafeInteger(x) || !Number.isSafeInteger(z) ||
       x < layout.min || z < layout.min ||
       x + fp.width > layout.max || z + fp.height > layout.max) return false;
-    return rows.every(other => {
+    return defenses().every(d => !(x < Number(d.grid_x)+Number(d.width) && x+fp.width > Number(d.grid_x) &&
+      z < Number(d.grid_z)+Number(d.height) && z+fp.height > Number(d.grid_z))) && rows.every(other => {
       if (other.building_type === current.building_type) return true;
       const footprint = layout.footprints[other.building_type];
       if (!footprint) return false;
@@ -100,15 +106,29 @@ if (root) {
   });
   xInput.addEventListener("input",draw);
   zInput.addEventListener("input",draw);
-  canvas.addEventListener("pointerdown",event => {
+  function selectBuildingGridCell(event) {
     if (!selected() || moving) return;
+    if (event.cancelable) event.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const layout = config();
     if (!layout || !rect.width || !rect.height) return;
     const tiles = layout.max - layout.min;
-    xInput.value = String(Math.floor((event.clientX - rect.left) / rect.width * tiles) + layout.min);
-    zInput.value = String(Math.floor((event.clientY - rect.top) / rect.height * tiles) + layout.min);
+    const cx = Math.max(0, Math.min(tiles - 1, Math.floor((event.clientX - rect.left) / rect.width * tiles)));
+    const cz = Math.max(0, Math.min(tiles - 1, Math.floor((event.clientY - rect.top) / rect.height * tiles)));
+    xInput.value = String(cx + layout.min);
+    zInput.value = String(cz + layout.min);
     draw();
+  }
+  canvas.addEventListener("pointerdown",event => {
+    if (!selected() || moving || (event.pointerType === "mouse" && event.button !== 0)) return;
+    canvas.setPointerCapture?.(event.pointerId);
+    selectBuildingGridCell(event);
+  });
+  canvas.addEventListener("pointermove",event => {
+    if (canvas.hasPointerCapture?.(event.pointerId)) selectBuildingGridCell(event);
+  });
+  canvas.addEventListener("pointerup",event => {
+    if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   });
   submit.addEventListener("click",async () => {
     const b = selected();

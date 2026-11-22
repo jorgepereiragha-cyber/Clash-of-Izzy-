@@ -7,6 +7,10 @@ import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
 import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
 import { cityLayoutConfig, moveCityBuilding } from "./city-layout-rules.js";
+import { advanced4xEnabled,calculateChainProduction,ensureIntermediateResources,upgradeIndustry } from "./intermediate-production.js";
+import { DEFENSE_CATALOG,placeCityDefense,movePlacedDefense,defensePowerFromRows } from "./city-defense-rules.js";
+import { getKingdomProgression,progressionQueueStatements } from "./player-progression-4x.js";
+import { assign4xHero,unassign4xHero,assigned4xHeroLevel,millHeroMultiplier,towerHeroMultiplier } from "./hero-assignments-4x.js";
 import { processEmailQueue, requestEmailVerification, verifyEmailToken, getEmailPreferences, updateEmailPreferences, getEmailHistory, queueEmailForInternalPlayer } from "./email-system.js";
 import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaConfig } from "./valhalla-config.js";
 import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
@@ -398,7 +402,11 @@ async function recalculateKingdomStats(env,kingdomId){
     gold:20000+warehouse*8000+(levels.market||1)*500
   };
   const wallMax=5000+(levels.wall||1)*5000;
-  const defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number(kingdom.castle_level)||1)*10;
+  let defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number(kingdom.castle_level)||1)*10;
+  if(advanced4xEnabled(env)){
+    const defenseRows=await env.DB.prepare("SELECT defense_type,level FROM city_defenses WHERE kingdom_id=?").bind(kingdomId).all();
+    defense+=Math.floor(defensePowerFromRows(defenseRows.results||[])*towerHeroMultiplier(await assigned4xHeroLevel(env,kingdomId,"defense:tower")));
+  }
   await env.DB.prepare(
     "UPDATE kingdoms SET food_capacity=MAX(?,food),wood_capacity=MAX(?,wood),stone_capacity=MAX(?,stone),iron_capacity=MAX(?,iron),gold_capacity=MAX(?,gold),wall_max_hp=?,wall_hp=MIN(wall_hp,?),defense_power=? WHERE id=?"
   ).bind(capacities.food,capacities.wood,capacities.stone,capacities.iron,capacities.gold,wallMax,wallMax,defense,kingdomId).run();
@@ -424,6 +432,10 @@ async function recalculateKingdomPower(env,kingdomId){
   for(const row of heroes.results||[])power+=(Number(row.level)||0)*25;
   power+=(Number(dragon?.level)||0)*40;
   power+=Math.max(0,Number(kingdom?.prestige)||0)*100;
+  if(advanced4xEnabled(env)){
+    const defenses=await env.DB.prepare("SELECT defense_type,level FROM city_defenses WHERE kingdom_id=?").bind(kingdomId).all();
+    power+=Math.floor(defensePowerFromRows(defenses.results||[])*towerHeroMultiplier(await assigned4xHeroLevel(env,kingdomId,"defense:tower")));
+  }
   const total=Math.max(0,Math.floor(power));
   await env.DB.prepare("UPDATE kingdoms SET power=? WHERE id=?").bind(total,kingdomId).run();
   return total;
@@ -447,7 +459,7 @@ async function applyProduction(env,kingdomId){
   const perHour={
     wood:8*(levels.lumber_mill||1),
     stone:6*(levels.quarry||1),
-    food:12*(levels.farm||1),
+    food:advanced4xEnabled(env)?0:12*(levels.farm||1),
     iron:2*(levels.iron_mine||1),
     gold:1.5*(levels.market||1)
   };
@@ -465,6 +477,9 @@ async function applyProduction(env,kingdomId){
   let previousRemainders={};
   try{const parsed=JSON.parse(row.production_remainders||"{}");if(parsed&&typeof parsed==="object"&&!Array.isArray(parsed))previousRemainders=parsed}catch{}
   const gains={},nextRemainders={};
+  const chainEnabled=advanced4xEnabled(env);
+  const chainState=chainEnabled?await ensureIntermediateResources(env,kingdomId):null;
+  let chainResult=null;
   const capacities={food:Number(row.food_capacity)||50000,wood:Number(row.wood_capacity)||50000,stone:Number(row.stone_capacity)||30000,iron:Number(row.iron_capacity)||25000,gold:Number(row.gold_capacity)||20000};
   for(const [key,rate] of Object.entries(perHour)){
     const accumulated=rate*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*petBonuses.resourceProductionMultiplier*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
@@ -472,6 +487,19 @@ async function applyProduction(env,kingdomId){
     const current=Math.max(0,Number(row[key])||0);
     gains[key]=Math.min(produced,Math.max(0,capacities[key]-current));
     nextRemainders[key]=gains[key]<produced?0:accumulated-produced*3600;
+  }
+  if(chainEnabled){
+    chainResult=calculateChainProduction({
+      elapsedSeconds:elapsed,farmLevel:levels.farm||1,
+      millLevel:chainState.mill_level,bakeryLevel:chainState.bakery_level,
+      millMultiplier:millHeroMultiplier(await assigned4xHeroLevel(env,kingdomId,"industry:mill")),
+      wheat:chainState.wheat,flour:chainState.flour,
+      foodFreeSpace:Math.max(0,capacities.food-Math.max(0,Number(row.food)||0)),
+      multiplier:valhallaMultipliers.resource*valhallaBuffs.resourceProduction*petBonuses.resourceProductionMultiplier*prestigeBonus,
+      remainders:previousRemainders
+    });
+    gains.food=chainResult.food;
+    Object.assign(nextRemainders,chainResult.remainders);
   }
   // Guarda as frações de produção: consultas frequentes não descartam os segundos acumulados.
   // Compare-and-set impede duas chamadas simultâneas de creditar o mesmo intervalo.
@@ -482,7 +510,15 @@ async function applyProduction(env,kingdomId){
   const ledgerInsert=ledgerRows.length?env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) "+ledgerRows.map(()=> "SELECT ?,?,?,? WHERE changes()>0").join(" UNION ALL "))
     .bind(...ledgerRows.flatMap(([resource,amount])=>[kingdomId,resource,amount,"produção automática"])):null;
   // Produção e extrato são confirmados no mesmo lote; chamadas concorrentes não duplicam nenhum dos dois.
-  await env.DB.batch(ledgerInsert?[productionUpdate,ledgerInsert]:[productionUpdate]);
+  const writes=[productionUpdate];
+  if(chainEnabled){
+    // changes() testa exclusivamente o UPDATE de kingdoms anterior: se o CAS perder,
+    // nenhum trigo/farinha é alterado e o ledger não é escrito.
+    writes.push(env.DB.prepare("UPDATE intermediate_resources SET wheat=?,flour=?,updated_at=CURRENT_TIMESTAMP WHERE kingdom_id=? AND changes()=1")
+      .bind(chainResult.wheat,chainResult.flour,kingdomId));
+  }
+  if(ledgerInsert)writes.push(ledgerInsert);
+  await env.DB.batch(writes);
 }
 async function seedWorld(env,region=1){
  const nodes=[
@@ -860,7 +896,14 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,source_key,title,body,reward_key,read_at,claimed_at,created_at FROM kingdom_mailbox WHERE kingdom_id=? ORDER BY id DESC LIMIT 50").bind(kingdom.id)
   ]);
   const dragonCollection=getDragonCollectionView((dragonOwnedRows.results||[]).map(row=>row.dragon_key),dragon?.dragon_key,dragon?.level,dragon?.bond);
-  return {castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
+  const advancedState=advanced4xEnabled(env)?await Promise.all([
+    ensureIntermediateResources(env,kingdom.id),
+    env.DB.prepare("SELECT id,defense_type,grid_x,grid_z,width,height,level FROM city_defenses WHERE kingdom_id=? ORDER BY id").bind(kingdom.id).all(),
+    getKingdomProgression(env,kingdom.id)
+  ]):null;
+  return {advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
+    cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
+    defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -1393,6 +1436,34 @@ async function gameAction(env,playerId,body){
         .bind(k.id,"castle_vip_upgraded",JSON.stringify({vipLevel:target,gemsSpent:cost,bonuses:getCastleVipBonuses(target),castleLevel:CASTLE_MAX_LEVEL}))
     ]);
     if(!result[0]?.meta?.changes||!result[1]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Evolução VIP não concluída: gemas insuficientes ou estado alterado."},409);
+  }else if(type==="assign_hero_to_building"||type==="assign_hero_to_defense"||type==="unassign_hero_4x"){
+    if(!advanced4xEnabled(env))return json({error:"Sistemas 4X ainda não habilitados no servidor."},503);
+    const heroKey=typeof body.heroKey==="string"?body.heroKey:"";
+    if(type==="assign_hero_to_building"&&body.building!=="mill")
+      return json({error:"A alocação de produção atualmente aceita somente moinho."},400);
+    if(type==="assign_hero_to_defense"&&body.defense!=="tower")
+      return json({error:"A alocação militar atualmente aceita somente torres."},400);
+    const slot=type==="assign_hero_to_building"?"industry:mill":"defense:tower";
+    const result=type==="unassign_hero_4x"
+      ?await unassign4xHero(env,k.id,heroKey)
+      :await assign4xHero(env,k.id,heroKey,slot,HERO_TEMPLATES[heroKey]?.type);
+    if(!result.ok)return json({error:result.error},result.status);
+    // O jogo recalcula o valor efetivo, nunca aceita porcentagens do cliente.
+    await recalculateKingdomStats(env,k.id);
+    await recalculateKingdomPower(env,k.id);
+    await logKingdomAction(env,k.id,p.id,type,result);
+  }else if(type==="city_defense_place"||type==="city_defense_move"||type==="industry_upgrade"){
+    if(!advanced4xEnabled(env))return json({error:"Sistemas 4X ainda não habilitados no servidor."},503);
+    const result=type==="city_defense_place"?await placeCityDefense(env,k.id,body)
+      :type==="city_defense_move"?await movePlacedDefense(env,k.id,body)
+      :await upgradeIndustry(env,k.id,String(body.industry||""));
+    if(!result.ok)return json({error:result.error},result.status);
+    if(type==="city_defense_place"||type==="city_defense_move"){
+      // Uma defesa recém-criada deve afetar o poder imediatamente, não só no próximo upgrade.
+      await recalculateKingdomStats(env,k.id);
+      await recalculateKingdomPower(env,k.id);
+    }
+    await logKingdomAction(env,k.id,p.id,type,result);
   }else if(type==="city_layout_move"){
     const move=await moveCityBuilding(env,k.id,body);
     if(!move.ok)return json({error:move.error},move.status);
@@ -1871,6 +1942,7 @@ async function processDueKingdomQueues(env,kingdomId=null){
       .bind(queue.kingdom_id,eventType,JSON.stringify(eventPayload),queue.id,completionToken));
     statements.push(env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,?,? WHERE "+guard)
       .bind(queue.kingdom_id,queue.queue_type+"_completed",JSON.stringify(eventPayload),queue.id,completionToken));
+    if(advanced4xEnabled(env))statements.push(...progressionQueueStatements(env,{...queue,completionToken},guard));
     try{
       await env.DB.batch(statements);
       if(queue.queue_type==="construction")await recalculateKingdomStats(env,queue.kingdom_id);

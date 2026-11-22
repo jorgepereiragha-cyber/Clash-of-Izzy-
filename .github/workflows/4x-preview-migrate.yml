@@ -1,0 +1,22 @@
+name: Legado 4X remote Preview migrate (desativado)
+
+# Fluxo antigo aposentado: o push em branch de feature nao pode alterar D1 remoto.
+# Para aplicar migracoes no Preview, usar somente o workflow manual
+# Prepare Clash of Izzy Preview D1 (isolated), com UUID confirmado,
+# declaracao de banco descartavel e autorizacao explicita.
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  legacy-disabled:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Exigir caminho canonico de homologacao isolada
+        shell: bash
+        run: |
+          echo "::error::Workflow legado desativado. Use prepare-preview-d1.yml com confirmacao explicita e banco Preview descartavel."
+          exit 1

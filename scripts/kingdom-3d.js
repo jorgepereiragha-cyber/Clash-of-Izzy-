@@ -17,6 +17,12 @@ if (host && "WebGLRenderingContext" in window) {
   let latestTroops = [];
   let latestCastleSkinId = 0;
   let activeModels = [];
+  let activeDefenseModels = [];
+  let defensePreviewMesh = null;
+  let defensePreviewHandler = null;
+  let latestDefenses = [];
+  let latestHeroAssignments = [];
+  let activeHeroFigures = [];
   let activeProps = [];
   let activeTroops = [];
   let armyMixers = [];
@@ -63,8 +69,12 @@ if (host && "WebGLRenderingContext" in window) {
   };
   const sharedMaterials = new Set(Object.values(mats));
   const surfaceTextureCache = new Map();
+  const surfaceMaterialCache = new Map();
   let disposed = false;
   let kingdomRenderHandler = null;
+  let valhallaModeHandler = null;
+  let developmentStatsBadge = null;
+  let developmentStatsTimer = null;
   let cinematicCaptureActive = false;
   let cinematicApi = null;
   let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
@@ -91,9 +101,37 @@ if (host && "WebGLRenderingContext" in window) {
       scene.add(valhallaAuroraLight);
     }
   }
-  window.addEventListener("coi:valhalla-mode", event => {
-    setKingdomValhallaMode(event.detail?.active === true);
-  });
+  valhallaModeHandler = event => setKingdomValhallaMode(event.detail?.active === true);
+  window.addEventListener("coi:valhalla-mode", valhallaModeHandler);
+
+  // Métricas apenas no ambiente de desenvolvimento, sem render loop extra.
+  function stopDevelopmentStats() {
+    if (developmentStatsTimer !== null) clearInterval(developmentStatsTimer);
+    developmentStatsTimer = null;
+    developmentStatsBadge?.remove();
+    developmentStatsBadge = null;
+  }
+  function startDevelopmentStats() {
+    if (window.ENVIRONMENT !== "development" || developmentStatsBadge || !renderer) return;
+    const output = document.createElement("output");
+    output.setAttribute("aria-label", "Métricas do renderizador 3D");
+    output.style.cssText = "position:absolute;left:6px;top:6px;z-index:4;" +
+      "pointer-events:none;padding:4px 7px;border-radius:5px;" +
+      "background:rgba(5,12,20,.8);color:#e9f1f5;font:11px monospace";
+    output.textContent = "FPS — · draw calls —";
+    host.appendChild(output);
+    developmentStatsBadge = output;
+    developmentStatsTimer = window.setInterval(() => {
+      if (!renderer || disposed || document.hidden) return;
+      const timing = animationFrameTiming.snapshot();
+      // Cenas estáticas não produzem um FPS mensurável.
+      const fps = animationFrame && timing.sampleCount >= 5 && timing.p50Ms > 0
+        ? Math.round(1000 / timing.p50Ms) : null;
+      output.textContent = (fps ?? "—") + " FPS · " +
+        renderer.info.render.calls + " draw calls · " +
+        renderer.info.memory.geometries + " geometrias";
+    }, 1000);
+  }
 
   // Explicitly release GPU-backed resources on WebGL context loss. Three.js
   // resources are not reclaimed by the browser's garbage collector.
@@ -139,13 +177,19 @@ if (host && "WebGLRenderingContext" in window) {
       resources.materials.add(mat);
       if (mat.map) resources.textures.add(mat.map);
     }
+    for(const mat of surfaceMaterialCache.values())resources.materials.add(mat);
     disposeResourceSet(resources);
     scene?.clear();
     surfaceTextureCache.clear();
+    surfaceMaterialCache.clear();
     glbTemplates.clear();
     glbPropTemplates.clear();
     glbUnitTemplates.clear();
     activeModels = [];
+    activeDefenseModels = [];
+    activeHeroFigures = [];
+    latestHeroAssignments = [];
+    defensePreviewMesh = null;
     activeProps = [];
     activeTroops = [];
     armyMixers = [];
@@ -269,13 +313,19 @@ if (host && "WebGLRenderingContext" in window) {
     return surfaceTextureCache.get(key);
   }
   function surfaceMaterial(base, kind, seed) {
+    const key=`${base}:${kind}:${seed}`;
+    if(surfaceMaterialCache.has(key))return surfaceMaterialCache.get(key);
     const maps = getSurfaceMaps(base, kind, seed);
-    return new THREE.MeshStandardMaterial({
+    const mat=new THREE.MeshStandardMaterial({
       color: "#ffffff",
       ...maps,
       roughness: kind === "roof" ? .86 : .96,
       metalness: 0.01
     });
+    // Evita recompilar materiais iguais após cada atualização de estado.
+    surfaceMaterialCache.set(key,mat);
+    sharedMaterials.add(mat);
+    return mat;
   }
   function applyProceduralSurfaceMaps() {
     const maps = [
@@ -623,6 +673,169 @@ if (host && "WebGLRenderingContext" in window) {
     renderer.render(scene, camera);
     publishBuildingHitTargets(list);
   }
+  // Defesas 4X são meshes leves; posições usam a mesma escala do castelo 3D.
+  function renderCityDefenses(defenses = []) {
+    if (!scene || !renderer || disposed) return;
+    for (const object of activeDefenseModels) {
+      scene.remove(object);
+      disposeDetachedObject3D(object);
+    }
+    activeDefenseModels = [];
+    const entries = (Array.isArray(defenses) ? defenses : []).slice(0, 32);
+    const distantByType=new Map();
+    for (const item of entries) {
+      const type = item?.defense_type;
+      const x = Number(item.grid_x), z = Number(item.grid_z);
+      const w = Number(item.width), h = Number(item.height);
+      if (!["tower","trap","gate"].includes(type) ||
+          ![x,z,w,h].every(Number.isFinite) || w<1 || h<1 || w>5 || h>5) continue;
+      const worldX=(x+w/2)*.53,worldZ=(z+h/2)*.53;
+      const threshold=qualityProfile?.tier==="low"?22:30;
+      if(camera.position.distanceToSquared(new THREE.Vector3(worldX,0,worldZ))>threshold*threshold){
+        if(!distantByType.has(type))distantByType.set(type,[]);
+        distantByType.get(type).push({x:worldX,z:worldZ,sx:w*.53,sz:h*.53});
+        continue;
+      }
+      const group = new THREE.Group();
+      const stone = new THREE.MeshStandardMaterial({color:"#89959c",roughness:.87});
+      const wood = new THREE.MeshStandardMaterial({color:"#6d4834",roughness:.9});
+      const accent = new THREE.MeshStandardMaterial({color:type==="trap"?"#a3694a":"#c4a45e",roughness:.75});
+      const add = (geometry,material,px,py,pz) => {
+        const mesh = new THREE.Mesh(geometry,material);
+        mesh.position.set(px,py,pz);
+        mesh.castShadow = true; mesh.receiveShadow = true; group.add(mesh);
+      };
+      const sx=w*.53,sz=h*.53;
+      add(new THREE.BoxGeometry(sx*.88,.12,sz*.88),stone,0,.06,0);
+      if(type==="tower"){
+        add(new THREE.CylinderGeometry(.28,.34,1.05,8),stone,0,.64,0);
+        add(new THREE.CylinderGeometry(.38,.3,.16,8),accent,0,1.25,0);
+      }else if(type==="gate"){
+        const pillarHeight=.95;
+        add(new THREE.BoxGeometry(.18,pillarHeight,.22),stone,-sx*.3,.55,0);
+        add(new THREE.BoxGeometry(.18,pillarHeight,.22),stone,sx*.3,.55,0);
+        add(new THREE.BoxGeometry(sx*.75,.18,.24),accent,0,1.08,0);
+        add(new THREE.BoxGeometry(sx*.37,.6,.08),wood,0,.39,0);
+      }else{
+        for(const dx of [-.12,0,.12])for(const dz of [-.12,.12])
+          add(new THREE.ConeGeometry(.072,.35,4),accent,dx,.29,dz);
+      }
+      group.position.set(worldX,0,worldZ);
+      group.userData.coIDefenseId = item.id;
+      scene.add(group); activeDefenseModels.push(group);
+    }
+    // Defesas distantes compartilham geometria e material por tipo (uma draw call por tipo).
+    for(const [type,list] of distantByType){
+      const geometry=new THREE.BoxGeometry(1,1,1);
+      const material=new THREE.MeshStandardMaterial({
+        color:type==="trap"?0xa3694a:type==="tower"?0x89959c:0xc4a45e,
+        roughness:.9
+      });
+      const instanced=new THREE.InstancedMesh(geometry,material,list.length);
+      const dummy=new THREE.Object3D();
+      list.forEach((item,i)=>{
+        const height=type==="tower" ? 1.45 : type==="gate" ? 0.98 : 0.22;
+        dummy.position.set(item.x,height/2,item.z);
+        dummy.scale.set(item.sx*.8,height,item.sz*.8);
+        dummy.updateMatrix();
+        instanced.setMatrixAt(i,dummy.matrix);
+      });
+      instanced.instanceMatrix.needsUpdate=true;
+      instanced.computeBoundingSphere();
+      scene.add(instanced);
+      activeDefenseModels.push(instanced);
+    }
+    renderer.render(scene,camera);
+  }
+  function renderAssignedHeroFigures(assignments=[]) {
+    if(!scene||!renderer||disposed)return;
+    for(const figure of activeHeroFigures){
+      scene.remove(figure);
+      disposeDetachedObject3D(figure);
+    }
+    activeHeroFigures=[];
+    // Até dois postos. Figuras procedurais evitam novos GLBs e luzes dinâmicas.
+    for(const hero of (Array.isArray(assignments)?assignments:[]).filter(h=>
+      h?.assigned_to==="industry:mill"||h?.assigned_to==="defense:tower").slice(0,2)){
+      const role=hero.assigned_to,level=Math.min(100,Math.max(1,Number(hero.level)||1));
+      let anchor=null;
+      if(role==="industry:mill"){
+        const idx=latestBuildings.findIndex(b=>b.building_type==="farm");
+        if(idx>=0){const p=cityWorldPoint(latestBuildings[idx],idx);anchor={x:p.x+.9,z:p.z-.6};}
+      }else{
+        const tower=latestDefenses.find(d=>d.defense_type==="tower");
+        if(tower)anchor={
+          x:(Number(tower.grid_x)+Number(tower.width)/2)*.53+.6,
+          z:(Number(tower.grid_z)+Number(tower.height)/2)*.53
+        };
+      }
+      if(!anchor||![anchor.x,anchor.z].every(Number.isFinite))continue;
+      const figure=new THREE.Group();
+      const baseColor=role==="industry:mill"?0x88755a:0x3e5f85;
+      const glowColor=role==="industry:mill"?0xffcb68:0x74c9ff;
+      const armor=new THREE.MeshStandardMaterial({color:baseColor,roughness:.68,metalness:.22});
+      const skin=new THREE.MeshStandardMaterial({color:0xd3aa85,roughness:.88});
+      const spell=new THREE.MeshStandardMaterial({
+        color:glowColor,emissive:glowColor,emissiveIntensity:level>=10 ? 0.65 : 0,
+        roughness:.35,metalness:.45
+      });
+      const part=(geometry,material,x,y,z)=>{
+        const mesh=new THREE.Mesh(geometry,material);
+        mesh.position.set(x,y,z);
+        mesh.castShadow=true;
+        figure.add(mesh);
+        return mesh;
+      };
+      part(new THREE.BoxGeometry(.38,.62,.24),armor,0,.52,0);
+      part(new THREE.SphereGeometry(.17,8,6),skin,0,.99,0);
+      part(new THREE.BoxGeometry(.09,.66,.09),spell,.30,.66,0);
+      if(level>=20 && qualityProfile?.tier!=="low"){
+        part(new THREE.ConeGeometry(.21,.23,6),armor,0,1.19,0);
+        part(new THREE.BoxGeometry(.35,.45,.045),armor,0,.47,-.17);
+      }
+      // Sinalização de buff sem partículas nem luz dinâmica (até 2 heróis).
+      // Removido e liberado com activeHeroFigures/disposeDetachedObject3D.
+      const buffRing=new THREE.Mesh(
+        new THREE.RingGeometry(.30,.40,16),
+        new THREE.MeshBasicMaterial({
+          color:glowColor,transparent:true,
+          opacity:qualityProfile?.tier==="low"?.26:.40,
+          side:THREE.DoubleSide,depthWrite:false
+        })
+      );
+      buffRing.rotation.x=-Math.PI/2;
+      buffRing.position.y=.025;
+      figure.add(buffRing);
+      figure.position.set(anchor.x,0,anchor.z);
+      figure.userData.coIHeroKey=hero.hero_key;
+      scene.add(figure);
+      activeHeroFigures.push(figure);
+    }
+    renderer.render(scene,camera);
+  }
+  function updateDefensePreview(detail) {
+    if (!scene || !renderer || disposed) return;
+    if (defensePreviewMesh) {
+      scene.remove(defensePreviewMesh);
+      disposeDetachedObject3D(defensePreviewMesh);
+      defensePreviewMesh = null;
+    }
+    const x=Number(detail?.gridX),z=Number(detail?.gridZ),
+      w=Number(detail?.width),h=Number(detail?.height);
+    if(!detail?.type||![x,z,w,h].every(Number.isFinite)||w<1||h<1||w>5||h>5){
+      renderer.render(scene,camera);return;
+    }
+    const geometry=new THREE.PlaneGeometry(w*.53,h*.53);
+    const material=new THREE.MeshBasicMaterial({
+      color:detail.valid?0x36d47a:0xe04d57,transparent:true,opacity:.5,
+      depthWrite:false,side:THREE.DoubleSide
+    });
+    defensePreviewMesh=new THREE.Mesh(geometry,material);
+    defensePreviewMesh.rotation.x=-Math.PI/2;
+    defensePreviewMesh.position.set((x+w/2)*.53,.16,(z+h/2)*.53);
+    scene.add(defensePreviewMesh);
+    renderer.render(scene,camera);
+  }
   function canRunArmyAnimation() {
     return !disposed && !cinematicCaptureActive && !document.hidden && sceneInViewport;
   }
@@ -924,6 +1137,7 @@ if (host && "WebGLRenderingContext" in window) {
     gltfLoader.setMeshoptDecoder(MeshoptDecoder);
     host.classList.add("has-3d");
     host.dataset.qualityTier = qualityProfile.tier;
+    startDevelopmentStats();
     const diagnostics = () => {
       if (!renderer) return { available: false, tier: qualityProfile?.tier || "unavailable" };
       const info = renderer.info;
@@ -964,6 +1178,10 @@ if (host && "WebGLRenderingContext" in window) {
       visibilityChangeHandler = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+      if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
+      if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
+      valhallaModeHandler = null;
+      stopDevelopmentStats();
       disposeSceneResources();
       ktx2?.dispose();
       draco?.dispose();
@@ -980,17 +1198,27 @@ if (host && "WebGLRenderingContext" in window) {
       const detail = event.detail || {};
       const list = detail.buildings || [];
       latestTroops = Array.isArray(detail.troops) ? detail.troops : [];
+      latestDefenses = Array.isArray(detail.defenses) ? detail.defenses : [];
+      latestHeroAssignments = Array.isArray(detail.heroes) ? detail.heroes : [];
       latestCastleSkinId=Number(detail.castleSkinId)||0;
       renderBuildings(list,latestCastleSkinId);
+      renderCityDefenses(latestDefenses);
+      renderAssignedHeroFigures(latestHeroAssignments);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
     };
     window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
+    defensePreviewHandler=event=>updateDefensePreview(event.detail||{});
+    window.addEventListener("coi:defense-preview",defensePreviewHandler);
     if (Array.isArray(window.__coiKingdomBuildings)) {
       latestTroops = Array.isArray(window.__coiKingdomTroops) ? window.__coiKingdomTroops : [];
+      latestDefenses = Array.isArray(window.__coiKingdomDefenses) ? window.__coiKingdomDefenses : [];
+      latestHeroAssignments = Array.isArray(window.__coiKingdomHeroAssignments) ? window.__coiKingdomHeroAssignments : [];
       latestCastleSkinId=Number(window.__coiKingdomCastleSkin)||0;
       renderBuildings(window.__coiKingdomBuildings,latestCastleSkinId);
+      renderCityDefenses(latestDefenses);
+      renderAssignedHeroFigures(latestHeroAssignments);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops);
@@ -1078,6 +1306,10 @@ if (host && "WebGLRenderingContext" in window) {
     visibilityChangeHandler = null;
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+    if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
+    if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
+    valhallaModeHandler = null;
+    stopDevelopmentStats();
     disposeSceneResources();
     ktx2?.dispose();
       draco?.dispose();

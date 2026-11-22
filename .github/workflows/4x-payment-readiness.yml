@@ -1,0 +1,48 @@
+name: Pagamentos 4X - webhook mockado e status publico
+on:
+  push:
+    branches: [feat/4x-industries-defenses-p1-p8]
+    paths: [.github/workflows/4x-payment-readiness.yml]
+permissions:
+  contents: read
+jobs:
+  payment-audit:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Validar HMAC idempotencia e rejeicao de valor divergente sem efetuar cobranca
+        run: node --test tests/mercadopago-orders.test.js tests/mercadopago-4x-integration.test.js
+      - name: Ler prontidao publica do checkout da producao sem pagamentos
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module <<'NODE'
+          const url="https://clash-of-izzy.jorgepereiragha.workers.dev/api/store/payment-methods";
+          let status="not-verified",mp="unknown",pix="unknown";
+          try{
+            const response=await fetch(url,{method:"GET",signal:AbortSignal.timeout(15000)});
+            if(response.ok){
+              const body=await response.json();
+              if(typeof body.mercadoPago==="boolean"&&typeof body.nubankPix==="boolean"){
+                status="verified";
+                mp=body.mercadoPago;
+                pix=body.nubankPix;
+              }
+            }
+          }catch(e){console.log("Public endpoint unavailable: status left unverified.");}
+          console.log("CHECKOUT_PUBLIC_READONLY="+JSON.stringify({status,mercadoPago:mp,nubankPix:pix}));
+          const fs=await import("node:fs");
+          fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+            "## Verificacao de pagamentos (sem cobranca)\n"+
+            "- HMAC, repeticao e valor divergente testados com mock local.\n"+
+            "- Endpoint publico: "+status+"\n"+
+            "- Mercado Pago configurado segundo endpoint publico: "+mp+"\n"+
+            "- Pix Nubank configurado segundo endpoint publico: "+pix+"\n"+
+            "- Uma compra sandbox real ainda exige credenciais de teste e notificacao autentica.\n");
+          NODE

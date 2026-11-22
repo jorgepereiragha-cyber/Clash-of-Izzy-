@@ -1,0 +1,82 @@
+name: Auditoria remota D1 Preview 4X (somente leitura)
+on:
+  push:
+    branches: [feat/4x-industries-defenses-p1-p8]
+    paths: [.github/workflows/4x-preview-readonly.yml]
+permissions:
+  contents: read
+concurrency:
+  group: coi-4x-preview-remote-readonly
+  cancel-in-progress: false
+jobs:
+  audit-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Inventario remoto de migracoes e contagens, sem alteracoes
+        shell: bash
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json, os, re, urllib.request, urllib.error
+          preview = "6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          production = "7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          if preview == production:
+              raise SystemExit("Bloqueado: UUID Preview coincide com producao.")
+          token = os.environ.get("RAW_TOKEN", "").strip()
+          if token.lower().startswith("bearer "): token = token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("'", '"'): token=token[1:-1].strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if not token or any(c.isspace() for c in token) or not re.fullmatch(r"[0-9a-fA-F]{32}",account):
+              raise SystemExit("Credenciais ausentes ou malformadas. Nenhuma consulta/alteracao feita.")
+          print("::add-mask::"+token)
+          url="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/"+preview+"/query"
+          def query(sql):
+              if not sql.startswith("SELECT "):
+                  raise SystemExit("Somente SELECT autorizado")
+              req=urllib.request.Request(url,method="POST",
+                  data=json.dumps({"sql":sql}).encode(),
+                  headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+              try:
+                  with urllib.request.urlopen(req,timeout=30) as res: data=json.loads(res.read().decode())
+              except urllib.error.HTTPError as e:
+                  raise SystemExit("D1 Preview HTTP "+str(e.code))
+              if not data.get("success") or not data.get("result"):
+                  raise SystemExit("D1 Preview nao retornou resposta valida")
+              return data["result"][0].get("results",[])
+          names={x["name"] for x in query("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")}
+          relevant=["d1_migrations","players","kingdoms","kingdom_buildings","world_territories",
+                    "player_accounts","purchase_requests","mercadopago_orders","support_orders",
+                    "intermediate_resources","city_defenses","kingdom_progression","progression_xp_ledger"]
+          counts={}
+          for name in relevant:
+              if name in names and name!="d1_migrations":
+                  counts[name]=int(query("SELECT COUNT(*) AS n FROM "+name)[0]["n"])
+          history=[]
+          if "d1_migrations" in names:
+              history=[str(x["name"]) for x in query("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 15")]
+          existing4x=[x for x in relevant[-4:] if x in names]
+          core={"players","kingdoms","kingdom_buildings","d1_migrations"}.issubset(names)
+          contains_user_data=any(counts.get(x,0)>0 for x in
+              ("players","kingdoms","player_accounts","purchase_requests","mercadopago_orders","support_orders","world_territories"))
+          report={
+              "target":"preview-only",
+              "coreSchemaPresent":core,
+              "lastMigrations":history,
+              "new4xTablesAlreadyPresent":existing4x,
+              "aggregateCounts":counts,
+              "anyExistingGameplayOrPaymentData":contains_user_data,
+              "migrationReadiness":"inspect-needed" if (not core or contains_user_data) else "eligible-for-controlled-preview-migration",
+              "productionQueried":False,"writesPerformed":0
+          }
+          print("AUDIT_4X_PREVIEW="+json.dumps(report,ensure_ascii=False,sort_keys=True))
+          with open(os.environ["GITHUB_STEP_SUMMARY"],"a",encoding="utf8") as output:
+              output.write("## Clash of Izzy 4X Preview audit (read-only)\n\n")
+              output.write("- Consulta somente ao Preview D1; 0 escritas; producao nao consultada.\n")
+              output.write("- Schema base: "+str(core)+"\n")
+              output.write("- Dados existentes de jogo/pagamentos: "+str(contains_user_data)+"\n")
+              output.write("- Ultimas migracoes: "+", ".join(history[:10])+"\n")
+          PY

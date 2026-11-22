@@ -34,17 +34,20 @@ function overlaps(aX, aZ, aW, aH, bX, bZ, bW, bH) {
 }
 
 /** Validação para prévia e teste; o UPDATE SQL repete o teste atomicamente. */
-export function validateCityPlacement(buildings, type, x, z) {
+export function validateCityPlacement(buildings, type, x, z, defenses = []) {
   const footprint = Object.hasOwn(CITY_FOOTPRINTS, type) ? CITY_FOOTPRINTS[type] : null;
   if (!footprint || !Number.isSafeInteger(x) || !Number.isSafeInteger(z)) return false;
   if (x < CITY_GRID_MIN || z < CITY_GRID_MIN || x + footprint.width > CITY_GRID_MAX || z + footprint.height > CITY_GRID_MAX) return false;
-  return (Array.isArray(buildings) ? buildings : []).every(other => {
-    if (other.building_type === type) return true;
+  const clearBuildings = (Array.isArray(buildings) ? buildings : []).every(other => {
+    if (other.building_type === type) return true; // próprio edifício em reposicionamento
     const size = CITY_FOOTPRINTS[other.building_type];
     const ox = Number(other.position_x), oz = Number(other.position_z);
     if (!size || !Number.isFinite(ox) || !Number.isFinite(oz)) return false;
     return !overlaps(x, z, footprint.width, footprint.height, ox, oz, size.width, size.height);
   });
+  return clearBuildings && (Array.isArray(defenses) ? defenses : []).every(d =>
+    !overlaps(x,z,footprint.width,footprint.height,Number(d.grid_x),Number(d.grid_z),Number(d.width),Number(d.height))
+  );
 }
 
 function sizeCase(column) {
@@ -83,9 +86,15 @@ export async function moveCityBuilding(env, kingdomId, body) {
     x + footprint.width > CITY_GRID_MAX || z + footprint.height > CITY_GRID_MAX) {
     return { ok: false, status: 400, error: "Construção fora dos limites da cidade." };
   }
-  const update = await env.DB.prepare(ATOMIC_MOVE_SQL)
-    .bind(x, z, kingdomId, type, fromX, fromZ, kingdomId, type,
-      x + footprint.width, x, z + footprint.height, z).run();
+  const advanced = env.GAME_4X_SYSTEMS_ENABLED === "true";
+  const defenseGuard = advanced
+    ? " AND NOT EXISTS(SELECT 1 FROM city_defenses d WHERE d.kingdom_id=? "+
+      "AND d.grid_x<? AND d.grid_x+d.width>? AND d.grid_z<? AND d.grid_z+d.height>?)"
+    : "";
+  const binds=[x,z,kingdomId,type,fromX,fromZ,kingdomId,type,
+    x+footprint.width,x,z+footprint.height,z];
+  if(advanced)binds.push(kingdomId,x+footprint.width,x,z+footprint.height,z);
+  const update=await env.DB.prepare(ATOMIC_MOVE_SQL+defenseGuard).bind(...binds).run();
   if (Number(update?.meta?.changes) !== 1) {
     return { ok: false, status: 409, error: "Posição ocupada ou cidade desatualizada. Sincronize e tente novamente." };
   }

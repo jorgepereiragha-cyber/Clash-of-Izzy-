@@ -1,0 +1,50 @@
+name: Qualidade completa 4X (branch isolada)
+on:
+  push:
+    branches: [feat/4x-industries-defenses-p1-p8]
+    paths:
+      - .github/workflows/4x-quality-gate.yml
+      - worker.js
+      - intermediate-production.js
+      - city-defense-rules.js
+      - player-progression-4x.js
+      - city-layout-rules.js
+      - kingdom.html
+      - scripts/kingdom-3d.js
+      - scripts/kingdom-4x-systems.js
+      - migrations/**
+      - tests/**
+      - package.json
+permissions:
+  contents: read
+concurrency:
+  group: coi-4x-quality-isolated
+  cancel-in-progress: true
+jobs:
+  quality:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Testar migracoes D1 local completo
+        run: npx wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local
+      - name: Testar Preview D1 local completo
+        run: npm run db:migrate:preview:local
+      - name: Conferir service worker e assets 3D
+        run: |
+          node --check sw.js
+          npm run assets:validate
+      - name: Testar todos os contratos incluindo pagamento e 4X
+        run: npm test
+      - name: Preparar navegador Chromium
+        run: npx playwright install --with-deps chromium
+      - name: Validar UI mobile Playwright
+        run: npm run test:e2e
+      - name: Confirmar build do Worker sem deploy
+        run: npm run check

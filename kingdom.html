@@ -5,6 +5,7 @@
 <link rel="stylesheet" href="/styles/coi-theme.css">
 <link rel="stylesheet" href="/styles/premium-ui.css">
 <link rel="stylesheet" href="/styles/city-layout.css">
+<link rel="stylesheet" href="/styles/kingdom-4x-systems.css">
 <meta name="theme-color" content="#142b44"><meta name="description" content="Comande seu reino, evolua construções e prepare seu exército em Clash of Izzy.">
 <link rel="manifest" href="/manifest.json"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>Clash of Izzy — Reino</title>
@@ -146,6 +147,35 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
    <small id="coiCityGridStatus" role="status" aria-live="polite">Carregando a cidade…</small>
   </div>
  </details>
+ <section id="coiFourXPanel" class="coi-4x-panel" aria-label="Indústrias, defesas e progressão" hidden>
+  <h3>Indústrias do Reino</h3>
+  <p>Fazenda produz trigo; moinho transforma trigo em farinha; padaria transforma farinha em comida. O cálculo e os estoques são mantidos no servidor.</p>
+  <p id="coiIndustryStock" role="status">Aguardando estoque...</p>
+  <div class="toolbar"><button type="button" data-coi-industry="mill">Evoluir moinho</button><button type="button" data-coi-industry="bakery">Evoluir padaria</button></div>
+  <h3>Heróis em postos 4X</h3>
+  <p>Heróis de suporte melhoram o moinho; arqueiros e infantaria reforçam torres construídas. Os benefícios não alteram o VIP.</p>
+  <div class="coi-hero-controls">
+   <label for="coiHeroRole">Posto<select id="coiHeroRole"><option value="industry:mill">Moinho</option><option value="defense:tower">Torres defensivas</option></select></label>
+   <label for="coiHeroCandidate">Herói disponível<select id="coiHeroCandidate"></select></label>
+   <button id="coiHeroAssign" type="button" disabled>Alocar herói</button>
+   <button id="coiHeroUnassign" type="button" disabled>Liberar posto</button>
+  </div>
+  <p id="coiHeroSummary">Nenhum herói alocado.</p>
+  <p id="coiHeroFeedback" role="status" aria-live="polite"></p>
+  <h3>Defesas posicionáveis · 50×50</h3>
+  <p>Azul: construções. Dourado: defesas. Verde: posição válida. Vermelho: colisão.</p>
+  <canvas id="coiDefenseGrid" width="500" height="500" aria-label="Mapa de construção de defesas"></canvas>
+  <div class="coi-4x-controls">
+    <label for="coiDefenseType">Defesa<select id="coiDefenseType"></select></label>
+    <label for="coiDefenseX">Coordenada X<input id="coiDefenseX" type="number" step="1" min="-25" max="24" value="10"></label>
+    <label for="coiDefenseZ">Coordenada Z<input id="coiDefenseZ" type="number" step="1" min="-25" max="24" value="10"></label>
+  </div>
+  <button id="coiDefensePlace" type="button" disabled>Construir defesa</button>
+  <p id="coiDefenseStatus" role="status" aria-live="polite">Escolha uma defesa e uma posição.</p>
+  <div id="coiDefenseList" aria-label="Defesas existentes"></div>
+  <h3>Progressão do Comandante · P1 a P8</h3>
+  <p id="coiProgressionStatus" role="status">Aguardando progressão...</p>
+ </section>
  <div class="coi-graphics-controls" aria-label="Configurações de imagem">
   <div class="coi-graphics-description">
    <strong>Imagem e desempenho</strong>
@@ -575,7 +605,7 @@ async function upgradeCastleVip(expectedVipLevel){
 function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderCastleVip();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();
 const buildings=state.buildings||[];const city=document.getElementById("city");
 city.querySelectorAll(":scope > .building").forEach(button=>button.remove());
-city.insertAdjacentHTML("beforeend",buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join(""));drawKingdomScene(buildings,Number(k.equipped_skin_id||0));watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],castleSkinId:Number(k.equipped_skin_id||0)}}));
+city.insertAdjacentHTML("beforeend",buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join(""));drawKingdomScene(buildings,Number(k.equipped_skin_id||0));watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomDefenses=state.cityDefenses||[];window.__coiKingdomHeroAssignments=state.advanced4xEnabled?(state.heroes||[]):[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],defenses:state.cityDefenses||[],heroes:window.__coiKingdomHeroAssignments,castleSkinId:Number(k.equipped_skin_id||0)}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["👑 VIP do Castelo",fmt(state.castleVip?.level??k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const blocked=maxed||activeConstructionCount>=2||alreadyQueued||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
@@ -710,6 +740,15 @@ async function startResearch(event){
  event.preventDefault();
  await submitQueue("research",{research:document.getElementById("researchKey").value},"Pesquisa iniciada. O bônus será ativado ao concluir.");
 }
+async function submit4xAction(payload){
+ if(busy)throw new Error("Aguarde a ação atual terminar.");
+ busy=true;
+ try{
+  const result=await request("/game/action",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(payload)});
+  state=result.state;render();showActionNotice("Sistema 4X atualizado no servidor.");
+ }finally{busy=false;}
+}
+window.__coi4xAction=submit4xAction;
 async function moveCityLayout(payload){
  if(busy)throw new Error("Aguarde a ação atual terminar.");
  busy=true;
@@ -803,7 +842,7 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script type="module" src="/scripts/kingdom-4x-systems.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
 <script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>

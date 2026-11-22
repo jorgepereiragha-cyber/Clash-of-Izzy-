@@ -64,7 +64,8 @@ test("derived kingdom capacity and power calculations batch their independent D1
   const power = worker.slice(powerStart, logStart);
   assert.ok(stats.includes("const reads=await env.DB.batch(["));
   assert.ok(stats.includes("SELECT food,wood,stone,iron,gold,wall_hp,castle_level FROM kingdoms"));
-  assert.ok(stats.includes("const defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number(kingdom.castle_level)||1)*10"));
+  assert.ok(stats.includes("let defense=50+(levels.wall||1)*40+(levels.watchtower||0)*50+(Number(kingdom.castle_level)||1)*10"));
+  assert.ok(stats.includes("defense+=Math.floor(defensePowerFromRows(defenseRows.results||[])*towerHeroMultiplier("));
   assert.ok(power.includes("const reads=await env.DB.batch(["));
   assert.ok(power.includes("const dragon=reads[4]?.results?.[0]||null"));
   assert.ok(power.includes("const kingdom=reads[5]?.results?.[0]||null"));
