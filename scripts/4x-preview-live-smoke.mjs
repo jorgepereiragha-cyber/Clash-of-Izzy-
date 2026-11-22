@@ -61,10 +61,12 @@ try{
   state=(await game("/api/game/state")).data.state;
   const beforeWood=Number(state.kingdom.wood);
   const beforeStone=Number(state.kingdom.stone);
+  const beforeTowerPower=Number(state.kingdom.defense_power);
   const placed=await game("/api/game/action","POST",{type:"city_defense_place",defense:"tower",gridX:20,gridZ:20});
   assert.equal(placed.status,200,JSON.stringify(placed.data?.error));
   report("tower-in-preview-d1",placed.data.state?.cityDefenses?.some(d=>d.defense_type==="tower"&&d.grid_x===20&&d.grid_z===20));
   state=placed.data.state;
+  report("placed-tower-recalculates-defense-immediately",Number(state.kingdom.defense_power)>beforeTowerPower);
   report("server-debits-tower-cost-once",beforeWood-Number(state.kingdom.wood)===catalog.tower.wood&&
     beforeStone-Number(state.kingdom.stone)===catalog.tower.stone);
   const duplicate=await game("/api/game/action","POST",{type:"city_defense_place",defense:"trap",gridX:20,gridZ:20});
