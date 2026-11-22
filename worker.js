@@ -1925,7 +1925,9 @@ export default {
       }
     }
     const ready=checks.database&&checks.session&&checks.schema;
-    return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables},ready?200:503);
+    // Contrato de lançamento: o APK só pode ser publicado após esta versão de Eldoria estar ativa.
+    // O Worker antigo não expõe o marcador e não deve passar no gate de release.
+    return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables,androidApiContract:"eldoria-android-v1"},ready?200:503);
   }
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
   if(url.pathname.startsWith("/api/account/"))return await handlePlayerAccountRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
