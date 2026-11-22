@@ -9,6 +9,7 @@ import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTim
 import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
+import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -16,6 +17,7 @@ if (host && "WebGLRenderingContext" in window) {
   let latestBuildings = [];
   let latestTroops = [];
   let latestCastleSkinId = 0;
+  let latestCastleVipLevel = 0;
   let activeModels = [];
   let activeDefenseModels = [];
   let defensePreviewMesh = null;
@@ -648,6 +650,7 @@ if (host && "WebGLRenderingContext" in window) {
     latestCastleSkinId=Number(castleSkinId)||0;
     if (!renderer || !scene || !camera) return;
     for (const item of activeModels) {
+      disposeCastleVisualUpgrades(item);
       scene.remove(item);
       if (item.userData.coIProcedural) item.traverse(node => {
         if (!node.isMesh) return;
@@ -666,6 +669,7 @@ if (host && "WebGLRenderingContext" in window) {
       const template = glbTemplates.get(b.building_type);
       const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
+      if (b.building_type === "castle") applyCastleVisualUpgrades(group, b.level, latestCastleVipLevel);
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       scene.add(group);
       activeModels.push(group);
@@ -1201,6 +1205,7 @@ if (host && "WebGLRenderingContext" in window) {
       latestDefenses = Array.isArray(detail.defenses) ? detail.defenses : [];
       latestHeroAssignments = Array.isArray(detail.heroes) ? detail.heroes : [];
       latestCastleSkinId=Number(detail.castleSkinId)||0;
+      latestCastleVipLevel=Number(detail.castleVipLevel)||0;
       renderBuildings(list,latestCastleSkinId);
       renderCityDefenses(latestDefenses);
       renderAssignedHeroFigures(latestHeroAssignments);
@@ -1216,6 +1221,7 @@ if (host && "WebGLRenderingContext" in window) {
       latestDefenses = Array.isArray(window.__coiKingdomDefenses) ? window.__coiKingdomDefenses : [];
       latestHeroAssignments = Array.isArray(window.__coiKingdomHeroAssignments) ? window.__coiKingdomHeroAssignments : [];
       latestCastleSkinId=Number(window.__coiKingdomCastleSkin)||0;
+      latestCastleVipLevel=Number(window.__coiKingdomCastleVipLevel)||0;
       renderBuildings(window.__coiKingdomBuildings,latestCastleSkinId);
       renderCityDefenses(latestDefenses);
       renderAssignedHeroFigures(latestHeroAssignments);
