@@ -6,3 +6,10 @@ test-results/
 coverage/
 vendor/three/
 artifacts/3d-optimization/
+
+# Chaves privadas e credenciais locais de assinatura Android
+*.jks
+*.keystore
+*.p12
+*.pfx
+Clash-of-Izzy-secrets-para-GitHub.txt
