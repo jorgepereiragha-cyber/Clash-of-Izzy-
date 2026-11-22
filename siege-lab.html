@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#0a1829">
+<title>Clash of Izzy — Laboratório de Cerco 4X</title>
+<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<style>
+:root{color-scheme:dark;font-family:system-ui,Arial,sans-serif;background:#091727;color:#f7ebd6}
+*{box-sizing:border-box}
+body{margin:0;min-height:100svh;background:radial-gradient(circle at 60% 0,#2c4a55,#091727 65%)}
+main{max-width:1000px;margin:auto;padding:clamp(12px,3vw,26px);padding-bottom:calc(20px + env(safe-area-inset-bottom))}
+header{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+header img{width:58px;height:58px;object-fit:cover;border-radius:10px;border:1px solid #d4ac62}
+h1{font:700 clamp(21px,4vw,31px)/1.15 Georgia,serif;color:#ffdfa1;margin:0 0 6px}
+p{line-height:1.5;color:#c6d5df;margin:0}
+.lab{display:grid;grid-template-columns:minmax(0,1.4fr) minmax(240px,.65fr);gap:13px}
+#siegeViewport{width:100%;aspect-ratio:16/11;min-height:270px;background:linear-gradient(#455c6d,#2b503e);border-radius:13px;border:1px solid #d5b171;overflow:hidden}
+#siegeViewport canvas{width:100%;height:100%;display:block}
+.panel{background:linear-gradient(150deg,#1d3143,#102032);border:1px solid #a88a55;border-radius:13px;padding:15px;box-shadow:0 8px 25px #0006}
+.panel h2{font:700 18px Georgia,serif;color:#f4d69c;margin:0 0 12px}
+.metrics{display:grid;gap:11px}
+.metric{display:grid;gap:5px}
+.metric>div{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+progress{width:100%;height:12px;accent-color:#bda065}
+fieldset{border:0;padding:0;margin:14px 0 0;display:grid;gap:8px}
+button{min-height:48px;width:100%;padding:10px;border-radius:9px;border:1px solid #d3ad6e;background:linear-gradient(#a0753d,#704b27);color:#fff1d7;font:700 13px system-ui;cursor:pointer}
+button.secondary{background:#223b50;border-color:#7391a4}
+button:disabled{opacity:.5;cursor:not-allowed}
+button:focus-visible{outline:3px solid #fff2b6;outline-offset:2px}
+#siegeLog{margin-top:13px;min-height:65px;white-space:pre-wrap;font-size:12px;line-height:1.5;color:#e1e8ef}
+#siegeStatus{color:#ffdb93;font-weight:700;padding:10px 0}
+.notice{font-size:12px;margin:14px 0 0;color:#b9cbd6}
+@media(max-width:700px){.lab{grid-template-columns:1fr}#siegeViewport{aspect-ratio:5/4;min-height:280px}}
+@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important}}
+</style>
+<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js"}}</script>
+</head>
+<body>
+<main>
+<header><img src="/assets/brand/royal-king.webp" alt="" aria-hidden="true" width="58" height="58"><div><h1>Laboratório de Cerco</h1><p>Protótipo 4X · Muralha, portão, aríetes e infantaria</p></div></header>
+<div class="lab">
+<section class="panel" aria-label="Cenário 3D de cerco">
+<div id="siegeViewport" aria-label="Maquete 3D medieval de cerco"></div>
+<p id="siegeStatus" role="status" aria-live="polite">Pronto para iniciar a simulação.</p>
+<p>O aríete danifica o alvo escolhido. A infantaria só alcança a torre depois de abrir passagem.</p>
+</section>
+<section class="panel" aria-label="Controles do cenário">
+<h2>Estado da fortificação</h2>
+<div class="metrics">
+<div class="metric"><div><span>Portão</span><output id="gateValue">1.300</output></div><progress id="gateMeter" max="1300" value="1300"></progress></div>
+<div class="metric"><div><span>Muralha</span><output id="wallValue">2.200</output></div><progress id="wallMeter" max="2200" value="2200"></progress></div>
+<div class="metric"><div><span>Torre defensiva</span><output id="towerValue">600</output></div><progress id="towerMeter" max="600" value="600"></progress></div>
+<div class="metric"><div><span>Aríetes</span><output id="ramValue">880</output></div><progress id="ramMeter" max="880" value="880"></progress></div>
+<div class="metric"><div><span>Infantaria</span><output id="infantryValue">950</output></div><progress id="infantryMeter" max="950" value="950"></progress></div>
+</div>
+<fieldset><button id="attackGate" type="button">Atacar o portão</button><button id="attackWall" type="button" class="secondary">Atacar a muralha</button><button id="resetSiege" type="button" class="secondary">Reiniciar cenário</button></fieldset>
+<div id="siegeLog" role="log" aria-live="polite">Rodada 0 · Escolha um objetivo para o ataque.</div>
+</section>
+</div>
+<p class="notice">Ambiente de teste isolado. Não consome tropas, recursos ou dinheiro e não altera o banco D1 nem resultados de batalhas reais.</p>
+</main>
+<script type="module" src="/scripts/siege-lab.js"></script>
+</body>
+</html>
