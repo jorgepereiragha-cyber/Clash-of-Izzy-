@@ -117,8 +117,8 @@ test("70 heróis invocáveis e sazonais possuem aura própria e história de Eld
   const {HERO_IDENTITIES}=await import("../hero-identities.js");
   const ids=[...Object.keys(HERO_TEMPLATES),"odin_awakened","thor_ragnarok","freya_vanir","loki_chaos","valhalla_king"];
   assert.equal(ids.length,70);
-  assert.equal(new Set(ids).size,23);
-  assert.equal(new Set(ids.map(key=>HERO_IDENTITIES[key]?.aura)).size,23);
+  assert.equal(new Set(ids).size,70);
+  assert.equal(new Set(ids.map(key=>HERO_IDENTITIES[key]?.aura)).size,70);
   for(const key of ids){
     const identity=HERO_IDENTITIES[key];
     assert.ok(identity?.faction && identity?.aura_label && identity?.lore && identity?.motto,key);
