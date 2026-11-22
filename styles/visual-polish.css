@@ -1,0 +1,166 @@
+/* Clash of Izzy — camada de apresentação do inventário.
+ * Sem alteração de atributos, raridade autoritativa, transações ou renderização 3D.
+ * Gradientes, bordas e sombras estáticas; sem sprites externos e sem GPU/WebGL extra. */
+:root{
+  --coi-ui-canvas:#081527;
+  --coi-ui-card:#13273d;
+  --coi-ui-border:#59738c;
+  --coi-ui-ink:#f8f1df;
+  --coi-ui-muted:#c3d2e3;
+  --coi-ui-highlight:#f5cb73;
+  --coi-ui-focus:#ffe5a5;
+  --coi-ui-radius:14px;
+}
+.hero-roster-section,.hero-summon-section,.forge-section,.pantheon-skin-sets,body .norse-skins{
+  border-color:#a27f45;
+  border-radius:var(--coi-ui-radius);
+  background:radial-gradient(ellipse at 95% 0%,rgba(61,101,150,.22),transparent 52%),
+             linear-gradient(155deg,#1b354f,#0a182b);
+  box-shadow:0 14px 34px rgba(0,0,0,.25),inset 0 1px rgba(255,255,255,.07);
+}
+.hero-roster-card{
+  --rarity-accent:#cbd5e1;
+  --rarity-halo:rgba(203,213,225,.13);
+  position:relative;
+  grid-template-columns:92px minmax(0,1fr);
+  border:1px solid var(--rarity-accent);
+  border-radius:14px;
+  background:radial-gradient(ellipse at 7% 9%,var(--rarity-halo),transparent 52%),
+             linear-gradient(145deg,#223d57,#101d30 78%);
+  box-shadow:0 8px 24px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.065);
+  transition:transform .18s ease,box-shadow .18s ease;
+}
+.hero-roster-card:where([data-hero-rarity="white"]){--rarity-accent:#d2dce8;--rarity-halo:rgba(210,220,232,.16)}
+.hero-roster-card:where([data-hero-rarity="blue"]){--rarity-accent:#6dbcf9;--rarity-halo:rgba(69,152,237,.22)}
+.hero-roster-card:where([data-hero-rarity="purple"]){--rarity-accent:#cb9cff;--rarity-halo:rgba(167,101,233,.24)}
+.hero-roster-card:where([data-hero-rarity="gold"]){--rarity-accent:#f8d987;--rarity-halo:rgba(229,167,63,.25)}
+.hero-roster-card[data-hero-rarity="gold"]{
+  border:2px solid var(--rarity-accent);
+  background:radial-gradient(ellipse at 8% 5%,rgba(247,195,91,.25),transparent 55%),linear-gradient(145deg,#322b24,#121c2e 80%);
+}
+.hero-roster-card.is-selected{
+  border-color:#fff0be;
+  box-shadow:0 0 0 2px rgba(248,217,135,.38),0 12px 28px rgba(0,0,0,.28);
+}
+.hero-roster-portrait{
+  width:92px;
+  max-width:100%;
+  aspect-ratio:2/3;
+  border:2px solid var(--rarity-accent);
+  border-radius:11px;
+  background:radial-gradient(circle at 50% 25%,var(--rarity-halo),transparent 70%),#071527;
+  box-shadow:inset 0 0 18px rgba(0,0,0,.5),0 5px 14px rgba(0,0,0,.3);
+}
+.hero-roster-name{font-family:Georgia,'Times New Roman',serif;font-size:clamp(15px,3.6vw,18px);color:#fff2cf;letter-spacing:.015em}
+.hero-roster-title,.hero-roster-faction,.hero-roster-fragments{color:var(--coi-ui-muted)}
+.hero-roster-meta span:nth-child(2){
+  padding:3px 8px;
+  border:1px solid var(--rarity-accent);
+  border-radius:999px;
+  background:var(--rarity-halo);
+  color:var(--rarity-accent);
+  letter-spacing:.02em;
+}
+.hero-roster-stars{color:#ffdb83;text-shadow:0 1px 9px rgba(243,195,92,.32)}
+.hero-roster-stats{gap:5px}
+.hero-roster-stats span{
+  padding:4px 6px;border-radius:6px;
+  border:1px solid rgba(122,154,185,.23);
+  background:rgba(4,15,28,.3);
+  font-variant-numeric:tabular-nums;
+}
+.hero-roster-combat{line-height:1.5;font-size:11px;color:#c5e7ff}
+.hero-roster-skill strong{color:#ffe2a0}
+.hero-roster-select,.hero-summon-actions button{
+  min-height:48px;
+  border-radius:10px;
+  background:linear-gradient(180deg,#9c753c,#62421e);
+  border:1px solid #eac67c;
+  box-shadow:inset 0 1px rgba(255,246,204,.23);
+}
+.hero-roster-select:disabled,.hero-summon-actions button:disabled{box-shadow:none}
+@media (hover:hover) and (pointer:fine){
+  .hero-roster-card:hover{transform:translateY(-2px);box-shadow:0 13px 30px rgba(0,0,0,.35),0 0 18px var(--rarity-halo)}
+}
+@media(max-width:440px){
+  .hero-roster-card{grid-template-columns:78px minmax(0,1fr);gap:9px;padding:9px}
+  .hero-roster-portrait{width:78px}
+  .hero-roster-name{font-size:15px}
+}
+.equipment-tier-card{
+  --gear-accent:#b8c6d8;
+  --gear-halo:rgba(184,198,216,.09);
+  position:relative;
+  border-color:var(--gear-accent);
+  border-radius:12px;
+  background:radial-gradient(ellipse at 15% 6%,var(--gear-halo),transparent 70%),linear-gradient(155deg,#213a53,#101f33);
+  box-shadow:inset 0 1px rgba(255,255,255,.08),0 7px 16px rgba(0,0,0,.16);
+}
+.equipment-tier-card.rarity-comum{--gear-accent:#c3cfda;--gear-halo:rgba(195,207,218,.14)}
+.equipment-tier-card.rarity-raro{--gear-accent:#6cbdf5;--gear-halo:rgba(108,189,245,.17)}
+.equipment-tier-card.rarity-epico{--gear-accent:#c497ff;--gear-halo:rgba(196,151,255,.19)}
+.equipment-tier-card.rarity-lendario{--gear-accent:#f4ca72;--gear-halo:rgba(244,202,114,.22);background:radial-gradient(circle at 17% 12%,var(--gear-halo),transparent 68%),linear-gradient(145deg,#3c3040,#152237)}
+.equipment-tier-rarity{
+  display:inline-flex;max-width:100%;padding:4px 7px;border-radius:7px;
+  background:var(--gear-halo);border:1px solid var(--gear-accent);
+  color:var(--gear-accent);white-space:normal;
+}
+.equipment-tier-card strong{color:#fff2d0;font-size:13px}
+.equipment-tier-card p{color:#d7e6f3}
+.equipment-tier-card .forge-action,.forge-card .forge-action,.skin-buy-btn,
+.pantheon-skin-action,.mobile-equipment-container #equip-btn{
+  min-height:46px;border-color:#d7b16c;border-radius:9px;
+  background:linear-gradient(180deg,#856036,#50371e);
+  color:#fff2d1;font-weight:800;
+}
+.mobile-equipment-container .stats-preview{
+  border-color:#6d839a;
+  border-radius:12px;
+  background:linear-gradient(145deg,rgba(14,40,67,.9),rgba(6,18,35,.96));
+}
+.mobile-equipment-container .stat-column h3{font-family:Georgia,serif;font-size:15px;color:#f4d08f}
+.mobile-equipment-container .stat-column.next h3{color:#b5e8ca}
+.pantheon-set-card{border-radius:14px;background:radial-gradient(ellipse at 95% 0%,rgba(230,192,105,.08),transparent 60%),linear-gradient(145deg,#203a55,#101d30)}
+.pantheon-relic-card{
+  background:radial-gradient(ellipse at 50% 0%,rgba(218,180,104,.1),transparent 60%),linear-gradient(155deg,#263d53,#101d31);
+  border-radius:11px;
+}
+.pantheon-relic-card[data-equipped="true"]{border-color:#f7d994;box-shadow:0 0 0 1px rgba(247,217,148,.4),0 7px 20px rgba(0,0,0,.19)}
+.pantheon-relic-art{filter:drop-shadow(0 5px 9px rgba(0,0,0,.45))}
+body .norse-skins .norse-skin-card{
+  border-color:#8b7450;
+  border-radius:12px;
+  background:radial-gradient(ellipse at 100% 0%,rgba(191,158,238,.16),transparent 55%),linear-gradient(145deg,#253950,#0e1d30);
+  box-shadow:0 8px 20px rgba(0,0,0,.2);
+}
+body .norse-skins .norse-skin-card h3{color:#ffe4aa;font-family:Georgia,serif}
+body .norse-skins .norse-skin-card p{color:#d0deed}
+body .norse-skins .norse-skin-card .skin-rarity{color:#f6d692}
+.market-card{
+  border-radius:14px;
+  border-color:#75829a;
+  background:radial-gradient(ellipse at 100% 0%,rgba(230,181,98,.12),transparent 55%),linear-gradient(145deg,#203e5a,#0e1d30);
+  box-shadow:0 9px 22px rgba(0,0,0,.22),inset 0 1px rgba(255,255,255,.075);
+}
+.market-card h3{color:#ffeac3;font-family:Georgia,serif;font-size:17px;line-height:1.35}
+.market-card .market-price{font-size:14px;color:#ffe4a7;font-variant-numeric:tabular-nums}
+.market-card .market-action{
+  min-height:48px;
+  background:linear-gradient(180deg,#9a7340,#56391e);
+  color:#fff2d6;border-color:#f0c77f;
+}
+.market-card[data-hero-rarity="white"]{border-color:#bfcedc}
+.market-card[data-hero-rarity="blue"]{border-color:#66b4fb}
+.market-card[data-hero-rarity="purple"]{border-color:#c498f6}
+.market-card[data-hero-rarity="gold"]{border-color:#f4cc79;background:radial-gradient(circle at 92% 3%,rgba(240,191,95,.2),transparent 60%),linear-gradient(145deg,#302a25,#172239)}
+.market-card .market-icon{display:grid;place-items:center;width:48px;height:48px;border:1px solid #bc955e;border-radius:12px;background:#12253b;font-size:26px}
+#shop .inside{border-radius:17px;box-shadow:0 22px 60px #0009}
+#kingdomStore .storeCard{border-radius:12px;background:linear-gradient(155deg,#1e354d,#101d30);border-color:#826b48;box-shadow:inset 0 1px rgba(255,255,255,.05)}
+#kingdomStore .storeCard button{min-height:44px}
+#kingdomStore .pantheon-piece{border-radius:12px}
+:where(.hero-roster-select,.skin-buy-btn,.pantheon-skin-action,.market-action,.forge-action,.equipment-tier-card button):focus-visible{
+  outline:3px solid var(--coi-ui-focus);outline-offset:3px;
+}
+@media(prefers-reduced-motion:reduce){
+  .hero-roster-card,.equipment-tier-card,.market-card,.pantheon-relic-card{transition:none!important;animation:none!important}
+}

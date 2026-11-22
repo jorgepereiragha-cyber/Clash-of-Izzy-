@@ -112,8 +112,10 @@
     if(!offers.length){root.append(node("p","empty-state","Recrute um herói para habilitar a compra de fragmentos. Nenhum herói será criado pela loja de fragmentos sem recrutamento."));return;}
     for(const offer of offers){
       const card=node("article","market-card");
-      const rarity={white:"Comum",blue:"Raro",purple:"Lendário"}[offer.rarity]||offer.rarity;
-      card.append(node("div","market-icon","👑"),node("h3","",offer.name),node("p","",rarity+" · "+fmt(offer.stars)+" estrela(s)"));
+      const rarity={white:"Branco · Comum",blue:"Azul · Raro",purple:"Roxo · Épico",gold:"Dourado · Lendário"}[offer.rarity]||"Raridade não informada";
+      card.dataset.heroRarity=["white","blue","purple","gold"].includes(offer.rarity)?offer.rarity:"unknown";
+      const icon={white:"⚔️",blue:"🛡️",purple:"✦",gold:"👑"}[offer.rarity]||"⚔️";
+      card.append(node("div","market-icon",icon),node("h3","",offer.name),node("p","",rarity+" · "+fmt(offer.stars)+" estrela(s)"));
       card.append(node("p","market-price","Fragmentos: "+fmt(offer.fragments)+" → +"+fmt(offer.quantity)));
       card.append(node("p","market-meta","Custo: "+costText(offer.costs)));
       card.append(node("p","market-meta","Estoque da rotação: "+fmt(offer.stock)));
