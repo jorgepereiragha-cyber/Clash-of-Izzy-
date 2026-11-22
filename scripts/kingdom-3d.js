@@ -5,7 +5,7 @@ import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler } from "./kingdom-quality.js";
+import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
 import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
@@ -24,6 +24,8 @@ if (host && "WebGLRenderingContext" in window) {
   let lastAnimationTime = 0;
   let sceneInViewport = true;
   const animationFrameTiming = createFrameTimingSampler(120);
+  const adaptivePixelScale = createAdaptivePixelScaleController();
+  let automaticGraphics = false;
   const glbTemplates = new Map();
   const glbPropTemplates = new Map();
   const glbUnitTemplates = new Map();
@@ -614,6 +616,7 @@ if (host && "WebGLRenderingContext" in window) {
     if (animationFrame) cancelAnimationFrame(animationFrame);
     animationFrame = 0;
     lastAnimationTime = 0;
+    adaptivePixelScale.reset();
   }
   function renderArmyFrame(timestamp) {
     if (!canRunArmyAnimation() || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders)) {
@@ -621,7 +624,20 @@ if (host && "WebGLRenderingContext" in window) {
       lastAnimationTime = 0;
       return;
     }
-    if (lastAnimationTime) animationFrameTiming.record(timestamp - lastAnimationTime);
+    if (lastAnimationTime) {
+      const interval = timestamp - lastAnimationTime;
+      animationFrameTiming.record(interval);
+      // Nao sobrescrever a escolha manual; reduzir DPR apenas apos lentidao
+      // consistente. Sem animacao, nao temos amostras suficientes para inferir FPS.
+      if (automaticGraphics && adaptivePixelScale.observe(interval) &&
+          host.clientWidth && host.clientHeight) {
+        const baseRatio = calculateKingdomPixelRatio({
+          width: host.clientWidth, height: host.clientHeight,
+          devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile
+        });
+        renderer.setPixelRatio(Math.max(0.1, baseRatio * adaptivePixelScale.scale));
+      }
+    }
     const delta = lastAnimationTime ? Math.min(.05, Math.max(0, (timestamp - lastAnimationTime) / 1000)) : 0;
     lastAnimationTime = timestamp;
     for (const mixer of armyMixers) mixer.update(delta);
@@ -633,6 +649,7 @@ if (host && "WebGLRenderingContext" in window) {
     if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
     lastAnimationTime = 0;
     animationFrameTiming.reset();
+    adaptivePixelScale.reset();
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
   function normalizeGlbTemplate(gltf, asset) {
@@ -813,6 +830,7 @@ if (host && "WebGLRenderingContext" in window) {
   try {
     const deviceMemory = Number(navigator.deviceMemory || 0);
     const preferredTier = readGraphicsChoice(window.localStorage);
+    automaticGraphics = preferredTier === "auto";
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const cores = Number(navigator.hardwareConcurrency || 0);
     const safeForHighGpu = connection?.saveData !== true
@@ -899,6 +917,7 @@ if (host && "WebGLRenderingContext" in window) {
         geometries: info.memory.geometries,
         textures: info.memory.textures,
         pixelRatio: renderer.getPixelRatio(),
+        adaptivePixelScale: automaticGraphics ? adaptivePixelScale.scale : 1,
         maxTextureSize: renderer.capabilities.maxTextureSize,
         shadows: renderer.shadowMap.enabled,
         premiumWater: Boolean(waterFeature),
@@ -965,7 +984,7 @@ if (host && "WebGLRenderingContext" in window) {
       camera.left = -viewWidth / 2; camera.right = viewWidth / 2;
       camera.top = viewHeight / 2; camera.bottom = -viewHeight / 2;
       camera.updateProjectionMatrix();
-      renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }));
+      renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }) * (automaticGraphics ? adaptivePixelScale.scale : 1));
       renderer.setSize(host.clientWidth, host.clientHeight, false);
       renderer.render(scene, camera);
       publishBuildingHitTargets(latestBuildings);
