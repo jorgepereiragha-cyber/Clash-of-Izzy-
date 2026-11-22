@@ -1,0 +1,57 @@
+name: Diagnostico de saude sem dados pessoais do Worker
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/diagnostico-health-worker.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  health:
+    name: Diagnosticar contrato Android e esquema remoto (somente leitura)
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Consultar apenas endpoint publico de saude
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://clash-of-izzy.jorgepereiragha.workers.dev/api/health"
+          status="$(curl --silent --show-error --max-time 20 --location-trusted --max-redirs 0 -o "$RUNNER_TEMP/coi-health.json" -w '%{http_code}' "$url")"
+          HTTP_STATUS="$status" python3 - <<'PY'
+          import json, os, re
+          path = os.path.join(os.environ["RUNNER_TEMP"], "coi-health.json")
+          try:
+              with open(path, encoding="utf-8") as f:
+                  data = json.load(f)
+              if not isinstance(data, dict):
+                  raise ValueError("not a JSON object")
+          except (ValueError, OSError):
+              raise SystemExit("Worker nao retornou objeto JSON; nenhum dado privado exibido.")
+          checks = data.get("checks") if isinstance(data.get("checks"), dict) else {}
+          safe_checks = {key: checks.get(key) is True for key in ("database", "session", "schema")}
+          tables = data.get("missingTables")
+          safe_tables = [
+              table for table in tables[:50]
+              if isinstance(table, str) and re.fullmatch(r"[A-Za-z0-9_]{1,64}", table)
+          ] if isinstance(tables, list) else None
+          ready = (
+              os.environ["HTTP_STATUS"] == "200" and data.get("ok") is True
+              and data.get("status") == "ready"
+              and data.get("androidApiContract") == "eldoria-android-v1"
+              and all(safe_checks.values()) and safe_tables == []
+          )
+          print(json.dumps({
+              "httpStatus": os.environ["HTTP_STATUS"],
+              "ok": data.get("ok") is True,
+              "readyForAndroid": ready,
+              "androidContractValid": data.get("androidApiContract") == "eldoria-android-v1",
+              "checks": safe_checks,
+              "missingTables": safe_tables
+          }, sort_keys=True))
+          if not ready:
+              print("::warning::Backend ainda nao atende aos requisitos do APK oficial. Nenhuma migracao/deploy executado.")
+          PY
