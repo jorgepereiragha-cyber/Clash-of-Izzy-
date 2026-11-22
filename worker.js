@@ -1998,8 +1998,11 @@ export default {
   // Quando o release gratuito e deliberadamente habilitado, bloquear novas
   // solicitacoes financeiras antes de qualquer roteamento ou side effect.
   if(freeModeCommerceBlocked(request,env))return json({error:"Compras e créditos administrativos indisponíveis no modo gratuito."},503);
-  if(url.pathname==="/api/android/free-release-readiness"&&request.method==="GET")
+  if(url.pathname==="/api/android/free-release-readiness"&&request.method==="GET"){
+    const limited=await rateLimitDecision(env,"android-free-readiness",request.headers.get("CF-Connecting-IP")||"unknown",20,60);
+    if(limited)return limited;
     return await freeAndroidReadiness(env);
+  }
   if(url.pathname==="/api/realtime/eldoria/ticket"){
     if(request.method!=="POST")return json({error:"Método não permitido."},405);
     if(!env.ELDORIA_ROOM)return json({error:"Sala realtime ainda não implantada."},503);
