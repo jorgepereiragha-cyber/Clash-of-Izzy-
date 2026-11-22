@@ -34,46 +34,46 @@ jobs:
           missing=0
           for name in KS SP ALIAS KP; do
             if test -z "${!name}"; then
-              echo "::warning::Credencial de release não configurada: $name"
+              echo "::error::Credencial de release não configurada: $name"
               missing=1
             fi
           done
           normalized="$(printf '%s' "$FINGERPRINT" | tr -d ':' | tr '[:upper:]' '[:lower:]')"
           if ! [[ "$normalized" =~ ^[0-9a-f]{64}$ ]]; then
-            echo "::warning::ANDROID_RELEASE_CERT_SHA256 não configurado/ inválido."
+            echo "::error::ANDROID_RELEASE_CERT_SHA256 não configurado/ inválido."
             missing=1
           fi
           if test "$missing" = "1"; then
             echo "Assinatura comercial Android: PENDENTE. Nenhum segredo foi divulgado."
             echo "APK oficial bloqueado: credenciais e/ou pin ausentes." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            exit 1
           fi
           tmp="$(mktemp -d "$RUNNER_TEMP/android-signing-check.XXXXXX")"
           chmod 700 "$tmp"
           trap 'rm -rf "$tmp"' EXIT
           if ! printf '%s' "$KS" | base64 --decode > "$tmp/release.jks" 2>/dev/null; then
-            echo "::warning::Keystore invalida: base64 nao decodifica."
+            echo "::error::Keystore invalida: base64 nao decodifica."
             echo "APK oficial bloqueado: keystore invalida." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            exit 1
           fi
           chmod 600 "$tmp/release.jks"
           if ! keytool -exportcert -alias "$ALIAS" -keystore "$tmp/release.jks" \
                    -storepass "$SP" > "$tmp/cert.der" 2>/dev/null; then
-            echo "::warning::Keystore, senha ou alias nao correspondem."
+            echo "::error::Keystore, senha ou alias nao correspondem."
             echo "APK oficial bloqueado: certificado inacessivel." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            exit 1
           fi
           if ! keytool -certreq -alias "$ALIAS" -keystore "$tmp/release.jks" \
                    -storepass "$SP" -keypass "$KP" -file "$tmp/key-check.csr" >/dev/null 2>&1; then
-            echo "::warning::Chave privada ou senha da chave nao corresponde."
+            echo "::error::Chave privada ou senha da chave nao corresponde."
             echo "APK oficial bloqueado: chave privada inacessivel." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            exit 1
           fi
           actual="$(sha256sum "$tmp/cert.der" | cut -d' ' -f1)"
           if [[ "$actual" != "$normalized" ]]; then
-            echo "::warning::Certificado da keystore nao corresponde ao pin SHA-256 de release."
+            echo "::error::Certificado da keystore nao corresponde ao pin SHA-256 de release."
             echo "APK oficial bloqueado: divergencia no certificado de assinatura." >> "$GITHUB_STEP_SUMMARY"
-            exit 0
+            exit 1
           fi
           echo "Assinatura comercial Android: credenciais e certificado verificados."
           echo "Chave privada, senha, alias e pin SHA-256 validados. Ainda faltam build oficial e testes em aparelho." >> "$GITHUB_STEP_SUMMARY"
