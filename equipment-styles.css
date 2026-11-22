@@ -33,6 +33,11 @@
     text-transform: uppercase;
 }
 
+.rarity-badge.comum {
+    background: #68798b;
+    color: #fff;
+}
+
 .rarity-badge.lendario {
     background: linear-gradient(45deg, #ff8c00, #ffd700);
     color: #000;

@@ -31,6 +31,11 @@
 .hero-summon-results{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:7px}
 .hero-summon-result{display:grid;gap:3px;padding:9px;border:1px solid #56697d;border-radius:8px;background:#122337}
 .hero-summon-result strong{color:#fff0c9;font-size:13px}.hero-summon-result span{color:#e6c27e;font-size:11px}.hero-summon-result small{color:#c7d2df;font-size:10px}
+/* A mesma escada de raridade do catálogo: branco, azul, roxo e dourado. */
+.hero-summon-result.rarity-white{border-color:#9aa7b4}.hero-summon-result.rarity-white span{color:#d3dce5}
+.hero-summon-result.rarity-blue{border-color:#3b82f6}.hero-summon-result.rarity-blue span{color:#8ac5ff}
+.hero-summon-result.rarity-purple{border-color:#8b5cf6}.hero-summon-result.rarity-purple span{color:#d0afff}
+.hero-summon-result.rarity-gold{border:2px solid #ffd700;background:linear-gradient(145deg,#342a16,#142337)}.hero-summon-result.rarity-gold span{color:#ffe58a;font-weight:800}
 @media(max-width:420px){.hero-summon-section{padding:11px}.hero-summon-rates{grid-template-columns:1fr}.hero-summon-actions{grid-template-columns:1fr}}
 
 .hero-roster-combat{margin:2px 0;color:#b5d8f0;font-size:10px;line-height:1.35;font-weight:800}

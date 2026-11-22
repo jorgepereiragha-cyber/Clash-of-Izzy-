@@ -15,6 +15,7 @@
   }
   const slotLabels={weapon:"Arma",helmet:"Capacete",armor:"Armadura",boots:"Botas",accessory:"Acessório"};
   const rarityLabels={comum:"Comum",raro:"Raro",epico:"Épico",lendario:"Lendário"};
+  const summonRarityLabels=Object.freeze({white:"Comum",blue:"Raro",purple:"Épico",gold:"Lendário dourado"});
   function setStatus(message,error=false){
     const node=$("equipment-status");
     if(node){node.textContent=message;node.style.color=error?"#ffb4a9":"#f5d58a";}
@@ -428,12 +429,11 @@
     const root=$("hero-summon-rates");
     if(!root)return;
     const rows=Array.isArray(state?.heroSummonOdds)?state.heroSummonOdds:[];
-    const labels={white:"Comum",blue:"Raro",purple:"Épico",gold:"Lendário dourado"};
     root.replaceChildren();
     for(const row of rows){
       const card=document.createElement("div");
       const title=document.createElement("strong");
-      title.textContent=(labels[row.rarity]||row.rarity)+" · "+Number(row.chancePercent||0).toLocaleString("pt-BR")+"%";
+      title.textContent=(summonRarityLabels[row.rarity]||row.rarity)+" · "+Number(row.chancePercent||0).toLocaleString("pt-BR")+"%";
       const detail=document.createElement("span");
       detail.textContent=Number(row.heroCount||0)+" herói(s) · "+Number(row.perHeroPercent||0).toLocaleString("pt-BR",{maximumFractionDigits:2})+"% por herói";
       card.append(title,detail);
@@ -471,11 +471,11 @@
     if(!lastSummonResults.length)return;
     for(const summon of lastSummonResults){
       const card=document.createElement("div");
-      card.className="hero-summon-result";
+      card.className="hero-summon-result"+(Object.hasOwn(summonRarityLabels,summon.rarity)?" rarity-"+summon.rarity:"");
       const name=document.createElement("strong");
       name.textContent=summon.name||summon.hero_key||"Herói";
       const rarity=document.createElement("span");
-      rarity.textContent=({white:"Comum",blue:"Raro",purple:"Lendário"})[summon.rarity]||summon.rarity||"Herói";
+      rarity.textContent=summonRarityLabels[summon.rarity]||summon.rarity||"Herói";
       const outcome=document.createElement("small");
       outcome.textContent=summon.result_type==="duplicate"
         ? "Duplicado · +"+Number(summon.fragments||0)+" fragmentos"
