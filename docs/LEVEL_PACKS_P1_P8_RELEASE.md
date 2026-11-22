@@ -18,6 +18,9 @@ Valores P1-P3 fornecidos: P1 R$9,90; P2 R$29,90; P3 R$59,90.
 Os preços e quantidades P4-P8 foram alinhados ao protocolo 7777x. Atribuicoes e quantidades definitivas devem ser revisadas para equilibrar a economia, protecao do consumidor e nao prometer itens nao entregues.
 Nenhuma flag pode ser ativada antes da aprovacao comercial de TODOS os valores vigentes.
 
+## Migração corretiva e preservação de IDs
+Se uma versão anterior da migração `0042` já foi aplicada em um ambiente de testes, `0043_fix_vip_catalog.sql` reconcilia **somente** os cinco pares de preços/gemas legados esperados. Usa `UPDATE` condicionado a nome, preço anterior e gemas anteriores; registros personalizados não coincidentes ficam intactos. **Não usar `INSERT OR REPLACE`**, porque pode substituir a linha e afetar referências. Em produção, validar esquema, estado da `d1_migrations`, backup e consultas antes de aplicar qualquer migração; nenhuma foi aplicada por esta PR.
+
 ## Checklist de liberacao
 1. PR #223 revista e aprovada; #229 homologada e revisada. Rebase/retarget desta PR apos a ordem de merges. Validar testes e conflitos antes de qualquer merge.
 2. Criar backup D1 de producao, verificar integridade e capacidade de restaurar. Conferir nomes de tabelas e migracoes atuais de producao e preview, sem inferir a partir de documentacao antiga.
