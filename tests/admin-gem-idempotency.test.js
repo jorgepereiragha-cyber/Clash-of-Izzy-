@@ -25,7 +25,8 @@ test("admin gem credit has transactional unique ledger, no secret leakage and cl
   ]);
   assert.match(migration,/request_key TEXT PRIMARY KEY/);
   assert.match(migration,/REFERENCES players\(id\) ON DELETE RESTRICT/);
-  assert.doesNotMatch(migration,/\b(?:DROP|UPDATE|DELETE|REPLACE)\b/i);
+  const statements=migration.split("\n").filter(line=>!line.trim().startsWith("--")).join("\n").replace(/ON DELETE RESTRICT/g,"");
+  assert.doesNotMatch(statements,/\b(?:DROP|UPDATE|DELETE|REPLACE)\b/i);
   assert.match(worker,/grantAdminGems\(env,body,payload\)/);
   assert.match(worker,/"admin_gem_grants"/);
   assert.match(admin,/crypto\.randomUUID\(\)/);
