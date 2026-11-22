@@ -1,0 +1,37 @@
+name: Pacotes P1-P8 - homologacao isolada
+on:
+  push:
+    branches: [feat/level-packs-p1-p8-secure]
+  pull_request:
+    branches: [feat/4x-industries-defenses-p1-p8]
+permissions:
+  contents: read
+concurrency:
+  group: coi-level-packs-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Install
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Apply full D1 migrations in local isolated SQLite
+        run: |
+          npm run db:migrate:local
+          npm run db:migrate:preview:local
+      - name: Validate syntax and targeted payment regressions
+        run: |
+          node --check worker.js
+          node --check mercadopago-orders.js
+          node --test tests/level-packs.test.js tests/mercadopago-orders.test.js tests/mercadopago-4x-integration.test.js tests/purchase-requests.test.js
+      - name: Run full unit suite
+        run: npm test
+      - name: Bundle Worker without deploying to production
+        run: npm run check

@@ -490,7 +490,7 @@ function attack(){if(ended)return;player.swing=.28;const t=nearestEnemy(5);if(t)
 function skill(k){if(ended||skillCooldowns[k]>0||player.mana<({q:15,w:20,e:25,r:45}[k]))return;player.mana-=({q:15,w:20,e:25,r:45}[k]);skillCooldowns[k]=skillCooldownMax[k];player.swing=.42;const radius=k==='r'?15:k==='e'?9:k==='q'?7:0;const colors={q:0xffd45c,w:0x78d7ff,e:0xff8a3d,r:0xc58aff};burstAt(player.group.position,colors[k],k==='r'?2.8:k==='e'?1.8:k==='q'?1.25:.9);if(k==='w'){player.group.position.x=Math.min(42,player.group.position.x+9);burstAt(player.group.position,colors.w,1.35)}else{const damage=k==='r'?390:k==='e'?180:115;for(const target of [bot,...minions.filter(m=>m.team==='red'&&m.hp>0).map(m=>({group:m.mesh,hp:m.hp,unit:m}))]){const p=target.group?.position;if(p&&player.group.position.distanceTo(p)<radius)hurt(target,damage)}}updateHud()}
 function finish(win){ended=true;const m=document.getElementById('message');m.innerHTML=win?'🏆 VITÓRIA!<br><small>O Nexus inimigo caiu.</small>':'💀 DERROTA';m.style.display='block';}
 function updateSkillHud(){document.querySelectorAll('[data-skill]').forEach(b=>{const k=b.dataset.skill;const remaining=skillCooldowns[k];const small=b.querySelector('small');b.disabled=remaining>0||player.mana<({q:15,w:20,e:25,r:45}[k]);if(remaining>0){small.textContent=remaining.toFixed(1)+'s';small.classList.add('cooldown')}else{small.textContent=({q:'Solar',w:'Avanço',e:'Explosão',r:'Suprema'})[k];small.classList.remove('cooldown')}})}function updateHud(){const hpRatio=Math.max(0,Math.min(1,player.hp/player.max));document.getElementById('hp').style.width=(hpRatio*100)+'%';document.getElementById('hpText').textContent=Math.ceil(Math.max(0,player.hp))+'/'+player.max;document.getElementById('hp').parentElement.classList.toggle('critical',hpRatio<=.25);document.getElementById('mp').style.width=Math.max(0,Math.min(100,player.mana/player.maxMana*100))+'%';document.getElementById('mpText').textContent=Math.floor(player.mana)+'/'+player.maxMana;document.getElementById('gold').textContent=gold;document.getElementById('kills').textContent=kills;document.getElementById('nexusHp').textContent=Math.max(0,Math.ceil(redNexus.hp/redNexus.max*100))+'%';updateSkillHud()}
-function toggleShop(show){document.getElementById('shop').style.display=show?'flex':'none';if(show)refreshKingdomStore()}
+function toggleShop(show){document.getElementById('shop').style.display=show?'flex':'none';if(show){refreshKingdomStore();loadCatalog()}}
 document.getElementById('attack').onclick=attack;document.querySelectorAll('[data-skill]').forEach(b=>b.onclick=()=>skill(b.dataset.skill));document.getElementById('openShop').onclick=()=>toggleShop(true);document.getElementById('closeShop').onclick=()=>toggleShop(false);
 document.getElementById('buyDamage').onclick=()=>{if(gold<300)return;gold-=300;damageBonus+=25;updateHud()};document.getElementById('buyHealth').onclick=()=>{if(gold<250)return;gold-=250;healthBonus+=150;player.max+=150;player.hp=Math.min(player.max,player.hp+150);updateHud()};document.getElementById('buySpeed').onclick=()=>{if(gold<200)return;gold-=200;speedBonus+=2;updateHud()};
 document.getElementById('whatsapp').onclick=()=>window.open('https://wa.me/5547996531437?text='+encodeURIComponent('Olá! Quero consultar os pacotes e skins do Clash of Izzy.'),'_blank','noopener');
@@ -722,7 +722,7 @@ async function requestOfficialPurchase(item,kind,button){
 async function loadCatalog(){
  const box=document.getElementById('catalog');
  try{
-  const res=await fetch('/api/store/catalog');if(!res.ok)throw new Error('Catálogo indisponível');
+  const token=chatToken();const res=await fetch('/api/store/catalog',{cache:'no-store',headers:token?{Authorization:'Bearer '+token}:{}});if(!res.ok)throw new Error('Catálogo indisponível');
   const data=await res.json();box.replaceChildren();
   if(data.skin_edition==="initial"&&Number(data.skin_limit)>0){
    const note=document.createElement('p');note.className='muted';
@@ -733,10 +733,17 @@ async function loadCatalog(){
   if(!entries.length){box.textContent='Nenhum item cadastrado no catálogo neste momento.';return}
   for(const item of entries){
    const b=document.createElement('button');const label=document.createElement('span');const detail=document.createElement('small');const price=document.createElement('b');
-   label.textContent=item.kind+' · '+item.name;
-   detail.textContent=item.productKind==='vip_package'?(item.oneTime?'MASTER · '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas + 3 dragões dourados + 175 mil recursos (uma vez por reino)':' '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação'):'Skin de castelo · Ataque +'+Number(item.attack_bonus_percent||0).toFixed(2)+'% · Defesa +'+Number(item.defense_bonus_percent||0).toFixed(2)+'%';
+   label.textContent=(item.levelPack?'Pacote '+item.levelPack.phase:item.kind)+' · '+item.name;
+   const resources=item.levelPack?.resources||{};
+   const resourceNames={wood:'madeira',food:'comida',stone:'pedra',iron:'ferro',gold:'ouro'};
+   const resourceText=Object.entries(resources).filter(([,qty])=>Number(qty)>0)
+     .map(([key,qty])=>Number(qty).toLocaleString('pt-BR')+' '+(resourceNames[key]||key)).join(' · ');
+   detail.textContent=item.levelPack
+     ? 'Nível '+Number(item.levelPack.requiredLevel)+'+ · '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas · '+resourceText+' · compra única por reino'+(item.levelPack.priceProvisional?' · PREÇO PROPOSTO':'')
+     :item.productKind==='vip_package'?(item.oneTime?'MASTER · '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas + 3 dragões dourados + 175 mil recursos (uma vez por reino)':' '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação'):'Skin de castelo · Ataque +'+Number(item.attack_bonus_percent||0).toFixed(2)+'% · Defesa +'+Number(item.defense_bonus_percent||0).toFixed(2)+'%';
    if(item.dailyLimitHours===24)detail.textContent+=' · limite: 1 compra a cada 24 horas';
    price.textContent='R$ '+Number(item.price_brl).toFixed(2).replace('.',',');
+   b.disabled=Boolean(item.levelPack?.priceProvisional);
    b.append(label,detail,price);b.addEventListener('click',()=>requestOfficialPurchase(item,item.productKind,b));
    box.appendChild(b);
   }
