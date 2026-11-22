@@ -49,7 +49,7 @@ footer{padding:15px 0 50px;color:#a4b8d2;font-size:13px;text-align:center}
 <header><strong>CLASH OF IZZY</strong><a href="/portal.html" id="backLink">Voltar ao portal</a></header>
 <main>
 <div class="hero"><div class="eyebrow">Desenvolvimento independente</div><h1>Apoie a construção de Eldoria</h1><p>Servidor, eventos e arte evoluem com recursos reais. O apoio é opcional e a compra dos pacotes concede apenas os benefícios especificados abaixo, após confirmação do pagamento.</p></div>
-<section aria-labelledby="goals-title"><h2 id="goals-title">Metas verificáveis</h2><p>Contabilizamos somente compras dos três pacotes de apoio cujo pagamento foi aprovado. Cada real é alocado à próxima meta na ordem indicada.</p>
+<section aria-labelledby="goals-title"><h2 id="goals-title">Metas verificáveis</h2><p>Contabilizamos apenas transações verificadas e aprovadas dos pacotes de apoio e das contribuições voluntárias. Cada real é alocado à próxima meta na ordem indicada.</p>
 <div class="grid">
 <article class="goal"><h3>Servidor e estabilidade</h3><strong id="goal0amount">Aguardando dados…</strong><div class="progress" role="progressbar" aria-label="Meta servidor" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="goal0bar"></span></div><small>Meta: R$ 2.000</small></article>
 <article class="goal"><h3>Eventos do mundo</h3><strong id="goal1amount">Aguardando dados…</strong><div class="progress" role="progressbar" aria-label="Meta eventos" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0"><span id="goal1bar"></span></div><small>Meta: R$ 500</small></article>
@@ -65,13 +65,23 @@ footer{padding:15px 0 50px;color:#a4b8d2;font-size:13px;text-align:center}
 <p id="supportStatus" role="status" aria-live="polite">Para comprar, é necessário estar conectado à sua conta no Worker do jogo. O portal promocional nunca processa pagamentos.</p>
 <div id="pixInfo" hidden><p>Pedido Pix criado, mas ainda não pago. Confirme o recebedor no seu aplicativo bancário. A entrega só ocorrerá após conciliação do extrato pela administração.</p><label for="pixKey">Chave Pix fornecida pelo servidor após autenticação</label><input id="pixKey" readonly><button type="button" id="copyPix" class="secondary">Copiar chave Pix</button><p id="pixAmount"></p></div>
 </section>
+<section id="contribuicao" aria-labelledby="voluntary-title">
+<h2 id="voluntary-title">Contribuição voluntária, sem recompensas</h2>
+<p>Se preferir apoiar o projeto sem comprar gemas, escolha um valor abaixo. Esta modalidade não dá acesso a heróis, skins, VIP, gemas ou vantagens no jogo. Nenhuma vantagem pode ser desbloqueada pelo navegador.</p>
+<div class="actions" aria-label="Valores de contribuição voluntária">
+<button type="button" data-voluntary="escudeiro">Contribuir R$ 10</button>
+<button type="button" data-voluntary="cavaleiro">Contribuir R$ 50</button>
+<button type="button" data-voluntary="senhor">Contribuir R$ 200</button>
+</div>
+<p id="voluntaryStatus" role="status" aria-live="polite">Esta modalidade requer uma conta de jogador e checkout seguro do Mercado Pago.</p>
+</section>
 <section aria-labelledby="roadmap-title"><h2 id="roadmap-title">Roteiro de evolução</h2>
 <div class="grid"><div><strong>Validação</strong><p>Instalação Android, tutorial e primeiros jogadores reais.</p></div><div><strong>Comunidade</strong><p>Feedback, correção de problemas e eventos mundiais.</p></div><div><strong>Escala</strong><p>Melhorias visuais, balanceamento e novos mapas conforme a base de jogadores crescer.</p></div></div></section>
 <section><h2>Perguntas frequentes</h2>
 <details><summary>O jogo é gratuito?</summary><p>O acesso básico foi planejado como gratuito. Os pacotes são opcionais e não substituem a publicação do APK oficial assinado.</p></details>
 <details><summary>Posso pagar sem criar conta?</summary><p>Não. Para conceder gemas à pessoa certa, o sistema exige uma sessão válida e um reino criado.</p></details>
 <details><summary>Quando recebo as gemas?</summary><p>Mercado Pago: somente após verificação do webhook e do valor aprovado no provedor. Pix Nubank: somente após conferência manual do crédito efetivo no extrato.</p></details>
-<details><summary>As metas representam dinheiro já recebido?</summary><p>Sim. Apenas transações de pacotes de apoio aprovadas no sistema são contabilizadas. O indicador não inclui outras receitas do jogo.</p></details>
+<details><summary>As metas representam dinheiro já recebido?</summary><p>Sim. Apenas transações dos pacotes de apoio e contribuições voluntárias aprovadas no sistema são contabilizadas. O indicador não inclui outras receitas do jogo.</p></details>
 </section>
 </main>
 <footer>© 2026 Clash of Izzy · Projeto independente · Sem associação a editoras de outros jogos.</footer>
@@ -173,6 +183,31 @@ if(isPortal){
  const option=Array.from(document.querySelectorAll("[data-support]")).find(item=>item.dataset.support===selected);
  if(option){option.focus();status.textContent="Pacote selecionado. Escolha o método de pagamento e confirme Adquirir.";}
 }
+
+const voluntaryStatus=document.getElementById("voluntaryStatus");
+const contributionKeys=new Map();
+let voluntaryBusy=false;
+document.querySelectorAll("[data-voluntary]").forEach(button=>button.addEventListener("click",async()=>{
+ if(isPortal){location.assign(mainOrigin+"/apoie.html#contribuicao");return;}
+ const auth=token();
+ if(!auth){voluntaryStatus.textContent="Entre na sua conta dentro do aplicativo para contribuir.";return;}
+ if(voluntaryBusy)return;
+ voluntaryBusy=true;
+ for(const el of document.querySelectorAll("[data-voluntary]"))el.disabled=true;
+ const tier=button.dataset.voluntary;
+ const key=contributionKeys.get(tier)||crypto.randomUUID().replaceAll("-","");
+ contributionKeys.set(tier,key);
+ voluntaryStatus.textContent="Preparando contribuição pelo Mercado Pago…";
+ try{
+  const data=await jsonPost("/api/support/checkout",{tier,requestKey:key},auth);
+  const url=new URL(String(data.checkoutUrl||""));
+  const host=url.hostname.toLowerCase();
+  if(url.protocol!=="https:"||!(host==="mercadopago.com.br"||host.endsWith(".mercadopago.com.br")||host==="mercadopago.com"||host.endsWith(".mercadopago.com")))throw Error("Destino de cobrança não autorizado.");
+  location.assign(url.href);
+ }catch(error){voluntaryStatus.textContent=String(error?.message||"Falha ao criar contribuição.");}
+ finally{voluntaryBusy=false;for(const el of document.querySelectorAll("[data-voluntary]"))el.disabled=false;}
+}));
+
 void loadStats();
 })();
 </script>
