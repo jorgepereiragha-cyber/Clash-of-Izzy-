@@ -2061,22 +2061,46 @@ export default {
     // O Worker antigo não expõe o marcador e não deve passar no gate de release.
     return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables,androidApiContract:"eldoria-android-v1"},ready?200:503);
   }
-  // Contadores públicos reais: não publicar números inventados ou dados de jogadores.
+  // Contadores publicos verificaveis nao devem depender de tabelas comerciais opcionais.
+  // Este endpoint nao aplica migrations, nao altera o D1 e nunca inventa valores.
   if(url.pathname==="/api/public/stats"){
     if(request.method!=="GET")return json({error:"Método não permitido."},405);
     if(!env.DB)return json({error:"Estatísticas temporariamente indisponíveis."},503);
     const limited=await rateLimitDecision(env,"public-stats-ip",request.headers.get("CF-Connecting-IP")||"unknown",60,60);
     if(limited)return limited;
     try{
-      const results=await env.DB.batch([
+      const catalog=await env.DB.prepare(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('players','battle_reports','alliances','purchase_requests','support_orders')"
+      ).all();
+      const tables=new Set((catalog.results||[]).map(item=>String(item.name)));
+      if(!["players","battle_reports","alliances"].every(name=>tables.has(name))){
+        return json({error:"Estatísticas temporariamente indisponíveis."},503);
+      }
+      const statements=[
         env.DB.prepare("SELECT COUNT(*) AS total FROM players"),
         env.DB.prepare("SELECT COUNT(*) AS total FROM battle_reports WHERE created_at>=datetime('now','-1 day')"),
-        env.DB.prepare("SELECT COUNT(*) AS total FROM alliances"),
-        env.DB.prepare("SELECT COALESCE(ROUND(SUM(price_brl*100)),0) AS total_cents FROM purchase_requests WHERE status='approved' AND product_kind='vip_package' AND product_name IN ('Apoio Escudeiro','Apoio Cavaleiro','Apoio Senhor Feudal')"),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM alliances")
+      ];
+      const packageIndex=tables.has("purchase_requests")?statements.push(
+        env.DB.prepare("SELECT COALESCE(ROUND(SUM(price_brl*100)),0) AS total_cents FROM purchase_requests WHERE status='approved' AND product_kind='vip_package' AND product_name IN ('Apoio Escudeiro','Apoio Cavaleiro','Apoio Senhor Feudal')")
+      )-1:-1;
+      const voluntaryIndex=tables.has("support_orders")?statements.push(
         env.DB.prepare("SELECT COALESCE(SUM(amount_cents),0) AS total_cents FROM support_orders WHERE status='approved'")
-      ]);
+      )-1:-1;
+      const results=await env.DB.batch(statements);
+      const supportVerified=packageIndex>=0&&voluntaryIndex>=0;
+      const packages=supportVerified?Number(results[packageIndex]?.results?.[0]?.total_cents||0):null;
+      const voluntary=supportVerified?Number(results[voluntaryIndex]?.results?.[0]?.total_cents||0):null;
       const headers={"Access-Control-Allow-Origin":"https://clash-of-izzy-portal.jorgepereiragha.workers.dev","Vary":"Origin","Cache-Control":"public, max-age=60"};
-      return json({totalPlayers:Number(results[0]?.results?.[0]?.total||0),battles24h:Number(results[1]?.results?.[0]?.total||0),totalAlliances:Number(results[2]?.results?.[0]?.total||0),supportTotalCents:Number(results[3]?.results?.[0]?.total_cents||0)+Number(results[4]?.results?.[0]?.total_cents||0),supportPackagesTotalCents:Number(results[3]?.results?.[0]?.total_cents||0),supportVoluntaryTotalCents:Number(results[4]?.results?.[0]?.total_cents||0),verified:true},200,headers);
+      return json({
+        totalPlayers:Number(results[0]?.results?.[0]?.total||0),
+        battles24h:Number(results[1]?.results?.[0]?.total||0),
+        totalAlliances:Number(results[2]?.results?.[0]?.total||0),
+        supportTotalCents:supportVerified?packages+voluntary:null,
+        supportPackagesTotalCents:packages,
+        supportVoluntaryTotalCents:voluntary,
+        supportVerified,verified:true
+      },200,headers);
     }catch(error){
       console.error("public_stats_failed",String(error?.message||error));
       return json({error:"Estatísticas temporariamente indisponíveis."},503);
