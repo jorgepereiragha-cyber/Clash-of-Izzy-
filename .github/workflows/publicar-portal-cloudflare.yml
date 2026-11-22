@@ -1,10 +1,13 @@
 name: Publicar portal publico Cloudflare (sem alterar o jogo)
 
 on:
-  workflow_run:
-    workflows: ["Clash of Izzy CI"]
-    types: [completed]
   workflow_dispatch:
+    inputs:
+      confirm_portal_publish:
+        description: "Confirma a publicacao separada do Worker promocional Cloudflare"
+        required: true
+        default: false
+        type: boolean
 
 permissions:
   contents: read
@@ -15,11 +18,9 @@ concurrency:
 
 jobs:
   deploy-portal:
-    if: >-
-      github.event_name == 'workflow_dispatch' ||
-      (github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.event == 'push')
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_portal_publish == true }}
+    environment:
+      name: production
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
