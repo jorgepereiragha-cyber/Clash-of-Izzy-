@@ -220,6 +220,21 @@ const UNITS = {
   ram:{label:"Aríete",food:60,wood:55,iron:18,power:20},
   trebuchet:{label:"Trabuco",food:90,wood:75,iron:30,power:30}
 };
+// Recebedor Pix é configurado só por secret no Cloudflare (não embutir CPF no repo).
+function nubankPixKey(env){
+  const key=String(env.NUBANK_PIX_KEY||"").trim().replace(/[.\-\s]/g,"");
+  if(!/^\d{11}$/.test(key)||/^(\d)\1{10}$/.test(key))return null;
+  const digits=[...key].map(Number);
+  for(const size of [9,10]){
+    const sum=digits.slice(0,size).reduce((acc,digit,index)=>acc+digit*(size+1-index),0);
+    const mod=(sum*10)%11;
+    if((mod===10?0:mod)!==digits[size])return null;
+  }
+  return key;
+}
+function nubankPixReady(env){
+  return env.NUBANK_PIX_ENABLED==="true"&&env.NUBANK_PIX_RECEIVER_VERIFIED==="true"&&Boolean(nubankPixKey(env));
+}
 function json(data,status=200,extraHeaders={}){return new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json; charset=utf-8","X-Content-Type-Options":"nosniff","Referrer-Policy":"strict-origin-when-cross-origin","X-Frame-Options":"DENY","Cache-Control":"no-store",...extraHeaders}})}
 function b64url(bytes){return btoa(String.fromCharCode(...new Uint8Array(bytes))).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/g,"")}
 async function sign(payload,secret){
@@ -1930,7 +1945,23 @@ export default {
       return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
-  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),nubankPix:env.NUBANK_PIX_ENABLED==="true"});
+  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),nubankPix:nubankPixReady(env)});
+  if(url.pathname==="/api/store/pix-instructions"&&request.method==="POST"){
+    if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
+    const playerId=await gameIdentity(request,env);
+    if(!playerId)return json({error:"Sessão do jogador inválida."},401);
+    if(!nubankPixReady(env))return json({error:"Nubank Pix ainda não está configurado.",code:"NUBANK_PIX_NOT_CONFIGURED"},503);
+    const limited=await rateLimitDecision(env,"pix-instructions-player",playerId,12,600);
+    if(limited)return limited;
+    const body=await readBody(request,1024);
+    const requestId=Number(body.requestId);
+    if(body.__bodyError||!Number.isSafeInteger(requestId)||requestId<1)return json({error:"Pedido inválido."},400);
+    const pending=await env.DB.prepare(
+      "SELECT id,product_name,price_brl,currency FROM purchase_requests WHERE id=? AND player_id=(SELECT id FROM players WHERE player_id=?) AND payment_method='pix' AND status='pending'"
+    ).bind(requestId,playerId).first();
+    if(!pending)return json({error:"Pedido Pix pendente não encontrado para este jogador."},404);
+    return json({requestId:pending.id,product:pending.product_name,amountBRL:Number(pending.price_brl),currency:"BRL",bank:"Nubank",pixKey:nubankPixKey(env),message:"Confira o nome do recebedor apresentado por seu banco antes de confirmar. O pedido só será entregue após conciliação manual."});
+  }
   if(url.pathname==="/api/store/purchase-request"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);
@@ -1943,7 +1974,7 @@ export default {
     if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
     const requestedPaymentMethod=String(body.paymentMethod||"mercadopago_link");
     if(!["mercadopago_link","manual_whatsapp","pix"].includes(requestedPaymentMethod))return json({error:"Método de pagamento inválido."},400);
-    if(requestedPaymentMethod==="pix" && env.NUBANK_PIX_ENABLED!=="true")return json({error:"O Pix Nubank ainda não está habilitado para pedidos.",code:"NUBANK_PIX_NOT_CONFIGURED"},503);
+    if(requestedPaymentMethod==="pix" && !nubankPixReady(env))return json({error:"O Pix Nubank ainda não está habilitado para pedidos.",code:"NUBANK_PIX_NOT_CONFIGURED"},503);
     const paymentMethod=requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":requestedPaymentMethod==="pix"?"pix":"manual";
     const paymentReference=null;
     const player=await env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first();

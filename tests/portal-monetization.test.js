@@ -27,8 +27,8 @@ test('browser portal is promotion and signed-APK distribution only, not web game
 test('Nubank Pix cannot be selected until a server flag enables the assisted workflow', async () => {
   const [worker, arena] = await Promise.all([read('worker.js'), read('arena.html')]);
   assert.match(worker, /\/api\/store\/payment-methods/);
-  assert.match(worker, /nubankPix:env\.NUBANK_PIX_ENABLED==="true"/);
-  assert.match(worker, /requestedPaymentMethod==="pix" && env\.NUBANK_PIX_ENABLED!=="true"/);
+  assert.match(worker, /nubankPix:nubankPixReady\(env\)/);
+  assert.match(worker, /requestedPaymentMethod==="pix" && !nubankPixReady\(env\)/);
   assert.match(worker, /"NUBANK_PIX_NOT_CONFIGURED"/);
   assert.match(arena, /<option value="pix" disabled>/);
   assert.match(arena, /pixOption\.disabled=methods\.nubankPix!==true/);
@@ -51,7 +51,8 @@ test('Pix requests remain pending and never call Mercado Pago checkout or auto-f
   const pix = arena.slice(arena.indexOf("if(paymentMethod==='pix'){"), arena.indexOf("const checkoutResponse=await fetch(API_BASE+'/store/checkout'"));
   assert.ok(pix.length > 200);
   assert.doesNotMatch(pix, /store\/checkout|checkoutUrl/);
-  assert.doesNotMatch(pix, /NUBANK_PIX_COPY_PASTE|pixKey|chave pix/);
+  assert.match(pix, /store\/pix-instructions/);
+  assert.doesNotMatch(pix, /NUBANK_PIX_COPY_PASTE|chave pix hardcoded/i);
 });
 
 test('public portal does not publish account details, banking data or payment controls', async () => {
@@ -60,4 +61,20 @@ test('public portal does not publish account details, banking data or payment co
   assert.doesNotMatch(portal, /NUBANK_PIX_ENABLED|MP_ACCESS_TOKEN|chave pix|Pix copia e cola/i);
   assert.doesNotMatch(portal, /href="\/arena\.html"|checkout|beforeinstallprompt/i);
   assert.match(portal, /Baixar aplicativo Android/);
+});
+
+test('Nubank CPF recipient key is never hardcoded and is returned only to an authenticated pending-order owner',async()=>{
+ const worker=await read('worker.js');
+ const arena=await read('arena.html');
+ assert.match(worker,/NUBANK_PIX_KEY/);
+ assert.match(worker,/NUBANK_PIX_RECEIVER_VERIFIED/);
+ assert.match(worker,/function nubankPixReady\(env\)/);
+ assert.match(worker,/\/api\/store\/pix-instructions/);
+ assert.match(worker,/player_id=\(SELECT id FROM players WHERE player_id=\?\)/);
+ assert.match(worker,/payment_method='pix' AND status='pending'/);
+ assert.match(worker,/rateLimitDecision\(env,"pix-instructions-player"/);
+ assert.match(arena,/id="pixKeyValue" readonly/);
+ assert.match(arena,/navigator\.clipboard\.writeText\(key\)/);
+ const portal=await read('portal.html');
+ assert.doesNotMatch(portal,/NUBANK_PIX_KEY|pixKeyValue|paymentMethod/);
 });

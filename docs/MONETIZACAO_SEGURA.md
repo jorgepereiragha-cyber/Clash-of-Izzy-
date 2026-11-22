@@ -28,3 +28,10 @@ Gerar a primeira receita **depois** de validar uma compra ponta a ponta, a entre
 - Não executar pagamentos/transferências em nome dos usuários com este recurso.
 
 Referências oficiais: https://nubank.com.br/empresas/solucoes-para-cobranca e https://www.mercadopago.com.br/developers/pt/docs/checkout-pro-orders/notifications
+
+## Chave Pix Nubank via secret (sem gravar dados pessoais no GitHub)
+A chave do recebedor é um identificador financeiro pessoal e **não deve entrar no código-fonte, no portal público ou em logs**. O backend suporta chave Pix do tipo CPF validada por dígitos verificadores. Configure `NUBANK_PIX_KEY` como **secret no Cloudflare Worker** e mantenha a variável `NUBANK_PIX_ENABLED` desligada até concluir a verificação do titular e o teste de pagamento. Depois de verificar pessoalmente a conta recebedora, configure `NUBANK_PIX_RECEIVER_VERIFIED=true` e habilite `NUBANK_PIX_ENABLED=true` somente na conta/ambiente autorizado. Nenhuma chave foi enviada para o GitHub por esta atualização.
+
+Com o servidor corretamente configurado, **somente a sessão autenticada dona de um pedido Pix pendente** recebe a chave para copiar em `POST /api/store/pix-instructions`; a rota tem limite de requisições, exige pedido pendente e responde com cabeçalho `Cache-Control: no-store`. Na interface, o comprador vê o valor e deve conferir o destinatário no banco antes de transferir. Isso é **Pix por chave CPF com conciliação manual**, não Pix Cobrança com QR dinâmico ou liquidação automatizada. O administrador só pode liberar os itens após conferir o crédito no extrato da conta autorizada; comprovante enviado pelo jogador não basta.
+
+A configuração do secret, do plano Cloudflare, da conta Nubank e do acesso ao extrato **não é executada por commits no GitHub**. O passo de ativação exige sessão autorizada no Cloudflare e operação bancária do titular, sem publicar ou solicitar senhas.

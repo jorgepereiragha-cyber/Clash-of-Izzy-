@@ -95,7 +95,7 @@
  <div id="territoryList"><div class="territoryCard">Carregando territórios…</div></div>
 </section>
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
-<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Escolha seu pacote e conclua a compra pelo checkout seguro do Mercado Pago. A liberação ocorre após a confirmação do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><label>Forma de pagamento<select id="purchaseMethod" aria-label="Forma de pagamento"><option value="mercadopago_link" selected>Mercado Pago · checkout oficial</option><option value="pix" disabled>Nubank Pix · aguardando configuração</option></select></label><p>Mercado Pago: checkout seguro e confirmação automática. Nubank Pix: pedido assistido, com cobrança do banco e conferência manual antes da entrega. Não envie senhas ou códigos de acesso.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><button id="pixSupportButton" type="button" hidden>Solicitar cobrança Nubank Pix</button><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
+<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Escolha seu pacote e conclua a compra pelo checkout seguro do Mercado Pago. A liberação ocorre após a confirmação do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><label>Forma de pagamento<select id="purchaseMethod" aria-label="Forma de pagamento"><option value="mercadopago_link" selected>Mercado Pago · checkout oficial</option><option value="pix" disabled>Nubank Pix · aguardando configuração</option></select></label><p>Mercado Pago: checkout seguro e confirmação automática. Nubank Pix: pedido assistido, com cobrança do banco e conferência manual antes da entrega. Não envie senhas ou códigos de acesso.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><button id="pixSupportButton" type="button" hidden>Solicitar cobrança Nubank Pix</button><div id="pixPaymentDetails" hidden><label>Chave Pix Nubank do pedido:<input type="text" id="pixKeyValue" readonly autocomplete="off" aria-label="Chave Pix para pagar o pedido" style="width:100%;padding:10px;margin:8px 0;background:#17283c;color:#fff5de;border:1px solid #d8ad5f;border-radius:8px"></label><button id="pixCopyKey" type="button">Copiar chave Pix</button><p id="pixPaymentSummary">Confira o nome do recebedor no seu banco antes de transferir. A entrega é manual após crédito confirmado.</p></div><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'three';
 import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } from './engine/asset-loader.js';
@@ -650,6 +650,7 @@ async function refreshKingdomStore(){
 async function requestOfficialPurchase(item,kind,button){
  const notice=document.getElementById('purchaseNotice');
  const supportButton=document.getElementById('pixSupportButton');if(supportButton)supportButton.hidden=true;
+ const pixDetails=document.getElementById('pixPaymentDetails');if(pixDetails)pixDetails.hidden=true;
  const paymentMethod=document.getElementById('purchaseMethod')?.value==='pix'?'pix':'mercadopago_link';
  const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
  if(!token){notice.textContent='Conecte seu reino antes de comprar.';return}
@@ -673,6 +674,24 @@ async function requestOfficialPurchase(item,kind,button){
    notice.textContent='Pedido #'+requestId+' registrado, ainda não pago ('+amount+'). Solicite cobrança Nubank Pix no canal de suporte e aguarde a conferência do crédito no extrato antes da entrega.';
    button.textContent='Pix pendente · Pedido #'+requestId;
    if(supportButton){supportButton.hidden=false;supportButton.onclick=()=>document.getElementById('whatsapp')?.click();}
+   // The CPF Pix key is never shipped in HTML; only this authenticated pending order may read it.
+   try{
+     const payResponse=await fetch(API_BASE+'/store/pix-instructions',{
+       method:'POST',
+       headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+       body:JSON.stringify({requestId})
+     });
+     if(payResponse.ok){
+       const pay=await payResponse.json();
+       if(typeof pay.pixKey==='string'&&/^\d{11}$/.test(pay.pixKey)){
+         const pixField=document.getElementById('pixKeyValue');
+         const pixSummary=document.getElementById('pixPaymentSummary');
+         if(pixField)pixField.value=pay.pixKey;
+         if(pixSummary)pixSummary.textContent='Pedido #'+requestId+' · R$ '+Number(pay.amountBRL||0).toFixed(2).replace('.',',')+'. Banco: Nubank. Confirme o nome do recebedor mostrado no aplicativo bancário antes de transferir. Não envie apenas comprovante; a entrega exige crédito conciliado.';
+         if(pixDetails)pixDetails.hidden=false;
+       }
+     }
+   }catch{ /* O pedido fica pendente; suporte continua disponível. */ }
    return;
   }
   const checkoutResponse=await fetch(API_BASE+'/store/checkout',{
@@ -734,6 +753,19 @@ async function loadPaymentMethods(){
 void loadPaymentMethods();
 document.getElementById('purchaseMethod')?.addEventListener('change',()=>{
  const button=document.getElementById('pixSupportButton');if(button)button.hidden=true;
+ const details=document.getElementById('pixPaymentDetails');if(details)details.hidden=true;
+});
+document.getElementById('pixCopyKey')?.addEventListener('click',async()=>{
+ const key=document.getElementById('pixKeyValue')?.value||'';
+ const notice=document.getElementById('purchaseNotice');
+ if(!/^\d{11}$/.test(key))return;
+ try{
+   await navigator.clipboard.writeText(key);
+   if(notice)notice.textContent='Chave Pix copiada. Confira o destinatário em seu banco. O pedido permanecerá pendente até confirmação.';
+ }catch{
+   document.getElementById('pixKeyValue')?.select();
+   if(notice)notice.textContent='Selecione e copie a chave Pix manualmente. Confira o destinatário em seu banco.';
+ }
 });
 function update(dt,time){for(const k of ['q','w','e','r'])skillCooldowns[k]=Math.max(0,skillCooldowns[k]-dt);waterTexture.offset.x=(waterTexture.offset.x+dt*.035)%1;
  for(const fire of fireEffects){const pulse=Math.sin(time*.009+fire.phase);fire.flame.scale.set(.88+pulse*.12,1.05+pulse*.2,.88+pulse*.12);fire.flame.rotation.y+=dt*1.8;fire.flame.position.y=fire.baseY+Math.sin(time*.006+fire.phase)*.07}
