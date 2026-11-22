@@ -304,3 +304,28 @@
   .coi-command-metrics strong{font-size:12px}
   .coi-command-orders a{max-width:102px}
 }
+
+/* Action feedback belongs above the mobile dock, not in the brand/status header. */
+#coiActionNotice{
+  position:fixed;
+  z-index:30;
+  left:50%;
+  bottom:calc(88px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  width:max-content;
+  max-width:min(92vw,460px);
+  padding:11px 15px;
+  border:1px solid rgba(241,196,103,.88);
+  border-radius:12px;
+  background:linear-gradient(150deg,rgba(29,54,72,.98),rgba(6,19,33,.98));
+  box-shadow:0 14px 35px #0009;
+  color:#fff0c6;
+  font:700 12px/1.45 system-ui,sans-serif;
+  text-align:center;
+  pointer-events:none;
+  overflow-wrap:anywhere;
+}
+#coiActionNotice[hidden]{display:none!important}
+@media(min-width:761px){
+  #coiActionNotice{bottom:20px}
+}
