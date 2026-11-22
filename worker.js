@@ -2062,7 +2062,8 @@ export default {
     return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables,androidApiContract:"eldoria-android-v1"},ready?200:503);
   }
   // Contadores publicos verificaveis nao devem depender de tabelas comerciais opcionais.
-  // Este endpoint nao aplica migrations, nao altera o D1 e nunca inventa valores.
+  // As consultas de contadores são SELECTs; o limitador de taxa existente pode persistir seu estado.
+  // Não aplica migrations e nunca inventa valores de apoio.
   if(url.pathname==="/api/public/stats"){
     if(request.method!=="GET")return json({error:"Método não permitido."},405);
     if(!env.DB)return json({error:"Estatísticas temporariamente indisponíveis."},503);
