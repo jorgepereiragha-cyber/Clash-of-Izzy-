@@ -98,8 +98,12 @@ function buildScene() {
       renderer.setSize(host.clientWidth, host.clientHeight, false);
       renderer.render(scene, camera);
     };
-    resizeObserver = new ResizeObserver(resize);
-    resizeObserver.observe(host);
+    if ("ResizeObserver" in window) {
+      resizeObserver = new ResizeObserver(resize);
+      resizeObserver.observe(host);
+    } else {
+      window.addEventListener("resize", resize, { passive: true });
+    }
     renderer.domElement.addEventListener("webglcontextlost", event => {
       event.preventDefault();
       renderer = null;
