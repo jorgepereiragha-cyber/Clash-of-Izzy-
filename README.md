@@ -6,8 +6,9 @@ Jogo de estratégia medieval com interface Web 3D, API em Cloudflare Workers e p
 
 ## Produção e release
 
-- 🎮 **Jogar:** [Clash of Izzy — Produção](https://clash-of-izzy.jorgepereiragha.workers.dev)
-- 📲 **Portal de instalação e loja (após deploy):** [/portal.html](https://clash-of-izzy.jorgepereiragha.workers.dev/portal.html)
+- 📲 **Site público (após revisão e deploy):** [portal Android, divulgação e download](https://clash-of-izzy.jorgepereiragha.workers.dev/portal.html). O navegador não oferece entrada para jogar nesta proposta; o aplicativo Android WebView continua dependente do Worker.
+- 🔒 **APK oficial:** a publicação requer keystore permanente, fingerprint de certificado em `ANDROID_RELEASE_CERT_SHA256`, testes e workflow manual de release. Sem isso, não existe download oficial garantido.
+- 📋 **Guia de distribuição:** [docs/DISTRIBUICAO_APK_OFICIAL.md](docs/DISTRIBUICAO_APK_OFICIAL.md)
 - 💳 **Monetização e reconciliação:** [docs/MONETIZACAO_SEGURA.md](docs/MONETIZACAO_SEGURA.md)
 - 📘 **Relatório oficial:** [docs/RELEASE_NOTES.md](docs/RELEASE_NOTES.md)
 - ⚙️ **Deploy final validado:** [GitHub Actions — run #43872671573](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/43872671573)
