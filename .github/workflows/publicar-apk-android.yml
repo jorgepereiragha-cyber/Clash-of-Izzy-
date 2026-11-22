@@ -93,6 +93,8 @@ jobs:
           npm run test:e2e
       - name: Exigir backend de Eldoria publicado e D1 completo antes de assinar
         run: node scripts/check-android-release-server.mjs
+      - name: Exigir todos pacotes e dois recebimentos habilitados antes de assinar
+        run: node scripts/check-commercial-store.mjs
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -162,6 +164,8 @@ jobs:
           echo "APK SHA-256: $(cut -d' ' -f1 "$RUNNER_TEMP/clash-of-izzy-android.apk.sha256")" >> "$GITHUB_STEP_SUMMARY"
       - name: Revalidar backend imediatamente antes de disponibilizar APK
         run: node scripts/check-android-release-server.mjs
+      - name: Revalidar catalogo e pagamentos imediatamente antes de liberar APK
+        run: node scripts/check-commercial-store.mjs
       - name: Publicar release oficial com APK e checksum
         shell: bash
         env:
