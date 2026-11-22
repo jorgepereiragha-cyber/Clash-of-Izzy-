@@ -41,3 +41,22 @@ test("catalog fetch uses GET and refuses redirects",async()=>{
   assert.equal(seen.opts.redirect,"error");
   assert.equal(result.paymentsVerified,false);
 });
+
+test("rejects fractional cents, coercible nulls and noninteger gems",()=>{
+  for (const mutate of [
+    x=>{x.packages[0].price_brl="1.001"},
+    x=>{x.packages[0].price_brl=null},
+    x=>{x.packages[0].price_brl="1e2"},
+    x=>{x.packages[0].gems=null},
+    x=>{x.packages[0].gems="1e3"},
+    x=>{x.packages[0].gems=1.5}
+  ]) {
+    const x=valid();mutate(x);
+    assert.throws(()=>assertCatalogReady(x),/price\/gems mismatch/);
+  }
+});
+test("accepts decimal-string serialization for valid prices and gem counts",()=>{
+  const x=valid();
+  for(const p of x.packages){p.price_brl=String(p.price_brl);p.gems=String(p.gems);}
+  assert.equal(assertCatalogReady(x).paymentsVerified,false);
+});
