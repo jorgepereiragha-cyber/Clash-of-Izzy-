@@ -92,7 +92,17 @@ jobs:
           with urllib.request.urlopen(request,timeout=30) as response:reply=json.load(response)
           if not reply.get("success") or not reply.get("result"):raise SystemExit("Cannot audit D1 migrations; no write.")
           names=[x["name"] for x in reply["result"][0].get("results",[])]
-          last=names[-1] if names else None
+          # The newest name alone is insufficient: older missing migration names
+          # would be re-applied by Wrangler. Reject any noncanonical prefix.
+          canonical=[]
+          for file in (root/"migrations").glob("*.sql"):
+              match=re.match(r"^(\d{4})_",file.name)
+              if match and int(match.group(1))<=39:
+                  canonical.append(file.name)
+          canonical.sort()
+          if not canonical or not names or names!=canonical[:len(names)]:
+              raise SystemExit("Noncanonical D1 migration history; no production write allowed.")
+          last=names[-1]
           if last not in ("0035_throne_war.sql","0036_4x_read_indexes.sql"):
               raise SystemExit("Unexpected migration history: production core repair aborted.")
           essential=("0037_daily_login_rewards.sql","0038_onboarding_bonus.sql","0039_support_orders.sql")
