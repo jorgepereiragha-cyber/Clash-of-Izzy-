@@ -46,7 +46,7 @@ test("defesas respeitam grid, construções legadas, outras defesas e limites",(
   assert.equal(validateDefensePlacement(buildings,defenses,"trap",5,5),false);
   assert.equal(validateDefensePlacement(buildings,defenses,"tower",-10,-7),false);
   assert.equal(validateDefensePlacement(buildings,defenses,"gate",23,0),false);
-  assert.equal(validateDefensePlacement(buildings,defenses,"tower",23,23),false);
+  assert.equal(validateDefensePlacement(buildings,defenses,"tower",24,24),false);
   assert.equal(validateDefensePlacement(buildings,defenses,"trap",5,5,7),true);
   assert.equal(validateCityPlacement(buildings,"farm",5,5,defenses),false);
   assert.ok(defenseLimit("tower",30)>defenseLimit("tower",5));
