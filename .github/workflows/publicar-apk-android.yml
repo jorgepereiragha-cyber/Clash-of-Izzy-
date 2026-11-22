@@ -33,13 +33,14 @@ jobs:
       ANDROID_VERSION_NAME: ${{ inputs.versao }}
       ANDROID_VERSION_CODE: ${{ inputs.codigo_versao }}
       RELEASE_CONFIRMATION: ${{ inputs.confirmacao }}
-      GH_TOKEN: ${{ github.token }}
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
       - name: Validar autorizacao de publicacao e identificadores
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           [[ "$RELEASE_CONFIRMATION" == "PUBLICAR_APK_OFICIAL" ]] || { echo "::error::Confirmacao obrigatoria"; exit 1; }
@@ -130,6 +131,8 @@ jobs:
           echo "APK SHA-256: $(cut -d' ' -f1 "$RUNNER_TEMP/clash-of-izzy-android.apk.sha256")" >> "$GITHUB_STEP_SUMMARY"
       - name: Publicar release oficial com APK e checksum
         shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag="v$ANDROID_VERSION_NAME"
