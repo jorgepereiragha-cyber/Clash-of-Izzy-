@@ -37,7 +37,7 @@ test("coleção marca um único dragão equipado e preserva o inicial",()=>{
 test("Master só é concedido com compra aprovada e ledger único",async()=>{
  const migration=await readFile(new URL("../migrations/0030_dragons_master_mailbox.sql",import.meta.url),"utf8");
  assert.match(migration,/UNIQUE REFERENCES kingdoms/);
- assert.match(migration,/UNIQUE\(kingdom_id,dragon_key\)/);
+ assert.match(migration,/PRIMARY KEY\(kingdom_id,dragon_key\)/);
  assert.match(migration,/UNIQUE\(kingdom_id,source_key\)/);
  assert.match(migration,/Pacote Master de Eldoria/);
  assert.equal(MASTER_PACK_GEMS,10000);
