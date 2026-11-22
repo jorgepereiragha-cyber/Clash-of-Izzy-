@@ -34,7 +34,11 @@
     "enabled": true
   },
   "vars": {
-    "ENVIRONMENT": "production"
+    "ENVIRONMENT": "production",
+    "GAME_4X_SYSTEMS_ENABLED": "false",
+    "LEVEL_PACKS_ENABLED": "false",
+    "LEVEL_PACKS_PUBLIC_ENABLED": "false",
+    "LEVEL_PACKS_PROPOSED_PRICES_APPROVED": "false"
   },
   "previews": {
     "vars": {
