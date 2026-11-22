@@ -151,3 +151,9 @@ test("navegação interna do Android retorna ao castelo, não à propaganda",asy
   assert.match(nav, /path === "\/index"/);
   assert.doesNotMatch(portal, /href="\/kingdom\.html"/);
 });
+
+test("aliança sem sessão envia ao castelo em vez do portal de propaganda",async()=>{
+  const alliance=await read("alliance.html");
+  assert.match(alliance,/link\.href="\/kingdom\.html";link\.className="btn secondary";link\.textContent="Ir ao castelo"/);
+  assert.doesNotMatch(alliance,/link\.href="\/index\.html"/);
+});
