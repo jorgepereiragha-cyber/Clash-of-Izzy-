@@ -1,7 +1,7 @@
 // Apenas marketing e downloads: sem rotas de jogo, login, pagamentos ou APIs.
 // Deploy separado do Worker principal que atende o aplicativo Android.
 const PUBLIC_FILES = new Set([
-  "/portal", "/portal.html", "/favicon.svg",
+  "/portal", "/portal.html", "/apoie", "/apoie.html", "/favicon.svg",
   "/styles/coi-theme.css", "/assets/brand/hero-emblem.svg", "/assets/brand/royal-king.webp"
 ]);
 const publicHeaders = { "Cache-Control": "no-store", "X-Content-Type-Options": "nosniff" };
