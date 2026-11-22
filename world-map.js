@@ -154,6 +154,16 @@ function addStat(root, label, value) {
   stat.append(make("span", "", label), make("b", "", value));
   root.append(stat);
 }
+function updateMarchCapacityLabel(){
+ const label=$("marchCapacity");
+ if(!label)return;
+ const cap=Math.max(0,Number(state?.marchCapacity?.maximum)||0);
+ const total=Object.values(selectedUnits).reduce((sum,value)=>sum+Math.max(0,Math.floor(Number(value)||0)),0);
+ label.textContent="Formação: "+fmt(total)+" / "+fmt(cap)+" tropas. "+
+   "Castelo, academia, herói "+(state?.marchCapacity?.heroRarity||"")+
+   " e pesquisa militar aumentam esse limite.";
+ label.style.color=total>cap?"#ffc1ac":"#d6e2f0";
+}
 function renderTroops() {
   const root = $("troops");
   root.replaceChildren();
@@ -184,15 +194,18 @@ function renderTroops() {
       selectedUnits[unit.unit_type] = clamp(Math.floor(Number(input.value) || 0), 0, Number(unit.quantity));
       input.value = String(selectedUnits[unit.unit_type]);
       updateActionButtons();
+      updateMarchCapacityLabel();
     });
     row.append(label, input);
     root.append(row);
   }
   updateActionButtons();
+  updateMarchCapacityLabel();
 }
 function updateActionButtons() {
   const territory = getSelectedTerritory();
-  const hasTroops = Object.values(selectedUnits).some(quantity => Number(quantity) > 0);
+  const total=Object.values(selectedUnits).reduce((sum,value)=>sum+Math.max(0,Math.floor(Number(value)||0)),0);
+  const hasTroops=total>0&&total<=Number(state?.marchCapacity?.maximum||0);
   const isCastle = territory?.territory_kind === "castle";
   const isThrone = territory?.territory_kind === "throne";
   const canVisit = Boolean(territory && !isCastle && !isThrone && territoryOwner(territory) !== "Outro reino");
@@ -364,6 +377,13 @@ async function sendMarch(marchType) {
   const territory = getSelectedTerritory();
   const units = Object.fromEntries(Object.entries(selectedUnits).filter(([, quantity]) => Number(quantity) > 0));
   if (!territory || !Object.keys(units).length) return;
+  const total=Object.values(units).reduce((sum,value)=>sum+Number(value||0),0);
+  const max=Number(state?.marchCapacity?.maximum||0);
+  if(total>max){
+    $("marchNotice").textContent="Capacidade excedida: "+fmt(total)+"/"+fmt(max)+
+      ". Evolua heróis, castelo, academia e pesquisa militar.";
+    return;
+  }
   busy = true;
   updateActionButtons();
   $("marchNotice").textContent = "Enviando ordem de marcha ao servidor…";

@@ -1,11 +1,12 @@
 import { getPetBonuses } from "./pets.js";
+import {marchCapacityForKingdom,countTroops} from "./march-capacity.js";
 
 const UNIT_POWER=Object.freeze({
  militia:2,swordsman:5,spearman:4,archer:5,cavalry:9,knight:14,
  mage:12,crossbowman:7,catapult:22,ram:20,trebuchet:30
 });
 const NODE_RESOURCE=Object.freeze({mine:"iron",forest:"wood",farm:"food",quarry:"stone"});
-const MAX_TOTAL_TROOPS=100000;
+const MAX_TOTAL_TROOPS=200000;
 
 function reply(data,status=200){
  return Response.json(data,{status,headers:{"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
@@ -21,6 +22,16 @@ function parseTroops(value){
   troops[type]=raw;
  }
  return troops;
+}
+async function validateMarchCapacity(env,kingdomId,troops){
+ const capacity=await marchCapacityForKingdom(env.DB,kingdomId);
+ const total=countTroops(troops);
+ if(total<1||total>capacity.maximum){
+   return reply({error:"Capacidade de marcha excedida. Máximo: "+capacity.maximum+
+     " soldados. Evolua castelo, academia, herói e pesquisa militar.",
+     marchCapacity:capacity},409);
+ }
+ return null;
 }
 function troopPower(troops){
  return Object.entries(troops).reduce((sum,[type,count])=>sum+UNIT_POWER[type]*count,0);
@@ -88,6 +99,8 @@ async function createRally(env,kingdomId,body){
  if(node.occupied_by!==null||node.reserved_by_rally)return reply({error:"Este nó já está ocupado ou reservado."},409);
  const troops=parseTroops(body.troops);
  if(!troops)return reply({error:"Informe quantidades inteiras e positivas de tropas válidas."},400);
+ const marchError=await validateMarchCapacity(env,kingdomId,troops);
+ if(marchError)return marchError;
  const troopJson=JSON.stringify(troops),count=Object.keys(troops).length;
  const rallyId=crypto.randomUUID(),now=Math.floor(Date.now()/1000),duration=300;
  const distance=Math.hypot(Number(node.map_x),Number(node.map_y));
@@ -127,6 +140,8 @@ async function joinRally(env,kingdomId,body){
   return reply({error:"Você não pertence à aliança deste rally."},403);
  const troops=parseTroops(body.troops);
  if(!troops)return reply({error:"Informe quantidades inteiras e positivas de tropas válidas."},400);
+ const marchError=await validateMarchCapacity(env,kingdomId,troops);
+ if(marchError)return marchError;
  const troopJson=JSON.stringify(troops),count=Object.keys(troops).length,power=troopPower(troops);
  const withdrawal=withdrawalStatement(
   troopJson,kingdomId,
@@ -152,6 +167,8 @@ async function occupyNode(env,kingdomId,body){
  if(node.occupied_by!==null||node.reserved_by_rally)return reply({error:"Nó já ocupado ou reservado."},409);
  const troops=parseTroops(body.troops);
  if(!troops)return reply({error:"Envie ao menos uma tropa válida para ocupar o nó."},400);
+ const marchError=await validateMarchCapacity(env,kingdomId,troops);
+ if(marchError)return marchError;
  const troopJson=JSON.stringify(troops),count=Object.keys(troops).length,now=Math.floor(Date.now()/1000);
  const withdrawal=withdrawalStatement(troopJson,kingdomId,
   "EXISTS(SELECT 1 FROM resource_nodes WHERE id=? AND occupied_by IS NULL AND reserved_by_rally IS NULL)",
