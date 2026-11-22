@@ -8,11 +8,11 @@ test("GET /api/account/status returns a masked email and never the stored addres
   const env = {
     DB: {
       prepare(query) {
-        assert.match(query, /SELECT a\.username,a\.email,a\.created_at/);
+        assert.match(query, /SELECT a\.username,a\.email,a\.created_at|SELECT l\.linked_at/);
         return {
           bind(playerId) {
             assert.equal(playerId, "player-status-001");
-            return { first: async () => ({
+            return { first: async () => query.includes("google_account_links") ? null : ({
               username: "ComandanteTeste",
               email: storedEmail,
               created_at: "2026-11-17 12:00:00"
@@ -44,10 +44,12 @@ test("GET /api/account/status returns a masked email and never the stored addres
   assert.equal(response.status, 200);
   assert.deepEqual(body, {
     hasAccount: true,
+    googleLinked: false,
     account: {
       username: "ComandanteTeste",
       emailMasked: "c***@example.com",
-      created_at: "2026-11-17 12:00:00"
+      created_at: "2026-11-17 12:00:00",
+      googleLinked: false
     }
   });
   assert.equal(Object.hasOwn(body.account, "email"), false);
