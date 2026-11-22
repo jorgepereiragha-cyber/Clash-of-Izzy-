@@ -2,7 +2,7 @@ name: Homologacao 4X HTTP Worker remoto com D1 Preview
 on:
   push:
     branches: [feat/4x-industries-defenses-p1-p8]
-    paths: [.github/workflows/4x-preview-http-smoke.yml]
+    paths: [.github/workflows/4x-preview-http-smoke.yml, scripts/4x-preview-live-smoke.mjs]
 permissions:
   contents: read
 concurrency:
