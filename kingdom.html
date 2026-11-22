@@ -64,6 +64,17 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   #feedbackForm select,#feedbackForm textarea{width:100%;padding:10px;border:1px solid #71839a;border-radius:8px;background:#0e1a2a;color:#fff;font:inherit}
   #feedbackForm textarea{resize:vertical;min-height:84px}
   #feedbackForm button{justify-self:start}
+
+/* Tutorial e recompensas: sem bloquear o mapa nem impedir toques. */
+.coi-engagement{margin:14px 0;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px}
+.coi-engagement .panel{padding:18px;border-color:#af8649}
+.coi-engagement h2{font:700 1.16rem Georgia,serif;color:#f6cf88;margin:0 0 8px}
+.coi-engagement p{margin:8px 0}
+.coi-engagement ol{padding-left:22px;margin:12px 0;color:#e5eaf2;line-height:1.75}
+.coi-engagement a{color:#ffda8c}
+.coi-engagement button{min-height:44px;margin-top:6px}
+.coi-engagement button[disabled]{opacity:.64;cursor:not-allowed}
+.coi-engagement [hidden]{display:none}
 </style>  <link rel="stylesheet" href="/styles/navigation.css">
   <link rel="stylesheet" href="/styles/android-experience.css">
 <link rel="stylesheet" href="/styles/kingdom-4x-command.css">
@@ -89,6 +100,23 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div class="hero"><div><h1 id="kingdomName">Seu Reino</h1><div class="muted" id="playerName">Carregando comandante…</div></div><div class="toolbar"><button class="secondary" id="refresh">↻ Atualizar</button></div></div>
 <div id="loading" role="status" aria-live="polite"><img src="/assets/brand/royal-king.webp" alt="" aria-hidden="true" width="76" height="76" decoding="async"><strong>Preparando Eldoria</strong><span>Conectando com segurança ao seu reino…</span></div>
 <div id="game" hidden>
+<div class="coi-engagement" aria-label="Primeiros passos e recompensas">
+  <section class="panel" id="coi-onboarding" hidden>
+    <h2>Primeiros passos em Eldoria</h2>
+    <p>Complete três tarefas reais para ganhar 500 gemas uma única vez.</p>
+    <p id="coi-onboarding-progress" role="status">Preparando tutorial…</p>
+    <ol id="coi-onboarding-steps"></ol>
+    <p id="coi-onboarding-hint" class="muted"></p>
+    <button type="button" id="coi-onboarding-claim" hidden>Receber 500 gemas</button>
+  </section>
+  <section class="panel" id="coi-daily" hidden>
+    <h2>Recompensa diária</h2>
+    <p id="coi-daily-progress" role="status">Consultando o servidor…</p>
+    <button type="button" id="coi-daily-claim" disabled>Resgatar recompensa diária</button>
+    <p class="muted">O calendário usa dias UTC. Se perder um dia, o ciclo recomeça. Cada dia pode ser resgatado uma vez.</p>
+  </section>
+</div>
+<div class="toolbar" style="margin-bottom:12px"><button class="secondary" id="coi-refresh-rewards" type="button">Atualizar recompensas</button><span id="coi-reward-status" class="muted" role="status" aria-live="polite"></span></div>
 <section class="panel coi-engagement" id="onboardingPanel" aria-labelledby="onboardingTitle" hidden>
  <h2 id="onboardingTitle">Primeiros 60 segundos · Seu reino começa aqui</h2>
  <p>Siga três ações reais. O servidor confirma seu progresso; não é necessário terminar em um minuto.</p>
@@ -776,7 +804,7 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/engagement-ui.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
 <script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>
