@@ -92,6 +92,9 @@ test("identidade rei guerreiro usa capa real responsiva sem ativar download inex
   assert.match(publicHtml,/@media\(max-width:800px\)/);
   assert.match(publicHtml,/alt="Rei guerreiro de coroa dourada/);
   assert.match(publicHtml,/id="download-apk" aria-disabled="true"/);
+  assert.match(publicHtml,/id="play-browser" href="https:\/\/clash-of-izzy\.jorgepereiragha\.workers\.dev\/kingdom\.html"/);
+  assert.match(publicHtml,/class="is-loading"/);
+  assert.match(publicHtml,/Em breve/);
   assert.match(publicHtml,/id="checksum-link" hidden/);
   assert.match(publicHtml,/function validAsset\(asset, expectedName\)/);
   assert.doesNotMatch(publicHtml,/href="\/(?:kingdom|world|arena)\.html"/);
