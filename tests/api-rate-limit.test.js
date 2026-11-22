@@ -53,7 +53,8 @@ test("Worker rate-limits authentication and game endpoints without wildcard CORS
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   const arena = await readFile(new URL("../arena.html", import.meta.url), "utf8");
   for (const scope of ["store-catalog-ip", "game-start-ip", "game-state-player", "game-action-player", "game-action-network", "admin-login-ip", "admin-login-account"]) assert.ok(worker.includes(scope), "missing rate-limit scope: " + scope);
-  assert.doesNotMatch(worker, /Access-Control-Allow-Origin/);
+  assert.ok(worker.includes('"Access-Control-Allow-Origin":"https://clash-of-izzy-portal.jorgepereiragha.workers.dev"'));
+  assert.ok(!worker.includes('"Access-Control-Allow-Origin":"*"'));
   assert.doesNotMatch(worker, /Access-Control-Allow-Headers/);
   assert.ok(arena.includes("const API_BASE='/api'"));
 });

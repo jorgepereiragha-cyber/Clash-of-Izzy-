@@ -65,9 +65,25 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   #feedbackForm select,#feedbackForm textarea{width:100%;padding:10px;border:1px solid #71839a;border-radius:8px;background:#0e1a2a;color:#fff;font:inherit}
   #feedbackForm textarea{resize:vertical;min-height:84px}
   #feedbackForm button{justify-self:start}
+
 </style>  <link rel="stylesheet" href="/styles/navigation.css">
   <link rel="stylesheet" href="/styles/android-experience.css">
 <link rel="stylesheet" href="/styles/kingdom-4x-command.css">
+<style>
+.coi-engagement{margin:14px 0;border:1px solid #cba55a;background:linear-gradient(145deg,#15283d,#101b2e);padding:16px;border-radius:12px;color:#e7e8ed}
+.coi-engagement h2{color:#f1ce86;font-size:19px;margin:0 0 6px}
+.coi-engagement p{font-size:13px;line-height:1.5}
+.coi-engagement a{color:#fbe2a0;text-decoration:underline;text-underline-offset:3px}
+.coi-engagement ol{padding-left:24px;line-height:2}
+.coi-engagement button{min-height:44px;margin-top:10px}
+.coi-engagement progress{display:block;width:100%;height:12px;accent-color:#edbf67}
+.coi-daily-days{list-style:none;padding:0;display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:7px;margin:12px 0}
+.coi-daily-day{min-width:0;display:flex;flex-direction:column;padding:9px 5px;background:#102439;border:1px solid #53657d;border-radius:8px;text-align:center;font-size:11px}
+.coi-daily-day span{color:#dbe5f0}
+.coi-daily-day.current{border:2px solid #f1cc7a}
+@media(max-width:750px){.coi-daily-days{grid-template-columns:repeat(4,minmax(0,1fr))}}
+@media(max-width:390px){.coi-daily-days{grid-template-columns:repeat(3,minmax(0,1fr))}}
+</style>
 </head>
 <body class="coi-fourx">
 <header><div class="top"><div class="brand"><img class="brand-royal-seal" src="/assets/brand/royal-king.webp" alt="" aria-hidden="true" width="44" height="44" loading="eager" decoding="async"><img src="/logo.svg" alt="Clash of Izzy" width="190" height="55" style="display:block;max-width:38vw;height:auto"></div><div id="status" role="status">Conectando ao reino…</div></div><div class="resources" id="resources"><div class="resource">🌾<b>—</b>Comida</div><div class="resource">🪵<b>—</b>Madeira</div><div class="resource">🪨<b>—</b>Pedra</div><div class="resource">⛓️<b>—</b>Ferro</div><div class="resource">🪙<b>—</b>Ouro</div></div></header>
@@ -75,6 +91,21 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div class="hero"><div><h1 id="kingdomName">Seu Reino</h1><div class="muted" id="playerName">Carregando comandante…</div></div><div class="toolbar"><button class="secondary" id="refresh">↻ Atualizar</button></div></div>
 <div id="loading" role="status" aria-live="polite"><img src="/assets/brand/royal-king.webp" alt="" aria-hidden="true" width="76" height="76" decoding="async"><strong>Preparando Eldoria</strong><span>Conectando com segurança ao seu reino…</span></div>
 <div id="game" hidden>
+<section class="panel coi-engagement" id="onboardingPanel" aria-labelledby="onboardingTitle" hidden>
+ <h2 id="onboardingTitle">Primeiros 60 segundos · Seu reino começa aqui</h2>
+ <p>Siga três ações reais. O servidor confirma seu progresso; não é necessário terminar em um minuto.</p>
+ <progress id="onboardingProgress" max="3" value="0" aria-label="Tarefas do tutorial realizadas"></progress>
+ <ol id="onboardingSteps"></ol>
+ <div class="toolbar"><button type="button" id="onboardingClaim" disabled>Resgatar 500 gemas</button><button type="button" class="secondary" id="onboardingReload">Verificar progresso</button></div>
+ <p id="onboardingStatus" role="status" aria-live="polite">Verificando progresso no servidor…</p>
+</section>
+<section class="panel coi-engagement" id="dailyRewardsPanel" aria-labelledby="dailyRewardsTitle" hidden>
+ <h2 id="dailyRewardsTitle">Recompensas diárias</h2>
+ <p>Entre todos os dias para avançar no ciclo de 7 dias. A contagem muda às 00:00 UTC; faltas reiniciam a sequência.</p>
+ <ul id="dailyRewardDays" class="coi-daily-days" aria-label="Prêmios disponíveis em cada dia do ciclo"></ul>
+ <button type="button" id="dailyClaim" disabled>Resgatar recompensa de hoje</button>
+ <p id="dailyStatus" role="status" aria-live="polite">Carregando recompensas…</p>
+</section>
 <section class="coi-command-deck" aria-label="Comando do reino">
  <div class="coi-command-identity"><img class="coi-command-seal" src="/assets/brand/royal-king.webp" alt="" aria-hidden="true" width="58" height="58" loading="eager" decoding="async"><span class="coi-command-kicker">SALA DO TRONO · ELDORIA</span><strong>Comando do reino</strong><span>Construa, pesquise e comande seu exército.</span></div>
  <div class="coi-command-metrics" aria-label="Indicadores do reino">
@@ -772,7 +803,7 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
 <script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>

@@ -27,6 +27,9 @@ import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "
 import { MASTER_PACK_NAME, MASTER_PACK_BONUSES, masterGrantStatements } from "./master-pack.js";
 import { isDailyPackage, DAILY_PACKAGE_COOLDOWN_HOURS } from "./daily-package-offers.js";
 import { CASTLE_MAX_LEVEL, CASTLE_VIP_MAX_LEVEL, getCastleVipBonuses, getCastleVipState } from "./castle-vip.js";
+import { handleDailyReward } from "./daily-rewards.js";
+import { handleOnboarding } from "./onboarding-bonus.js";
+import { createSupportCheckout } from "./support-orders.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -1966,7 +1969,7 @@ export default {
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
+    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","daily_reward_claims","onboarding_bonus_claims","support_orders","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1985,11 +1988,33 @@ export default {
     // O Worker antigo não expõe o marcador e não deve passar no gate de release.
     return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables,androidApiContract:"eldoria-android-v1"},ready?200:503);
   }
+  // Contadores públicos reais: não publicar números inventados ou dados de jogadores.
+  if(url.pathname==="/api/public/stats"){
+    if(request.method!=="GET")return json({error:"Método não permitido."},405);
+    if(!env.DB)return json({error:"Estatísticas temporariamente indisponíveis."},503);
+    const limited=await rateLimitDecision(env,"public-stats-ip",request.headers.get("CF-Connecting-IP")||"unknown",60,60);
+    if(limited)return limited;
+    try{
+      const results=await env.DB.batch([
+        env.DB.prepare("SELECT COUNT(*) AS total FROM players"),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM battle_reports WHERE created_at>=datetime('now','-1 day')"),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM alliances"),
+        env.DB.prepare("SELECT COALESCE(ROUND(SUM(price_brl*100)),0) AS total_cents FROM purchase_requests WHERE status='approved' AND product_kind='vip_package' AND product_name IN ('Apoio Escudeiro','Apoio Cavaleiro','Apoio Senhor Feudal')"),
+        env.DB.prepare("SELECT COALESCE(SUM(amount_cents),0) AS total_cents FROM support_orders WHERE status='approved'")
+      ]);
+      const headers={"Access-Control-Allow-Origin":"https://clash-of-izzy-portal.jorgepereiragha.workers.dev","Vary":"Origin","Cache-Control":"public, max-age=60"};
+      return json({totalPlayers:Number(results[0]?.results?.[0]?.total||0),battles24h:Number(results[1]?.results?.[0]?.total||0),totalAlliances:Number(results[2]?.results?.[0]?.total||0),supportTotalCents:Number(results[3]?.results?.[0]?.total_cents||0)+Number(results[4]?.results?.[0]?.total_cents||0),supportPackagesTotalCents:Number(results[3]?.results?.[0]?.total_cents||0),supportVoluntaryTotalCents:Number(results[4]?.results?.[0]?.total_cents||0),verified:true},200,headers);
+    }catch(error){
+      console.error("public_stats_failed",String(error?.message||error));
+      return json({error:"Estatísticas temporariamente indisponíveis."},503);
+    }
+  }
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
   if(url.pathname.startsWith("/api/account/"))return await handlePlayerAccountRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   const mpRouteResponse=await handleMercadoPagoRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   if(mpRouteResponse)return mpRouteResponse;
-  if(url.pathname==="/api/config/valhalla"&&request.method==="GET")return await handleValhallaConfig(request,env);
+  if(url.pathname==="/api/support/checkout")return await createSupportCheckout(request,env,{json,readBody,gameIdentity,rateLimitDecision});
+   if(url.pathname==="/api/config/valhalla"&&request.method==="GET")return await handleValhallaConfig(request,env);
   if(url.pathname==="/api/beta/signup"&&request.method==="POST"){
     const ip=request.headers.get("CF-Connecting-IP")||"unknown";
     const limited=await rateLimitDecision(env,"beta-signup-ip",ip,5,3600);
@@ -2169,7 +2194,17 @@ export default {
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
     try{
-      if(url.pathname==="/api/game/referral/link"&&request.method==="GET"){
+      if(url.pathname==="/api/game/daily-reward"){
+         const limited=await rateLimitDecision(env,"daily-reward-player",playerId,request.method==="POST"?10:40,3600);
+         if(limited)return limited;
+         return await handleDailyReward(request,env,playerId,json);
+       }
+       if(url.pathname==="/api/game/onboarding"){
+         const limited=await rateLimitDecision(env,"onboarding-player",playerId,request.method==="POST"?10:40,3600);
+         if(limited)return limited;
+         return await handleOnboarding(request,env,playerId,json);
+       }
+       if(url.pathname==="/api/game/referral/link"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"referral-link-player",playerId,15,60);
         if(limited)return limited;
         const player=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -2530,7 +2565,7 @@ export default {
     }catch(e){console.error("game_request_failed",String(e?.message||e));return json({error:"Falha ao processar o jogo. Tente novamente."},500)}
   }
   const valhallaAdminPath=url.pathname.startsWith("/api/valhalla-admin/");
-  if(request.method!=="POST"&&!(request.method==="GET"&&valhallaAdminPath))return json({error:"Método não permitido."},405);
+  if(request.method!=="POST"&&!(request.method==="GET"&&(valhallaAdminPath||url.pathname==="/api/admin/launch-metrics")))return json({error:"Método não permitido."},405);
   const body=request.method==="POST"?await readBody(request):{};if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);
   if(url.pathname==="/api/admin/login"){
     if(!env.ADMIN_EMAIL||!env.ADMIN_PASSWORD||!env.SESSION_SECRET)return json({error:"Configure ADMIN_EMAIL, ADMIN_PASSWORD e SESSION_SECRET nos segredos do Worker."},503);
@@ -2552,6 +2587,22 @@ export default {
       const limited=await rateLimitDecision(env,scope,"master",request.method==="GET"?120:30,60);
       if(limited)return limited;
       return await handleValhallaAdmin(request,env,body);
+    }
+    if(url.pathname==="/api/admin/launch-metrics"&&request.method==="GET"){
+      const limited=await rateLimitDecision(env,"admin-launch-metrics","master",30,60);
+      if(limited)return limited;
+      const results=await env.DB.batch([
+        env.DB.prepare("SELECT COUNT(DISTINCT player_id) AS total FROM analytics_events WHERE event='kingdom.opened' AND date(created_at)=date('now')"),
+        env.DB.prepare("SELECT COUNT(*) AS cohort,COALESCE(SUM(CASE WHEN EXISTS(SELECT 1 FROM analytics_events e WHERE e.player_id=p.id AND e.event='kingdom.opened' AND date(e.created_at)=date('now')) THEN 1 ELSE 0 END),0) AS returned FROM players p WHERE date(p.created_at)=date('now','-1 day')"),
+        env.DB.prepare("SELECT COUNT(*) AS cohort,COALESCE(SUM(CASE WHEN EXISTS(SELECT 1 FROM analytics_events e WHERE e.player_id=p.id AND e.event='kingdom.opened' AND date(e.created_at)=date('now')) THEN 1 ELSE 0 END),0) AS returned FROM players p WHERE date(p.created_at)=date('now','-7 day')"),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM feedback"),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM beta_signups")
+      ]);
+      const d1=results[1]?.results?.[0]||{},d7=results[2]?.results?.[0]||{};
+      const retention=row=>{const cohort=Number(row.cohort||0),returned=Number(row.returned||0);return {cohort,returned,percent:cohort?Math.round(returned/cohort*10000)/100:null};};
+      return json({observedAt:new Date().toISOString(),timezone:"UTC",dauUtc:Number(results[0]?.results?.[0]?.total||0),
+        retentionD1:retention(d1),retentionD7:retention(d7),feedbackTotal:Number(results[3]?.results?.[0]?.total||0),betaSignupsTotal:Number(results[4]?.results?.[0]?.total||0),
+        note:"DAU é o número de jogadores com kingdom.opened hoje UTC; D1 e D7 usam coortes de criação do reino em dias UTC."});
     }
     if(url.pathname==="/api/admin/purchase-requests"){
       const rows=await env.DB.prepare("SELECT r.id,r.product_kind,r.product_name,r.price_brl,r.currency,r.gems_amount,r.payment_method,r.payment_reference,r.mp_order_id,r.mp_payment_status,r.status,r.created_at,p.player_id,p.name AS player_name,k.kingdom_name FROM purchase_requests r JOIN players p ON p.id=r.player_id JOIN kingdoms k ON k.id=r.kingdom_id WHERE r.status='pending' ORDER BY r.created_at ASC LIMIT 100").all();
