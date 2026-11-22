@@ -125,3 +125,15 @@ test("world-map renderer caps drawing-buffer pixels and restores from Android ba
   assert.ok(scene.includes("if (!event.persisted) dispose()"));
   assert.ok(scene.includes("syncMarchAnimation()"));
 });
+
+test("procedural world forest uses GPU instancing while keeping dynamic territory trees", async () => {
+  const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
+  assert.ok(scene.includes("function addForestInstances(parent, trees)"));
+  assert.ok(scene.includes("new THREE.InstancedMesh("));
+  assert.ok(scene.includes("mesh.setMatrixAt(index, transform.matrix)"));
+  assert.ok(scene.includes("mesh.instanceMatrix.needsUpdate = true"));
+  assert.ok(scene.includes("mesh.computeBoundingSphere()"));
+  assert.ok(scene.includes("addForestInstances(terrainRoot, trees)"));
+  assert.ok(!scene.includes("addTree(terrainRoot,"));
+  assert.ok(scene.includes("addTree(parent, x - .9"));
+});

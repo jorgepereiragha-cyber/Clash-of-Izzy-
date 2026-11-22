@@ -161,6 +161,43 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     return group;
   }
 
+  // Batch the static procedural forest into four instanced meshes instead of
+  // creating three independent meshes and a Group for each tree.
+  // Territory-specific trees remain individual objects for dynamic updates.
+  function addForestInstances(parent, trees) {
+    if (!trees.length) return;
+    const trunks = new THREE.CylinderGeometry(.13, .18, .85, 5);
+    const lowerCrown = new THREE.ConeGeometry(.72, 1.35, 6);
+    const upperCrown = new THREE.ConeGeometry(.48, .95, 6);
+    const lightTrees = trees.filter(tree => tree.variant % 2 === 0);
+    const darkTrees = trees.filter(tree => tree.variant % 2 !== 0);
+    const batches = [
+      { geometry: trunks, material: shared.trunk, trees, y: .4 },
+      { geometry: lowerCrown, material: shared.forestLight, trees: lightTrees, y: 1.2 },
+      { geometry: lowerCrown, material: shared.forest, trees: darkTrees, y: 1.2 },
+      { geometry: upperCrown, material: shared.forest, trees, y: 1.86 }
+    ];
+    const transform = new THREE.Object3D();
+    for (const batch of batches) {
+      if (!batch.trees.length) continue;
+      const mesh = new THREE.InstancedMesh(batch.geometry, batch.material, batch.trees.length);
+      mesh.instanceMatrix.setUsage(THREE.StaticDrawUsage);
+      for (let index = 0; index < batch.trees.length; index += 1) {
+        const tree = batch.trees[index];
+        transform.position.set(tree.x, terrainHeight(tree.x, tree.z) + batch.y * tree.scale, tree.z);
+        transform.rotation.set(0, 0, 0);
+        transform.scale.setScalar(tree.scale);
+        transform.updateMatrix();
+        mesh.setMatrixAt(index, transform.matrix);
+      }
+      mesh.instanceMatrix.needsUpdate = true;
+      mesh.computeBoundingSphere();
+      mesh.castShadow = quality !== "low";
+      mesh.receiveShadow = true;
+      parent.add(mesh);
+    }
+  }
+
   function clearGroup(group) {
     while (group.children.length) {
       const child = group.children[group.children.length - 1];
@@ -213,14 +250,16 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 
     const random = seeded(27011);
     const treeCount = quality === "low" ? 38 : quality === "high" ? 105 : 68;
+    const trees = [];
     for (let i = 0; i < treeCount; i++) {
       const x = (random() - .5) * 96;
       const z = (random() - .5) * 72;
       // Keep the main roads and central settlement readable.
       if (Math.abs(x) < 9 && Math.abs(z) < 9) continue;
       if (Math.abs(z + 10) < 3 && x > -52 && x < 52) continue;
-      addTree(terrainRoot, x, z, .62 + random() * .58, i);
+      trees.push({ x, z, scale: .62 + random() * .58, variant: i });
     }
+    addForestInstances(terrainRoot, trees);
 
     // A few ridges make the mountain belt visible even before a territory is selected.
     for (const [x, z, scale] of [[-42, -31, 1.5], [-30, 34, 1.25], [43, 28, 1.65], [47, -36, 1.15], [0, 37, .9]]) {
