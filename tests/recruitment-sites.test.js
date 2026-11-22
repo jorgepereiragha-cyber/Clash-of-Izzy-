@@ -15,6 +15,8 @@ test("altar and nest are visible in the city and link only to existing authentic
   assert.match(equipment, /id="hero-summon-title">Convocar Heróis/);
   assert.match(city, /id="coiDragonPanel"/);
   assert.match(city, /id="dragonCollection"/);
+  assert.match(city, /state\?\.dragon\?\.level/);
+  assert.match(city, /state\?\.dragon\?\.bond/);
   assert.match(styles, /\.coi-recruitment-site:focus-visible/);
   assert.match(styles, /@media\(max-width:650px\)/);
 });
