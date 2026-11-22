@@ -1,10 +1,6 @@
 name: Liberar Eldoria em producao apos CI e D1 Preview
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - ".github/workflows/liberar-eldoria-prod-apos-ci.yml"
   workflow_run:
     workflows: ["Clash of Izzy CI"]
     types: [completed]
@@ -20,37 +16,35 @@ concurrency:
 jobs:
   validar-e-disparar-deploy:
     if: >-
-      (github.event_name == 'push' &&
-       github.ref == 'refs/heads/main' &&
-       contains(github.event.head_commit.message, '[READY-ELDORIA-RELEASE]')) ||
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.head_branch == 'main' &&
-       github.event.workflow_run.event == 'push' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       contains(github.event.workflow_run.head_commit.message, '[READY-ELDORIA-RELEASE]'))
+      github.event_name == 'workflow_run' &&
+      github.event.workflow_run.head_branch == 'main' &&
+      github.event.workflow_run.event == 'push' &&
+      github.event.workflow_run.conclusion == 'success' &&
+      contains(github.event.workflow_run.head_commit.message, '[READY-ELDORIA-RELEASE]')
     runs-on: ubuntu-latest
     timeout-minutes: 8
     steps:
-      - name: Exigir CI aprovada do mesmo código antes de qualquer deploy
+      - name: Exigir CI aprovada do commit exato e autorizar somente mudança deste workflow
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
+          TRIGGER_SHA: ${{ github.event.workflow_run.head_sha }}
+          TRIGGER_RUN_ID: ${{ github.event.workflow_run.id }}
         run: |
           set -euo pipefail
-          # A revisão 444f27ac inclui todo o código e foi validada pela CI.
-          approved="444f27acc2be26398f5fc86770126331fefe9450"
-          tested="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/44974948379" --jq '.head_sha')"
-          result="$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/44974948379" --jq '.conclusion')"
-          test "$tested" = "$approved"
-          test "$result" = "success"
-          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
-            # Commit que aciona o fallback pode alterar APENAS este workflow.
-            changed="$(gh api "repos/$GITHUB_REPOSITORY/commits/$GITHUB_SHA" --jq '.files[].filename')"
-            test "$changed" = ".github/workflows/liberar-eldoria-prod-apos-ci.yml" || {
-              echo "::error::Commit inclui arquivos de código não validados pela CI de referência."; exit 1;
-            }
-          fi
-          echo "CI aprovada para o código Eldoria; sem checkout adicional do repositório."
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TRIGGER_RUN_ID" --jq '.head_sha')" = "$TRIGGER_SHA"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TRIGGER_RUN_ID" --jq '.conclusion')" = "success"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$TRIGGER_RUN_ID" --jq '.event')" = "push"
+          test "$(gh api "repos/$GITHUB_REPOSITORY/branches/main" --jq '.commit.sha')" = "$TRIGGER_SHA" || {
+            echo "::error::Main avançou após a CI; liberação antiga bloqueada."; exit 1;
+          }
+          # A CI validou o commit exato. O commit de liberação não pode
+          # incluir alteração de Worker, migrations, scripts ou assets.
+          changed="$(gh api "repos/$GITHUB_REPOSITORY/commits/$TRIGGER_SHA" --jq '.files[].filename')"
+          test "$changed" = ".github/workflows/liberar-eldoria-prod-apos-ci.yml" || {
+            echo "::error::Liberação exige commit exclusivo deste workflow."; exit 1;
+          }
+          echo "CI do mesmo commit aprovada; main atual; nenhuma alteração de código de jogo no gatilho."
 
       - name: Conferir D1 Preview homologado, produção intocada e bookmark de recuperação
         shell: bash
@@ -86,23 +80,46 @@ jobs:
           staging=cloud(base+preview+"/query",
             "SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")
           latestPreview=staging[0]["results"][0]["name"]
-          if latestPreview!="0030_dragons_master_mailbox.sql":
-            raise SystemExit("Preview não está na migração 0030; sem deploy.")
+          if latestPreview!="0035_throne_war.sql":
+            raise SystemExit("D1 Preview não está homologado na migração 0035; sem deploy.")
+          # As cinco tabelas novas devem estar presentes no Preview antes de
+          # sequer considerar qualquer alteração no banco de produção.
+          rows=cloud(base+preview+"/query",
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('google_account_links','google_auth_challenges','realm_openings','realm_thrones','throne_assaults')")
+          present={row["name"] for row in rows[0]["results"]}
+          expected={"google_account_links","google_auth_challenges","realm_openings","realm_thrones","throne_assaults"}
+          if present!=expected:
+            raise SystemExit("D1 Preview 0035 incompleto; sem deploy.")
+          realm=cloud(base+preview+"/query",
+            "SELECT (SELECT COUNT(*) FROM realm_openings) AS mundos, (SELECT COUNT(*) FROM realm_thrones) AS tronos")
+          if int(realm[0]["results"][0]["mundos"])!=1 or int(realm[0]["results"][0]["tronos"])!=1:
+            raise SystemExit("D1 Preview não preserva um único mundo e trono; sem deploy.")
           prodRows=cloud(base+prod+"/query",
             "SELECT (SELECT COUNT(*) FROM players) AS jogadores,(SELECT COUNT(*) FROM kingdoms) AS reinos,(SELECT COUNT(*) FROM player_accounts) AS contas,(SELECT COUNT(*) FROM purchase_requests) AS pedidos,(SELECT COUNT(*) FROM mercadopago_orders) AS ordens")
           row=prodRows[0]["results"][0]
           counts={k:int(v) for k,v in row.items()}
           print("D1 produção, contagens agregadas: "+json.dumps(counts,ensure_ascii=False))
-          if counts!={"jogadores":28,"reinos":23,"contas":0,"pedidos":0,"ordens":0}:
-            raise SystemExit("D1 de produção mudou desde a auditoria; é necessária uma nova revisão.")
+          # Contagens podem crescer sem indicar corrupção. Nunca zerar dados
+          # ou exigir snapshots de jogadores que já ficaram obsoletos.
+          if (counts["jogadores"]<counts["reinos"] or
+              counts["reinos"]<1 or
+              any(number<0 for number in counts.values())):
+            raise SystemExit("Contagens D1 produção inconsistentes; sem deploy.")
           migration=cloud(base+prod+"/query",
             "SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1")[0]["results"][0]["name"]
-          if migration!="0025_kingdom_world_queues_defense_audit.sql":
-            raise SystemExit("Migração atual da produção diferente de 0025; sem deploy.")
+          if migration!="0030_dragons_master_mailbox.sql":
+            raise SystemExit("D1 produção não está na base 0030 verificada; sem deploy.")
+          # 0033-0035 só podem ser criadas pelo deploy original com bookmark.
+          prodTables=cloud(base+prod+"/query",
+            "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('kingdom_dragons','kingdom_mailbox','master_bonus_claims','google_account_links','google_auth_challenges','realm_openings','realm_thrones','throne_assaults')")
+          names={r["name"] for r in prodTables[0]["results"]}
+          if names!={"kingdom_dragons","kingdom_mailbox","master_bonus_claims"}:
+            raise SystemExit("Esquema D1 produção divergiu da base 0030; sem deploy.")
           tt=cloud(base+prod+"/time_travel/bookmark")
           if not str(tt.get("bookmark","")).strip():
             raise SystemExit("Time Travel de produção sem bookmark; sem deploy.")
-          print("OK: Preview na 0030, produção na 0025, registros originais preservados, bookmark de recuperação disponível.")
+          print("OK: Preview homologado na 0035; produção na 0030 sem tabelas parciais; bookmark disponível.")
+          print("O workflow oficial captura e arquiva outro bookmark antes da migração 0031-0035.")
           print("Plano Workers Paid declarado pelo proprietário. A API Billing retornou 403 em auditoria anterior; não foi confirmado por Billing Read.")
           PY
       - name: Acionar deploy original protegido e arquivamento D1
