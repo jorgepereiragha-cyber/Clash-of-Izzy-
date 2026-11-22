@@ -24,6 +24,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 import android.widget.Button;
 import android.widget.FrameLayout;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.TextView;
@@ -82,6 +83,14 @@ public final class MainActivity extends Activity {
                 GradientDrawable.Orientation.TOP_BOTTOM,
                 new int[] { Color.rgb(7, 18, 29), Color.rgb(28, 49, 59) });
         loadingPanel.setBackground(loadingGradient);
+
+        ImageView heroEmblem = new ImageView(this);
+        heroEmblem.setImageResource(R.drawable.ic_launcher);
+        heroEmblem.setContentDescription("Emblema de Clash of Izzy, herói com espada e coroa");
+        heroEmblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(dp(118), dp(118));
+        heroParams.bottomMargin = dp(14);
+        loadingPanel.addView(heroEmblem, heroParams);
 
         TextView loadingTitle = new TextView(this);
         loadingTitle.setText("CLASH OF IZZY");
@@ -218,12 +227,13 @@ public final class MainActivity extends Activity {
         recoveryCardBackground.setStroke(dp(1), Color.rgb(198, 162, 93));
         recoveryCard.setBackground(recoveryCardBackground);
 
-        TextView emblem = new TextView(this);
-        emblem.setText("✦");
-        emblem.setTextColor(Color.rgb(244, 210, 143));
-        emblem.setTextSize(36);
-        emblem.setGravity(Gravity.CENTER);
-        recoveryCard.addView(emblem);
+        ImageView emblem = new ImageView(this);
+        emblem.setImageResource(R.drawable.ic_launcher);
+        emblem.setContentDescription("Emblema de herói medieval com espada");
+        emblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        LinearLayout.LayoutParams emblemParams = new LinearLayout.LayoutParams(dp(100), dp(100));
+        emblemParams.bottomMargin = dp(10);
+        recoveryCard.addView(emblem, emblemParams);
 
         TextView title = new TextView(this);
         title.setText("CLASH OF IZZY");
