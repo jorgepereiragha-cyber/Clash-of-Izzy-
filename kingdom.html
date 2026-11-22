@@ -134,6 +134,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <small class="coi-graphics-hint" id="coiGraphicsHint">Preferência salva apenas neste dispositivo. Perfis exigentes podem ser reduzidos conforme a GPU.</small>
  </div>
  <div class="grid2" id="summary"></div>
+ <div class="grid2" id="progressionSummary" aria-label="Fases do castelo e do governante" aria-live="polite"></div>
  <div class="events" id="castleSkins" aria-live="polite"></div>
 <section class="coi-castle-vip" aria-label="Evolução VIP do Castelo">
 <h3>Castelo VIP · Até nível 7</h3><p class="muted">A partir do castelo nível 30. Evolução permanente sem reiniciar edifícios.</p><div id="castleVipProgress" class="events" aria-live="polite"></div>
@@ -541,7 +542,19 @@ async function upgradeCastleVip(expectedVipLevel){
  }catch(error){setStatus(error.message||"Não foi possível evoluir o VIP.",true);}
  finally{busy=false;render();}
 }
-function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderCastleVip();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();
+function renderProgression(){
+ const root=document.getElementById("progressionSummary");
+ if(!root)return;
+ const castle=state?.castleProgression,player=state?.playerProgression;
+ if(!castle||!player){root.textContent="Aguardando sincronização da progressão.";return;}
+ const castleText=castle.name+" · Nível "+Number(castle.level||1)+
+  (castle.nextTierAt?" · Próxima fase: "+Number(castle.nextTierAt):" · Estágio máximo");
+ const playerText=player.phase+" · "+player.phaseName+" · Nível "+Number(player.level||1)+
+  (Number(player.experienceToNext)>0?" · "+fmt(player.experience)+"/"+fmt(player.experienceToNext)+" XP":" · Nível máximo");
+ root.innerHTML='<div class="stat"><span>Estágio do castelo</span><b>'+esc(castleText)+'</b></div>'+
+  '<div class="stat"><span>Governante</span><b>'+esc(playerText)+'</b></div>';
+}
+function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderCastleVip();renderProgression();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();
 const buildings=state.buildings||[];const city=document.getElementById("city");
 city.querySelectorAll(":scope > .building").forEach(button=>button.remove());
 city.insertAdjacentHTML("beforeend",buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join(""));drawKingdomScene(buildings,Number(k.equipped_skin_id||0));watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],castleSkinId:Number(k.equipped_skin_id||0)}}));
