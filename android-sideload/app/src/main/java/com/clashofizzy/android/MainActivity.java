@@ -147,6 +147,12 @@ public final class MainActivity extends Activity {
                 popupSettings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
                 popup.setVisibility(View.INVISIBLE);
                 final boolean[] handled = { false };
+                popup.setWebChromeClient(new WebChromeClient() {
+                    @Override
+                    public void onCloseWindow(WebView window) {
+                        root.post(() -> closePopup(window));
+                    }
+                });
                 popup.setWebViewClient(new WebViewClient() {
                     @Override
                     public boolean shouldOverrideUrlLoading(WebView child, WebResourceRequest request) {
