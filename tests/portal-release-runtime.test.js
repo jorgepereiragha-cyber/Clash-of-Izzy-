@@ -10,7 +10,7 @@ const asset = (name, url = base + name) => ({ name, state: "uploaded", size: 100
 
 async function render(release, responseOk = true) {
   const html = await readFile(new URL("../public-portal/portal.html", import.meta.url), "utf8");
-  const script = html.match(/<script>([\\s\\S]*?)<\\/script>/)?.[1];
+  const script = html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(script, "portal release script must exist");
   const nodes = Object.fromEntries(["download-apk", "download-status", "checksum-link"].map(id => {
     const attributes = new Map();
