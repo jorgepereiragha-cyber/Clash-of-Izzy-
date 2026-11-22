@@ -96,6 +96,44 @@ try{
   report("xp-idempotent-after-repeat",Number(replay.data.state?.playerProgression?.xp||0)===xp);
   const vip=replay.data.state.castleVip;
   report("legacy-vip-preserved",vip&&Number(vip.level||0)===0);
+  if(process.env.RUN_4X_BROWSER_SMOKE==="true"){
+    const {chromium}=await import("@playwright/test");
+    const {mkdir}=await import("node:fs/promises");
+    const browser=await chromium.launch({headless:true});
+    try{
+      const context=await browser.newContext({viewport:{width:390,height:844},
+        deviceScaleFactor:2,isMobile:true,hasTouch:true});
+      await context.addInitScript(token=>{
+        localStorage.setItem("coi_game_token",token);
+        sessionStorage.setItem("coi_game_token",token);
+      },gameToken);
+      const page=await context.newPage();
+      const jsErrors=[];
+      page.on("pageerror",error=>jsErrors.push(String(error.message||error)));
+      await page.goto(gameUrl+"/kingdom.html",{waitUntil:"domcontentloaded",timeout:60000});
+      const panel=page.locator("#coiFourXPanel");
+      await panel.waitFor({state:"visible",timeout:60000});
+      const fourX=await page.evaluate(()=>window.__coiCityLayoutState?.()?.advanced4xEnabled);
+      report("mobile-preview-4x-panel-visible",fourX===true);
+      const stock=await page.locator("#coiIndustryStock").textContent();
+      report("mobile-preview-industry-stock",stock?.includes("Trigo:")&&stock?.includes("Farinha:"));
+      const progression=await page.locator("#coiProgressionStatus").textContent();
+      report("mobile-preview-progression",progression?.includes("P1")&&progression?.includes("XP"));
+      report("mobile-preview-defense-catalog",(await page.locator("#coiDefenseType option").count())===3);
+      await page.locator("#coiDefenseType").selectOption("tower");
+      await page.locator("#coiDefenseX").fill("20");
+      await page.locator("#coiDefenseZ").fill("20");
+      report("mobile-preview-overlap-rejected",await page.locator("#coiDefensePlace").isDisabled());
+      await page.locator("#coiDefenseX").fill("22");
+      await page.locator("#coiDefenseZ").fill("22");
+      report("mobile-preview-free-plot-enabled",await page.locator("#coiDefensePlace").isEnabled());
+      await mkdir("test-results/4x-mobile-preview",{recursive:true});
+      await panel.screenshot({path:"test-results/4x-mobile-preview/controls.png",timeout:30000});
+      await page.screenshot({path:"test-results/4x-mobile-preview/viewport.png",timeout:30000});
+      report("mobile-preview-no-fatal-javascript",jsErrors.length===0);
+      console.log("PREVIEW_4X_MOBILE_UI=success; screenshots from synthetic Preview account");
+    }finally{await browser.close();}
+  }
   console.log("PREVIEW_HTTP_SMOKE_RESULT=success; no production queries or writes");
 }finally{
   if(playerId&&/^izzy_[a-f0-9]{32}$/.test(playerId)){
