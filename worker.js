@@ -2583,6 +2583,22 @@ export default {
       if(limited)return limited;
       return await handleValhallaAdmin(request,env,body);
     }
+    if(url.pathname==="/api/admin/launch-metrics"&&request.method==="GET"){
+      const limited=await rateLimitDecision(env,"admin-launch-metrics","master",30,60);
+      if(limited)return limited;
+      const results=await env.DB.batch([
+        env.DB.prepare("SELECT COUNT(DISTINCT player_id) AS total FROM analytics_events WHERE event='kingdom.opened' AND date(created_at)=date('now')"),
+        env.DB.prepare("SELECT COUNT(*) AS cohort,COALESCE(SUM(CASE WHEN EXISTS(SELECT 1 FROM analytics_events e WHERE e.player_id=p.id AND e.event='kingdom.opened' AND date(e.created_at)=date('now')) THEN 1 ELSE 0 END),0) AS returned FROM players p WHERE date(p.created_at)=date('now','-1 day')"),
+        env.DB.prepare("SELECT COUNT(*) AS cohort,COALESCE(SUM(CASE WHEN EXISTS(SELECT 1 FROM analytics_events e WHERE e.player_id=p.id AND e.event='kingdom.opened' AND date(e.created_at)=date('now')) THEN 1 ELSE 0 END),0) AS returned FROM players p WHERE date(p.created_at)=date('now','-7 day')"),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM feedback"),
+        env.DB.prepare("SELECT COUNT(*) AS total FROM beta_signups")
+      ]);
+      const d1=results[1]?.results?.[0]||{},d7=results[2]?.results?.[0]||{};
+      const retention=row=>{const cohort=Number(row.cohort||0),returned=Number(row.returned||0);return {cohort,returned,percent:cohort?Math.round(returned/cohort*10000)/100:null};};
+      return json({observedAt:new Date().toISOString(),timezone:"UTC",dauUtc:Number(results[0]?.results?.[0]?.total||0),
+        retentionD1:retention(d1),retentionD7:retention(d7),feedbackTotal:Number(results[3]?.results?.[0]?.total||0),betaSignupsTotal:Number(results[4]?.results?.[0]?.total||0),
+        note:"DAU é o número de jogadores com kingdom.opened hoje UTC; D1 e D7 usam coortes de criação do reino em dias UTC."});
+    }
     if(url.pathname==="/api/admin/purchase-requests"){
       const rows=await env.DB.prepare("SELECT r.id,r.product_kind,r.product_name,r.price_brl,r.currency,r.gems_amount,r.payment_method,r.payment_reference,r.mp_order_id,r.mp_payment_status,r.status,r.created_at,p.player_id,p.name AS player_name,k.kingdom_name FROM purchase_requests r JOIN players p ON p.id=r.player_id JOIN kingdoms k ON k.id=r.kingdom_id WHERE r.status='pending' ORDER BY r.created_at ASC LIMIT 100").all();
       return json({requests:rows.results||[]});
