@@ -14,7 +14,7 @@
 
 ## Precos para aprovar
 Valores P1-P3 fornecidos: P1 R$9,90; P2 R$29,90; P3 R$59,90.
-**P4-P8 sao PROPOSTAS NAO APROVADAS**: P4 R$89,90; P5 R$129,90; P6 R$179,90; P7 R$229,90; P8 R$299,90.
+**P4-P8 sao PROPOSTAS NAO APROVADAS**: P4 R$89,90; P5 R$129,90; P6 R$179,90; P7 R$229,90; P8 R$299,90. O servidor e a interface bloqueiam compras P4-P8 enquanto `LEVEL_PACKS_PROPOSED_PRICES_APPROVED` nao estiver igual a `true`.
 Atribuicoes e quantidades definitivas devem ser revisadas para equilibrar a economia, protecao do consumidor e nao prometer itens nao entregues.
 Nenhuma flag pode ser ativada antes da aprovacao comercial de TODOS os valores vigentes.
 
@@ -26,7 +26,7 @@ Nenhuma flag pode ser ativada antes da aprovacao comercial de TODOS os valores v
 5. Configurar credenciais Mercado Pago de teste apenas em ambiente isolado, validar autenticacao do webhook, divergencia de valores, replay e pagamento duplicado entre pedidos distintos. Usar dados sinteticos; verificar os balances efetivos no D1 Preview.
 6. Testar troca de fase P1–P8, niveis 9/10, 19/20, 79/80, compra unica, concorrencia, compra pendente, pagamento recusado, cancelamento, disputa e estorno. Verificar que a ordem duplicada exige conciliacao.
 7. Revisar UX da loja, acessibilidade, desempenho e APK assinado em Android fisico. Não declarar Android apto apenas por emulador.
-8. Ativar `GAME_4X_SYSTEMS_ENABLED=true` em staging primeiro, e depois `LEVEL_PACKS_ENABLED=true` com `LEVEL_PACKS_TEST_PLAYER_IDS` definido apenas para contas de teste. Confirmar que outras contas nao visualizam nem criam checkout. `LEVEL_PACKS_PUBLIC_ENABLED=true` autoriza o publico e deve permanecer ausente ate homologacao completa.
+8. Ativar `GAME_4X_SYSTEMS_ENABLED=true` em staging primeiro, e depois `LEVEL_PACKS_ENABLED=true` com `LEVEL_PACKS_TEST_PLAYER_IDS` definido apenas para contas de teste. Confirmar que outras contas nao visualizam nem criam checkout. `LEVEL_PACKS_PUBLIC_ENABLED=true` autoriza o publico e deve permanecer ausente ate homologacao completa. Antes disso, `LEVEL_PACKS_PROPOSED_PRICES_APPROVED=true` so pode ser configurado apos aprovacao dos precos P4-P8.
 9. Confirmar forma de rollback de Worker e flags; monitorar logs e saldos por 24h ou janela aprovada; liberar ao publico somente apos evidencias.
 
 ## Nota de segurança
