@@ -502,8 +502,11 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     }
     // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
     const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
-    homeCastleGroup=createCastle(terrainRoot,hasThrone?13:0,hasThrone?-11:0,
-      1.4,"home",Number(worldState.castleSkinId)||0);
+    if(hasThrone){
+      homeCastleGroup=createCastle(terrainRoot,13,-11,1.4,"home",Number(worldState.castleSkinId)||0);
+    }else{
+      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(worldState.castleSkinId)||0);
+    }
     rebuildTerritories();
     rebuildRoads();
     rebuildMarches();
