@@ -1,16 +1,17 @@
+import { HERO_IDENTITIES } from "./hero-identities.js";
 const HERO_TEMPLATES = Object.freeze({
-  soldado_basico:{name:"Soldado Recruta",title:"Recruta do Reino",rarity:"white",type:"infantaria",portrait:"guard",stats:{hp:500,attack:80,defense:60,speed:30},skill:"Golpe Rápido",skillDesc:"Ataque básico simples",skillPower:1.2},
-  arqueiro_comum:{name:"Arqueiro da Floresta",title:"Atirador Comum",rarity:"white",type:"arqueiro",portrait:"archer",stats:{hp:400,attack:100,defense:40,speed:45},skill:"Flecha Simples",skillDesc:"Disparo básico",skillPower:1.3},
-  cavaleiro_iniciante:{name:"Cavaleiro Novato",title:"Montador Iniciante",rarity:"white",type:"cavalaria",portrait:"knight",stats:{hp:600,attack:90,defense:70,speed:50},skill:"Investida",skillDesc:"Carga básica",skillPower:1.4},
-  curandeiro_aldeia:{name:"Curandeiro da Aldeia",title:"Médico Rural",rarity:"white",type:"suporte",portrait:"healer",stats:{hp:450,attack:50,defense:50,speed:35},skill:"Cura Menor",skillDesc:"Restaura pouca vida",skillPower:1.1},
-  capitao_espada:{name:"Capitão da Guarda",title:"Líder Militar",rarity:"blue",type:"infantaria",portrait:"commander",stats:{hp:1200,attack:180,defense:140,speed:40},skill:"Corte Devastador",skillDesc:"Ataque poderoso em área",skillPower:2},
-  mestre_arco:{name:"Mestre Arqueiro",title:"Atirador de Elite",rarity:"blue",type:"arqueiro",portrait:"master-archer",stats:{hp:900,attack:220,defense:80,speed:60},skill:"Chuva de Flechas",skillDesc:"Múltiplos disparos",skillPower:2.2},
-  cavaleiro_dragao:{name:"Cavaleiro do Dragão",title:"Montador de Dragão",rarity:"blue",type:"cavalaria",portrait:"dragon-knight",stats:{hp:1400,attack:200,defense:160,speed:70},skill:"Sopro de Fogo",skillDesc:"Ataque flamejante",skillPower:2.5},
-  sacerdotisa_luar:{name:"Sacerdotisa do Luar",title:"Curandeira Mística",rarity:"blue",type:"suporte",portrait:"moon-priestess",stats:{hp:1000,attack:120,defense:100,speed:50},skill:"Cura Lunar",skillDesc:"Cura poderosa em área",skillPower:1.8},
-  rei_artur:{name:"Rei Artur",title:"O Rei Eterno",rarity:"purple",type:"infantaria",portrait:"arthur",stats:{hp:3500,attack:500,defense:400,speed:55},skill:"Excalibur",skillDesc:"Espada sagrada causa dano massivo",skillPower:4.5},
-  merlin_arquimago:{name:"Merlin",title:"O Arquimago Supremo",rarity:"purple",type:"suporte",portrait:"mage",stats:{hp:2800,attack:650,defense:250,speed:65},skill:"Meteoro Ancestral",skillDesc:"Invoca destruição dos céus",skillPower:5},
-  joana_darc:{name:"Joana D’Arc",title:"A Donzela de Ferro",rarity:"purple",type:"infantaria",portrait:"valkyrie",stats:{hp:4000,attack:450,defense:550,speed:60},skill:"Fé Divina",skillDesc:"Proteção sagrada absoluta",skillPower:4},
-  genghis_khan:{name:"Genghis Khan",title:"O Flagelo de Deus",rarity:"purple",type:"cavalaria",portrait:"raider",stats:{hp:3200,attack:600,defense:300,speed:85},skill:"Horda Mongol",skillDesc:"Convoca exército de cavalaria",skillPower:4.8},
+  soldado_basico:{name:"Darian Ferrovale",title:"Sentinela do Primeiro Muro",rarity:"white",type:"infantaria",portrait:"guard",stats:{hp:500,attack:80,defense:60,speed:30},skill:"Golpe Rápido",skillDesc:"Ataque básico simples",skillPower:1.2},
+  arqueiro_comum:{name:"Lyria Falcobruma",title:"Batedora de Folhavento",rarity:"white",type:"arqueiro",portrait:"archer",stats:{hp:400,attack:100,defense:40,speed:45},skill:"Flecha Simples",skillDesc:"Disparo básico",skillPower:1.3},
+  cavaleiro_iniciante:{name:"Torven Galopardo",title:"Escudeiro da Aurora",rarity:"white",type:"cavalaria",portrait:"knight",stats:{hp:600,attack:90,defense:70,speed:50},skill:"Investida",skillDesc:"Carga básica",skillPower:1.4},
+  curandeiro_aldeia:{name:"Elara Ervalume",title:"Curadora do Vale Azul",rarity:"white",type:"suporte",portrait:"healer",stats:{hp:450,attack:50,defense:50,speed:35},skill:"Cura Menor",skillDesc:"Restaura pouca vida",skillPower:1.1},
+  capitao_espada:{name:"Rovan Brasaferro",title:"Capitão do Bastião",rarity:"blue",type:"infantaria",portrait:"commander",stats:{hp:1200,attack:180,defense:140,speed:40},skill:"Corte Devastador",skillDesc:"Ataque poderoso em área",skillPower:2},
+  mestre_arco:{name:"Serin Longavento",title:"Olho do Carvalho",rarity:"blue",type:"arqueiro",portrait:"master-archer",stats:{hp:900,attack:220,defense:80,speed:60},skill:"Chuva de Flechas",skillDesc:"Múltiplos disparos",skillPower:2.2},
+  cavaleiro_dragao:{name:"Veyron Escamaforte",title:"Guardião da Brasa Alta",rarity:"blue",type:"cavalaria",portrait:"dragon-knight",stats:{hp:1400,attack:200,defense:160,speed:70},skill:"Sopro de Fogo",skillDesc:"Ataque flamejante",skillPower:2.5},
+  sacerdotisa_luar:{name:"Maelis Pratalua",title:"Oráculo das Marés",rarity:"blue",type:"suporte",portrait:"moon-priestess",stats:{hp:1000,attack:120,defense:100,speed:50},skill:"Cura Lunar",skillDesc:"Cura poderosa em área",skillPower:1.8},
+  rei_artur:{name:"Arthelion de Aurendal",title:"Soberano das Sete Lâminas",rarity:"purple",type:"infantaria",portrait:"arthur",stats:{hp:3500,attack:500,defense:400,speed:55},skill:"Lâmina do Juramento",skillDesc:"Lâmina ancestral de Aurendal causa dano massivo",skillPower:4.5},
+  merlin_arquimago:{name:"Meridran Astrolume",title:"Arquiteto dos Arcanos",rarity:"purple",type:"suporte",portrait:"mage",stats:{hp:2800,attack:650,defense:250,speed:65},skill:"Meteoro Ancestral",skillDesc:"Invoca destruição dos céus",skillPower:5},
+  joana_darc:{name:"Serah Valen",title:"Sentinela da Chama Viva",rarity:"purple",type:"infantaria",portrait:"valkyrie",stats:{hp:4000,attack:450,defense:550,speed:60},skill:"Fé Divina",skillDesc:"Proteção sagrada absoluta",skillPower:4},
+  genghis_khan:{name:"Kharzun Ventobravo",title:"Senhor das Mil Selas",rarity:"purple",type:"cavalaria",portrait:"raider",stats:{hp:3200,attack:600,defense:300,speed:85},skill:"Horda Mongol",skillDesc:"Convoca exército de cavalaria",skillPower:4.8},
   kael_sunwarden:{name:"Kael",title:"Guardião do Sol",rarity:"blue",type:"infantaria",portrait:"kael",stats:{hp:1400,attack:250,defense:180,speed:64},skill:"Lâmina Solar",skillDesc:"Golpe de luz que fortalece a linha de frente",skillPower:2.1},
   amun_ra_solar:{name:"Amon-Rá",title:"Soberano do Disco Solar",rarity:"purple",type:"infantaria",portrait:"amun-ra",theme:"egypt",aura:"solar",stats:{hp:4100,attack:640,defense:430,speed:62},skill:"Presença do Meio-Dia",skillDesc:"Passivo de comandante: amplia o poder ofensivo da formação",skillPower:4.7},
   anubis_duat:{name:"Anúbis",title:"Guardião das Balanças do Duat",rarity:"purple",type:"infantaria",portrait:"anubis",theme:"egypt",aura:"duat",stats:{hp:4700,attack:430,defense:650,speed:50},skill:"Vigília do Duat",skillDesc:"Passivo de comandante: reforça a resistência da linha de frente",skillPower:4.5},
@@ -121,6 +122,7 @@ function normalizedRarity(value) {
 export function heroView(row = {}) {
   const heroKey = String(row.hero_key || "");
   const template = HERO_TEMPLATES[heroKey] || null;
+  const identity = HERO_IDENTITIES[heroKey] || null;
   const rarityKey = normalizedRarity(row.rarity);
   const rarity = HERO_RARITY[rarityKey];
   const level = integerInRange(row.level, 1, 1, rarity.maxLevel);
@@ -165,8 +167,12 @@ export function heroView(row = {}) {
     fragments_to_next: HERO_STAR_COST[stars + 1] || null,
     portrait_symbol: portrait,
     portrait_alt: name + " — " + title,
-    theme_key: template?.theme || null,
-    aura_key: template?.aura || null,
+    theme_key: template?.theme || (identity?.faction==="Panteão das Areias"?"egypt":"eldoria"),
+    aura_key: identity?.aura || template?.aura || null,
+    aura_label: identity?.aura_label || null,
+    identity_faction: identity?.faction || null,
+    identity_lore: identity?.lore || null,
+    identity_motto: identity?.motto || null,
     combat_bonuses: getHeroCombatBonuses({ ...row, hero_key: heroKey, rarity: row.rarity, level, stars })
   };
 }

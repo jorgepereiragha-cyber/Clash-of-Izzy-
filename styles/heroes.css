@@ -48,3 +48,35 @@
 }
 @keyframes coi-egypt-aura{from{opacity:.94;transform:translateY(0)}to{opacity:1;transform:translateY(-1px)}}
 @media(prefers-reduced-motion:reduce){.hero-roster-card[data-hero-theme="egypt"] .hero-roster-portrait{animation:none}}
+
+/* Auras exclusivas da identidade Eldoria, implementadas apenas em CSS. */
+.hero-roster-faction{margin:0;color:#dacba5;font-size:10px;font-weight:700}
+.hero-roster-aura{margin:0;color:#f4d48e;font-size:10px}
+.hero-roster-story{margin:5px 0 0;border-top:1px solid #526177;padding-top:5px;font-size:11px;color:#dce5ee}
+.hero-roster-story summary{cursor:pointer;font-weight:750;color:#eed08b;padding:3px 0}
+.hero-roster-story p{margin:6px 0}
+.hero-roster-motto{font-style:italic}
+.hero-roster-card[data-hero-aura="aura-ember"] .hero-roster-portrait{box-shadow:0 0 0 1px #eda45d,0 0 13px #9b4b2d}
+.hero-roster-card[data-hero-aura="aura-leaf"] .hero-roster-portrait{box-shadow:0 0 0 1px #98e4a2,0 0 13px #387c5b}
+.hero-roster-card[data-hero-aura="aura-charge"] .hero-roster-portrait{box-shadow:0 0 0 1px #ffdf8d,0 0 13px #bc7653}
+.hero-roster-card[data-hero-aura="aura-herb"] .hero-roster-portrait{box-shadow:0 0 0 1px #99dac9,0 0 13px #388c9e}
+.hero-roster-card[data-hero-aura="aura-steel"] .hero-roster-portrait{box-shadow:0 0 0 1px #b4caff,0 0 13px #526d9a}
+.hero-roster-card[data-hero-aura="aura-arrow"] .hero-roster-portrait{box-shadow:0 0 0 1px #b4ecde,0 0 13px #449c9f}
+.hero-roster-card[data-hero-aura="aura-dragon"] .hero-roster-portrait{box-shadow:0 0 0 1px #ffd093,0 0 13px #cd683c}
+.hero-roster-card[data-hero-aura="aura-moon"] .hero-roster-portrait{box-shadow:0 0 0 1px #d6e4ff,0 0 13px #847bbf}
+.hero-roster-card[data-hero-aura="aura-crown"] .hero-roster-portrait{box-shadow:0 0 0 1px #ffe3a9,0 0 13px #c38d42}
+.hero-roster-card[data-hero-aura="aura-astral"] .hero-roster-portrait{box-shadow:0 0 0 1px #bac0ff,0 0 13px #7666be}
+.hero-roster-card[data-hero-aura="aura-flame"] .hero-roster-portrait{box-shadow:0 0 0 1px #ffd1a9,0 0 13px #d16c5b}
+.hero-roster-card[data-hero-aura="aura-steppe"] .hero-roster-portrait{box-shadow:0 0 0 1px #91ddff,0 0 13px #5b8bba}
+.hero-roster-card[data-hero-aura="aura-sun"] .hero-roster-portrait{box-shadow:0 0 0 1px #f8d57d,0 0 13px #cc9837}
+.hero-roster-card[data-hero-aura="solar"] .hero-roster-portrait{box-shadow:0 0 0 1px #ffd36b,0 0 13px #df9535}
+.hero-roster-card[data-hero-aura="duat"] .hero-roster-portrait{box-shadow:0 0 0 1px #9bb5de,0 0 13px #455a80}
+.hero-roster-card[data-hero-aura="wings"] .hero-roster-portrait{box-shadow:0 0 0 1px #8ddddd,0 0 13px #aa88d9}
+.hero-roster-card[data-hero-aura="falcon"] .hero-roster-portrait{box-shadow:0 0 0 1px #90d4ff,0 0 13px #e8c16a}
+.hero-roster-card[data-hero-aura="crimson"] .hero-roster-portrait{box-shadow:0 0 0 1px #ff906f,0 0 13px #bb4551}
+.hero-roster-card[data-hero-aura="aura-ravens"] .hero-roster-portrait{box-shadow:0 0 0 1px #c2cfeb,0 0 13px #6c7ca7}
+.hero-roster-card[data-hero-aura="aura-thunder"] .hero-roster-portrait{box-shadow:0 0 0 1px #93d8ff,0 0 13px #4489c6}
+.hero-roster-card[data-hero-aura="aura-vanir"] .hero-roster-portrait{box-shadow:0 0 0 1px #ffdfa7,0 0 13px #dc91bc}
+.hero-roster-card[data-hero-aura="aura-trickster"] .hero-roster-portrait{box-shadow:0 0 0 1px #95e8b2,0 0 13px #468a69}
+.hero-roster-card[data-hero-aura="aura-starlight"] .hero-roster-portrait{box-shadow:0 0 0 1px #ead99c,0 0 13px #9278c0}
+@media(prefers-reduced-motion:reduce){.hero-roster-card[data-hero-aura] .hero-roster-portrait{animation:none}}

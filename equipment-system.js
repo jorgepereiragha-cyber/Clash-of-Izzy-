@@ -352,6 +352,10 @@
       const title=document.createElement("p");
       title.className="hero-roster-title";
       title.textContent=hero.title||"Campeão de Eldoria";
+      const origin=document.createElement("p");origin.className="hero-roster-faction";
+      origin.textContent=hero.identity_faction||"Reino de Eldoria";
+      const aura=document.createElement("p");aura.className="hero-roster-aura";
+      aura.textContent=hero.aura_label?"Aura: "+hero.aura_label:"";
       const meta=document.createElement("div");
       meta.className="hero-roster-meta";
       const level=document.createElement("span");
@@ -390,7 +394,15 @@
       fragments.className="hero-roster-fragments";
       fragments.textContent="Fragmentos: "+Number(hero.fragments||0).toLocaleString("pt-BR")+
         (hero.fragments_to_next?" · Próxima estrela: "+hero.fragments_to_next:" · Estrelas máximas");
-      copy.append(name,title,meta,stats,combat,skill,fragments);
+      copy.append(name,title,origin,aura,meta,stats,combat,skill,fragments);
+      if(hero.identity_lore){
+        const story=document.createElement("details");story.className="hero-roster-story";
+        const summary=document.createElement("summary");summary.textContent="História do herói";
+        const description=document.createElement("p");description.textContent=hero.identity_lore;
+        const motto=document.createElement("p");motto.className="hero-roster-motto";
+        motto.textContent=hero.identity_motto?"Lema: "+hero.identity_motto:"";
+        story.append(summary,description,motto);copy.append(story);
+      }
 
       const button=document.createElement("button");
       button.type="button";
