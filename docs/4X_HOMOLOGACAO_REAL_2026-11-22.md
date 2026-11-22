@@ -15,6 +15,7 @@ Data: 2026-11-22. Escopo: PR #229 empilhada sobre PR #223.
 | XP P1–P8 | Fila legítima concluída atribui XP uma vez; VIP legado intacto | mesmo teste HTTP |
 | Emulador Android | APK debug instalado e aberto em emulador Pixel | https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/45031469200 |
 | Testes HMAC e cobrança simulada | Assinatura, valor divergente e replay aprovados; sem cobrança | https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/45032017121 |
+| Visual mobile 4X contra Worker e D1 Preview | Painel, progresso, estoque, bloqueio de colisão, posição livre e JS sem erros; imagens capturadas | https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/45032336540 |
 | Estado público de pagamentos | Endpoint de produção respondeu `mercadoPago:false`, `nubankPix:false` | mesmo diagnóstico de pagamento |
 | CI original da PR #229 | Node, D1 local, Playwright e Worker bundle aprovados | https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/45030588462 |
 
