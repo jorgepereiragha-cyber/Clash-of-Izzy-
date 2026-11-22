@@ -4,7 +4,7 @@ import {readFile} from "node:fs/promises";
 const source=path=>readFile(new URL("../"+path,import.meta.url),"utf8");
 test("Google account link remains opt-in and unique, with expiry, one-use nonce and no email auto merge",async()=>{
   const [schema,routes,worker,ui]=await Promise.all([
-    source("migrations/0032_google_account_links.sql"),source("player-accounts.js"),
+    source("migrations/0033_google_account_links.sql"),source("player-accounts.js"),
     source("worker.js"),source("account.html")
   ]);
   assert.match(schema,/google_sub TEXT NOT NULL UNIQUE/);
