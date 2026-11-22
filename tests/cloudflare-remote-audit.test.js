@@ -41,3 +41,59 @@ test("cloud-only diagnostic source is not published as a static asset",async()=>
   const ignored=(await read(".assetsignore")).split(/\r?\n/);
   assert.ok(ignored.includes("scripts/cloudflare-remote-audit.mjs"));
 });
+
+test("auditoria pré-migração 0030 aceita somente três tabelas faltando com DB e sessão prontos",async()=>{
+  const prodDb=prod.d1_databases.find(x=>x.binding==="DB");
+  const stageDb=staging.d1_databases.find(x=>x.binding==="PREVIEW_DB");
+  const goodMissing=["kingdom_dragons","kingdom_mailbox","master_bonus_claims"];
+  function mockFor(health){
+    const visits=[];
+    const reply=(data,status=200)=>new Response(JSON.stringify(data),{status,headers:{"Content-Type":"application/json"}});
+    const fetchImpl=async(url,options={})=>{
+      visits.push({url,method:options.method});
+      if(url.endsWith("/api/health"))return reply(health,health.ok?200:503);
+      if(url.endsWith("/api/admin/health")||url.endsWith("/api/account/status"))return reply({error:"Sem sessão"},401);
+      if(url.endsWith("/user/tokens/verify"))return reply({success:true,result:{status:"active"}});
+      if(url.endsWith("/time_travel/bookmark"))return reply({success:true,result:{bookmark:"test-restore-point"}});
+      if(url.endsWith("/subscriptions"))return reply({success:false},403);
+      if(url.endsWith("/d1/database/"+prodDb.database_id))return reply({success:true,result:{uuid:prodDb.database_id,name:prodDb.database_name}});
+      if(url.endsWith("/d1/database/"+stageDb.database_id))return reply({success:true,result:{uuid:stageDb.database_id,name:stageDb.database_name}});
+      return reply({error:"Rota não esperada"},404);
+    };
+    return{visits,fetchImpl};
+  }
+  const base={ok:false,status:"not_ready",checks:{database:true,schema:false,session:true},missingTables:goodMissing};
+  const args={production:prod,staging,token:"test-token",accountId:"a".repeat(32),allowPending0030:true};
+  const valid=mockFor(base);
+  const accepted=await audit({...args,fetchImpl:valid.fetchImpl});
+  assert.equal(accepted.ready,true,JSON.stringify(accepted.checks));
+  assert.ok(accepted.checks.find(row=>row.name==="Worker público e D1").detail.includes("0030"));
+  assert.ok(valid.visits.every(x=>x.method==="GET"));
+  const strict=await audit({...args,allowPending0030:false,fetchImpl:mockFor(base).fetchImpl});
+  assert.equal(strict.ready,false);
+  for(const health of [
+    {...base,missingTables:["kingdom_dragons","kingdom_mailbox","outro"]},
+    {...base,missingTables:["kingdom_dragons","kingdom_mailbox"]},
+    {...base,checks:{...base.checks,session:false}},
+    {...base,checks:{...base.checks,database:false}},
+    {...base,status:"error"},
+    {...base,ok:true}
+  ]){
+    const result=await audit({...args,fetchImpl:mockFor(health).fetchImpl});
+    assert.equal(result.ready,false,JSON.stringify(health));
+    assert.equal(result.checks.find(x=>x.name==="Worker público e D1").ok,false);
+  }
+});
+test("deploy não relaxa a validação de saúde pós-migração",async()=>{
+  const workflow=await read(".github/workflows/deploy-cloudflare.yml");
+  const source=await read("scripts/cloudflare-remote-audit.mjs");
+  const old=workflow.indexOf("COI_ALLOW_PENDING_0030:");
+  const newCheck=workflow.indexOf("Verify live D1 schema and Android API contract after Worker deploy");
+  const migrate=workflow.indexOf("Apply D1 migrations remotely");
+  const deploy=workflow.indexOf("Deploy Worker and static assets");
+  assert.ok(old>=0&&migrate>old&&deploy>migrate&&newCheck>deploy);
+  const strict=workflow.slice(newCheck,workflow.indexOf("Smoke test production Worker",newCheck));
+  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030/);
+  assert.match(strict,/check-android-release-server\.mjs/);
+  assert.match(source,/allowPending0030:process\.env\.COI_ALLOW_PENDING_0030==="true"/);
+});
