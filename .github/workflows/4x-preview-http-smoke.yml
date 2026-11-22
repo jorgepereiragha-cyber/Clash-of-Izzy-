@@ -1,0 +1,103 @@
+name: Homologacao 4X HTTP Worker remoto com D1 Preview
+on:
+  push:
+    branches: [feat/4x-industries-defenses-p1-p8]
+    paths: [.github/workflows/4x-preview-http-smoke.yml]
+permissions:
+  contents: read
+concurrency:
+  group: coi-4x-preview-remote-live-smoke
+  cancel-in-progress: false
+jobs:
+  live-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Normalizar credenciais e gerar configuracao isolada e efemera
+        shell: bash
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,re,secrets
+          raw=os.environ.get("RAW_TOKEN","").strip()
+          if raw.lower().startswith("bearer "):raw=raw[7:].strip()
+          if len(raw)>1 and raw[0]==raw[-1] and raw[0] in ("'",'"'):raw=raw[1:-1].strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if not raw or any(c.isspace() for c in raw) or not re.fullmatch(r"[0-9a-fA-F]{32}",account):
+              raise SystemExit("Cloudflare credentials missing, no remote dev started.")
+          with open("wrangler.jsonc") as f: config=json.load(f)
+          with open("wrangler.preview-migrations.jsonc") as f:preview=json.load(f)["d1_databases"][0]
+          assert preview["binding"]=="PREVIEW_DB"
+          assert preview["database_id"]=="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          assert config["d1_databases"][0]["database_id"]=="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          config["name"]="clash-of-izzy-4x-api-smoke"
+          config["main"]="worker.js"
+          config["d1_databases"]=[{
+              "binding":"DB","database_name":preview["database_name"],
+              "database_id":preview["database_id"],"migrations_dir":"migrations"}]
+          config["vars"]={"ENVIRONMENT":"staging","GAME_4X_SYSTEMS_ENABLED":"true"}
+          config["triggers"]={"crons":[]}
+          config["workers_dev"]=False
+          config.pop("previews",None)
+          session=secrets.token_urlsafe(48)
+          config["vars"]["SESSION_SECRET"]=session
+          print("::add-mask::"+raw)
+          print("::add-mask::"+session)
+          with open(os.environ["GITHUB_ENV"],"a",encoding="utf8") as env:
+              env.write("CLOUDFLARE_API_TOKEN="+raw+"\n")
+              env.write("CLOUDFLARE_ACCOUNT_ID="+account+"\n")
+          with open("wrangler.4x-smoke.generated.jsonc","w",encoding="utf8") as out:
+              json.dump(config,out,indent=2)
+          print("STAGING_REMOTE_CONFIG=Preview-only, 4X enabled, no Mercado Pago credentials.")
+          PY
+      - name: Confirmar schema 0041 e ausencia de jogadores antes de testar
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import os,json,urllib.request
+          url="https://api.cloudflare.com/client/v4/accounts/"+os.environ["CLOUDFLARE_ACCOUNT_ID"]+"/d1/database/6674c0ac-3636-4e57-bff8-23cf60ab9637/query"
+          for sql,expected in [
+            ("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 1","0041_4x_industries_defenses_progression.sql"),
+            ("SELECT COUNT(*) AS n FROM players",0)
+          ]:
+              req=urllib.request.Request(url,method="POST",data=json.dumps({"sql":sql}).encode(),headers={
+                "Authorization":"Bearer "+os.environ["CLOUDFLARE_API_TOKEN"],"Content-Type":"application/json"})
+              with urllib.request.urlopen(req,timeout=30) as response:obj=json.load(response)
+              assert obj.get("success")
+              result=obj["result"][0]["results"][0]
+              value=result.get("name",result.get("n"))
+              assert value==expected,(sql,value)
+          print("D1 Preview ready: migration 0041 applied, no players before synthetic test.")
+          PY
+      - name: Iniciar Worker remotamente, testar API real e encerrar o runner
+        shell: bash
+        run: |
+          set -euo pipefail
+          npx wrangler --config wrangler.4x-smoke.generated.jsonc dev --remote --ip 127.0.0.1 --port 8787 > "$RUNNER_TEMP/coi-4x-remote-dev.log" 2>&1 &
+          worker_pid=$!
+          trap 'kill "$worker_pid" 2>/dev/null || true' EXIT
+          ready=0
+          for i in $(seq 1 50); do
+            if ! kill -0 "$worker_pid" 2>/dev/null; then
+              echo "::error::Preview Worker exited before health request"
+              exit 1
+            fi
+            if curl -s --max-time 4 -o /dev/null http://127.0.0.1:8787/api/health; then
+              ready=1;break
+            fi
+            sleep 3
+          done
+          test "$ready" = 1 || { echo "::error::Remote preview did not start on localhost"; exit 1; }
+          STAGING_CONFIG_PATH=wrangler.4x-smoke.generated.jsonc GAME_SMOKE_BASE=http://127.0.0.1:8787 node scripts/4x-preview-live-smoke.mjs
+          echo "Worker remoto homologado em Preview D1; nenhuma alteracao no Worker publico."
