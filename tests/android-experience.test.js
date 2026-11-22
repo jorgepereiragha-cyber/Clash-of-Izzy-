@@ -122,9 +122,9 @@ test("Android native launcher presents the independent hero emblem and promo por
   const portal = await readFile(new URL("../portal.html", import.meta.url), "utf8");
   assert.match(activity, /heroEmblem\.setImageResource\(R\.drawable\.royal_king\)/);
   assert.match(icon, /fillColor="#E3B865"/);
-  assert.match(manifest, /android:icon="@drawable\\/royal_king"/);
-  assert.match(manifest, /android:roundIcon="@drawable\\/royal_king"/);
-  assert.match(kingdom, /class="coi-command-seal" src="\\/assets\\/brand\\/royal-king\\.webp"/);
+  assert.ok(manifest.includes('android:icon="@drawable/royal_king"'));
+  assert.ok(manifest.includes('android:roundIcon="@drawable/royal_king"'));
+  assert.ok(kingdom.includes('class="coi-command-seal" src="/assets/brand/royal-king.webp"'));
   assert.match(portal, /assets\/brand\/royal-king\.webp/);
   assert.doesNotMatch(portal, /\/scripts\/pwa-runtime\.js|href="\/manifest\.json"/);
 });
