@@ -70,3 +70,12 @@ A loja obtém produtos, preços e gemas do D1; não deve calcular valores a part
 
 ## Publicação nas redes
 O portal oferece botões de compartilhamento nativo, WhatsApp, Facebook e cópia de URL para Instagram/TikTok. A publicação direta nas redes exige conexão e autorização das respectivas contas; os textos acima são rascunhos para aprovação editorial, não posts já publicados.
+
+## Oferta de entrada por R$ 3,99
+
+A migração incremental `migrations/0031_entry_package_399.sql` inclui **Pacote Inicial de Eldoria**, por **R$ 3,99**, com **35 gemas** por compra. A oferta é repetível, não inclui skin, dragão, VIP ou bônus de combate. O banco impede repetir o cadastro pelo nome da oferta.
+
+- `/api/store/catalog` deve exibir o preço como 3,99 BRL e a recompensa exata de 35 gemas, após a migração D1 de produção aprovada.
+- Mercado Pago deve conferir pedido, preço e moeda no backend antes de entregar gemas. Pix Nubank permanece assistido, com crédito no extrato e EndToEndId único.
+- Não anunciar o pacote como disponível para compra enquanto a configuração financeira real não estiver homologada.
+- O banco D1 mantém valores e catálogo como fonte de verdade. Promoção nunca deve alterar a validação dos valores no Worker.
