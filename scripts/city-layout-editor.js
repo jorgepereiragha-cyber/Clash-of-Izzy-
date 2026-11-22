@@ -10,6 +10,7 @@ if (root) {
   const status = document.getElementById("coiCityGridStatus");
   const config = () => window.__coiCityLayoutState?.()?.cityLayout;
   const buildings = () => window.__coiCityLayoutState?.()?.buildings || [];
+  const extraBuildings = () => window.__coiAdvancedCityStructures || [];
   const selected = () => buildings().find(item => item.building_type === selector.value);
   let moving = false;
 
@@ -32,6 +33,13 @@ if (root) {
       ctx.beginPath();ctx.moveTo(p,0);ctx.lineTo(p,canvas.height);ctx.stroke();
       ctx.beginPath();ctx.moveTo(0,p);ctx.lineTo(canvas.width,p);ctx.stroke();
     }
+    extraBuildings().forEach(b => {
+      const px=Number(b.grid_x)*unit,py=Number(b.grid_y)*unit;
+      ctx.fillStyle="#a8794a";
+      ctx.fillRect(px,py,Number(b.width)*unit,Number(b.height)*unit);
+      ctx.strokeStyle="#e8ce92";
+      ctx.strokeRect(px,py,Number(b.width)*unit,Number(b.height)*unit);
+    });
     rows.forEach(b => {
       const fp = layout.footprints[b.building_type];
       if (!fp) return;
@@ -68,6 +76,10 @@ if (root) {
       const ox = Number(other.position_x), oz = Number(other.position_z);
       return !(x < ox + footprint.width && x + fp.width > ox &&
         z < oz + footprint.height && z + fp.height > oz);
+    }) && extraBuildings().every(b => {
+      const bx=Number(b.grid_x)-25,bz=Number(b.grid_y)-25;
+      return !(x < bx + Number(b.width) && x+fp.width > bx &&
+        z < bz + Number(b.height) && z+fp.height > bz);
     });
   }
 
@@ -131,6 +143,7 @@ if (root) {
     }
   });
   window.addEventListener("coi:kingdom-render",refresh);
+  window.addEventListener("coi:advanced-city-state",refresh);
   root.addEventListener("toggle",() => { if(root.open) refresh(); });
   refresh();
 }

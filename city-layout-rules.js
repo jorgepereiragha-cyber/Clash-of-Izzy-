@@ -61,7 +61,10 @@ const ATOMIC_MOVE_SQL =
   "AND NOT EXISTS (SELECT 1 FROM kingdom_buildings other " +
   "WHERE other.kingdom_id=? AND other.building_type<>? " +
   "AND other.position_x<? AND other.position_x+(" + sizeCase("width") + ")>? " +
-  "AND other.position_z<? AND other.position_z+(" + sizeCase("height") + ")>?)";
+  "AND other.position_z<? AND other.position_z+(" + sizeCase("height") + ")>?)" +
+  " AND NOT EXISTS(SELECT 1 FROM city_structures addition WHERE addition.kingdom_id=?"+
+  " AND addition.grid_x<? AND addition.grid_x+addition.width>?"+
+  " AND addition.grid_y<? AND addition.grid_y+addition.height>?)";
 
 /**
  * Reposicionamento com ownership no kingdom_id autenticado, CAS e colisões
@@ -85,7 +88,8 @@ export async function moveCityBuilding(env, kingdomId, body) {
   }
   const update = await env.DB.prepare(ATOMIC_MOVE_SQL)
     .bind(x, z, kingdomId, type, fromX, fromZ, kingdomId, type,
-      x + footprint.width, x, z + footprint.height, z).run();
+      x + footprint.width, x, z + footprint.height, z,
+      kingdomId,x+footprint.width+25,x+25,z+footprint.height+25,z+25).run();
   if (Number(update?.meta?.changes) !== 1) {
     return { ok: false, status: 409, error: "Posição ocupada ou cidade desatualizada. Sincronize e tente novamente." };
   }
