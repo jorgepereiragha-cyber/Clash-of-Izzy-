@@ -95,7 +95,7 @@
  <div id="territoryList"><div class="territoryCard">Carregando territórios…</div></div>
 </section>
 <section id="materialsPanel" aria-label="Inventário de materiais"><div id="materialsHead"><h2>🏰 Materiais do Castelo</h2><button id="materialsClose" type="button">Fechar</button></div><div id="materialsList"><div class="materialItem">Carregando inventário…</div></div><div id="castleNextUpgrade" class="materialItem" style="margin-top:10px"><strong>🏰 Próxima evolução</strong><small>Carregando requisitos…</small></div><p id="materialsNote" class="materialsNote">Os materiais são conquistados em atividades do reino e usados para evoluir o Castelo. A Medalha SVIP é especial, mas não é obrigatória para subir o nível.</p></section>
-<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Escolha seu pacote e conclua a compra pelo checkout seguro do Mercado Pago. A liberação ocorre após a confirmação do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><p>Seu pedido fica vinculado ao reino. O checkout abre em uma nova janela; o item é liberado somente após a confirmação do webhook do Mercado Pago.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
+<div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Escolha seu pacote e conclua a compra pelo checkout seguro do Mercado Pago. A liberação ocorre após a confirmação do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><label>Forma de pagamento<select id="purchaseMethod" aria-label="Forma de pagamento"><option value="mercadopago_link" selected>Mercado Pago · checkout oficial</option><option value="pix" disabled>Nubank Pix · aguardando configuração</option></select></label><p>Mercado Pago: checkout seguro e confirmação automática. Nubank Pix: pedido assistido, com cobrança do banco e conferência manual antes da entrega. Não envie senhas ou códigos de acesso.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><button id="pixSupportButton" type="button" hidden>Solicitar cobrança Nubank Pix</button><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'three';
 import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } from './engine/asset-loader.js';
@@ -649,21 +649,32 @@ async function refreshKingdomStore(){
 }
 async function requestOfficialPurchase(item,kind,button){
  const notice=document.getElementById('purchaseNotice');
+ const supportButton=document.getElementById('pixSupportButton');if(supportButton)supportButton.hidden=true;
+ const paymentMethod=document.getElementById('purchaseMethod')?.value==='pix'?'pix':'mercadopago_link';
  const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
  if(!token){notice.textContent='Conecte seu reino antes de comprar.';return}
- const checkoutWindow=window.open('about:blank','_blank');
+ const checkoutWindow=paymentMethod==='mercadopago_link'?window.open('about:blank','_blank'):null;
  if(checkoutWindow)checkoutWindow.opener=null;
  button.disabled=true;notice.textContent='Registrando pedido seguro…';
  try{
   const response=await fetch(API_BASE+'/store/purchase-request',{
    method:'POST',
    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
-   body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod:'mercadopago_link'})
+   body:JSON.stringify({kind,itemId:item.id,requestKey:crypto.randomUUID(),paymentMethod})
   });
   const requestData=await response.json().catch(()=>({}));
   if(!response.ok)throw new Error(requestData.error||'Não foi possível registrar o pedido.');
   const requestId=Number(requestData.request?.id);
   if(!Number.isSafeInteger(requestId)||requestId<1)throw new Error('O servidor não retornou um número de pedido válido.');
+  if(String(requestData.request?.payment_method||'')!==paymentMethod)throw new Error('Há um pedido aberto em outra modalidade. Conclua ou resolva o pedido anterior antes de tentar novamente.');
+  if(paymentMethod==='pix'){
+   const value=Number(requestData.request?.price_brl??item.price_brl);
+   const amount=Number.isFinite(value)&&value>0?'R$ '+value.toFixed(2).replace('.',','):'valor a confirmar';
+   notice.textContent='Pedido #'+requestId+' registrado, ainda não pago ('+amount+'). Solicite cobrança Nubank Pix no canal de suporte e aguarde a conferência do crédito no extrato antes da entrega.';
+   button.textContent='Pix pendente · Pedido #'+requestId;
+   if(supportButton){supportButton.hidden=false;supportButton.onclick=()=>document.getElementById('whatsapp')?.click();}
+   return;
+  }
   const checkoutResponse=await fetch(API_BASE+'/store/checkout',{
    method:'POST',
    headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
@@ -707,6 +718,23 @@ async function loadCatalog(){
  }catch(error){box.textContent='Não foi possível carregar o catálogo agora. Tente novamente mais tarde.'}
 }
 loadCatalog();
+async function loadPaymentMethods(){
+ const pixOption=document.querySelector('#purchaseMethod option[value="pix"]');
+ if(!pixOption)return;
+ try{
+  const response=await fetch('/api/store/payment-methods',{cache:'no-store'});
+  if(!response.ok)throw new Error('Payment methods unavailable');
+  const methods=await response.json();
+  pixOption.disabled=methods.nubankPix!==true;
+  pixOption.textContent=methods.nubankPix===true?'Nubank Pix · cobrança assistida':'Nubank Pix · aguardando configuração';
+ }catch{
+  pixOption.disabled=true;pixOption.textContent='Nubank Pix · indisponível';
+ }
+}
+void loadPaymentMethods();
+document.getElementById('purchaseMethod')?.addEventListener('change',()=>{
+ const button=document.getElementById('pixSupportButton');if(button)button.hidden=true;
+});
 function update(dt,time){for(const k of ['q','w','e','r'])skillCooldowns[k]=Math.max(0,skillCooldowns[k]-dt);waterTexture.offset.x=(waterTexture.offset.x+dt*.035)%1;
  for(const fire of fireEffects){const pulse=Math.sin(time*.009+fire.phase);fire.flame.scale.set(.88+pulse*.12,1.05+pulse*.2,.88+pulse*.12);fire.flame.rotation.y+=dt*1.8;fire.flame.position.y=fire.baseY+Math.sin(time*.006+fire.phase)*.07}
  for(const puff of smokeEffects){const cycle=((time*.00022+puff.phase) % 1);puff.mesh.position.set(puff.baseX+Math.sin(time*.001+puff.phase)*.12,puff.baseY+cycle*1.35,puff.baseZ);const scale=.55+cycle*1.45;puff.mesh.scale.setScalar(scale)}
