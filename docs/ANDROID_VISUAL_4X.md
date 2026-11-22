@@ -46,3 +46,28 @@ O APK do PR deve ser usado somente para validação, não é release assinada.
 - Que foi validado 60 FPS, PvP massivo, 1000 pessoas simultâneas, ou
   estabilidade Android físico.
 - Que foi feita alteração em dados reais ou deploy de produção.
+
+## Refinamento de fluidez Android — 22/11/2026
+
+- Em **gráficos Automático**, o renderizador do reino observa janelas de 90 intervalos
+  entre frames animados. Quando p50 > 21 ms **e** p95 > 28 ms de forma sustentada,
+  reduz o pixel scale em passos de 10%, até 70% do DPR originalmente limitado pelo
+  orçamento de pixels do aparelho.
+- Depois de três janelas rápidas consecutivas (p50 < 17,5 ms e p95 < 19 ms),
+  recompõe a resolução em passos de 5%, no máximo até 100% do DPR previsto
+  pelo perfil original. Eventos isolados e pausas superiores a 250 ms não
+  provocam degradação.
+- Gráficos **Economia, Equilibrado, Máximo e 2D** continuam sob controle manual.
+  A captura cinematográfica não sofre alterações de resolução durante a gravação.
+- A adaptação só mede frames quando há animação ativa; intervalo entre callbacks
+  não é medição direta do tempo de GPU nem prova de 60 FPS. Não inventar ganhos
+  de desempenho sem executar benchmarks físicos.
+- A WebView Android agora apresenta a recuperação offline/erro de carregamento
+  também para respostas HTTP 4xx da página principal, não apenas 5xx. Erros de
+  subrecursos e endpoints API continuam sem substituir o jogo por uma tela de erro.
+- Testes de regressão: `tests/adaptive-kingdom-pixel-scale.test.js` e
+  `tests/android-apk-sideload.test.js`.
+
+**Gate de aceite:** medir FPS, latência do toque, tempo de abertura, memória,
+temperatura e quedas de WebView em Android físico de entrada/intermediário/topo,
+comparando modo Automático com perfis manuais na mesma cena e sessão.
