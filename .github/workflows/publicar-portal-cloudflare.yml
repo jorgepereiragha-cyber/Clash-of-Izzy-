@@ -85,7 +85,19 @@ jobs:
         run: |
           set -euo pipefail
           base="https://clash-of-izzy-portal.jorgepereiragha.workers.dev"
-          curl --fail --silent --show-error --max-time 20 "$base/portal.html" | grep -q 'id="download-apk"'
+          # Cloudflare pode levar alguns segundos para ativar assets após o deploy.
+          # HTML canoniza /portal.html -> /portal: seguir redirecionamentos.
+          page="$RUNNER_TEMP/portal-marketing-smoke.html"
+          page_status="000"
+          for attempt in 1 2 3 4 5 6; do
+            page_status="$(curl -L --silent --show-error --max-time 20 \
+              -o "$page" -w '%{http_code}' "$base/portal.html")" || page_status="000"
+            if [[ "$page_status" == "200" ]] && grep -q 'id="download-apk"' "$page"; then break; fi
+            sleep 4
+          done
+          [[ "$page_status" == "200" ]] && grep -q 'id="download-apk"' "$page" || {
+            echo "::error::Portal não entregou HTML de propaganda após tentativas HTTP"; exit 1;
+          }
           for path in /kingdom.html /api/game/state /arena.html /sw.js; do
             status="$(curl -s -o /dev/null -w '%{http_code}' --max-time 20 "$base$path")"
             test "$status" = "404" || { echo "::error::$path respondeu $status, esperado 404"; exit 1; }

@@ -1,10 +1,11 @@
-name: Primeiro lancamento protegido - sem jogadores
+name: Primeiro lancamento protegido - banco sem contas cadastradas
 
 on:
   push:
     branches: [main]
     paths:
       - .github/workflows/primeiro-lancamento-clash-izzy.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -70,18 +71,23 @@ jobs:
             return obj.get("result")
           db_id="7e63af59-d9ff-4159-a9cf-b02e35b92605"
           result=call(prefix+"/d1/database/"+db_id+"/query","POST",{
-            "sql":"SELECT (SELECT COUNT(*) FROM players) AS jogadores, (SELECT COUNT(*) FROM kingdoms) AS reinos"
+            "sql":"SELECT (SELECT COUNT(*) FROM players) AS jogadores, (SELECT COUNT(*) FROM kingdoms) AS reinos, (SELECT COUNT(*) FROM player_accounts) AS contas, (SELECT COUNT(*) FROM purchase_requests) AS pedidos, (SELECT COUNT(*) FROM mercadopago_orders) AS ordens"
           })
           try:
             rows=result[0]["results"]
             row=rows[0]
             jogadores=int(row["jogadores"])
             reinos=int(row["reinos"])
+            contas=int(row["contas"])
+            pedidos=int(row["pedidos"])
+            ordens=int(row["ordens"])
           except Exception:
             raise SystemExit("Consulta D1 incompleta; nao iniciar implantacao.")
-          if jogadores!=0 or reinos!=0:
-            raise SystemExit("D1 possui registros de jogadores ou reinos. Lancamento automatico bloqueado.")
-          print("D1 remoto confirmado sem jogadores e sem reinos; verificando Workers Paid.")
+          print(f"D1: {jogadores} linhas players, {reinos} reinos, {contas} contas, {pedidos} pedidos, {ordens} ordens.")
+          # Não apagar jogadores legados: exigir ausência de contas cadastradas e de cobranças.
+          if contas!=0 or pedidos!=0 or ordens!=0:
+            raise SystemExit("Ha contas/pedidos/ordens reais ou testes; revisao obrigatoria antes do lancamento.")
+          print("D1 sem contas cadastradas ou pedidos: registros antigos preservados. Verificando Workers Paid.")
           subscriptions=call(prefix+"/subscriptions") # exige permissao Billing Read
           subscriptions=subscriptions if isinstance(subscriptions,list) else []
           if not any("workers" in str((s.get("rate_plan") or {}).get("id","")).lower()+" "+str((s.get("rate_plan") or {}).get("name","")).lower() and str(s.get("state","")).lower() in ("paid","active") for s in subscriptions):
