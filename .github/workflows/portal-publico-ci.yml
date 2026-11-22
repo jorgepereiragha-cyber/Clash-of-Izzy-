@@ -37,6 +37,7 @@ jobs:
           from pathlib import Path
           allowed = {
               "portal.html",
+              "support.html",
               "favicon.svg",
               "styles/coi-theme.css",
               "assets/brand/hero-emblem.svg",
