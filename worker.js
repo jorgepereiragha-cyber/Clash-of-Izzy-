@@ -21,6 +21,7 @@ import { normalizePixEndToEndId, preparePixApproval } from "./pix-reconciliation
 import { PANTHEON_SKIN_ITEMS, buildSkinSetGallery } from "./skin-sets.js";
 import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "./dragon-catalog.js";
 import { MASTER_PACK_NAME, MASTER_PACK_BONUSES, masterGrantStatements } from "./master-pack.js";
+import { isDailyPackage, DAILY_PACKAGE_COOLDOWN_HOURS } from "./daily-package-offers.js";
 import { CASTLE_MAX_LEVEL, CASTLE_VIP_MAX_LEVEL, getCastleVipBonuses, getCastleVipState } from "./castle-vip.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
@@ -1964,7 +1965,7 @@ export default {
         env.DB.prepare("SELECT id,name,price_brl,attack_bonus_percent,defense_bonus_percent FROM skins ORDER BY id LIMIT ?").bind(INITIAL_PAID_SKIN_LIMIT).all(),
         env.DB.prepare("SELECT id,name,price_brl,gems FROM vip_packages ORDER BY price_brl,name").all()
       ]);
-      return json({skins:skins.results||[],packages:(packages.results||[]).filter(item=>item.name!==MASTER_PACK_NAME||env.MASTER_PACK_ENABLED==="true").map(item=>item.name===MASTER_PACK_NAME?{...item,bonus:MASTER_PACK_BONUSES,oneTime:true}:item),skin_edition:"initial",skin_limit:INITIAL_PAID_SKIN_LIMIT,whatsapp:"+5547996531437"});
+      return json({skins:skins.results||[],packages:(packages.results||[]).filter(item=>item.name!==MASTER_PACK_NAME||env.MASTER_PACK_ENABLED==="true").map(item=>item.name===MASTER_PACK_NAME?{...item,bonus:MASTER_PACK_BONUSES,oneTime:true}:isDailyPackage(item.name)?{...item,dailyLimitHours:DAILY_PACKAGE_COOLDOWN_HOURS}:item),skin_edition:"initial",skin_limit:INITIAL_PAID_SKIN_LIMIT,whatsapp:"+5547996531437"});
     }catch(e){return json({error:"Catálogo indisponível no momento."},503)}
   }
   if(url.pathname==="/api/game/start"&&request.method==="POST"){
@@ -2060,9 +2061,19 @@ export default {
     const pending=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method,mp_order_id,mp_checkout_url FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
     if(pending&&pending.payment_method!==paymentMethod)return json({error:"Já existe um pedido deste produto aberto por outro meio de pagamento. Conclua ou resolva o pedido anterior antes de criar outro."},409);
     if(pending)return json({success:true,request:pending,reused:true,message:"Você já possui um pedido aguardando pagamento."},200);
+    const dailyPurchase=kind==="vip_package"&&isDailyPackage(item.name);
     try{
-      await env.DB.prepare("INSERT INTO purchase_requests(player_id,kingdom_id,product_kind,product_id,product_name,price_brl,currency,gems_amount,payment_method,payment_reference,request_key) VALUES(?,?,?,?,?,?,'BRL',?,?,?,?)")
-        .bind(player.id,kingdom.id,kind,item.id,item.name,item.price_brl,kind==="vip_package"?Number(item.gems||0):0,paymentMethod,paymentReference,requestKey).run();
+      const statement=dailyPurchase
+        ?env.DB.prepare(
+          "INSERT INTO purchase_requests(player_id,kingdom_id,product_kind,product_id,product_name,price_brl,currency,gems_amount,payment_method,payment_reference,request_key) " +
+          "SELECT ?,?,?,?,?,?,'BRL',?,?,?,? WHERE NOT EXISTS (" +
+          "SELECT 1 FROM purchase_requests WHERE player_id=? AND product_kind='vip_package' AND product_id=? " +
+          "AND status='approved' AND COALESCE(reviewed_at,created_at)>=datetime('now','-24 hours'))"
+        ).bind(player.id,kingdom.id,kind,item.id,item.name,item.price_brl,Number(item.gems||0),paymentMethod,paymentReference,requestKey,player.id,item.id)
+        :env.DB.prepare("INSERT INTO purchase_requests(player_id,kingdom_id,product_kind,product_id,product_name,price_brl,currency,gems_amount,payment_method,payment_reference,request_key) VALUES(?,?,?,?,?,?,'BRL',?,?,?,?)")
+          .bind(player.id,kingdom.id,kind,item.id,item.name,item.price_brl,kind==="vip_package"?Number(item.gems||0):0,paymentMethod,paymentReference,requestKey);
+      const inserted=await statement.run();
+      if(dailyPurchase&&!inserted.meta?.changes)return json({error:"Este pacote já foi adquirido nas últimas 24 horas. Cada categoria pode ser comprada novamente após 24 horas do último pagamento confirmado.",code:"DAILY_PACKAGE_LIMIT"},409);
     }catch(error){
       const existing=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
       if(existing){
