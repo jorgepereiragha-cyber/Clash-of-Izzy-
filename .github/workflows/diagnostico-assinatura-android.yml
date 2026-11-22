@@ -64,10 +64,16 @@ jobs:
             exit 1
           fi
           chmod 600 "$tmp/release.jks"
+          # Diagnosticos independentes, sem expor bytes, alias ou senhas.
+          if ! keytool -list -keystore "$tmp/release.jks" -storepass "$SP" >/dev/null 2>&1; then
+            echo "::error::Keystore nao abre com ANDROID_RELEASE_STORE_PASSWORD (ou arquivo nao e uma keystore)."
+            echo "APK oficial bloqueado: keystore ou senha do armazenamento incompatível." >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
           if ! keytool -exportcert -alias "$ALIAS" -keystore "$tmp/release.jks" \
                    -storepass "$SP" > "$tmp/cert.der" 2>/dev/null; then
-            echo "::error::Keystore, senha ou alias nao correspondem."
-            echo "APK oficial bloqueado: certificado inacessivel." >> "$GITHUB_STEP_SUMMARY"
+            echo "::error::ANDROID_RELEASE_KEY_ALIAS nao existe na keystore validada."
+            echo "APK oficial bloqueado: alias nao corresponde." >> "$GITHUB_STEP_SUMMARY"
             exit 1
           fi
           if ! keytool -certreq -alias "$ALIAS" -keystore "$tmp/release.jks" \
