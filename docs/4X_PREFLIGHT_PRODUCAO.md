@@ -10,16 +10,16 @@ Data: 2026-11-22. **A PR #229 é Draft e depende da PR #223. Não liberar em pro
 - Mercado Pago processa Orders em `mercadopago-orders.js` com HMAC, validação remota de valor e ledger por `order_id`. A lista de IDs de pagamento fica em `mercadopago_orders.payment_ids_json`; não existe razão para inventar coluna `mp_payment_id` no banco.
 - Testes HMAC usam provedor simulado; Mercado Pago sandbox real não homologado.
 
-## 1. Backup D1 antes de qualquer migração (executor com acesso autorizado)
+## 1. Protecao do D1 antes de qualquer migração (sem export manual)
 
-Execute a partir do checkout revisado e com `npm ci` já concluído. Disponibilize `CLOUDFLARE_API_TOKEN` e `CLOUDFLARE_ACCOUNT_ID` **somente no ambiente privado do executor**; nunca em comandos postados no chat ou em arquivos do Git.
+O comando antigo `scripts/backup-d1-production.sh` **foi desativado**, com falha explicita. A exportacao por `wrangler d1 export --remote` nao e um checkpoint de recuperacao aprovado para este banco com tabelas FTS5: o formato de exportacao de tabelas virtuais compativel com `sqlite3_cli_only` nao pode ser importado de volta no D1.
 
-```bash
-npm ci
-CONFIRM_D1_PRODUCTION_BACKUP=clash-of-izzy-db bash scripts/backup-d1-production.sh
-```
+1. Acesse GitHub Actions → **Cloudflare Paid Readiness (read-only)** e execute na `main`, deixando o Workers Paid desmarcado caso ainda nao comprovado. Inspecione UUIDs de producao/Preview, migracoes e disponibilidade Time Travel.
+2. Com GO comercial aprovado, o **unico** deploy remoto indicado e o workflow `deploy-cloudflare.yml` manual, na `main`, com `confirm_paid_plan=true` e `confirm_production=true` e aprovacoes do ambiente `production`, quando aplicaveis.
+3. Esse workflow captura e arquiva o bookmark de Time Travel ANTES de aplicar as migrações remotas e publicar. A existencia de um bookmark nao prova restore funcional; a retencao e a recuperacao dependem do plano e da janela.
+4. Nao executar restore de producao sem protocolo de incidente e autorizacao, pois ele sobrescreve transacoes posteriores.
 
-O script executa apenas `wrangler d1 export clash-of-izzy-db --remote`, grava SQL completo fora do repositório em `$HOME/clash-of-izzy-private-backups`, verifica tamanho não nulo e gera SHA-256. Um arquivo exportado **não** comprova sozinho que uma restauração funcionará; validar a importação em um banco D1 de ensaio separado antes do go/no-go.
+Documentacao oficial: https://developers.cloudflare.com/d1/reference/time-travel/ e https://developers.cloudflare.com/changelog/post/2026-11-12-d1-export-virtual-tables/.
 
 ## 2. Preflight de esquema (somente leitura)
 
@@ -32,21 +32,15 @@ npx wrangler d1 execute clash-of-izzy-db --remote --command "PRAGMA foreign_key_
 
 Rever os resultados **antes** de qualquer `apply`: `CREATE TABLE IF NOT EXISTS` não comprova que um objeto preexistente possui o esquema esperado. As migrações 0037–0041 atuais **não** incluem `ALTER TABLE`; 0040 usa `INSERT OR IGNORE`. Mesmo assim, índice com nome preexistente, tabela divergente, dados conflitantes ou migrações manualmente aplicadas podem causar falhas. Não editar SQL de migrações já registradas. Se encontrar divergência, interromper e planejar migração corretiva incremental.
 
-## 3. Aplicação só após gates aprovados
+## 3. Aplicação somente pelo workflow manual protegido
 
-Pré-requisitos: merge/validação da PR #223, rebase da #229, CI verde no SHA exato, backup verificável, pagamento sandbox real, Android físico e liberação manual da operação remota.
+Pré-requisitos: integrar as PRs em ordem, CI verde no SHA atual, auditar D1 Preview remoto sem ambiguidades, homologar Mercado Pago Sandbox em ambiente separado, testar Android físico e registrar GO comercial.
 
-```bash
-# Somente após pré-requisitos e janela de manutenção aprovada:
-npx wrangler d1 migrations apply clash-of-izzy-db --remote
+Nao executar `wrangler d1 migrations apply clash-of-izzy-db --remote` no terminal. Esse comando seleciona o D1 de **producao** e ignora os gates do workflow.
 
-# Confirmação posterior, ainda com GAME_4X_SYSTEMS_ENABLED desligada:
-npx wrangler d1 execute clash-of-izzy-db --remote --command "SELECT id,name FROM d1_migrations ORDER BY id DESC LIMIT 6"
-npx wrangler d1 execute clash-of-izzy-db --remote --command "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('intermediate_resources','city_defenses','kingdom_progression','progression_xp_ledger') ORDER BY name"
-npx wrangler d1 execute clash-of-izzy-db --remote --command "PRAGMA foreign_key_check"
-```
+Para publicar, apenas depois de todos os gates: GitHub Actions → **Deploy Clash of Izzy to Cloudflare** → `Run workflow` → branch `main` → marcar **ambas** as confirmacoes `confirm_paid_plan` e `confirm_production`. Uma caixa desmarcada ignora integralmente o job, nao e modo de homologacao. A etapa de migracoes remotas do workflow somente ocorre apos captura/arquivo do Time Travel.
 
-Ativar a flag depois de conferir esquema, logs e teste funcional real. **O código atual não implementa allowlist por jogador nessa flag**: `GAME_4X_SYSTEMS_ENABLED=true` é global; não prometer ativação apenas para uma conta sem desenvolver gate de usuário e testes apropriados. Rollback operacional: desabilitar flag; não destruir tabelas nem sobrescrever registros.
+Com flags `GAME_4X_SYSTEMS_ENABLED`, `LEVEL_PACKS_ENABLED`, `LEVEL_PACKS_PUBLIC_ENABLED` e `LEVEL_PACKS_PROPOSED_PRICES_APPROVED` desligadas, nem a aprovacao de CI nem a fusao das PRs liberam o comercio. Ativacao publica exige gate financeiro e revisao de preco, com rollout progressivo, nao mudanca direta das quatro flags na `main`.
 
 ## 4. Android físico e indicadores 3D
 
