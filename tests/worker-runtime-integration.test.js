@@ -619,8 +619,19 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
     await t.test("painel Master, catálogo e pedidos de compra", async () => {
       expectStatus(await admin("/api/admin/player-search", { query: playerA }), 200, "busca administrativa de jogador");
-      expectStatus(await admin("/api/admin/gems", { playerId: playerA, amount: 10 }), 200, "crédito administrativo de gemas");
-      expectStatus(await admin("/api/admin/gems", { playerId: playerA, amount: 0 }), 400, "bloqueio de crédito inválido");
+      const beforeGems=expectStatus(await admin("/api/admin/player-search",{query:playerA}),200,"saldo de gemas anterior").player;
+      const grantBody={playerId:playerA,amount:10,reason:"Ajuste autorizado no teste local",request_key:"admin-gems-integration-0001"};
+      const firstGrant=expectStatus(await admin("/api/admin/gems",grantBody),200,"crédito administrativo idempotente");
+      assert.equal(firstGrant.reused,false);
+      assert.equal(Number(firstGrant.player.gems),Number(beforeGems.gems)+10);
+      const sameGrant=expectStatus(await admin("/api/admin/gems",grantBody),200,"replay do crédito administrativo");
+      assert.equal(sameGrant.reused,true);
+      assert.equal(Number(sameGrant.player.gems),Number(firstGrant.player.gems),"replay não credita gemas novamente");
+      expectStatus(await admin("/api/admin/gems",{...grantBody,amount:11}),409,"reuso indevido da chave");
+      expectStatus(await admin("/api/admin/gems",{...grantBody,request_key:""}),400,"bloqueio sem chave");
+      expectStatus(await admin("/api/admin/gems",{...grantBody,amount:0}),400,"bloqueio de crédito inválido");
+      expectStatus(await admin("/api/admin/gems",{...grantBody,amount:1000001}),400,"limite de gemas por operação");
+      expectStatus(await api("/api/admin/gems",{method:"POST",body:grantBody}),401,"crédito sem sessão administrativa");
 
       expectStatus(await admin("/api/admin/vip-packages", {
         name: "Pacote de integração", price: 1, gems: 100,
