@@ -73,3 +73,28 @@ test("migracao e integracao proíbem compra sem progresso e mantêm habilitacao 
   assert.match(mp,/levelPacksEnabledForPlayer/);
   assert.match(arena,/item.levelPack/);
 });
+
+test("catalogo P1-P8 segue os valores solicitados e migracao 0043 nao substitui IDs",async()=>{
+  const expected=[
+    [10,990,500,5000,5000,0,0,0],
+    [20,2990,2000,20000,0,10000,5000,0],
+    [30,5990,5000,50000,0,30000,15000,5000],
+    [40,9990,10000,100000,50000,50000,25000,10000],
+    [50,14990,20000,200000,100000,100000,50000,20000],
+    [60,19990,35000,350000,150000,150000,75000,30000],
+    [70,29990,60000,500000,250000,250000,100000,50000],
+    [80,49990,100000,1000000,500000,500000,200000,100000]
+  ];
+  assert.deepEqual(LEVEL_PACKS.map(p=>[
+    p.level,p.priceCents,p.gems,p.resources.wood,p.resources.food,
+    p.resources.stone,p.resources.iron,p.resources.gold
+  ]),expected);
+  const sql=await read("migrations/0043_align_level_pack_catalog.sql");
+  assert.match(sql,/UPDATE vip_packages SET/);
+  assert.doesNotMatch(sql,/^\s*(?:INSERT|REPLACE|DELETE|DROP|ALTER)\b/im);
+  for(const p of LEVEL_PACKS.slice(3)){
+    assert.match(sql,new RegExp("WHEN '"+p.name+"' THEN "+(p.priceCents/100).toFixed(2).replace(".","\\.")));
+    assert.match(sql,new RegExp("WHEN '"+p.name+"' THEN "+p.gems+"\\b"));
+  }
+  assert.equal(levelPackPriceApproved({},LEVEL_PACKS[7]),false);
+});
