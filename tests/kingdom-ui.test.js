@@ -76,3 +76,13 @@ test("PWA cache version is bumped when static UI changes", async () => {
   assert.match(worker, /valhalla-shop-ui\.js/);
   assert.match(worker, /styles\/valhalla-shop\.css/);
 });
+
+
+test("reino oferece recuperação de conta após 401/403 sem apagar a sessão", async () => {
+  const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
+  assert.match(html, /failure\.status=response\.status/);
+  assert.match(html, /error\?\.status===401\|\|error\?\.status===403/);
+  assert.match(html, /accountLink\.href="\/account\.html"/);
+  assert.match(html, /loading\.append\(accountLink\)/);
+  assert.doesNotMatch(html, /localStorage\.removeItem\("coi_game_token"\)/);
+});
