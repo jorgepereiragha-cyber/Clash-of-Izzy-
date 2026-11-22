@@ -27,7 +27,13 @@ antes de declarar acesso exclusivamente via APK.
    Identifique o SHA-256 do certificado de assinatura da keystore em ambiente
    privado (por exemplo, `keytool -list -v -keystore arquivo.jks`). Configure
    **Actions > Variables** com `ANDROID_RELEASE_CERT_SHA256` (64 hexadecimais,
-   sem os dois-pontos). Nao use o SHA-256 do arquivo APK ou da keystore no lugar
+   sem os dois-pontos).
+   Se voce ja configurou as quatro credenciais em **Actions > Secrets**, mas nao tem
+   o SHA-256, execute [Diagnostico seguro dos requisitos de assinatura Android](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/diagnostico-assinatura-android.yml)
+   pelo botao **Run workflow**. A rotina valida a keystore e as senhas; se o
+   pin estiver ausente, mostra **somente o SHA-256 publico do certificado** no
+   resumo da execucao e encerra com falha ate que voce o configure em Variables.
+   Nao cole keystore, Base64, senhas ou tokens em conversas nem no repositorio. Nao use o SHA-256 do arquivo APK ou da keystore no lugar
    do fingerprint do **certificado**. O workflow cancela o release se a variavel
    estiver ausente ou nao corresponder a assinatura do APK. O fingerprint nao
    e uma senha, mas a keystore e suas credenciais devem continuar privadas.
