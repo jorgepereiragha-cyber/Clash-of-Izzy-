@@ -47,6 +47,14 @@ jobs:
           ! grep -q 'id="play-now"' "$dest/index.html"
           # Preservar worker.js, bindings D1 e versao de runtime em producao.
           test "$(sha256sum "$dest/worker.js" | cut -d ' ' -f 1)" = "$(git show "$stable:worker.js" | sha256sum | cut -d ' ' -f 1)"
+          # O Worker em produção já possui Durable Objects. Preservar a classe
+          # sem alterar sua lógica nem excluir objetos persistidos.
+          cp wrangler.jsonc "$dest/wrangler.jsonc"
+          cp eldoria-room.js "$dest/eldoria-room.js"
+          printf '\nexport { EldoriaRoom } from "./eldoria-room.js";\n' >> "$dest/worker.js"
+          printf '\neldoria-room.js\n' >> "$dest/.assetsignore"
+          grep -q 'export { EldoriaRoom }' "$dest/worker.js"
+          grep -q 'new_sqlite_classes' "$dest/wrangler.jsonc"
           echo "BUILD_DIR=$dest" >> "$GITHUB_ENV"
       - name: Instalar dependencias do backend estavel
         run: npm install --ignore-scripts --no-audit --no-fund
