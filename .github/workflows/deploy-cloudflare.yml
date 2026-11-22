@@ -120,6 +120,7 @@ jobs:
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           COI_ALLOW_PENDING_0030: "true"
           COI_ALLOW_PENDING_0033: "true"
+          COI_ALLOW_PENDING_0034: "true"
         run: node scripts/cloudflare-remote-audit.mjs
 
       - name: Capture D1 pre-deployment restore point
