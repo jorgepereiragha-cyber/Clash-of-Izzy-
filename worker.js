@@ -755,7 +755,7 @@ async function gameState(env,playerId){
   // query ceiling. A batch counts as one query; each statement still consumes
   // its normal daily row-read quota.
   const stateResults=await env.DB.batch([
-    env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdom.id),
+    env.DB.prepare("SELECT kingdoms.*,(SELECT COUNT(*) FROM marches WHERE kingdom_id=kingdoms.id AND status='marching') AS active_marches FROM kingdoms WHERE id=?").bind(kingdom.id),
     env.DB.prepare("SELECT building_type,level,position_x,position_z FROM kingdom_buildings WHERE kingdom_id=? ORDER BY id").bind(kingdom.id),
     env.DB.prepare("SELECT unit_type,tier,quantity,wounded FROM army_units WHERE kingdom_id=? ORDER BY tier,unit_type").bind(kingdom.id),
     env.DB.prepare("SELECT id,hero_key,hero_name,level,experience,rarity,assigned_to FROM heroes WHERE kingdom_id=? ORDER BY level DESC,id").bind(kingdom.id),
@@ -790,7 +790,7 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,event_type,payload_json FROM kingdom_events WHERE kingdom_id=? AND event_type!='__internal_action_guard' ORDER BY id DESC LIMIT 15").bind(kingdom.id),
     env.DB.prepare("SELECT id,queue_type,queue_slot,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at,completed_at FROM kingdom_queues WHERE kingdom_id=? ORDER BY CASE WHEN status='running' THEN 0 ELSE 1 END,queue_type,queue_slot,id DESC LIMIT 20").bind(kingdom.id),
     env.DB.prepare("SELECT s.id,s.name,s.price_brl,s.attack_bonus_percent,s.defense_bonus_percent,ps.unlocked_at FROM player_skins ps JOIN skins s ON s.id=ps.skin_id WHERE ps.player_id=? ORDER BY s.id").bind(p.id),
-    env.DB.prepare("SELECT COUNT(*) AS total FROM marches WHERE kingdom_id=? AND status='marching'").bind(kingdom.id)
+
   ]);
   const fresh=stateResults[0]?.results?.[0]||null;
   const buildings=stateResults[1],troops=stateResults[2],heroes=stateResults[3];
@@ -834,7 +834,7 @@ async function gameState(env,playerId){
     heroes:marchLeaders
   };
   const marchCapacity=calculateMarchCapacity(marchFactors);
-  const activeMarches=Number(stateResults[15]?.results?.[0]?.total||0);
+  const activeMarches=Number(fresh?.active_marches||0);
   const marchSlots=calculateMarchSlots({...marchFactors,activeMarches});
   const marchHeroOptions=marchLeaders.map(hero=>{
     const detail=calculateMarchCapacity({...marchFactors,heroKey:hero.hero_key});
