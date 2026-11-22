@@ -1,8 +1,17 @@
 name: Homologacao 4X HTTP Worker remoto com D1 Preview
 on:
-  push:
-    branches: [feat/4x-industries-defenses-p1-p8]
-    paths: [.github/workflows/4x-preview-http-smoke.yml, scripts/4x-preview-live-smoke.mjs]
+  workflow_dispatch:
+    inputs:
+      confirm_preview_disposable:
+        description: "Confirmo que D1 Preview nao contem dados reais e autorizo testes sinteticos REMOTOS"
+        required: true
+        default: false
+        type: boolean
+      confirm_preview_uuid:
+        description: "Digite UUID exato do D1 Preview autorizado"
+        required: true
+        default: ""
+        type: string
 permissions:
   contents: read
 concurrency:
@@ -10,9 +19,23 @@ concurrency:
   cancel-in-progress: false
 jobs:
   live-preview:
+    if: >-
+      (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/feat/4x-industries-defenses-p1-p8') &&
+      inputs.confirm_preview_disposable == true &&
+      inputs.confirm_preview_uuid == '6674c0ac-3636-4e57-bff8-23cf60ab9637'
     runs-on: ubuntu-latest
     timeout-minutes: 18
     steps:
+      - name: Validar autorizacao explicita do Preview antes de carregar credenciais
+        shell: bash
+        env:
+          CONFIRM_DISPOSABLE: ${{ inputs.confirm_preview_disposable }}
+          CONFIRM_UUID: ${{ inputs.confirm_preview_uuid }}
+        run: |
+          set -euo pipefail
+          test "$CONFIRM_DISPOSABLE" = "true"
+          test "$CONFIRM_UUID" = "6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          echo "Uso remoto autorizado apenas no D1 Preview isolado, nunca em producao."
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
