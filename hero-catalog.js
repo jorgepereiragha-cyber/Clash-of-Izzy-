@@ -146,7 +146,9 @@ export function heroView(row = {}) {
   const heroKey = String(row.hero_key || "");
   const template = HERO_TEMPLATES[heroKey] || null;
   const identity = HERO_IDENTITIES[heroKey] || null;
-  const rarityKey = normalizedRarity(row.rarity);
+  // A ficha usa a raridade canônica do herói conhecido. Dados legados do D1
+  // guardam alguns dourados como "legendary", que não deve virá-los roxos.
+  const rarityKey = template?.rarity || normalizedRarity(row.rarity);
   const rarity = HERO_RARITY[rarityKey];
   const level = integerInRange(row.level, 1, 1, rarity.maxLevel);
   const stars = integerInRange(row.stars, 1, 1, rarity.maxStars);
