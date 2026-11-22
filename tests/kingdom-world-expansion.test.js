@@ -66,3 +66,13 @@ test("world map shows player castles but does not route unsupported PvP attacks"
   assert.ok(worker.includes("O combate PvP será habilitado na Fase 10"));
   assert.ok(worker.includes("applyUnitLosses(army, losses)"), "PvE march resolution must return only surviving troops");
 });
+
+test("4X read indexes optimize defense reports and regional ownership without touching player data", async () => {
+  const migration = await read("migrations/0036_4x_read_indexes.sql");
+  const worker = await read("worker.js");
+  assert.match(migration, /CREATE INDEX IF NOT EXISTS idx_battle_reports_defender_recent/);
+  assert.match(migration, /ON battle_reports\(defender_kingdom_id,id DESC\)/);
+  assert.match(migration, /ON world_territories\(map_region,owner_kingdom_id,territory_kind\)/);
+  assert.doesNotMatch(migration, /DROP\s+TABLE|UPDATE\s+kingdoms|DELETE\s+FROM|INSERT\s+INTO/i);
+  assert.match(worker, /br\.|battle_reports/);
+});
