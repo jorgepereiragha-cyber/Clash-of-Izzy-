@@ -33,7 +33,7 @@ export async function freeAndroidReadiness(env){
       const result=await env.DB.batch([
         env.DB.prepare("SELECT COUNT(*) AS n FROM purchase_requests WHERE status='pending'"),
         env.DB.prepare("SELECT COUNT(*) AS n FROM support_orders WHERE status='pending'"),
-        env.DB.prepare("SELECT COUNT(*) AS n FROM mercadopago_orders WHERE fulfilled_at IS NULL AND status NOT IN ('cancelled','rejected','refunded')")
+        env.DB.prepare("SELECT COUNT(*) AS n FROM mercadopago_orders WHERE fulfilled_at IS NULL AND (status IS NULL OR status NOT IN ('cancelled','rejected','refunded'))")
       ]);
       pendingOrders=Number(result[0]?.results?.[0]?.n);
       pendingSupportOrders=Number(result[1]?.results?.[0]?.n);
