@@ -1,63 +1,19 @@
-name: Aplicar identidade real azul-ouro ao Worker de producao
+name: Legado Royal Skin auto-release (desativado)
 
+# Workflow antigo aposentado: nunca disparar deploy por workflow_run ou commit marcador.
+# A publicacao visual integra o mesmo deploy oficial protegido de producao.
 on:
-  workflow_run:
-    workflows: ["Clash of Izzy CI"]
-    types: [completed]
+  workflow_dispatch:
 
 permissions:
   contents: read
-  actions: write
-
-concurrency:
-  group: clash-izzy-visual-real-deploy
-  cancel-in-progress: false
 
 jobs:
-  solicitar-deploy-protegido:
-    if: >-
-      github.event.workflow_run.conclusion == 'success' &&
-      github.event.workflow_run.head_branch == 'main' &&
-      github.event.workflow_run.event == 'push' &&
-      contains(github.event.workflow_run.head_commit.message, '[READY-ROYAL-SKIN]')
+  legacy-disabled:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 2
     steps:
-      - name: Exigir commit da main e backend Android saudavel
-        shell: bash
-        env:
-          GH_TOKEN: ${{ github.token }}
-          RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
+      - name: Informar desativacao do disparo automatico
         run: |
-          set -euo pipefail
-          current="$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq '.object.sha')"
-          if [[ "$current" != "$RELEASE_SHA" ]]; then
-            echo "::error::A main avançou; não publicar visual de um commit antigo."
-            exit 1
-          fi
-          curl -fsSL --max-time 20 --retry 2 \
-            -o "$RUNNER_TEMP/coi-health.json" \
-            https://clash-of-izzy.jorgepereiragha.workers.dev/api/health
-          node -e '
-            const fs = require("node:fs");
-            const h = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-            const c = h.checks || {};
-            if (h.ok !== true || h.status !== "ready" ||
-                h.androidApiContract !== "eldoria-android-v1" ||
-                c.database !== true || c.schema !== true || c.session !== true ||
-                !Array.isArray(h.missingTables) || h.missingTables.length) {
-              console.error("Backend não está pronto: deploy visual protegido bloqueado.");
-              process.exit(1);
-            }
-            console.log("Backend Eldoria saudável: apto a atualizar somente a identidade visual.");
-          ' "$RUNNER_TEMP/coi-health.json"
-      - name: Solicitar workflow oficial com checkpoint D1 e smoke
-        env:
-          GH_TOKEN: ${{ github.token }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          gh workflow run deploy-cloudflare.yml --repo "$GITHUB_REPOSITORY" --ref main \
-            -f confirm_paid_plan=true \
-            -f confirm_production=true
-          echo "Deploy oficial protegido solicitado. Nenhuma chave, pagamento ou migração manual."
+          echo '::error::O disparo automatico Royal Skin foi desativado. Use o workflow oficial de producao apos homologacao e autorizacao explicita.'
+          exit 1

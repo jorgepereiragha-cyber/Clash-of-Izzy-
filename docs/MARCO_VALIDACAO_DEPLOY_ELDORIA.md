@@ -1,5 +1,7 @@
 # Marco de liberação — Clash of Izzy / Eldoria
 
+> **Registro histórico (não é um procedimento atual de deploy).** A PR #240 aposentou o bridge `.github/workflows/liberar-eldoria-prod-apos-ci.yml`: commits com marcador `[READY-ELDORIA-RELEASE]` não devem mais solicitar produção por `workflow_run`. Para releases atuais, utilizar auditoria Cloudflare read-only, homologação de staging e `deploy-cloudflare.yml` manual com ambas as confirmações e aprovação do ambiente protegido.
+
 Esta alteração não contém credenciais nem realiza alterações diretas no servidor. O commit com marcador `[READY-ELDORIA-RELEASE]` permite executar a **auditoria de disparo único** (`.github/workflows/liberar-eldoria-prod-apos-ci.yml`) após a CI desta revisão passar em `main`.
 
 ## Evidências verificadas antes do marco

@@ -32,15 +32,12 @@ test("jogo dentro do aplicativo compartilha paleta real e mantém a loja Valhall
   assert.match(androidTheme,/#081831/);
 });
 
-test("publicação de visual de produção exige CI verde, API saudável e deploy com rollback",async()=>{
-  const yaml=await read(".github/workflows/publicar-visual-real-apos-ci.yml");
-  assert.match(yaml,/Clash of Izzy CI/);
-  assert.match(yaml,/READY-ROYAL-SKIN/);
-  assert.match(yaml,/head_branch == 'main'/);
-  assert.match(yaml,/androidApiContract !== "eldoria-android-v1"/);
-  assert.match(yaml,/c\.database !== true \|\| c\.schema !== true \|\| c\.session !== true/);
-  assert.match(yaml,/gh workflow run deploy-cloudflare\.yml --repo/);
-  assert.doesNotMatch(yaml,/d1 migrations apply|wrangler deploy/);
+test("legacy Royal Skin auto-deploy is retired and cannot dispatch production", async () => {
+  const yaml = await read(".github/workflows/publicar-visual-real-apos-ci.yml");
+  assert.match(yaml, /^on:\s*\n  workflow_dispatch:/m);
+  assert.doesNotMatch(yaml, /workflow_run:|gh workflow run deploy-cloudflare/);
+  assert.doesNotMatch(yaml, /actions:\s*write/);
+  assert.match(yaml, /exit 1/);
 });
 
 test("arte real é embutida nos três ambientes em WebP leve e idêntico",async()=>{
