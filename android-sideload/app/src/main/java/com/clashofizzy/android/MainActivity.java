@@ -354,7 +354,7 @@ public final class MainActivity extends Activity {
         recoveryCard.setBackground(recoveryCardBackground);
 
         ImageView emblem = new ImageView(this);
-        emblem.setImageResource(R.drawable.ic_launcher);
+        emblem.setImageResource(R.drawable.royal_king);
         emblem.setContentDescription("Emblema de herói medieval com espada");
         emblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
         LinearLayout.LayoutParams emblemParams = new LinearLayout.LayoutParams(dp(100), dp(100));

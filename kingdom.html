@@ -75,7 +75,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div id="loading">Carregando seu reino e sincronizando com o servidor…</div>
 <div id="game" hidden>
 <section class="coi-command-deck" aria-label="Comando do reino">
- <div class="coi-command-identity"><span class="coi-command-kicker">SALA DO TRONO · ELDORIA</span><strong>Conquiste sua história</strong><span>Construa, pesquise e comande seu exército.</span></div>
+ <div class="coi-command-identity"><img class="coi-command-seal" src="/assets/brand/royal-king.webp" alt="" aria-hidden="true" width="58" height="58" loading="eager" decoding="async"><span class="coi-command-kicker">SALA DO TRONO · ELDORIA</span><strong>Comando do reino</strong><span>Construa, pesquise e comande seu exército.</span></div>
  <div class="coi-command-metrics" aria-label="Indicadores do reino">
   <div><small>Castelo</small><strong id="coiHudCastle">—</strong></div>
   <div><small>Poder real</small><strong id="coiHudPower">—</strong></div>
@@ -159,7 +159,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <section class="panel"><h2>🛡️ Poder do reino</h2><div class="grid2" id="army"></div><div class="toolbar"><button class="secondary" id="goMap">🌍 Explorar territórios</button></div></section>
 <section class="panel"><h2>📜 Crônicas do reino</h2><div class="events" id="events"></div></section>
 <section class="panel" id="coiDragonPanel"><h2>🐉 Dragões de Eldoria · Azul, Roxo e Dourado</h2><p class="muted">Colecione nove dragões exclusivos; somente o equipado participa dos bônus do combate. Os três dourados pertencem ao pacote Master confirmado.</p><div id="dragonCollection" class="events" aria-live="polite"></div></section>
-<section class="panel" id="coiMailboxPanel"><h2>✉️ Caixa de mensagens</h2><p class="muted">Mensagens do seu reino, recompensas pendentes e confirmações. Resgates protegidos contra duplicação.</p><div id="kingdomMailbox" class="events" aria-live="polite"></div></section>
+<section class="panel" id="coiMailboxPanel"><h2>✉️ Caixa de mensagens</h2><p class="muted">Mensagens, recompensas e confirmações do reino.</p><div id="kingdomMailbox" class="events" aria-live="polite"></div></section>
 <section class="panel" id="coiBackpackPanel"><h2>🎒 Mochila do reino</h2><p class="muted">Materiais do castelo, itens e recursos conquistados. Inventário salvo no servidor.</p><div id="kingdomBackpack" class="events" aria-live="polite"></div></section>
 <section class="panel"><h2>🐾 Companhia de mascotes</h2><p class="muted">Desbloqueie, ative e evolua um mascote. As habilidades passivas são aplicadas pelo servidor.</p><div class="events" id="petsList"></div><div class="muted" id="petStatus" role="status" aria-live="polite"></div></section>
 <section class="panel"><h2>📜 Relatórios e replays de batalha</h2><div class="events" id="battleReplayList"></div><div class="events" id="battleReplayView" aria-live="polite"></div></section>
@@ -652,7 +652,7 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/cinematic/recorder-ui.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
 <script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>

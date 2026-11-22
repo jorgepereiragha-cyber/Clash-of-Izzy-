@@ -111,7 +111,30 @@
   .coi-fourx .layout{grid-template-columns:1fr}
 }
 @media(max-width:760px){
-  .coi-fourx header{padding-top:max(8px,env(safe-area-inset-top));}
+  .coi-fourx header{
+    position:relative;
+    padding:8px max(10px,env(safe-area-inset-right)) 9px max(10px,env(safe-area-inset-left));
+  }
+  .coi-fourx header .top{
+    display:grid;grid-template-columns:minmax(0,1fr) minmax(90px,34%);
+    gap:8px;align-items:center;
+  }
+  .coi-fourx header .brand{min-width:0;overflow:hidden;gap:6px}
+  .coi-fourx header .brand img:not(.brand-royal-seal){max-width:min(43vw,155px)!important}
+  .coi-fourx #status{
+    max-width:none;min-width:0;max-height:2.7em;
+    font-size:11px;line-height:1.3;text-align:right;
+    overflow:hidden;overflow-wrap:anywhere;
+  }
+  .coi-fourx .resource{
+    flex-basis:90px;min-height:65px;line-height:1.25;
+    padding:6px 4px;
+  }
+  .coi-fourx .resource b{font-size:14px;line-height:1.25}
+  .coi-fourx .panel{padding:12px}
+  .coi-fourx .panel h2{font-size:17px;line-height:1.25;letter-spacing:0}
+  .coi-fourx .coi-mobile-dock a{border-radius:9px}
+
   .coi-fourx header .top{gap:8px}
   .coi-fourx header .brand img{max-width:130px!important;height:auto}
   .coi-fourx #status{max-width:54vw;font-size:10px;text-align:right}
@@ -167,10 +190,6 @@
   .coi-mobile-dock a:active,.coi-mobile-dock a:focus-visible{background:#40513a;border-color:#f4d28e}
   .coi-fourx #city,.coi-fourx #buildings,.coi-fourx #queues,
   .coi-fourx #trainingForm{scroll-margin-top:180px}
-  .coi-fourx #trailer-recorder-panel{
-    bottom:calc(92px + env(safe-area-inset-bottom));right:8px;
-    max-width:calc(100vw - 16px);
-  }
 }
 @media(max-width:360px){
   .coi-fourx .resource{flex-basis:85px}
@@ -221,3 +240,67 @@
 }
 
 #coiGraphicsPreset{scroll-margin-top:160px}
+
+/* Android compact command HUD with royal portrait; shared by browser and WebView. */
+.coi-command-identity{
+  display:grid;
+  grid-template-columns:58px minmax(0,1fr);
+  grid-template-rows:repeat(3,auto);
+  align-content:center;
+  align-items:center;
+  gap:2px 10px;
+}
+.coi-command-seal{
+  grid-column:1;grid-row:1/4;
+  display:block;width:58px;height:58px;
+  object-fit:cover;border:1px solid #e7bd68;
+  border-radius:13px;
+  box-shadow:inset 0 0 0 1px #ffffff30,0 4px 14px #0007;
+}
+.coi-command-identity > :not(.coi-command-seal){grid-column:2;min-width:0}
+@media (max-width:760px){
+  .coi-fourx .hero{
+    display:flex;align-items:center;flex-direction:row;gap:8px;
+    margin:6px 0 9px;
+  }
+  .coi-fourx .hero > div:first-child{min-width:0;flex:1}
+  .coi-fourx .hero h1{font-size:18px;line-height:1.2;overflow-wrap:anywhere}
+  .coi-fourx .hero #playerName{font-size:11px;line-height:1.3}
+  .coi-fourx .hero .toolbar{margin:0;flex:0 0 auto}
+  .coi-fourx .hero #refresh{padding:7px 9px;min-height:44px;font-size:11px}
+  .coi-command-deck{
+    padding:9px 10px;gap:7px;margin-bottom:10px;
+    border-radius:11px;
+  }
+  .coi-command-deck::before{inset:3px}
+  .coi-command-identity{
+    grid-template-columns:44px minmax(0,1fr);
+    grid-template-rows:44px;
+    gap:0 9px;
+  }
+  .coi-command-seal{width:44px;height:44px;grid-row:1;border-radius:9px}
+  .coi-command-identity .coi-command-kicker,
+  .coi-command-identity > span:last-child{display:none}
+  .coi-command-identity strong{font-size:17px;line-height:1.2}
+  .coi-command-metrics{grid-template-columns:repeat(3,minmax(0,1fr));gap:5px}
+  .coi-command-metrics>div{gap:3px;padding:5px 3px;min-height:43px}
+  .coi-command-metrics small{font-size:9px}
+  .coi-command-metrics strong{font-size:13px;line-height:1.2}
+  .coi-command-orders{gap:6px;padding:5px 7px;font-size:10px;line-height:1.25}
+  .coi-command-orders span{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+  .coi-command-orders a{flex:0 0 auto;padding:7px 8px;min-height:42px;display:flex;align-items:center;max-width:120px}
+  .coi-fourx .coi-city-stage .city{min-height:clamp(290px,49svh,440px)}
+  .coi-fourx .coi-city-panel{padding:8px}
+  .coi-fourx .coi-city-panel h2{font-size:17px;letter-spacing:0}
+  .coi-mobile-dock{
+    padding-top:5px;padding-bottom:calc(5px + env(safe-area-inset-bottom));
+    gap:4px;
+  }
+  .coi-mobile-dock a{min-height:54px}
+  .coi-mobile-dock a span:first-child{font-size:21px}
+  .coi-fourx main{padding-bottom:calc(89px + env(safe-area-inset-bottom))}
+}
+@media (max-width:380px){
+  .coi-command-metrics strong{font-size:12px}
+  .coi-command-orders a{max-width:102px}
+}

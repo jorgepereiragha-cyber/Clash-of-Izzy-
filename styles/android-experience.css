@@ -79,10 +79,6 @@ img, svg, canvas, video { max-width: 100%; }
 }
 @media (max-width: 760px) {
   main { padding-bottom: max(32px, var(--coi-safe-bottom)); }
-  #trailer-recorder-panel {
-    right: max(10px, var(--coi-safe-right));
-    bottom: max(10px, var(--coi-safe-bottom));
-  }
   .coi-nav-links.open a { min-height: 48px; }
   .territory-pin { min-width: 48px; min-height: 48px; }
 }

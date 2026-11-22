@@ -238,19 +238,19 @@ test("recorder uses the renderer API instead of an assumed window.map3d global",
   assert.match(renderer, /renderFrame\(delta = 0\)/);
   assert.match(ui, /new CinematicCapture\(this\.api\)/);
   assert.doesNotMatch(ui, /window\.map3d/);
-  assert.match(kingdom, /type="module" src="\/scripts\/cinematic\/recorder-ui\.js"/);
+  assert.doesNotMatch(kingdom, /type="module" src="\/scripts\/cinematic\/recorder-ui\.js"/);
 });
 
-test("PWA and shared styles include the recorder resources", () => {
+test("PWA does not preload the trailer recorder; cached overlays are hidden", () => {
   const cacheVersion = Number(serviceWorker.match(/const CACHE_NAME="clash-of-izzy-shell-v(\d+)"/)?.[1] || 0);
-  assert.ok(cacheVersion > 40, `expected Service Worker cache version above v40, got v${cacheVersion || "missing"}`);
+  assert.ok(cacheVersion >= 50, "expected new service worker cache version");
   for (const path of [
     "/scripts/cinematic/capture-system.js",
     "/scripts/cinematic/media-recorder-support.js",
     "/scripts/cinematic/trailer-script.js",
     "/scripts/cinematic/recorder-ui.js"
-  ]) assert.ok(serviceWorker.includes(path), "Recurso cinematográfico ausente do cache: " + path);
-  assert.match(premiumCss, /CINEMATIC TRAILER RECORDER/);
+  ]) assert.ok(!serviceWorker.includes(path), "Nenhum módulo de gravação deve ser pré-carregado: " + path);
+  assert.match(premiumCss, /#trailer-recorder-panel\{display:none!important\}/);
   assert.match(ui, /URL\.revokeObjectURL\(url\)/);
 });
 
