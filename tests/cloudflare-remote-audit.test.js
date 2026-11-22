@@ -77,6 +77,18 @@ test("auditoria pré-migração 0030 aceita somente três tabelas faltando com D
   assert.ok(approvedGoogle.checks.find(row=>row.name==="Worker público e D1").detail.includes("0033"));
   const rejectedWithoutFlag=await audit({...args,fetchImpl:mockFor(missingGoogle).fetchImpl});
   assert.equal(rejectedWithoutFlag.ready,false);
+  const throneOnly={...base,missingTables:["realm_thrones","throne_assaults"]};
+  const throneAllowed=await audit({...args,allowPending0035:true,fetchImpl:mockFor(throneOnly).fetchImpl});
+  assert.equal(throneAllowed.ready,true,JSON.stringify(throneAllowed.checks));
+  const throneDenied=await audit({...args,fetchImpl:mockFor(throneOnly).fetchImpl});
+  assert.equal(throneDenied.ready,false);
+  const allPending={...base,missingTables:["realm_openings","google_account_links","google_auth_challenges","realm_thrones","throne_assaults"]};
+  const allApproved=await audit({...args,allowPending0033:true,allowPending0034:true,allowPending0035:true,
+    fetchImpl:mockFor(allPending).fetchImpl});
+  assert.equal(allApproved.ready,true,JSON.stringify(allApproved.checks));
+  const rogue=await audit({...args,allowPending0033:true,allowPending0034:true,allowPending0035:true,
+    fetchImpl:mockFor({...allPending,missingTables:[...allPending.missingTables,"other_table"]}).fetchImpl});
+  assert.equal(rogue.ready,false);
   const realmOnly={...base,missingTables:["realm_openings"]};
   const realmAllowed=await audit({...args,allowPending0034:true,fetchImpl:mockFor(realmOnly).fetchImpl});
   assert.equal(realmAllowed.ready,true,JSON.stringify(realmAllowed.checks));
@@ -115,11 +127,12 @@ test("deploy não relaxa a validação de saúde pós-migração",async()=>{
   const deploy=workflow.indexOf("Deploy Worker and static assets");
   assert.ok(old>=0&&migrate>old&&deploy>migrate&&newCheck>deploy);
   const strict=workflow.slice(newCheck,workflow.indexOf("Smoke test production Worker",newCheck));
-  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030|COI_ALLOW_PENDING_0033|COI_ALLOW_PENDING_0034/);
+  assert.doesNotMatch(strict,/COI_ALLOW_PENDING_0030|COI_ALLOW_PENDING_0033|COI_ALLOW_PENDING_0034|COI_ALLOW_PENDING_0035/);
   assert.match(strict,/check-android-release-server\.mjs/);
   assert.match(source,/allowPending0030:process\.env\.COI_ALLOW_PENDING_0030==="true"/);
   assert.match(source,/allowPending0033:process\.env\.COI_ALLOW_PENDING_0033==="true"/);
   assert.match(source,/allowPending0034:process\.env\.COI_ALLOW_PENDING_0034==="true"/);
+  assert.match(source,/allowPending0035:process\.env\.COI_ALLOW_PENDING_0035==="true"/);
 });
 
 test("normaliza account ID sem expor valor e mantém formato de 32 caracteres",()=>{
