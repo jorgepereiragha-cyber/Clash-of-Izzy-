@@ -1,10 +1,11 @@
 // Rules for the Throne War. Dates are computed from the per-realm unlock
 // timestamp kept in D1; browser clocks do not authorize combat or coronations.
+import {marchCapacityForKingdom} from "./march-capacity.js";
 export const THRONE_SHIELD_DAYS=35;
 export const THRONE_PREPARATION_HOURS=24;
 export const THRONE_CONTEST_HOURS=8;
 export const THRONE_CYCLE_DAYS=7;
-export const THRONE_HOLD_MINUTES=30;
+export const THRONE_HOLD_MINUTES=150;
 const DAY=86400000;
 const HOUR=3600000;
 export const THRONE_UNIT_POWER=Object.freeze({
@@ -123,6 +124,10 @@ export async function assaultThrone(env,kingdom,body,now=new Date()){
   try{selection=validateThroneArmy(body?.units)}catch(e){
     return {ok:false,status:400,error:e.message};
   }
+  const capacity=await marchCapacityForKingdom(env.DB,kingdomId);
+  if(selection.quantity>capacity.maximum)
+    return {ok:false,status:409,error:"Capacidade de marcha excedida para o cerco. Máximo: "+
+      capacity.maximum,marchCapacity:capacity};
   const membership=await env.DB.prepare(
     "SELECT am.alliance_id FROM alliance_members am "+
     "JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=?"
