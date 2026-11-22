@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { LEVEL_PACKS,getLevelPackByName,getPackForLevel,publicLevelPack,levelPackMatchesOrder,levelPackGrantStatements } from "../level-packs.js";
+import { LEVEL_PACKS,getLevelPackByName,getPackForLevel,publicLevelPack,levelPackMatchesOrder,levelPackGrantStatements,levelPacksEnabledForPlayer } from "../level-packs.js";
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
 test("P1-P8 possuem precos positivos, recompensas deterministicas e limites 10-80", () => {
@@ -19,6 +19,16 @@ test("P1-P8 possuem precos positivos, recompensas deterministicas e limites 10-8
   assert.equal(getPackForLevel(80).phase,"P8");
   assert.equal(getPackForLevel(-1),null);
   assert.equal(getPackForLevel(12.5),null);
+});
+
+test("a flag de rollout nao vende a todos sem autorizacao publica",()=>{
+  const env={LEVEL_PACKS_ENABLED:"true",GAME_4X_SYSTEMS_ENABLED:"true",LEVEL_PACKS_TEST_PLAYER_IDS:"izzy_a,izzy_b"};
+  assert.equal(levelPacksEnabledForPlayer(env,"izzy_a"),true);
+  assert.equal(levelPacksEnabledForPlayer(env,"izzy_c"),false);
+  assert.equal(levelPacksEnabledForPlayer({...env,LEVEL_PACKS_PUBLIC_ENABLED:"true"},null),true);
+  assert.equal(levelPacksEnabledForPlayer({...env,GAME_4X_SYSTEMS_ENABLED:"false"},"izzy_a"),false);
+  assert.equal(levelPacksEnabledForPlayer({...env,LEVEL_PACKS_ENABLED:"false"},"izzy_a"),false);
+  assert.equal(levelPacksEnabledForPlayer({},null),false);
 });
 
 test("pacote somente combina com pedido originado no servidor, incluindo preco e gemas",()=>{
