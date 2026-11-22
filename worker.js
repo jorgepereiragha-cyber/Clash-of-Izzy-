@@ -1458,6 +1458,11 @@ async function gameAction(env,playerId,body){
       :type==="city_defense_move"?await movePlacedDefense(env,k.id,body)
       :await upgradeIndustry(env,k.id,String(body.industry||""));
     if(!result.ok)return json({error:result.error},result.status);
+    if(type==="city_defense_place"||type==="city_defense_move"){
+      // Uma defesa recém-criada deve afetar o poder imediatamente, não só no próximo upgrade.
+      await recalculateKingdomStats(env,k.id);
+      await recalculateKingdomPower(env,k.id);
+    }
     await logKingdomAction(env,k.id,p.id,type,result);
   }else if(type==="city_layout_move"){
     const move=await moveCityBuilding(env,k.id,body);
