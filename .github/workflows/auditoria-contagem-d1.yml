@@ -29,7 +29,7 @@ jobs:
           print("::add-mask::"+token)
           db="7e63af59-d9ff-4159-a9cf-b02e35b92605"
           url="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/"+db+"/query"
-          query="SELECT (SELECT COUNT(*) FROM players) AS jogadores, (SELECT COUNT(*) FROM kingdoms) AS reinos, (SELECT COUNT(*) FROM player_accounts) AS contas, (SELECT COUNT(*) FROM purchase_requests) AS pedidos, (SELECT COUNT(*) FROM mercadopago_orders) AS ordens"
+          query="SELECT (SELECT COUNT(*) FROM players) AS jogadores, (SELECT COUNT(*) FROM kingdoms) AS reinos, (SELECT COUNT(*) FROM player_accounts) AS contas, (SELECT COUNT(*) FROM purchase_requests) AS pedidos, (SELECT COUNT(*) FROM mercadopago_orders) AS ordens, (SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name IN ('kingdom_dragons','kingdom_mailbox','master_bonus_claims')) AS tabelas_0030"
           request=urllib.request.Request(url,data=json.dumps({"sql":query}).encode(),method="POST",
             headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
           try:
@@ -40,7 +40,8 @@ jobs:
           if not payload.get("success"): raise SystemExit("D1 retornou resposta sem sucesso.")
           try: row=payload["result"][0]["results"][0]
           except (KeyError,IndexError,TypeError): raise SystemExit("Contagens D1 incompletas.")
-          keys=("jogadores","reinos","contas","pedidos","ordens")
+          keys=("jogadores","reinos","contas","pedidos","ordens","tabelas_0030")
           counts={key:int(row[key]) for key in keys}
           print("Contagens D1 produção (sem dados pessoais): "+json.dumps(counts,ensure_ascii=False))
+          print("Tabelas novas 0030 identificadas: "+str(counts["tabelas_0030"])+"/3; consulta somente leitura.")
           PY
