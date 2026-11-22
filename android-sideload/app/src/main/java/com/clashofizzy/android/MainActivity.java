@@ -43,6 +43,9 @@ public final class MainActivity extends Activity {
     private boolean hasLoadedPage;
     private ProgressBar progress;
     private boolean mainFrameFailed;
+    // Limita telas de abertura presas em rede lenta, DNS ou Worker indisponivel.
+    private static final long STARTUP_TIMEOUT_MS = 45_000L;
+    private Runnable pendingLoadTimeout;
 
     @Override
     protected void onCreate(Bundle state) {
@@ -193,13 +196,17 @@ public final class MainActivity extends Activity {
             public void onPageStarted(WebView view, String url, android.graphics.Bitmap favicon) {
                 mainFrameFailed = false;
                 offlinePanel.setVisibility(View.GONE);
-                if (!hasLoadedPage) loadingPanel.setVisibility(View.VISIBLE);
+                if (!hasLoadedPage) {
+                    loadingPanel.setVisibility(View.VISIBLE);
+                    scheduleStartupTimeout();
+                }
             }
 
             @Override
             public void onReceivedError(WebView view, WebResourceRequest request,
                                         WebResourceError error) {
                 if (request.isForMainFrame()) {
+                    cancelStartupTimeout();
                     mainFrameFailed = true;
                     loadingPanel.setVisibility(View.GONE);
                     offlinePanel.setVisibility(View.VISIBLE);
@@ -212,6 +219,7 @@ public final class MainActivity extends Activity {
                 // Falhas de backend não acionam onReceivedError.
                 // Não bloquear a interface por falhas de subrecursos ou APIs.
                 if (request.isForMainFrame() && errorResponse.getStatusCode() >= 500) {
+                    cancelStartupTimeout();
                     mainFrameFailed = true;
                     loadingPanel.setVisibility(View.GONE);
                     offlinePanel.setVisibility(View.VISIBLE);
@@ -220,6 +228,7 @@ public final class MainActivity extends Activity {
 
             @Override
             public void onPageFinished(WebView view, String url) {
+                cancelStartupTimeout();
                 if (progress != null) progress.setVisibility(View.GONE);
                 loadingPanel.setVisibility(View.GONE);
                 if (!mainFrameFailed) {
@@ -232,6 +241,7 @@ public final class MainActivity extends Activity {
             public void onReceivedSslError(WebView view, SslErrorHandler handler,
                                            SslError error) {
                 handler.cancel(); // Nunca ignorar certificado inválido.
+                cancelStartupTimeout();
                 mainFrameFailed = true;
                 loadingPanel.setVisibility(View.GONE);
                 offlinePanel.setVisibility(View.VISIBLE);
@@ -239,6 +249,7 @@ public final class MainActivity extends Activity {
 
             @Override
             public boolean onRenderProcessGone(WebView view, RenderProcessGoneDetail detail) {
+                cancelStartupTimeout();
                 root.removeView(view);
                 view.destroy();
                 webView = null;
@@ -330,6 +341,7 @@ public final class MainActivity extends Activity {
             offlinePanel.setVisibility(View.GONE);
             hasLoadedPage = false;
             loadingPanel.setVisibility(View.VISIBLE);
+            scheduleStartupTimeout();
             if (webView != null) webView.loadUrl(GAME_URL);
         });
         recoveryCard.addView(retry, new LinearLayout.LayoutParams(
@@ -356,6 +368,25 @@ public final class MainActivity extends Activity {
                 ViewGroup.LayoutParams.MATCH_PARENT));
         offlinePanel.setVisibility(View.GONE);
         webView.loadUrl(GAME_URL);
+    }
+
+    private void scheduleStartupTimeout() {
+        cancelStartupTimeout();
+        pendingLoadTimeout = () -> {
+            pendingLoadTimeout = null;
+            if (isFinishing() || webView == null || hasLoadedPage || mainFrameFailed) return;
+            mainFrameFailed = true;
+            loadingPanel.setVisibility(View.GONE);
+            offlinePanel.setVisibility(View.VISIBLE);
+        };
+        root.postDelayed(pendingLoadTimeout, STARTUP_TIMEOUT_MS);
+    }
+
+    private void cancelStartupTimeout() {
+        if (pendingLoadTimeout != null && root != null) {
+            root.removeCallbacks(pendingLoadTimeout);
+        }
+        pendingLoadTimeout = null;
     }
 
     private boolean isGameUrl(Uri uri) {
@@ -432,6 +463,7 @@ public final class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        cancelStartupTimeout();
         if (popupWebView != null) closePopup(popupWebView);
         if (webView != null) {
             root.removeView(webView);
