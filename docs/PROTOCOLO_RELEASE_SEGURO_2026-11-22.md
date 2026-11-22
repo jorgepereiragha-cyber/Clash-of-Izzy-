@@ -4,7 +4,7 @@ Estado: **NO-GO comercial**. Este documento não autoriza merge, deploy, migraç
 
 ## 1. Flags do Worker — não confundir strings e booleanos
 
-A PR #240 propõe adicionar à branch `main`, após revisão e merge, os seguintes valores explícitos em `wrangler.jsonc` como **strings**:
+A PR #240 foi integrada à `main` no commit `07026b6ef92a44b266b3ee2f9eb2cf60061a41d7` e definiu os seguintes valores explícitos em `wrangler.jsonc` como **strings**:
 `GAME_4X_SYSTEMS_ENABLED="false"`,
 `LEVEL_PACKS_ENABLED="false"`,
 `LEVEL_PACKS_PUBLIC_ENABLED="false"` e
@@ -47,6 +47,11 @@ No momento desta auditoria: `#223` base `main`, `#229` base branch de `#223`, `#
 
 ## 5. SQL de conferência — chaves internas vs. públicas
 
+**Atualização operacional:** A consulta completa para uma Order específica, com verificação das colunas reais de `mercadopago_orders` e `purchase_requests`, está em [`docs/4X_SANDBOX_CHECK_SQL.md`](4X_SANDBOX_CHECK_SQL.md). A coluna `mp_payment_status` pertence a `purchase_requests`, e não a `mercadopago_orders`. Não se espera automaticamente uma linha por jogador: é obrigatório filtrar um pedido específico.
+
+**Desenvolvimento local:** `npm run dev` e `wrangler dev` usam D1 local por padrão, mesmo que a configuração mencione a identidade do banco de produção. Isso não equivale a rodar contra o D1 Preview remoto, nem ativa por si só credenciais Sandbox do Mercado Pago. Nunca executar `dev --remote` sem revisar previamente todas as bindings e segredos. O workflow de migração de Preview é separado, exige UUID e confirmação de que o banco é descartável e só permite branches aprovadas. A presença do esquema Preview não prova o fluxo real de pagamento.
+
+
 Em `players`, `id` é inteiro interno e `player_id` é identificador público textual. Em `kingdoms`, `player_id` referencia `players.id`. Na migração 0042, `level_pack_claims.request_id` referencia **`purchase_requests.id`**, e não o identificador da Order do Mercado Pago.
 
 Após executar o teste **em D1 Preview isolado**, consulte o saldo do jogador de teste com:
@@ -76,7 +81,7 @@ Use identificadores sintéticos e mantenha resultados privados. A evidência req
 
 ## 6. Etapas separadas para Preview, produção e publicidade
 
-**Fase A — auditoria:** executar apenas `Cloudflare Paid Readiness (read-only)` em `main`, sem marcar Paid se não comprovado. Registrar metadados, `d1_migrations` e Time Travel; não inferir que há restore testado.
+**Fase A — auditoria:** executar apenas `Cloudflare Paid Readiness (read-only)` com `target_branch=main`, sem marcar Paid se não comprovado. Registrar metadados, `d1_migrations` e Time Travel; não inferir que há restore testado.
 
 **Fase B — homologação isolada:** validar migrações em Preview descartável autorizado e realizar pagamento do Mercado Pago Sandbox **somente no ambiente isolado com credenciais de teste**. Não usar o Worker público com credenciais reais para simular Sandbox. Verificar sessão, status via API do provedor, webhook, ledger, saldos anteriores/depois, retries, estornos e ausência de crédito indevido.
 
@@ -90,7 +95,7 @@ Use identificadores sintéticos e mantenha resultados privados. A evidência req
 - Obter auditoria autenticada read-only de produção e Preview; validar o ponto de restauração e o plano de recuperação.
 - Aplicar e testar 0037–0043 **somente em D1 Preview isolado** antes de agendar a migração protegida de produção.
 - Homologar um pagamento P1 de R$ 9,90 com credenciais **Sandbox**, webhook e saldo no Preview. Nunca colocar credenciais ou pagamentos de Sandbox misturados ao Worker comercial.
-- Validar APK **release assinado** em Android físico, inclusive atualização, touch, WebGL fallback e retomada; não prometer `< 3 segundos` sem métricas.
+- Validar APK **release assinado** em Android físico, inclusive atualização, touch, WebGL fallback e retomada; não prometer desempenho inferior a 3 segundos sem métricas.
 - Aprovar os preços P4–P8 antes de permitir vendas; obter GO registrado e janela protegida. Liberar público somente depois de canary documentado.
 
 Referência de bloqueios: https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/issues/234
