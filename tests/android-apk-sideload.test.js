@@ -81,3 +81,12 @@ test('A recuperação offline usa cartão medieval, botão acessível e largura 
   assert.match(activity, /Math\.min\(dp\(420\), availableWidth\)/);
   assert.match(activity, /hasLoadedPage = false;/);
 });
+
+test('Android pausa a renderização WebView em segundo plano e retoma sem recarregar a página',()=>{
+  assert.match(activity,/protected void onPause\(\)/);
+  assert.match(activity,/if \(webView != null\) webView\.onPause\(\)/);
+  assert.match(activity,/protected void onResume\(\)/);
+  assert.match(activity,/if \(webView != null\) webView\.onResume\(\)/);
+  const resume = activity.slice(activity.indexOf('protected void onResume()'),activity.indexOf('protected void onDestroy()'));
+  assert.doesNotMatch(resume,/loadUrl\(|recreate\(/);
+});
