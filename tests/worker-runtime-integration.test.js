@@ -641,6 +641,17 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(entry?.id, "pacote inicial R$ 3,99 consta do catálogo D1");
       assert.equal(Number(entry.price_brl), 3.99, "preço do pacote inicial é R$ 3,99");
       assert.equal(Number(entry.gems), 35, "o pacote inicial credita 35 gemas após a liquidação");
+      for (const [name,price,gems] of [
+        ["Pacote Inicial de Eldoria",3.99,35],
+        ["Pacote Diário de Eldoria",9.99,100],
+        ["Pacote Premium Diário de Eldoria",49.99,600]
+      ]) {
+        const pack=catalog.packages.find(item=>item.name===name);
+        assert.ok(pack?.id, "Pacote diário presente no catálogo: "+name);
+        assert.equal(Number(pack.price_brl),price,"Preço correto de "+name);
+        assert.equal(Number(pack.gems),gems,"Gemas corretas de "+name);
+        assert.equal(pack.dailyLimitHours,24,"Cooldown de compra de "+name);
+      }
       const skin = catalog.skins[0];
       assert.equal(catalog.skins.length, 6, "catálogo de lançamento permanece limitado a seis skins");
       assert.ok(vip?.id, "pacote VIP aparece no catálogo");
