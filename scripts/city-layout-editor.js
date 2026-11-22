@@ -106,15 +106,29 @@ if (root) {
   });
   xInput.addEventListener("input",draw);
   zInput.addEventListener("input",draw);
-  canvas.addEventListener("pointerdown",event => {
+  function selectBuildingGridCell(event) {
     if (!selected() || moving) return;
+    if (event.cancelable) event.preventDefault();
     const rect = canvas.getBoundingClientRect();
     const layout = config();
     if (!layout || !rect.width || !rect.height) return;
     const tiles = layout.max - layout.min;
-    xInput.value = String(Math.floor((event.clientX - rect.left) / rect.width * tiles) + layout.min);
-    zInput.value = String(Math.floor((event.clientY - rect.top) / rect.height * tiles) + layout.min);
+    const cx = Math.max(0, Math.min(tiles - 1, Math.floor((event.clientX - rect.left) / rect.width * tiles)));
+    const cz = Math.max(0, Math.min(tiles - 1, Math.floor((event.clientY - rect.top) / rect.height * tiles)));
+    xInput.value = String(cx + layout.min);
+    zInput.value = String(cz + layout.min);
     draw();
+  }
+  canvas.addEventListener("pointerdown",event => {
+    if (!selected() || moving || (event.pointerType === "mouse" && event.button !== 0)) return;
+    canvas.setPointerCapture?.(event.pointerId);
+    selectBuildingGridCell(event);
+  });
+  canvas.addEventListener("pointermove",event => {
+    if (canvas.hasPointerCapture?.(event.pointerId)) selectBuildingGridCell(event);
+  });
+  canvas.addEventListener("pointerup",event => {
+    if (canvas.hasPointerCapture?.(event.pointerId)) canvas.releasePointerCapture(event.pointerId);
   });
   submit.addEventListener("click",async () => {
     const b = selected();
