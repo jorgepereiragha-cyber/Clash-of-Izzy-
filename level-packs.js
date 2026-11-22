@@ -23,6 +23,14 @@ export function getPackForLevel(playerLevel) {
   return [...LEVEL_PACKS].reverse().find(pack => level >= pack.level) || null;
 }
 
+// Liberacao progressiva: a flag global nunca expoe sozinha a loja a todos.
+export function levelPacksEnabledForPlayer(env, publicPlayerId) {
+  if (env?.LEVEL_PACKS_ENABLED !== "true" || env?.GAME_4X_SYSTEMS_ENABLED !== "true") return false;
+  if (env?.LEVEL_PACKS_PUBLIC_ENABLED === "true") return true;
+  const allowlist = String(env?.LEVEL_PACKS_TEST_PLAYER_IDS || "").split(",").map(id => id.trim()).filter(Boolean);
+  return Boolean(publicPlayerId) && allowlist.includes(String(publicPlayerId));
+}
+
 export function publicLevelPack(pack) {
   return {
     phase: pack.phase,
