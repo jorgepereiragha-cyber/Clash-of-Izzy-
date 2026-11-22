@@ -26,6 +26,8 @@ rally.js
 search-ranking.js
 shared-world-coordinates.js
 realm-progression.js
+throne-war.js
+throne-war-rules.js
 valhalla-admin.js
 valhalla-config.js
 valhalla-rewards.js
