@@ -647,7 +647,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
           requestKey: "integration-vip-request-01",
           paymentMethod: "pix",
         },
-      }), 400, "bloqueio do PIX direto");
+      }), 503, "Pix Nubank desabilitado: rejeitar sem registrar pedido");
 
       const purchase = expectStatus(await api("/api/store/purchase-request", {
         method: "POST", token: tokenA,
