@@ -503,7 +503,7 @@ async function processMarches(env,kingdomId,batchSize=50){
    env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
   ];
   if(m.march_type==="attack"){
-   const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+   const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=? AND territory_kind='resource'").bind(m.target_territory_id).first();
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={},replayData={};
    if(target&&!target.owner_kingdom_id&&army.length){
@@ -555,7 +555,7 @@ async function processMarches(env,kingdomId,batchSize=50){
     battleLog=[{event:"attack_cancelled",reason:target?"territory_already_owned":"territory_missing"}];
    }
    // A captura é condicional e imediatamente seguida pelo relatório, que lê changes() da captura.
-   statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
+   statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND territory_kind='resource' AND owner_kingdom_id IS NULL AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log,replay_json) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,?,? WHERE "+guard)
     .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits:simulation.criticalHits||0}),JSON.stringify({territoryCaptured:false,criticalHits:simulation.criticalHits||0}),JSON.stringify(battleLog),JSON.stringify(replayData),m.id,kingdomId,resolutionToken));
    // Uma pequena recompensa de material acompanha cada conquista válida.
@@ -1244,8 +1244,9 @@ async function gameAction(env,playerId,body){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const territoryId=Number(body.territoryId);
     if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não pode reivindicar território."},403);
-    const t=await env.DB.prepare("SELECT id,alliance_id,owner_kingdom_id FROM world_territories WHERE id=? AND map_region=?").bind(territoryId,Number(k.map_region)||1).first();
+    const t=await env.DB.prepare("SELECT id,alliance_id,owner_kingdom_id,territory_kind FROM world_territories WHERE id=? AND map_region=?").bind(territoryId,Number(k.map_region)||1).first();
     if(!t)return json({error:"Território não encontrado."},404);
+    if(t.territory_kind!=="resource")return json({error:"O Trono e os castelos não podem ser reivindicados como território comum."},409);
     if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
     const cost=await env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000").bind(member.alliance_id).run();
     if(!cost.meta.changes)return json({error:"A aliança precisa de 1.000 comida e 1.000 madeira no depósito."},409);
