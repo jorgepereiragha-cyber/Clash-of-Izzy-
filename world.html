@@ -62,6 +62,17 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 .territory-pin.selected{outline:3px solid #fff2b5;box-shadow:0 0 0 7px #ffe09a44,0 4px 12px #0008}
 .territory-pin.castle{border-radius:12px;min-width:54px;min-height:54px;background:linear-gradient(145deg,#26334aee,#101827f5);box-shadow:0 5px 16px #000b}
 .territory-pin.owned{border-color:#79d49a}.territory-pin.enemy{border-color:#ed8b80}
+.territory-pin.throne{border-color:#ffde92;border-width:3px;border-radius:14px;min-width:58px;min-height:58px;background:radial-gradient(circle,#70502adf,#182138f5);box-shadow:0 0 0 5px #eecb6340,0 10px 24px #000b}
+.throne-panel{border-color:#d6ac59;background:radial-gradient(ellipse at top right,#604b3133,transparent 65%),linear-gradient(150deg,#223c56,#0b182b)}
+.throne-progress{height:8px;width:100%;accent-color:#e7bd68}
+.throne-actions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:12px}
+.throne-actions select,.throne-actions input{min-height:44px;border:1px solid #8e8d85;border-radius:8px;background:#0a1728;color:#fff3dc;padding:8px;max-width:100%}
+.throne-actions input{width:110px}
+.throne-actions button{min-height:44px}
+.throne-phase{font-weight:800;color:#f5d69a}
+.throne-note{font-size:12px;color:#d2dfeb;line-height:1.6}
+.throne-phase strong{color:#ffdb8c}
+
 .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;color:var(--muted);font-size:11px}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:#e7bd68}.dot.owned{background:#79d49a}.dot.enemy{background:#ed8b80}
@@ -119,6 +130,26 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
  </section>
   </section>
   <aside class="stack">
+   <section class="panel throne-panel" id="thronePanel" aria-labelledby="throneHeading">
+    <h2 id="throneHeading">Guerra do Trono · Eldoria</h2>
+    <p id="thronePhase" class="throne-phase" role="status" aria-live="polite">Consultando o escudo real…</p>
+    <p id="throneHolder" class="throne-note">O trono de cada mundo fica protegido durante 35 dias.</p>
+    <p id="throneKing" class="throne-note"></p>
+    <div class="throne-actions">
+     <label for="throneUnit">Tropa</label>
+     <select id="throneUnit" aria-label="Tipo de tropa para o trono"></select>
+     <label for="throneQuantity">Unidades</label>
+     <input id="throneQuantity" type="number" min="1" max="5000" value="100" inputmode="numeric">
+     <button id="throneAttack" type="button" disabled>Atacar o Trono</button>
+     <button id="throneReinforce" type="button" disabled>Reforçar</button>
+    </div>
+    <p class="throne-note">Ação de cerco consome 5% das tropas selecionadas (mínimo 1) como baixas. Intervalo: 5 minutos. Vitória: 150 minutos consecutivos de ocupação durante a Disputa.</p>
+    <div class="throne-actions">
+     <input id="throneNominee" type="number" min="1" step="1" aria-label="ID do reino indicado para Rei" placeholder="ID do reino">
+     <button id="throneAppoint" type="button" disabled>Nomear Rei</button>
+    </div>
+    <p id="throneMessage" class="throne-note" role="status" aria-live="polite"></p>
+   </section>
    <section class="panel">
     <h2>📍 Território selecionado</h2>
     <div id="territoryDetails"><div id="empty">Escolha um ponto no mapa.</div></div>
