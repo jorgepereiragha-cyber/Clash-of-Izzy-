@@ -106,12 +106,15 @@ function renderMap() {
   const buttonRefs = new Map();
   for (const territory of state.territories || []) {
     const isCastle = territory.territory_kind === "castle";
-    const resource = isCastle ? { icon: "🏰", label: "Castelo de jogador" } : (RESOURCE[territory.resource_type] || { icon: "📍", label: "Território" });
+    const isThrone = territory.territory_kind === "throne";
+    const resource = isThrone?{icon:"👑",label:"Trono Imperial"}:
+      isCastle?{icon:"🏰",label:"Castelo de jogador"}:
+      (RESOURCE[territory.resource_type]||{icon:"📍",label:"Território"});
     const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
     const owner = territoryOwner(territory);
     const button = make("button", "territory-pin" +
       (owner === "Seu reino" ? " owned" : owner === "Outro reino" ? " enemy" : "") +
-      (isCastle ? " castle" : "") +
+      (isCastle ? " castle" : "") + (isThrone ? " throne" : "") +
       (Number(territory.id) === Number(selectedTerritoryId) ? " selected" : ""));
     button.type = "button";
     button.dataset.territoryId = String(territory.id);
@@ -135,7 +138,8 @@ function renderMap() {
     territories: state.territories || [],
     marches: state.marches || [],
     kingdomId: state.kingdom?.id || 0,
-    castleSkinId: Number(state.kingdom?.equipped_skin_id || 0)
+    castleSkinId: Number(state.kingdom?.equipped_skin_id || 0),
+    throneShielded:state.throne?.shielded===true
   };
   window.__coiWorldMapButtons = buttonRefs;
   window.__coiWorldMapState = visualState;
@@ -190,10 +194,17 @@ function updateActionButtons() {
   const territory = getSelectedTerritory();
   const hasTroops = Object.values(selectedUnits).some(quantity => Number(quantity) > 0);
   const isCastle = territory?.territory_kind === "castle";
-  const canVisit = Boolean(territory && !isCastle && territoryOwner(territory) !== "Outro reino");
+  const isThrone = territory?.territory_kind === "throne";
+  const canVisit = Boolean(territory && !isCastle && !isThrone && territoryOwner(territory) !== "Outro reino");
   $("gather").disabled = busy || !canVisit || !hasTroops;
   $("scout").disabled = busy || !canVisit || !hasTroops;
-  $("attack").disabled = busy || !territory || isCastle || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops;
+  const siegeTotal=Object.values(selectedUnits).reduce((n,q)=>n+Number(q||0),0);
+  $("throneAssault").hidden=!isThrone;
+  $("throneAssault").disabled=busy||!isThrone||state?.throne?.phase!=="contest"||
+    Boolean(state?.throne?.kingAllianceId)||
+    !state?.alliance?.id||Number(state?.kingdom?.castle_level||0)<10||
+    siegeTotal<200||siegeTotal>10000;
 }
 function renderDetails() {
   const root = $("territoryDetails");
@@ -205,13 +216,23 @@ function renderDetails() {
     updateActionButtons();
     return;
   }
-  const resource = RESOURCE[territory.resource_type] || { icon: "📍", label: "Recurso" };
+  const resource = territory.territory_kind==="throne"?{icon:"👑",label:"Trono Imperial"}:(RESOURCE[territory.resource_type] || { icon: "📍", label: "Recurso" });
   const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
   root.append(make("div", "territory-title", resource.icon + " " + territory.name));
   root.append(make("p", "muted", territoryOwner(territory)));
   const grid = make("div", "detail-grid");
   const isCastle = territory.territory_kind === "castle";
-  if (isCastle) {
+  const isThrone = territory.territory_kind === "throne";
+  if(isThrone){
+    const throne=state.throne;
+    const phases={shield:"Escudo de proteção",preparation:"Preparação",contest:"Guerra do Trono",recovery:"Recuperação"};
+    addStat(grid,"Situação",phases[throne?.phase]||"Consultando o servidor");
+    addStat(grid,"Escudo até",throne?.shieldUntil?new Date(throne.shieldUntil).toLocaleString("pt-BR"):"—");
+    addStat(grid,"Aliança ocupante",throne?.occupantAllianceTag||"Nenhuma");
+    addStat(grid,"Reino coroado",throne?.reigningKingdom||"Nenhum");
+    addStat(grid,"Requisito","Aliança · Castelo 10 · 200 tropas");
+    if(throne?.phase==="contest")addStat(grid,"Ocupação para vencer","30 minutos contínuos");
+  }else if (isCastle) {
     addStat(grid, "Comandante", territory.commander_name || "Comandante");
     addStat(grid, "Poder", fmt(territory.power));
     addStat(grid, "Nível do castelo", fmt(territory.castle_level || territory.level || 1));
@@ -223,7 +244,9 @@ function renderDetails() {
     addStat(grid, "Nível", fmt(territory.level || 1));
   }
   root.append(grid);
-  $("marchNotice").textContent = isCastle
+  $("marchNotice").textContent = isThrone
+    ? "Guerra do Trono: 35 dias de proteção, alianças rivais, cerco de tropas e 30 minutos de ocupação para coroação."
+    : isCastle
     ? "Castelo de outro comandante detectado. Você pode consultar comandante, poder e aliança; o envio de ataques PvP será ativado na Fase 10."
     : territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
       ? "Este território pertence a outro jogador e não está disponível para coleta."
@@ -278,6 +301,11 @@ async function updateRealmCards(){
       }
       grid.append(card);
     }
+    try{
+      state.throne=await request("/throne/status?realm="+encodeURIComponent(state?.kingdom?.map_region||1));
+      renderMap();
+      renderDetails();
+    }catch{state.throne=null;updateActionButtons();}
   }catch{
     label.textContent="Não foi possível consultar o desbloqueio dos mapas.";
   }
@@ -289,8 +317,11 @@ function render() {
   renderMarches();
 }
 async function refreshState() {
+  const oldThrone=state?.throne||null;
   const response = await request("/game/state");
   state = response.state || response;
+  if(oldThrone&&Number(oldThrone.realmId)===Number(state?.kingdom?.map_region||1))
+    state.throne=oldThrone;
   if (!state.kingdom) throw new Error("O servidor não retornou o reino.");
   if (!requestedTerritoryApplied && requestedTerritorySearch) {
     const query = normalizeTerritorySearch(requestedTerritorySearch);
@@ -304,6 +335,30 @@ async function refreshState() {
   if (!getSelectedTerritory() && state.territories?.length) selectedTerritoryId = state.territories[0].id;
   render();
 }
+async function sendThroneAssault(){
+  if(busy||getSelectedTerritory()?.territory_kind!=="throne"||state?.throne?.phase!=="contest")return;
+  const units=Object.fromEntries(Object.entries(selectedUnits).filter(([,qty])=>Number(qty)>0));
+  const count=Object.values(units).reduce((n,q)=>n+Number(q),0);
+  if(count<200||count>10000)return;
+  if(!window.confirm("Confirmar cerco ao Trono Imperial? O resultado pode causar perdas permanentes de tropas."))return;
+  busy=true;updateActionButtons();
+  $("marchNotice").textContent="Realizando cerco ao Trono Imperial…";
+  try{
+    const outcome=await request("/game/action",{
+      method:"POST",headers:{"Content-Type":"application/json"},
+      body:JSON.stringify({type:"throne_assault",units,requestId:crypto.randomUUID()})
+    });
+    selectedUnits={};
+    await refreshState();
+    await updateRealmCards();
+    $("marchNotice").textContent=outcome.battle?.won?
+      "Cerco vitorioso! Sua aliança deve manter o trono por 30 minutos.":
+      "O cerco não superou as defesas. Confira as baixas no relatório.";
+  }catch(e){$("marchNotice").textContent=e.message;setStatus(e.message,true)}
+  finally{busy=false;updateActionButtons()}
+}
+$("throneAssault").addEventListener("click",sendThroneAssault);
+
 async function sendMarch(marchType) {
   if (busy) return;
   const territory = getSelectedTerritory();

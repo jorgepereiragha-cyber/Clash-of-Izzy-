@@ -13,6 +13,7 @@ import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
 import {realmStatusView} from "./realm-progression.js";
+import {getThroneStatus,assaultThrone} from "./throne-war.js";
 import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
@@ -349,7 +350,13 @@ async function ensureKingdom(env,playerId){
       env.DB.prepare("INSERT OR IGNORE INTO kingdom_pets(kingdom_id,pet_id,level,experience,is_active) SELECT ?,'pet_raven',1,0,1 WHERE EXISTS(SELECT 1 FROM pet_catalog WHERE id='pet_raven' AND active=1)").bind(id),
       // Marcos permanentes: 700 reinos liberam o mapa 2; 1.000 liberam o mapa 3.
       env.DB.prepare("INSERT OR IGNORE INTO realm_openings(realm_id) SELECT 2 WHERE (SELECT COUNT(*) FROM kingdoms)>=700"),
-      env.DB.prepare("INSERT OR IGNORE INTO realm_openings(realm_id) SELECT 3 WHERE (SELECT COUNT(*) FROM kingdoms)>=1000")
+      env.DB.prepare("INSERT OR IGNORE INTO realm_openings(realm_id) SELECT 3 WHERE (SELECT COUNT(*) FROM kingdoms)>=1000"),
+      // O trono nasce na abertura do mapa; proteção persistente de 35 dias.
+      env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,level,resource_type,resource_rate,territory_kind,map_region,shield_until) "+
+        "SELECT 'royal_throne_'||realm_id,'Trono Imperial de Eldoria','royal',0,0,30,NULL,0,'resource',realm_id,datetime(unlocked_at,'+35 days') FROM realm_openings"),
+      env.DB.prepare("INSERT OR IGNORE INTO realm_thrones(realm_id,territory_id,shield_until) "+
+        "SELECT r.realm_id,t.id,datetime(r.unlocked_at,'+35 days') FROM realm_openings r "+
+        "JOIN world_territories t ON t.territory_key='royal_throne_'||r.realm_id AND t.map_region=r.realm_id")
     ]);
     k={id};
   }
@@ -496,10 +503,10 @@ async function processMarches(env,kingdomId,batchSize=50){
    env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
   ];
   if(m.march_type==="attack"){
-   const target=await env.DB.prepare("SELECT id,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+   const target=await env.DB.prepare("SELECT id,territory_key,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,losses={},battleLog=[],survivors={},replayData={};
-   if(target&&!target.owner_kingdom_id&&army.length){
+   if(target&&!target.territory_key?.startsWith("royal_throne_")&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level,prestige,equipped_skin_id FROM kingdoms WHERE id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
@@ -548,7 +555,7 @@ async function processMarches(env,kingdomId,batchSize=50){
     battleLog=[{event:"attack_cancelled",reason:target?"territory_already_owned":"territory_missing"}];
    }
    // A captura é condicional e imediatamente seguida pelo relatório, que lê changes() da captura.
-   statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
+   statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND territory_key NOT LIKE 'royal_throne_%' AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log,replay_json) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,?,? WHERE "+guard)
     .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits:simulation.criticalHits||0}),JSON.stringify({territoryCaptured:false,criticalHits:simulation.criticalHits||0}),JSON.stringify(battleLog),JSON.stringify(replayData),m.id,kingdomId,resolutionToken));
    // Uma pequena recompensa de material acompanha cada conquista válida.
@@ -757,7 +764,8 @@ async function gameState(env,playerId){
       "SELECT wt.id,wt.name,wt.terrain,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.x-? ELSE wt.x END AS x,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.z-? ELSE wt.z END AS z,"+
-      "wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,wt.territory_kind,"+
+      "wt.territory_key,wt.shield_until,wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,"+
+      "CASE WHEN wt.territory_key LIKE 'royal_throne_%' THEN 'throne' ELSE wt.territory_kind END AS territory_kind,"+
       "owner.id AS kingdom_id,owner.kingdom_name,owner.castle_level,owner.power,owner.equipped_skin_id AS castle_skin_id,"+
       "COALESCE(n.nickname,op.name) AS commander_name,"+
       "COALESCE((SELECT a.tag FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=owner.id),'') AS alliance_tag "+
@@ -1237,8 +1245,9 @@ async function gameAction(env,playerId,body){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const territoryId=Number(body.territoryId);
     if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não pode reivindicar território."},403);
-    const t=await env.DB.prepare("SELECT id,alliance_id,owner_kingdom_id FROM world_territories WHERE id=? AND map_region=?").bind(territoryId,Number(k.map_region)||1).first();
+    const t=await env.DB.prepare("SELECT id,territory_key,alliance_id,owner_kingdom_id FROM world_territories WHERE id=? AND map_region=?").bind(territoryId,Number(k.map_region)||1).first();
     if(!t)return json({error:"Território não encontrado."},404);
+    if(t.territory_key?.startsWith("royal_throne_"))return json({error:"O Trono Imperial não pode ser reivindicado fora da Guerra do Trono."},409);
     if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
     const cost=await env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000").bind(member.alliance_id).run();
     if(!cost.meta.changes)return json({error:"A aliança precisa de 1.000 comida e 1.000 madeira no depósito."},409);
@@ -1483,11 +1492,17 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const result=await env.DB.batch(statements);
     if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes, pesquisa alterada ou fila de pesquisa ocupada. Atualize e tente novamente."},409);
+  }else if(type==="throne_assault"){
+    const result=await assaultThrone(env,k,body);
+    if(!result.ok)return json({error:result.error,...(result.shieldUntil?{shieldUntil:result.shieldUntil}:{})},result.status);
+    battleOutcome=result.combat;
   }else if(type==="march"){
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
-    const target=await env.DB.prepare("SELECT id,resource_type,owner_kingdom_id,territory_kind FROM world_territories WHERE id=? AND map_region=?").bind(targetId,Number(k.map_region)||1).first();
+    const target=await env.DB.prepare("SELECT id,territory_key,resource_type,owner_kingdom_id,territory_kind FROM world_territories WHERE id=? AND map_region=?").bind(targetId,Number(k.map_region)||1).first();
     if(!target)return json({error:"Território não encontrado."},404);
+    if(target.territory_key?.startsWith("royal_throne_"))
+      return json({error:"O Trono Imperial exige Guerra do Trono; não pode ser atacado por marcha normal."},409);
     const marchType=String(body.marchType||"gather");
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
     if(marchType==="attack"&&(target.owner_kingdom_id||target.territory_kind==="castle"))return json({error:"O castelo de outro comandante está visível no mapa. O combate PvP será habilitado na Fase 10; por enquanto, ataque apenas territórios neutros."},409);
@@ -1926,7 +1941,7 @@ export default {
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
+    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -1970,7 +1985,16 @@ export default {
       return json({error:"Não foi possível concluir a inscrição."},500);
     }
   }
-  if(url.pathname==="/api/realms/status"&&request.method==="GET"){
+  if(url.pathname==="/api/throne/status"&&request.method==="GET"){
+     if(url.searchParams.getAll("realm").length!==1)return json({error:"Selecione um único mapa."},400);
+     const realmId=Number(url.searchParams.get("realm"));
+     if(!Number.isSafeInteger(realmId)||realmId<1||realmId>3)return json({error:"Mapa inválido."},400);
+     const limited=await rateLimitDecision(env,"throne-status-ip",request.headers.get("CF-Connecting-IP")||"unknown",40,60);
+     if(limited)return limited;
+     const result=await getThroneStatus(env,realmId);
+     return result?json(result.public):json({error:"Trono bloqueado: mapa ainda não aberto."},404);
+   }
+   if(url.pathname==="/api/realms/status"&&request.method==="GET"){
      const limited=await rateLimitDecision(env,"realms-status-ip",request.headers.get("CF-Connecting-IP")||"unknown",30,60);
      if(limited)return limited;
      const [population,opened,counts]=await Promise.all([

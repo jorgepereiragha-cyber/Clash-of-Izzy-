@@ -911,7 +911,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "research", research: "military" }, 409, "segunda pesquisa na mesma fila");
 
       stateA = (await api("/api/game/state", { token: tokenA })).data.state;
-      const neutral = stateA.territories.find(item => !item.owner_kingdom_id && !item.alliance_id);
+      const neutral = stateA.territories.find(item => item.territory_kind==="resource" && item.resource_type && !item.owner_kingdom_id && !item.alliance_id);
       assert.ok(neutral?.id, "mapa possui território neutro para marcha");
       await action(tokenA, { type: "march", targetId: -1, marchType: "gather", units: { militia: 1 } }, 400);
       await action(tokenA, { type: "march", targetId: neutral.id, marchType: "gather", units: { militia: 1 } }, 200);
@@ -971,7 +971,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "alliance_war_declare", targetTag: "BETA" }, 200);
 
       stateA = (await api("/api/game/state", { token: tokenA })).data.state;
-      const claimable = stateA.territories.find(item => !item.alliance_id && !item.owner_kingdom_id);
+      const claimable = stateA.territories.find(item => item.territory_kind==="resource" && item.resource_type && !item.alliance_id && !item.owner_kingdom_id);
       assert.ok(claimable?.id, "há território disponível para reivindicação");
       await action(tokenA, { type: "alliance_claim_territory", territoryId: claimable.id }, 200);
 

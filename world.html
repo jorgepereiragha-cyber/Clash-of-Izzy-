@@ -62,6 +62,14 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 .territory-pin.selected{outline:3px solid #fff2b5;box-shadow:0 0 0 7px #ffe09a44,0 4px 12px #0008}
 .territory-pin.castle{border-radius:12px;min-width:54px;min-height:54px;background:linear-gradient(145deg,#26334aee,#101827f5);box-shadow:0 5px 16px #000b}
 .territory-pin.owned{border-color:#79d49a}.territory-pin.enemy{border-color:#ed8b80}
+.territory-pin.throne{border-color:#f6d58a;background:radial-gradient(circle at 30% 12%,#8d7244,#1d293d 85%);
+ box-shadow:0 0 0 3px #ecc77855,0 5px 19px #000b;min-width:60px;min-height:60px}
+.territory-pin.throne span{font-size:26px}
+.territory-pin.throne small{background:#2a1c10f0;color:#f5d794}
+#throneAssault{min-height:48px;border-color:#f8d78d;
+ background:linear-gradient(180deg,#ba8747,#75502a);color:#fff4de;font-weight:800}
+#throneAssault:disabled{filter:grayscale(.55);opacity:.55}
+
 .legend{display:flex;gap:12px;flex-wrap:wrap;margin-top:12px;color:var(--muted);font-size:11px}
 .legend span{display:inline-flex;align-items:center;gap:5px}
 .dot{width:9px;height:9px;border-radius:50%;display:inline-block;background:#e7bd68}.dot.owned{background:#79d49a}.dot.enemy{background:#ed8b80}
@@ -127,6 +135,7 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
      <button id="gather" disabled>🌾 Coletar</button>
      <button id="scout" disabled>🔭 Explorar</button>
      <button id="attack" disabled>⚔ Conquistar</button>
+     <button id="throneAssault" type="button" hidden disabled>⚔️ Assaltar Trono Imperial</button>
     </div>
     <p class="muted" id="marchNotice" aria-live="polite">O servidor valida tropas disponíveis, propriedade e conclusão da marcha.</p>
    </section>
