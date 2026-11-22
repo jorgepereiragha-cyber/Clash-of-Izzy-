@@ -267,6 +267,33 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     return group;
   }
 
+  function createRoyalThrone(parent,x,z,shielded){
+    // Original low-poly model made from procedural geometry. No downloads/GLB.
+    const group=new THREE.Group();
+    group.position.set(x,terrainHeight(x,z)+.2,z);
+    makeMesh(new THREE.CylinderGeometry(4.2,4.6,.48,8),shared.stone,group,0,.1,0);
+    makeMesh(new THREE.CylinderGeometry(3.2,3.6,.38,8),shared.stoneLight,group,0,.5,0);
+    box(group,2.5,.55,2.1,shared.gold,0,1.1,0);
+    box(group,1.7,2.6,.45,shared.stone,0,2.45,-.84);
+    box(group,1.95,.28,.62,shared.gold,0,3.9,-.84);
+    box(group,.5,1.5,.45,shared.gold,-1.35,2.0,-.66);
+    box(group,.5,1.5,.45,shared.gold,1.35,2.0,-.66);
+    for(const dx of [-1.1,0,1.1]){
+      cone(group,.44,.75,shared.gold,dx,4.45,-.84,4);
+    }
+    for(const dx of [-3.8,3.8]){
+      makeTower(group,dx,2.6,3,shared.stone);
+    }
+    if(shielded){
+      const halo=makeMesh(new THREE.TorusGeometry(4.6,.13,7,38),
+        shared.blueTroop,group,0,2.0,0);
+      halo.rotation.x=Math.PI/2;
+      halo.castShadow=false;
+    }
+    parent.add(group);
+    return group;
+  }
+
   function createMine(parent, x, z, resource) {
     const material = resource === "iron" ? shared.iron : resource === "stone" ? shared.stoneLight : resource === "food" ? shared.food : shared.wood;
     const y = terrainHeight(x, z);
@@ -288,6 +315,10 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     const inset = makeMesh(new THREE.CylinderGeometry(2.1, 2.2, .12, 6), shared.stoneLight, parent, x, y + .31, z);
     inset.rotation.y = Math.PI / 6;
 
+    if (territory.territory_kind === "throne") {
+      createRoyalThrone(parent,x,z,worldState?.throneShielded===true);
+      return;
+    }
     if (territory.territory_kind === "castle") {
       createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home", territory.castle_skin_id);
       return;
@@ -469,7 +500,10 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
       terrainRoot.remove(homeCastleGroup);
       homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
     }
-    homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(worldState.castleSkinId)||0);
+    // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
+    const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
+    homeCastleGroup=createCastle(terrainRoot,hasThrone?13:0,hasThrone?-11:0,
+      1.4,"home",Number(worldState.castleSkinId)||0);
     rebuildTerritories();
     rebuildRoads();
     rebuildMarches();
