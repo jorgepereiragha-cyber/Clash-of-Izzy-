@@ -12,7 +12,9 @@ const RUNTIME_CACHE = "clash-of-izzy-runtime-v1";
 const CACHED_MODEL = "/assets/3d/kenney/castle-kit/Models/GLB%20format/tower-square.glb";
 
 test("PWA activates its Service Worker and serves previously cached shell and GLB offline", async ({ page, context }) => {
-  await page.goto("/");
+  // Start on the canonical portal route, not / (instant meta refresh),
+  // so SW registration and activation occur in one stable document.
+  await page.goto("/portal");
   await expect(page.locator("h1")).toContainText("CLASH OF IZZY");
 
   // The promotional portal never auto-installs the WebView cache. Register it
@@ -22,10 +24,27 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
     const registration = await navigator.serviceWorker.getRegistration("/");
     return registration?.active?.state === "activated";
   });
-  await page.reload();
-  await page.waitForFunction(() =>
-    navigator.serviceWorker.controller?.scriptURL.endsWith("/sw.js") === true
-  );
+  // The activated SW must claim this same page without a second navigation.
+  // A new-page navigation is not needed to prove Cache API offline delivery.
+  try {
+    await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+  } catch (error) {
+    const diagnostics = await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration("/");
+      return {
+        pagePath: location.pathname,
+        origin: location.origin,
+        controllerScript: navigator.serviceWorker.controller?.scriptURL || null,
+        activeScript: registration?.active?.scriptURL || null,
+        activeState: registration?.active?.state || null,
+        waitingState: registration?.waiting?.state || null,
+        scope: registration?.scope || null
+      };
+    });
+    throw new Error("SW controller missing after activation on stable page: " + JSON.stringify(diagnostics), { cause: error });
+  }
+  const controlledScript = await page.evaluate(() => navigator.serviceWorker.controller.scriptURL);
+  expect(new URL(controlledScript).pathname).toBe("/sw.js");
 
   const shellState = await page.evaluate(async cacheName => {
     const names = await caches.keys();

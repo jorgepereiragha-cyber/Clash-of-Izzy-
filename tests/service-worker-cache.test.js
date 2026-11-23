@@ -8,13 +8,13 @@ const ORIGIN = "https://clash-of-izzy.example";
 const SHELL_CACHE = source.match(/const CACHE_NAME="([^"]+)"/)?.[1];
 assert.ok(SHELL_CACHE, "Service Worker shell cache identifier missing");
 
-function makeResponse({ status = 200, headers = {}, type = "basic" } = {}) {
+function makeResponse({ status = 200, headers = {}, type = "basic", url = "" } = {}) {
   return {
     status,
     ok: status >= 200 && status < 300,
-    type,
+    type, url,
     headers: new Headers(headers),
-    clone() { return makeResponse({ status, headers, type }); },
+    clone() { return makeResponse({ status, headers, type, url }); },
     async json() { return { format: 1, threeVersion: "0.187.0", assets: ["/vendor/three/build/three.module.js"] }; },
   };
 }
@@ -198,6 +198,43 @@ test("network success is returned even when cache storage rejects writes", async
   assert.equal(navigation.result.status, 200);
   const asset = await h.dispatch("/assets/3d/house.glb");
   assert.equal(asset.result.status, 200);
+});
+
+test("PWA permits same-origin clean URL redirects and rejects external essential responses", async () => {
+  const expected = makeHarness(path => makeResponse({ url: ORIGIN + (path === "/index.html" ? "/index" : path) }));
+  await expected.lifecycle("install");
+  assert.equal(expected.stores.get(SHELL_CACHE).has("/index.html"), true);
+  const external = makeHarness(path => path === "/kingdom.html"
+    ? makeResponse({ url: "https://unexpected.example/kingdom" })
+    : makeResponse({ url: ORIGIN + path }));
+  await assert.rejects(external.lifecycle("install"), /Shell essencial nao armazenavel/);
+  assert.equal(external.stores.get(SHELL_CACHE)?.has("/kingdom.html") ?? false, false);
+});
+
+test("PWA install refuses to cache private or cookie-bearing essential HTML", async () => {
+  for (const header of [
+    { "cache-control": "private, max-age=60" },
+    { "cache-control": "no-store" },
+    { "cache-control": "no-cache" },
+    { "set-cookie": "session=opaque" }
+  ]) {
+    const h = makeHarness(request => request === "/kingdom.html"
+      ? makeResponse({ headers: header })
+      : makeResponse());
+    await assert.rejects(h.lifecycle("install"), /Shell essencial nao armazenavel/);
+    assert.equal(h.stores.get(SHELL_CACHE)?.has("/kingdom.html") ?? false, false);
+    assert.equal(h.stores.get(SHELL_CACHE)?.has("/offline.html") ?? false, false);
+  }
+});
+
+test("PWA install fetches core shell anonymously, without credentials or cache reuse", async () => {
+  const seen = [];
+  const h = makeHarness(request => {
+    if (request === "/index.html" || request === "/kingdom.html" || request === "/offline.html") seen.push(request);
+    return makeResponse();
+  });
+  await h.lifecycle("install");
+  assert.deepEqual(seen, ["/index.html", "/kingdom.html", "/offline.html"]);
 });
 
 test("shell v53 instala mesmo que uma textura opcional falhe", async () => {
