@@ -1,0 +1,217 @@
+name: Beta isolado - implantar D1 e Worker (manual e protegido)
+
+on:
+  workflow_dispatch:
+    inputs:
+      beta_sha:
+        description: "SHA completo aprovado da branch beta"
+        required: true
+        type: string
+      beta_d1_uuid:
+        description: "UUID exclusivo do D1 beta, ja vinculado em wrangler.beta.jsonc"
+        required: true
+        type: string
+      confirm_beta_only:
+        description: "Confirmo deploy SOMENTE do Worker clash-of-izzy-beta"
+        required: true
+        type: boolean
+        default: false
+      confirm_beta_migrations:
+        description: "Autorizo migrations SOMENTE no D1 clash-of-izzy-beta-db"
+        required: true
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: clash-of-izzy-beta-launch
+  cancel-in-progress: false
+
+jobs:
+  launch:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_beta_only == true && inputs.confirm_beta_migrations == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    environment: beta-infrastructure
+    steps:
+      - name: Checkout trusted main (reference data)
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: trusted-main
+          persist-credentials: false
+
+      - name: Checkout pinned beta SHA
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.beta_sha }}
+          path: beta-source
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Validate exact branch head, database target and all beta safety gates
+        shell: bash
+        env:
+          EXPECTED_SHA: ${{ inputs.beta_sha }}
+          EXPECTED_D1: ${{ inputs.beta_d1_uuid }}
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'JS'
+          import {readFileSync} from "node:fs";
+          const sha=process.env.EXPECTED_SHA,uuid=process.env.EXPECTED_D1;
+          const validUuid=/^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
+          if(!/^[a-f0-9]{40}$/i.test(sha)||!validUuid.test(uuid))throw Error("SHA ou UUID invalido");
+          const b=JSON.parse(readFileSync("beta-source/wrangler.beta.jsonc","utf8"));
+          const p=JSON.parse(readFileSync("trusted-main/wrangler.jsonc","utf8"));
+          const db=b.d1_databases?.[0];
+          if(p.name!=="clash-of-izzy"||p.d1_databases?.[0]?.database_name!=="clash-of-izzy-db"||
+            p.previews?.d1_databases?.[0]?.database_name!=="izzy-preview-17112026"||
+            !validUuid.test(p.d1_databases?.[0]?.database_id||"")||
+            !validUuid.test(p.previews?.d1_databases?.[0]?.database_id||"")||
+            p.d1_databases[0].database_id===p.previews.d1_databases[0].database_id)throw Error("Referencia original mudou");
+          if(b.name!=="clash-of-izzy-beta"||b.main!=="worker.js"||b.workers_dev!==true||
+            b.assets?.run_worker_first!==true||b.assets?.binding!=="ASSETS"||
+            b.assets?.html_handling!=="none"||b.assets?.directory!=="."||
+            b.d1_databases?.length!==1||db?.binding!=="DB"||
+            db?.database_name!=="clash-of-izzy-beta-db"||db?.database_id!==uuid||
+            uuid===p.d1_databases[0].database_id||uuid===p.previews.d1_databases[0].database_id||
+            b.vars?.ENVIRONMENT!=="beta"||b.vars?.INVITE_ONLY!=="true"||
+            b.vars?.GAME_4X_SYSTEMS_ENABLED!=="true"||
+            (b.triggers&&Object.keys(b.triggers).length))throw Error("Beta nao isolado, abortar");
+          for(const key of ["BETA_LIVE_PAYMENTS_APPROVED","LEVEL_PACKS_ENABLED",
+            "LEVEL_PACKS_PUBLIC_ENABLED","LEVEL_PACKS_PROPOSED_PRICES_APPROVED","MASTER_PACK_ENABLED"]){
+            if(b.vars?.[key]!=="false")throw Error("Pagamento ou pacote nao bloqueado: "+key);
+          }
+          console.log("Configuracao beta isolada, ainda sem escrita remota");
+          JS
+          test "$(git -C beta-source rev-parse HEAD)" = "$EXPECTED_SHA"
+          test "$(git -C beta-source ls-remote origin refs/heads/beta | cut -f1)" = "$EXPECTED_SHA"
+
+      - name: Require approved beta isolation CI for the exact SHA
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          EXPECTED_SHA: ${{ inputs.beta_sha }}
+        run: |
+          node --input-type=module - <<'JS'
+          const sha=process.env.EXPECTED_SHA;
+          const response=await fetch("https://api.github.com/repos/"+process.env.GITHUB_REPOSITORY+
+            "/actions/runs?head_sha="+sha+"&per_page=100",{headers:{
+              Authorization:"Bearer "+process.env.GITHUB_TOKEN,
+              Accept:"application/vnd.github+json"
+            }});
+          if(!response.ok)throw Error("GitHub CI API HTTP "+response.status);
+          const body=await response.json();
+          if(!body.workflow_runs?.some(run=>run.head_sha===sha&&run.head_branch==="beta"&&
+            run.name==="Beta isolation checks (no deploy)"&&run.status==="completed"&&
+            run.conclusion==="success"))throw Error("CI beta nao aprovada no commit selecionado");
+          console.log("CI beta validada no SHA exato");
+          JS
+
+      - name: Dry-run and isolation tests without remote credentials
+        working-directory: beta-source
+        shell: bash
+        run: |
+          set -euo pipefail
+          npm install --ignore-scripts --no-save --no-audit --no-fund --package-lock=false
+          npm run vendor:three
+          node beta/check-isolation.mjs --require-provisioned
+          node --test tests/beta-isolation.test.js tests/beta-preflight.test.js tests/advanced-4x-systems.test.js
+          node scripts/validate-3d-assets.js
+          npx wrangler --config wrangler.beta.jsonc deploy --dry-run --outdir=../beta-dry-run
+
+      - name: Verify remote D1 UUID, name, account and all required secrets
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          D1_TOKEN: ${{ secrets.CLOUDFLARE_BETA_D1_TOKEN }}
+          WORKER_TOKEN: ${{ secrets.CLOUDFLARE_BETA_WORKER_TOKEN }}
+          SESSION_SECRET: ${{ secrets.CLOUDFLARE_BETA_SESSION_SECRET }}
+          EXPECTED_D1: ${{ inputs.beta_d1_uuid }}
+        run: |
+          node --input-type=module - <<'JS'
+          const {CLOUDFLARE_ACCOUNT_ID:account,D1_TOKEN:d1,WORKER_TOKEN:worker,
+            SESSION_SECRET:session,EXPECTED_D1:uuid}=process.env;
+          if(!/^[0-9a-f]{32}$/i.test(account||"")||!d1||/\s/.test(d1)||
+            !worker||/\s/.test(worker)||!session||session.length<32)
+            throw Error("Secrets beta ausentes ou invalidos; nada aplicado");
+          const response=await fetch("https://api.cloudflare.com/client/v4/accounts/"+
+            account+"/d1/database/"+uuid,{headers:{Authorization:"Bearer "+d1}});
+          if(!response.ok)throw Error("Consulta D1 falhou HTTP "+response.status);
+          const body=await response.json();
+          if(!body.success||body.result?.uuid!==uuid||
+            body.result?.name!=="clash-of-izzy-beta-db")
+            throw Error("D1 Cloudflare nao corresponde ao beta, abortado");
+          console.log("D1 remoto beta exclusivo comprovado");
+          JS
+
+      - name: Apply migrations only to the verified beta D1
+        working-directory: beta-source
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BETA_D1_TOKEN }}
+        run: |
+          set -euo pipefail
+          npx wrangler --config wrangler.beta.jsonc d1 migrations apply clash-of-izzy-beta-db --remote
+          npx wrangler --config wrangler.beta.jsonc d1 execute clash-of-izzy-beta-db --remote --file beta/schema.sql
+
+      - name: Deploy exclusively the beta Worker and assets
+        working-directory: beta-source
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BETA_WORKER_TOKEN }}
+        run: npx wrangler --config wrangler.beta.jsonc deploy
+
+      - name: Install distinct beta signing secret (never production)
+        working-directory: beta-source
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BETA_WORKER_TOKEN }}
+          SESSION_SECRET: ${{ secrets.CLOUDFLARE_BETA_SESSION_SECRET }}
+        run: |
+          set -euo pipefail
+          printf '%s' "$SESSION_SECRET" | npx wrangler --config wrangler.beta.jsonc secret put SESSION_SECRET
+
+      - name: Require live beta health, invite page and closed anonymous routes
+        run: |
+          node --input-type=module - <<'JS'
+          const origin="https://clash-of-izzy-beta.jorgepereiragha.workers.dev";
+          const get=path=>fetch(origin+path,{redirect:"manual",signal:AbortSignal.timeout(12000)});
+          let healthy=false;
+          for(let attempt=0;attempt<10;attempt++){
+            try{
+              const response=await get("/api/health"),body=await response.json();
+              if(response.status===200&&body.ok===true&&body.status==="ready"&&
+                body.checks?.database===true&&body.checks?.schema===true&&
+                body.checks?.session===true&&Array.isArray(body.missingTables)&&
+                body.missingTables.length===0&&Array.isArray(body.missingTriggers)&&
+                body.missingTriggers.length===0){healthy=true;break;}
+            }catch{}
+            await new Promise(resolve=>setTimeout(resolve,5000));
+          }
+          if(!healthy)throw Error("Worker beta nao esta pronto; NAO distribuir convites");
+          const [page,kingdom,api]=await Promise.all([
+            get("/beta-access.html"),get("/kingdom.html"),get("/api/game/state")
+          ]);
+          if(page.status!==200||kingdom.status!==302||
+            new URL(kingdom.headers.get("location"),origin).pathname!=="/beta-access.html"||
+            api.status!==403||(await api.json()).code!=="BETA_INVITE_REQUIRED")
+            throw Error("Rotas beta nao isoladas; NAO distribuir convites");
+          console.log("Beta online: health pronto, convite disponivel, mundo privado para anonimos");
+          JS
+
+      - name: Publish verified status in job summary
+        if: success()
+        env:
+          EXPECTED_SHA: ${{ inputs.beta_sha }}
+        run: |
+          echo "### Beta Worker e D1 exclusivos verificados" >> "$GITHUB_STEP_SUMMARY"
+          echo "SHA aprovado: $EXPECTED_SHA" >> "$GITHUB_STEP_SUMMARY"
+          echo "Health remoto e protecao de acesso anonimo aprovados." >> "$GITHUB_STEP_SUMMARY"
+          echo "Convites, cron remoto e Android ainda requerem homologacao independente." >> "$GITHUB_STEP_SUMMARY"
