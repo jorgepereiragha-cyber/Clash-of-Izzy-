@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
+import { createWorldFpsMonitor } from "./scripts/world-map-performance.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -24,7 +25,7 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   const preference = readGraphicsChoice(window.localStorage);
   const automatic = lowMemory ? "low" : memory >= 8 ? "high" : "balanced";
   const highUnsafe = (memory > 0 && memory < 6) || (cores > 0 && cores < 6);
-  const quality = lowMemory || saveData ? "low"
+  let quality = lowMemory || saveData ? "low"
     : preference === "low" ? "low"
     : preference === "balanced" ? "balanced"
     : preference === "high" ? (highUnsafe ? "balanced" : "high")
@@ -46,6 +47,7 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   let activeMarches = [];
   let homeCastleGroup = null;
   let projectionButtons = new Map();
+  const fpsMonitor = createWorldFpsMonitor();
   let lastFrameTime = 0;
   let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
   let valhallaAuroraLight = null;
@@ -489,6 +491,20 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     projectTerritories();
   }
 
+  function downgradeWorldQuality(avg) {
+    if (quality === "low" || disposed || contextLost || !renderer) return;
+    quality = "low";
+    window.__coiWorldGraphicsQuality = "low";
+    // This actually reduces GPU work; do not only update the quality label.
+    renderer.shadowMap.enabled = false;
+    if (worldSunLight) worldSunLight.castShadow = false;
+    worldRoot.traverse(node => {
+      if (node.isMesh) node.castShadow = false;
+    });
+    resize(); // Reapply the low-resolution pixel budget (max 1M pixels / DPR 1).
+    window.dispatchEvent(new CustomEvent("coi:quality-downgraded", { detail: { avg } }));
+  }
+
   function canAnimateMarches() {
     return !disposed && !contextLost && !reduceMotion && !document.hidden && sceneInViewport;
   }
@@ -497,6 +513,7 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
     lastFrameTime = 0;
+    fpsMonitor.reset();
   }
 
   function syncMarchAnimation() {
@@ -507,9 +524,13 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   function animateMarches() {
     if (frame || !canAnimateMarches() || !activeMarches.length) return;
     lastFrameTime = 0;
+    fpsMonitor.reset();
     const tick = timestamp => {
       frame = 0;
       if (!canAnimateMarches() || !renderer || !scene) return;
+      const lowFpsAverage = fpsMonitor.sample(timestamp);
+      if (lowFpsAverage !== null) downgradeWorldQuality(lowFpsAverage);
+      lastFrameTime = timestamp;
       const now = Date.now();
       updateMarchPositions(now);
       renderer.render(scene, camera);
