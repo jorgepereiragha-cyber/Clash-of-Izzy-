@@ -25,7 +25,7 @@ test("beta deployment is manual, gated and pinned to a checked isolated D1", () 
 test("beta Worker deploys with the session secret in one version, never as an exposed asset", () => {
   assert.match(workflow, /CLOUDFLARE_BETA_WORKER_TOKEN/);
   assert.match(workflow, /CLOUDFLARE_BETA_SESSION_SECRET/);
-  assert.match(workflow, /secret_file="\$\(mktemp "\$RUNNER_TEMP\//);
+  assert.match(workflow, /secret_file="\$\(mktemp --suffix=\.json "\$RUNNER_TEMP\//);
   assert.match(workflow, /umask 077/);
   assert.match(workflow, /trap 'rm -f "\$secret_file"' EXIT/);
   assert.match(workflow, /json\.dump\(\{"SESSION_SECRET": secret\}, output\)/);
