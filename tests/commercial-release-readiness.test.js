@@ -76,7 +76,7 @@ test("consulta API pública exclusivamente por GET e falha fechado em rede ou JS
     COMMERCIAL_STORE_ORIGIN+"/api/store/catalog",
     COMMERCIAL_STORE_ORIGIN+"/api/store/payment-methods"
   ]);
-  assert.ok(visits.every(x=>x.method==="GET"&&x.redirect==="error"));
+  assert.ok(visits.every(x=>x.method==="GET"&&x.redirect==="manual"));
   await assert.rejects(checkCommercialStore(async()=>new Response("{}",{status:503})),/API pública indisponível/);
   await assert.rejects(checkCommercialStore(async()=>new Response("<html>",{status:200})),/Resposta JSON inválida/);
 });
