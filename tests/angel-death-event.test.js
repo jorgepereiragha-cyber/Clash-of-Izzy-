@@ -115,8 +115,12 @@ test("successful Angel of Death attack refreshes authoritative scores despite th
     "every refresh has a monotonically increasing generation");
   assert.ok(client.includes("if(generation!==refreshGeneration)return;state="),
     "a slow pre-attack state response cannot overwrite fresher post-attack data");
-  assert.match(client, /message\("Dano: "[^\n]+await refresh\(true\);\}catch\(error\)/,
+  assert.match(client, /const resultMessage="Dano: "[\s\S]*?const refreshed=await refresh\(true\);[\s\S]*?\}catch\(error\)/,
     "after a confirmed attack, force server-state reconciliation before releasing the lock");
+  assert.ok(client.includes("loadValhallaEventConfig().catch(()=>valhallaConfig)"),
+    "an optional event catalog failure must not suppress the authoritative fight scoreboard");
+  assert.ok(client.includes('if(!refreshed)message(resultMessage+'),
+    "a confirmed attack must not look unprocessed when only post-attack refresh fails");
   assert.ok(client.includes("finally{busy=false;updateAttackButton();}"),
     "the mutation lock is always released, including after a failed refresh");
 });
@@ -127,7 +131,32 @@ test("the browser reuses a pending attack request ID after a network retry", asy
   assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_request",pendingRequestId)'));
   assert.ok(client.includes("requestId:pendingRequestId"));
   assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_request")'));
+  assert.ok(client.includes('sessionStorage.getItem("coi_angel_death_units")'),
+    "restore the original troops of an ambiguous previous attack");
+  assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_units",JSON.stringify(pendingAttackUnits))'),
+    "persist the same troop payload as the idempotency key before sending");
+  assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_units")'),
+    "clear both only after a confirmed response");
+  assert.ok(client.includes('units:pendingAttackUnits'),
+    "retry must send the original army rather than new inputs with an old key");
+  assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_event_id",String(pendingEventId))'),
+    "bind attack retries to their original event cycle");
+  assert.ok(client.includes("currentEventId!==pendingEventId"),
+    "never apply a previous weekend retry to a new active event");
+  assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_event_id")'),
+    "release event identity after success or detected rollover");
+  const page = await readFile(new URL("../events.html", import.meta.url), "utf8");
+  assert.ok(page.includes('id="discardPendingAttack"'), "provide explicit recovery for legacy pending requests");
+  assert.ok(client.includes('const legacy=Boolean(pendingRequestId&&!pendingEventId)'),
+    "unscoped legacy request IDs must never silently replay into a new weekend");
+  assert.ok(client.includes('$("attack").disabled=busy||legacy'),
+    "require explicit acknowledgment before creating a new attack after a legacy retry");
+  assert.ok(client.includes('$("discardPendingAttack").addEventListener("click"'),
+    "allow the player to discard a local retry only after a clear confirmation");
+  assert.ok(client.includes("const units=pendingReplay?pendingAttackUnits:"),
+    "user cannot silently change army composition for a pending idempotency key");
 });
+
 
 
 
