@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- API 24-25 fallback: color + the same local royal_king.webp; no duplicated raster densities. -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:drawable="@color/coi_icon_background" />
+    <item android:width="72dp" android:height="72dp" android:gravity="center">
+        <bitmap android:src="@drawable/royal_king" android:gravity="fill" />
+    </item>
+</layer-list>

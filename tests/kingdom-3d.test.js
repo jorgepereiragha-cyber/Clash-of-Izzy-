@@ -7,6 +7,28 @@ const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 
+test("Kenney castle kit progressively replaces the default castle without leaking shared GLB geometry", () => {
+  assert.match(renderer, /function createCastleGlbGroup\(\)/);
+  assert.match(renderer, /glbTemplates\.get\("watchtower"\)/);
+  assert.match(renderer, /glbTemplates\.get\("wall"\)/);
+  assert.match(renderer, /towerTemplate\.clone\(true\)/);
+  assert.match(renderer, /wallTemplate\.clone\(true\)/);
+  assert.match(renderer, /latestCastleSkinId === 0/);
+  assert.match(renderer, /const group = castleKit \|\| \(template \? template\.clone\(true\) : createBuilding/);
+  assert.match(renderer, /neededTypes\.add\("watchtower"\)/);
+  assert.match(renderer, /neededTypes\.add\("wall"\)/);
+  assert.match(renderer, /if \(!towerTemplate \|\| !wallTemplate \|\| qualityProfile\?\.tier === "low"\) return null/);
+  assert.match(renderer, /PCFSoftShadowMap/);
+});
+
+test("mobile GLB trees scale to device tier without discarding instanced procedural forest", () => {
+  const trees=manifest.props.find(asset=>asset.id==="kenney-tree-high");
+  assert.equal(trees.positions.length,6);
+  assert.match(renderer,/positions\.slice\(0, qualityProfile\?\.tier === "high" \? 6 : 3\)/);
+  assert.match(renderer,/function addForestInstances\(\)/);
+  assert.match(renderer,/new THREE\.InstancedMesh\(trunkGeometry/);
+});
+
 test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(kingdom, /type="module" src="\/scripts\/kingdom-visual-boot\.js"/);
   assert.match(kingdom, /drawKingdomScene\(buildings,Number\(k\.equipped_skin_id\|\|0\)\)/);

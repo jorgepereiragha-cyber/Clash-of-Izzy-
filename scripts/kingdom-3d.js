@@ -588,6 +588,37 @@ if (host && "WebGLRenderingContext" in window) {
     }
     return group;
   }
+  // Reuse licensed, textured Kenney tower + wall GLBs for the default main castle.
+  // Never mutate or dispose template geometries/materials: clone(true) shares them.
+  // Owned castle skins continue through the established procedural palette path.
+  function createCastleGlbGroup() {
+    const towerTemplate = glbTemplates.get("watchtower");
+    const wallTemplate = glbTemplates.get("wall");
+    if (!towerTemplate || !wallTemplate || qualityProfile?.tier === "low") return null;
+    const castle = new THREE.Group();
+    castle.userData.coIAssetId = "kenney-castle-kit-composite";
+    const high = qualityProfile?.tier === "high";
+    const towerPositions = high
+      ? [[-.87, -.73], [.87, -.73], [-.87, .73], [.87, .73]]
+      : [[-.87, -.73], [.87, .73]];
+    for (const [x, z] of towerPositions) {
+      const tower = towerTemplate.clone(true);
+      tower.scale.setScalar(.76);
+      tower.position.set(x, 0, z);
+      castle.add(tower);
+    }
+    const wallPositions = high
+      ? [[0, -.73, 0], [0, .73, Math.PI], [-.87, 0, Math.PI / 2], [.87, 0, -Math.PI / 2]]
+      : [[0, -.73, 0], [0, .73, Math.PI]];
+    for (const [x, z, angle] of wallPositions) {
+      const wall = wallTemplate.clone(true);
+      wall.position.set(x, 0, z);
+      wall.rotation.y = angle;
+      wall.scale.setScalar(.88);
+      castle.add(wall);
+    }
+    return castle;
+  }
   function buildGround() {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(32, 32), mats.grass);
     ground.rotation.x = -Math.PI / 2; ground.position.y = -.08; ground.receiveShadow = true; scene.add(ground);
@@ -667,7 +698,9 @@ if (host && "WebGLRenderingContext" in window) {
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
       const template = glbTemplates.get(b.building_type);
-      const group = template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId);
+      const castleKit = b.building_type === "castle" && latestCastleSkinId === 0
+        ? createCastleGlbGroup() : null;
+      const group = castleKit || (template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId));
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       // Adicionar acessórios depois das sombras: ornamentos mobile não projetam sombras.
@@ -952,8 +985,11 @@ if (host && "WebGLRenderingContext" in window) {
       const template = glbPropTemplates.get(asset.id);
       if (!template) continue;
       const positions = Array.isArray(asset.positions) && asset.positions.length ? asset.positions : [asset.position || [0, 0, 0]];
-      for (let index = 0; index < positions.length; index += 1) {
-        const position = positions[index];
+      // Limit optional textured trees per tier; existing instanced forest stays as baseline.
+      const visiblePositions = asset.id === "kenney-tree-high"
+        ? positions.slice(0, qualityProfile?.tier === "high" ? 6 : 3) : positions;
+      for (let index = 0; index < visiblePositions.length; index += 1) {
+        const position = visiblePositions[index];
         if (!Array.isArray(position) || position.length !== 3 || position.some(value => !Number.isFinite(Number(value)))) continue;
         const instance = template.clone(true);
         instance.position.fromArray(position.map(Number));
@@ -1030,6 +1066,12 @@ if (host && "WebGLRenderingContext" in window) {
           .map(item => item?.building_type)
           .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
       );
+      // The textured main castle is assembled from already licensed watchtower/wall GLBs.
+      // When those assets cannot load, the original castle still renders unmodified.
+      if (neededTypes.has("castle") && latestCastleSkinId === 0) {
+        neededTypes.add("watchtower");
+        neededTypes.add("wall");
+      }
       const presentUnits = new Set(
         (Array.isArray(troops) ? troops : [])
           .filter(unit => Number(unit?.quantity) > 0)
@@ -1100,7 +1142,7 @@ if (host && "WebGLRenderingContext" in window) {
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
     renderer.toneMappingExposure = 1.12;
     renderer.shadowMap.enabled = qualityProfile.shadows;
-    renderer.shadowMap.type = THREE.PCFShadowMap;
+    renderer.shadowMap.type = qualityProfile.tier === "high" ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     renderer.domElement.id = "kingdom3d";
     renderer.domElement.setAttribute("aria-hidden", "true");
     renderer.domElement.style.cssText = "position:absolute;inset:0;width:100%;height:100%;z-index:0;pointer-events:none";
