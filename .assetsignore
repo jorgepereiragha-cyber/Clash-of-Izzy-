@@ -77,6 +77,7 @@ eldoria-room.js
 
 scripts/staging-load-smoke.mjs
 scripts/cloudflare-remote-audit.mjs
+scripts/verify-d1-core-repair-readonly.mjs
 android-sideload/**
 # Do not serve local package lockfile as a public asset.
 package-lock.json
