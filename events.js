@@ -4,10 +4,12 @@ const API="/api";
 const $=id=>document.getElementById(id);
 const token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
 const unitNames={militia:"Milícia",swordsman:"Espadachim",spearman:"Lanceiro",archer:"Arqueiro",crossbowman:"Besteiro",cavalry:"Cavalaria",knight:"Cavaleiro",catapult:"Catapulta",ram:"Aríete",trebuchet:"Trabuquete"};
-let state=null,eventState=null,valhallaConfig=null,busy=false,selected={},pendingRequestId=null,pendingAttackUnits=null;
+let state=null,eventState=null,valhallaConfig=null,busy=false,selected={},pendingRequestId=null,pendingAttackUnits=null,pendingEventId=null;
 let refreshGeneration=0;
 try{
  pendingRequestId=sessionStorage.getItem("coi_angel_death_request")||null;
+ const storedEventId=Number(sessionStorage.getItem("coi_angel_death_event_id"));
+ if(Number.isSafeInteger(storedEventId)&&storedEventId>0)pendingEventId=storedEventId;
  const storedUnits=sessionStorage.getItem("coi_angel_death_units");
  if(pendingRequestId&&storedUnits){
   const parsed=JSON.parse(storedUnits);
@@ -25,7 +27,15 @@ function renderTroops(){const root=$("troops");root.replaceChildren();const troo
 function renderLeaderboard(){const root=$("leaderboard");root.replaceChildren();const rows=eventState?.leaderboard||[];if(!rows.length){root.append(make("div","muted","Ainda não há pontuação. Seja o primeiro a enfrentar o Anjo da Morte."));return;}const table=make("table","leaderboard"),head=make("thead"),hr=make("tr");for(const label of ["Pos.","Jogador / Reino","Pontuação"]){hr.append(make("th","",label));}head.append(hr);table.append(head);const body=make("tbody");rows.forEach((player,index)=>{const tr=make("tr"),position=make("td","",index+1+"º"),name=make("td","",player.display_name+" · "+player.kingdom_name),score=make("td","",fmt(player.score));tr.append(position,name,score);body.append(tr);});table.append(body);root.append(table);}
 function updateAttackButton(){const event=eventState?.event;const retry=Boolean(pendingRequestId&&pendingAttackUnits);const units=retry?pendingAttackUnits:selected;const selectedCount=Object.values(units).reduce((sum,value)=>sum+Number(value||0),0);$("attack").textContent=retry?"↻ REENVIAR ATAQUE PENDENTE":"⚔️ ATACAR O ANJO DA MORTE";$("attack").disabled=busy||!event||event.status!=="active"||Number(event.boss_hp_remaining)<=0||selectedCount<1;}
 function render(){renderWorldEventCards({eventState,valhallaConfig});const event=eventState?.event;if(!event){$("eventStatus").textContent="Evento aguardando calendário";$("bossHpText").textContent="O calendário mundial será sincronizado em instantes.";updateAttackButton();return;}const active=event.status==="active"&&Number(event.boss_hp_remaining)>0;const status=event.status==="scheduled"?"AGENDADO":event.status==="completed"?"ENCERRADO":Number(event.boss_hp_remaining)<=0?"CHEFE DERROTADO":"EM ANDAMENTO";$("eventStatus").textContent=status;$("schedule").textContent=dateLabel(event.starts_at)+" até "+dateLabel(event.ends_at)+" · Horário de Brasília";const hp=Math.max(0,Number(event.boss_hp_remaining||0)),max=Math.max(1,Number(event.boss_hp_total||1)),percent=Math.max(0,Math.min(100,hp/max*100));$("bossHpBar").style.width=percent+"%";$("bossHpText").textContent=fmt(hp)+" / "+fmt(max)+" pontos de vida · "+percent.toFixed(4).replace(".",",")+"% restantes";const p=eventState.participant||{};$("myScore").textContent=fmt(p.score);$("myRank").textContent=p.rank?fmt(p.rank)+"º":"—";$("myAttacks").textContent=fmt(p.attacks);$("myLosses").textContent=fmt(p.troops_lost);const essence=(state?.inventoryItems||[]).find(item=>item.item_key==="death_essence");$("myEssence").textContent=fmt(essence?.quantity);renderLeaderboard();renderCountdown();renderTroops();updateAttackButton();if(!active&&event.status==="active")message("O chefe foi derrotado. A classificação permanece aberta até o encerramento do fim de semana.");}
-async function refresh(force=false){if(busy&&!force)return;const generation=++refreshGeneration;try{const [game,event,seasonConfig]=await Promise.all([request("/game/state"),request("/game/event"),loadValhallaEventConfig()]);if(generation!==refreshGeneration)return;state=game.state||game;eventState=event;valhallaConfig=seasonConfig;render();}catch(error){if(generation===refreshGeneration)message(error.message,true);}}
+async function refresh(force=false){if(busy&&!force)return;const generation=++refreshGeneration;try{const [game,event,seasonConfig]=await Promise.all([request("/game/state"),request("/game/event"),loadValhallaEventConfig()]);if(generation!==refreshGeneration)return;state=game.state||game;eventState=event;valhallaConfig=seasonConfig;
+ const currentEventId=Number(eventState?.event?.id);
+ if(pendingRequestId&&pendingEventId&&Number.isSafeInteger(currentEventId)&&currentEventId>0&&currentEventId!==pendingEventId){
+  // A completed weekend's idempotency key must never be reused in a new event.
+  pendingRequestId=null;pendingAttackUnits=null;pendingEventId=null;
+  try{sessionStorage.removeItem("coi_angel_death_request");sessionStorage.removeItem("coi_angel_death_units");sessionStorage.removeItem("coi_angel_death_event_id");}catch{}
+  message("Tentativa pendente de outro ciclo descartada. Consulte o resultado anterior antes de enviar novas tropas.");
+ }
+ render();}catch(error){if(generation===refreshGeneration)message(error.message,true);}}
 async function attack(){
  if(busy)return;
  const pendingReplay=Boolean(pendingRequestId&&pendingAttackUnits);
@@ -39,16 +49,18 @@ async function attack(){
  busy=true;++refreshGeneration;updateAttackButton();
  if(!pendingRequestId)pendingRequestId=crypto.randomUUID();
  if(!pendingAttackUnits)pendingAttackUnits={...units};
+ if(!pendingEventId)pendingEventId=Number(eventState?.event?.id)||null;
  try{
   sessionStorage.setItem("coi_angel_death_request",pendingRequestId);
   sessionStorage.setItem("coi_angel_death_units",JSON.stringify(pendingAttackUnits));
+  if(pendingEventId)sessionStorage.setItem("coi_angel_death_event_id",String(pendingEventId));
  }catch{}
  message(pendingReplay?"Verificando o resultado do ataque pendente…":"O exército está avançando contra o Anjo da Morte…");
  try{
   const result=await request("/game/event/attack",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({requestId:pendingRequestId,units:pendingAttackUnits})});
-  try{sessionStorage.removeItem("coi_angel_death_request");sessionStorage.removeItem("coi_angel_death_units");}catch{}
-  pendingRequestId=null;pendingAttackUnits=null;selected={};
+  try{sessionStorage.removeItem("coi_angel_death_request");sessionStorage.removeItem("coi_angel_death_units");sessionStorage.removeItem("coi_angel_death_event_id");}catch{}
+  pendingRequestId=null;pendingAttackUnits=null;pendingEventId=null;selected={};
   const losses=Object.entries(result.losses||{}).filter(([,value])=>Number(value)>0)
    .map(([key,value])=>key.replace("_"," T")+" × "+fmt(value)).join(", ");
   message("Dano: "+fmt(result.damage)+" · Tropas perdidas: "+fmt(result.troopsLost)+(losses?" ("+losses+")":""));
