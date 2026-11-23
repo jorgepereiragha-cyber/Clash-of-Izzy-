@@ -13,14 +13,24 @@ const configured = () => {
   return snapshot;
 };
 
-test("beta config is safe as a scaffold, but the remote migration/deploy gate is closed", () => {
+test("beta config is safe both before and after isolated D1 provisioning", () => {
   const { beta, production } = baseline();
-  const check = checkBetaIsolation(beta, production);
-  assert.equal(check.ok, true, check.errors.join("; "));
-  assert.equal(check.configured, false);
+  const current = checkBetaIsolation(beta, production);
+  assert.equal(current.ok, true, current.errors.join("; "));
+
+  // Verify the unprovisioned state independently of the current branch configuration.
+  const scaffold = structuredClone(beta);
+  scaffold.d1_databases[0].database_id = "REPLACE_WITH_NEW_BETA_D1_UUID";
+  const scaffoldCheck = checkBetaIsolation(scaffold, production);
+  assert.equal(scaffoldCheck.ok, true, scaffoldCheck.errors.join("; "));
+  assert.equal(scaffoldCheck.configured, false);
+  const scaffoldRemote = checkBetaIsolation(scaffold, production, { requireProvisioned: true });
+  assert.equal(scaffoldRemote.ok, false);
+  assert.match(scaffoldRemote.errors.join(" "), /UUID exclusivo/);
+
+  // A configured, distinct D1 must pass the strict remote gate, never bypass it.
   const remote = checkBetaIsolation(beta, production, { requireProvisioned: true });
-  assert.equal(remote.ok, false);
-  assert.match(remote.errors.join(" "), /UUID exclusivo/);
+  assert.equal(remote.ok, current.configured, remote.errors.join("; "));
 });
 
 test("a fresh, distinct beta D1 UUID passes preflight without mutating existing environments", () => {
@@ -66,12 +76,21 @@ test("cannot bypass invite gate, real-money kill switches or worker-first asset 
   }
 });
 
-test("CLI communicates safe placeholder status but refuses remote prerequisite until UUID exists", () => {
+test("CLI reports the current D1 state and enforces the remote prerequisite", () => {
+  const { beta, production } = baseline();
+  const check = checkBetaIsolation(beta, production);
+  assert.equal(check.ok, true, check.errors.join("; "));
+
   const script = new URL("../beta/check-isolation.mjs", import.meta.url);
   const preview = spawnSync(process.execPath, [script.pathname], { encoding: "utf8" });
   assert.equal(preview.status, 0, preview.stderr);
-  assert.match(preview.stdout, /ESQUELETO OK/);
-  const blocked = spawnSync(process.execPath, [script.pathname, "--require-provisioned"], { encoding: "utf8" });
-  assert.equal(blocked.status, 1);
-  assert.match(blocked.stderr, /BETA BLOQUEADO/);
+  assert.match(preview.stdout, check.configured ? /BETA CONFIG OK/ : /BETA ESQUELETO OK/);
+
+  const remote = spawnSync(process.execPath, [script.pathname, "--require-provisioned"], { encoding: "utf8" });
+  assert.equal(remote.status, check.configured ? 0 : 1);
+  if (check.configured) {
+    assert.match(remote.stdout, /BETA CONFIG OK/);
+  } else {
+    assert.match(remote.stderr, /BETA BLOQUEADO/);
+  }
 });
