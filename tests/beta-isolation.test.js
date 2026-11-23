@@ -45,6 +45,11 @@ const request = (path, init = {}) => new Request("https://clash-of-izzy-beta.jor
 const betaEnv = db => ({ ENVIRONMENT: "beta", INVITE_ONLY: "true", BETA_LIVE_PAYMENTS_APPROVED: "false", DB: db });
 
 test("the beta config never binds either existing D1 and intercepts all asset requests", () => {
+  const excludes = new Set(read(".assetsignore").split("\n").map(v => v.trim()));
+  for (const item of ["beta-access.js", "wrangler.beta.jsonc", "beta/**"]) {
+    assert.ok(excludes.has(item), "private beta code/config leaked into assets: " + item);
+  }
+  assert.ok(!excludes.has("beta-access.html"), "the invitation page must remain available");
   const betaConfig = JSON.parse(read("wrangler.beta.jsonc"));
   const prodConfig = JSON.parse(read("wrangler.jsonc"));
   assert.equal(betaConfig.name, "clash-of-izzy-beta");
