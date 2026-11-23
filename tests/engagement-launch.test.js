@@ -62,6 +62,7 @@ test("contribuições voluntárias são separadas de pacotes de gemas",async()=>
   assert.match(mp,/finalizeSupportOrder/);
   assert.doesNotMatch(module,/UPDATE players SET gems|INSERT INTO player_skins/);
   assert.match(apoie,/data-voluntary="escudeiro"/);
-  assert.match(portal,/api\/public\/stats/);
+  assert.match(portal,/href="\/apoie\.html"/);
+  assert.doesNotMatch(portal,/api\/public\/stats|supportTotalCents|id="support-goal"/);
   assert.doesNotMatch(portal,/1247|8542|clashofizzy@pix\.com/);
 });
