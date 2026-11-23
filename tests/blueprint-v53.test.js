@@ -21,9 +21,9 @@ test("castle upgrades não mutam materiais compartilhados nem permanecem em clon
 test("service worker mantém shell essencial e trata falha de recursos opcionais", async () => {
   const sw = await read("sw.js");
   assert.ok(Number(sw.match(/clash-of-izzy-shell-v(\d+)/)?.[1]) >= 54, "PWA cache must include kingdom session recovery");
-  assert.doesNotMatch(sw, /cache\\.addAll\\(required\\)/);
-  assert.match(sw, /if \\(!canStoreResponse\\(response\\)\\) throw new Error/);
-  assert.match(sw, /credentials: "omit"/);
+  assert.equal(sw.includes("cache.addAll(required)"), false);
+  assert.ok(sw.includes('if (!canStoreResponse(response)) throw new Error'));
+  assert.ok(sw.includes('credentials: "omit"'));
   assert.match(sw, /Promise\.allSettled/);
   assert.match(sw, /canStoreResponse\(response\)/);
   assert.match(sw, /new Response\("Sem conexão/);
