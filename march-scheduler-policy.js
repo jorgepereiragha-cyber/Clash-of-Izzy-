@@ -24,11 +24,16 @@ export async function resolveDueMarchKingdoms({
     ? now : new Date().toISOString();
   const due = await db.prepare(DUE_MARCH_KINGDOMS_SQL).bind(queryAt, maxRealms).all();
   let completed = 0, failed = 0;
+  // Diagnostic failures must never prevent other due kingdoms from settling.
+  const reportFailure = async (id, error) => {
+    try { await onFailure(id, error); }
+    catch { console.warn("Beta march failure reporter failed; continuing tick"); }
+  };
   for (const row of (due.results || []).slice(0, maxRealms)) {
     const id = Number(row.kingdom_id);
     if (!Number.isSafeInteger(id) || id <= 0) {
       failed++;
-      onFailure(row.kingdom_id, new Error("Invalid realm identifier"));
+      await reportFailure(row.kingdom_id, new Error("Invalid realm identifier"));
       continue;
     }
     try {
@@ -36,7 +41,7 @@ export async function resolveDueMarchKingdoms({
       completed++;
     } catch (error) {
       failed++;
-      onFailure(id, error);
+      await reportFailure(id, error);
       // Never let one realm with failing state block the others this tick.
     }
   }

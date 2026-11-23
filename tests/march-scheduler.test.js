@@ -60,3 +60,18 @@ test("malformed realm IDs are skipped; no calls run without DB", async () => {
   assert.deepEqual(res,{selected:3,completed:1,failed:2});
   await assert.rejects(resolveDueMarchKingdoms({resolveKingdom:async()=>{}}), /Missing scheduler/);
 });
+
+test("diagnostic callback errors never starve later realms", async () => {
+  const db = dbFixture([{kingdom_id:-1},{kingdom_id:1},{kingdom_id:2},{kingdom_id:3}]);
+  const settled = [];
+  const result = await resolveDueMarchKingdoms({
+    db, now:"2026-11-23T20:40:00.000Z",
+    resolveKingdom:async id => {
+      settled.push(id);
+      if(id===1) throw new Error("settlement failure");
+    },
+    onFailure:async () => { throw new Error("diagnostics unavailable"); }
+  });
+  assert.deepEqual(settled,[1,2,3]);
+  assert.deepEqual(result,{selected:4,completed:2,failed:2});
+});

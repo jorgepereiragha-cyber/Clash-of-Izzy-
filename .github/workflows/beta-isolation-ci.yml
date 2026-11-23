@@ -2,50 +2,8 @@ name: Beta isolation checks (no deploy)
 on:
   pull_request:
     branches: [beta]
-    paths:
-      - wrangler.beta.jsonc
-      - beta-access.js
-      - beta-access.html
-      - beta/**
-      - android-sideload/**
-      - tests/beta-isolation.test.js
-      - .github/workflows/beta-isolation-ci.yml
-      - .github/workflows/android-beta-apk.yml
-      - .assetsignore
-      - worker.js
-      - kingdom.html
-      - intermediate-production.js
-      - city-defense-rules.js
-      - player-progression-4x.js
-      - hero-assignments-4x.js
-      - scripts/kingdom-3d.js
-      - scripts/kingdom-4x-systems.js
-      - migrations/**
-      - tests/**
-      - package.json
   push:
     branches: [beta]
-    paths:
-      - wrangler.beta.jsonc
-      - beta-access.js
-      - beta-access.html
-      - beta/**
-      - android-sideload/**
-      - tests/beta-isolation.test.js
-      - .github/workflows/beta-isolation-ci.yml
-      - .github/workflows/android-beta-apk.yml
-      - .assetsignore
-      - worker.js
-      - kingdom.html
-      - intermediate-production.js
-      - city-defense-rules.js
-      - player-progression-4x.js
-      - hero-assignments-4x.js
-      - scripts/kingdom-3d.js
-      - scripts/kingdom-4x-systems.js
-      - migrations/**
-      - tests/**
-      - package.json
 permissions:
   contents: read
 jobs:
