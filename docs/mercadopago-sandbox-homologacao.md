@@ -55,6 +55,18 @@ Estas consultas exigem schema correspondente e acesso ao Preview comercial; não
 
 Somente após CI, Preview, Sandbox, auditoria de segurança, procedimentos de estorno e autorização do proprietário, criar uma mudança explícita e reversível para ativar `MP_PAYMENTS_ENABLED`. A mera presença de credenciais nunca equivale à homologação.
 
+## Escopo comercial por migração — evitar ofertas inexistentes
+
+A última auditoria **de leitura** confirmada para produção (Action #45109683935, em 23/11/2026) identificou histórico até `0039_support_orders.sql`. Isso **não comprova** que migrações posteriores estejam presentes agora; conferir novamente antes de qualquer lançamento.
+
+- `0024`: campos e tabela `mercadopago_orders` necessários ao checkout Orders; `0031` e `0032`: sementes dos pacotes diários incluindo o Inicial de R$ 3,99/35 gemas. Testar esses produtos **em staging**, não presumir sucesso de cobrança em produção pela existência de tabelas.
+- `0039`: `support_orders` para contribuição voluntária **sem gemas**.
+- `0040`: adiciona na `vip_packages` os produtos **Apoio Escudeiro/Cavaleiro/Senhor Feudal com gemas**. Se o histórico de produção continuar em `0039`, esses produtos **não estão cadastrados por essa migração em produção**. Não anunciá-los como disponíveis para compra.
+- `0041` e `0042`: schema avançado 4X e `level_pack_claims` para progressão P1–P8. Não ativar P1–P3 sem homologar todo o encadeamento; P4–P8 têm preços propostos e exigem aprovação adicional.
+- Pacote Master exige `MASTER_PACK_ENABLED="true"`, também sujeito a teste e autorização específicos.
+
+**Gate:** o rollout financeiro pode ser fatiado por produtos, mas a seleção de catálogo e migrações deve ser comprovada **por banco**. Não aplicar `0040`–`0044` diretamente em produção como atalho para habilitar a loja.
+
 ## Procedimento operacional detalhado (somente após autorização para staging)
 
 **Não executar estes passos no Worker ou D1 de produção.** Não reutilizar o D1 Preview 4X da PR #319 para testes comerciais se seu histórico for incompatível. Preparar um Worker de homologação com domínio distinto, D1 isolado e descartável, log protegido e `ENVIRONMENT` identificando o ambiente, sem jogadores ou credenciais reais. O endereço e o UUID exatos serão definidos pelo operador e verificados **antes** de qualquer escrita. Não criar valores fictícios para eles.
