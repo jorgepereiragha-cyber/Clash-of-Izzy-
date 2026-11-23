@@ -2,7 +2,19 @@ import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map
 
 const API = "/api";
 const $ = id => document.getElementById(id);
-const token = localStorage.getItem("coi_game_token") || sessionStorage.getItem("coi_game_token");
+function readWorldSession() {
+  let readable = false;
+  // Accessing a browser storage property may throw before getItem can run.
+  for (const storage of [() => window.localStorage, () => window.sessionStorage]) {
+    try {
+      const value = storage().getItem("coi_game_token");
+      readable = true;
+      if (value) return { token: value, blocked: false };
+    } catch {}
+  }
+  return { token: "", blocked: !readable };
+}
+let token = readWorldSession().token;
 const RESOURCE = {
   food: { icon: "🌾", label: "Comida" },
   wood: { icon: "🪵", label: "Madeira" },
@@ -58,7 +70,11 @@ async function request(path, options = {}) {
     },
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Falha ao comunicar com o reino.");
+  if (!response.ok) {
+    const error = new Error(data.error || "Falha ao comunicar com o reino.");
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 function territoryOwner(territory) {
@@ -536,10 +552,29 @@ $("worldMap").addEventListener("wheel", event => {
 }, { passive: false });
 window.addEventListener("resize", () => applyMapViewport());
 
+function showWorldSessionRecovery() {
+  setStatus("O navegador bloqueou o armazenamento da sessão. Nenhum novo reino será criado automaticamente.", true);
+  const notice = $("marchNotice");
+  notice.replaceChildren(document.createTextNode("Permita o armazenamento do site e "));
+  const retry = make("button", "", "Tentar novamente");
+  retry.type = "button";
+  retry.id = "retryWorldSession";
+  retry.addEventListener("click", () => {
+    const checked = readWorldSession();
+    if (checked.blocked) { setStatus("O armazenamento da sessão continua bloqueado.", true); return; }
+    token = checked.token;
+    void connect();
+  });
+  const link = make("a", "", "Acessar minha conta");
+  link.href = "/account.html";
+  notice.append(retry, document.createTextNode(" ou "), link);
+}
 async function connect() {
   if (!token) {
-    location.replace("/kingdom.html");
-    return;
+    const checked = readWorldSession();
+    token = checked.token;
+    if (!token && checked.blocked) { showWorldSessionRecovery(); return; }
+    if (!token) { location.replace("/kingdom.html"); return; }
   }
   setStatus("Sincronizando territórios…");
   try {
@@ -548,7 +583,13 @@ async function connect() {
     setStatus("● Reino sincronizado");
   } catch (error) {
     setStatus(error.message, true);
-    $("marchNotice").textContent = error.message;
+    const notice = $("marchNotice");
+    notice.replaceChildren(document.createTextNode(error.message));
+    if (error.status === 401 || error.status === 403) {
+      const account = make("a", "", "Acessar minha conta");
+      account.href = "/account.html";
+      notice.append(document.createTextNode(" "), account);
+    }
   }
 }
 connect();

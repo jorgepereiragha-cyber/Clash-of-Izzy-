@@ -19,6 +19,22 @@ test("world map page loads authenticated territory and march interface", () => {
   for (const marker of ['id="worldMap"', 'id="territoryDetails"', 'id="troops"', 'id="marches"', 'src="/world-map.js"']) assert.ok(html.includes(marker), "missing world map marker: " + marker);
 });
 
+test("world map handles inaccessible browser storage before importing world state", () => {
+  const start = script.indexOf("function readWorldSession()");
+  const check = script.indexOf("const RESOURCE", start);
+  assert.ok(start > 0 && check > start);
+  const storage = script.slice(start, check);
+  assert.ok(storage.includes("() => window.localStorage"));
+  assert.ok(storage.includes("() => window.sessionStorage"));
+  assert.ok(storage.includes("return { token: \"\", blocked: !readable }"));
+  assert.ok(script.includes('if (!token && checked.blocked) { showWorldSessionRecovery(); return; }'));
+  assert.ok(script.includes('retry.id = "retryWorldSession"'));
+  assert.ok(script.includes('link.href = "/account.html"'));
+  assert.ok(script.includes("error.status = response.status;"), "preserve error status to display account recovery");
+  assert.ok(script.includes('if (error.status === 401 || error.status === 403)'));
+
+});
+
 test("world map presents an isometric 3D strategy view instead of a free-roaming arena hero", async () => {
   const scene = await readFile(new URL("../world-map-3d.js", import.meta.url), "utf8");
   for (const marker of ['id="world3d"', 'Mapa estratégico 3D', 'world-map-visual-boot.js']) assert.ok(html.includes(marker), "missing 3D map presentation: " + marker);
