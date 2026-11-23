@@ -27,7 +27,7 @@ function renderTroops(){const root=$("troops");root.replaceChildren();const troo
 function renderLeaderboard(){const root=$("leaderboard");root.replaceChildren();const rows=eventState?.leaderboard||[];if(!rows.length){root.append(make("div","muted","Ainda não há pontuação. Seja o primeiro a enfrentar o Anjo da Morte."));return;}const table=make("table","leaderboard"),head=make("thead"),hr=make("tr");for(const label of ["Pos.","Jogador / Reino","Pontuação"]){hr.append(make("th","",label));}head.append(hr);table.append(head);const body=make("tbody");rows.forEach((player,index)=>{const tr=make("tr"),position=make("td","",index+1+"º"),name=make("td","",player.display_name+" · "+player.kingdom_name),score=make("td","",fmt(player.score));tr.append(position,name,score);body.append(tr);});table.append(body);root.append(table);}
 function updateAttackButton(){const event=eventState?.event;const retry=Boolean(pendingRequestId&&pendingAttackUnits);const legacy=Boolean(pendingRequestId&&!pendingEventId);const units=retry?pendingAttackUnits:selected;const selectedCount=Object.values(units).reduce((sum,value)=>sum+Number(value||0),0);$("attack").textContent=legacy?"⚠️ CONFIRA TENTATIVA ANTERIOR":retry?"↻ REENVIAR ATAQUE PENDENTE":"⚔️ ATACAR O ANJO DA MORTE";$("attack").disabled=busy||legacy||!event||event.status!=="active"||Number(event.boss_hp_remaining)<=0||selectedCount<1;$("discardPendingAttack").hidden=!pendingRequestId;$("discardPendingAttack").disabled=busy;}
 function render(){renderWorldEventCards({eventState,valhallaConfig});const event=eventState?.event;if(!event){$("eventStatus").textContent="Evento aguardando calendário";$("bossHpText").textContent="O calendário mundial será sincronizado em instantes.";updateAttackButton();return;}const active=event.status==="active"&&Number(event.boss_hp_remaining)>0;const status=event.status==="scheduled"?"AGENDADO":event.status==="completed"?"ENCERRADO":Number(event.boss_hp_remaining)<=0?"CHEFE DERROTADO":"EM ANDAMENTO";$("eventStatus").textContent=status;$("schedule").textContent=dateLabel(event.starts_at)+" até "+dateLabel(event.ends_at)+" · Horário de Brasília";const hp=Math.max(0,Number(event.boss_hp_remaining||0)),max=Math.max(1,Number(event.boss_hp_total||1)),percent=Math.max(0,Math.min(100,hp/max*100));$("bossHpBar").style.width=percent+"%";$("bossHpText").textContent=fmt(hp)+" / "+fmt(max)+" pontos de vida · "+percent.toFixed(4).replace(".",",")+"% restantes";const p=eventState.participant||{};$("myScore").textContent=fmt(p.score);$("myRank").textContent=p.rank?fmt(p.rank)+"º":"—";$("myAttacks").textContent=fmt(p.attacks);$("myLosses").textContent=fmt(p.troops_lost);const essence=(state?.inventoryItems||[]).find(item=>item.item_key==="death_essence");$("myEssence").textContent=fmt(essence?.quantity);renderLeaderboard();renderCountdown();renderTroops();updateAttackButton();if(!active&&event.status==="active")message("O chefe foi derrotado. A classificação permanece aberta até o encerramento do fim de semana.");}
-async function refresh(force=false){if(busy&&!force)return;const generation=++refreshGeneration;try{const [game,event,seasonConfig]=await Promise.all([request("/game/state"),request("/game/event"),loadValhallaEventConfig()]);if(generation!==refreshGeneration)return;state=game.state||game;eventState=event;valhallaConfig=seasonConfig;
+async function refresh(force=false){if(busy&&!force)return;const generation=++refreshGeneration;try{const [game,event,seasonConfig]=await Promise.all([request("/game/state"),request("/game/event"),loadValhallaEventConfig().catch(()=>valhallaConfig)]);if(generation!==refreshGeneration)return;state=game.state||game;eventState=event;valhallaConfig=seasonConfig;
  const currentEventId=Number(eventState?.event?.id);
  if(pendingRequestId&&pendingEventId&&Number.isSafeInteger(currentEventId)&&currentEventId>0&&currentEventId!==pendingEventId){
   // A completed weekend's idempotency key must never be reused in a new event.
@@ -35,7 +35,7 @@ async function refresh(force=false){if(busy&&!force)return;const generation=++re
   try{sessionStorage.removeItem("coi_angel_death_request");sessionStorage.removeItem("coi_angel_death_units");sessionStorage.removeItem("coi_angel_death_event_id");}catch{}
   message("Tentativa pendente de outro ciclo descartada. Consulte o resultado anterior antes de enviar novas tropas.");
  }
- render();}catch(error){if(generation===refreshGeneration)message(error.message,true);}}
+ render();return true;}catch(error){if(generation===refreshGeneration)message(error.message,true);return false;}}
 async function attack(){
  if(busy)return;
  const pendingReplay=Boolean(pendingRequestId&&pendingAttackUnits);
@@ -63,8 +63,10 @@ async function attack(){
   pendingRequestId=null;pendingAttackUnits=null;pendingEventId=null;selected={};
   const losses=Object.entries(result.losses||{}).filter(([,value])=>Number(value)>0)
    .map(([key,value])=>key.replace("_"," T")+" × "+fmt(value)).join(", ");
-  message("Dano: "+fmt(result.damage)+" · Tropas perdidas: "+fmt(result.troopsLost)+(losses?" ("+losses+")":""));
-  await refresh(true);
+  const resultMessage="Dano: "+fmt(result.damage)+" · Tropas perdidas: "+fmt(result.troopsLost)+(losses?" ("+losses+")":"");
+  message(resultMessage);
+  const refreshed=await refresh(true);
+  if(!refreshed)message(resultMessage+" · O ataque foi confirmado, mas o placar não pôde ser atualizado. Use Atualizar.",true);
  }catch(error){message(error.message,true);}
  finally{busy=false;updateAttackButton();}
 }
