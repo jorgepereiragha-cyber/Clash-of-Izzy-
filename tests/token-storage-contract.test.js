@@ -42,6 +42,10 @@ test("kingdom tolerates one blocked storage without replacing the player's realm
   assert.match(html,/if\(token\)saveKingdomGameToken\(token\)/);
   assert.match(html,/sessionStorageUnavailable=!saveKingdomGameToken\(token\)/);
   assert.match(html,/não salvou a sessão/);
+  assert.match(html,/let guestCreationAttempted=false/);
+  assert.match(html,/guestCreationAttempted=true/);
+  assert.match(html,/if\(!guestCreationAttempted\|\|token\)\{/);
+  assert.match(html,/guestCreationAttempted&&!token/);
 });
 
 test("account logout clears both copies of the game token", async () => {
