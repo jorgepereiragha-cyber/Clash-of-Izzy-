@@ -1,5 +1,6 @@
 // Release-only public check. Never creates orders, reads secrets, or edits production.
 import {pathToFileURL} from "node:url";
+import {readReleaseJson} from "./release-readonly-http.mjs";
 
 export const COMMERCIAL_STORE_ORIGIN="https://clash-of-izzy.jorgepereiragha.workers.dev";
 export const REQUIRED_OFFERS=Object.freeze([
@@ -66,18 +67,8 @@ export function assertCommercialStore(catalog,methods){
 }
 
 async function fetchJson(fetchImpl,path){
-  const response=await fetchImpl(COMMERCIAL_STORE_ORIGIN+path,{
-    method:"GET",redirect:"error",headers:{Accept:"application/json"},
-    signal:AbortSignal.timeout(12000)
-  });
-  if(!response||response.status!==200){
-    throw new Error("API pública indisponível em "+path+" (HTTP "+String(response?.status||0)+").");
-  }
-  const value=await response.json().catch(()=>null);
-  if(!value||typeof value!=="object"){
-    throw new Error("Resposta JSON inválida em "+path+".");
-  }
-  return value;
+  const result=await readReleaseJson(fetchImpl,COMMERCIAL_STORE_ORIGIN+path);
+  return result.value;
 }
 
 export async function checkCommercialStore(fetchImpl=fetch){
