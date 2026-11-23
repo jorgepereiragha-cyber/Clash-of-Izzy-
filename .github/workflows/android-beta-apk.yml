@@ -11,7 +11,7 @@ permissions:
   contents: read
 jobs:
   apk_beta:
-    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_beta_build == true }}
+    if: ${{ github.ref == 'refs/heads/beta' && inputs.confirm_beta_build == true }}
     runs-on: ubuntu-latest
     environment: beta-signing
     timeout-minutes: 30
