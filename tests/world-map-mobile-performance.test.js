@@ -35,7 +35,7 @@ test("FPS downgrade changes actual renderer cost, not just an indicator", async 
   const scene = await read("world-map-3d.js");
   assert.match(scene,/let quality = lowMemory \|\| saveData/);
   assert.match(scene,/function checkAndDowngradeQuality\(timestamp\)/);
-  assert.match(scene,/timestamp - lastFpsCheck < 3000 \\|\\| fpsSamples.length < 20/);
+  assert.ok(scene.includes("timestamp - lastFpsCheck < 3000 || fpsSamples.length < 20"));
   assert.match(scene,/samples\.length < 20/);
   assert.match(scene,/avg >= 22/);
   assert.match(scene,/fpsSamples\.length > 60/);
