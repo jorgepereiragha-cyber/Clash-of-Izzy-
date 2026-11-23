@@ -663,11 +663,23 @@ if (host && "WebGLRenderingContext" in window) {
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minZ = Math.min(...zs), maxZ = Math.max(...zs);
     const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-    const span = Math.max(maxX - minX + 4, maxZ - minZ + 4);
-    // Zoom only affects the client camera; no game state is persisted.
-    camera.zoom = Math.min(1, 13 / span) * cameraZoomFactor;
     camera.position.set(cx + 10, 13, cz + 11);
     camera.lookAt(cx, .2, cz);
+    // On narrow Android screens world-space X/Z spans are insufficient: the
+    // diagonal isometric projection can crop buildings at the left and right.
+    // Fit the *camera-space* footprint to the actual orthographic viewport.
+    camera.updateMatrixWorld(true);
+    const projected = points.map(({ x, z }) =>
+      new THREE.Vector3(x, .18, z).applyMatrix4(camera.matrixWorldInverse));
+    const screenXs = projected.map(point => point.x);
+    const screenYs = projected.map(point => point.y);
+    const projectedWidth = Math.max(...screenXs) - Math.min(...screenXs) + 3.2;
+    const projectedHeight = Math.max(...screenYs) - Math.min(...screenYs) + 4.0;
+    const viewportWidth = Math.max(1, camera.right - camera.left);
+    const viewportHeight = Math.max(1, camera.top - camera.bottom);
+    // Player zoom remains view-only. A reset always restores the safe fit.
+    const fitZoom = Math.min(1, viewportWidth / projectedWidth, viewportHeight / projectedHeight);
+    camera.zoom = fitZoom * cameraZoomFactor;
     camera.updateProjectionMatrix();
   }
   function publishBuildingHitTargets(buildings = latestBuildings) {
@@ -1305,6 +1317,10 @@ if (host && "WebGLRenderingContext" in window) {
       const viewHeight = 12.8, viewWidth = viewHeight * aspect;
       camera.left = -viewWidth / 2; camera.right = viewWidth / 2;
       camera.top = viewHeight / 2; camera.bottom = -viewHeight / 2;
+      // Refit after orientation/viewport changes; otherwise portrait mode can
+      // clip outer buildings even when the initial landscape frame was valid.
+      const visibleBuildings = latestBuildings.slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
+      if (visibleBuildings.length) frameCityBuildings(visibleBuildings);
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }) * (automaticGraphics ? adaptivePixelScale.scale : 1));
       renderer.setSize(host.clientWidth, host.clientHeight, false);
