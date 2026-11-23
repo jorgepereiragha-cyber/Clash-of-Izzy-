@@ -61,7 +61,7 @@ const betaEnv = db => ({ ENVIRONMENT: "beta", INVITE_ONLY: "true", BETA_LIVE_PAY
 
 test("the beta config never binds either existing D1 and intercepts all asset requests", () => {
   const excludes = new Set(read(".assetsignore").split("\n").map(v => v.trim()));
-  for (const item of ["beta-access.js", "portal-worker.js", "wrangler.beta.jsonc", "beta/**"]) {
+  for (const item of ["beta-access.js", "portal-worker.js", "march-scheduler-policy.js", "wrangler.beta.jsonc", "beta/**"]) {
     assert.ok(excludes.has(item), "private beta code/config leaked into assets: " + item);
   }
   assert.ok(!excludes.has("beta-access.html"), "the invitation page must remain available");
