@@ -688,6 +688,17 @@ const EQUIPMENT_RESEARCH={
  gear_vitality:{name:"Forja Vital",icon:"❤️",description:"Amplia a vida concedida pelos equipamentos.",effect:"Vida",perLevel:0.5,maxLevel:10,cost:{wood:500,stone:350,iron:60}},
  gear_logistics:{name:"Passos de Asgard",icon:"🌬️",description:"Aumenta a velocidade das marchas do reino.",effect:"Marcha",perLevel:0.5,maxLevel:10,cost:{wood:600,stone:350,iron:100}}
 };
+const RESEARCH_CATALOG=Object.freeze({
+ economy:{name:"Economia",category:"economy",cost:{wood:250,stone:120,iron:0},maxLevel:30,requiresAcademy:false},
+ military:{name:"Doutrina militar",category:"military",cost:{wood:300,stone:180,iron:40},maxLevel:30,requiresAcademy:false},
+ construction:{name:"Engenharia de construção",category:"economy",cost:{wood:350,stone:250,iron:0},maxLevel:30,requiresAcademy:false},
+ defense:{name:"Defesa",category:"defense",cost:{wood:220,stone:300,iron:25},maxLevel:30,requiresAcademy:true},
+ gear_forging:{name:EQUIPMENT_RESEARCH.gear_forging.name,category:"military",cost:EQUIPMENT_RESEARCH.gear_forging.cost,maxLevel:EQUIPMENT_RESEARCH.gear_forging.maxLevel,requiresAcademy:true},
+ gear_ward:{name:EQUIPMENT_RESEARCH.gear_ward.name,category:"defense",cost:EQUIPMENT_RESEARCH.gear_ward.cost,maxLevel:EQUIPMENT_RESEARCH.gear_ward.maxLevel,requiresAcademy:true},
+ gear_vitality:{name:EQUIPMENT_RESEARCH.gear_vitality.name,category:"defense",cost:EQUIPMENT_RESEARCH.gear_vitality.cost,maxLevel:EQUIPMENT_RESEARCH.gear_vitality.maxLevel,requiresAcademy:true},
+ gear_logistics:{name:EQUIPMENT_RESEARCH.gear_logistics.name,category:"military",cost:EQUIPMENT_RESEARCH.gear_logistics.cost,maxLevel:EQUIPMENT_RESEARCH.gear_logistics.maxLevel,requiresAcademy:true}
+});
+
 async function ensureEquipmentTables(env,kingdomId){
  await env.DB.batch(STARTER_EQUIPMENT_KEYS.map(key=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_equipment(kingdom_id,item_key,level,is_locked) VALUES(?,?,1,0)").bind(kingdomId,key)));
  return (await env.DB.prepare("SELECT item_key,level,is_locked,updated_at FROM kingdom_equipment WHERE kingdom_id=? ORDER BY item_key").bind(kingdomId).all()).results||[];
@@ -906,6 +917,100 @@ async function gameState(env,playerId){
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
     defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
+
+async function kingdomStatus(env,playerId){
+  const player=await env.DB.prepare("SELECT id,gems FROM players WHERE player_id=?").bind(playerId).first();
+  if(!player)return null;
+  const ownedKingdom=await env.DB.prepare("SELECT id FROM kingdoms WHERE player_id=?").bind(player.id).first();
+  if(!ownedKingdom)return null;
+
+  const kingdomId=Number(ownedKingdom.id);
+  await applyProduction(env,kingdomId);
+  await processDueKingdomQueues(env,kingdomId);
+  await recalculateKingdomStats(env,kingdomId);
+  await recalculateKingdomPower(env,kingdomId);
+
+  const [kingdom,academy,researchRows,activeQueue]=await Promise.all([
+    env.DB.prepare(
+      "SELECT kingdom_name,castle_level,power,food,wood,stone,iron,gold,"+
+      "food_capacity,wood_capacity,stone_capacity,iron_capacity,gold_capacity,updated_at "+
+      "FROM kingdoms WHERE id=?"
+    ).bind(kingdomId).first(),
+    env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy'").bind(kingdomId).first(),
+    env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=?").bind(kingdomId).all(),
+    env.DB.prepare(
+      "SELECT id,target_key,from_level,to_level,started_at,completes_at "+
+      "FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running' ORDER BY id DESC LIMIT 1"
+    ).bind(kingdomId).first()
+  ]);
+  if(!kingdom)return null;
+
+  const academyLevel=Math.max(0,Number(academy?.level)||0);
+  const levels=new Map((researchRows.results||[]).map(row=>[
+    String(row.research_key),Math.max(0,Number(row.level)||0)
+  ]));
+  const activeResearch=activeQueue?{
+    id:Number(activeQueue.id),
+    researchKey:String(activeQueue.target_key),
+    fromLevel:Number(activeQueue.from_level)||0,
+    toLevel:Number(activeQueue.to_level)||0,
+    startedAt:activeQueue.started_at,
+    completesAt:activeQueue.completes_at
+  }:null;
+  const researches=Object.entries(RESEARCH_CATALOG).map(([id,definition])=>{
+    const level=levels.get(id)||0;
+    const maxLevel=Math.max(1,Number(definition.maxLevel)||30);
+    const requiredAcademyLevel=definition.requiresAcademy?Math.ceil((level+1)/3):null;
+    const unlocked=level<maxLevel&&(!definition.requiresAcademy||academyLevel>=requiredAcademyLevel);
+    let lockedReason=null;
+    if(level>=maxLevel)lockedReason="Nível máximo atingido.";
+    else if(definition.requiresAcademy&&academyLevel<requiredAcademyLevel){
+      lockedReason=academyLevel<1
+        ?"Construa o Centro de Pesquisa Militar primeiro."
+        :"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis desta ciência.";
+    }
+    const nextCost=Object.fromEntries(Object.entries(definition.cost).map(([resource,amount])=>[
+      resource,Math.max(0,Math.floor(Number(amount)||0))*(level+1)
+    ]));
+    const canAfford=Object.entries(nextCost).every(([resource,cost])=>Number(kingdom[resource]||0)>=cost);
+    const queued=activeResearch?.researchKey===id;
+    const available=unlocked&&!activeResearch;
+    return {
+      id,name:definition.name,category:definition.category,level,maxLevel,nextLevel:level+1,
+      unlocked,available,canAfford,canStart:available&&canAfford,queued,
+      requiredAcademyLevel,nextCost,lockedReason
+    };
+  });
+
+  return {
+    kingdom:{
+      name:kingdom.kingdom_name,
+      castleLevel:Number(kingdom.castle_level)||1,
+      power:Math.max(0,Number(kingdom.power)||0),
+      updatedAt:kingdom.updated_at||null
+    },
+    resources:{
+      food:Math.max(0,Number(kingdom.food)||0),
+      wood:Math.max(0,Number(kingdom.wood)||0),
+      stone:Math.max(0,Number(kingdom.stone)||0),
+      iron:Math.max(0,Number(kingdom.iron)||0),
+      gold:Math.max(0,Number(kingdom.gold)||0),
+      gems:Math.max(0,Number(player.gems)||0)
+    },
+    capacities:{
+      food:Math.max(0,Number(kingdom.food_capacity)||0),
+      wood:Math.max(0,Number(kingdom.wood_capacity)||0),
+      stone:Math.max(0,Number(kingdom.stone_capacity)||0),
+      iron:Math.max(0,Number(kingdom.iron_capacity)||0),
+      gold:Math.max(0,Number(kingdom.gold_capacity)||0)
+    },
+    researchCenterLevel:academyLevel,
+    researches,
+    activeResearch,
+    serverTime:new Date().toISOString()
+  };
+}
+
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
   if(!p)return json({error:"Jogador não encontrado."},404);
@@ -1559,15 +1664,15 @@ async function gameAction(env,playerId,body){
     if(!result[1]?.meta?.changes)return json({error:"Recursos insuficientes ou fila de treinamento ocupada. Atualize e tente novamente."},409);
   }else if(type==="research"){
     const key=String(body.research||"economy");
-    const allowed={economy:{wood:250,stone:120,iron:0},military:{wood:300,stone:180,iron:40},construction:{wood:350,stone:250,iron:0},defense:{wood:220,stone:300,iron:25},gear_forging:{wood:500,stone:300,iron:60},gear_ward:{wood:450,stone:400,iron:70},gear_vitality:{wood:500,stone:350,iron:60},gear_logistics:{wood:600,stone:350,iron:100}};
+    const allowed=Object.fromEntries(Object.entries(RESEARCH_CATALOG).map(([key,definition])=>[key,definition.cost]));
     if(!Object.hasOwn(allowed,key))return json({error:"Pesquisa inválida."},400);
     const current=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key=?").bind(k.id,key).first();
-    const level=current?.level||0,maxLevel=key.startsWith("gear_")?(EQUIPMENT_RESEARCH[key]?.maxLevel||10):30;
+    const level=current?.level||0,maxLevel=RESEARCH_CATALOG[key].maxLevel;
     if(level>=maxLevel)return json({error:"Pesquisa no nível máximo."},409);
     const center=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy'").bind(k.id).first();
     const centerLevel=Number(center?.level||0);
-    if((key==="defense"||key.startsWith("gear_"))&&centerLevel<1)return json({error:"Construa o Centro de Pesquisa Militar primeiro."},409);
-    if((key==="defense"||key.startsWith("gear_"))&&level>=Math.min(maxLevel,centerLevel*3))return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis desta ciência."},409);
+    if(RESEARCH_CATALOG[key].requiresAcademy&&centerLevel<1)return json({error:"Construa o Centro de Pesquisa Militar primeiro."},409);
+    if(RESEARCH_CATALOG[key].requiresAcademy&&level>=Math.min(maxLevel,centerLevel*3))return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis desta ciência."},409);
     const activeQueue=await env.DB.prepare("SELECT id FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running'").bind(k.id).first();
     if(activeQueue)return json({error:"Sua fila de pesquisa já está ocupada. Aguarde a tecnologia atual."},409);
     const c=allowed[key],factor=level+1,cost={wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
@@ -1575,8 +1680,8 @@ async function gameAction(env,playerId,body){
     const durationSeconds=await scaleKingdomQueueDurationSeconds(env,k.id,calculateQueueDurationSeconds("research",{level:level+1,facilityLevel:Math.max(1,centerLevel)}),"research",valhallaMultipliers);
     const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();
     const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
-    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND (? NOT IN ('defense','gear_forging','gear_ward','gear_vitality','gear_logistics') OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running')")
-      .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,key,k.id,Math.ceil((level+1)/3),k.id);
+    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND (?=0 OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running')")
+      .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,RESEARCH_CATALOG[key].requiresAcademy?1:0,k.id,Math.ceil((level+1)/3),k.id);
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
     statements.push(env.DB.prepare("INSERT INTO kingdom_queues(kingdom_id,queue_type,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at) SELECT ?,?,?,?,?,?,?,'running',?,? WHERE "+guard)
       .bind(k.id,"research",key,1,level,level+1,"imperial_crest",startedAt,completesAt,k.id,actionId));
@@ -2302,7 +2407,7 @@ export default {
     const created=await env.DB.prepare("SELECT id,status,product_name,price_brl,currency,payment_method,payment_reference,created_at FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
     return json({success:true,request:created,message:paymentMethod==="mercadopago_link"?"Pedido registrado. Finalize o pagamento no checkout seguro.":paymentMethod==="pix"?"Pedido Pix Nubank registrado e ainda não pago. Solicite cobrança no suporte e aguarde a conciliação bancária.":"Pedido registrado para conferência manual."},201);
   }
-  const isGamePath=url.pathname.startsWith("/api/game/");
+  const isGamePath=url.pathname.startsWith("/api/game/")||url.pathname==="/api/kingdom/status";
   if(isGamePath){
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
@@ -2669,6 +2774,13 @@ export default {
         const rallyBody=isWrite?await readBody(request,8192):{};
         if(rallyBody.__bodyError)return json({error:"Solicitação de guerra inválida."},rallyBody.__bodyError==="payload_too_large"?413:400);
         return await handleRally(request,env,playerId,rallyPath,rallyBody);
+      }
+      if(url.pathname==="/api/kingdom/status"){
+        if(request.method!=="GET")return json({error:"Método não permitido."},405);
+        const limited=await rateLimitDecision(env,"kingdom-status-player",playerId,120,60);
+        if(limited)return limited;
+        const status=await kingdomStatus(env,playerId);
+        return status?json(status):json({error:"Reino não encontrado."},404);
       }
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);

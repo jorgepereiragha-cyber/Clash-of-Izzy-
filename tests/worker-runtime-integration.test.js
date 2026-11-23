@@ -180,6 +180,7 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     assert.equal(valhallaDefault.dailyRunesReward, 100);
 
     expectStatus(await api("/api/game/state"), 401, "estado sem sessão");
+    expectStatus(await api("/api/kingdom/status"), 401, "resumo do reino sem sessão");
     expectStatus(await api("/api/game/action", { method: "POST", body: { type: "rename", name: "Sem Token" } }), 401, "ação sem sessão");
 
     const catalogBefore = expectStatus(await api("/api/store/catalog"), 200, "catálogo público");
@@ -248,6 +249,18 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const state = stateEnvelope.state;
       assert.ok(state, "o endpoint retorna o estado dentro do envelope state");
       assert.equal(Number(state.kingdom.id), kingdomA);
+      const kingdomStatus = expectStatus(await api("/api/kingdom/status", { token: tokenA }), 200, "resumo autenticado do reino");
+      assert.equal(kingdomStatus.kingdom.name, state.kingdom.kingdom_name);
+      assert.equal(Number(kingdomStatus.kingdom.castleLevel), Number(state.kingdom.castle_level));
+      assert.ok(Number.isFinite(Number(kingdomStatus.resources.food)) && Number(kingdomStatus.resources.food) >= 0);
+      assert.ok(Number(kingdomStatus.capacities.food) >= Number(kingdomStatus.resources.food));
+      assert.ok(Number(kingdomStatus.resources.gems) >= 0);
+      assert.equal(Number(kingdomStatus.researchCenterLevel), Number(state.buildings.find(item => item.building_type === "academy")?.level || 0));
+      assert.ok(kingdomStatus.researches.some(item => item.id === "economy" && item.unlocked), "economia fica disponível sem requisito de Academia");
+      assert.ok(kingdomStatus.researches.some(item => item.id === "economy" && item.canAfford && item.canStart), "pesquisa informa elegibilidade e recursos suficientes para começar");
+      assert.ok(kingdomStatus.researches.some(item => item.id === "defense" && item.requiredAcademyLevel === 1), "defesa expõe o requisito real da Academia");
+      assert.ok(kingdomStatus.researches.every(item => Number.isInteger(item.level) && Number.isInteger(item.maxLevel)));
+      expectStatus(await api("/api/kingdom/status", { method: "POST", token: tokenA }), 405, "resumo do reino aceita apenas GET");
       assert.ok(state.equipment?.length >= 4, "equipamentos iniciais carregados");
       assert.ok(state.heroInventory?.length >= 1, "herói inicial sincronizado");
       expectStatus(await api("/api/game/analytics", {
