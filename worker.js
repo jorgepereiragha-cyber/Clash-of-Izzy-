@@ -2179,9 +2179,14 @@ export default {
       // Existing verified sessions are not new account creation. Rate-limit
       // resumes by player, not by shared NAT/proxy IP, to avoid locking out
       // established kingdoms when other devices exhaust the guest quota.
-      const existingPlayerId=await gameIdentity(request,env);
+      const authorization=request.headers.get("Authorization")||"";
+      const existingPlayerId=authorization?await gameIdentity(request,env):null;
+      // Never create a fresh guest realm when the caller intended to resume
+      // one with an expired, revoked or malformed session.
+      if(authorization&&!existingPlayerId)return json({error:"Sessão inválida ou expirada. Entre na sua conta para recuperar o reino.",code:"GAME_SESSION_INVALID"},401);
       if(existingPlayerId){
         const existingKingdom=await env.DB.prepare("SELECT 1 FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?").bind(existingPlayerId).first();
+        if(!existingKingdom)return json({error:"O reino vinculado à sessão não foi encontrado. Entre em contato com o suporte.",code:"GAME_REALM_MISSING"},404);
         if(existingKingdom){
           const resumedLimit=await rateLimitDecision(env,"game-resume-player",existingPlayerId,120,3600);
           if(resumedLimit)return resumedLimit;
