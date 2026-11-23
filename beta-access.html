@@ -25,11 +25,33 @@ button:disabled{opacity:.65;cursor:wait}#status{min-height:26px;font-weight:600}
 <input id="code" name="code" type="text" placeholder="IZZY-..." autocomplete="off" maxlength="25" required spellcheck="false">
 <button id="submit" type="submit">Entrar no beta</button>
 </form>
+<section id="active-session" hidden>
+<p>Esta sessão já tem autorização para o beta fechado.</p>
+<a href="/kingdom.html" style="display:block;color:#f4d69a;margin:14px 0">Voltar ao meu reino</a>
+<button type="button" id="logout">Encerrar sessão beta</button>
+</section>
 <p id="status" role="status" aria-live="polite"></p>
 <small>O acesso é limitado. O beta não aceita pagamentos reais nesta fase.</small>
 </main>
 <script>
 const form=document.getElementById("form"),button=document.getElementById("submit"),status=document.getElementById("status");
+const activeSession=document.getElementById("active-session"),logout=document.getElementById("logout");
+function setSession(active){form.hidden=active;activeSession.hidden=!active;}
+fetch("/api/beta/access/status",{cache:"no-store",credentials:"same-origin"})
+  .then(response=>{if(response.ok)setSession(true);}).catch(()=>{});
+logout.addEventListener("click",async()=>{
+  logout.disabled=true;status.textContent="Encerrando sessão...";
+  try{
+    const response=await fetch("/api/beta/access/logout",{
+      method:"POST",credentials:"same-origin",cache:"no-store"
+    });
+    if(!response.ok)throw new Error("logout");
+    setSession(false);
+    document.getElementById("code").value="";
+    status.textContent="Sessão encerrada. Um novo convite será necessário.";
+  }catch{status.textContent="Não foi possível encerrar. Tente novamente.";}
+  finally{logout.disabled=false;}
+});
 form.addEventListener("submit",async e=>{
   e.preventDefault();button.disabled=true;status.textContent="Validando convite...";
   try{
