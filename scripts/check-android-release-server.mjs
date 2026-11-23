@@ -1,4 +1,5 @@
 import { pathToFileURL } from "node:url";
+import { readReleaseJson } from "./release-readonly-http.mjs";
 
 export const LIVE_API_URL = "https://clash-of-izzy.jorgepereiragha.workers.dev/api/health";
 export const REQUIRED_ANDROID_CONTRACT = "eldoria-android-v1";
@@ -22,17 +23,8 @@ export function assertAndroidReleaseServer(health, httpStatus) {
 }
 
 export async function checkAndroidReleaseServer(fetchImpl = fetch) {
-  const response = await fetchImpl(LIVE_API_URL, {
-    method: "GET",
-    redirect: "error",
-    headers: { Accept: "application/json" },
-    signal: AbortSignal.timeout(12000)
-  });
-  if (!response || typeof response.status !== "number") {
-    throw new Error("Resposta HTTP ausente da API de produção.");
-  }
-  const health = await response.json().catch(() => null);
-  return assertAndroidReleaseServer(health, response.status);
+  const {value:health,status} = await readReleaseJson(fetchImpl,LIVE_API_URL);
+  return assertAndroidReleaseServer(health,status);
 }
 
 async function main() {
