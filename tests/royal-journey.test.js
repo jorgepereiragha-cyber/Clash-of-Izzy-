@@ -13,6 +13,9 @@ test("Jornada do Trono is real, discoverable and accessible on mobile", () => {
   assert.match(html, /src="\/scripts\/royal-journey\.js"/);
   assert.match(html, /href="\/styles\/royal-journey\.css"/);
   assert.match(html, /coi:command-state/);
+  assert.match(html, /window\\.__coiCommandSnapshot=commandSnapshot/);
+  assert.match(ui, /if \\(window\\.__coiCommandSnapshot\\)/);
+  assert.doesNotMatch(html, /window\\.__coiCommandSnapshot=token/);
   assert.match(ui, /\.textContent = next\./);
   assert.doesNotMatch(ui, /\.innerHTML|fetch\(|postMessage\(/);
   assert.match(css, /max-width:600px/);
