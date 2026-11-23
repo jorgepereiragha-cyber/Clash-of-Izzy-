@@ -149,19 +149,33 @@ test("PWA serves Cloudflare clean-URL pages offline using the canonical .html sh
   assert.equal(unknown.result.status, 200, "unknown URL receives only the cached offline fallback");
 });
 
-test("PWA shell responses are cached by pathname and serve offline fallback", async () => {
+test("PWA navigation never saves live HTML and falls back to anonymous shell snapshots", async () => {
   const h = makeHarness();
   const first = await h.dispatch("/kingdom.html", { mode: "navigate" });
   assert.equal(first.handled, true);
   assert.equal(first.result.status, 200);
+  assert.equal(h.stores.size, 0, "online HTML navigation must not be cached");
+  await h.lifecycle("install");
   assert.ok(h.stores.get(SHELL_CACHE).has("/kingdom.html"));
   h.offline();
-  const fallback = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
-  assert.equal(fallback.result.status, 503);
-  await (await h.caches.open(SHELL_CACHE))
-    .put("/offline.html", makeResponse());
+  const kingdom = await h.dispatch("/kingdom", { mode: "navigate" });
+  assert.equal(kingdom.result.status, 200, "offline canonical route uses anonymous snapshot");
   const offline = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
-  assert.equal(offline.result.status, 200);
+  assert.equal(offline.result.status, 200, "unknown route shows only offline fallback");
+});
+
+test("PWA never stores potentially personalized HTML even if headers hide Set-Cookie", async () => {
+  const h = makeHarness(() => makeResponse());
+  for (const [path,options] of [
+    ["/kingdom", { mode:"navigate" }],
+    ["/account.html", { mode:"navigate" }],
+    ["/kingdom", { mode:"cors" }],
+    ["/portal", { mode:"cors" }],
+  ]) {
+    const response = await h.dispatch(path, options);
+    assert.equal(response.result.status, 200, path);
+  }
+  assert.equal(h.stores.size, 0, "only the anonymous install step is allowed to save HTML");
 });
 
 test("PWA only adds approved static assets without query strings", async () => {
