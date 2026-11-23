@@ -5,7 +5,7 @@ import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
-import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
+import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController, calculateKingdomFrameZoom } from "./kingdom-quality.js";
 import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
@@ -648,13 +648,35 @@ if (host && "WebGLRenderingContext" in window) {
     if (!camera || !buildings.length) return;
     const points = buildings.map(cityWorldPoint);
     const xs = points.map(p => p.x), zs = points.map(p => p.z);
-    const minX = Math.min(...xs), maxX = Math.max(...xs);
-    const minZ = Math.min(...zs), maxZ = Math.max(...zs);
-    const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-    const span = Math.max(maxX - minX + 4, maxZ - minZ + 4);
-    camera.zoom = Math.min(1, 13 / span);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2;
+    const cz = (Math.min(...zs) + Math.max(...zs)) / 2;
     camera.position.set(cx + 10, 13, cz + 11);
-    camera.lookAt(cx, .2, cz);
+    camera.lookAt(cx, 1.45, cz);
+    camera.updateMatrixWorld(true);
+
+    // Usa as dimensões projetadas de edifícios (incluindo altura), em vez de
+    // um span no plano X/Z que pode cortar as bordas em Android estreito.
+    let minViewX = Infinity, maxViewX = -Infinity;
+    let minViewY = Infinity, maxViewY = -Infinity;
+    for (const point of points) {
+      for (const x of [point.x - 1.7, point.x + 1.7]) {
+        for (const z of [point.z - 1.7, point.z + 1.7]) {
+          for (const y of [0, 4.2]) {
+            const viewPoint = new THREE.Vector3(x, y, z).applyMatrix4(camera.matrixWorldInverse);
+            minViewX = Math.min(minViewX, viewPoint.x);
+            maxViewX = Math.max(maxViewX, viewPoint.x);
+            minViewY = Math.min(minViewY, viewPoint.y);
+            maxViewY = Math.max(maxViewY, viewPoint.y);
+          }
+        }
+      }
+    }
+    camera.zoom = calculateKingdomFrameZoom({
+      viewWidth: camera.right - camera.left,
+      viewHeight: camera.top - camera.bottom,
+      sceneWidth: maxViewX - minViewX,
+      sceneHeight: maxViewY - minViewY
+    });
     camera.updateProjectionMatrix();
   }
   function publishBuildingHitTargets(buildings = latestBuildings) {
@@ -1278,6 +1300,7 @@ if (host && "WebGLRenderingContext" in window) {
       const viewHeight = 12.8, viewWidth = viewHeight * aspect;
       camera.left = -viewWidth / 2; camera.right = viewWidth / 2;
       camera.top = viewHeight / 2; camera.bottom = -viewHeight / 2;
+      frameCityBuildings(latestBuildings.slice(0, Math.min(9, qualityProfile?.maxBuildings || 9)));
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }) * (automaticGraphics ? adaptivePixelScale.scale : 1));
       renderer.setSize(host.clientWidth, host.clientHeight, false);
