@@ -10,7 +10,7 @@ test("official and isolated portal display exactly the same social launch metada
   assert.match(portal,/twitter:card/);
   assert.match(portal,/rel="canonical"/);
   assert.match(portal,/og:image/);
-  assert.match(portal,/download oficial será liberado após os testes finais/);
+  assert.match(portal,/O APK será oferecido quando a release oficial estiver publicada/);
 });
 test("social actions share only the public marketing portal and never a payment or internal game page", () => {
   const portal=read("public-portal/portal.html");
@@ -22,7 +22,8 @@ test("social actions share only the public marketing portal and never a payment 
   assert.match(portal,/navigator\.clipboard\.writeText/);
   assert.match(portal,/utm_campaign=eldoria_pre_lancamento/);
   assert.match(portal,/id="download-apk" aria-disabled="true"/);
-  assert.match(portal,/id="play-browser" href="https:\/\/clash-of-izzy\.jorgepereiragha\.workers\.dev\/kingdom\.html"/);
+  assert.doesNotMatch(portal,/id="play-browser"|kingdom\.html/);
+  assert.match(portal,/id="download-apk-final" aria-disabled="true"/);
   assert.doesNotMatch(portal,/NUBANK_PIX_KEY|MP_ACCESS_TOKEN|paymentReference/);
   assert.doesNotMatch(portal,/href="\/(?:kingdom|world|arena|account|admin)\.html"/);
 });
