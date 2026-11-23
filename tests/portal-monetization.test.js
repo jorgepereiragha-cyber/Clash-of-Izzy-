@@ -29,7 +29,7 @@ test('isolated portal markets Android only without game routes or PWA', async ()
 test('Nubank Pix cannot be selected until a server flag enables the assisted workflow', async () => {
   const [worker, arena] = await Promise.all([read('worker.js'), read('arena.html')]);
   assert.match(worker, /\/api\/store\/payment-methods/);
-  assert.match(worker, /nubankPix:nubankPixReady\(env\)/);
+  assert.match(worker, /visiblePaymentMethods\(env,nubankPixReady\(env\)\)/);
   assert.match(worker, /requestedPaymentMethod==="pix" && !nubankPixReady\(env\)/);
   assert.match(worker, /"NUBANK_PIX_NOT_CONFIGURED"/);
   assert.match(arena, /<option value="pix" disabled>/);
