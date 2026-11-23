@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { createHash, webcrypto } from "node:crypto";
 import { readFileSync } from "node:fs";
 import { betaAccessGuard, betaPaymentDisabled, normalizeInviteCode } from "../beta-access.js";
+import { checkBetaIsolation } from "../beta/check-isolation.mjs";
 
 globalThis.crypto ??= webcrypto;
 const read = path => readFileSync(new URL("../" + path, import.meta.url), "utf8");
@@ -88,7 +89,10 @@ test("the beta config never binds either existing D1 and intercepts all asset re
   assert.equal(prodConfig.vars.GAME_4X_SYSTEMS_ENABLED, "false");
   assert.notEqual(betaConfig.d1_databases[0].database_id, prodConfig.d1_databases[0].database_id);
   assert.notEqual(betaConfig.d1_databases[0].database_id, prodConfig.previews.d1_databases[0].database_id);
-  assert.match(betaConfig.d1_databases[0].database_id, /^REPLACE_WITH_/);
+  // The contract must remain valid before AND after real beta D1 provisioning.
+  // Requiring the placeholder here would make the first real beta deploy fail CI.
+  const isolation = checkBetaIsolation(betaConfig, prodConfig);
+  assert.equal(isolation.ok, true, isolation.errors.join("; "));
   assert.equal(betaConfig.triggers, undefined);
   assert.match(read("worker.js"), /const betaGateResponse=await betaAccessGuard\(request,env\);/);
   assert.match(read("worker.js"), /if\(env\.ENVIRONMENT==="beta"&&advanced4xEnabled\(env\)\)requiredTables\.push\("intermediate_resources","city_defenses","kingdom_progression","progression_xp_ledger"\)/);
