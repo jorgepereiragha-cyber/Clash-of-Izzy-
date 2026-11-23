@@ -4,11 +4,10 @@ import { readFile } from "node:fs/promises";
 
 test("Worker processa marchas vencidas sem depender do login do jogador", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
-  assert.ok(policy.includes("GROUP BY kingdom_id ORDER BY MIN(arrives_at), kingdom_id LIMIT ?"));
   const policy = await readFile(new URL("../march-scheduler-policy.js", import.meta.url), "utf8");
+  assert.ok(policy.includes("GROUP BY kingdom_id ORDER BY MIN(arrives_at), kingdom_id LIMIT ?"));
+  assert.ok(policy.includes("MAX_DUE_KINGDOMS_PER_TICK = 4"));
   assert.ok(worker.includes("resolveDueMarchKingdoms("));
-  assert.match(policy, /MAX_DUE_KINGDOMS_PER_TICK = 4/);
-  assert.match(worker, /resolveDueMarchKingdoms\\(/);
   const schedulerStart = worker.indexOf("async scheduled(controller,env){");
   const schedulerEnd = worker.indexOf("async fetch(request,env)", schedulerStart);
   const scheduler = worker.slice(schedulerStart, schedulerEnd);
