@@ -4,12 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#081831">
-<meta name="description" content="Clash of Izzy: estratégia medieval para Android. Conheça o jogo e baixe o APK oficial assinado quando estiver disponível.">
-<meta property="og:title" content="Clash of Izzy — Jogo para Android">
-<meta property="og:description" content="Conheça Clash of Izzy: construa seu reino, recrute heróis e forme alianças. O download oficial será liberado após os testes finais.">
+<meta name="description" content="Clash of Izzy: o reino no seu celular. Descubra o jogo e acompanhe o lançamento do APK oficial para Android.">
+<meta property="og:title" content="Clash of Izzy — O Reino no Seu Celular">
+<meta property="og:description" content="Construa, lute e domine. O APK será oferecido quando a release oficial estiver publicada e validada.">
 <meta property="og:url" content="https://clash-of-izzy-portal.jorgepereiragha.workers.dev/portal.html">
 <meta name="twitter:card" content="summary_large_image">
-<meta name="twitter:title" content="Clash of Izzy — Seu reino, seu legado">
+<meta name="twitter:title" content="Clash of Izzy — O Reino no Seu Celular">
 <meta name="twitter:description" content="Estratégia medieval 4X para Android. Acompanhe o lançamento do APK oficial.">
 <meta name="twitter:image" content="https://clash-of-izzy-portal.jorgepereiragha.workers.dev/assets/brand/royal-king.webp">
 <link rel="canonical" href="https://clash-of-izzy-portal.jorgepereiragha.workers.dev/portal.html">
@@ -18,7 +18,7 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="preload" href="/assets/brand/royal-king.webp" as="image" type="image/webp">
 <link rel="stylesheet" href="/styles/coi-theme.css">
-<title>Clash of Izzy — Jogar no navegador e APK Android</title>
+<title>Clash of Izzy — O Reino no Seu Celular | APK Android</title>
 <style>
 :root{
   color-scheme:dark;--gold:#f1c467;--gold-light:#ffe3a1;--ink:#f8f1df;--muted:#c5d2e7;
@@ -114,84 +114,106 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
 @media(prefers-reduced-motion:reduce){.download{transition:none}}
 
 
-/* Converta visitantes sem mascarar a disponibilidade real do APK. */
-.launch-kpis{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:11px;margin:0 auto 30px}
-.launch-kpi{padding:16px 10px;text-align:center;background:#122844;border:1px solid #8c784e;border-radius:12px}
-.launch-kpi strong{display:block;color:#f8d38a;font-size:clamp(20px,4vw,28px)}
-.launch-kpi span{font-size:12px;color:#ccd8ec}
-.launch-kpi strong.is-loading{width:75%;height:1.4em;margin:0 auto 5px;border-radius:6px;color:transparent;background:linear-gradient(100deg,#1c3654 25%,#577397 50%,#1c3654 75%);background-size:200% 100%;animation:kpi-shimmer 1.5s linear infinite}
-.launch-kpi strong.is-unavailable{font-size:15px;color:#d7e2f3}
-@keyframes kpi-shimmer{from{background-position:200% 0}to{background-position:-200% 0}}
-@media(prefers-reduced-motion:reduce){.launch-kpi strong.is-loading{animation:none}}
-.launch-support{max-width:960px;margin:0 auto 30px;padding:26px 28px;border:1px solid #cda15e;border-radius:16px;background:linear-gradient(140deg,#153763,#0b1930)}
-.launch-support h2{color:#ffda91;font:700 27px Georgia,serif;margin:0 0 10px}
-.launch-support .cta{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:12px 20px;border:1px solid #ffe4af;border-radius:10px;background:#edc078;color:#16141a;font-weight:850;text-decoration:none}
-.launch-support .goal{margin:16px 0}.launch-support .goal label{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
-.launch-support .goal progress{width:100%;height:16px;accent-color:#e5b45b}
-.launch-support p,.launch-support small{color:#dbe4f4}
-.launch-support details{border-bottom:1px solid #57708e;padding:10px 0}
-.launch-support summary{cursor:pointer;font-weight:bold;color:#ffdfab}
-@media(max-width:490px){.launch-kpis{grid-template-columns:1fr 1fr 1fr;gap:6px}.launch-kpi{padding:9px 4px}.launch-support{padding:20px 18px}}
 
+/* A página pública divulga o Android sem simular downloads, imagens ou público. */
+h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-ui,sans-serif;letter-spacing:0;margin:14px 0 0;text-shadow:none}
+.section{margin:0 auto 54px}.section h2{font:700 clamp(28px,4vw,40px)/1.2 Georgia,serif;color:#ffdea0;margin:0 0 11px}
+.section>p{color:#d6e2f1;max-width:790px;margin:0 0 22px}.eyebrow{color:#f1c467;font-weight:800;font-size:12px;letter-spacing:.16em;text-transform:uppercase}
+.download{min-height:64px;width:min(100%,440px);font-size:18px}
+.download[aria-disabled="true"]{opacity:.92}.fine-print{max-width:440px;color:#ccd9e9;font-size:13px;margin:0}
+.feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
+.feature-card{border:1px solid #a8824899;background:linear-gradient(145deg,#1e3e6c,#0b1c37);padding:23px;border-radius:16px}
+.feature-card h3{font:700 20px Georgia,serif;color:#ffe0a5;margin:8px 0}.feature-card p{margin:0;font-size:14px;color:#d6e2f1}
+.feature-icon{display:grid;place-items:center;border:1px solid #b68e54;border-radius:11px;background:#25446a;width:45px;height:45px;font-size:27px;color:#f5cb82}
+.gallery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
+.gallery-grid figure{background:#0d1d35;border:1px solid #a88248;border-radius:16px;overflow:hidden;margin:0}
+.shot-placeholder{height:235px;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;background:radial-gradient(circle at center,#35598b,#0d1d35 76%);color:#f6d79b;font-weight:700}
+.shot-placeholder span{border:1px dashed #d4ad70;padding:28px 12px;max-width:190px;letter-spacing:.04em}
+.gallery-grid figcaption{padding:13px 16px;color:#f3dfb9;font-weight:700}
+.install-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;list-style:none;margin:20px 0;padding:0}
+.install-steps li{border:1px solid #8a744f;border-radius:13px;background:#112b4d;padding:18px;color:#d6e2f1;font-size:14px}
+.install-steps strong{display:block;color:#ffdaa0;font-size:16px;margin:10px 0}
+.step-num{display:grid;place-items:center;border-radius:50%;width:36px;height:36px;background:#e8bd76;color:#121b29;font-weight:900}
+.safety-note{border-left:4px solid #ebc37d;background:#142e50;border-radius:0 10px 10px 0;padding:14px;color:#e2e9f5}
+.final-cta{text-align:center;padding:42px 18px;margin:20px auto 36px;border-radius:24px;border:1px solid #e4b76f;background:radial-gradient(circle at top,#2c4f82,#0a1a33 70%)}
+.final-cta h2{font:700 clamp(28px,4vw,42px) Georgia,serif;color:#ffe0a2;margin:12px 0}.final-cta p{color:#dbe5f2}
+.final-cta .download{margin:15px auto 8px}
+.support-mini{margin:0 auto 40px;display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap;border:1px solid #6e7891;border-radius:13px;padding:19px;background:#132c4d;color:#dbe5f2;font-size:14px}
+.support-mini a{color:#ffdc9b;font-weight:800}
+@media(max-width:800px){.feature-grid,.gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.install-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:540px){.feature-grid,.gallery-grid,.install-steps{grid-template-columns:1fr}.shot-placeholder{height:175px}.support-mini{justify-content:center;text-align:center}.final-cta{padding:30px 15px}.download{width:100%}}
 </style>
 </head>
 <body>
+
 <main class="wrap">
 <header class="royal-hero">
-<div class="royal-art">
-<div class="royal-sun" aria-hidden="true"></div>
-<img class="crest" src="/assets/brand/royal-king.webp" width="224" height="224" loading="eager" decoding="async" fetchpriority="high" alt="Rei guerreiro de coroa dourada, espada real e brasão azul do Clash of Izzy">
-<div class="royal-caption">HONRA · GLÓRIA · CONQUISTA</div>
-</div>
-<div class="royal-copy">
-<div class="royal-titleline">Estratégia medieval para Android</div>
-<h1>CLASH OF <span class="golden">IZZY</span></h1>
-<p class="lead">Seu reino. Seu legado. Construa um castelo, convoque heróis e lidere alianças em um mundo de disputas e conquistas.</p>
-<div class="royal-features" aria-label="Destaques do jogo"><span>Castelos e reinos</span><span>Heróis e dragões</span><span>Alianças e batalhas</span></div>
-<div class="actions">
-<a class="download" id="play-browser" href="https://clash-of-izzy.jorgepereiragha.workers.dev/kingdom.html">Jogar no navegador</a>
-<p class="play-note">Acesso web ao reino, com conexão à internet. Alguns recursos ainda estão em homologação.</p>
-<a class="download" id="download-apk" aria-disabled="true" tabindex="-1">Baixar aplicativo Android (APK)</a>
-<p class="status" id="download-status" role="status" aria-live="polite">Verificando se existe uma versão oficial assinada disponível para download…</p>
-<a class="hash" id="checksum-link" hidden>Verificar arquivo SHA-256 da versão</a>
-<a class="hash" id="official-release-page" href="https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases" target="_blank" rel="noopener noreferrer">Consultar versões oficiais publicadas</a>
-<div class="share-row" aria-label="Divulgação do jogo">
-  <button class="share-link" id="share-portal" type="button">Compartilhar</button>
-  <a class="share-link" id="share-whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp</a>
-  <a class="share-link" id="share-facebook" target="_blank" rel="noopener noreferrer">Facebook</a>
-  <button class="share-link" id="copy-portal" type="button">Copiar link</button>
-</div>
-<p class="status" id="share-status" role="status" aria-live="polite">Divulgue a página oficial de apresentação do jogo. O download será habilitado somente após a publicação do APK aprovado.</p>
-</div>
-</div>
+  <div class="royal-art">
+    <div class="royal-sun" aria-hidden="true"></div>
+    <img class="crest" src="/assets/brand/royal-king.webp" width="224" height="224" loading="eager" decoding="async" fetchpriority="high" alt="Rei guerreiro de coroa dourada, espada real e brasão azul do Clash of Izzy">
+    <div class="royal-caption">HONRA · GLÓRIA · CONQUISTA</div>
+  </div>
+  <div class="royal-copy">
+    <div class="royal-titleline">Estratégia medieval para Android</div>
+    <h1>CLASH OF <span class="golden">IZZY</span><small>O Reino no Seu Celular</small></h1>
+    <p class="lead">Baixe o app oficial Android quando lançado. Construa, lute e domine um mundo de castelos, heróis e alianças.</p>
+    <div class="royal-features" aria-label="Sobre o aplicativo"><span>App Android</span><span>Grátis para jogar</span><span>Em desenvolvimento</span></div>
+    <div class="actions">
+      <a class="download" id="download-apk" aria-disabled="true" tabindex="-1">Baixar APK Android</a>
+      <p class="status" id="download-status" role="status" aria-live="polite">Verificando se uma versão Android oficial foi publicada…</p>
+      <p class="fine-print">O botão será liberado somente após a publicação oficial do APK e do arquivo SHA-256 no GitHub.</p>
+      <a class="hash" id="checksum-link" hidden>Consultar arquivo SHA-256</a>
+      <a class="hash" id="official-release-page" href="https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases" target="_blank" rel="noopener noreferrer">Conferir versões oficiais no GitHub</a>
+      <div class="share-row" aria-label="Divulgar o app">
+        <button class="share-link" id="share-portal" type="button">Compartilhar</button>
+        <a class="share-link" id="share-whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a class="share-link" id="share-facebook" target="_blank" rel="noopener noreferrer">Facebook</a>
+        <button class="share-link" id="copy-portal" type="button">Copiar link</button>
+      </div>
+      <p class="status" id="share-status" role="status" aria-live="polite">Compartilhe esta página sem anunciar que o APK já está disponível.</p>
+    </div>
+  </div>
 </header>
-<section class="grid" aria-label="Recursos do jogo">
-<article class="tile"><h2>Seu reino</h2><p>Administre recursos, construa sua cidade e planeje o crescimento do castelo.</p></article>
-<article class="tile"><h2>Seu exército</h2><p>Treine tropas, aprimore seus heróis e prepare estratégias de combate.</p></article>
-<article class="tile"><h2>Seu mundo</h2><p>Explore o mapa persistente, forme alianças e participe de eventos quando estiverem ativos.</p></article>
+<section class="section" aria-labelledby="benefits-title">
+  <div class="eyebrow">A aventura começa no reino</div>
+  <h2 id="benefits-title">Construa seu legado</h2>
+  <p>Conheça os sistemas e conteúdos planejados para o Android. Alguns recursos ainda podem ser habilitados por etapas.</p>
+  <div class="feature-grid"><article class="feature-card"><span class="feature-icon" aria-hidden="true">◇</span><h3>Mapa 3D isométrico</h3><p>Explore o mundo medieval com diferentes opções visuais de renderização.</p></article>
+<article class="feature-card"><span class="feature-icon" aria-hidden="true">♜</span><h3>Castelos e construções</h3><p>Administre recursos, fortaleça estruturas e evolua o reino.</p></article>
+<article class="feature-card"><span class="feature-icon" aria-hidden="true">✦</span><h3>Heróis e dragões</h3><p>Reúna personagens e prepare equipamentos e estratégias.</p></article>
+<article class="feature-card"><span class="feature-icon" aria-hidden="true">⚔</span><h3>Alianças e batalhas</h3><p>Forme alianças e participe dos confrontos quando habilitados.</p></article>
+<article class="feature-card"><span class="feature-icon" aria-hidden="true">☼</span><h3>Eventos diários</h3><p>Acompanhe recompensas e eventos disponíveis no servidor.</p></article>
+<article class="feature-card"><span class="feature-icon" aria-hidden="true">♛</span><h3>Skins e pacotes</h3><p>Personalizações e conteúdos opcionais sujeitos a disponibilidade.</p></article></div>
 </section>
-<section class="launch-kpis" aria-label="Indicadores reais do jogo">
-  <div class="launch-kpi"><strong id="players-count" class="is-loading" aria-label="Carregando jogadores">—</strong><span>Jogadores registrados</span></div>
-  <div class="launch-kpi"><strong id="battles-count" class="is-loading" aria-label="Carregando batalhas">—</strong><span>Batalhas em 24h</span></div>
-  <div class="launch-kpi"><strong id="alliances-count" class="is-loading" aria-label="Carregando alianças">—</strong><span>Alianças</span></div>
+<section class="section" aria-labelledby="gallery-title">
+  <div class="eyebrow">Galeria do jogo</div>
+  <h2 id="gallery-title">Veja o reino em ação</h2>
+  <p>As capturas reais do Android serão adicionadas após a homologação visual. Os espaços abaixo não são imagens de jogabilidade.</p>
+  <div class="gallery-grid"><figure><div class="shot-placeholder"><span>Captura do jogo em preparação</span></div><figcaption>Castelo e construções</figcaption></figure>
+<figure><div class="shot-placeholder"><span>Captura do jogo em preparação</span></div><figcaption>Mapa e exploração</figcaption></figure>
+<figure><div class="shot-placeholder"><span>Captura do jogo em preparação</span></div><figcaption>Heróis e dragões</figcaption></figure></div>
 </section>
-<section class="launch-support" aria-labelledby="support-title">
-  <h2 id="support-title">Apoie o desenvolvimento</h2>
-  <p>Você pode ajudar a financiar a estabilidade do servidor, novos eventos e melhorias na arte do Clash of Izzy. Os pagamentos são opcionais, realizados somente pelo sistema oficial e associados ao seu reino.</p>
-  <div class="goal"><label for="support-goal"><strong>Meta de infraestrutura</strong><span id="support-amount">Aguardando arrecadação verificada…</span></label><progress id="support-goal" value="0" max="2000"></progress></div>
-  <a class="cta" href="/apoie.html">Conhecer os pacotes de apoio</a>
-  <p><small>Pacotes disponíveis após habilitação dos meios de pagamento e confirmação do servidor. Nenhum valor ou número de jogadores é inventado.</small></p>
-  <details><summary>O jogo é gratuito?</summary><p>O projeto oferece acesso básico gratuito. Pacotes de apoio são opcionais.</p></details>
-  <details><summary>Quando posso instalar?</summary><p>Assim que o APK Android oficial assinado e seu arquivo de verificação forem publicados na seção de versões oficiais.</p></details>
-  <details><summary>Como funcionam os pagamentos?</summary><p>Os pacotes com gemas só são entregues após verificação do pagamento aprovado pelo servidor. Pix manual exige conciliação real no extrato.</p></details>
-  <p id="launch-stats-status" class="status" role="status" aria-live="polite">Conferindo dados públicos verificados…</p>
+<section class="section instructions" aria-labelledby="install-title">
+  <div class="eyebrow">Instalação segura</div>
+  <h2 id="install-title">Como instalar no Android</h2>
+  <p>Quando o APK oficial estiver disponível, siga os passos abaixo. Não baixe arquivos de fontes desconhecidas.</p>
+  <ol class="install-steps"><li><span class="step-num">1</span><strong>Baixe pelo portal</strong>Use o botão oficial quando a versão estiver liberada.</li>
+<li><span class="step-num">2</span><strong>Confira o arquivo</strong>Verifique origem, checksum SHA-256 e assinatura do APK.</li>
+<li><span class="step-num">3</span><strong>Instale no Android</strong>Abra o APK e autorize essa fonte se o Android solicitar.</li>
+<li><span class="step-num">4</span><strong>Entre no reino</strong>Inicie o app com conexão à internet para sincronizar.</li></ol>
+  <p class="safety-note"><strong>Baixe somente o APK oficial desta página.</strong> APK direto não significa publicação na Play Store. Builds de teste não são downloads oficiais; a versão para iPhone ainda não está disponível.</p>
 </section>
-<section class="instructions" aria-labelledby="install-title">
-<h2 id="install-title">Como instalar no Android</h2>
-<p>Quando o APK oficial estiver disponível, toque em <strong>Baixar aplicativo Android</strong>. Abra o arquivo baixado no celular, autorize a instalação desta fonte se o Android solicitar e conclua a instalação. Depois, abra o ícone <strong>Clash of Izzy</strong> na lista de aplicativos.</p>
-<p>A versão Android exige conexão à internet para sincronizar o jogo. APK assinado e instalação direta não significam publicação na Play Store. O aplicativo para iPhone ainda não está disponível.</p>
-<p>Baixe somente o arquivo oficial. O link será habilitado apenas quando existir uma versão pública de release com APK e arquivo de verificação; builds de teste não são oferecidos como downloads oficiais.</p>
+<section class="final-cta" aria-labelledby="final-title">
+  <div class="eyebrow">Sua próxima conquista</div>
+  <h2 id="final-title">Seu reino está esperando. Baixe agora.</h2>
+  <p>Instale o Clash of Izzy assim que a versão Android oficial estiver liberada.</p>
+  <a class="download" id="download-apk-final" aria-disabled="true" tabindex="-1">Baixar APK Android</a>
+  <p class="fine-print">Download indisponível até a publicação da release oficial.</p>
 </section>
+<aside class="support-mini" aria-label="Apoio ao desenvolvimento">
+  <span><strong>Projeto independente.</strong> Apoiar é opcional e depende da habilitação dos pagamentos.</span>
+  <a href="/apoie.html">Conhecer o projeto de apoio</a>
+</aside>
 </main>
 <footer class="wrap">© 2026 Clash of Izzy. Projeto independente, sem associação a outros jogos ou editoras.</footer>
 <script>
@@ -199,13 +221,13 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
   "use strict";
   const repo = "jorgepereiragha-cyber/Clash-of-Izzy-";
   const filename = "clash-of-izzy-android.apk";
-  const button = document.getElementById("download-apk");
+  const buttons = [document.getElementById("download-apk"), document.getElementById("download-apk-final")];
   const status = document.getElementById("download-status");
   const checksum = document.getElementById("checksum-link");
   const prefix = "/" + repo + "/releases/download/";
   const publicUrl = "https://clash-of-izzy-portal.jorgepereiragha.workers.dev/portal.html";
   const shareStatus = document.getElementById("share-status");
-  const shareText = "Clash of Izzy: construa seu reino, convoque heróis e forme alianças. Acompanhe o lançamento oficial!";
+  const shareText = "Clash of Izzy: o reino no seu celular. Conheça o app Android e acompanhe o APK oficial!";
   document.getElementById("share-whatsapp").href =
     "https://wa.me/?text=" + encodeURIComponent(shareText + " " + publicUrl + "?utm_source=whatsapp&utm_medium=social&utm_campaign=eldoria_pre_lancamento");
   document.getElementById("share-facebook").href =
@@ -245,64 +267,30 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
       if (release.draft || release.prerelease || !Array.isArray(release.assets)) throw new Error("release não oficial");
       const apk = release.assets.find(asset => validAsset(asset, filename) && asset.size > 0);
       const hash = release.assets.find(asset => validAsset(asset, filename + ".sha256"));
-      if (!apk || !hash) throw new Error("APK assinado e hash não publicados");
-      button.href = apk.browser_download_url;
-      button.setAttribute("download", filename);
-      button.removeAttribute("aria-disabled");
-      button.removeAttribute("tabindex");
-      status.textContent = "Versão " + String(release.tag_name || "estável") + " disponível. Instale o APK e confira a origem antes de executar.";
+      if (!apk || !hash || hash.size <= 0) throw new Error("APK e SHA-256 não publicados");
+      if (!release.tag_name || ![apk,hash].every(asset => new URL(asset.browser_download_url).pathname.startsWith(prefix + encodeURIComponent(release.tag_name) + "/"))) throw new Error("tag da release incompatível");
+      for (const button of buttons) {
+        button.href = apk.browser_download_url;
+        button.setAttribute("download", filename);
+        button.removeAttribute("aria-disabled");
+        button.removeAttribute("tabindex");
+      }
+      status.textContent = "Versão " + String(release.tag_name) + " disponível no GitHub. Confira o SHA-256 e a assinatura antes de instalar.";
       checksum.href = hash.browser_download_url;
       checksum.rel = "noopener noreferrer";
       checksum.hidden = false;
     } catch {
-      button.removeAttribute("href");
-      button.setAttribute("aria-disabled", "true");
-      button.setAttribute("tabindex", "-1");
-      status.textContent = "O APK comercial ainda não está disponível ou não foi possível verificar a publicação oficial. Consulte as versões no GitHub; builds de teste não substituem uma versão assinada.";
+      for (const button of buttons) {
+        button.removeAttribute("href");
+        button.setAttribute("aria-disabled", "true");
+        button.setAttribute("tabindex", "-1");
+      }
+      checksum.removeAttribute("href");
+      checksum.hidden = true;
+      status.textContent = "O APK comercial ainda não está disponível ou não foi possível verificar a publicação oficial. Não instale builds de teste.";
     }
   }
 
-  async function loadPublicStats() {
-    const status=document.getElementById("launch-stats-status");
-    const counters=[["players-count","totalPlayers"],["battles-count","battles24h"],["alliances-count","totalAlliances"]];
-    try {
-      const response=await fetch("https://clash-of-izzy.jorgepereiragha.workers.dev/api/public/stats",{cache:"no-store"});
-      if(!response.ok)throw new Error("unavailable");
-      const data=await response.json();
-      if(data.verified!==true)throw new Error("unverified");
-      for(const [id,key] of counters){
-        const value=Number(data[key]);
-        if(!Number.isSafeInteger(value)||value<0)throw new Error("invalid_stats");
-        document.getElementById(id).textContent=value.toLocaleString("pt-BR");
-      }
-      // Contadores 4X podem estar completos antes da migração do ledger de apoio.
-      // Nunca converter total financeiro não verificado (null) em zero.
-      if(data.supportVerified!==true || !Number.isSafeInteger(data.supportTotalCents) || data.supportTotalCents<0){
-        document.getElementById("support-amount").textContent="Apoios confirmados: aguardando validação do banco.";
-        status.textContent="Jogadores, batalhas e alianças verificados. Total de apoios temporariamente indisponível.";
-        return;
-      }
-      const totalCents=data.supportTotalCents;
-      const amount=Math.min(2000,totalCents/100);
-      document.getElementById("support-goal").value=amount;
-      document.getElementById("support-amount").textContent=(totalCents/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"})+" confirmados de R$ 2.000";
-      status.textContent="Contadores obtidos do banco do jogo. A meta mostra somente pagamentos confirmados.";
-    }catch{
-      for(const [id] of counters){
-        const node=document.getElementById(id);
-        node.textContent="Em breve";
-        node.classList.add("is-unavailable");
-      }
-      status.textContent="Dados públicos temporariamente indisponíveis. Nenhuma contagem foi estimada.";
-    }finally{
-      for(const [id] of counters){
-        const node=document.getElementById(id);
-        node.classList.remove("is-loading");
-        node.removeAttribute("aria-label");
-      }
-    }
-  }
-  void loadPublicStats();
   void findOfficialApk();
 })();
 </script>
