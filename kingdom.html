@@ -61,6 +61,13 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .coi-city-camera-controls{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 12px}
 .coi-city-camera-controls button{min-width:48px;min-height:48px;font-size:18px;touch-action:manipulation}
 .coi-city-camera-controls .coi-camera-reset{min-width:100px;font-size:12px}
+/* Desktop camera tools occupy the top-right of the scene without enlarging
+   the city panel. Mobile tools stay beneath the canvas to avoid blocking taps. */
+.coi-city-stage .coi-city-camera-controls{position:absolute;top:10px;right:10px;z-index:5;margin:0;padding:3px;border:1px solid #e7bd6855;border-radius:10px;background:#0d1c2ac9}
+@media(max-width:900px){
+ .coi-city-stage .coi-city-camera-controls{position:static;margin:8px 0 4px;padding:0;background:transparent;border:0}
+ .coi-city-stage:has(.coi-city-camera-controls:not([hidden])) .coi-city-stage-corner{bottom:72px}
+}
 .city.has-3d.dense-3d .building{width:clamp(48px,13%,76px);height:44px;min-height:44px;padding:4px 2px 6px}
 .city.has-3d.dense-3d .building strong{font-size:10px}
 .city.has-3d.dense-3d .building small{font-size:9px}
@@ -146,11 +153,11 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <div class="coi-city-stage-label" aria-hidden="true"><span>ELDORIA</span><small>CENTRO DO REINO</small></div>
   <div class="city" id="city"></div>
   <div class="coi-city-stage-corner" aria-hidden="true">Toque em um edifício para ver melhorias</div>
- </div>
  <div class="coi-city-camera-controls" id="coiCityCameraControls" role="group" aria-label="Aproximação da cidade 3D" hidden>
   <button type="button" class="secondary" data-city-zoom="out" aria-label="Afastar câmera da cidade">−</button>
   <button type="button" class="secondary coi-camera-reset" data-city-zoom="reset" aria-label="Restaurar enquadramento da cidade">Centralizar</button>
   <button type="button" class="secondary" data-city-zoom="in" aria-label="Aproximar câmera da cidade">+</button>
+ </div>
  </div>
  <nav id="coiRecruitmentSites" class="coi-recruitment-sites" aria-label="Locais de recrutamento da cidade">
   <a id="coiSummonAltar" class="coi-recruitment-site coi-site-altar" href="/equipment-ui.html#hero-summon-title" aria-label="Entrar no Altar de Convocação e convocar heróis">
