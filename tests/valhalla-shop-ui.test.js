@@ -30,8 +30,8 @@ test("Loja Valhalla é carregada nas telas do reino e do mapa mundial", () => {
 test("interface usa as rotas autenticadas reais e não cria um segundo contrato de sessão", () => {
   assert.ok(ui.includes('const API = "/api/game/valhalla-shop"'));
   assert.ok(ui.includes('const CONFIG = "/api/config/valhalla"'));
-  assert.ok(ui.includes('localStorage.getItem("coi_game_token")'));
-  assert.ok(ui.includes('sessionStorage.getItem("coi_game_token")'));
+  assert.ok(ui.includes("for(const storage of [()=>window.localStorage,()=>window.sessionStorage])"));
+  assert.ok(ui.includes('storage().getItem("coi_game_token")'));
   assert.ok(ui.includes('API + "/catalog"'));
   assert.ok(ui.includes('API + "/buy"'));
   assert.ok(ui.includes('API + "/history"'));
