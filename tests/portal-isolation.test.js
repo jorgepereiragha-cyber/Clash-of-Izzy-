@@ -90,6 +90,7 @@ test("identidade rei guerreiro usa capa real responsiva sem ativar download inex
   assert.match(publicHtml,/class="royal-art"/);
   assert.match(publicHtml,/--gold:#f1c467/);
   assert.match(publicHtml,/@media\(max-width:800px\)/);
+  assert.match(publicHtml,/\.royal-copy\{text-align:center;order:-1\}/);
   assert.match(publicHtml,/alt="Rei guerreiro de coroa dourada/);
   assert.match(publicHtml,/id="download-apk" aria-disabled="true"/);
   assert.doesNotMatch(publicHtml,/id="play-browser"|kingdom\.html/);
