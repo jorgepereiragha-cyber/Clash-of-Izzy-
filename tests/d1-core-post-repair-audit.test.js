@@ -103,3 +103,9 @@ test("protected repair executes verifier strictly after remote apply and before 
   assert.match(standalone,/node scripts\/check-android-release-server\.mjs/);
   assert.doesNotMatch(standalone,/d1 migrations apply|wrangler[^\n]* deploy|time-travel restore/);
 });
+
+test("production audit source is excluded from Cloudflare public static assets", async () => {
+  const ignored = (await readFile(new URL("../.assetsignore", import.meta.url), "utf8")).split(/\r?\n/);
+  assert.ok(ignored.includes("scripts/verify-d1-core-repair-readonly.mjs"),
+    "Private production D1 audit tooling must not be published in browser assets.");
+});
