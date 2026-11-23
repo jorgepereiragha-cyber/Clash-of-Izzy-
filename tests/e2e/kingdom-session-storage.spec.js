@@ -27,6 +27,19 @@ test("kingdom reuses a sessionStorage token when localStorage is blocked", async
   expect(starts).toBe(0);
 });
 
+test("kingdom avoids repeating an anonymous start when its response is ambiguous", async ({page}) => {
+  let starts=0;
+  await page.route("**/api/game/start",route=>{
+    starts++;
+    return route.fulfill({status:503,contentType:"application/json",body:JSON.stringify({error:"D1 temporariamente indisponível"})});
+  });
+  await page.goto("/kingdom.html");
+  await expect(page.locator("#loading")).toContainText("não a repita automaticamente");
+  await expect(page.locator("#retryConnection")).toHaveCount(0);
+  await expect(page.locator("#loading").getByRole("link",{name:"Acessar minha conta"})).toHaveAttribute("href","/account.html");
+  expect(starts).toBe(1);
+});
+
 test("kingdom never creates a guest realm when both token stores are inaccessible", async ({page}) => {
   await page.addInitScript(() => {
     const get=Storage.prototype.getItem;
