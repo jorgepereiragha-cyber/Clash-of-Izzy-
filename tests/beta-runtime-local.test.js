@@ -133,6 +133,10 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const blocked = await http(base, "/api/game/state");
     assert.equal(blocked.status, 403, "API private before invite");
     assert.equal(blocked.data.code, "BETA_INVITE_REQUIRED");
+    const blockedRealtime = await http(base, "/api/realtime/eldoria/ticket", {method:"POST",body:{}});
+    assert.equal(blockedRealtime.status, 403, "realtime tickets require an invitation");
+    const blockedScript = await http(base, "/scripts/kingdom-3d.js");
+    assert.equal(blockedScript.status, 302, "3D scripts are private before invitation");
 
     const initial = await http(base, "/kingdom.html");
     assert.equal(initial.status, 302, "kingdom page requires invite");
@@ -166,6 +170,17 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(state.status, 200, "state responds after game start");
     assert.equal(state.data.state?.kingdom?.id, start.data.state.kingdom.id);
     assert.equal(state.data.state?.advanced4xEnabled, true);
+
+    const badIndustry = await http(base, "/api/game/action", {
+      method:"POST", body:{type:"industry_upgrade",industry:"not-a-real-industry"},
+      cookie, bearer:start.data.token
+    });
+    assert.equal(badIndustry.status, 400, "real 4X industry handler validates input");
+    const badDefense = await http(base, "/api/game/action", {
+      method:"POST", body:{type:"city_defense_place",defense:"tower",gridX:999,gridZ:999},
+      cookie, bearer:start.data.token
+    });
+    assert.equal(badDefense.status, 400, "real 4X defense handler validates map bounds");
 
     const resume = await http(base, "/api/game/start", {
       method:"POST", body:{}, cookie, bearer:start.data.token
