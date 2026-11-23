@@ -2238,7 +2238,7 @@ export default {
     if(limited)return limited;
     const body=await readBody(request,8192);
     if(body.__bodyError)return json({error:"Solicitação inválida."},400);
-    const kind=String(body.kind||""),itemId=Number(body.itemId),requestKey=String(body.requestKey||"").slice(0,64);
+    const kind=String(body.kind||""),itemId=Number(body.itemId),requestKey=String(body.requestKey||"");
     if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
     const requestedPaymentMethod=String(body.paymentMethod||"mercadopago_link");
     if(!["mercadopago_link","manual_whatsapp","pix"].includes(requestedPaymentMethod))return json({error:"Método de pagamento inválido."},400);
@@ -2293,9 +2293,11 @@ export default {
       const inserted=await statement.run();
       if(dailyPurchase&&!inserted.meta?.changes)return json({error:"Este pacote já foi adquirido nas últimas 24 horas. Cada categoria pode ser comprada novamente após 24 horas do último pagamento confirmado.",code:"DAILY_PACKAGE_LIMIT"},409);
     }catch(error){
-      const existing=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
+      const existing=await env.DB.prepare("SELECT id,status,product_kind,product_id,product_name,price_brl,payment_method FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
       if(existing){
         if(existing.payment_method!==paymentMethod)return json({error:"A chave de idempotência já pertence a outro meio de pagamento."},409);
+        if(existing.product_kind!==kind||Number(existing.product_id)!==itemId)
+          return json({error:"A chave de idempotência já pertence a outro produto.",code:"PURCHASE_KEY_PRODUCT_MISMATCH"},409);
         return json({success:true,request:existing,reused:true},200);
       }
       const duplicate=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
