@@ -28,6 +28,8 @@ jobs:
     name: Testar, assinar, verificar e publicar APK
     if: ${{ github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    environment:
+      name: production
     timeout-minutes: 90
     env:
       ANDROID_VERSION_NAME: ${{ inputs.versao }}
