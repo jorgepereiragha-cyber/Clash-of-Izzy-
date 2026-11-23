@@ -1796,6 +1796,15 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
     .bind(event.id,kingdom.id,requestId).first();
   if(duplicate){
     const snapshot=JSON.parse(duplicate.troop_losses_json||"{}");
+    // A request id belongs to the exact troop composition originally charged.
+    // Do not replay an old success for a different army chosen after network failure.
+    const replayUnits=body.units;
+    const normalizedReplay=replayUnits&&typeof replayUnits==="object"&&!Array.isArray(replayUnits)
+      ?Object.fromEntries(Object.entries(replayUnits).filter(([,amount])=>Number(amount)!==0).map(([key,amount])=>[key,Number(amount)]))
+      :null;
+    if(!normalizedReplay||Object.keys(normalizedReplay).length!==Object.keys(snapshot).length||
+      Object.entries(normalizedReplay).some(([key,amount])=>!Object.hasOwn(snapshot,key)||Number(snapshot[key]?.quantity)!==amount))
+      return json({error:"Este identificador pertence a um ataque anterior com outras tropas. Reenvie a composição original antes de iniciar um novo ataque.",code:"EVENT_ATTACK_PAYLOAD_MISMATCH"},409);
     const losses=Object.fromEntries(Object.entries(snapshot).map(([key,value])=>[key,Number(value?.loss||0)]));
     return json({success:true,duplicate:true,damage:Number(duplicate.damage||0),score:Number(duplicate.score||0),losses,troopsLost:Object.values(losses).reduce((sum,value)=>sum+value,0)});
   }
