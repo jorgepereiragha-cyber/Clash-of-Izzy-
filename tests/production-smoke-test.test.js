@@ -9,10 +9,19 @@ function makeResponse(body, status = 200, contentType = "application/json; chars
   });
 }
 
+function validGlbResponse() {
+  const bytes = new ArrayBuffer(64);
+  const header = new DataView(bytes);
+  header.setUint32(0, 0x46546c67, true); // glTF
+  header.setUint32(4, 2, true); // binary glTF v2
+  header.setUint32(8, bytes.byteLength, true);
+  return new Response(bytes, { status: 200, headers: { "content-type": "model/gltf-binary" } });
+}
+
 function successfulFetch() {
   const calls = [];
   const fetchImpl = async url => {
-    const path = new URL(url).pathname;
+    const path = decodeURIComponent(new URL(url).pathname);
     calls.push(path);
     if (path === "/api/health") return makeResponse({
       ok: true, status: "ready",
@@ -44,6 +53,19 @@ function successfulFetch() {
       200,
       "text/html; charset=utf-8"
     );
+    if (path === "/assets/3d/manifest.json") return makeResponse({
+      version: 2,
+      models: [
+        { type: "watchtower", enabled: true, src: "/assets/3d/kenney/castle-kit/Models/GLB format/tower-square.glb" },
+        { type: "wall", enabled: true, src: "/assets/3d/kenney/castle-kit/Models/GLB format/wall.glb" },
+      ],
+      props: [{
+        id: "kenney-tree-high", enabled: true,
+        src: "/assets/3d/kenney/mini-forest/Models/GLB format/tree-high.glb",
+        positions: Array.from({ length: 6 }, (_, i) => [i, 0, i]),
+      }],
+    });
+    if (path.startsWith("/assets/3d/kenney/")) return validGlbResponse();
     if (path === "/vendor/three/asset-manifest.json") return makeResponse({
       format: 1, threeVersion: "0.187.0",
       assets: ["/vendor/three/build/three.module.js","/vendor/three/examples/jsm/loaders/GLTFLoader.js","/vendor/three/examples/jsm/loaders/DRACOLoader.js","/vendor/three/examples/jsm/loaders/KTX2Loader.js","/vendor/three/examples/jsm/libs/meshopt_decoder.module.js","/vendor/three/examples/jsm/libs/draco/draco_decoder.js","/vendor/three/examples/jsm/libs/draco/draco_decoder.wasm","/vendor/three/examples/jsm/libs/draco/draco_wasm_wrapper.js","/vendor/three/examples/jsm/libs/basis/basis_transcoder.js","/vendor/three/examples/jsm/libs/basis/basis_transcoder.wasm"]
@@ -54,7 +76,7 @@ function successfulFetch() {
       return makeResponse('import * as THREE from "three"; new THREE.OrthographicCamera(); function createMarchFormation(){}', 200, "text/javascript; charset=utf-8");
     }
     if (path === "/engine/asset-loader.js" || path === "/scripts/kingdom-3d.js") {
-      return makeResponse('import * as THREE from "three";', 200, "text/javascript; charset=utf-8");
+      return makeResponse('import * as THREE from "three"; function createCastleGlbGroup() { return glbTemplates; }', 200, "text/javascript; charset=utf-8");
     }
     if (path === "/arena.html" || path === "/kingdom.html" || path === "/world.html") {
       return makeResponse('<script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>', 200, "text/html; charset=utf-8");
@@ -88,7 +110,12 @@ test("production smoke validates D1, secrets, game auth, store, core screens and
   assert.equal(result.checks.worldMapNavigation, true);
   assert.equal(result.checks.worldMap3D, true);
   assert.equal(result.checks.threeVendorRuntime, true);
+  assert.equal(result.checks.castleForestGlbAssets, true);
   assert.equal(result.checks.trailerRecorderRemovedFromGameplay, true);
+  assert.ok(calls.includes("/assets/3d/manifest.json"));
+  assert.ok(calls.some(path => path.endsWith("/tower-square.glb")));
+  assert.ok(calls.some(path => path.endsWith("/wall.glb")));
+  assert.ok(calls.some(path => path.endsWith("/tree-high.glb")));
   assert.ok(calls.includes("/world-map-viewport.js"));
   assert.ok(calls.includes("/world-map-3d.js"));
   assert.ok(!calls.includes("/scripts/cinematic/capture-system.js"));
@@ -169,4 +196,46 @@ test("production smoke aceita entrada exclusivamente promocional com APK oficial
   const result = await runProductionSmokeTests({ baseUrl: "https://clash-of-izzy.example.workers.dev", fetchImpl });
   assert.equal(result.checks.androidPortalUi, true);
   assert.equal(result.checks.betaSignupUi, false);
+});
+
+test("production smoke fails closed if a castle GLB is missing", async () => {
+  const { fetchImpl } = successfulFetch();
+  const missingModel = async url => {
+    const path = decodeURIComponent(new URL(url).pathname);
+    if (path.endsWith("/tower-square.glb")) return makeResponse("missing", 404, "text/plain");
+    return fetchImpl(url);
+  };
+  await assert.rejects(
+    runProductionSmokeTests({ baseUrl: "https://clash-of-izzy.example.workers.dev", fetchImpl: missingModel }),
+    /Modelo GLB indisponível/
+  );
+});
+
+test("production smoke rejects a published HTML error page posing as a GLB", async () => {
+  const { fetchImpl } = successfulFetch();
+  const malformed = async url => {
+    const path = decodeURIComponent(new URL(url).pathname);
+    if (path.endsWith("/tree-high.glb")) return makeResponse("<html>failure</html>".repeat(5), 200, "text/html");
+    return fetchImpl(url);
+  };
+  await assert.rejects(
+    runProductionSmokeTests({ baseUrl: "https://clash-of-izzy.example.workers.dev", fetchImpl: malformed }),
+    /Modelo GLB sem cabeçalho glTF 2.0 íntegro/
+  );
+});
+
+test("production smoke rejects a 3D manifest missing required forest placements", async () => {
+  const { fetchImpl } = successfulFetch();
+  const missingForest = async url => {
+    if (new URL(url).pathname === "/assets/3d/manifest.json")
+      return makeResponse({ version: 2, models: [
+        { type: "watchtower", enabled: true, src: "/assets/3d/kenney/castle-kit/Models/GLB format/tower-square.glb" },
+        { type: "wall", enabled: true, src: "/assets/3d/kenney/castle-kit/Models/GLB format/wall.glb" }
+      ], props: [] });
+    return fetchImpl(url);
+  };
+  await assert.rejects(
+    runProductionSmokeTests({ baseUrl: "https://clash-of-izzy.example.workers.dev", fetchImpl: missingForest }),
+    /Manifesto 3D não contém torre, muralha e árvore Kenney/
+  );
 });
