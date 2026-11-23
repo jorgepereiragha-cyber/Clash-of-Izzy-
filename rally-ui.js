@@ -1,5 +1,13 @@
 const $=id=>document.getElementById(id);
-const token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
+function readRallySession() {
+ let readable=false;
+ for(const storage of [()=>window.localStorage,()=>window.sessionStorage]){
+  try{const found=storage().getItem("coi_game_token");readable=true;if(found)return {token:found,blocked:false};}catch{}
+ }
+ return {token:"",blocked:!readable};
+}
+const rallySession=readRallySession();
+const token=rallySession.token;
 const NODE_TYPES={
  mine:{icon:"⛏️",name:"Mina",resource:"Ferro"},
  forest:{icon:"🌲",name:"Floresta",resource:"Madeira"},
@@ -171,7 +179,9 @@ async function refresh(){
  finally{refreshing=false;}
 }
 function init(){
- if(!token){notify("Entre no seu reino para acessar a guerra.");return;}
+ if(!token){notify(rallySession.blocked
+  ?"O navegador bloqueou o armazenamento da sessão. Ative o acesso deste site e abra o reino para recuperar a guerra."
+  :"Entre no seu reino para acessar a guerra.",true);return;}
  refresh();
  window.setInterval(()=>{if(!document.hidden)refresh();},12000);
  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh();});
