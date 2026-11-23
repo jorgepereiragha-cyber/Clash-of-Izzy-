@@ -59,15 +59,28 @@ jobs:
               counts[name]=int(query("SELECT COUNT(*) AS total FROM "+name)[0]["total"])
           required=("kingdom_dragons","kingdom_mailbox","master_bonus_claims",
               "google_account_links","google_auth_challenges","realm_openings",
-              "realm_thrones","throne_assaults")
+              "realm_thrones","throne_assaults","daily_reward_claims",
+              "onboarding_bonus_claims","support_orders")
+          advanced4x=("intermediate_resources","city_defenses",
+              "kingdom_progression","progression_xp_ledger")
           if "d1_migrations" not in names:raise SystemExit("Sem historico D1 de producao.")
           history=[r["name"] for r in query("SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 12")
               if isinstance(r.get("name"),str) and re.fullmatch(r"[A-Za-z0-9_.-]{1,100}",r["name"])]
           pending=sorted(set(required)-names)
-          ready=bool(history) and history[0]=="0035_throne_war.sql" and not pending
+          essential_migrations={"0037_daily_login_rewards.sql",
+              "0038_onboarding_bonus.sql","0039_support_orders.sql"}
+          accepted_latest={"0039_support_orders.sql","0040_support_packages.sql",
+              "0041_4x_industries_defenses_progression.sql"}
+          ready=bool(history) and history[0] in accepted_latest and (
+              essential_migrations.issubset(set(history))) and not pending
+          advanced_ready=ready and {
+              "0040_support_packages.sql",
+              "0041_4x_industries_defenses_progression.sql"
+          }.issubset(set(history)) and set(advanced4x).issubset(names)
           report={"target":"production","latestMigration":history[0] if history else None,
               "recentMigrations":history,"counts":counts,
-              "essentialTablesMissing":pending,"schemaReadyForAndroid":ready}
+              "essentialTablesMissing":pending,"schemaReadyForAndroid":ready,
+              "advanced4xSchemaReady":advanced_ready}
           print(json.dumps(report,ensure_ascii=False,sort_keys=True))
           if not ready:print("::warning::D1 de producao requer validacao e migracoes por deploy protegido; nenhuma escrita realizada.")
           print("Auditoria somente leitura: nenhuma tabela ou conta foi alterada.")
