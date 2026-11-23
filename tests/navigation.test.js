@@ -5,6 +5,22 @@ import { readFile } from "node:fs/promises";
 
 const read = path => readFile(new URL("../" + path, import.meta.url), "utf8");
 
+test("navigation online search keeps a saved game session when one storage is blocked", async () => {
+  const nav = await read("navigation.js");
+  const from = nav.indexOf("function getGameToken()");
+  const to = nav.indexOf("const normalizeSearch", from);
+  assert.ok(from >= 0 && to > from);
+  const helper = nav.slice(from, to);
+  const readToken = (local, session) => vm.runInNewContext(helper + String.fromCharCode(10) + "getGameToken()", {
+    window: {localStorage:local,sessionStorage:session}
+  });
+  const blocked = {getItem(){throw new Error("SecurityError")}};
+  const valid = {getItem(key){return key==="coi_game_token"?"saved-session":null}};
+  assert.equal(readToken(blocked,valid),"saved-session");
+  assert.equal(readToken(valid,blocked),"saved-session");
+  assert.equal(readToken(blocked,blocked),"");
+});
+
 test("shared navigation exposes the real game sections and a responsive search", async () => {
   const nav = await read("navigation.js");
   const css = await read("styles/navigation.css");
