@@ -12,7 +12,12 @@ test("um Worker, um D1 de producao e um PWA canonicos", () => {
   assert.equal(wrangler.d1_databases?.length, 1);
   assert.equal(wrangler.d1_databases[0].binding, "DB");
   assert.equal(wrangler.d1_databases[0].migrations_dir, "migrations");
-  assert.match(pkg.scripts.deploy, /wrangler --config wrangler\.jsonc deploy/);
+  // Canonical Worker remains in wrangler.jsonc, but deployment must pass the
+  // protected manual workflow instead of an unguarded npm production alias.
+  assert.equal(pkg.scripts.deploy, "node scripts/block-direct-production-operation.mjs deploy");
+  const workerWorkflow = read(".github/workflows/deploy-worker-only.yml");
+  assert.match(workerWorkflow, /run: npx wrangler --config wrangler\.jsonc deploy\b/);
+  assert.match(workerWorkflow, /confirm_production == true/);
   for (const path of ["worker.js", "city-layout-rules.js", "sw.js", "manifest.json", "kingdom.html"]) {
     assert.ok(existsSync(new URL(path, root)), "Artefato existente ausente: " + path);
   }
