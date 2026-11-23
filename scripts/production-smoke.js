@@ -51,6 +51,8 @@ export async function runProductionSmokeTests({
   baseUrl,
   fetchImpl = fetch,
   timeoutMs = 12_000,
+  networkRetries = 2,
+  networkRetryDelayMs = 200,
 } = {}) {
   assert(typeof baseUrl === "string" && baseUrl.trim(), "WORKER_BASE_URL não foi informado.");
   const base = new URL(baseUrl);
@@ -59,23 +61,39 @@ export async function runProductionSmokeTests({
   base.pathname = "/";
   base.search = "";
   base.hash = "";
+  assert(Number.isInteger(networkRetries) && networkRetries >= 0 && networkRetries <= 2,
+    "Limite de tentativas de rede inválido para o smoke.");
+  assert(Number.isInteger(networkRetryDelayMs) && networkRetryDelayMs >= 0 && networkRetryDelayMs <= 1000,
+    "Intervalo de nova tentativa inválido para o smoke.");
 
   const get = async path => {
     const target = new URL(path.replace(/^\//, ""), base);
-    try {
-      return await fetchImpl(target, {
-        method: "GET",
-        redirect: "error",
-        signal: AbortSignal.timeout(timeoutMs),
-        headers: { "User-Agent": "Clash-of-Izzy-production-smoke/1.0" },
-      });
-    } catch (error) {
-      // Keep the URL path and network cause visible, but never log credentials or query strings.
-      const cause = error?.cause;
-      const code = typeof cause?.code === "string" && /^[A-Z][A-Z0-9_]{1,39}$/.test(cause.code) ? " [" + cause.code + "]" : "";
-      const message = error?.name === "TimeoutError" ? "timeout" : "fetch failed";
-      // Do not attach the original error: Node prints nested causes, which may contain secrets.
-      throw new Error("Falha de rede no smoke GET " + target.pathname + ": " + message + code);
+    // GET-only retries handle short-lived transport errors. HTTP responses,
+    // including non-200/401 statuses, are NEVER retried or reclassified.
+    for (let attempt = 1; attempt <= networkRetries + 1; attempt++) {
+      try {
+        return await fetchImpl(target, {
+          method: "GET",
+          redirect: "error",
+          signal: AbortSignal.timeout(timeoutMs),
+          headers: { "User-Agent": "Clash-of-Izzy-production-smoke/1.0" },
+        });
+      } catch (error) {
+        const cause = error?.cause;
+        const code = typeof cause?.code === "string" && /^[A-Z][A-Z0-9_]{1,39}$/.test(cause.code) ? " [" + cause.code + "]" : "";
+        const message = error?.name === "TimeoutError" ? "timeout" : "fetch failed";
+        // Never interpolate URLs with query strings or native error objects:
+        // Node's nested causes could include tokens, headers and credentials.
+        const safeLabel = "smoke GET " + target.pathname + ": " + message + code;
+        if (attempt > networkRetries) {
+          throw new Error("Falha de rede no " + safeLabel + " após " + attempt + " tentativas");
+        }
+        console.warn("Falha temporária no " + safeLabel + " (tentativa " + attempt +
+          "/" + (networkRetries + 1) + "); repetindo GET somente leitura.");
+        if (networkRetryDelayMs > 0) {
+          await new Promise(resolve => setTimeout(resolve, networkRetryDelayMs * attempt));
+        }
+      }
     }
   };
 
