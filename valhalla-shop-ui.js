@@ -30,8 +30,13 @@
   let pollHandle = null;
 
   function getToken() {
-    return localStorage.getItem("coi_game_token") ||
-      sessionStorage.getItem("coi_game_token") || "";
+    // If one storage is blocked, the other may still contain the account token.
+    let readable=false;
+    for(const storage of [()=>window.localStorage,()=>window.sessionStorage]){
+      try{const value=storage().getItem("coi_game_token");readable=true;if(value)return value;}catch{}
+    }
+    if(!readable)throw new Error("O navegador bloqueou o armazenamento da sessão. Reative o acesso para usar a Loja de Valhalla.");
+    return "";
   }
 
   async function request(path, options = {}) {
