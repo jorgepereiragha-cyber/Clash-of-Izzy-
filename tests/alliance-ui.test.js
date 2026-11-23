@@ -56,7 +56,8 @@ test("chat da arena usa feed autenticado compacto em vez de consultar o estado i
   const refreshEnd = arena.indexOf("document.getElementById('openChat')", refreshStart);
   const refresh = arena.slice(refreshStart, refreshEnd);
 
-  assert.ok(arena.includes("localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token')||''"));
+  assert.ok(arena.includes("function chatToken(){try{return readArenaGameToken()}catch{return ''}}"),
+    "arena chat must use the guarded token reader instead of direct storage access");
   assert.ok(refresh.includes("chatApi('/game/alliance/chat')"));
   assert.ok(refresh.includes("chat:data.chat||[]"));
   assert.ok(!refresh.includes("chatApi('/game/state')"));
