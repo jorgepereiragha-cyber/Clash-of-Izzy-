@@ -70,7 +70,11 @@ async function request(path, options = {}) {
     },
   });
   const data = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(data.error || "Falha ao comunicar com o reino.");
+  if (!response.ok) {
+    const error = new Error(data.error || "Falha ao comunicar com o reino.");
+    error.status = response.status;
+    throw error;
+  }
   return data;
 }
 function territoryOwner(territory) {
@@ -579,7 +583,13 @@ async function connect() {
     setStatus("● Reino sincronizado");
   } catch (error) {
     setStatus(error.message, true);
-    $("marchNotice").textContent = error.message;
+    const notice = $("marchNotice");
+    notice.replaceChildren(document.createTextNode(error.message));
+    if (error.status === 401 || error.status === 403) {
+      const account = make("a", "", "Acessar minha conta");
+      account.href = "/account.html";
+      notice.append(document.createTextNode(" "), account);
+    }
   }
 }
 connect();
