@@ -16,6 +16,12 @@ function mockBetaDb(maxUses = 1) {
     prepare(sql) {
       if (state.errors) throw new Error("D1 offline");
       return {
+        async first() {
+          if (sql.includes("name='beta_claim_invite_for_session'")) {
+            return state.claimTriggerInstalled ? { installed: 1 } : null;
+          }
+          throw new Error("Unexpected unbound SQL: " + sql);
+        },
         bind(...args) {
           return {
             async first() {
