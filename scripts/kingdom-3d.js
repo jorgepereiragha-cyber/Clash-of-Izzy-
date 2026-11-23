@@ -642,7 +642,17 @@ if (host && "WebGLRenderingContext" in window) {
     const x = Number(building?.position_x), z = Number(building?.position_z);
     if (building?.position_x != null && building?.position_z != null &&
         Number.isFinite(x) && Number.isFinite(z)) return { x: x * .53, z: z * .53 };
-    return { x: (index % 3 - 1) * 4.15, z: (Math.floor(index / 3) - 1) * 3.15 };
+    // Only legacy buildings without stored coordinates use this preview grid.
+    // Keep the familiar 3x3 arrangement for compact cities, and arrange
+    // larger settlements in four columns without changing persisted layout.
+    const columns = latestBuildings.length > 9 ? 4 : 3;
+    const spacingX = columns === 4 ? 3.35 : 4.15;
+    const spacingZ = columns === 4 ? 3.0 : 3.15;
+    const rows = Math.ceil(Math.min(16, latestBuildings.length) / columns);
+    return {
+      x: (index % columns - (columns - 1) / 2) * spacingX,
+      z: (Math.floor(index / columns) - (rows - 1) / 2) * spacingZ
+    };
   }
   function frameCityBuildings(buildings) {
     if (!camera || !buildings.length) return;
@@ -660,7 +670,7 @@ if (host && "WebGLRenderingContext" in window) {
   function publishBuildingHitTargets(buildings = latestBuildings) {
     if (!host || !camera || !renderer || disposed) return;
     camera.updateMatrixWorld(true);
-    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
     const positions = list.map((building, index) => {
       const { x, z } = cityWorldPoint(building, index);
       const projected = new THREE.Vector3(x, .18, z).project(camera);
@@ -693,7 +703,7 @@ if (host && "WebGLRenderingContext" in window) {
     activeModels = [];
     // Keep deterministic world-space building anchors. HTML hit targets are
     // projected into screen coordinates from this same camera below.
-    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
     frameCityBuildings(list);
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
