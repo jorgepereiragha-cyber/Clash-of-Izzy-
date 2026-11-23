@@ -31,9 +31,15 @@ function mockBetaDb(maxUses = 1) {
               throw new Error("Unexpected SQL: " + sql);
             },
             async run() {
-              if (!sql.startsWith("INSERT INTO beta_access_sessions")) throw new Error("Unexpected SQL: " + sql);
-              state.sessions.add(args[0]);
-              return { meta: { changes: 1 } };
+              if (sql.startsWith("INSERT INTO beta_access_sessions")) {
+                state.sessions.add(args[0]);
+                return { meta: { changes: 1 } };
+              }
+              if (sql.startsWith("UPDATE beta_access_sessions SET revoked_at")) {
+                const deleted = state.sessions.delete(args[0]);
+                return { meta: { changes: deleted ? 1 : 0 } };
+              }
+              throw new Error("Unexpected SQL: " + sql);
             }
           };
         }
@@ -136,6 +142,18 @@ test("beta payments fail closed even when provider secrets exist", async () => {
     assert.equal((await denied.json()).code, "BETA_PAYMENTS_DISABLED");
   }
   assert.equal(betaPaymentDisabled("/api/store/catalog", "GET", env), false);
+  // An accidental flag flip cannot turn on real-money checkout or webhooks.
+  env.BETA_LIVE_PAYMENTS_APPROVED = "true";
+  assert.equal(betaPaymentDisabled("/api/store/checkout", "POST", env), true);
+  assert.equal(betaPaymentDisabled("/api/webhook/mp", "POST", env), true);
+  const blocked = await betaAccessGuard(request("/api/store/checkout", {
+    method: "POST", headers: { Cookie: cookie }
+  }), env);
+  assert.equal(blocked.status, 503);
+  const methodsStillOff = await betaAccessGuard(request("/api/store/payment-methods", {
+    headers: { Cookie: cookie }
+  }), env);
+  assert.deepEqual(await methodsStillOff.json(), { mercadoPago: false, nubankPix: false });
 });
 
 test("the Android beta uses a different application ID, origin and signing credentials", () => {
@@ -155,4 +173,52 @@ test("invitation code validation accepts only high entropy base32 format", () =>
   for (const bad of ["IZZY-123", "IZZY-AAAAAAAAAAAAAAAAAAA1", "IZZY-" + "0".repeat(20), "IZZY-" + "A".repeat(100)]) {
     assert.equal(normalizeInviteCode(bad), null);
   }
+});
+
+test("beta PWA never installs the production offline cache or exposes protected pages", async () => {
+  const db = mockBetaDb(), env = betaEnv(db);
+  const unauthenticated = await betaAccessGuard(request("/sw.js"), env);
+  assert.equal(unauthenticated.status, 302);
+  const unlocked = await betaAccessGuard(request("/api/beta/invite/redeem", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: validCode })
+  }), env);
+  const cookie = unlocked.headers.get("Set-Cookie").split(";")[0];
+  const sw = await betaAccessGuard(request("/sw.js", { headers: { Cookie: cookie } }), env);
+  assert.equal(sw.status, 200);
+  assert.match(sw.headers.get("Content-Type"), /text\/javascript/);
+  assert.match(sw.headers.get("Cache-Control"), /no-store/);
+  const code = await sw.text();
+  assert.match(code, /caches\.delete/);
+  assert.doesNotMatch(code, /addEventListener\(['"]fetch/);
+  assert.doesNotMatch(code, /caches\.open/);
+  const worker = read("worker.js");
+  assert.match(worker, /headers\.set\("Cache-Control","private, no-store"\)/);
+});
+
+test("beta session logout revokes server-side token and clears the cookie", async () => {
+  const db = mockBetaDb(), env = betaEnv(db);
+  const unlocked = await betaAccessGuard(request("/api/beta/invite/redeem", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ code: validCode })
+  }), env);
+  const cookie = unlocked.headers.get("Set-Cookie").split(";")[0];
+  const before = await betaAccessGuard(request("/api/beta/access/status", { headers: { Cookie: cookie } }), env);
+  assert.equal(before.status, 200);
+  assert.deepEqual(await before.json(), { authorized: true });
+  const denied = await betaAccessGuard(request("/api/beta/access/logout", {
+    method: "POST", headers: { Cookie: cookie, Origin: "https://unauthorized.example" }
+  }), env);
+  assert.equal(denied.status, 403);
+  assert.equal(db.state.sessions.size, 1);
+  const logout = await betaAccessGuard(request("/api/beta/access/logout", {
+    method: "POST",
+    headers: { Cookie: cookie, Origin: "https://clash-of-izzy-beta.jorgepereiragha.workers.dev" }
+  }), env);
+  assert.equal(logout.status, 200);
+  assert.match(logout.headers.get("Set-Cookie"), /^__Host-izzy_beta=; Path=\/; Max-Age=0; Secure; HttpOnly; SameSite=Strict$/);
+  assert.equal(db.state.sessions.size, 0);
+  const noAccess = await betaAccessGuard(request("/api/game/state", { headers: { Cookie: cookie } }), env);
+  assert.equal(noAccess.status, 403);
+  const status = await betaAccessGuard(request("/api/beta/access/status", { headers: { Cookie: cookie } }), env);
+  assert.equal(status.status, 401);
+  assert.deepEqual(await status.json(), { authorized: false });
 });
