@@ -740,6 +740,24 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         }), 404, "painel Master não libera skin ainda bloqueada");
       }
 
+      // The same idempotency key must never resolve to a different product
+      // even when that different product already has its own pending order.
+      const pendingVipB = expectStatus(await api("/api/store/purchase-request", {
+        method:"POST",token:tokenB,
+        body:{kind:"vip_package",itemId:vip.id,requestKey:"integration-key-vip-beta-01",paymentMethod:"manual_whatsapp"}
+      }),201,"pedido VIP sintético do segundo jogador");
+      const pendingEntryB = expectStatus(await api("/api/store/purchase-request", {
+        method:"POST",token:tokenB,
+        body:{kind:"vip_package",itemId:entry.id,requestKey:"integration-key-entry-beta-01",paymentMethod:"manual_whatsapp"}
+      }),201,"pedido de outro pacote do segundo jogador");
+      assert.notEqual(pendingVipB.request.id,pendingEntryB.request.id);
+      const crossProductReplay = await api("/api/store/purchase-request", {
+        method:"POST",token:tokenB,
+        body:{kind:"vip_package",itemId:entry.id,requestKey:"integration-key-vip-beta-01",paymentMethod:"manual_whatsapp"}
+      });
+      assert.equal(crossProductReplay.status,409,"pedido pendente não pode mascarar chave de outro item");
+      assert.equal(crossProductReplay.data.code,"PURCHASE_KEY_PRODUCT_MISMATCH");
+
       const skinPurchase = expectStatus(await api("/api/store/purchase-request", {
         method: "POST", token: tokenB,
         body: {

@@ -2276,6 +2276,15 @@ export default {
       const owned=await env.DB.prepare("SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?").bind(player.id,item.id).first();
       if(owned)return json({error:"Você já possui esta skin."},409);
     }
+    // A request key is bound to exactly one order; check before the product-wide
+    // pending-order shortcut, which might otherwise hide cross-product key reuse.
+    const keyed=await env.DB.prepare("SELECT id,status,product_kind,product_id,product_name,price_brl,payment_method,mp_order_id,mp_checkout_url FROM purchase_requests WHERE player_id=? AND request_key=?").bind(player.id,requestKey).first();
+    if(keyed){
+      if(keyed.payment_method!==paymentMethod)return json({error:"A chave de idempotência já pertence a outro meio de pagamento."},409);
+      if(keyed.product_kind!==kind||Number(keyed.product_id)!==itemId)
+        return json({error:"A chave de idempotência já pertence a outro produto.",code:"PURCHASE_KEY_PRODUCT_MISMATCH"},409);
+      return json({success:true,request:keyed,reused:true},200);
+    }
     const pending=await env.DB.prepare("SELECT id,status,product_name,price_brl,payment_method,mp_order_id,mp_checkout_url FROM purchase_requests WHERE player_id=? AND product_kind=? AND product_id=? AND status='pending'").bind(player.id,kind,item.id).first();
     if(pending&&pending.payment_method!==paymentMethod)return json({error:"Já existe um pedido deste produto aberto por outro meio de pagamento. Conclua ou resolva o pedido anterior antes de criar outro."},409);
     if(pending)return json({success:true,request:pending,reused:true,message:"Você já possui um pedido aguardando pagamento."},200);
