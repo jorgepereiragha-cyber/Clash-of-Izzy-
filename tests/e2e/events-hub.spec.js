@@ -2,6 +2,46 @@ import { test, expect } from "@playwright/test";
 
 const SESSION_TOKEN = "playwright-events-fixture-session";
 
+test("event hub handles blocked game-session storage without redirect or anonymous realm creation", async ({ page }) => {
+  await page.addInitScript(() => {
+    const get=Storage.prototype.getItem;
+    Storage.prototype.getItem=function(key){
+      if(key==="coi_game_token")throw new DOMException("Storage denied","SecurityError");
+      return get.call(this,key);
+    };
+  });
+  let created=0;
+  await page.route("**/api/game/start",route=>{created++;return route.abort();});
+  await page.goto("/events.html");
+  await expect(page.locator("#eventStatus")).toHaveText("Sessão indisponível");
+  await expect(page.locator("#message")).toContainText("bloqueou o armazenamento");
+  await expect(page.locator("#message").getByRole("link",{name:"acesse sua conta"})).toHaveAttribute("href","/account.html");
+  await expect(page.locator("#attack")).toBeDisabled();
+  expect(created).toBe(0);
+  await expect(page).toHaveURL(/\/events(?:\.html)?$/);
+});
+
+test("event hub retains sessionStorage token when localStorage denies access", async ({ page }) => {
+  await page.addInitScript(() => {
+    sessionStorage.setItem("coi_game_token","event-session-only");
+    const get=Storage.prototype.getItem;
+    Storage.prototype.getItem=function(key){
+      if(key==="coi_game_token"&&this===localStorage)throw new DOMException("Storage denied","SecurityError");
+      return get.call(this,key);
+    };
+  });
+  const requests=[];
+  await page.route("**/api/game/state",route=>{
+    requests.push(route.request().headers().authorization);
+    return route.fulfill({status:200,contentType:"application/json",body:'{"state":{"troops":[],"inventoryItems":[]}}'});
+  });
+  await page.route("**/api/game/event",route=>route.fulfill({status:200,contentType:"application/json",body:'{"event":null,"participant":{},"leaderboard":[]}'}));
+  await page.route("**/api/config/valhalla",route=>route.fulfill({status:200,contentType:"application/json",body:'{"active":false}'}));
+  await page.goto("/events.html");
+  await expect(page.locator("#eventStatus")).toHaveText("Evento aguardando calendário");
+  expect(requests).toContain("Bearer event-session-only");
+});
+
 test("hub de sete eventos funciona em viewport Android estreito e identifica prêmios previstos", async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 780 });
   await page.addInitScript(token => {
