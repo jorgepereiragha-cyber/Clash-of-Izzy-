@@ -85,3 +85,20 @@ package-lock.json
 
 # Server-only presence shard selection must not be publicly served.
 scripts/eldoria-realtime-routing.js
+# Exclude additional Worker-only modules from the public static asset root.
+city-layout-rules.js
+intermediate-production.js
+city-defense-rules.js
+player-progression-4x.js
+hero-assignments-4x.js
+pix-reconciliation.js
+dragon-catalog.js
+master-pack.js
+daily-package-offers.js
+castle-vip.js
+daily-rewards.js
+onboarding-bonus.js
+support-orders.js
+
+# All D1 audits and local build CLIs are server-side tooling.
+scripts/*.mjs
