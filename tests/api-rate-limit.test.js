@@ -54,6 +54,12 @@ test("Worker rate-limits authentication and game endpoints without wildcard CORS
   const arena = await readFile(new URL("../arena.html", import.meta.url), "utf8");
   for (const scope of ["store-catalog-ip", "game-start-ip", "game-state-player", "game-action-player", "game-action-network", "admin-login-ip", "admin-login-account"]) assert.ok(worker.includes(scope), "missing rate-limit scope: " + scope);
   assert.ok(worker.includes('"Access-Control-Allow-Origin":"https://clash-of-izzy-portal.jorgepereiragha.workers.dev"'));
+  assert.ok(worker.includes('"game-resume-player",existingPlayerId,120,3600'),"authenticated resumes have their own player quota");
+  const resumeIdx=worker.indexOf('const existingPlayerId=await gameIdentity(request,env)');
+  const guestLimitIdx=worker.indexOf('rateLimitDecision(env,"game-start-ip",ip,20,3600)',resumeIdx);
+  const playerLimitIdx=worker.indexOf('rateLimitDecision(env,"game-resume-player",existingPlayerId,120,3600)',resumeIdx);
+  assert.ok(resumeIdx>=0 && playerLimitIdx>resumeIdx && guestLimitIdx>playerLimitIdx,
+    "guest IP rate limit must run after verified kingdom resume path");
   assert.ok(!worker.includes('"Access-Control-Allow-Origin":"*"'));
   assert.doesNotMatch(worker, /Access-Control-Allow-Headers/);
   assert.ok(arena.includes("const API_BASE='/api'"));
