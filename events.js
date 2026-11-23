@@ -2,7 +2,13 @@ import { renderWorldEventCards, loadValhallaEventConfig } from "./event-catalog.
 
 const API="/api";
 const $=id=>document.getElementById(id);
-const token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
+function readEventSession(){
+ let readable=false;
+ try{const saved=localStorage.getItem("coi_game_token");readable=true;if(saved)return {token:saved,readable};}catch{}
+ try{const saved=sessionStorage.getItem("coi_game_token");readable=true;if(saved)return {token:saved,readable};}catch{}
+ return {token:"",readable};
+}
+const {token,eventStorageReadable}=(()=>{const session=readEventSession();return {token:session.token,eventStorageReadable:session.readable};})();
 const unitNames={militia:"Milícia",swordsman:"Espadachim",spearman:"Lanceiro",archer:"Arqueiro",crossbowman:"Besteiro",cavalry:"Cavalaria",knight:"Cavaleiro",catapult:"Catapulta",ram:"Aríete",trebuchet:"Trabuquete"};
 let state=null,eventState=null,valhallaConfig=null,busy=false,selected={},pendingRequestId=null,pendingAttackUnits=null,pendingEventId=null;
 let refreshGeneration=0;
@@ -91,7 +97,15 @@ function startEventTimers(){
  if(countdownTimer===null)countdownTimer=window.setInterval(renderCountdown,1000);
  if(eventRefreshTimer===null)eventRefreshTimer=window.setInterval(refresh,20000);
 }
-if(!token){location.replace("/kingdom.html");}else{
+if(!token){
+ const status=$("eventStatus");
+ status.replaceChildren(document.createTextNode(eventStorageReadable
+  ?"Conecte sua conta para acessar os eventos. "
+  :"O navegador bloqueou o armazenamento da sessão. Ative o armazenamento para recuperar seu reino. "));
+ const account=make("a","","Acessar minha conta");account.href="/account.html";status.append(account);
+ message("Sessão não disponível neste dispositivo. Nenhuma tropa será enviada.",true);
+ $("attack").disabled=true;
+}else{
  refresh();
  startEventTimers();
  document.addEventListener("visibilitychange",()=>{
