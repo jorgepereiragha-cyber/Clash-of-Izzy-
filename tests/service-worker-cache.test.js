@@ -130,19 +130,52 @@ test("PWA fetches query-bearing navigation but never stores its parameters or re
   assert.ok(![...h.stores.values()].some(store => [...store.keys()].some(key => key.includes("?"))));
 });
 
-test("PWA shell responses are cached by pathname and serve offline fallback", async () => {
+test("PWA serves Cloudflare clean-URL pages offline using the canonical .html shell key", async () => {
+  const h = makeHarness();
+  await h.lifecycle("install");
+  assert.equal(h.stores.get(SHELL_CACHE).has("/kingdom.html"), true);
+  assert.equal(h.stores.get(SHELL_CACHE).has("/kingdom"), false);
+  h.offline();
+  for (const path of ["/kingdom", "/kingdom/", "/kingdom?ref=private-code", "/portal", "/account"]) {
+    const response = await h.dispatch(path, { mode: "navigate" });
+    assert.equal(response.handled, true);
+    assert.equal(response.result.status, 200, path + " should resolve cached public shell");
+  }
+  const scriptResponse = await h.dispatch("/kingdom", { mode: "cors" });
+  assert.equal(scriptResponse.result.status, 200, "clean-URL GET also resolves the shell");
+  assert.ok(![...h.stores.values()].some(store => [...store.keys()].some(key => key.includes("?"))),
+    "query-bearing routes must never be stored");
+  const unknown = await h.dispatch("/account/private", { mode: "navigate" });
+  assert.equal(unknown.result.status, 200, "unknown URL receives only the cached offline fallback");
+});
+
+test("PWA navigation never saves live HTML and falls back to anonymous shell snapshots", async () => {
   const h = makeHarness();
   const first = await h.dispatch("/kingdom.html", { mode: "navigate" });
   assert.equal(first.handled, true);
   assert.equal(first.result.status, 200);
+  assert.equal(h.stores.size, 0, "online HTML navigation must not be cached");
+  await h.lifecycle("install");
   assert.ok(h.stores.get(SHELL_CACHE).has("/kingdom.html"));
   h.offline();
-  const fallback = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
-  assert.equal(fallback.result.status, 503);
-  await (await h.caches.open(SHELL_CACHE))
-    .put("/offline.html", makeResponse());
+  const kingdom = await h.dispatch("/kingdom", { mode: "navigate" });
+  assert.equal(kingdom.result.status, 200, "offline canonical route uses anonymous snapshot");
   const offline = await h.dispatch("/unknown-route?token=sensitive", { mode: "navigate" });
-  assert.equal(offline.result.status, 200);
+  assert.equal(offline.result.status, 200, "unknown route shows only offline fallback");
+});
+
+test("PWA never stores potentially personalized HTML even if headers hide Set-Cookie", async () => {
+  const h = makeHarness(() => makeResponse());
+  for (const [path,options] of [
+    ["/kingdom", { mode:"navigate" }],
+    ["/account.html", { mode:"navigate" }],
+    ["/kingdom", { mode:"cors" }],
+    ["/portal", { mode:"cors" }],
+  ]) {
+    const response = await h.dispatch(path, options);
+    assert.equal(response.result.status, 200, path);
+  }
+  assert.equal(h.stores.size, 0, "only the anonymous install step is allowed to save HTML");
 });
 
 test("PWA only adds approved static assets without query strings", async () => {
