@@ -171,7 +171,7 @@ jobs:
           set -euo pipefail
           # Keep this file OUTSIDE the assets root and remove it even if deployment fails.
           umask 077
-          secret_file="$(mktemp "$RUNNER_TEMP/izzy-beta-secrets.XXXXXX")"
+          secret_file="$(mktemp --suffix=.json "$RUNNER_TEMP/izzy-beta-secrets.XXXXXX")"
           trap 'rm -f "$secret_file"' EXIT
           python3 - "$secret_file" <<'PY'
           import json
