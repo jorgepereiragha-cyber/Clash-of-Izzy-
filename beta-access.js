@@ -114,9 +114,10 @@ async function redeemInvite(request, env, url) {
   const issued = await env.DB.prepare(
     "INSERT INTO beta_access_sessions(session_hash,invite_id,expires_at) " +
     "SELECT ?,id,? FROM beta_invites WHERE code_hash=? AND disabled=0 " +
-    "AND uses<max_uses AND (expires_at IS NULL OR expires_at>unixepoch())"
-  ).bind(await sha256(token), Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS, await sha256(code)).run();
-  if (Number(issued?.meta?.changes) !== 1) {
+    "AND uses<max_uses AND (expires_at IS NULL OR expires_at>unixepoch()) RETURNING 1 AS issued"
+  ).bind(await sha256(token), Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS, await sha256(code)).first();
+  // D1 meta.changes includes trigger side-effects; read the inserted row instead.
+  if (issued?.issued !== 1) {
     return responseJson({ error: "Convite invalido ou expirado." }, 403);
   }
   return responseJson({ ok: true, next: "/kingdom.html" }, 200, {
