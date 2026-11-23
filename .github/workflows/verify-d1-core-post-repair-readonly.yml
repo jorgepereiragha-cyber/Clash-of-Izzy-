@@ -1,0 +1,27 @@
+name: Verificar reparo D1 essencial de producao (somente leitura)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify-core:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Verificar somente ledger, tabelas, indices e FKs no D1 de producao
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: node scripts/verify-d1-core-repair-readonly.mjs
+      - name: Exigir health e contrato Android de producao, somente GET
+        run: node scripts/check-android-release-server.mjs
