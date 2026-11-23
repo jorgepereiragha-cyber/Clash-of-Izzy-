@@ -125,6 +125,12 @@ export async function betaAccessGuard(request, env) {
   try {
     if (path === "/api/beta/invite/redeem") return await redeemInvite(request, env, url);
     if (path === "/beta-access.html" && request.method === "GET") return null;
+    // Never expose promotional contribution pages inside the private beta realm.
+    // This also covers assets physically present in the shared repository.
+    if (path === "/public-portal" || path.startsWith("/public-portal/") ||
+        path === "/apoie" || path === "/apoie.html") {
+      return responseJson({ error: "Portal de divulgacao indisponivel no beta.", code: "BETA_MARKETING_DISABLED" }, 404);
+    }
     // The public marketing portal and legacy beta sign-up are not part of this realm.
     if (path === "/api/beta/signup") {
       return responseJson({ error: "Use o convite do beta fechado.", code: "BETA_LEGACY_SIGNUP_DISABLED" }, 404);
