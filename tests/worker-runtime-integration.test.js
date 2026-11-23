@@ -1127,21 +1127,26 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     });
 
     await t.test("limite de criação por IP não bloqueia reentrada autenticada em rede compartilhada", async () => {
-      // Exhaust the guest/IP window in local D1 without creating 20 disposable
-      // kingdoms. The default test Worker receives no CF-Connecting-IP header.
-      const now=Math.floor(Date.now()/1000);
-      const started=Math.floor(now/3600)*3600;
-      const key=createHmac("sha256",SESSION_SECRET).update("game-start-ip:unknown").digest("hex");
-      await runCli([
+      // Observe the actual rate-key the local Wrangler runtime derives.
+      // CF-Connecting-IP may be injected by Miniflare; do not guess "unknown".
+      const sqlRows=command => runCli([
         "--config","wrangler.jsonc","d1","execute","clash-of-izzy-db",
-        "--local","--persist-to",persistDir,
-        "--command",
-        "INSERT INTO api_rate_limits(rate_key,window_started_at,request_count,expires_at) " +
-        "VALUES('"+key+"',"+started+",20,"+(started+7200)+") " +
-        "ON CONFLICT(rate_key) DO UPDATE SET request_count=20,window_started_at="+started+",expires_at="+(started+7200)+";"
+        "--local","--persist-to",persistDir,"--command",command
       ]);
-      expectStatus(await api("/api/game/start",{method:"POST",body:{}}),429,
-        "novo reino continua bloqueado ao exceder 20 criações/IP/hora");
+      const before=rowsFromD1Json(await sqlRows("SELECT rate_key,request_count FROM api_rate_limits"));
+      // An invalid JSON array consumes a guest limiter but creates no player.
+      expectStatus(await api("/api/game/start",{method:"POST",body:[]}),400,
+        "sonda local de IP não cria conta");
+      const after=rowsFromD1Json(await sqlRows("SELECT rate_key,request_count FROM api_rate_limits"));
+      const counters=new Map(before.map(row=>[row.rate_key,Number(row.request_count)]));
+      const incremented=after.filter(row=>Number(row.request_count)===(counters.get(row.rate_key)||0)+1);
+      assert.equal(incremented.length,1,
+        "exactly one guest rate-limit key must increment during the invalid start probe");
+      const key=incremented[0].rate_key;
+      await sqlRows("UPDATE api_rate_limits SET request_count=20 WHERE rate_key='"+key+"';");
+      const blocked=await api("/api/game/start",{method:"POST",body:{}});
+      assert.equal(blocked.status,429,
+        "new realm must remain blocked after shared-IP creation quota is exhausted");
       const returned=expectStatus(await api("/api/game/start",{method:"POST",token:tokenA,body:{}}),200,
         "token válido retoma reino, embora IP compartilhado tenha esgotado a cota");
       assert.equal(returned.resumed,true);
