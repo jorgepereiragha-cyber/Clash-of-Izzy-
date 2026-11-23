@@ -105,4 +105,15 @@ jobs:
           done
           echo "Portal publicado e URLs internas bloqueadas no host de propaganda."
       - name: Comprovar hashes dos assets promocionais publicados (somente GET)
-        run: node scripts/verify-deployed-assets.mjs portal
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if node scripts/verify-deployed-assets.mjs portal; then
+              echo "Assets portal publicados e íntegros no SHA aprovado."
+              exit 0
+            fi
+            if [[ "$attempt" -lt 5 ]]; then sleep 6; fi
+          done
+          echo "::error::Assets portal não correspondem ao SHA aprovado após cinco verificações."
+          exit 1
