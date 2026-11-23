@@ -15,6 +15,12 @@ export function projectRoyalJourney(detail = {}) {
       "Ver cidade", "#city", "sync");
   }
   const level = natural(kingdom.castle_level);
+  // A partial/invalid response must not be presented as a new level-1 kingdom.
+  if (level < 1) {
+    return directive("Reino não sincronizado",
+      "Aguarde a conexão antes de planejar ordens. Nenhuma ação é executada aqui.",
+      "Ver cidade", "#city", "sync");
+  }
   const army = natural(detail.armyCount);
   const active = (Array.isArray(detail.queues) ? detail.queues : [])
     .filter(q => q && q.status === "running");
