@@ -140,14 +140,18 @@ async function connectKingdom(){
   renderChronicle();
  }catch(error){
   status.replaceChildren(document.createTextNode('⚠️ Reino não conectado · '+(error.message||'Servidor indisponível')+' '));
-  const retry=document.createElement('button');
-  retry.type='button';
-  retry.className='secondary';
-  retry.id='retryArenaKingdom';
-  retry.textContent='Tentar novamente';
-  retry.addEventListener('click',()=>{retry.disabled=true;void connectKingdom();});
-  status.append(retry);
-  if(error.status===401||error.status===403){
+  // Retrying guest creation after a lost response may create an unrelated
+  // second kingdom. Only retry when a saved realm token identifies the player.
+  if(savedToken){
+   const retry=document.createElement('button');
+   retry.type='button';
+   retry.className='secondary';
+   retry.id='retryArenaKingdom';
+   retry.textContent='Tentar novamente';
+   retry.addEventListener('click',()=>{retry.disabled=true;void connectKingdom();});
+   status.append(retry);
+  }
+  if(!savedToken||error.status===401||error.status===403){
    const recover=document.createElement('a');
    recover.href='/account.html';
    recover.className='linkbtn secondary';
