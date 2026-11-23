@@ -20,6 +20,19 @@ test("interface de alianças usa sessão persistida e estado real do Worker", as
   ]) assert.ok(html.includes(snippet), `interface de alianças deve conter: ${snippet}`);
 });
 
+test("reconexão de alianças mostra ação de retry e link de conta sem apagar o token", async () => {
+  const html = await readFile(new URL("../alliance.html", import.meta.url), "utf8");
+  assert.ok(html.includes('error.status=res.status'), "preserve HTTP status for session recovery");
+  assert.ok(html.includes('retryAllianceConnection'), "retry button available after API errors");
+  assert.ok(html.includes('const synchronized=await load(false);if(synchronized)status("Aliança sincronizada.");'), "do not show success after failed state refresh");
+  assert.ok(html.includes('status("● Conectado ao reino");return true;'));
+  assert.ok(html.includes('retry.addEventListener("click",()=>{retry.disabled=true;void load(false)})'));
+  assert.ok(html.includes('if(e.status===401||e.status===403)'), "account link only for authentication errors");
+  assert.ok(html.includes('link.href="/account.html"'));
+  assert.ok(html.includes('loading.classList.remove("hidden")'));
+  assert.ok(!html.includes('localStorage.removeItem("coi_game_token")'));
+});
+
 test("central do reino oferece acesso à gestão de alianças", async () => {
   const nav = await readFile(new URL("../navigation.js", import.meta.url), "utf8");
   assert.ok(nav.includes('href:"/alliance.html"'));
