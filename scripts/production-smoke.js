@@ -73,7 +73,7 @@ export async function runProductionSmokeTests({
       // Keep the URL path and network cause visible, but never log credentials or query strings.
       const cause = error?.cause;
       const code = typeof cause?.code === "string" ? " [" + cause.code + "]" : "";
-      const message = error?.name === "TimeoutError" ? "timeout" : String(error?.message || error);
+      const message = error?.name === "TimeoutError" ? "timeout" : "fetch failed";
       throw new Error("Falha de rede no smoke GET " + target.pathname + ": " + message + code, { cause: error });
     }
   };
