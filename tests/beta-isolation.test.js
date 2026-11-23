@@ -10,7 +10,7 @@ const validCode = "IZZY-" + "A".repeat(20);
 const validHash = createHash("sha256").update(validCode).digest("hex");
 
 function mockBetaDb(maxUses = 1) {
-  const state = { attempts: 0, uses: 0, sessions: new Set(), disabledInvites: false, errors: false, sessionInsertFailure: false };
+  const state = { attempts: 0, uses: 0, sessions: new Set(), disabledInvites: false, errors: false, sessionInsertFailure: false, claimTriggerInstalled: true };
   return {
     state,
     prepare(sql) {
@@ -19,6 +19,9 @@ function mockBetaDb(maxUses = 1) {
         bind(...args) {
           return {
             async first() {
+              if (sql.includes("name='beta_claim_invite_for_session'")) {
+                return state.claimTriggerInstalled ? { installed: 1 } : null;
+              }
               if (sql.startsWith("INSERT INTO beta_redeem_attempts")) return { hits: ++state.attempts };
               if (sql.startsWith("SELECT 1 AS permitted FROM beta_access_sessions")) {
                 return state.sessions.has(args[0]) && !state.disabledInvites ? { permitted: 1 } : null;
@@ -91,6 +94,23 @@ test("unauthenticated players cannot read game API or static assets", async () =
   assert.equal(asset.headers.get("Location"), "https://clash-of-izzy-beta.jorgepereiragha.workers.dev/beta-access.html");
   assert.equal(await betaAccessGuard(request("/beta-access.html"), env), null);
   assert.equal(await betaAccessGuard(request("/api/health"), env), null);
+});
+
+test("missing atomic invite trigger blocks redemption and prevents unmetered sessions", async () => {
+  const db = mockBetaDb(), env = betaEnv(db);
+  db.state.claimTriggerInstalled = false;
+  const response = await betaAccessGuard(request("/api/beta/invite/redeem", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: validCode })
+  }), env);
+  assert.equal(response.status, 503);
+  assert.equal((await response.json()).code, "BETA_SCHEMA_INCOMPLETE");
+  assert.equal(db.state.sessions.size, 0);
+  assert.equal(db.state.uses, 0);
+  const health = read("worker.js");
+  assert.match(health, /missingTriggers=env\.ENVIRONMENT==="beta"/);
+  assert.match(health, /name='beta_claim_invite_for_session'/);
+  assert.match(health, /checks\.schema=missingTables\.length===0&&missingTriggers\.length===0/);
 });
 
 test("invites are hashed, limited by uses and issue secure host-only session cookies", async () => {
