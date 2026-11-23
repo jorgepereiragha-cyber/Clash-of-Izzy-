@@ -79,7 +79,13 @@ button:disabled{opacity:.5;cursor:wait}
 (() => {
  "use strict";
  const $ = id => document.getElementById(id);
- let token = localStorage.getItem("coi_game_token") || sessionStorage.getItem("coi_game_token") || "";
+ function readAccountToken(){
+  let value="";
+  try{value=localStorage.getItem("coi_game_token")||"";}catch{}
+  if(!value)try{value=sessionStorage.getItem("coi_game_token")||"";}catch{}
+  return value;
+ }
+ let token=readAccountToken();
  let linkedAccount = false;
  let googleConfig = null, googlePending = null, googleBusy = false;
  const isNativeAndroid = navigator.userAgent.includes("ClashOfIzzyAndroid/");
@@ -165,9 +171,26 @@ button:disabled{opacity:.5;cursor:wait}
  function setStatus(message, kind="") {
   const node=$("accountStatus");node.textContent=message;node.className="status "+kind;
  }
+ function canPersistAccountSession(){
+  for(const getter of [()=>window.localStorage,()=>window.sessionStorage]){
+   try{const store=getter(),key="coi_account_storage_probe";store.setItem(key,"1");const valid=store.getItem(key)==="1";store.removeItem(key);if(valid)return true;}catch{}
+  }
+  return false;
+ }
  function saveToken(value) {
   token=String(value||"");
-  if(token){localStorage.setItem("coi_game_token",token);sessionStorage.setItem("coi_game_token",token);}
+  if(!token)throw new Error("O servidor não retornou uma sessão válida.");
+  let persisted=false;
+  try{localStorage.setItem("coi_game_token",token);persisted=true;}catch{}
+  try{sessionStorage.setItem("coi_game_token",token);persisted=true;}catch{}
+  if(!persisted)throw new Error("Sessão autenticada, mas o navegador bloqueou seu armazenamento. Autorize os dados deste site antes de abrir o reino.");
+ }
+ function clearAccountToken(){
+  let cleared=true;
+  try{localStorage.removeItem("coi_game_token");}catch{cleared=false;}
+  try{sessionStorage.removeItem("coi_game_token");}catch{cleared=false;}
+  token="";
+  return cleared;
  }
  async function api(path, options={}) {
   const response=await fetch("/api"+path,{method:options.method||"GET",headers:{
@@ -194,7 +217,7 @@ button:disabled{opacity:.5;cursor:wait}
    }
   }catch(error){
    if(error.status===401){
-    token="";localStorage.removeItem("coi_game_token");sessionStorage.removeItem("coi_game_token");
+    clearAccountToken();
     $("googleLinkButton").hidden=true;
     setStatus("A sessão salva expirou ou foi substituída. Entre com sua conta para recuperar o reino; não crie outro reino por engano.","error");
    }else setStatus(error.message,"error");
@@ -217,6 +240,7 @@ button:disabled{opacity:.5;cursor:wait}
   try{
    // Para novos jogadores, a fundação usa a mesma rota oficial e o mesmo modelo de reino.
    if(!token){
+    if(!canPersistAccountSession())throw new Error("O navegador bloqueou o armazenamento da sessão. Autorize os dados deste site antes de criar um novo reino.");
     const started=await api("/game/start",{method:"POST",body:{}});
     saveToken(started.token);
    }
@@ -236,12 +260,13 @@ button:disabled{opacity:.5;cursor:wait}
   try{await api("/account/logout",{method:"POST"});remoteRevoked=true;}
   catch(error){console.warn("logout_remote_revocation_unconfirmed",error?.message||error);}
   // Always remove local credentials, even offline; never claim server revocation on API failure.
-  localStorage.removeItem("coi_game_token");sessionStorage.removeItem("coi_game_token");token="";linkedAccount=false;
+  const locallyCleared=clearAccountToken();linkedAccount=false;
   $("registerForm").hidden=false;$("logoutButton").hidden=true;
-  setStatus(remoteRevoked
+  const logoutMessage=remoteRevoked
     ?"Sessão revogada no servidor e encerrada neste dispositivo. Entre novamente para recuperar seu reino."
-    :"Saída local concluída, mas não foi possível confirmar a revogação no servidor. Entre novamente para encerrar outras sessões.",
-    remoteRevoked?"success":"error");
+    :"Saída local concluída, mas não foi possível confirmar a revogação no servidor. Entre novamente para encerrar outras sessões.";
+   setStatus(logoutMessage+(locallyCleared?"":" Atenção: um armazenamento local não pôde ser limpo. Remova os dados deste site no navegador."),
+    remoteRevoked&&locallyCleared?"success":"error");
  });
  void loadGoogleConfig();
  void inspectSession();
