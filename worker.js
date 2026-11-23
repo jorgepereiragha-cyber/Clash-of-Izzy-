@@ -2073,6 +2073,8 @@ export default {
     // An enabled 4X beta must fail readiness until all additive 0041 tables exist.
     if(env.ENVIRONMENT==="beta"&&advanced4xEnabled(env))requiredTables.push("intermediate_resources","city_defenses","kingdom_progression","progression_xp_ledger");
     let missingTables=[...requiredTables];
+    // Invitation quotas rely on this trigger; table presence alone is not readiness.
+    let missingTriggers=env.ENVIRONMENT==="beta"?["beta_claim_invite_for_session"]:[];
     if(env.DB){
       try{
         await env.DB.prepare("SELECT 1 AS ready").first();
@@ -2080,7 +2082,12 @@ export default {
         const rows=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='table'").all();
         const existing=new Set((rows.results||[]).map(row=>row.name));
         missingTables=requiredTables.filter(name=>!existing.has(name));
-        checks.schema=missingTables.length===0;
+        if(env.ENVIRONMENT==="beta"){
+          const triggerRows=await env.DB.prepare("SELECT name FROM sqlite_master WHERE type='trigger' AND name='beta_claim_invite_for_session'").all();
+          const existingTriggers=new Set((triggerRows.results||[]).map(row=>row.name));
+          missingTriggers=missingTriggers.filter(name=>!existingTriggers.has(name));
+        }
+        checks.schema=missingTables.length===0&&missingTriggers.length===0;
       }catch(error){
         console.error("health_check_failed",String(error?.message||error));
       }
@@ -2088,7 +2095,7 @@ export default {
     const ready=checks.database&&checks.session&&checks.schema;
     // Contrato de lançamento: o APK só pode ser publicado após esta versão de Eldoria estar ativa.
     // O Worker antigo não expõe o marcador e não deve passar no gate de release.
-    return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables,androidApiContract:"eldoria-android-v1"},ready?200:503);
+    return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables,...(env.ENVIRONMENT==="beta"?{missingTriggers}:{}),androidApiContract:"eldoria-android-v1"},ready?200:503);
   }
   // Contadores publicos verificaveis nao devem depender de tabelas comerciais opcionais.
   // As consultas de contadores são SELECTs; o limitador de taxa existente pode persistir seu estado.

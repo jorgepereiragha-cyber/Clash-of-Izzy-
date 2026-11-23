@@ -99,6 +99,14 @@ async function redeemInvite(request, env, url) {
   }
   const code = normalizeInviteCode(input?.code);
   if (!code) return responseJson({ error: "Convite invalido ou expirado." }, 403);
+  // Without this trigger the INSERT below would create sessions but never
+  // consume the invitation quota. Fail closed if schema migration is partial.
+  const claimTrigger = await env.DB.prepare(
+    "SELECT 1 AS installed FROM sqlite_master WHERE type='trigger' AND name='beta_claim_invite_for_session'"
+  ).first();
+  if (!claimTrigger) {
+    return responseJson({ error: "Controle de convites beta nao instalado.", code: "BETA_SCHEMA_INCOMPLETE" }, 503);
+  }
   // One INSERT claims the invite and issues its session atomically.
   // The beta-only BEFORE INSERT trigger increments uses in the same SQLite
   // statement; a rejected/failed insert never burns an invite.
