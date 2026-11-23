@@ -5,7 +5,14 @@ const CORE_ASSETS=["/","/index.html","/portal.html","/assets/brand/hero-emblem.s
 async function precacheApplicationShell() {
  const cache = await caches.open(CACHE_NAME);
  const required = ["/index.html", "/kingdom.html", "/offline.html"];
- await cache.addAll(required);
+ // Cache.addAll does not honor Cache-Control: private/no-store or Set-Cookie.
+ // Fetch anonymously and inspect *each response* before writing to storage.
+ // A rejected essential response blocks this SW install; the older SW remains active.
+ for (const path of required) {
+  const response = await fetch(path, { cache: "no-store", credentials: "omit", redirect: "error" });
+  if (!canStoreResponse(response)) throw new Error("Shell essencial nao armazenavel: " + path);
+  await cache.put(path, response.clone());
+ }
  const manifestPath = "/vendor/three/asset-manifest.json";
  let vendorAssets = [];
  try {
