@@ -25,8 +25,8 @@ test("production migration audit fails closed on any historical gap or divergenc
   assert.match(audit, /not advanced_applied/);
   assert.match(audit, /not duplicate_names/);
   assert.match(audit, /coreHistoryCompleteRegardlessOfOrder/);
-  assert.match(audit, /pending = \\[name for name in expected if name not in observed_set\\] if baseline_complete else \\[\\]/);
-  assert.doesNotMatch(audit, /pending = expected\\[len\\(names\\):\\] if prefix_valid else \\[\\]/);
+  assert.match(audit, /pending = \[name for name in expected if name not in observed_set\] if baseline_complete else \[\]/);
+  assert.doesNotMatch(audit, /pending = expected\[len\(names\):\] if prefix_valid else \[\]/);
   assert.match(audit, /missingHistoricalMigrations/);
   assert.match(audit, /firstHistoryDivergence/);
   assert.match(audit, /for index, observed in enumerate\(names\)/);
