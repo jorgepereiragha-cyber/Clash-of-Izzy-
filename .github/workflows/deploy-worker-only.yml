@@ -131,3 +131,5 @@ jobs:
           node scripts/check-android-release-server.mjs
           node scripts/check-worker-only-payment-state.mjs
           node scripts/production-smoke.js
+      - name: Comprovar hashes do renderer, manifesto e GLBs publicados (somente GET)
+        run: node scripts/verify-deployed-assets.mjs worker
