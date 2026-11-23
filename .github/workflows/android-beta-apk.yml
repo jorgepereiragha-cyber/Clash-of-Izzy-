@@ -1,0 +1,96 @@
+name: Android beta fechado - APK assinado separado
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_beta_build:
+        description: "Confirmo que o Worker beta foi homologado e o APK nao e a release oficial"
+        type: boolean
+        required: true
+        default: false
+permissions:
+  contents: read
+jobs:
+  apk_beta:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_beta_build == true }}
+    runs-on: ubuntu-latest
+    environment: beta-signing
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Conferir contrato beta
+        run: node --test tests/beta-isolation.test.js
+      - name: Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Gradle 8.11.1
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Instalar plataforma Android 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ANDROID_HOME:?Android SDK ausente}"
+          sdkmanager_cmd="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$sdkmanager_cmd"
+          yes | "$sdkmanager_cmd" --licenses > /dev/null || true
+          "$sdkmanager_cmd" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Preparar apenas a chave beta
+        shell: bash
+        env:
+          KEYSTORE_B64: ${{ secrets.ANDROID_BETA_KEYSTORE_BASE64 }}
+          STORE_PASS: ${{ secrets.ANDROID_BETA_STORE_PASSWORD }}
+          ALIAS: ${{ secrets.ANDROID_BETA_KEY_ALIAS }}
+          KEY_PASS: ${{ secrets.ANDROID_BETA_KEY_PASSWORD }}
+          CERT_SHA: ${{ vars.ANDROID_BETA_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$KEYSTORE_B64" || -z "$STORE_PASS" || -z "$ALIAS" || -z "$KEY_PASS" || -z "$CERT_SHA" ]]; then
+            echo "::error::Chave beta ou fingerprint ausente"
+            exit 1
+          fi
+          printf '%s' "$KEYSTORE_B64" | tr -d '[:space:]' | base64 --decode > "$RUNNER_TEMP/izzy-beta.jks"
+          test -s "$RUNNER_TEMP/izzy-beta.jks"
+          chmod 600 "$RUNNER_TEMP/izzy-beta.jks"
+          echo "ANDROID_BETA_KEYSTORE_PATH=$RUNNER_TEMP/izzy-beta.jks" >> "$GITHUB_ENV"
+      - name: Compilar variante beta assinada
+        working-directory: android-sideload
+        env:
+          ANDROID_BETA_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_BETA_STORE_PASSWORD }}
+          ANDROID_BETA_KEY_ALIAS: ${{ secrets.ANDROID_BETA_KEY_ALIAS }}
+          ANDROID_BETA_KEY_PASSWORD: ${{ secrets.ANDROID_BETA_KEY_PASSWORD }}
+        run: gradle --no-daemon assembleBeta
+      - name: Validar assinatura, ID e hash do APK beta
+        shell: bash
+        env:
+          CERT_SHA: ${{ vars.ANDROID_BETA_CERT_SHA256 }}
+        run: |
+          set -euo pipefail
+          dir=android-sideload/app/build/outputs/apk/beta
+          apk="$dir/app-beta.apk"
+          test -s "$apk"
+          signer="$ANDROID_HOME/build-tools/35.0.0/apksigner"
+          "$signer" verify --verbose "$apk"
+          actual="$("$signer" verify --print-certs "$apk" | awk -F': ' '/Signer #1 certificate SHA-256 digest/ {print $2; exit}' | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          expected="$(printf '%s' "$CERT_SHA" | tr -d ':[:space:]' | tr '[:upper:]' '[:lower:]')"
+          if [[ ! "$expected" =~ ^[0-9a-f]{64}$ || "$actual" != "$expected" ]]; then
+            echo "::error::Certificado beta divergente do certificado aprovado"
+            exit 1
+          fi
+          "$ANDROID_HOME/build-tools/35.0.0/aapt" dump badging "$apk" | grep -q "package: name='com.clashofizzy.android.beta'"
+          (cd "$dir" && sha256sum app-beta.apk > app-beta.apk.sha256)
+      - name: Publicar somente artefato temporario
+        uses: actions/upload-artifact@v4
+        with:
+          name: clash-of-izzy-beta-apk-assinado
+          path: |
+            android-sideload/app/build/outputs/apk/beta/app-beta.apk
+            android-sideload/app/build/outputs/apk/beta/app-beta.apk.sha256
+          retention-days: 7
+          if-no-files-found: error
+      - name: Eliminar keystore temporaria
+        if: always()
+        run: rm -f "$RUNNER_TEMP/izzy-beta.jks"
