@@ -30,3 +30,81 @@ test("production smoke does not leak secrets embedded in network error messages"
     error => error.message.includes("GET /api/health") && !error.message.includes(secret) && error.cause === undefined
   );
 });
+
+
+test("read-only smoke retries a transient network error, then still rejects an HTTP 503", async () => {
+  let attempts = 0;
+  const warnings = [];
+  const previousWarn = console.warn;
+  console.warn = message => warnings.push(message);
+  try {
+    await assert.rejects(runProductionSmokeTests({
+      baseUrl: "https://example.test",
+      networkRetryDelayMs: 0,
+      fetchImpl: async (_url, init) => {
+        attempts++;
+        assert.equal(init.method, "GET");
+        if (attempts === 1) throw new TypeError("fetch failed");
+        return { status: 503 };
+      }
+    }), /API de saúde respondeu HTTP 503/);
+  } finally {
+    console.warn = previousWarn;
+  }
+  assert.equal(attempts, 2);
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0], /smoke GET \/api\/health/);
+});
+
+test("smoke never retries an HTTP error status", async () => {
+  let attempts = 0;
+  await assert.rejects(runProductionSmokeTests({
+    baseUrl: "https://example.test",
+    networkRetryDelayMs: 0,
+    fetchImpl: async () => {
+      attempts++;
+      return { status: 503 };
+    }
+  }), /API de saúde respondeu HTTP 503/);
+  assert.equal(attempts, 1);
+});
+
+test("smoke network retries are bounded and sanitized after exhaustion", async () => {
+  const secret = "private-value-hidden-4321";
+  let attempts = 0;
+  const warnings = [];
+  const previousWarn = console.warn;
+  console.warn = message => warnings.push(message);
+  try {
+    await assert.rejects(runProductionSmokeTests({
+      baseUrl: "https://example.test/?token=" + secret,
+      networkRetryDelayMs: 0,
+      fetchImpl: async (_url, init) => {
+        attempts++;
+        assert.equal(init.method, "GET");
+        throw new TypeError("fetch failed " + secret,
+          { cause: Object.assign(new Error("URL contains " + secret), { code: "ECONNRESET" }) });
+      }
+    }), error =>
+      error.message.includes("GET /api/health") &&
+      error.message.includes("ECONNRESET") &&
+      error.message.includes("3 tentativas") &&
+      !error.message.includes(secret) && error.cause === undefined
+    );
+  } finally {
+    console.warn = previousWarn;
+  }
+  assert.equal(attempts, 3);
+  assert.equal(warnings.length, 2);
+  assert.ok(warnings.every(message => !message.includes(secret)));
+});
+
+test("smoke rejects unbounded retry configuration before any fetch", async () => {
+  let called = false;
+  await assert.rejects(runProductionSmokeTests({
+    baseUrl: "https://example.test",
+    networkRetries: 10,
+    fetchImpl: async () => { called = true; }
+  }), /Limite de tentativas/);
+  assert.equal(called, false);
+});
