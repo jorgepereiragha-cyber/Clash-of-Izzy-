@@ -374,6 +374,7 @@ async function connect(){
  const game=document.getElementById("game");
  const loading=document.getElementById("loading");
  const previouslyPlayable=!game.hidden;
+ let guestCreationAttempted=false;
  setStatus("Sincronizando…");
  try{
   token=readKingdomGameToken();
@@ -389,6 +390,7 @@ async function connect(){
     throw new Error("Não é possível salvar a sessão do reino neste navegador. Autorize o armazenamento para evitar perder seu progresso.");
    }
    const referrerCode=new URLSearchParams(location.search).get("ref")||"";
+   guestCreationAttempted=true;
    data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify(referrerCode?{referrer_code:referrerCode}:{})});
    if(data.token){
@@ -420,10 +422,13 @@ async function connect(){
    game.hidden=true;
    loading.hidden=false;
    loading.textContent=(error.message||"Conexão indisponível")+
-    " Seu acesso salvo foi preservado. Verifique a conexão e tente novamente. ";
-   let retry=document.getElementById("retryConnection");
-   if(!retry){
-    retry=document.createElement("button");
+    (guestCreationAttempted&&!token
+      ?" A criação pode ter sido processada. Por segurança, não repita automaticamente essa solicitação. "
+      :" Seu acesso salvo foi preservado. Verifique a conexão e tente novamente. ");
+   // Repeating an anonymous POST after losing its response can create an
+   // unrelated second realm. Resume only when a realm token is available.
+   if(!guestCreationAttempted||token){
+    const retry=document.createElement("button");
     retry.id="retryConnection";
     retry.type="button";
     retry.className="secondary";
@@ -431,8 +436,7 @@ async function connect(){
     retry.addEventListener("click",connect);
     loading.append(retry);
    }
-   retry.disabled=false;
-   if(token&&(error?.status===401||error?.status===403)){
+   if((guestCreationAttempted&&!token)||(token&&(error?.status===401||error?.status===403))){
     const accountLink=document.createElement("a");
     accountLink.href="/account.html";
     accountLink.className="linkbtn secondary";
