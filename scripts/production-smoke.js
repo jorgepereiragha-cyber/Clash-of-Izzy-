@@ -235,6 +235,38 @@ export async function runProductionSmokeTests({
     const moduleBody = await moduleResponse.text();
     assert(!/cdn\.jsdelivr\.net\/npm\/three/i.test(moduleBody),
       modulePath + " ainda importa Three.js de um CDN.");
+    if (modulePath === "/scripts/kingdom-3d.js") {
+      assert(moduleBody.includes("createCastleGlbGroup") && moduleBody.includes("glbTemplates"),
+        "Castelo 3D publicado não contém a integração dos GLBs Kenney da PR #326.");
+    }
+  }
+
+  // PR #326: verify the deployed castle and forest GLBs, not only the Three.js bundle.
+  // Missing optional models must fail the protected visual-release smoke gate.
+  const sceneManifestResponse = await get("/assets/3d/manifest.json");
+  assert(sceneManifestResponse.status === 200, "Manifesto de modelos 3D não foi publicado.");
+  const sceneManifest = await readJson(sceneManifestResponse, "Manifesto de modelos 3D");
+  assert(Number.isInteger(sceneManifest.version) && sceneManifest.version >= 2,
+    "Manifesto 3D publicado é anterior à atualização visual da PR #326.");
+  const watchtower = sceneManifest.models?.find(asset => asset.type === "watchtower" && asset.enabled === true);
+  const castleWall = sceneManifest.models?.find(asset => asset.type === "wall" && asset.enabled === true);
+  const forestTree = sceneManifest.props?.find(asset => asset.id === "kenney-tree-high" && asset.enabled === true);
+  assert(watchtower && castleWall && forestTree,
+    "Manifesto 3D não contém torre, muralha e árvore Kenney habilitados.");
+  assert(Array.isArray(forestTree.positions) && forestTree.positions.length >= 6,
+    "Manifesto 3D não contém as seis posições da floresta balanced/high.");
+  for (const asset of [watchtower, castleWall, forestTree]) {
+    const path = asset.src;
+    assert(typeof path === "string" && /^\\/assets\\/3d\\/kenney\\/[A-Za-z0-9/_ .-]+\\.glb$/.test(path) &&
+      !path.includes(".."), "Caminho de modelo GLB inválido no manifesto.");
+    const response = await get(path);
+    assert(response.status === 200, "Modelo GLB indisponível: " + path + " (HTTP " + response.status + ").");
+    const bytes = await response.arrayBuffer();
+    assert(bytes.byteLength >= 24, "Modelo GLB vazio ou truncado: " + path + ".");
+    const header = new DataView(bytes);
+    assert(header.getUint32(0, true) === 0x46546c67 && header.getUint32(4, true) === 2 &&
+      header.getUint32(8, true) === bytes.byteLength,
+      "Modelo GLB sem cabeçalho glTF 2.0 íntegro: " + path + ".");
   }
 
   const manifestResponse = await get("/manifest.json");
@@ -283,6 +315,7 @@ export async function runProductionSmokeTests({
       worldMapNavigation: true,
       worldMap3D: true,
       threeVendorRuntime: true,
+      castleForestGlbAssets: true,
       trailerRecorderRemovedFromGameplay: true,
     },
   };
