@@ -43,7 +43,7 @@ async function attack(){
  if(!Object.keys(units).length)return;
  const total=Object.values(units).reduce((sum,value)=>sum+Number(value),0);
  const explanation=pendingReplay
-  ?"Este ataque de "+fmt(total)+" tropas já foi enviado, mas sua confirmação está pendente. Reenviar a composição ORIGINAL, sem registrar um novo ataque?"
+  ?"Há uma tentativa anterior de "+fmt(total)+" tropas sem confirmação. Reenviar a MESMA composição? Se o ataque já foi registrado, ele não será duplicado. Caso contrário, poderá ser executado agora e causar perdas permanentes."
   :"Você enviará "+fmt(total)+" tropas. As baixas deste evento são permanentes. Deseja confirmar o ataque?";
  if(!confirm(explanation))return;
  busy=true;++refreshGeneration;updateAttackButton();
@@ -55,7 +55,7 @@ async function attack(){
   sessionStorage.setItem("coi_angel_death_units",JSON.stringify(pendingAttackUnits));
   if(pendingEventId)sessionStorage.setItem("coi_angel_death_event_id",String(pendingEventId));
  }catch{}
- message(pendingReplay?"Verificando o resultado do ataque pendente…":"O exército está avançando contra o Anjo da Morte…");
+ message(pendingReplay?"Reenviando a solicitação original; a primeira execução poderá ocorrer agora…":"O exército está avançando contra o Anjo da Morte…");
  try{
   const result=await request("/game/event/attack",{method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify({requestId:pendingRequestId,units:pendingAttackUnits})});
