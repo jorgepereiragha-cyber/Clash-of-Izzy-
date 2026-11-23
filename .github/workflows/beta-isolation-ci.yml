@@ -81,3 +81,20 @@ jobs:
       - name: Compile beta without signing or publishing
         working-directory: android-sideload
         run: gradle --no-daemon assembleBeta
+
+  beta-local-runtime:
+    name: Beta real Worker + D1 local (no Cloudflare API)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - name: Install locked tooling, without remote credentials
+        run: npm ci
+      - name: Vendor pinned Three.js for local static assets
+        run: npm run vendor:three
+      - name: Smoke real beta Worker and local D1 (no deployment)
+        run: node --test tests/beta-runtime-local.test.js
