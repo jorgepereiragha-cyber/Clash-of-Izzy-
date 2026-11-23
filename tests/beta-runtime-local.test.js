@@ -205,6 +205,30 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(resume.status, 200, "existing kingdom is resumed");
     assert.equal(resume.data.state?.kingdom?.id, start.data.state.kingdom.id);
 
+    // Prove a real first-gameplay progression, not only invalid 4X inputs.
+    // The castle starts at level 1; upgrading it enables mill level 2.
+    const beginCastleUpgrade = await http(base, "/api/game/action", {
+      method:"POST", body:{type:"upgrade",building:"castle"}, cookie, bearer:start.data.token
+    });
+    assert.equal(beginCastleUpgrade.status, 200,
+      "the new kingdom can start its first castle upgrade: " + JSON.stringify(beginCastleUpgrade.data).slice(0,1000));
+    const castleQueue = beginCastleUpgrade.data.state?.queues?.find(
+      row => row.queue_type === "construction" && row.target_key === "castle" && row.status === "running"
+    );
+    assert.ok(castleQueue, "the castle construction is persisted in a queue");
+
+    const duplicateCastleUpgrade = await http(base, "/api/game/action", {
+      method:"POST", body:{type:"upgrade",building:"castle"}, cookie, bearer:start.data.token
+    });
+    assert.equal(duplicateCastleUpgrade.status, 409, "duplicate upgrade cannot charge resources again");
+
+    // Advance only disposable local D1 clock state; NEVER change a remote database.
+    await command([...common, "execute", "clash-of-izzy-beta-db", "--local",
+      "--persist-to", persist, "--command",
+      "UPDATE kingdom_queues SET completes_at=datetime('now','-1 minute') WHERE kingdom_id=" +
+      Number(start.data.state.kingdom.id) +
+      " AND queue_type='construction' AND target_key='castle' AND status='running'"]);
+
     // Wrangler exposes a local-only scheduled handler probe, without registering a remote cron.
     const cronResponse = await fetch(base + "/cdn-cgi/local/scheduled?format=json", {
       signal:AbortSignal.timeout(30_000)
@@ -212,6 +236,26 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(cronResponse.status, 200, "scheduled handler can be invoked offline");
     const cronResult = await cronResponse.json();
     assert.equal(cronResult.outcome, "ok", "scheduled handler returns a successful execution outcome");
+
+    const completedCastle = await http(base, "/api/game/state", {cookie,bearer:start.data.token});
+    assert.equal(completedCastle.status, 200);
+    assert.equal(Number(completedCastle.data.state?.kingdom?.castle_level), 2,
+      "scheduled processing completes first castle upgrade and persists level 2");
+    assert.equal(completedCastle.data.state?.queues?.filter(
+      row => row.queue_type === "construction" && row.target_key === "castle" && row.status === "running"
+    ).length, 0, "the completed construction leaves no active duplicate queue");
+
+    const millUpgrade = await http(base, "/api/game/action", {
+      method:"POST", body:{type:"industry_upgrade",industry:"mill"}, cookie, bearer:start.data.token
+    });
+    assert.equal(millUpgrade.status, 200,
+      "a real 4X industry upgrade succeeds after castle level 2: " + JSON.stringify(millUpgrade.data).slice(0,1000));
+    assert.equal(Number(millUpgrade.data.state?.intermediateResources?.mill_level), 2,
+      "4X mill level 2 is present in the returned state");
+    const persistedMill = await http(base, "/api/game/state", {cookie,bearer:start.data.token});
+    assert.equal(persistedMill.status, 200);
+    assert.equal(Number(persistedMill.data.state?.intermediateResources?.mill_level), 2,
+      "4X mill upgrade persists across subsequent reads");
 
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
@@ -229,7 +273,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(logout.status, 200);
     const after = await http(base, "/api/game/state", {cookie,bearer:start.data.token});
     assert.equal(after.status, 403, "logged-out beta cookie blocks former game token");
-    console.log("Offline beta runtime passed: health, invites, 4X, kingdom, world, free market, payment lock, logout.");
+    console.log("Offline beta runtime passed: health, invites, castle upgrade and scheduled completion, 4X mill persistence, kingdom, world, free market, payment lock, logout.");
   } finally {
     if (processWorker) {
       processWorker.kill("SIGTERM");
