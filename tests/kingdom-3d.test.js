@@ -392,3 +392,19 @@ test("WebGL shows 8/12/16 buildings by tier and Canvas keeps nine accessible slo
   assert.ok(kingdom.includes('city.classList.toggle("dense-3d",positions.length>9)'));
   assert.ok(kingdom.includes('.city .building[hidden]{display:none!important}'));
 });
+
+
+test("city camera touch zoom is view-only, bounded, and disabled after WebGL loss", () => {
+  assert.match(kingdom, /id="coiCityCameraControls"/);
+  assert.match(kingdom, /data-city-zoom="in"/);
+  assert.match(kingdom, /data-city-zoom="out"/);
+  assert.match(kingdom, /data-city-zoom="reset"/);
+  assert.match(kingdom, /aria-label="Aproximar câmera da cidade"/);
+  assert.match(kingdom, /coi:kingdom-3d-ready/);
+  assert.match(kingdom, /if\(cityCameraControls\)cityCameraControls\.hidden=true/);
+  assert.match(renderer, /camera\.zoom = Math\.min\(1, 13 \/ span\) \* cameraZoomFactor/);
+  assert.match(renderer, /Math\.max\(0\.7, Math\.min\(1\.6/);
+  assert.match(renderer, /if \(disposed \|\| cinematicCaptureActive \|\| !renderer \|\| !scene \|\| !camera\) return/);
+  assert.match(renderer, /publishBuildingHitTargets\(visible\)/);
+  assert.equal(renderer.split('window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler)').length - 1, 2);
+});
