@@ -40,9 +40,11 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption;
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential;
 
 public final class MainActivity extends Activity {
-    private static final String GAME_URL =
-            "https://clash-of-izzy.jorgepereiragha.workers.dev/kingdom.html";
-    private static final String GAME_HOST = "clash-of-izzy.jorgepereiragha.workers.dev";
+    // Build-time routing. No beta package is permitted to contact the official realm.
+    private static final String GAME_URL = BuildConfig.BETA
+            ? "https://clash-of-izzy-beta.jorgepereiragha.workers.dev/kingdom.html"
+            : "https://clash-of-izzy.jorgepereiragha.workers.dev/kingdom.html";
+    private static final String GAME_HOST = Uri.parse(GAME_URL).getHost();
     private boolean googleSignInInProgress = false;
     // Evita loop de reinicio quando o processo WebView falha repetidamente (ex.: GPU sem memoria).
     private static final long RENDERER_RESTART_WINDOW_MS = 60_000L;
@@ -179,6 +181,7 @@ public final class MainActivity extends Activity {
 
         TextView loadingMessage = new TextView(this);
         loadingMessage.setText("Preparando Eldoria e sincronizando seu reino…");
+        if (BuildConfig.BETA) loadingMessage.setText("Beta fechado · reino de testes independente");
         loadingMessage.setTextColor(Color.rgb(216, 228, 233));
         loadingMessage.setTextSize(14);
         loadingMessage.setGravity(Gravity.CENTER);
