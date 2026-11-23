@@ -5,8 +5,20 @@ import {
   ANGEL_DEATH_EVENT,
   getAngelDeathWeekendWindow,
   simulateAngelDeathAttack,
-  angelDeathRewardForRank
+  angelDeathRewardForRank,
+  sameAngelDeathAttackUnits
 } from "../angel-death-event.js";
+
+test("replayed event attacks require the identical saved troop composition", () => {
+  const snapshot={militia_1:{quantity:8,loss:1},archer_2:{quantity:4,loss:0}};
+  assert.equal(sameAngelDeathAttackUnits(snapshot,{militia_1:8,archer_2:4}),true);
+  assert.equal(sameAngelDeathAttackUnits(snapshot,{archer_2:4,militia_1:"8",knight_1:0}),true);
+  assert.equal(sameAngelDeathAttackUnits(snapshot,{militia_1:8,archer_2:5}),false);
+  assert.equal(sameAngelDeathAttackUnits(snapshot,{militia_1:8}),false);
+  assert.equal(sameAngelDeathAttackUnits(snapshot,{militia_1:8,archer_2:4,knight_1:1}),false);
+  assert.equal(sameAngelDeathAttackUnits(snapshot,null),false);
+  assert.equal(sameAngelDeathAttackUnits(snapshot,{militia_1:"NaN",archer_2:4}),false);
+});
 
 test("Anjo da Morte uses the Brasília weekend window consistently", () => {
   const beforeStart = getAngelDeathWeekendWindow(new Date("2026-11-20T20:00:00.000Z"));
