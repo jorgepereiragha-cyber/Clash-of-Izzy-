@@ -14,7 +14,7 @@ test("auth session lookup is one D1 query and preserves guest/Google/password se
   assert.ok(helper.includes("LEFT JOIN player_accounts a ON a.player_id=p.id"));
   assert.ok(helper.includes("LEFT JOIN google_account_links g ON g.player_id=p.id"));
   assert.ok(helper.includes("return row?.version ?? undefined;"), "guests without account keep unversioned tokens");
-  assert.equal((helper.match(/env.DB.prepare\\(/g) || []).length, 1);
+  assert.equal(helper.split("env.DB.prepare(").length - 1, 1);
   const identityStart = worker.indexOf("async function gameIdentity(");
   const identityEnd = worker.indexOf("async function ensureKingdom(", identityStart);
   const identity = worker.slice(identityStart, identityEnd);
