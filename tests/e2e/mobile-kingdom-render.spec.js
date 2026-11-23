@@ -290,14 +290,16 @@ test.describe("Mobile kingdom rendering", () => {
       path: "test-results/visual-preview/cidade-16-edificios-390px.png"
     });
 
-    // Simulate a WebGL loss: the existing nine-slot Canvas layout stays usable.
+    // Trigger the actual canvas WebGL loss handler. Dispatching only the
+    // fallback notice would leave the WebGL renderer alive, which can emit a
+    // late projection and incorrectly reveal all sixteen buttons again.
     await page.evaluate(() => {
-      document.getElementById("city").classList.remove("has-3d");
-      window.dispatchEvent(new Event("coi:kingdom-2d-fallback"));
+      const canvas = document.getElementById("kingdom3d");
+      canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
     });
+    await expect(page.locator("#city #kingdom3d")).toHaveCount(0);
     await expect(page.locator("#coiCityCameraControls")).toBeHidden();
-    const remaining = await page.locator("#city .building:visible").count();
-    expect(remaining).toBe(9);
+    await expect.poll(() => page.locator("#city .building:visible").count()).toBe(9);
     await expect(page.locator('#city .building[data-building="castle"]')).toBeVisible();
   });
 
