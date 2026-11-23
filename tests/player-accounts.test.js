@@ -68,10 +68,22 @@ test("account logout distinguishes local sign-out from confirmed remote token re
   const html = await readFile(new URL("../account.html", import.meta.url), "utf8");
   assert.ok(html.includes("let remoteRevoked=false;"));
   assert.ok(html.includes('await api("/account/logout",{method:"POST"});remoteRevoked=true;'));
-  assert.ok(html.includes('localStorage.removeItem("coi_game_token");sessionStorage.removeItem("coi_game_token");'),
-    "local credentials are cleared even if remote revocation fails");
-  assert.ok(html.includes('setStatus(remoteRevoked'),
+  assert.ok(html.includes('const locallyCleared=clearAccountToken();linkedAccount=false;'));
+  assert.ok(html.includes('try{localStorage.removeItem("coi_game_token");}catch{cleared=false;}'));
+  assert.ok(html.includes('try{sessionStorage.removeItem("coi_game_token");}catch{cleared=false;}'));
+  assert.ok(html.includes('const logoutMessage=remoteRevoked'),
     "never show the confirmed-revocation success message after a server failure");
   assert.ok(html.includes("não foi possível confirmar a revogação no servidor"));
 });
 
+
+test("account storage errors cannot create anonymous realms without persistent storage", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const html = await readFile(new URL("../account.html", import.meta.url), "utf8");
+  assert.ok(html.includes("let token=readAccountToken();"));
+  assert.ok(html.includes("function canPersistAccountSession()"));
+  assert.ok(html.includes('if(!canPersistAccountSession())throw new Error('));
+  assert.ok(html.includes('try{localStorage.setItem("coi_game_token",token);persisted=true;}catch{}'));
+  assert.ok(html.includes('try{sessionStorage.setItem("coi_game_token",token);persisted=true;}catch{}'));
+  assert.ok(html.includes('if(!persisted)throw new Error('));
+});
