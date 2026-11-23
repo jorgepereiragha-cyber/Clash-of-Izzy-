@@ -108,3 +108,33 @@ test("smoke rejects unbounded retry configuration before any fetch", async () =>
   }), /Limite de tentativas/);
   assert.equal(called, false);
 });
+
+test("smoke reports HTTP 302 as a redirect without following or retrying", async () => {
+  let calls = 0;
+  const privateToken = "secret-redirect-token";
+  await assert.rejects(runProductionSmokeTests({
+    baseUrl: "https://example.test/?token=" + privateToken,
+    networkRetryDelayMs: 0,
+    fetchImpl: async (_url, options) => {
+      calls++;
+      assert.equal(options.method, "GET");
+      assert.equal(options.redirect, "manual");
+      return { status: 302, headers: { get: () => "https://outside.test/?token=" + privateToken } };
+    }
+  }), error => error.message.includes("GET /api/health") &&
+    error.message.includes("HTTP 302") && !error.message.includes(privateToken));
+  assert.equal(calls, 1);
+});
+
+test("opaque redirects fail closed without revealing redirect destination", async () => {
+  let calls = 0;
+  await assert.rejects(runProductionSmokeTests({
+    baseUrl: "https://example.test",
+    fetchImpl: async (_url, options) => {
+      calls++;
+      assert.equal(options.redirect, "manual");
+      return { type: "opaqueredirect", status: 0 };
+    }
+  }), /Redirecionamento inesperado no smoke GET \/api\/health \(HTTP opaqueredirect\)/);
+  assert.equal(calls, 1);
+});
