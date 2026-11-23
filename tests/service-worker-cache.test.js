@@ -200,6 +200,32 @@ test("network success is returned even when cache storage rejects writes", async
   assert.equal(asset.result.status, 200);
 });
 
+test("PWA install refuses to cache private or cookie-bearing essential HTML", async () => {
+  for (const header of [
+    { "cache-control": "private, max-age=60" },
+    { "cache-control": "no-store" },
+    { "cache-control": "no-cache" },
+    { "set-cookie": "session=opaque" }
+  ]) {
+    const h = makeHarness(request => request === "/kingdom.html"
+      ? makeResponse({ headers: header })
+      : makeResponse());
+    await assert.rejects(h.lifecycle("install"), /Shell essencial nao armazenavel/);
+    assert.equal(h.stores.get(SHELL_CACHE)?.has("/kingdom.html") ?? false, false);
+    assert.equal(h.stores.get(SHELL_CACHE)?.has("/offline.html") ?? false, false);
+  }
+});
+
+test("PWA install fetches core shell anonymously, without credentials or cache reuse", async () => {
+  const seen = [];
+  const h = makeHarness(request => {
+    if (request === "/index.html" || request === "/kingdom.html" || request === "/offline.html") seen.push(request);
+    return makeResponse();
+  });
+  await h.lifecycle("install");
+  assert.deepEqual(seen, ["/index.html", "/kingdom.html", "/offline.html"]);
+});
+
 test("shell v53 instala mesmo que uma textura opcional falhe", async () => {
   const h = makeHarness(request => {
     if (request === "/assets/brand/hero-emblem.svg") throw new Error("asset temporarily missing");
