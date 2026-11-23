@@ -11,6 +11,9 @@ test("purchase requests require a valid player session and a stable idempotency 
   assert.ok(worker.includes('SELECT id,kingdom_name FROM kingdoms WHERE player_id=?").bind(player.id)'));
   assert.ok(worker.includes("purchase-request-player"));
   assert.ok(worker.includes("requestKey"));
+  assert.ok(worker.includes('requestKey=String(body.requestKey||"");'), "idempotency keys cannot be silently truncated");
+  assert.ok(worker.includes("existing.product_kind!==kind||Number(existing.product_id)!==itemId"));
+  assert.ok(worker.includes("PURCHASE_KEY_PRODUCT_MISMATCH"));
   assert.ok(worker.includes("SELECT id,status,product_name,price_brl,payment_method,mp_order_id,mp_checkout_url FROM purchase_requests"));
   assert.ok(worker.includes("payment_method,payment_reference,request_key"));
   assert.ok(worker.includes('["mercadopago_link","manual_whatsapp","pix"].includes(requestedPaymentMethod)'));

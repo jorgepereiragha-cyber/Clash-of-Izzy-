@@ -697,6 +697,20 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(purchase.request.status, "pending");
       assert.equal(purchase.request.payment_method, "manual");
 
+      // One key must never identify two different products for one player.
+      const keyCollision=await api("/api/store/purchase-request", {
+        method:"POST",token:tokenA,
+        body:{kind:"vip_package",itemId:entry.id,requestKey:"integration-vip-request-01",paymentMethod:"manual_whatsapp"}
+      });
+      assert.equal(keyCollision.status,409,"reusing a key for another product is a conflict");
+      assert.equal(keyCollision.data.code,"PURCHASE_KEY_PRODUCT_MISMATCH");
+      const oversizedKey=await api("/api/store/purchase-request", {
+        method:"POST",token:tokenA,
+        body:{kind:"vip_package",itemId:vip.id,requestKey:"x".repeat(65),paymentMethod:"manual_whatsapp"}
+      });
+      assert.equal(oversizedKey.status,400,"oversized idempotency keys are rejected, not truncated");
+
+
       const pending = expectStatus(await admin("/api/admin/purchase-requests", {}), 200, "fila Master de pedidos");
       assert.ok(pending.requests.some(item => Number(item.id) === Number(purchase.request.id)));
 
