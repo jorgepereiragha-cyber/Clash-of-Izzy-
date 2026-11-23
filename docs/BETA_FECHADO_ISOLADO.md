@@ -18,6 +18,20 @@ O Worker beta usa `assets.run_worker_first=true` para que HTML, arquivos estáti
 
 A fonte da versão fechada vive na branch `beta`, derivada da `main` sem alterar a produção. Os workflows beta devem ser acionados **na branch `beta`** e não em `main`. O workflow de deploy da produção permanece protegido e separado. Revisar a versão exata da branch antes de copiar o código para qualquer Worker.
 
+## Provisionamento guiado por GitHub Actions (novo)
+
+A opção mais segura para iniciar é o workflow manual **[Beta fechado - auditar ou criar D1 exclusivo](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/provision-beta-d1.yml)**. Ele fica na branch `main` apenas por ser a branch padrão de acionamento do GitHub; **não faz deploy nem altera o Worker da produção**. Lê `wrangler.jsonc` da `main` e `wrangler.beta.jsonc` da branch `beta` como dados, sem executar código da branch beta com credenciais Cloudflare.
+
+Antes de acionar:
+1. Criar/revisar o ambiente de aprovação `beta-infrastructure` em **Settings → Environments**, restringindo acesso a mantenedores autorizados e exigindo aprovação humana quando disponível.
+2. Configurar o secret **`CLOUDFLARE_BETA_D1_TOKEN`** no ambiente `beta-infrastructure` com permissão **D1 Write** na conta Cloudflare, sem permissões Workers/Secrets. A permissão D1 Write é da conta, não de um banco individual; o workflow restringe as operações efetivas a GET de listagem e POST de criação com nome beta. Não reutilizar a credencial de produção.
+3. Ter `CLOUDFLARE_ACCOUNT_ID` disponível para o workflow como secret (no repositório ou no ambiente).
+4. Em **Actions → Beta fechado - auditar ou criar D1 exclusivo → Run workflow**, selecionar branch `main` e `operation=audit` primeiro. Essa etapa não escreve nada e informa se o terceiro banco já existe.
+5. Só se a auditoria confirmar que o D1 ainda não existe, selecionar `operation=create` e digitar **`CRIAR-D1-BETA`** em `confirm_new_beta_only`. O padrão `location_hint=enam` solicita localização inicial na América do Norte Oriental; é apenas uma preferência geográfica, não residência de dados garantida.
+6. Copiar o UUID do **Step Summary** do workflow, conferir que é diferente dos IDs de produção/Preview e atualizar somente `wrangler.beta.jsonc` na branch `beta` após revisão. Não é preciso enviar tokens ou senhas pelo chat.
+
+Este workflow não aplica migrações, não configura secrets do Worker beta, não cria convites, não faz deploy e não altera D1s anteriores. Se o nome `clash-of-izzy-beta-db` já existir, a auditoria apenas informa seu UUID; o modo de criação recusa duplicatas. Configurar a branch `beta` e as credenciais beta continua sendo uma etapa distinta.
+
 ## Operações manuais (somente após revisão e CI)
 
 1. Criar **terceiro** D1 no Cloudflare: `npx wrangler d1 create clash-of-izzy-beta-db`. Guardar o novo ID retornado e verificar que não coincide com produção nem Preview.
