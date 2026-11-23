@@ -49,6 +49,15 @@ test("reino não cria conta anônima quando nenhum armazenamento funciona", () =
   assert.ok(!connect.includes('localStorage.getItem(') && !connect.includes('sessionStorage.getItem('), 'connect must use guarded readers');
 });
 
+test("retries on kingdom connection do not duplicate ambiguous anonymous creation", () => {
+  const source=html.slice(html.indexOf("async function connect(){"),html.indexOf("function drawKingdomScene("));
+  assert.match(source,/let guestCreationAttempted=false/);
+  assert.match(source,/guestCreationAttempted=true/);
+  assert.match(source,/if\(!guestCreationAttempted\|\|token\)\{/);
+  assert.match(source,/guestCreationAttempted&&!token/);
+  assert.match(source,/A criação pode ter sido processada/);
+});
+
 test("token em memória permanece disponível após bloqueio de ambos os armazenamentos", () => {
   const run = sandbox(denied, denied, "in-memory-kingdom-token");
   assert.equal(run("readKingdomGameToken()"), "in-memory-kingdom-token");
