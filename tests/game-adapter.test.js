@@ -59,6 +59,21 @@ test("cliente preserva o token e não funda outro reino quando a sessão salva f
 });
 
 
+test("arena oferece retry e recuperação de sessão após falha sem criar outro reino", async () => {
+  const { readFile }=await import("node:fs/promises");
+  const arena=await readFile(new URL("../arena.html",import.meta.url),"utf8");
+  const connect=arena.slice(arena.indexOf("async function connectKingdom()"),arena.indexOf("\nfunction renderChronicle()"));
+  assert.ok(connect.includes("kingdomConnectInFlight"),"guard against duplicate reconnect requests");
+  assert.ok(connect.includes("retryArenaKingdom"),"show retry after connection failure");
+  assert.ok(connect.includes("void connectKingdom();"),"retry the existing connection flow");
+  assert.ok(connect.includes("authError.status=response.status"),"remember HTTP error for recovery");
+  assert.ok(connect.includes("if(error.status===401||error.status===403)"),"offer account recovery on unauthorized");
+  assert.ok(connect.includes("recover.href='/account.html'"));
+  assert.ok(connect.includes("status.replaceChildren("),"replace prior controls rather than duplicating");
+  assert.ok(connect.includes("finally{kingdomConnectInFlight=false;}"));
+  assert.doesNotMatch(connect,/localStorage\.removeItem\('coi_game_token'\)/);
+});
+
 test("bônus de equipamentos fortalecem ataque e sobrevivência sem ultrapassar o limite", () => {
   const army = [{ unit_type: "knight", tier: 2, quantity: 20 }];
   const base = simulateBattle({ army, castleLevel: 1, defenderLevel: 8, roll: 1 });
