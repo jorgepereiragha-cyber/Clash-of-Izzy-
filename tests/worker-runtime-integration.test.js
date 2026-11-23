@@ -1167,6 +1167,12 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.deepEqual([...executedActions].sort(), [...actionTypes].sort(),
         "cada um dos 40 tipos de ação deve ter sido enviado ao Worker autenticado");
     });
+    await t.test("logout Master revoga token no D1 e impede reutilização",async()=>{
+      const logout=expectStatus(await admin("/api/admin/logout",{}),200,"logout Master");
+      assert.equal(logout.success,true);
+      expectStatus(await adminGet("/api/admin/health"),401,"token revogado no servidor");
+      expectStatus(await admin("/api/admin/player-search",{query:playerA}),401,"busca bloqueada após revogação");
+    });
   } finally {
     if (workerProcess && workerProcess.exitCode === null) {
       workerProcess.kill("SIGTERM");

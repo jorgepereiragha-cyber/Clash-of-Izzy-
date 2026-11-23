@@ -284,6 +284,18 @@ async function verify(token,secret){
     return payload.exp>Math.floor(Date.now()/1000)?payload:false;
   }catch{return false}
 }
+async function adminSessionActive(env,payload){
+  if(!payload||payload.scope!=="admin"||payload.sub!=="admin"||
+     !/^[a-f0-9]{32}$/.test(String(payload.jti||""))||!env.DB)return false;
+  try {
+    const revoked=await env.DB.prepare("SELECT 1 AS revoked FROM admin_session_revocations WHERE token_id=?")
+      .bind(payload.jti).first();
+    return !revoked;
+  }catch(error){
+    console.error("admin_session_verification_unavailable");
+    return false;
+  }
+}
 async function rateLimitDecision(env,scope,identity,limit,windowSeconds){
   if(!env.DB||!env.SESSION_SECRET)return json({error:"Proteção temporariamente indisponível."},503);
   try{
@@ -1997,6 +2009,10 @@ export default {
   catch(error){console.error("scheduled_rally_resolution_failed",String(error?.message||error));}
   try{await processAngelDeathEventLifecycle(env);}
   catch(error){console.error("angel_death_event_scheduler_failed",String(error?.message||error));}
+  try{
+    await env.DB.prepare("DELETE FROM admin_session_revocations WHERE token_id IN (SELECT token_id FROM admin_session_revocations WHERE expires_at<=? LIMIT 100)")
+      .bind(Math.floor(Date.now()/1000)).run();
+  }catch(error){console.error("admin_session_revocation_cleanup_failed");}
   try{await env.DB.prepare("DELETE FROM api_rate_limits WHERE rate_key IN (SELECT rate_key FROM api_rate_limits WHERE expires_at<=? ORDER BY expires_at LIMIT 100)").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_rate_limit_cleanup_failed",String(error?.message||error));}
   try{await env.DB.prepare("UPDATE battle_reports SET replay_json='{}',battle_log='[]' WHERE id IN (SELECT id FROM battle_reports WHERE replay_expires_at>0 AND replay_expires_at<=? AND (replay_json<>'{}' OR battle_log<>'[]') ORDER BY replay_expires_at,id LIMIT 25)").bind(Math.floor(Date.now()/1000)).run();}
@@ -2050,12 +2066,12 @@ export default {
     if(request.method!=="GET")return json({error:"Método não permitido."},405);
     const auth=request.headers.get("Authorization")||"",token=auth.startsWith("Bearer ")?auth.slice(7):"";
     const payload=env.SESSION_SECRET?await verify(token,env.SESSION_SECRET):false;
-    if(!payload||payload.scope!=="admin"||payload.sub!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
+    if(!await adminSessionActive(env,payload))return json({error:"Sessão administrativa inválida ou expirada."},401);
     return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET),hasMP_ACCESS_TOKEN:Boolean(env.MP_ACCESS_TOKEN),hasMP_WEBHOOK_SECRET:Boolean(env.MP_WEBHOOK_SECRET),hasMercadoPagoAutomaticCheckout:Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),hasEmailProvider:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.FRONTEND_URL),hasResendApiKey:Boolean(env.RESEND_API_KEY),hasEmailFrom:Boolean(env.EMAIL_FROM),hasFrontendUrl:Boolean(env.FRONTEND_URL)});
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","daily_reward_claims","onboarding_bonus_claims","support_orders","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
+    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","daily_reward_claims","onboarding_bonus_claims","support_orders","admin_session_revocations","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -2726,12 +2742,18 @@ export default {
     const accountLimit=await rateLimitDecision(env,"admin-login-account",email,5,900);
     if(accountLimit)return accountLimit;
     if(email!==String(env.ADMIN_EMAIL).trim().toLowerCase()||body.password!==env.ADMIN_PASSWORD)return json({error:"E-mail ou senha incorretos."},401);
-    const token=await sign({sub:"admin",scope:"admin",exp:Math.floor(Date.now()/1000)+28800},env.SESSION_SECRET);return json({token,expiresIn:28800});
+    const token=await sign({sub:"admin",scope:"admin",jti:crypto.randomUUID().replaceAll("-",""),exp:Math.floor(Date.now()/1000)+3600},env.SESSION_SECRET);return json({token,expiresIn:3600});
   }
   const auth=request.headers.get("Authorization")||"",token=auth.startsWith("Bearer ")?auth.slice(7):"";
   const payload=env.SESSION_SECRET?await verify(token,env.SESSION_SECRET):false;
-  if(!payload||payload.scope!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
+  if(!await adminSessionActive(env,payload))return json({error:"Sessão administrativa inválida ou expirada."},401);
   try{
+    if(url.pathname==="/api/admin/logout"&&request.method==="POST"){
+      await env.DB.prepare(
+        "INSERT OR IGNORE INTO admin_session_revocations(token_id,expires_at) VALUES(?,?)"
+      ).bind(payload.jti,payload.exp).run();
+      return json({success:true,message:"Sessão administrativa revogada."});
+    }
     if(valhallaAdminPath){
       const scope=request.method==="GET"?"valhalla-admin-read":"valhalla-admin-write";
       const limited=await rateLimitDecision(env,scope,"master",request.method==="GET"?120:30,60);
