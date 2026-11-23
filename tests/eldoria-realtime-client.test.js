@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { readGameToken, readRealtimePacket, requestRealtimeTicket } from "../scripts/eldoria-realtime-client.js";
+import { readGameToken, readRealtimePacket, requestRealtimeTicket, startRealtimePresence } from "../scripts/eldoria-realtime-client.js";
 
 test("realtime client reads only existing game session storage", () => {
   const fail = { getItem() { throw new Error("storage blocked"); } };
@@ -57,4 +57,100 @@ test("kingdom displays realtime status without exposing principal token in a URL
   assert.match(html, /startRealtimePresence\(\)/);
   assert.match(client, /"wss:\/\/" \+ windowRef\.location\.host/);
   assert.doesNotMatch(client, /new WebSocketImpl\([^;\n]*\+ token/);
+});
+
+function mockPresenceEnvironment(fetchImpl) {
+  const events = (target => ({
+    target,
+    handlers: new Map(),
+    addEventListener(name, callback) { this.handlers.set(name, callback); },
+    removeEventListener(name) { this.handlers.delete(name); },
+    emit(name, event = {}) { this.handlers.get(name)?.(event); }
+  }));
+  const documentRef = events();
+  documentRef.hidden = false;
+  const status = { textContent: "" };
+  documentRef.getElementById = id => id === "eldoriaPresence" ? status : null;
+  const windowRef = events();
+  windowRef.navigator = { onLine: true };
+  windowRef.location = { protocol: "https:", host: "play.example" };
+  windowRef.localStorage = { getItem: () => "valid-game-token" };
+  windowRef.sessionStorage = { getItem: () => null };
+  const sockets = [];
+  class FakeWebSocket {
+    static OPEN = 1;
+    constructor(url, protocols) {
+      this.url = url;
+      this.protocols = protocols;
+      this.listeners = new Map();
+      this.readyState = 0;
+      this.closed = false;
+      sockets.push(this);
+    }
+    addEventListener(name, handler) { this.listeners.set(name, handler); }
+    close() { this.closed = true; }
+    send() {}
+  }
+  const stop = startRealtimePresence({ documentRef, windowRef, fetchImpl, WebSocketImpl: FakeWebSocket });
+  return { documentRef, windowRef, status, sockets, stop };
+}
+
+const validTicketResponse = (ticket = "a".repeat(72)) => new Response(
+  JSON.stringify({ ticket, room: 0 }), { status: 201, headers: { "content-type": "application/json" } }
+);
+const flushMicrotasks = async () => {
+  for (let n = 0; n < 8; n++) await Promise.resolve();
+};
+
+test("realtime client permits only one ticket request when multiple resume events race", async () => {
+  let resolveTicket;
+  let count = 0;
+  const fetchImpl = () => {
+    count++;
+    return new Promise(resolve => { resolveTicket = resolve; });
+  };
+  const client = mockPresenceEnvironment(fetchImpl);
+  try {
+    client.windowRef.emit("online");
+    client.documentRef.emit("visibilitychange");
+    assert.equal(count, 1, "parallel triggers cannot create two pending tickets");
+    resolveTicket(validTicketResponse());
+    await flushMicrotasks();
+    assert.equal(client.sockets.length, 1, "only one WebSocket created");
+  } finally { client.stop(); }
+});
+
+test("realtime client cancels stale ticket completions during hide and reconnect", async () => {
+  const pending = [];
+  const fetchImpl = (_url, options) => new Promise(resolve => pending.push({ resolve, signal: options.signal }));
+  const client = mockPresenceEnvironment(fetchImpl);
+  try {
+    assert.equal(pending.length, 1);
+    client.documentRef.hidden = true;
+    client.documentRef.emit("visibilitychange");
+    assert.equal(pending[0].signal.aborted, true);
+    client.documentRef.hidden = false;
+    client.documentRef.emit("visibilitychange");
+    assert.equal(pending.length, 2);
+    pending[0].resolve(validTicketResponse("b".repeat(72)));
+    await flushMicrotasks();
+    assert.equal(client.sockets.length, 0, "stale credential must never open a socket");
+    pending[1].resolve(validTicketResponse());
+    await flushMicrotasks();
+    assert.equal(client.sockets.length, 1, "only latest credential is usable");
+  } finally { client.stop(); }
+});
+
+test("bfcache pageshow restores WebSocket presence and shutdown removes listeners", async () => {
+  const client = mockPresenceEnvironment(async () => validTicketResponse());
+  try {
+    await flushMicrotasks();
+    assert.equal(client.sockets.length, 1);
+    client.windowRef.emit("pagehide");
+    assert.equal(client.sockets[0].closed, true, "pagehide closes original socket");
+    client.windowRef.emit("pageshow", { persisted: true });
+    await flushMicrotasks();
+    assert.equal(client.sockets.length, 2, "restored page must reconnect");
+  } finally { client.stop(); }
+  assert.equal(client.windowRef.handlers.has("pageshow"), false, "cleanup detaches pageshow listener");
 });
