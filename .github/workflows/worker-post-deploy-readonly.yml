@@ -1,0 +1,139 @@
+name: Homologar Worker publicado (somente leitura)
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirm_readonly:
+        description: "Confirmo execucao de GETs publicos e comparacao de hashes; sem deploy ou D1 remoto"
+        type: boolean
+        required: true
+        default: false
+      published_sha:
+        description: "SHA completo do commit que foi publicado pelo workflow protegido"
+        type: string
+        required: true
+        default: cc168ffff6fdc906129e7c6438f7d77ca43bfe55
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clash-of-izzy-worker-readonly-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  smoke:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_readonly == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout da versao de verificacao aprovada na main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Exigir rejeicao explicita de redirects HTTP 3xx
+        shell: bash
+        run: |
+          node --input-type=module - <<'NODE'
+          import { readFileSync } from "node:fs";
+          const smoke = readFileSync("scripts/production-smoke.js", "utf8");
+          if (!smoke.includes('redirect: "manual"') ||
+              !smoke.includes("Redirecionamento inesperado no smoke GET")) {
+            throw new Error("A correcao de diagnostico 3xx da PR #332 ainda nao esta na main.");
+          }
+          NODE
+
+      - name: Testar diagnostico e limites de autenticacao do smoke
+        run: node --test tests/production-smoke-network-diagnostics.test.js tests/worker-only-payment-gates.test.mjs
+
+      - name: Verificar contratos publicos do Worker (GET-only)
+        env:
+          WORKER_BASE_URL: https://clash-of-izzy.jorgepereiragha.workers.dev
+        run: node scripts/production-smoke.js
+
+  hashes:
+    if: ${{ github.ref == 'refs/heads/main' && inputs.confirm_readonly == true }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Validar formato do SHA indicado
+        env:
+          PUBLISHED_SHA: ${{ inputs.published_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [[ ! "$PUBLISHED_SHA" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "::error::Informe o SHA Git completo, com 40 caracteres hexadecimais minusculos."
+            exit 1
+          fi
+
+      - name: Checkout independente do verificador confiavel da main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: trusted
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Confirmar que o SHA pertence ao historico aprovado da main
+        env:
+          PUBLISHED_SHA: ${{ inputs.published_sha }}
+          TRUSTED_SHA: ${{ github.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          git -C trusted merge-base --is-ancestor "$PUBLISHED_SHA" "$TRUSTED_SHA" || {
+            echo "::error::O SHA informado nao e ancestral da main aprovada."
+            exit 1
+          }
+
+      - name: Checkout isolado dos bytes esperados do deploy publicado
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.published_sha }}
+          path: published
+          persist-credentials: false
+
+      - name: Configurar Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Comparar SHA-256 remoto com o commit publicado, inclusive GLBs habilitados
+        env:
+          PUBLISHED_SHA: ${{ inputs.published_sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --input-type=module - <<'NODE'
+          import { readFile } from "node:fs/promises";
+          import { join } from "node:path";
+          import { verifyDeployedAssets } from "./trusted/scripts/verify-deployed-assets.mjs";
+          const result = await verifyDeployedAssets({
+            target: "worker",
+            revision: process.env.PUBLISHED_SHA,
+            readLocal: relativePath => readFile(join("published", relativePath)),
+          });
+          console.log("Hashes do commit informado: " + JSON.stringify(result));
+          NODE
+
+      - name: Registrar escopo da comprovacao
+        env:
+          PUBLISHED_SHA: ${{ inputs.published_sha }}
+        shell: bash
+        run: |
+          {
+            echo "## Evidencia de assets Worker — somente leitura"
+            echo "- Commit de referencia informado: $PUBLISHED_SHA"
+            echo "- Hashes SHA-256 comparados contra arquivos desse commit."
+            echo "- Esta comparacao NAO comprova que o SHA informado foi o ultimo efetivamente implantado."
+            echo "- Confirme a proveniencia no historico do deploy protegido."
+            echo "- Nenhum deploy, migracao D1 ou habilitacao de pagamentos executado."
+          } >> "$GITHUB_STEP_SUMMARY"
