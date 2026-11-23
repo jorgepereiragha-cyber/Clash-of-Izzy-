@@ -35,6 +35,10 @@ test("events use a valid sessionStorage token when localStorage refuses reads", 
       body: '{"error":"Sessão sintética inválida para teste"}'
     });
   });
+  await page.route("**/api/game/event", route => route.fulfill({
+    status: 401, contentType: "application/json",
+    body: '{"error":"Sessão sintética inválida para teste"}'
+  }));
   await page.goto("/events.html");
   await expect(page.locator("#message")).toContainText("Sessão sintética inválida para teste");
   expect(authorizations).toEqual(["Bearer synthetic-event-session"]);
