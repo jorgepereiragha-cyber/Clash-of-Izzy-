@@ -2177,9 +2177,15 @@ export default {
       if(existingPlayerId){
         const existingKingdom=await env.DB.prepare("SELECT 1 FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?").bind(existingPlayerId).first();
         if(existingKingdom){
-          const account=await env.DB.prepare("SELECT a.session_version FROM player_accounts a JOIN players p ON p.id=a.player_id WHERE p.player_id=?").bind(existingPlayerId).first();
+          // Match gameIdentity(): password accounts take precedence, but Google-only
+          // kingdoms must also keep the account version claim on renewed tokens.
+          const [account,googleLink]=await Promise.all([
+            env.DB.prepare("SELECT a.session_version FROM player_accounts a JOIN players p ON p.id=a.player_id WHERE p.player_id=?").bind(existingPlayerId).first(),
+            env.DB.prepare("SELECT g.session_version FROM google_account_links g JOIN players p ON p.id=g.player_id WHERE p.player_id=?").bind(existingPlayerId).first()
+          ]);
           const payload={sub:existingPlayerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365};
-          if(account)payload.av=Number(account.session_version);
+          const sessionVersion=account?.session_version ?? googleLink?.session_version;
+          if(sessionVersion!==undefined)payload.av=Number(sessionVersion);
           const token=await sign(payload,env.SESSION_SECRET);
           return json({token,state:await gameState(env,existingPlayerId),referral_recorded:false,resumed:true},200);
         }

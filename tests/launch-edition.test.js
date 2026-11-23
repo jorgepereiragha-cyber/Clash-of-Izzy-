@@ -11,7 +11,8 @@ test("launch preserves one kingdom per player and existing kingdoms in map 1", a
   assert.ok(schema.includes("player_id INTEGER NOT NULL UNIQUE REFERENCES players(id)"));
   assert.ok(worker.includes("const existingPlayerId=await gameIdentity(request,env)"));
   assert.ok(worker.includes("SELECT 1 FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?"));
-  assert.ok(worker.includes("payload.av=Number(account.session_version)"));
+  assert.ok(worker.includes("const sessionVersion=account?.session_version ?? googleLink?.session_version;"));
+  assert.ok(worker.includes("if(sessionVersion!==undefined)payload.av=Number(sessionVersion);"));
   assert.ok(worker.includes("resumed:true"));
   assert.ok(sharedRealm.includes("map_region = 1"));
   const progressive=await read("migrations/0034_progressive_realms.sql");
