@@ -26,6 +26,8 @@ test('release remains manual, main-only, and refuses to overwrite existing tag',
   assert.match(workflow, /workflow_dispatch:/);
   assert.doesNotMatch(workflow, /\n  push:/);
   assert.match(workflow, /github\.ref == 'refs\/heads\/main'/);
+  const releaseJobHeader = workflow.slice(workflow.indexOf('jobs:'), workflow.indexOf('    steps:'));
+  assert.match(releaseJobHeader, /environment:\s*\n\s*name: production/, 'official release requires production environment approval gate');
   assert.match(step('Validar autorizacao de publicacao e identificadores').body, /PUBLICAR_APK_OFICIAL/);
   assert.match(step('Validar autorizacao de publicacao e identificadores').body, /gh release view/);
 });
