@@ -11,7 +11,7 @@ function getReader(source, name, end) {
   const last=source.indexOf(end,start);
   assert.ok(start>=0&&last>start,"reader must be present: "+name);
   const text=source.slice(start,last);
-  return (local,session)=>vm.runInNewContext(text+"\\n"+name+"()",{
+  return (local,session)=>vm.runInNewContext(text+String.fromCharCode(10)+name+"()",{
     window:{localStorage:local,sessionStorage:session}
   });
 }
