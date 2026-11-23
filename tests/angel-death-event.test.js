@@ -103,7 +103,7 @@ test("successful Angel of Death attack refreshes authoritative scores despite th
     "every refresh has a monotonically increasing generation");
   assert.ok(client.includes("if(generation!==refreshGeneration)return;state="),
     "a slow pre-attack state response cannot overwrite fresher post-attack data");
-  assert.match(client, /message\("Dano: "[^\n]+await refresh\(true\);\}catch\(error\)/,
+  assert.match(client, /message\("Dano: "[\s\S]*?await refresh\(true\);\s*\}catch\(error\)/,
     "after a confirmed attack, force server-state reconciliation before releasing the lock");
   assert.ok(client.includes("finally{busy=false;updateAttackButton();}"),
     "the mutation lock is always released, including after a failed refresh");
@@ -115,7 +115,18 @@ test("the browser reuses a pending attack request ID after a network retry", asy
   assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_request",pendingRequestId)'));
   assert.ok(client.includes("requestId:pendingRequestId"));
   assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_request")'));
+  assert.ok(client.includes('sessionStorage.getItem("coi_angel_death_units")'),
+    "restore the original troops of an ambiguous previous attack");
+  assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_units",JSON.stringify(pendingAttackUnits))'),
+    "persist the same troop payload as the idempotency key before sending");
+  assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_units")'),
+    "clear both only after a confirmed response");
+  assert.ok(client.includes('units:pendingAttackUnits'),
+    "retry must send the original army rather than new inputs with an old key");
+  assert.ok(client.includes("const units=pendingReplay?pendingAttackUnits:"),
+    "user cannot silently change army composition for a pending idempotency key");
 });
+
 
 
 
