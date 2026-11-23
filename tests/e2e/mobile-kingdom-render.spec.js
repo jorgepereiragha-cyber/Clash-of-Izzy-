@@ -285,6 +285,10 @@ test.describe("Mobile kingdom rendering", () => {
     expect(metrics.visible).toBe(16);
     expect(metrics.width).toBeLessThanOrEqual(metrics.viewport + 1);
     expect(new Set(metrics.targetCenters.map(target => target.centerX + ":" + target.centerY)).size).toBe(16);
+    // Dense 3D retains full accessible names while showing short captions.
+    const archers = page.locator('#city .building[data-building="archery_range"]');
+    await expect(archers).toHaveAttribute("aria-label", /Campo de arqueiros, nível/);
+    await expect(archers.locator("strong")).toHaveAttribute("data-compact", "Arqueiros");
     await mkdir("test-results/visual-preview", { recursive: true });
     await page.locator(".coi-city-stage").screenshot({
       path: "test-results/visual-preview/cidade-16-edificios-390px.png"
