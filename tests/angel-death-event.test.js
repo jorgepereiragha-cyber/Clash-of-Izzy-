@@ -129,6 +129,14 @@ test("the browser reuses a pending attack request ID after a network retry", asy
     "never apply a previous weekend retry to a new active event");
   assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_event_id")'),
     "release event identity after success or detected rollover");
+  const page = await readFile(new URL("../events.html", import.meta.url), "utf8");
+  assert.ok(page.includes('id="discardPendingAttack"'), "provide explicit recovery for legacy pending requests");
+  assert.ok(client.includes('const legacy=Boolean(pendingRequestId&&!pendingEventId)'),
+    "unscoped legacy request IDs must never silently replay into a new weekend");
+  assert.ok(client.includes('$("attack").disabled=busy||legacy'),
+    "require explicit acknowledgment before creating a new attack after a legacy retry");
+  assert.ok(client.includes('$("discardPendingAttack").addEventListener("click"'),
+    "allow the player to discard a local retry only after a clear confirmation");
   assert.ok(client.includes("const units=pendingReplay?pendingAttackUnits:"),
     "user cannot silently change army composition for a pending idempotency key");
 });
