@@ -219,6 +219,20 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(Array.isArray(started.state?.queues));
     }
     const tokenA = startA.token, tokenB = startB.token, tokenC = startC.token;
+    // A broken or revoked Bearer must never silently create an unrelated realm.
+    expectStatus(await api("/api/game/start", {
+      method:"POST", token:startA.token+".unsigned-extension", body:{}
+    }),401,"invalid saved session cannot found a new kingdom");
+    expectStatus(await api("/api/game/start", {
+      method:"POST",headers:{Authorization:"Basic invalid"},body:{}
+    }),401,"unsupported Authorization must not create a realm");
+    const unknownRealmClaims={sub:"izzy_"+"f".repeat(32),scope:"game",exp:Math.floor(Date.now()/1000)+3600};
+    const unknownRealmBody=Buffer.from(JSON.stringify(unknownRealmClaims)).toString("base64url");
+    const unknownRealmSig=createHmac("sha256",SESSION_SECRET).update(unknownRealmBody).digest("base64url");
+    expectStatus(await api("/api/game/start", {
+      method:"POST",token:unknownRealmBody+"."+unknownRealmSig,body:{}
+    }),404,"signed session of missing realm cannot silently create a different realm");
+
     // Signed tokens with suffixes used to be accepted because verify()
     // destructured the first two dot-separated components and ignored the rest.
     expectStatus(await api("/api/game/state", { token: startA.token + ".unsigned-extension" }), 401,
