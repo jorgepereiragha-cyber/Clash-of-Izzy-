@@ -14,6 +14,10 @@ O `wrangler.beta.jsonc` contém `REPLACE_WITH_NEW_BETA_D1_UUID` propositalmente 
 
 O Worker beta usa `assets.run_worker_first=true` para que HTML, arquivos estáticos, API e WebSocket sejam filtrados antes da entrega. O acesso fica fechado se `INVITE_ONLY` não for `true`, faltar D1 ou ocorrer erro no banco. `/api/health` fica acessível apenas para diagnóstico sem informações de jogador. Um código de convite é usado para obter uma sessão segura e limitada ao navegador; o código não substitui autenticação de conta. **Nesta versão, acesso não está vinculado individualmente à conta do jogador** — restringir convite a cada conta e revogação por usuário é etapa posterior.
 
+## Branch independente de implementação
+
+A fonte da versão fechada vive na branch `beta`, derivada da `main` sem alterar a produção. Os workflows beta devem ser acionados **na branch `beta`** e não em `main`. O workflow de deploy da produção permanece protegido e separado. Revisar a versão exata da branch antes de copiar o código para qualquer Worker.
+
 ## Operações manuais (somente após revisão e CI)
 
 1. Criar **terceiro** D1 no Cloudflare: `npx wrangler d1 create clash-of-izzy-beta-db`. Guardar o novo ID retornado e verificar que não coincide com produção nem Preview.
@@ -25,7 +29,7 @@ O Worker beta usa `assets.run_worker_first=true` para que HTML, arquivos estáti
 7. Verificar `https://clash-of-izzy-beta.jorgepereiragha.workers.dev/api/health`. Exigir `200`, `status=ready`, migrations completas e tabelas `beta_invites`, `beta_access_sessions`, `beta_redeem_attempts`. Sem convite, `/kingdom.html` precisa redirecionar para `/beta-access.html` e `/api/game/state` precisa responder `403 BETA_INVITE_REQUIRED`.
 8. Resgatar um convite; conferir cookie `__Host-izzy_beta`, `Secure`, `HttpOnly`, `SameSite=Strict` e acesso ao reino. Verificar que o segundo resgate do mesmo convite de uso único falha. Confirmar contas e dados separados da produção.
 9. Manter `BETA_LIVE_PAYMENTS_APPROVED=false`: `GET /api/store/payment-methods` deve retornar dois valores `false`; `POST /api/store/checkout`, `POST /api/store/purchase-request`, `POST /api/support/checkout`, `POST /api/webhook/mp` e aprovação manual devem retornar `503 BETA_PAYMENTS_DISABLED` ao usuário autenticado no beta.
-10. Configurar **keystore e certificado separados** para Android beta, colocar os secrets `ANDROID_BETA_KEYSTORE_BASE64`, `ANDROID_BETA_STORE_PASSWORD`, `ANDROID_BETA_KEY_ALIAS`, `ANDROID_BETA_KEY_PASSWORD` no ambiente protegido `beta-signing`; fixar o SHA-256 do certificado em `ANDROID_BETA_CERT_SHA256`. Executar o workflow manual `android-beta-apk.yml` na main **somente após** homologação do Worker. O arquivo resultante fica como artefato privado da execução (não como release oficial).
+10. Configurar **keystore e certificado separados** para Android beta, colocar os secrets `ANDROID_BETA_KEYSTORE_BASE64`, `ANDROID_BETA_STORE_PASSWORD`, `ANDROID_BETA_KEY_ALIAS`, `ANDROID_BETA_KEY_PASSWORD` no ambiente protegido `beta-signing`; fixar o SHA-256 do certificado em `ANDROID_BETA_CERT_SHA256`. Executar o workflow manual `android-beta-apk.yml` na branch `beta` **somente após** homologação do Worker. O arquivo resultante fica como artefato privado da execução (não como release oficial).
 11. Testar em aparelhos reais: login, sessões, reconexão, reino e mundo, desempenho, convites, trocas de rede, 4X com gates, pagamentos desabilitados, instalação simultânea com o APK oficial. Não anunciar distribuição antes dos testes.
 
 ## Padrão de segurança e rollback
