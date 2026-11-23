@@ -154,15 +154,17 @@ public final class MainActivity extends Activity {
                 new int[] { Color.rgb(255, 232, 169), Color.rgb(197, 136, 42), Color.rgb(119, 72, 24) });
         emblemBorder.setCornerRadius(dp(26));
         FrameLayout royalFrame = new FrameLayout(this);
-        royalFrame.setPadding(dp(5), dp(5), dp(5), dp(5));
+        royalFrame.setPadding(dp(7), dp(7), dp(7), dp(7));
         royalFrame.setBackground(emblemBorder);
         ImageView heroEmblem = new ImageView(this);
         heroEmblem.setImageResource(R.drawable.royal_king);
         heroEmblem.setContentDescription("Rei guerreiro do Clash of Izzy com espada, coroa e brasão dourado");
         heroEmblem.setScaleType(ImageView.ScaleType.FIT_CENTER);
+        heroEmblem.setAdjustViewBounds(true);
+        heroEmblem.setPadding(dp(5), dp(5), dp(5), dp(5));
         royalFrame.addView(heroEmblem, new FrameLayout.LayoutParams(
                 ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(dp(152), dp(152));
+        LinearLayout.LayoutParams heroParams = new LinearLayout.LayoutParams(dp(168), dp(168));
         heroParams.bottomMargin = dp(20);
         loadingPanel.addView(royalFrame, heroParams);
 
