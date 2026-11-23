@@ -41,7 +41,7 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
         scope: registration?.scope || null
       };
     });
-    throw new Error("SW controller missing after navigation: " + JSON.stringify(diagnostics), { cause: error });
+    throw new Error("SW controller missing after activation on stable page: " + JSON.stringify(diagnostics), { cause: error });
   }
   const controlledScript = await page.evaluate(() => navigator.serviceWorker.controller.scriptURL);
   expect(new URL(controlledScript).pathname).toBe("/sw.js");
