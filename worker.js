@@ -271,7 +271,12 @@ async function sign(payload,secret){
 }
 async function verify(token,secret){
   try{
-    const [body,signature]=token.split(".");
+    // Signatures cover precisely two components. Extra segments must not
+    // create alternate encodings of the same authenticated identity.
+    if(typeof token!=="string"||token.length>4096)return false;
+    const parts=token.split(".");
+    if(parts.length!==2||parts.some(part=>!/^[A-Za-z0-9_-]+$/.test(part)))return false;
+    const [body,signature]=parts;
     const key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),{name:"HMAC",hash:"SHA-256"},false,["verify"]);
     const bytes=Uint8Array.from(atob(signature.replace(/-/g,"+").replace(/_/g,"/")),c=>c.charCodeAt(0));
     if(!await crypto.subtle.verify("HMAC",key,bytes,new TextEncoder().encode(body)))return false;
