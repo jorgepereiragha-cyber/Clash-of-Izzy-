@@ -5,12 +5,17 @@ import { readFile } from "node:fs/promises";
 test("Worker processa marchas vencidas sem depender do login do jogador", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   assert.ok(worker.includes("async function processDueMarches(env)"));
-  assert.ok(worker.includes("SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 1"));
+  const policy = await readFile(new URL("../march-scheduler-policy.js", import.meta.url), "utf8");
+  assert.match(policy, /GROUP BY kingdom_id ORDER BY MIN\\(arrives_at\\), kingdom_id LIMIT \\?/);
+  assert.match(policy, /MAX_DUE_KINGDOMS_PER_TICK = 4/);
+  assert.match(worker, /resolveDueMarchKingdoms\\(/);
   const schedulerStart = worker.indexOf("async scheduled(controller,env){");
   const schedulerEnd = worker.indexOf("async fetch(request,env)", schedulerStart);
   const scheduler = worker.slice(schedulerStart, schedulerEnd);
   assert.ok(scheduler.includes("await processDueKingdomQueues(env)"));
-  assert.ok(scheduler.includes("await processDueMarches(env)"));
+  assert.ok(scheduler.includes("try{await processDueMarches(env);}"));
+  assert.ok(scheduler.includes('console.error("scheduled_marches_failed"'));
+  assert.ok(scheduler.includes("await processDueRallies(env)"), "failure in marches must not skip rallies");
   assert.ok(scheduler.indexOf("await processDueKingdomQueues(env)") < scheduler.indexOf("await processDueMarches(env)"));
   assert.ok(worker.includes('console.error("scheduled_march_resolution_failed"'));
 });
@@ -35,4 +40,11 @@ test("normal world PvE marches return all troops; permanent losses are reserved 
   assert.ok(worker.includes("async function angelDeathEventAttack"));
   assert.ok(worker.includes("SET quantity=quantity-CAST"));
   assert.ok(worker.includes("AS selected WHERE selected.key=army_units.unit_type"));
+});
+
+test("o beta mantém cron desligado até a homologação remota, sem impedir o progresso do jogador ativo", async () => {
+  const beta = JSON.parse(await readFile(new URL("../wrangler.beta.jsonc", import.meta.url), "utf8"));
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  assert.equal(beta.triggers, undefined);
+  assert.ok(worker.includes("await processMarches(env,kingdom.id);"));
 });
