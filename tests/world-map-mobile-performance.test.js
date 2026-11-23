@@ -57,3 +57,12 @@ test("existing GPU safety guards remain intact", async () => {
   assert.match(scene,/const maxPixelCount = quality === "high" \? 3200000/);
   assert.match(boot,/WebGLRenderingContext/);
 });
+
+test("storage-denied WebViews retain graphics fallback without throwing during module boot", async () => {
+  const boot=await read("scripts/world-map-visual-boot.js");
+  const scene=await read("world-map-3d.js");
+  assert.match(boot,/let choice = "auto"/);
+  assert.match(boot,/try \{ choice = readGraphicsChoice\(window\.localStorage\); \} catch/);
+  assert.match(scene,/let preference = "auto"/);
+  assert.match(scene,/try \{ preference = readGraphicsChoice\(window\.localStorage\); \} catch/);
+});
