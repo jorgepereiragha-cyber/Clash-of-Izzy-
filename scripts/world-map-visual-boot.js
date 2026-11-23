@@ -1,7 +1,9 @@
 // Reuse the existing 2D tactical map while heavy Three.js is loaded on demand.
 import {readGraphicsChoice, graphicsChoiceLabel} from "./kingdom-visual-preferences.js";
 
-const choice = readGraphicsChoice(window.localStorage);
+// Accessing localStorage itself may throw (not only getItem).
+let choice = "auto";
+try { choice = readGraphicsChoice(window.localStorage); } catch { /* Use automatic profile. */ }
 const host = document.getElementById("worldMap");
 const canvas = document.getElementById("world3d");
 const status = document.getElementById("worldGraphicsStatus");
