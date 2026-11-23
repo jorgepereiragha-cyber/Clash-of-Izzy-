@@ -1,0 +1,74 @@
+name: Auditoria D1 Preview somente leitura
+
+on:
+  pull_request:
+    paths:
+      - .github/workflows/auditoria-preview-d1.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  inspect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 6
+    steps:
+      - name: Validar isolamento e contar tabelas sem dados privados
+        env:
+          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          python3 - <<'PY'
+          import json,os,urllib.request,urllib.error
+          token=os.environ.get("RAW_TOKEN","").strip()
+          if token.lower().startswith("bearer "): token=token[7:].strip()
+          if len(token)>1 and token[0]==token[-1] and token[0] in ("\"", "'"): token=token[1:-1].strip()
+          account=os.environ.get("ACCOUNT_ID","").strip()
+          if not token or not account or any(c.isspace() for c in token):
+            raise SystemExit("Credenciais Cloudflare não disponíveis.")
+          print("::add-mask::"+token)
+          prod="7e63af59-d9ff-4159-a9cf-b02e35b92605"
+          preview="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          assert prod!=preview
+          base="https://api.cloudflare.com/client/v4/accounts/"+account+"/d1/database/"
+          def request(url, sql=None):
+            body=json.dumps({"sql":sql}).encode() if sql else None
+            req=urllib.request.Request(url,data=body,method="POST" if sql else "GET",headers={
+              "Authorization":"Bearer "+token,"Content-Type":"application/json"})
+            try:
+              with urllib.request.urlopen(req,timeout=20) as response: value=json.loads(response.read().decode())
+            except urllib.error.HTTPError as error:
+              raise SystemExit("D1 Preview inacessível: HTTP "+str(error.code))
+            if not value.get("success"): raise SystemExit("Erro da API Cloudflare D1.")
+            return value["result"]
+          meta=request(base+preview)
+          if isinstance(meta,dict) and meta.get("uuid",meta.get("id",preview))!=preview:
+            raise SystemExit("D1 Preview aponta para UUID diferente.")
+          queryUrl=base+preview+"/query"
+          tableRows=request(queryUrl,"SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")
+          names={str(x.get("name")) for x in tableRows[0]["results"]}
+          print("Preview: todas as tabelas (somente nomes)="+json.dumps(sorted(names),ensure_ascii=False))
+          import re
+          other={}
+          for name in sorted(names - {"players","kingdoms","player_accounts","purchase_requests","mercadopago_orders","d1_migrations","kingdom_dragons","kingdom_mailbox","master_bonus_claims"}):
+            if not re.fullmatch(r"[a-zA-Z_][a-zA-Z_0-9]{0,127}",name): continue
+            tableCount=request(queryUrl,'SELECT COUNT(*) AS total FROM "'+name+'"')
+            other[name]=int(tableCount[0]["results"][0]["total"])
+          print("Preview: outras tabelas, apenas contagem="+json.dumps(other,ensure_ascii=False))
+          counts={}
+          for name in ("players","kingdoms","player_accounts","purchase_requests","mercadopago_orders"):
+            if name in names:
+              data=request(queryUrl,"SELECT COUNT(*) AS total FROM "+name)
+              counts[name]=int(data[0]["results"][0]["total"])
+            else: counts[name]=None
+          print("Preview: somente contagens agregadas="+json.dumps(counts,ensure_ascii=False))
+          if "d1_migrations" in names:
+            data=request(queryUrl,"SELECT name FROM d1_migrations ORDER BY id DESC LIMIT 10")
+            applied=[str(x.get("name")) for x in data[0]["results"]]
+            print("Preview: últimas migrations="+json.dumps(applied,ensure_ascii=False))
+          else: print("Preview: sem histórico d1_migrations.")
+          disposable=all((value in (0,None)) for value in counts.values())
+          print("Preview sem registros nas tabelas verificadas: "+("SIM" if disposable else "NÃO"))
+          print("Uma contagem zero NÃO garante descarte seguro: exigir autorização explícita antes de migrar.")
+          PY
