@@ -27,9 +27,24 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   // Navigate explicitly to the stable promotional page under the same scope.
   await page.goto("/portal.html", { waitUntil: "domcontentloaded" });
   await expect(page).toHaveURL(/\/portal(?:\.html)?$/);
-  await page.waitForFunction(() =>
-    navigator.serviceWorker.controller?.scriptURL.endsWith("/sw.js") === true
-  );
+  try {
+    await page.waitForFunction(() => Boolean(navigator.serviceWorker.controller));
+  } catch (error) {
+    const diagnostics = await page.evaluate(async () => {
+      const registration = await navigator.serviceWorker.getRegistration("/");
+      return {
+        pagePath: location.pathname,
+        controllerScript: navigator.serviceWorker.controller?.scriptURL || null,
+        activeScript: registration?.active?.scriptURL || null,
+        activeState: registration?.active?.state || null,
+        waitingState: registration?.waiting?.state || null,
+        scope: registration?.scope || null
+      };
+    });
+    throw new Error("SW controller missing after navigation: " + JSON.stringify(diagnostics), { cause: error });
+  }
+  const controlledScript = await page.evaluate(() => navigator.serviceWorker.controller.scriptURL);
+  expect(new URL(controlledScript).pathname).toBe("/sw.js");
 
   const shellState = await page.evaluate(async cacheName => {
     const names = await caches.keys();
