@@ -125,6 +125,17 @@ test("successful Angel of Death attack refreshes authoritative scores despite th
     "the mutation lock is always released, including after a failed refresh");
 });
 
+test("events page survives blocked localStorage and never creates a guest kingdom while recovering auth", async () => {
+  const client=await readFile(new URL("../events.js",import.meta.url),"utf8");
+  assert.ok(client.includes("function readEventSession()"));
+  assert.match(client,/try\{const saved=localStorage\.getItem\("coi_game_token"\)/);
+  assert.match(client,/try\{const saved=sessionStorage\.getItem\("coi_game_token"\)/);
+  assert.ok(client.includes('account.href="/account.html"'));
+  assert.ok(client.includes("Nenhuma tropa será enviada."));
+  assert.ok(!client.includes('if(!token){location.replace("/kingdom.html");}'));
+  assert.ok(!client.includes('request("/game/start"'));
+});
+
 test("the browser reuses a pending attack request ID after a network retry", async () => {
   const client = await readFile(new URL("../events.js", import.meta.url), "utf8");
   assert.ok(client.includes('sessionStorage.getItem("coi_angel_death_request")'));
