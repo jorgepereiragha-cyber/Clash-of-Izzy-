@@ -130,6 +130,25 @@ test("PWA fetches query-bearing navigation but never stores its parameters or re
   assert.ok(![...h.stores.values()].some(store => [...store.keys()].some(key => key.includes("?"))));
 });
 
+test("PWA serves Cloudflare clean-URL pages offline using the canonical .html shell key", async () => {
+  const h = makeHarness();
+  await h.lifecycle("install");
+  assert.equal(h.stores.get(SHELL_CACHE).has("/kingdom.html"), true);
+  assert.equal(h.stores.get(SHELL_CACHE).has("/kingdom"), false);
+  h.offline();
+  for (const path of ["/kingdom", "/kingdom/", "/kingdom?ref=private-code", "/portal", "/account"]) {
+    const response = await h.dispatch(path, { mode: "navigate" });
+    assert.equal(response.handled, true);
+    assert.equal(response.result.status, 200, path + " should resolve cached public shell");
+  }
+  const scriptResponse = await h.dispatch("/kingdom", { mode: "cors" });
+  assert.equal(scriptResponse.result.status, 200, "clean-URL GET also resolves the shell");
+  assert.ok(![...h.stores.values()].some(store => [...store.keys()].some(key => key.includes("?"))),
+    "query-bearing routes must never be stored");
+  const unknown = await h.dispatch("/account/private", { mode: "navigate" });
+  assert.equal(unknown.result.status, 200, "unknown URL receives only the cached offline fallback");
+});
+
 test("PWA shell responses are cached by pathname and serve offline fallback", async () => {
   const h = makeHarness();
   const first = await h.dispatch("/kingdom.html", { mode: "navigate" });
