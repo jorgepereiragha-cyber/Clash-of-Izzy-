@@ -2176,13 +2176,15 @@ export default {
   if(url.pathname==="/api/game/start"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"SESSION_SECRET não configurado no Worker."},503);
     try{
-      const ip=request.headers.get("CF-Connecting-IP")||"unknown";
-      const limited=await rateLimitDecision(env,"game-start-ip",ip,20,3600);
-      if(limited)return limited;
+      // Existing verified sessions are not new account creation. Rate-limit
+      // resumes by player, not by shared NAT/proxy IP, to avoid locking out
+      // established kingdoms when other devices exhaust the guest quota.
       const existingPlayerId=await gameIdentity(request,env);
       if(existingPlayerId){
         const existingKingdom=await env.DB.prepare("SELECT 1 FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?").bind(existingPlayerId).first();
         if(existingKingdom){
+          const resumedLimit=await rateLimitDecision(env,"game-resume-player",existingPlayerId,120,3600);
+          if(resumedLimit)return resumedLimit;
           // Match gameIdentity(): password accounts take precedence, but Google-only
           // kingdoms must also keep the account version claim on renewed tokens.
           const sessionVersion=await sessionVersionForPlayer(env,existingPlayerId);
@@ -2192,6 +2194,10 @@ export default {
           return json({token,state:await gameState(env,existingPlayerId),referral_recorded:false,resumed:true},200);
         }
       }
+      // Only unauthenticated/new-realm creation consumes the shared IP quota.
+      const ip=request.headers.get("CF-Connecting-IP")||"unknown";
+      const limited=await rateLimitDecision(env,"game-start-ip",ip,20,3600);
+      if(limited)return limited;
       const startBody=await readBody(request,4096);
       if(startBody.__bodyError)return json({error:"Solicitação de criação de reino inválida."},startBody.__bodyError==="payload_too_large"?413:400);
       const playerId="izzy_"+crypto.randomUUID().replace(/-/g,"");
