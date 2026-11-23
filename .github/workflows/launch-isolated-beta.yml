@@ -160,14 +160,7 @@ jobs:
           npx wrangler --config wrangler.beta.jsonc d1 migrations apply clash-of-izzy-beta-db --remote
           npx wrangler --config wrangler.beta.jsonc d1 execute clash-of-izzy-beta-db --remote --file beta/schema.sql
 
-      - name: Deploy exclusively the beta Worker and assets
-        working-directory: beta-source
-        env:
-          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_BETA_WORKER_TOKEN }}
-        run: npx wrangler --config wrangler.beta.jsonc deploy
-
-      - name: Install distinct beta signing secret (never production)
+      - name: Deploy beta Worker and its distinct session secret in one version
         working-directory: beta-source
         shell: bash
         env:
@@ -176,7 +169,21 @@ jobs:
           SESSION_SECRET: ${{ secrets.CLOUDFLARE_BETA_SESSION_SECRET }}
         run: |
           set -euo pipefail
-          printf '%s' "$SESSION_SECRET" | npx wrangler --config wrangler.beta.jsonc secret put SESSION_SECRET
+          # Keep this file OUTSIDE the assets root and remove it even if deployment fails.
+          umask 077
+          secret_file="$(mktemp "$RUNNER_TEMP/izzy-beta-secrets.XXXXXX")"
+          trap 'rm -f "$secret_file"' EXIT
+          python3 - "$secret_file" <<'PY'
+          import json
+          import os
+          import sys
+          secret = os.environ["SESSION_SECRET"]
+          if len(secret) < 32:
+              raise SystemExit("Beta SESSION_SECRET invalido; deploy cancelado")
+          with open(sys.argv[1], "w", encoding="utf-8") as output:
+              json.dump({"SESSION_SECRET": secret}, output)
+          PY
+          npx wrangler --config wrangler.beta.jsonc deploy --secrets-file "$secret_file"
 
       - name: Require live beta health, invite page and closed anonymous routes
         run: |
