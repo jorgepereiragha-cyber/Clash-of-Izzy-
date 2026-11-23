@@ -35,7 +35,7 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(renderer, /new THREE\.WebGLRenderer/);
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
   assert.match(renderer, /coi:kingdom-render/);
-  assert.match(renderer, /Math\.min\(9, qualityProfile\?\.maxBuildings \|\| 9\)/);
+  assert.match(renderer, /Math\.min\(16, qualityProfile\?\.maxBuildings \|\| 9\)/);
   assert.match(renderer, /const \{ x, z \} = cityWorldPoint\(b, i\)/);
   assert.match(renderer, /frameCityBuildings\(list\)/);
   assert.match(renderer, /Number\(building\?\.position_x\)/);
@@ -379,4 +379,16 @@ test("the city ambient layer is loaded and respects Android power and lifecycle 
   assert.doesNotMatch(ambient, /new THREE\.WebGLRenderer/);
   assert.match(ambient, /FRAME_INTERVAL_MS = 1000 \/ 30/);
   assert.match(ambient, /timestamp - lastFrame < FRAME_INTERVAL_MS/);
+});
+
+
+test("WebGL shows 8/12/16 buildings by tier and Canvas keeps nine accessible slots", () => {
+  assert.equal(renderer.split("Math.min(16, qualityProfile?.maxBuildings || 9)").length - 1, 2);
+  assert.match(renderer, /const columns = latestBuildings\.length > 9 \? 4 : 3/);
+  assert.match(kingdom, /buildings\.slice\(0,16\)\.map\(\(b,i\)=>/);
+  assert.ok(kingdom.includes("i>=9?' hidden':''"));
+  assert.match(kingdom, /button\.hidden=index>=9/);
+  assert.match(kingdom, /const order=buildings\.slice\(0,9\)/);
+  assert.ok(kingdom.includes('city.classList.toggle("dense-3d",positions.length>9)'));
+  assert.ok(kingdom.includes('.city .building[hidden]{display:none!important}'));
 });
