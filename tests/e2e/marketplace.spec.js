@@ -1,5 +1,27 @@
 import { test, expect } from "@playwright/test";
 
+test("mercado usa sessão preservada no sessionStorage quando localStorage falha", async ({page}) => {
+  const headers=[];
+  await page.addInitScript(() => {
+    sessionStorage.setItem("coi_game_token","session-storage-only-token");
+    const original = Storage.prototype.getItem;
+    Storage.prototype.getItem = function(key){
+      if(key==="coi_game_token" && this===localStorage)throw new DOMException("Access denied","SecurityError");
+      return original.call(this,key);
+    };
+  });
+  await page.route("**/api/game/state", route => {
+    headers.push(route.request().headers()["authorization"]);
+    return route.fulfill({status:200,contentType:"application/json",body:JSON.stringify({
+      state:{player:{gems:0},kingdom:{food:0,wood:0,stone:0,iron:0,gold:0},
+        shop:{items:{},exchangeOffers:[],offers:[],inventory:[]},heroShop:{offers:[]},queues:[]}
+    })});
+  });
+  await page.goto("/market.html");
+  await expect(page.locator("#market-status")).toContainText("Mercado sincronizado");
+  expect(headers).toEqual(["Bearer session-storage-only-token"]);
+});
+
 test("Mercador, Loja de Heróis e aceleradores funcionam no viewport Android", async ({ page }) => {
   const now = new Date();
   const completesAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
