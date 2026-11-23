@@ -92,6 +92,9 @@ jobs:
           console.log("Production backend healthy before deployment; no D1 changes performed.");
           JS
 
+      - name: Exigir recebimentos explicitamente desligados antes do deploy (somente GET)
+        run: node scripts/check-worker-only-payment-state.mjs
+
       - name: Normalizar token Cloudflare sem imprimir segredo
         shell: bash
         env:
@@ -126,4 +129,5 @@ jobs:
           set -euo pipefail
           node scripts/cloudflare-remote-audit.mjs
           node scripts/check-android-release-server.mjs
+          node scripts/check-worker-only-payment-state.mjs
           node scripts/production-smoke.js
