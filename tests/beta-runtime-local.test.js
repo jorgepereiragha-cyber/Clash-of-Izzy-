@@ -15,6 +15,7 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const wrangler = path.join(root, "node_modules", "wrangler", "bin", "wrangler.js");
 const testUuid = "0ef0ef0e-0000-4000-8000-000000000001"; // synthetic, local only
 const testInvite = "IZZY-" + "A".repeat(20);
+const concurrentInvite = "IZZY-" + "B".repeat(20);
 
 async function command(args, deadlineMs = 120_000) {
   // Explicit local-only argument policy. A failed check aborts before any CLI is called.
@@ -109,6 +110,10 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const insert = "INSERT INTO beta_invites(code_hash,max_uses) VALUES('" + inviteHash + "',1)";
     await command([...common, "execute", "clash-of-izzy-beta-db", "--local",
       "--persist-to", persist, "--command", insert]);
+    const concurrentHash = createHash("sha256").update(concurrentInvite).digest("hex");
+    await command([...common, "execute", "clash-of-izzy-beta-db", "--local",
+      "--persist-to", persist, "--command",
+      "INSERT INTO beta_invites(code_hash,max_uses) VALUES('" + concurrentHash + "',1)"]);
 
     const port = await freePort();
     const base = "http://127.0.0.1:" + port;
@@ -154,6 +159,18 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       method: "POST", body:{code:testInvite}, origin:base
     });
     assert.equal(reused.status, 403, "single-use invitation cannot be redeemed twice");
+
+    // Hit the real Worker simultaneously, not just the isolated SQL fixture.
+    const concurrentAttempts = await Promise.all([
+      http(base, "/api/beta/invite/redeem", {method:"POST",body:{code:concurrentInvite},origin:base}),
+      http(base, "/api/beta/invite/redeem", {method:"POST",body:{code:concurrentInvite},origin:base})
+    ]);
+    assert.deepEqual(concurrentAttempts.map(attempt => attempt.status).sort((a,b)=>a-b), [200,403],
+      "an atomic invite claims only one session under concurrent redemption");
+    const claimedCookie = concurrentAttempts.find(attempt=>attempt.status===200)?.headers.get("set-cookie")?.split(";")[0];
+    assert.match(claimedCookie || "", /^__Host-izzy_beta=[a-f0-9]{64}$/);
+    const claimedStatus = await http(base, "/api/beta/access/status", {cookie:claimedCookie});
+    assert.equal(claimedStatus.status, 200, "winning session remains usable");
 
     const privatePage = await http(base, "/kingdom.html", {cookie});
     assert.equal(privatePage.status, 200, "authorized player can open kingdom");
