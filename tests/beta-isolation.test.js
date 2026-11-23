@@ -10,7 +10,7 @@ const validCode = "IZZY-" + "A".repeat(20);
 const validHash = createHash("sha256").update(validCode).digest("hex");
 
 function mockBetaDb(maxUses = 1) {
-  const state = { attempts: 0, uses: 0, sessions: new Set(), disabledInvites: false, errors: false };
+  const state = { attempts: 0, uses: 0, sessions: new Set(), disabledInvites: false, errors: false, sessionInsertFailure: false };
   return {
     state,
     prepare(sql) {
@@ -20,11 +20,6 @@ function mockBetaDb(maxUses = 1) {
           return {
             async first() {
               if (sql.startsWith("INSERT INTO beta_redeem_attempts")) return { hits: ++state.attempts };
-              if (sql.startsWith("UPDATE beta_invites")) {
-                if (args[0] !== validHash || state.uses >= maxUses) return null;
-                state.uses += 1;
-                return { id: 123 };
-              }
               if (sql.startsWith("SELECT 1 AS permitted FROM beta_access_sessions")) {
                 return state.sessions.has(args[0]) && !state.disabledInvites ? { permitted: 1 } : null;
               }
@@ -32,6 +27,11 @@ function mockBetaDb(maxUses = 1) {
             },
             async run() {
               if (sql.startsWith("INSERT INTO beta_access_sessions")) {
+                if (state.sessionInsertFailure) throw new Error("D1 INSERT failed");
+                if (args[2] !== validHash || state.disabledInvites || state.uses >= maxUses) {
+                  return { meta: { changes: 0 } };
+                }
+                state.uses += 1; // Mirrors the beta-only SQLite trigger.
                 state.sessions.add(args[0]);
                 return { meta: { changes: 1 } };
               }
@@ -112,6 +112,34 @@ test("invites are hashed, limited by uses and issue secure host-only session coo
   assert.equal((await redeem()).status, 403);
   assert.equal(db.state.uses, 1);
   assert.equal(db.state.sessions.size, 1);
+});
+
+test("failed session insert does not consume an invitation", async () => {
+  const db = mockBetaDb(), env = betaEnv(db);
+  const redeem = () => betaAccessGuard(request("/api/beta/invite/redeem", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: validCode })
+  }), env);
+  db.state.sessionInsertFailure = true;
+  assert.equal((await redeem()).status, 503);
+  assert.equal(db.state.uses, 0);
+  assert.equal(db.state.sessions.size, 0);
+  db.state.sessionInsertFailure = false;
+  assert.equal((await redeem()).status, 200);
+  assert.equal(db.state.uses, 1);
+  assert.equal(db.state.sessions.size, 1);
+  assert.equal((await redeem()).status, 403);
+});
+
+test("beta-only schema enforces atomic invite use in the session insert", () => {
+  const schema = read("beta/schema.sql");
+  assert.match(schema, /CREATE TRIGGER IF NOT EXISTS beta_claim_invite_for_session/);
+  assert.match(schema, /BEFORE INSERT ON beta_access_sessions/);
+  assert.match(schema, /UPDATE beta_invites SET uses=uses\+1/);
+  assert.match(schema, /RAISE\(ABORT, 'BETA_INVITE_UNAVAILABLE'\)/);
+  const gate = read("beta-access.js");
+  assert.match(gate, /INSERT INTO beta_access_sessions\(session_hash,invite_id,expires_at\)/);
+  assert.doesNotMatch(gate, /UPDATE beta_invites SET uses=uses\+1/);
 });
 
 test("attempts are bounded and D1 failures never open the beta", async () => {
