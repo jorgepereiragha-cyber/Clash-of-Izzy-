@@ -38,7 +38,8 @@
     "GAME_4X_SYSTEMS_ENABLED": "false",
     "LEVEL_PACKS_ENABLED": "false",
     "LEVEL_PACKS_PUBLIC_ENABLED": "false",
-    "LEVEL_PACKS_PROPOSED_PRICES_APPROVED": "false"
+    "LEVEL_PACKS_PROPOSED_PRICES_APPROVED": "false",
+    "ANDROID_FREE_RELEASE_MODE_ENABLED": "false"
   },
   "previews": {
     "vars": {

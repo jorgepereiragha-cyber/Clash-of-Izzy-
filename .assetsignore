@@ -20,6 +20,8 @@ battle-replay.js
 email-system.js
 kingdom-queue-rules.js
 mercadopago-orders.js
+android-free-mode.js
+scripts/check-android-free-release-gate.mjs
 level-packs.js
 pets.js
 player-accounts.js
