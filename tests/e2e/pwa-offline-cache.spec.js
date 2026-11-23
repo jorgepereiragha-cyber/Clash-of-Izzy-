@@ -127,6 +127,15 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   expect(offlineShell.status).toBe(200);
   expect(offlineShell.body).toContain("<h1>Você está sem conexão</h1>");
 
+  // The host canonicalizes /kingdom.html to /kingdom: prove that the clean
+  // URL still serves the pre-cached public shell without a new top-level nav.
+  const offlineCleanKingdom = await page.evaluate(async () => {
+    const response = await fetch("/kingdom");
+    return { status: response.status, body: await response.text() };
+  });
+  expect(offlineCleanKingdom.status).toBe(200);
+  expect(offlineCleanKingdom.body).toContain("id=\"kingdomName\"");
+
   // Verify first-time module resolution while offline. The promo document
   // has not imported any modules yet, so its import map can be registered before
   // resolving the same-origin Three.js addon graph.
