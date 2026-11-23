@@ -11,7 +11,7 @@ on:
       - .github/workflows/beta-isolation-ci.yml
       - .github/workflows/android-beta-apk.yml
   push:
-    branches: [main]
+    branches: [beta]
     paths:
       - wrangler.beta.jsonc
       - beta-access.js
