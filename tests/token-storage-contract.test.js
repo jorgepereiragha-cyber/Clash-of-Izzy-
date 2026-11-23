@@ -34,8 +34,8 @@ test("arena handles denied browser storage, preserves a single kingdom and expos
 
 test("account logout clears both copies of the game token", async () => {
   const source = await read("../account.html");
-  assert.match(source, /function clearAccountToken\\(\\)/);
-  assert.match(source, /try\\{localStorage\\.removeItem/);
-  assert.match(source, /try\\{sessionStorage\\.removeItem/);
-  assert.match(source, /const locallyCleared=clearAccountToken\\(\\)/);
+  assert.ok(source.includes("function clearAccountToken()"));
+  assert.ok(source.includes('try{localStorage.removeItem("coi_game_token");}catch'));
+  assert.ok(source.includes('try{sessionStorage.removeItem("coi_game_token");}catch'));
+  assert.ok(source.includes("const locallyCleared=clearAccountToken()"));
 });
