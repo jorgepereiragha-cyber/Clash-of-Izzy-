@@ -398,6 +398,12 @@ test("WebGL shows 8/12/16 buildings by tier and Canvas keeps nine accessible slo
 });
 
 
+test("WebGL loss returns focus from hidden camera tools to a visible Canvas building", () => {
+  assert.match(kingdom, /const cameraHadFocus=!!cityCameraControls\?\.contains\(document\.activeElement\)/);
+  assert.match(kingdom, /if\(cameraHadFocus\)city\.querySelector\("\[data-building\]:not\(\[hidden\]\)"\)\?\.focus\(\{preventScroll:true\}\)/);
+  assert.match(kingdom, /button\.hidden=index>=9/);
+});
+
 test("city camera touch zoom is view-only, bounded, and disabled after WebGL loss", () => {
   assert.match(kingdom, /id="coiCityCameraControls"/);
   assert.match(kingdom, /data-city-zoom="in"/);
