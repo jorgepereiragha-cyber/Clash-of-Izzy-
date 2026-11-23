@@ -9,7 +9,8 @@ async function precacheApplicationShell() {
  // Fetch anonymously and inspect *each response* before writing to storage.
  // A rejected essential response blocks this SW install; the older SW remains active.
  for (const path of required) {
-  const response = await fetch(path, { cache: "no-store", credentials: "omit", redirect: "error" });
+  // Allow same-origin canonical redirects (/index.html -> /index), but never cache an external response.
+  const response = await fetch(path, { cache: "no-store", credentials: "omit" });
   if (!canStoreResponse(response)) throw new Error("Shell essencial nao armazenavel: " + path);
   await cache.put(path, response.clone());
  }
@@ -62,6 +63,11 @@ function isRuntimeAsset(pathname) {
 
 function canStoreResponse(response) {
   if (!response || response.status !== 200 || response.type !== "basic") return false;
+  // Both static files and redirected canonical URLs must remain on this Worker origin.
+  if (response.url) {
+    try { if (new URL(response.url).origin !== self.location.origin) return false; }
+    catch { return false; }
+  }
   const directives = response.headers.get("cache-control") || "";
   if (/(?:^|,)\s*(?:private|no-store|no-cache)\b/i.test(directives)) return false;
   if (response.headers.has("set-cookie")) return false;
