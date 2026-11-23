@@ -22,7 +22,11 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
     const registration = await navigator.serviceWorker.getRegistration("/");
     return registration?.active?.state === "activated";
   });
-  await page.reload();
+  // The home page has an immediate meta refresh to /portal.html. A reload
+  // while that redirect is pending can race the Service Worker controller.
+  // Navigate explicitly to the stable promotional page under the same scope.
+  await page.goto("/portal.html", { waitUntil: "domcontentloaded" });
+  await expect(page).toHaveURL(/\/portal\.html$/);
   await page.waitForFunction(() =>
     navigator.serviceWorker.controller?.scriptURL.endsWith("/sw.js") === true
   );
