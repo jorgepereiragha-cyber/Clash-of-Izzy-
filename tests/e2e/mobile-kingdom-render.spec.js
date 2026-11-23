@@ -237,6 +237,29 @@ test.describe("Mobile kingdom rendering", () => {
   });
 
 
+  test("selecting a city building shows details without submitting an upgrade", async ({ page }) => {
+    const { actions } = await installApiFixtures(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/kingdom.html");
+    await expect(page.locator("#coiCitySelection")).toBeHidden();
+
+    const farm = page.locator('#city .building[data-building="farm"]');
+    await farm.click();
+    await expect(farm).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#coiCitySelection")).toBeVisible();
+    await expect(page.locator("#coiCitySelectionName")).toHaveText("Fazenda");
+    await expect(page.locator("#coiCitySelectionLevel")).toContainText("Nível 2");
+    expect(actions).toHaveLength(0);
+
+    await page.locator("#coiCitySelectionDetails").click();
+    await expect(page.locator('#buildings [data-upgrade="farm"]')).toBeFocused();
+    expect(actions).toHaveLength(0);
+
+    await page.locator("#coiCitySelectionClose").click();
+    await expect(page.locator("#coiCitySelection")).toBeHidden();
+    await expect(farm).toHaveAttribute("aria-pressed", "false");
+  });
+
   test("high-capability Android previews all 16 buildings and retains nine safe 2D controls", async ({ page }) => {
     const types = [
       "castle", "barracks", "farm", "quarry",
@@ -289,6 +312,11 @@ test.describe("Mobile kingdom rendering", () => {
     const archers = page.locator('#city .building[data-building="archery_range"]');
     await expect(archers).toHaveAttribute("aria-label", /Campo de arqueiros, nível/);
     await expect(archers.locator("strong")).toHaveAttribute("data-compact", "Arqueiros");
+    // Even a sixteenth building can be selected without placing a game order.
+    await page.locator('#city .building[data-building="warehouse"]').click();
+    await expect(page.locator("#coiCitySelectionName")).toHaveText("Armazém");
+    await expect(page.locator("#coiCitySelectionLevel")).toContainText("Nível 4");
+    await page.locator("#coiCitySelectionClose").click();
     await mkdir("test-results/visual-preview", { recursive: true });
     await page.locator(".coi-city-stage").screenshot({
       path: "test-results/visual-preview/cidade-16-edificios-390px.png"
