@@ -123,6 +123,10 @@ export async function betaAccessGuard(request, env) {
   try {
     if (path === "/api/beta/invite/redeem") return await redeemInvite(request, env, url);
     if (path === "/beta-access.html" && request.method === "GET") return null;
+    // The public marketing portal and legacy beta sign-up are not part of this realm.
+    if (path === "/api/beta/signup") {
+      return responseJson({ error: "Use o convite do beta fechado.", code: "BETA_LEGACY_SIGNUP_DISABLED" }, 404);
+    }
     if (path === "/api/beta/access/status" && request.method === "GET") {
       const permitted = await hasValidAccess(request, env);
       return responseJson({ authorized: permitted }, permitted ? 200 : 401);
@@ -140,7 +144,17 @@ export async function betaAccessGuard(request, env) {
         "Set-Cookie": COOKIE_NAME + "=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict"
       });
     }
-    if (!(await hasValidAccess(request, env))) {
+    const hasAccess = await hasValidAccess(request, env);
+    if (path === "/" || path === "/portal.html") {
+      return new Response(null, {
+        status: 302,
+        headers: {
+          Location: new URL(hasAccess ? "/kingdom.html" : "/beta-access.html", url).href,
+          "Cache-Control": "private, no-store"
+        }
+      });
+    }
+    if (!hasAccess) {
       if (path.startsWith("/api/")) return responseJson({ error: "Convite beta necessario.", code: "BETA_INVITE_REQUIRED" }, 403);
       return new Response(null, {
         status: 302,
