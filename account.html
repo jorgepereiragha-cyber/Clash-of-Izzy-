@@ -232,10 +232,16 @@ button:disabled{opacity:.5;cursor:wait}
  });
  $("logoutButton").addEventListener("click",async()=>{
   $("logoutButton").disabled=true;
-  try{await api("/account/logout",{method:"POST"});}catch(error){setStatus(error.message,"error");}
+  let remoteRevoked=false;
+  try{await api("/account/logout",{method:"POST"});remoteRevoked=true;}
+  catch(error){console.warn("logout_remote_revocation_unconfirmed",error?.message||error);}
+  // Always remove local credentials, even offline; never claim server revocation on API failure.
   localStorage.removeItem("coi_game_token");sessionStorage.removeItem("coi_game_token");token="";linkedAccount=false;
   $("registerForm").hidden=false;$("logoutButton").hidden=true;
-  setStatus("Sessão encerrada neste dispositivo. Entre novamente para recuperar seu reino.");
+  setStatus(remoteRevoked
+    ?"Sessão revogada no servidor e encerrada neste dispositivo. Entre novamente para recuperar seu reino."
+    :"Saída local concluída, mas não foi possível confirmar a revogação no servidor. Entre novamente para encerrar outras sessões.",
+    remoteRevoked?"success":"error");
  });
  void loadGoogleConfig();
  void inspectSession();
