@@ -22,11 +22,14 @@ test("arena handles denied browser storage, preserves a single kingdom and expos
   const arena = await read("../arena.html");
   assert.match(arena, /function readArenaGameToken\(\)/);
   assert.match(arena, /if\(!readable\)throw new Error/);
-  assert.match(arena, /const savedToken=readArenaGameToken\(\)/);
+  assert.match(arena, /let savedToken='';[\s\S]*?savedToken=readArenaGameToken\(\)/);
   assert.match(arena, /let arenaConnectionInProgress=false/);
   assert.match(arena, /if\(arenaConnectionInProgress\)return/);
   assert.match(arena, /retryArenaConnection/);
-  assert.match(arena, /if\(error\.status===401\|\|error\.status===403\)/);
+  assert.match(arena, /if\(savedToken\)\{[\s\S]*?retryArenaConnection/,"retry only when resuming an existing token");
+  assert.match(arena, /if\(!savedToken\|\|error\.status===401\|\|error\.status===403\)/,"account recovery on guest failure");
+  assert.match(arena, /if\(!savedToken\|\|error\.status===401\|\|error\.status===403\)/);
+  assert.match(arena, /#kingdomStatus\{pointer-events:auto/, "HUD retry must receive clicks above the WebGL canvas");
   assert.match(arena, /account\.href='\/account\.html'/);
   assert.match(arena, /const persisted=!data\.token\|\|saveArenaGameToken\(data\.token\)/);
   assert.match(arena, /function chatToken\(\)\{try\{return readArenaGameToken\(\)\}catch\{return ''\}\}/);
