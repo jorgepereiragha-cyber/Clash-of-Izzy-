@@ -68,7 +68,8 @@ test("protected Worker-only deployment audits payment state before and after pub
 
 test("production smoke never follows unexpected redirects or silently skips payment-option checks", async()=>{
   const smoke=await source("scripts/production-smoke.js");
-  assert.match(smoke,/redirect: "error"/);
+  assert.match(smoke,/redirect: "manual"/);
+  assert.match(smoke,/Redirecionamento inesperado no smoke GET/);
   assert.doesNotMatch(smoke,/redirect: "follow"/);
   assert.match(smoke,/assertArenaPaymentOptionsSafe\(arena\)/);
 });
