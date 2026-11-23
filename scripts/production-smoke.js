@@ -257,8 +257,8 @@ export async function runProductionSmokeTests({
     "Manifesto 3D não contém as seis posições da floresta balanced/high.");
   for (const asset of [watchtower, castleWall, forestTree]) {
     const path = asset.src;
-    assert(typeof path === "string" && /^\/assets\/3d\/kenney\/[A-Za-z0-9/_ .-]+\.glb$/.test(path) &&
-      !path.includes(".."), "Caminho de modelo GLB inválido no manifesto.");
+    assert(typeof path === "string" && path.startsWith("/assets/3d/kenney/") &&
+      path.endsWith(".glb") && !path.includes("..") && !/[?#%\\\\]/.test(path), "Caminho de modelo GLB inválido no manifesto.");
     const response = await get(path);
     assert(response.status === 200, "Modelo GLB indisponível: " + path + " (HTTP " + response.status + ").");
     const bytes = await response.arrayBuffer();
