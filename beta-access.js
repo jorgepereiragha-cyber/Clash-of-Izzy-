@@ -125,11 +125,24 @@ export async function betaAccessGuard(request, env) {
   try {
     if (path === "/api/beta/invite/redeem") return await redeemInvite(request, env, url);
     if (path === "/beta-access.html" && request.method === "GET") return null;
+    // Paid/admin interfaces are legacy production tooling, not closed-beta gameplay.
+    // The free in-game resource market is /market.html and /api/game/action.
+    if (path === "/admin" || path === "/admin.html" ||
+        path === "/api/admin" || path.startsWith("/api/admin/")) {
+      if (path === "/api/admin/purchase-requests/review") {
+        return responseJson({ error: "Pagamento real indisponivel neste beta.", code: "BETA_PAYMENTS_DISABLED" }, 503);
+      }
+      return responseJson({ error: "Painel administrativo oficial indisponivel no beta.", code: "BETA_ADMIN_DISABLED" }, 404);
+    }
     // Never expose promotional contribution pages inside the private beta realm.
     // This also covers assets physically present in the shared repository.
     if (path === "/public-portal" || path.startsWith("/public-portal/") ||
         path === "/apoie" || path === "/apoie.html") {
       return responseJson({ error: "Portal de divulgacao indisponivel no beta.", code: "BETA_MARKETING_DISABLED" }, 404);
+    }
+    // A closed beta cannot ship the official install manifest or offline landing.
+    if (path === "/manifest.json" || path === "/offline.html") {
+      return responseJson({ error: "PWA oficial indisponivel neste beta.", code: "BETA_LEGACY_PWA_DISABLED" }, 404);
     }
     // The public marketing portal and legacy beta sign-up are not part of this realm.
     if (path === "/api/beta/signup") {
@@ -153,7 +166,8 @@ export async function betaAccessGuard(request, env) {
       });
     }
     const hasAccess = await hasValidAccess(request, env);
-    if (path === "/" || path === "/portal.html") {
+    if (path === "/" || path === "/index" || path === "/index.html" ||
+        path === "/portal" || path === "/portal.html") {
       return new Response(null, {
         status: 302,
         headers: {
@@ -189,10 +203,29 @@ export async function betaAccessGuard(request, env) {
         }
       });
     }
+    // Legacy playable modules are reused; real-money storefront is not.
+    // This authenticated endpoint is a contract for beta UI, not a live health assertion.
+    if (path === "/api/beta/capabilities" && request.method === "GET") {
+      return responseJson({
+        environment: "beta", inviteOnly: true,
+        enabled: {
+          realm: true, battles: true, alliances: true, heroes: true,
+          dragons: true, pets: true, world: true, freeResourceMarket: true,
+          advanced4x: env.GAME_4X_SYSTEMS_ENABLED === "true"
+        },
+        realMoneyPayments: false, administration: false, backgroundCron: false
+      });
+    }
+    if (path === "/api/store/catalog" && request.method === "GET") {
+      // Empty paid-only catalog; /api/game/state still serves earnable cosmetics,
+      // in-game barter, accelerator purchases and hero fragments.
+      return responseJson({ skins: [], packages: [], skin_edition: "beta", skin_limit: 0, whatsapp: "" });
+    }
     if (path === "/api/store/payment-methods" && request.method === "GET") {
       return responseJson({ mercadoPago: false, nubankPix: false });
     }
-    if (betaPaymentDisabled(path, request.method, env)) {
+    if (betaPaymentDisabled(path, request.method, env) ||
+        path === "/api/store" || path.startsWith("/api/store/")) {
       return responseJson({ error: "Pagamento real indisponivel neste beta.", code: "BETA_PAYMENTS_DISABLED" }, 503);
     }
     return null;
