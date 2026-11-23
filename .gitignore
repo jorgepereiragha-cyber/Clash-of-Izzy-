@@ -13,3 +13,6 @@ artifacts/3d-optimization/
 *.p12
 *.pfx
 Clash-of-Izzy-secrets-para-GitHub.txt
+
+# Generated only by offline beta runtime smoke.
+wrangler.beta.local-smoke.jsonc

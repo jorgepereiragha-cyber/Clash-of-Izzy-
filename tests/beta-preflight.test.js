@@ -51,6 +51,7 @@ test("cannot bypass invite gate, real-money kill switches or worker-first asset 
     b => { b.vars.LEVEL_PACKS_ENABLED = "true"; },
     b => { b.vars.MASTER_PACK_ENABLED = "true"; },
     b => { b.assets.run_worker_first = false; },
+    b => { b.assets.html_handling = "auto-trailing-slash"; },
     b => { b.d1_databases[0].database_name = "clash-of-izzy-db"; },
     b => { b.triggers = { crons: ["* * * * *"] }; },
     b => { b.vars.MP_ACCESS_TOKEN = "should-not-appear-in-wrangler"; },

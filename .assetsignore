@@ -116,3 +116,6 @@ support-orders.js
 
 # All D1 audits and local build CLIs are server-side tooling.
 scripts/*.mjs
+
+# Temporary local-only beta runtime smoke config, never a public asset.
+wrangler.beta.local-smoke.jsonc

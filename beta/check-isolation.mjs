@@ -32,7 +32,8 @@ export function checkBetaIsolation(beta, production, { requireProvisioned = fals
     "Worker beta ou entrypoint incorreto");
   expect(beta?.workers_dev === true, "O dominio de teste workers.dev deve estar habilitado");
   expect(beta?.assets?.directory === "." && beta?.assets?.binding === "ASSETS" &&
-    beta?.assets?.run_worker_first === true, "Todos os assets devem atravessar o gate do Worker");
+    beta?.assets?.run_worker_first === true && beta?.assets?.html_handling === "none",
+    "Assets beta devem atravessar o Worker e servir URLs .html sem redirecionar");
   expect(Array.isArray(beta?.d1_databases) && beta.d1_databases.length === 1 &&
     db?.binding === "DB" && db?.database_name === "clash-of-izzy-beta-db" &&
     db?.migrations_dir === "migrations", "D1 beta ou migrations_dir inesperados");

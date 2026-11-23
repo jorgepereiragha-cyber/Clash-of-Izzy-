@@ -28,6 +28,15 @@ function mockBetaDb(maxUses = 1) {
               if (sql.includes("name='beta_claim_invite_for_session'")) {
                 return state.claimTriggerInstalled ? { installed: 1 } : null;
               }
+              if (sql.startsWith("INSERT INTO beta_access_sessions")) {
+                if (state.sessionInsertFailure) throw new Error("D1 INSERT failed");
+                if (args[2] !== validHash || state.disabledInvites || state.uses >= maxUses) {
+                  return null;
+                }
+                state.uses += 1; // Mirrors the beta-only SQLite trigger.
+                state.sessions.add(args[0]);
+                return { issued: 1 }; // Mirrors INSERT ... RETURNING 1 AS issued.
+              }
               if (sql.startsWith("INSERT INTO beta_redeem_attempts")) return { hits: ++state.attempts };
               if (sql.startsWith("SELECT 1 AS permitted FROM beta_access_sessions")) {
                 return state.sessions.has(args[0]) && !state.disabledInvites ? { permitted: 1 } : null;
@@ -35,15 +44,6 @@ function mockBetaDb(maxUses = 1) {
               throw new Error("Unexpected SQL: " + sql);
             },
             async run() {
-              if (sql.startsWith("INSERT INTO beta_access_sessions")) {
-                if (state.sessionInsertFailure) throw new Error("D1 INSERT failed");
-                if (args[2] !== validHash || state.disabledInvites || state.uses >= maxUses) {
-                  return { meta: { changes: 0 } };
-                }
-                state.uses += 1; // Mirrors the beta-only SQLite trigger.
-                state.sessions.add(args[0]);
-                return { meta: { changes: 1 } };
-              }
               if (sql.startsWith("UPDATE beta_access_sessions SET revoked_at")) {
                 const deleted = state.sessions.delete(args[0]);
                 return { meta: { changes: deleted ? 1 : 0 } };
@@ -69,6 +69,7 @@ test("the beta config never binds either existing D1 and intercepts all asset re
   const prodConfig = JSON.parse(read("wrangler.jsonc"));
   assert.equal(betaConfig.name, "clash-of-izzy-beta");
   assert.equal(betaConfig.assets.run_worker_first, true);
+  assert.equal(betaConfig.assets.html_handling, "none", "closed beta uses exact .html paths for the invite gate");
   assert.equal(betaConfig.vars.ENVIRONMENT, "beta");
   assert.equal(betaConfig.vars.INVITE_ONLY, "true");
   assert.equal(betaConfig.vars.BETA_LIVE_PAYMENTS_APPROVED, "false");
