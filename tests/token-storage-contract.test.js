@@ -32,6 +32,18 @@ test("arena handles denied browser storage, preserves a single kingdom and expos
   assert.match(arena, /function chatToken\(\)\{try\{return readArenaGameToken\(\)\}catch\{return ''\}\}/);
 });
 
+test("kingdom tolerates one blocked storage without replacing the player's realm", async () => {
+  const html=await read("../kingdom.html");
+  assert.match(html,/function readKingdomGameToken\(\)/);
+  assert.match(html,/try\{const value=localStorage\.getItem\("coi_game_token"\)/);
+  assert.match(html,/try\{const value=sessionStorage\.getItem\("coi_game_token"\)/);
+  assert.match(html,/if\(!readable\)throw new Error/);
+  assert.match(html,/token=readKingdomGameToken\(\)/);
+  assert.match(html,/if\(token\)saveKingdomGameToken\(token\)/);
+  assert.match(html,/sessionStorageUnavailable=!saveKingdomGameToken\(token\)/);
+  assert.match(html,/não salvou a sessão/);
+});
+
 test("account logout clears both copies of the game token", async () => {
   const source = await read("../account.html");
   assert.match(source, /localStorage\.removeItem\(["']coi_game_token["']\);sessionStorage\.removeItem\(["']coi_game_token["']\)/);
