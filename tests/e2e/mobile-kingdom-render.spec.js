@@ -255,9 +255,11 @@ test.describe("Mobile kingdom rendering", () => {
     await expect(page.locator('#buildings [data-upgrade="farm"]')).toBeFocused();
     expect(actions).toHaveLength(0);
 
-    await page.locator("#coiCitySelectionClose").click();
+    await page.locator("#coiCitySelectionClose").focus();
+    await page.keyboard.press("Escape");
     await expect(page.locator("#coiCitySelection")).toBeHidden();
     await expect(farm).toHaveAttribute("aria-pressed", "false");
+    await expect(farm).toBeFocused();
   });
 
   test("high-capability Android previews all 16 buildings and retains nine safe 2D controls", async ({ page }) => {
