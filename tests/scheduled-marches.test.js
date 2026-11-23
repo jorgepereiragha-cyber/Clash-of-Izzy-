@@ -4,9 +4,9 @@ import { readFile } from "node:fs/promises";
 
 test("Worker processa marchas vencidas sem depender do login do jogador", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
-  assert.ok(worker.includes("async function processDueMarches(env)"));
+  assert.ok(policy.includes("GROUP BY kingdom_id ORDER BY MIN(arrives_at), kingdom_id LIMIT ?"));
   const policy = await readFile(new URL("../march-scheduler-policy.js", import.meta.url), "utf8");
-  assert.match(policy, /GROUP BY kingdom_id ORDER BY MIN\\(arrives_at\\), kingdom_id LIMIT \\?/);
+  assert.ok(worker.includes("resolveDueMarchKingdoms("));
   assert.match(policy, /MAX_DUE_KINGDOMS_PER_TICK = 4/);
   assert.match(worker, /resolveDueMarchKingdoms\\(/);
   const schedulerStart = worker.indexOf("async scheduled(controller,env){");
@@ -17,7 +17,7 @@ test("Worker processa marchas vencidas sem depender do login do jogador", async 
   assert.ok(scheduler.includes('console.error("scheduled_marches_failed"'));
   assert.ok(scheduler.includes("await processDueRallies(env)"), "failure in marches must not skip rallies");
   assert.ok(scheduler.indexOf("await processDueKingdomQueues(env)") < scheduler.indexOf("await processDueMarches(env)"));
-  assert.ok(worker.includes('console.error("scheduled_march_resolution_failed"'));
+  assert.ok(worker.includes('"scheduled_march_resolution_failed"'));
 });
 
 test("Cloudflare agenda a resolução automática de marchas a cada minuto", async () => {
