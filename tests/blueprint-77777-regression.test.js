@@ -47,7 +47,9 @@ test("webhook mantém assinatura, verificação de valor, ledger único e batch 
 
 test("PWA preserva shell essencial e isola a falha dos assets opcionais", async () => {
   const sw = await read("sw.js");
-  assert.match(sw, /cache\.addAll\(required\)/);
+  assert.doesNotMatch(sw, /cache\\.addAll\\(required\\)/);
+  assert.match(sw, /if \\(!canStoreResponse\\(response\\)\\) throw new Error/);
+  assert.match(sw, /credentials: "omit"/);
   assert.match(sw, /Promise\.allSettled/);
   assert.match(sw, /canStoreResponse\(response\)/);
   assert.ok(Number(sw.match(/clash-of-izzy-shell-v(\d+)/)?.[1]) >= 54, "PWA cache must include kingdom session recovery");
