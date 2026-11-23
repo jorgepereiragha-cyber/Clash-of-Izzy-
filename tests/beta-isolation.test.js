@@ -69,6 +69,7 @@ test("the beta config never binds either existing D1 and intercepts all asset re
   const prodConfig = JSON.parse(read("wrangler.jsonc"));
   assert.equal(betaConfig.name, "clash-of-izzy-beta");
   assert.equal(betaConfig.assets.run_worker_first, true);
+  assert.equal(betaConfig.assets.html_handling, "none", "closed beta uses exact .html paths for the invite gate");
   assert.equal(betaConfig.vars.ENVIRONMENT, "beta");
   assert.equal(betaConfig.vars.INVITE_ONLY, "true");
   assert.equal(betaConfig.vars.BETA_LIVE_PAYMENTS_APPROVED, "false");
