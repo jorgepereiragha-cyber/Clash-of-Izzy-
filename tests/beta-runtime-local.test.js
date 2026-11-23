@@ -118,7 +118,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const port = await freePort();
     const base = "http://127.0.0.1:" + port;
     processWorker = spawn(process.execPath, [wrangler,
-      "--config", config, "dev", "--local", "--persist-to", persist,
+      "--config", config, "dev", "--local", "--test-scheduled", "--persist-to", persist,
       "--ip", "127.0.0.1", "--port", String(port),
       "--var", "SESSION_SECRET:beta-runtime-local-testing-secret-not-for-release",
       "--log-level", "error"
@@ -204,6 +204,14 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     });
     assert.equal(resume.status, 200, "existing kingdom is resumed");
     assert.equal(resume.data.state?.kingdom?.id, start.data.state.kingdom.id);
+
+    // Wrangler exposes a local-only scheduled handler probe, without registering a remote cron.
+    const cronResponse = await fetch(base + "/cdn-cgi/local/scheduled?format=json", {
+      signal:AbortSignal.timeout(30_000)
+    });
+    assert.equal(cronResponse.status, 200, "scheduled handler can be invoked offline");
+    const cronResult = await cronResponse.json();
+    assert.equal(cronResult.outcome, "ok", "scheduled handler returns a successful execution outcome");
 
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
