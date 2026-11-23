@@ -282,3 +282,83 @@ test("marketing and support pages never load inside the private beta, even after
   assert.equal((await signed.json()).code, "BETA_MARKETING_DISABLED");
   assert.equal(await betaAccessGuard(request("/public-portal/apoie.html"), { ENVIRONMENT: "production" }), null);
 });
+
+test("beta uses old free gameplay pages, but never exposes legacy admin, PWA or paid routes", async () => {
+  const db = mockBetaDb(), env = { ...betaEnv(db), GAME_4X_SYSTEMS_ENABLED: "true" };
+  const unlocked = await betaAccessGuard(request("/api/beta/invite/redeem", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: validCode })
+  }), env);
+  assert.equal(unlocked.status, 200);
+  const cookie = unlocked.headers.get("Set-Cookie").split(";")[0];
+  const authorized = (path, init = {}) => betaAccessGuard(request(path, {
+    ...init, headers: { ...(init.headers || {}), Cookie: cookie }
+  }), env);
+
+  // Preserve playable free-market trades, battle and world modules from the original game.
+  for (const path of ["/kingdom.html", "/market.html", "/world.html",
+    "/equipment-ui.html", "/alliance.html", "/events.html", "/api/game/state"]) {
+    assert.equal(await authorized(path), null, path);
+  }
+  const capabilities = await authorized("/api/beta/capabilities");
+  assert.equal(capabilities.status, 200);
+  assert.deepEqual(await capabilities.json(), {
+    environment: "beta", inviteOnly: true,
+    enabled: {
+      realm: true, battles: true, alliances: true, heroes: true,
+      dragons: true, pets: true, world: true, freeResourceMarket: true,
+      advanced4x: true
+    },
+    realMoneyPayments: false, administration: false, backgroundCron: false
+  });
+  assert.equal((await betaAccessGuard(request("/api/beta/capabilities"), env)).status, 403);
+
+  const catalog = await authorized("/api/store/catalog");
+  assert.equal(catalog.status, 200);
+  assert.deepEqual(await catalog.json(),
+    { skins: [], packages: [], skin_edition: "beta", skin_limit: 0, whatsapp: "" });
+  for (const path of ["/admin.html", "/admin", "/api/admin/login", "/api/admin/gems"]) {
+    const denied = await authorized(path, { method: path.startsWith("/api/") ? "POST" : "GET" });
+    assert.equal(denied.status, 404, path);
+    assert.equal((await denied.json()).code, "BETA_ADMIN_DISABLED");
+  }
+  for (const path of ["/manifest.json", "/offline.html"]) {
+    assert.equal((await authorized(path)).status, 404);
+  }
+  for (const path of ["/api/store/future-paid-route", "/api/store"]) {
+    const denied = await authorized(path);
+    assert.equal(denied.status, 503, path);
+    assert.equal((await denied.json()).code, "BETA_PAYMENTS_DISABLED");
+  }
+  // The commercial review endpoint retains the same explicit financial error code.
+  assert.equal((await authorized("/api/admin/purchase-requests/review", { method: "POST" })).status, 503);
+  // A production Worker never gains beta-specific rules.
+  assert.equal(await betaAccessGuard(request("/api/admin/login"), { ENVIRONMENT: "production" }), null);
+});
+
+test("beta landing routes and asset pack do not include old marketing, admin or PWA", async () => {
+  const db = mockBetaDb(), env = betaEnv(db);
+  const anonymous = await betaAccessGuard(request("/index.html"), env);
+  assert.equal(anonymous.status, 302);
+  assert.equal(new URL(anonymous.headers.get("Location")).pathname, "/beta-access.html");
+  const unlocked = await betaAccessGuard(request("/api/beta/invite/redeem", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: validCode })
+  }), env);
+  const cookie = unlocked.headers.get("Set-Cookie").split(";")[0];
+  for (const path of ["/index.html", "/index", "/portal"]) {
+    const redirect = await betaAccessGuard(request(path, { headers: { Cookie: cookie } }), env);
+    assert.equal(redirect.status, 302);
+    assert.equal(new URL(redirect.headers.get("Location")).pathname, "/kingdom.html");
+  }
+  const ignored = new Set(read(".assetsignore").split("\n").map(line => line.trim()));
+  for (const file of ["index.html", "portal.html", "apoie.html", "admin.html",
+    "offline.html", "manifest.json", "public-portal/**"]) {
+    assert.ok(ignored.has(file), file + " must be absent from the beta static bundle");
+  }
+  const entry = read("beta-access.html");
+  for (const file of ["/kingdom.html", "/world.html", "/market.html",
+    "/equipment-ui.html", "/alliance.html", "/events.html"]) {
+    assert.ok(entry.includes('href="' + file + '"'), file + " must be linked for invited testers");
+  }
+});
