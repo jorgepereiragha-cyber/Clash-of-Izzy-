@@ -21,14 +21,15 @@ test("public stats keep verified gameplay counters independent from migration 00
   assert.doesNotMatch(route, /\.run\(\)|\b(?:INSERT|UPDATE|DELETE|DROP|ALTER)\b/i);
 });
 
-test("both public portals show verified counters and never invent financial totals", async () => {
+test("marketing portals stay identical and never expose invented counters or financial claims", async () => {
   const [a, b] = await Promise.all([
     read("portal.html"), read("public-portal/portal.html")
   ]);
   assert.equal(a, b);
-  assert.match(a, /data\.supportVerified!==true/);
-  assert.match(a, /Apoios confirmados: aguardando validação do banco/);
-  assert.match(a, /Jogadores, batalhas e alianças verificados/);
+  assert.match(a, /Baixar APK Android/);
+  assert.match(a, /href="\/apoie\.html"/);
+  assert.doesNotMatch(a, /data\.supportVerified|supportTotalCents|support-goal|players-count|battles-count|alliances-count|loadPublicStats/);
+  assert.doesNotMatch(a, /api\/public\/stats/);
 });
 
 test("support page does not present unavailable contributions as R$0", async () => {
