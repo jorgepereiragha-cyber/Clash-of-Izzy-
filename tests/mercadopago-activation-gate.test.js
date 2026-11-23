@@ -24,7 +24,7 @@ test("Mercado Pago release flag is explicit, exact and requires both secrets",()
 });
 
 test("Public payment methods keep Mercado Pago OFF even with secrets until explicit approval",async()=>{
-  const defaultEnv={...goodSecrets,ENVIRONMENT:"production"};
+  const defaultEnv={...goodSecrets,DB:{},ENVIRONMENT:"production"};
   for(const env of [defaultEnv,{...defaultEnv,MP_PAYMENTS_ENABLED:"false"}]) {
     const response=await worker.fetch(new Request("https://game.invalid/api/store/payment-methods"),env);
     assert.equal(response.status,200);
