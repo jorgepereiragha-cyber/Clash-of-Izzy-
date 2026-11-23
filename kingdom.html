@@ -750,7 +750,19 @@ function selectCityBuilding(type){
  panel.hidden=false;
  document.querySelectorAll("#city [data-building]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.building===type)));
 }
-document.getElementById("coiCitySelectionClose").addEventListener("click",()=>selectCityBuilding(null));
+document.getElementById("coiCitySelectionClose").addEventListener("click",()=>{
+ const previous=selectedCityBuildingType;
+ selectCityBuilding(null);
+ if(previous){
+  const origin=[...document.querySelectorAll("#city [data-building]")].find(button=>button.dataset.building===previous&&!button.hidden);
+  origin?.focus({preventScroll:true});
+ }
+});
+document.getElementById("coiCitySelection").addEventListener("keydown",event=>{
+ if(event.key!=="Escape")return;
+ event.preventDefault();
+ document.getElementById("coiCitySelectionClose").click();
+});
 document.getElementById("coiCitySelectionDetails").addEventListener("click",()=>{
  if(!selectedCityBuildingType)return;
  const target=[...document.querySelectorAll("#buildings [data-upgrade]")].find(button=>button.dataset.upgrade===selectedCityBuildingType);
