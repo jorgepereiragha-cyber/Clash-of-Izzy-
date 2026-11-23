@@ -35,7 +35,7 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(renderer, /new THREE\.WebGLRenderer/);
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
   assert.match(renderer, /coi:kingdom-render/);
-  assert.match(renderer, /Math\.min\(9, qualityProfile\?\.maxBuildings \|\| 9\)/);
+  assert.match(renderer, /Math\.min\(16, qualityProfile\?\.maxBuildings \|\| 9\)/);
   assert.match(renderer, /const \{ x, z \} = cityWorldPoint\(b, i\)/);
   assert.match(renderer, /frameCityBuildings\(list\)/);
   assert.match(renderer, /Number\(building\?\.position_x\)/);
@@ -379,4 +379,45 @@ test("the city ambient layer is loaded and respects Android power and lifecycle 
   assert.doesNotMatch(ambient, /new THREE\.WebGLRenderer/);
   assert.match(ambient, /FRAME_INTERVAL_MS = 1000 \/ 30/);
   assert.match(ambient, /timestamp - lastFrame < FRAME_INTERVAL_MS/);
+});
+
+
+test("WebGL shows 8/12/16 buildings by tier and Canvas keeps nine accessible slots", () => {
+  // Assert the cap semantically rather than counting text occurrences: resize
+  // also needs the same limit, and refactors may add legitimate call sites.
+  assert.match(renderer, /Math\.min\(16, qualityProfile\?\.maxBuildings \|\| 9\)/);
+  assert.match(renderer, /const visibleBuildings = latestBuildings\.slice\(0, Math\.min\(16,/);
+  assert.match(renderer, /publishBuildingHitTargets\(list\)/);
+  assert.match(renderer, /const columns = latestBuildings\.length > 9 \? 4 : 3/);
+  assert.match(kingdom, /buildings\.slice\(0,16\)\.map\(\(b,i\)=>/);
+  assert.ok(kingdom.includes("i>=9?' hidden':''"));
+  assert.match(kingdom, /button\.hidden=index>=9/);
+  assert.match(kingdom, /const order=buildings\.slice\(0,9\)/);
+  assert.ok(kingdom.includes('city.classList.toggle("dense-3d",positions.length>9)'));
+  assert.ok(kingdom.includes('.city .building[hidden]{display:none!important}'));
+});
+
+
+test("WebGL loss returns focus from hidden camera tools to a visible Canvas building", () => {
+  assert.match(kingdom, /const cameraHadFocus=!!cityCameraControls\?\.contains\(document\.activeElement\)/);
+  assert.match(kingdom, /if\(cameraHadFocus\)city\.querySelector\("\[data-building\]:not\(\[hidden\]\)"\)\?\.focus\(\{preventScroll:true\}\)/);
+  assert.match(kingdom, /button\.hidden=index>=9/);
+});
+
+test("city camera touch zoom is view-only, bounded, and disabled after WebGL loss", () => {
+  assert.match(kingdom, /id="coiCityCameraControls"/);
+  assert.match(kingdom, /data-city-zoom="in"/);
+  assert.match(kingdom, /data-city-zoom="out"/);
+  assert.match(kingdom, /data-city-zoom="reset"/);
+  assert.match(kingdom, /aria-label="Aproximar câmera da cidade"/);
+  assert.match(kingdom, /coi:kingdom-3d-ready/);
+  assert.match(kingdom, /if\(cityCameraControls\)cityCameraControls\.hidden=true/);
+  assert.match(renderer, /camera\.zoom = fitZoom \* cameraZoomFactor/);
+  assert.match(renderer, /new THREE\.Vector3\(x, \.18, z\)\.applyMatrix4\(camera\.matrixWorldInverse\)/);
+  assert.match(renderer, /viewportWidth \/ projectedWidth, viewportHeight \/ projectedHeight/);
+  assert.match(renderer, /if \(visibleBuildings\.length\) frameCityBuildings\(visibleBuildings\)/);
+  assert.match(renderer, /Math\.max\(0\.7, Math\.min\(1\.6/);
+  assert.match(renderer, /if \(disposed \|\| cinematicCaptureActive \|\| !renderer \|\| !scene \|\| !camera\) return/);
+  assert.match(renderer, /publishBuildingHitTargets\(visible\)/);
+  assert.equal(renderer.split('window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler)').length - 1, 2);
 });

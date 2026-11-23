@@ -74,6 +74,8 @@ if (host && "WebGLRenderingContext" in window) {
   const surfaceMaterialCache = new Map();
   let disposed = false;
   let kingdomRenderHandler = null;
+  let kingdomZoomHandler = null;
+  let cameraZoomFactor = 1;
   let valhallaModeHandler = null;
   let developmentStatsBadge = null;
   let developmentStatsTimer = null;
@@ -642,7 +644,17 @@ if (host && "WebGLRenderingContext" in window) {
     const x = Number(building?.position_x), z = Number(building?.position_z);
     if (building?.position_x != null && building?.position_z != null &&
         Number.isFinite(x) && Number.isFinite(z)) return { x: x * .53, z: z * .53 };
-    return { x: (index % 3 - 1) * 4.15, z: (Math.floor(index / 3) - 1) * 3.15 };
+    // Only legacy buildings without stored coordinates use this preview grid.
+    // Keep the familiar 3x3 arrangement for compact cities, and arrange
+    // larger settlements in four columns without changing persisted layout.
+    const columns = latestBuildings.length > 9 ? 4 : 3;
+    const spacingX = columns === 4 ? 3.35 : 4.15;
+    const spacingZ = columns === 4 ? 3.0 : 3.15;
+    const rows = Math.ceil(Math.min(16, latestBuildings.length) / columns);
+    return {
+      x: (index % columns - (columns - 1) / 2) * spacingX,
+      z: (Math.floor(index / columns) - (rows - 1) / 2) * spacingZ
+    };
   }
   function frameCityBuildings(buildings) {
     if (!camera || !buildings.length) return;
@@ -651,16 +663,29 @@ if (host && "WebGLRenderingContext" in window) {
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minZ = Math.min(...zs), maxZ = Math.max(...zs);
     const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-    const span = Math.max(maxX - minX + 4, maxZ - minZ + 4);
-    camera.zoom = Math.min(1, 13 / span);
     camera.position.set(cx + 10, 13, cz + 11);
     camera.lookAt(cx, .2, cz);
+    // On narrow Android screens world-space X/Z spans are insufficient: the
+    // diagonal isometric projection can crop buildings at the left and right.
+    // Fit the *camera-space* footprint to the actual orthographic viewport.
+    camera.updateMatrixWorld(true);
+    const projected = points.map(({ x, z }) =>
+      new THREE.Vector3(x, .18, z).applyMatrix4(camera.matrixWorldInverse));
+    const screenXs = projected.map(point => point.x);
+    const screenYs = projected.map(point => point.y);
+    const projectedWidth = Math.max(...screenXs) - Math.min(...screenXs) + 3.2;
+    const projectedHeight = Math.max(...screenYs) - Math.min(...screenYs) + 4.0;
+    const viewportWidth = Math.max(1, camera.right - camera.left);
+    const viewportHeight = Math.max(1, camera.top - camera.bottom);
+    // Player zoom remains view-only. A reset always restores the safe fit.
+    const fitZoom = Math.min(1, viewportWidth / projectedWidth, viewportHeight / projectedHeight);
+    camera.zoom = fitZoom * cameraZoomFactor;
     camera.updateProjectionMatrix();
   }
   function publishBuildingHitTargets(buildings = latestBuildings) {
     if (!host || !camera || !renderer || disposed) return;
     camera.updateMatrixWorld(true);
-    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
     const positions = list.map((building, index) => {
       const { x, z } = cityWorldPoint(building, index);
       const projected = new THREE.Vector3(x, .18, z).project(camera);
@@ -693,7 +718,7 @@ if (host && "WebGLRenderingContext" in window) {
     activeModels = [];
     // Keep deterministic world-space building anchors. HTML hit targets are
     // projected into screen coordinates from this same camera below.
-    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
     frameCityBuildings(list);
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
@@ -1225,6 +1250,7 @@ if (host && "WebGLRenderingContext" in window) {
       visibilityChangeHandler = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+      if (kingdomZoomHandler) window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler);
       if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
       if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
       valhallaModeHandler = null;
@@ -1257,6 +1283,19 @@ if (host && "WebGLRenderingContext" in window) {
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
     };
     window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
+    kingdomZoomHandler = event => {
+      if (disposed || cinematicCaptureActive || !renderer || !scene || !camera) return;
+      const action = event.detail?.action;
+      if (!["in", "out", "reset"].includes(action)) return;
+      cameraZoomFactor = action === "reset" ? 1
+        : Math.max(0.7, Math.min(1.6, Number((cameraZoomFactor + (action === "in" ? 0.2 : -0.2)).toFixed(2))));
+      const visible = latestBuildings.slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
+      if (!visible.length) return;
+      frameCityBuildings(visible);
+      renderer.render(scene, camera);
+      publishBuildingHitTargets(visible);
+    };
+    window.addEventListener("coi:kingdom-zoom", kingdomZoomHandler);
     defensePreviewHandler=event=>updateDefensePreview(event.detail||{});
     window.addEventListener("coi:defense-preview",defensePreviewHandler);
     if (Array.isArray(window.__coiKingdomBuildings)) {
@@ -1278,6 +1317,10 @@ if (host && "WebGLRenderingContext" in window) {
       const viewHeight = 12.8, viewWidth = viewHeight * aspect;
       camera.left = -viewWidth / 2; camera.right = viewWidth / 2;
       camera.top = viewHeight / 2; camera.bottom = -viewHeight / 2;
+      // Refit after orientation/viewport changes; otherwise portrait mode can
+      // clip outer buildings even when the initial landscape frame was valid.
+      const visibleBuildings = latestBuildings.slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
+      if (visibleBuildings.length) frameCityBuildings(visibleBuildings);
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }) * (automaticGraphics ? adaptivePixelScale.scale : 1));
       renderer.setSize(host.clientWidth, host.clientHeight, false);
@@ -1341,6 +1384,7 @@ if (host && "WebGLRenderingContext" in window) {
       sceneVisibilityObserver.observe(host);
     }
     resize();
+    window.dispatchEvent(new CustomEvent("coi:kingdom-3d-ready"));
     if (advancedShaders) startArmyAnimationLoop();
   } catch (error) {
     // Initialization can fail after GPU resources or listeners were already created.
@@ -1355,6 +1399,7 @@ if (host && "WebGLRenderingContext" in window) {
     visibilityChangeHandler = null;
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+    if (kingdomZoomHandler) window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler);
     if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
     if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
     valhallaModeHandler = null;

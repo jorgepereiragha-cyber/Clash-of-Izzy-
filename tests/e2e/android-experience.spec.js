@@ -149,3 +149,38 @@ test("Android world map supports one-finger pan and two-finger pinch zoom", asyn
     .toBe("150%");
   await client.detach();
 });
+
+
+test("city zoom toolbar only appears for WebGL and keeps accessible touch targets", async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto("/kingdom.html");
+  const controls = page.locator("#coiCityCameraControls");
+  // Camera tools live inside the stage: desktop overlays do not create a
+  // full-height extra row, while mobile controls remain reachable below it.
+  await expect(page.locator(".coi-city-stage #coiCityCameraControls")).toHaveCount(1);
+
+  // A failed GPU must not leave UI controls suggesting zoom works in 2D.
+  await page.evaluate(() => window.dispatchEvent(new Event("coi:kingdom-2d-fallback")));
+  await expect(controls).toBeHidden();
+
+  await page.evaluate(() => {
+    window.__cityZoomActions = [];
+    window.addEventListener("coi:kingdom-zoom", event => {
+      window.__cityZoomActions.push(event.detail?.action);
+    });
+    window.dispatchEvent(new Event("coi:kingdom-3d-ready"));
+  });
+  await expect(controls).toBeVisible();
+  for (const action of ["in", "out", "reset"]) {
+    const button = controls.locator('[data-city-zoom="' + action + '"]');
+    await expect(button).toBeVisible();
+    const size = await button.boundingBox();
+    expect(size.height).toBeGreaterThanOrEqual(48);
+    expect(size.width).toBeGreaterThanOrEqual(48);
+    await button.click();
+  }
+  expect(await page.evaluate(() => window.__cityZoomActions)).toEqual(["in", "out", "reset"]);
+
+  await page.evaluate(() => window.dispatchEvent(new Event("coi:kingdom-2d-fallback")));
+  await expect(controls).toBeHidden();
+});
