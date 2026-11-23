@@ -315,22 +315,23 @@ async function readBody(request,maxBytes=32768){
   return parsed;
  }catch{return {__bodyError:"invalid_json"}}
 }
+// One D1 read per authenticated request. Password-linked sessions take
+// precedence over Google-only links; null means an unprotected guest kingdom.
+async function sessionVersionForPlayer(env,playerId){
+  const row=await env.DB.prepare(
+    "SELECT COALESCE(a.session_version,g.session_version) AS version FROM players p " +
+    "LEFT JOIN player_accounts a ON a.player_id=p.id " +
+    "LEFT JOIN google_account_links g ON g.player_id=p.id WHERE p.player_id=?"
+  ).bind(playerId).first();
+  return row?.version ?? undefined;
+}
 async function gameIdentity(request,env){
   const header=request.headers.get("Authorization")||"";
   const token=header.startsWith("Bearer ")?header.slice(7):"";
   const p=env.SESSION_SECRET?await verify(token,env.SESSION_SECRET):false;
   if(!p||p.scope!=="game"||!p.sub)return null;
-  const [account,googleLink]=await Promise.all([
-    env.DB.prepare(
-      "SELECT a.session_version FROM player_accounts a JOIN players p ON p.id=a.player_id WHERE p.player_id=?"
-    ).bind(String(p.sub)).first(),
-    env.DB.prepare(
-      "SELECT g.session_version FROM google_account_links g JOIN players p ON p.id=g.player_id WHERE p.player_id=?"
-    ).bind(String(p.sub)).first()
-  ]);
-  // A conta com senha prevalece. O Google permite recuperação sem criar outro reino.
   // Tokens anônimos antigos são rejeitados assim que Google é vinculado.
-  const version=account?.session_version ?? googleLink?.session_version;
+  const version=await sessionVersionForPlayer(env,String(p.sub));
   if(version!==undefined){
     if(!Number.isSafeInteger(p.av)||p.av!==Number(version))return null;
   }else if(p.av!==undefined)return null;
@@ -2184,12 +2185,8 @@ export default {
         if(existingKingdom){
           // Match gameIdentity(): password accounts take precedence, but Google-only
           // kingdoms must also keep the account version claim on renewed tokens.
-          const [account,googleLink]=await Promise.all([
-            env.DB.prepare("SELECT a.session_version FROM player_accounts a JOIN players p ON p.id=a.player_id WHERE p.player_id=?").bind(existingPlayerId).first(),
-            env.DB.prepare("SELECT g.session_version FROM google_account_links g JOIN players p ON p.id=g.player_id WHERE p.player_id=?").bind(existingPlayerId).first()
-          ]);
+          const sessionVersion=await sessionVersionForPlayer(env,existingPlayerId);
           const payload={sub:existingPlayerId,scope:"game",exp:Math.floor(Date.now()/1000)+60*60*24*365};
-          const sessionVersion=account?.session_version ?? googleLink?.session_version;
           if(sessionVersion!==undefined)payload.av=Number(sessionVersion);
           const token=await sign(payload,env.SESSION_SECRET);
           return json({token,state:await gameState(env,existingPlayerId),referral_recorded:false,resumed:true},200);
