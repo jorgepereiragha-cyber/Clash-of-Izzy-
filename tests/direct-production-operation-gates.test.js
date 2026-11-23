@@ -51,3 +51,14 @@ test("protected D1 core repair and Worker-only workflows remain independently ga
   assert.match(worker, /d1 migrations apply clash-of-izzy-db --local/);
   assert.doesNotMatch(worker, /d1 migrations apply clash-of-izzy-db --remote/);
 });
+
+test("legacy main push-triggered stale Worker deploy has been retired", () => {
+  const legacy = read(".github/workflows/publicar-entrada-worker-atual.yml");
+  assert.match(legacy, /workflow_dispatch:/);
+  assert.match(legacy, /Legado desativado/);
+  assert.doesNotMatch(legacy, /\bpush:\s*\n/);
+  assert.doesNotMatch(legacy, /wrangler.*deploy\b/);
+  assert.doesNotMatch(legacy, /\bd1 migrations apply\b/);
+  assert.doesNotMatch(legacy, /environment:\s*\n\s*name:\s*production/);
+  assert.doesNotMatch(legacy, /\$\{\{\s*secrets\./);
+});
