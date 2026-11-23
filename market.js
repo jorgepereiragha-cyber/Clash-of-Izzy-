@@ -18,8 +18,17 @@
   };
   let state = null, busy = false;
   function token(){
-    try{return localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token")||"";}
-    catch{return "";}
+    let readable=false;
+    // A falha de um armazenamento não pode ocultar uma sessão válida no outro.
+    for(const storage of [()=>window.localStorage,()=>window.sessionStorage]){
+      try{
+        const value=storage().getItem("coi_game_token");
+        readable=true;
+        if(value)return value;
+      }catch{}
+    }
+    if(!readable)throw new Error("O navegador bloqueou o armazenamento da sessão. Autorize este site e tente novamente.");
+    return "";
   }
   async function request(path,options={}){
     const auth=token();
