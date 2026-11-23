@@ -2,6 +2,14 @@
 (() => {
   const API="/api";
   let token=null,state=null,selected="iron_sword",selectedHeroId=null,busy=false,searchFocusApplied=false,lastSummonResults=[];
+  function readEquipmentToken() {
+    // A blocked localStorage must not hide a valid sessionStorage token.
+    for (const getStorage of [() => window.localStorage, () => window.sessionStorage]) {
+      try { const saved=getStorage().getItem("coi_game_token"); if (saved) return saved; }
+      catch {}
+    }
+    return "";
+  }
   const requestedSkinSearch=new URLSearchParams(location.search).get("search")||"";
   const normalizeSearch=value=>String(value||"").normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR");
   const $=id=>document.getElementById(id);
@@ -549,7 +557,7 @@
     renderForge();
   }
   async function refresh(){
-    token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
+    token=readEquipmentToken();
     if(!token){setStatus("Entre no seu reino primeiro. Depois volte para equipar seus heróis.",true);return;}
     const response=await request("/game/state");state=response.state;render();
   }
