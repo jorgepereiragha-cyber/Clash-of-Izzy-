@@ -1,4 +1,4 @@
-const CACHE_NAME="clash-of-izzy-shell-v55";
+const CACHE_NAME="clash-of-izzy-shell-v56";
 const CORE_ASSETS=["/","/index.html","/portal.html","/assets/brand/hero-emblem.svg","/assets/brand/royal-king.webp","/account.html","/arena.html","/kingdom.html","/world.html","/world-map.js","/world-map-3d.js","/world-map-viewport.js","/rally-ui.js","/styles/rally.css","/events.html","/events.js","/event-catalog.js","/styles/events-hub.css","/assets/art/events/angel-of-death.svg","/assets/art/events/valhalla.svg","/assets/art/events/wild-hunt.svg","/assets/art/events/shiva.svg","/assets/art/events/khali.svg","/assets/art/events/siege-of-eldoria.svg","/assets/art/events/champions-tournament.svg","/scripts/kingdom-3d.js","/scripts/castle-visual-upgrades.js","/scripts/kingdom-quality.js","/scripts/kingdom-materials.js","/scripts/pwa-runtime.js","/styles/android-experience.css","/assets/3d/manifest.json","/assets/art/landing-kingdom.svg","/assets/art/heroes/portraits.svg","/assets/art/skins/pantheon-relics.svg","/styles/heroes.css","/engine/asset-loader.js","/engine/resource-disposal.js","/engine/texture-manager.js","/equipment-ui.html","/equipment-system.js","/equipment-styles.css","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/player-engagement.js","/apoie.html","/navigation.js","/styles/navigation.css","/alliance.html","/styles/coi-theme.css","/styles/landing.css","/landing.js","/manifest.json","/icon-192.svg","/icon-512.svg","/favicon.svg","/logo.svg","/styles/premium-ui.css","/scripts/ambient-particles.js","/scripts/advanced-shaders.js","/offline.html","/styles/kingdom-4x-command.css","/scripts/kingdom-command-hud.js","/scripts/kingdom-command-state.js","/scripts/eldoria-realtime-client.js","/market.html","/market.css","/market.js","/scripts/kingdom-visual-boot.js","/scripts/kingdom-visual-preferences.js","/scripts/world-map-visual-boot.js"];
 // O shell 2D mínimo deve ser atômico: se falhar, o Service Worker antigo
 // continua ativo. Three.js e imagens são opcionais e nunca bloqueiam a instalação.
@@ -53,8 +53,16 @@ const RUNTIME_CACHE_NAME = "clash-of-izzy-runtime-v1";
 const RUNTIME_CACHE_MAX_ENTRIES = 64;
 const RUNTIME_ASSET_PATTERN = /\.(?:glb|gltf|bin|ktx2|png|jpe?g|webp|avif|svg|wasm|js|css)$/i;
 
+// Cloudflare serves .html assets at clean URLs (e.g. /kingdom.html -> /kingdom).
+// Match only explicitly listed public shell pages, never arbitrary paths.
+function shellCacheKey(pathname) {
+  if (CORE_ASSETS.includes(pathname)) return pathname;
+  const bare = pathname.endsWith("/") ? pathname.slice(0, -1) : pathname;
+  const htmlPath = bare + ".html";
+  return CORE_ASSETS.includes(htmlPath) ? htmlPath : null;
+}
 function isShellPath(pathname) {
-  return CORE_ASSETS.includes(pathname);
+  return shellCacheKey(pathname) !== null;
 }
 
 function isRuntimeAsset(pathname) {
@@ -107,11 +115,12 @@ self.addEventListener("fetch", event => {
         const response = await fetch(request);
         // Query-bearing routes may contain referral/search/account data.
         // Fetch those normally, but never persist their response or URL.
-        if (!url.search && isShellPath(url.pathname) && canStoreResponse(response)) {
+        const cacheKey = shellCacheKey(url.pathname);
+        if (!url.search && cacheKey && canStoreResponse(response)) {
           // Storage quotas and private-mode cache failures are not network failures.
           try {
             const cache = await caches.open(CACHE_NAME);
-            await cache.put(url.pathname, response.clone());
+            await cache.put(cacheKey, response.clone());
           } catch {
             // Online navigation must succeed even when offline storage is unavailable.
           }
@@ -120,7 +129,8 @@ self.addEventListener("fetch", event => {
       } catch {
         // The shell is stored under pathname only. Client-side routes retain
         // their query parameters in the browser even while offline.
-        return (await caches.match(url.pathname)) || (await caches.match("/offline.html")) ||
+        return (await caches.match(shellCacheKey(url.pathname) || url.pathname)) ||
+          (await caches.match("/offline.html")) ||
           new Response("Sem conexão. Reconecte-se para abrir o Clash of Izzy.", {
             status: 503, headers: { "content-type": "text/plain; charset=utf-8" }
           });
@@ -133,14 +143,15 @@ self.addEventListener("fetch", event => {
   // at runtime, avoiding unbounded query variants and accidental private data.
   if (url.search || (!isShellPath(url.pathname) && !isRuntimeAsset(url.pathname))) return;
   event.respondWith((async () => {
-    const cached = await caches.match(url.pathname);
+    const cacheKey = shellCacheKey(url.pathname) || url.pathname;
+    const cached = await caches.match(cacheKey);
     if (cached) return cached;
     const response = await fetch(request);
     if (canStoreResponse(response)) {
       try {
         const runtime = isRuntimeAsset(url.pathname) && !isShellPath(url.pathname);
         const cache = await caches.open(runtime ? RUNTIME_CACHE_NAME : CACHE_NAME);
-        await cache.put(url.pathname, response.clone());
+        await cache.put(cacheKey, response.clone());
         if (runtime) await limitRuntimeCache(cache);
       } catch {
         // Cache errors must not block the successfully fetched static resource.
