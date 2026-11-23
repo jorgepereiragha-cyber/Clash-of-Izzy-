@@ -54,6 +54,16 @@ test("Worker rate-limits authentication and game endpoints without wildcard CORS
   const arena = await readFile(new URL("../arena.html", import.meta.url), "utf8");
   for (const scope of ["store-catalog-ip", "game-start-ip", "game-state-player", "game-action-player", "game-action-network", "admin-login-ip", "admin-login-account"]) assert.ok(worker.includes(scope), "missing rate-limit scope: " + scope);
   assert.ok(worker.includes('"Access-Control-Allow-Origin":"https://clash-of-izzy-portal.jorgepereiragha.workers.dev"'));
+  assert.ok(worker.includes('"game-resume-player",existingPlayerId,120,3600'),"authenticated resumes have their own player quota");
+  assert.ok(worker.includes('code:"GAME_SESSION_INVALID"'),"invalid Bearer must not create guest kingdom");
+  assert.ok(worker.includes('code:"GAME_REALM_MISSING"'),"valid Bearer without existing kingdom must fail closed");
+  assert.ok(worker.includes("if(!row)return null;"),"signed token of deleted player never authenticates");
+  assert.ok(worker.includes("if(version===null)return null;"));
+  const resumeIdx=worker.indexOf('const existingPlayerId=authorization?await gameIdentity(request,env):null;');
+  const guestLimitIdx=worker.indexOf('rateLimitDecision(env,"game-start-ip",ip,20,3600)',resumeIdx);
+  const playerLimitIdx=worker.indexOf('rateLimitDecision(env,"game-resume-player",existingPlayerId,120,3600)',resumeIdx);
+  assert.ok(resumeIdx>=0 && playerLimitIdx>resumeIdx && guestLimitIdx>playerLimitIdx,
+    "guest IP rate limit must run after verified kingdom resume path");
   assert.ok(!worker.includes('"Access-Control-Allow-Origin":"*"'));
   assert.doesNotMatch(worker, /Access-Control-Allow-Headers/);
   assert.ok(arena.includes("const API_BASE='/api'"));

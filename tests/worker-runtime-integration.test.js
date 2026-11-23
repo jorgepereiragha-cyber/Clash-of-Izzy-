@@ -219,6 +219,30 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(Array.isArray(started.state?.queues));
     }
     const tokenA = startA.token, tokenB = startB.token, tokenC = startC.token;
+    // A broken or revoked Bearer must never silently create an unrelated realm.
+    expectStatus(await api("/api/game/start", {
+      method:"POST", token:startA.token+".unsigned-extension", body:{}
+    }),401,"invalid saved session cannot found a new kingdom");
+    expectStatus(await api("/api/game/start", {
+      method:"POST",headers:{Authorization:"Basic invalid"},body:{}
+    }),401,"unsupported Authorization must not create a realm");
+    const unknownRealmClaims={sub:"izzy_"+"f".repeat(32),scope:"game",exp:Math.floor(Date.now()/1000)+3600};
+    const unknownRealmBody=Buffer.from(JSON.stringify(unknownRealmClaims)).toString("base64url");
+    const unknownRealmSig=createHmac("sha256",SESSION_SECRET).update(unknownRealmBody).digest("base64url");
+    expectStatus(await api("/api/game/start", {
+      method:"POST",token:unknownRealmBody+"."+unknownRealmSig,body:{}
+    }),401,"signed session of deleted player must be rejected");
+    // The player exists, but the realm row is missing; this is an integrity
+    // incident, not consent to found a new anonymous kingdom.
+    await runCli([
+      "--config","wrangler.jsonc","d1","execute","clash-of-izzy-db",
+      "--local","--persist-to",persistDir,
+      "--command","INSERT INTO players(player_id,name,gems) VALUES('izzy_"+"f".repeat(32)+"','Orphan test',0);"
+    ]);
+    expectStatus(await api("/api/game/start", {
+      method:"POST",token:unknownRealmBody+"."+unknownRealmSig,body:{}
+    }),404,"signed session of player without kingdom must not create another realm");
+
     // Signed tokens with suffixes used to be accepted because verify()
     // destructured the first two dot-separated components and ignored the rest.
     expectStatus(await api("/api/game/state", { token: startA.token + ".unsigned-extension" }), 401,
@@ -1108,6 +1132,27 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(renewedClaims.av, 7, "a versão do Google deve persistir no novo token");
       expectStatus(await api("/api/game/state", { token: resumed.token }), 200,
         "reino permanece autenticado após retomada Google-only");
+    });
+
+    await t.test("limite de criação por IP não bloqueia reentrada autenticada em rede compartilhada", async () => {
+      // Saturate the limiter using the running Worker. A second Wrangler
+      // process may not share Miniflare's live D1 state consistently.
+      // Invalid JSON arrays consume attempts without creating any players.
+      let rateLimited=false;
+      for(let attempt=0;attempt<21;attempt++){
+        const probe=await api("/api/game/start",{method:"POST",body:[]});
+        if(probe.status===429){rateLimited=true;break;}
+        expectStatus(probe,400,"sonda local de IP não cria conta");
+      }
+      assert.equal(rateLimited,true,"guest creation must hit the IP limit within 21 probes");
+      expectStatus(await api("/api/game/start",{method:"POST",body:{}}),429,
+        "new realm must remain blocked after shared-IP creation quota is exhausted");
+      const returned=expectStatus(await api("/api/game/start",{method:"POST",token:tokenA,body:{}}),200,
+        "token válido retoma reino, embora IP compartilhado tenha esgotado a cota");
+      assert.equal(returned.resumed,true);
+      assert.equal(returned.state.kingdom.id,kingdomA);
+      expectStatus(await api("/api/game/state",{token:returned.token}),200,
+        "token de retomada permanece válido após bloqueio IP de criação");
     });
 
     await t.test("todas as 40 ações previstas foram alcançadas no fluxo de integração", async () => {
