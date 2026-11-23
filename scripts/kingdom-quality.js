@@ -48,6 +48,20 @@ export function selectKingdomQualityProfile({
   });
 }
 
+
+// Ajusta o zoom da câmera ortográfica ao espaço CSS disponível.
+// O limite de ocupação preserva uma margem visível para prédios e seus rótulos.
+export function calculateKingdomFrameZoom({
+  viewWidth, viewHeight, sceneWidth, sceneHeight, occupancy = 0.84
+} = {}) {
+  const dimensions = [viewWidth, viewHeight, sceneWidth, sceneHeight].map(Number);
+  if (dimensions.some(value => !Number.isFinite(value) || value <= 0)) return 1;
+  const [width, height, contentWidth, contentHeight] = dimensions;
+  const requested = Number(occupancy);
+  const margin = Number.isFinite(requested) ? Math.max(0.65, Math.min(0.94, requested)) : 0.84;
+  return Math.min(1, (width * margin) / contentWidth, (height * margin) / contentHeight);
+}
+
 // Limita o buffer de desenho pelo número total de pixels, não só pelo DPR.
 export function calculateKingdomPixelRatio({ width, height, devicePixelRatio = 1, profile } = {}) {
   const safeWidth = Math.max(1, Number(width) || 1);
