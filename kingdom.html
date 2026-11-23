@@ -76,6 +76,16 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .city.has-3d .building strong{font-size:12px;text-shadow:0 2px 4px #000}
 .city.has-3d .building small{font-size:10px;text-shadow:0 2px 4px #000}
 .city.has-3d .building.castle{background:linear-gradient(180deg,#0c172500 34%,#142b44d9 100%);border:1px solid #ffe09a;box-shadow:inset 0 0 0 1px #f4d78e55,0 4px 12px #0007}
+.city .building[aria-pressed="true"]{outline:3px solid #ffe39a;outline-offset:2px;z-index:4}
+#coiCitySelection[hidden]{display:none!important}
+#coiCitySelection{position:fixed;z-index:25;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;width:min(94vw,470px);padding:10px 12px;border:1px solid #e3bc72;border-radius:12px;background:#132739f5;box-shadow:0 12px 32px #000b;color:#fff2d7}
+#coiCitySelection .coi-selection-copy{display:grid;gap:3px;min-width:0;flex:1}
+#coiCitySelection strong{font-size:14px}
+#coiCitySelection small{font-size:11px;line-height:1.25;color:#d6e3ee}
+#coiCitySelection button{min-height:48px;touch-action:manipulation}
+#coiCitySelectionDetails{min-width:112px}
+#coiCitySelectionClose{min-width:48px;font-size:21px}
+@media(max-width:760px){#coiCitySelection{bottom:calc(86px + env(safe-area-inset-bottom));gap:7px;padding:9px}#coiCitySelectionDetails{min-width:106px;font-size:12px}}
 @media(prefers-reduced-motion:no-preference){.city .building{transition:transform .18s ease,border-color .18s ease}.city .building:hover{transform:translateY(-3px) scale(1.025)}}
   .coi-castle-vip{margin-top:14px;background:linear-gradient(145deg,#13263b,#2c2940);border:1px solid #d1a958;border-radius:10px;padding:12px}
 .coi-castle-vip h3{margin:0 0 8px;color:#f1d38b;font-size:15px}
@@ -314,6 +324,11 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 </section>
 <div class="notice" style="margin-top:14px">O tempo e os recursos são processados pelo servidor. Fechar o jogo não interrompe a evolução do reino; ao retornar, o estado é sincronizado novamente.</div>
 </div></main>
+<div id="coiCitySelection" aria-label="Edifício selecionado" hidden>
+ <div class="coi-selection-copy" aria-live="polite"><strong id="coiCitySelectionName"></strong><small id="coiCitySelectionLevel"></small></div>
+ <button type="button" id="coiCitySelectionDetails" class="secondary">Ver melhorias</button>
+ <button type="button" id="coiCitySelectionClose" class="secondary" aria-label="Fechar seleção do edifício">×</button>
+</div>
 <div id="coiActionNotice" role="status" aria-live="polite" hidden></div>
 <script>
 const API="/api";let token=null,state=null,busy=false;let lastResourceSnapshot=null;
@@ -717,6 +732,32 @@ async function upgradeCastleVip(expectedVipLevel){
  }catch(error){setStatus(error.message||"Não foi possível evoluir o VIP.",true);}
  finally{busy=false;render();}
 }
+let selectedCityBuildingType = null;
+function selectCityBuilding(type){
+ const panel=document.getElementById("coiCitySelection");
+ const entry=state?.buildings?.find(building=>building.building_type===type);
+ if(!entry||!names[type]){
+  selectedCityBuildingType=null;
+  panel.hidden=true;
+  document.querySelectorAll("#city [data-building]").forEach(button=>button.setAttribute("aria-pressed","false"));
+  return;
+ }
+ selectedCityBuildingType=type;
+ const upgradeButton=[...document.querySelectorAll("#buildings [data-upgrade]")].find(button=>button.dataset.upgrade===type);
+ const [name]=names[type];
+ document.getElementById("coiCitySelectionName").textContent=name;
+ document.getElementById("coiCitySelectionLevel").textContent="Nível "+fmt(entry.level)+(upgradeButton?.disabled?" · Melhoria indisponível no momento":" · Ver progresso e melhorias");
+ panel.hidden=false;
+ document.querySelectorAll("#city [data-building]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.building===type)));
+}
+document.getElementById("coiCitySelectionClose").addEventListener("click",()=>selectCityBuilding(null));
+document.getElementById("coiCitySelectionDetails").addEventListener("click",()=>{
+ if(!selectedCityBuildingType)return;
+ const target=[...document.querySelectorAll("#buildings [data-upgrade]")].find(button=>button.dataset.upgrade===selectedCityBuildingType);
+ if(!target)return;
+ target.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
+ target.focus({preventScroll:true});
+});
 function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderCastleVip();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();
 const buildings=state.buildings||[];const city=document.getElementById("city");
 city.querySelectorAll(":scope > .building").forEach(button=>button.remove());
@@ -732,7 +773,8 @@ document.getElementById("researchButton").disabled=busy||(state.queues||[]).some
 const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Exército / capacidade",fmt(state.armyCount??total)+" / "+fmt(state.troopCapacity||500)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).map(e=>'<div class="event">'+esc(String(e.event_type||"Atividade").replaceAll("_"," "))+'</div>').join("")||'<div class="muted">Seu reino está começando sua história.</div>';
 renderPets();renderBattleReports();
-city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
+city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>selectCityBuilding(el.dataset.building)));
+if(selectedCityBuildingType)selectCityBuilding(selectedCityBuildingType);
 document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
 window.dispatchEvent(new CustomEvent("coi:command-state",{detail:{
  kingdom:{castle_level:k.castle_level,power:k.power},
