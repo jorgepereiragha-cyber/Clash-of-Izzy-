@@ -8,7 +8,9 @@ on:
 
 concurrency:
   group: clash-of-izzy-ci-${{ github.ref }}
-  cancel-in-progress: true
+  # Allow a running main push CI to finish even if newer commits arrive.
+  # Superseded PR revisions may still cancel to save runner time.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 jobs:
   quality:
