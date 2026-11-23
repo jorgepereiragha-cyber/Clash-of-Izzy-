@@ -383,7 +383,8 @@ test("the city ambient layer is loaded and respects Android power and lifecycle 
 
 
 test("WebGL shows 8/12/16 buildings by tier and Canvas keeps nine accessible slots", () => {
-  assert.equal(renderer.split("Math.min(16, qualityProfile?.maxBuildings || 9)").length - 1, 2);
+  // Projection, rendering and camera zoom must use the same 16-building tier cap.
+  assert.equal(renderer.split("Math.min(16, qualityProfile?.maxBuildings || 9)").length - 1, 3);
   assert.match(renderer, /const columns = latestBuildings\.length > 9 \? 4 : 3/);
   assert.match(kingdom, /buildings\.slice\(0,16\)\.map\(\(b,i\)=>/);
   assert.ok(kingdom.includes("i>=9?' hidden':''"));
