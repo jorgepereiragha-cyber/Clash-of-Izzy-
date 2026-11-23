@@ -103,9 +103,13 @@ import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } 
 import { initTextureManager, loadTexture, preloadTextures, getTexture, disposeTextures } from './engine/texture-manager.js';
 const API_BASE='/api';
 let kingdomSession=null;
+let kingdomConnectInFlight=false;
 async function connectKingdom(){
+ if(kingdomConnectInFlight)return;
+ kingdomConnectInFlight=true;
  const status=document.getElementById('kingdomStatus');
  const savedToken=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
+ status.textContent='🌐 Conectando ao reino…';
  try{
   let response;
   if(savedToken){
@@ -113,7 +117,9 @@ async function connectKingdom(){
    if(!response.ok){
     const errorData=await response.json().catch(()=>({}));
     const reason=errorData.error||'Não foi possível validar a sessão do reino.';
-    throw new Error(reason+' Seu acesso foi preservado; tente novamente antes de criar outro reino.');
+    const authError=new Error(reason+' Seu acesso foi preservado; tente novamente antes de criar outro reino.');
+    authError.status=response.status;
+    throw authError;
    }
   }else{
    response=await fetch(API_BASE+'/game/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
@@ -133,9 +139,23 @@ async function connectKingdom(){
   renderKingdomStore();
   renderChronicle();
  }catch(error){
-  status.textContent='⚠️ Reino não conectado · '+error.message;
+  status.replaceChildren(document.createTextNode('⚠️ Reino não conectado · '+(error.message||'Servidor indisponível')+' '));
+  const retry=document.createElement('button');
+  retry.type='button';
+  retry.className='secondary';
+  retry.id='retryArenaKingdom';
+  retry.textContent='Tentar novamente';
+  retry.addEventListener('click',()=>{retry.disabled=true;void connectKingdom();});
+  status.append(retry);
+  if(error.status===401||error.status===403){
+   const recover=document.createElement('a');
+   recover.href='/account.html';
+   recover.className='linkbtn secondary';
+   recover.textContent='Acessar minha conta';
+   status.append(document.createTextNode(' '),recover);
+  }
   console.warn('Clash of Izzy: falha ao conectar ao reino:',error);
- }
+ }finally{kingdomConnectInFlight=false;}
 }
 
 function renderChronicle(){
