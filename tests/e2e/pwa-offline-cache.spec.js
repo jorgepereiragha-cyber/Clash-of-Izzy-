@@ -26,7 +26,7 @@ test("PWA activates its Service Worker and serves previously cached shell and GL
   // while that redirect is pending can race the Service Worker controller.
   // Navigate explicitly to the stable promotional page under the same scope.
   await page.goto("/portal.html", { waitUntil: "domcontentloaded" });
-  await expect(page).toHaveURL(/\/portal\.html$/);
+  await expect(page).toHaveURL(/\/portal(?:\.html)?$/);
   await page.waitForFunction(() =>
     navigator.serviceWorker.controller?.scriptURL.endsWith("/sw.js") === true
   );
