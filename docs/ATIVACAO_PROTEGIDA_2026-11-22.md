@@ -19,6 +19,12 @@
 4. Só então executar [Deploy Worker-only](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/deploy-worker-only.yml) na `main` com aprovações; não executar `deploy-cloudflare.yml` como atalho. Revalidar saúde 200, autenticação e recuperação de sessão, conta Master protegida, stats e navegação.
 5. Testar instalação real em Android e acesso ao reino. **O workflow oficial `publicar-apk-android.yml` ainda exige catálogo e pagamentos habilitados.** O fluxo gratuito alternativo da PR #258 permanece draft; não afirmar que o APK gratuito já pode ser lançado com o workflow comercial atual.
 
+## Proteção operacional do GitHub
+
+- A API do GitHub informou `protected=false` para a branch `main` nesta auditoria. Antes de executar mudanças sensíveis, configurar **branch protection ou ruleset** com CI obrigatória e revisão dos PRs, conforme permissões da conta.
+- Confirmar em `Settings > Environments > production` se existem **required reviewers**; apenas declarar `environment: production` no YAML não comprova que a aprovação humana está configurada.
+- Não usar este documento para contornar aprovações. Se as regras não puderem ser habilitadas, adiar a intervenção de produção e registrar a exceção formalmente.
+
 ## Segurança do D1
 
 - `d1_migrations` é um histórico de aplicação e não deve ser alterado manualmente para 'resolver' erros. Se o schema divergir do ledger, bloquear a operação e investigar todas as tabelas, índices, constraints e a execução parcial com administrador responsável.
