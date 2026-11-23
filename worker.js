@@ -35,6 +35,7 @@ import { CASTLE_MAX_LEVEL, CASTLE_VIP_MAX_LEVEL, getCastleVipBonuses, getCastleV
 import { handleDailyReward } from "./daily-rewards.js";
 import { handleOnboarding } from "./onboarding-bonus.js";
 import { createSupportCheckout } from "./support-orders.js";
+import { mercadoPagoNewCheckoutEnabled } from "./payment-activation.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -2051,7 +2052,7 @@ export default {
     const auth=request.headers.get("Authorization")||"",token=auth.startsWith("Bearer ")?auth.slice(7):"";
     const payload=env.SESSION_SECRET?await verify(token,env.SESSION_SECRET):false;
     if(!payload||payload.scope!=="admin"||payload.sub!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
-    return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET),hasMP_ACCESS_TOKEN:Boolean(env.MP_ACCESS_TOKEN),hasMP_WEBHOOK_SECRET:Boolean(env.MP_WEBHOOK_SECRET),hasMercadoPagoAutomaticCheckout:Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),hasEmailProvider:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.FRONTEND_URL),hasResendApiKey:Boolean(env.RESEND_API_KEY),hasEmailFrom:Boolean(env.EMAIL_FROM),hasFrontendUrl:Boolean(env.FRONTEND_URL)});
+    return json({hasDB:Boolean(env.DB),hasADMIN_EMAIL:Boolean(env.ADMIN_EMAIL),hasADMIN_PASSWORD:Boolean(env.ADMIN_PASSWORD),hasSESSION_SECRET:Boolean(env.SESSION_SECRET),hasMP_ACCESS_TOKEN:Boolean(env.MP_ACCESS_TOKEN),hasMP_WEBHOOK_SECRET:Boolean(env.MP_WEBHOOK_SECRET),hasMercadoPagoAutomaticCheckout:mercadoPagoNewCheckoutEnabled(env),hasEmailProvider:Boolean(env.RESEND_API_KEY&&env.EMAIL_FROM&&env.FRONTEND_URL),hasResendApiKey:Boolean(env.RESEND_API_KEY),hasEmailFrom:Boolean(env.EMAIL_FROM),hasFrontendUrl:Boolean(env.FRONTEND_URL)});
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
@@ -2233,7 +2234,7 @@ export default {
       return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
-  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),nubankPix:nubankPixReady(env)});
+  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:mercadoPagoNewCheckoutEnabled(env),nubankPix:nubankPixReady(env)});
   if(url.pathname==="/api/store/pix-instructions"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);
@@ -2263,7 +2264,7 @@ export default {
     const requestedPaymentMethod=String(body.paymentMethod||"mercadopago_link");
     if(!["mercadopago_link","manual_whatsapp","pix"].includes(requestedPaymentMethod))return json({error:"Método de pagamento inválido."},400);
     if(requestedPaymentMethod==="pix" && !nubankPixReady(env))return json({error:"O Pix Nubank ainda não está habilitado para pedidos.",code:"NUBANK_PIX_NOT_CONFIGURED"},503);
-    if(requestedPaymentMethod==="mercadopago_link"&&(!env.MP_ACCESS_TOKEN||!env.MP_WEBHOOK_SECRET))return json({error:"O checkout Mercado Pago ainda não está habilitado para pedidos.",code:"MP_NOT_CONFIGURED"},503);
+    if(requestedPaymentMethod==="mercadopago_link"&&!mercadoPagoNewCheckoutEnabled(env))return json({error:"O checkout Mercado Pago ainda não está habilitado para pedidos.",code:"MP_NOT_CONFIGURED"},503);
     const paymentMethod=requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":requestedPaymentMethod==="pix"?"pix":"manual";
     const paymentReference=null;
     const player=await env.DB.prepare("SELECT id,name,player_id FROM players WHERE player_id=?").bind(playerId).first();
