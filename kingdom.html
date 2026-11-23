@@ -57,6 +57,10 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .city.has-3d .building{position:absolute;left:50%;top:50%;width:clamp(76px,22%,112px);height:56px;min-height:44px;transform:translate(-50%,-18%);background:linear-gradient(180deg,#0c172500 38%,#0c1725bd 100%);backdrop-filter:none;border-color:#e7bd6866;box-shadow:0 3px 10px #07150e55;justify-content:end;padding:5px 4px 8px;z-index:2}
 .city.has-3d .building:hover{transform:translate(-50%,-18%) translateY(-2px) scale(1.02)}
 .city .building[hidden]{display:none!important}
+.coi-city-camera-controls[hidden]{display:none!important}
+.coi-city-camera-controls{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 12px}
+.coi-city-camera-controls button{min-width:48px;min-height:48px;font-size:18px;touch-action:manipulation}
+.coi-city-camera-controls .coi-camera-reset{min-width:100px;font-size:12px}
 .city.has-3d.dense-3d .building{width:clamp(48px,13%,76px);height:44px;min-height:44px;padding:4px 2px 6px}
 .city.has-3d.dense-3d .building strong{font-size:10px}
 .city.has-3d.dense-3d .building small{font-size:9px}
@@ -142,6 +146,11 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <div class="coi-city-stage-label" aria-hidden="true"><span>ELDORIA</span><small>CENTRO DO REINO</small></div>
   <div class="city" id="city"></div>
   <div class="coi-city-stage-corner" aria-hidden="true">Toque em um edifício para ver melhorias</div>
+ </div>
+ <div class="coi-city-camera-controls" id="coiCityCameraControls" role="group" aria-label="Aproximação da cidade 3D" hidden>
+  <button type="button" class="secondary" data-city-zoom="out" aria-label="Afastar câmera da cidade">−</button>
+  <button type="button" class="secondary coi-camera-reset" data-city-zoom="reset" aria-label="Restaurar enquadramento da cidade">Centralizar</button>
+  <button type="button" class="secondary" data-city-zoom="in" aria-label="Aproximar câmera da cidade">+</button>
  </div>
  <nav id="coiRecruitmentSites" class="coi-recruitment-sites" aria-label="Locais de recrutamento da cidade">
   <a id="coiSummonAltar" class="coi-recruitment-site coi-site-altar" href="/equipment-ui.html#hero-summon-title" aria-label="Entrar no Altar de Convocação e convocar heróis">
@@ -501,6 +510,15 @@ function watchKingdomScene(){
  if("ResizeObserver" in window){kingdomResizeObserver=new ResizeObserver(()=>drawKingdomScene(state?.buildings||[],Number(state?.kingdom?.equipped_skin_id||0)));kingdomResizeObserver.observe(host);}
  else{kingdomResizeHandler=()=>drawKingdomScene(state?.buildings||[],Number(state?.kingdom?.equipped_skin_id||0));window.addEventListener("resize",kingdomResizeHandler,{passive:true});}
 }
+const cityCameraControls=document.getElementById("coiCityCameraControls");
+cityCameraControls?.querySelectorAll("[data-city-zoom]").forEach(button=>{
+ button.addEventListener("click",()=>{
+  window.dispatchEvent(new CustomEvent("coi:kingdom-zoom",{detail:{action:button.dataset.cityZoom}}));
+ });
+});
+window.addEventListener("coi:kingdom-3d-ready",()=>{
+ if(cityCameraControls)cityCameraControls.hidden=false;
+});
 window.addEventListener("coi:kingdom-projection",event=>{
  const city=document.getElementById("city");if(!city)return;
  const positions=Array.isArray(event.detail?.positions)?event.detail.positions:[];
@@ -514,6 +532,7 @@ window.addEventListener("coi:kingdom-projection",event=>{
  });
 });
 window.addEventListener("coi:kingdom-2d-fallback",()=>{
+ if(cityCameraControls)cityCameraControls.hidden=true;
  const city=document.getElementById("city");if(!city)return;
  city.classList.remove("dense-3d");
  city.querySelectorAll("[data-building]").forEach((button,index)=>{
