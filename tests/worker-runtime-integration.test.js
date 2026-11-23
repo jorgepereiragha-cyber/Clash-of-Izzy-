@@ -231,7 +231,17 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     const unknownRealmSig=createHmac("sha256",SESSION_SECRET).update(unknownRealmBody).digest("base64url");
     expectStatus(await api("/api/game/start", {
       method:"POST",token:unknownRealmBody+"."+unknownRealmSig,body:{}
-    }),404,"signed session of missing realm cannot silently create a different realm");
+    }),401,"signed session of deleted player must be rejected");
+    // The player exists, but the realm row is missing; this is an integrity
+    // incident, not consent to found a new anonymous kingdom.
+    await runCli([
+      "--config","wrangler.jsonc","d1","execute","clash-of-izzy-db",
+      "--local","--persist-to",persistDir,
+      "--command","INSERT INTO players(player_id,name,gems) VALUES('izzy_"+"f".repeat(32)+"','Orphan test',0);"
+    ]);
+    expectStatus(await api("/api/game/start", {
+      method:"POST",token:unknownRealmBody+"."+unknownRealmSig,body:{}
+    }),404,"signed session of player without kingdom must not create another realm");
 
     // Signed tokens with suffixes used to be accepted because verify()
     // destructured the first two dot-separated components and ignored the rest.
