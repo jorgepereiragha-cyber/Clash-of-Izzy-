@@ -322,10 +322,10 @@ function readKingdomGameToken(){
  if(!readable)throw new Error("O navegador bloqueou o armazenamento da sessão. Autorize este site e tente novamente.");
  return "";
 }
-function saveKingdomGameToken(value){
+function saveKingdomGameToken(token){
  let saved=false;
- try{localStorage.setItem("coi_game_token",value);saved=true;}catch{}
- try{sessionStorage.setItem("coi_game_token",value);saved=true;}catch{}
+ try{localStorage.setItem("coi_game_token",token);saved=true;}catch{}
+ try{sessionStorage.setItem("coi_game_token",token);saved=true;}catch{}
  return saved;
 }
 let coiActionNoticeTimer = 0;
