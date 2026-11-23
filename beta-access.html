@@ -39,6 +39,7 @@ button:disabled{opacity:.65;cursor:wait}#status{min-height:26px;font-weight:600}
 <button type="button" id="logout">Encerrar sessão beta</button>
 </section>
 <p id="status" role="status" aria-live="polite"></p>
+<p id="server-status" role="status" aria-live="polite"><small>Consultando disponibilidade do servidor beta...</small></p>
 <small>O acesso é limitado. O beta não aceita pagamentos reais nesta fase.</small>
 </main>
 <script>
@@ -47,6 +48,15 @@ const activeSession=document.getElementById("active-session"),logout=document.ge
 function setSession(active){form.hidden=active;activeSession.hidden=!active;}
 fetch("/api/beta/access/status",{cache:"no-store",credentials:"same-origin"})
   .then(response=>{if(response.ok)setSession(true);}).catch(()=>{});
+const serverStatus=document.getElementById("server-status");
+fetch("/api/health",{cache:"no-store",credentials:"same-origin"})
+  .then(async response=>{
+    const health=await response.json().catch(()=>null);
+    serverStatus.textContent=response.ok&&health?.status==="ready"&&health?.checks?.database===true
+      ?"Servidor beta disponível para testes."
+      :"Servidor beta ainda não está pronto. Verifique a configuração do banco e tente novamente.";
+  })
+  .catch(()=>{serverStatus.textContent="Não foi possível verificar o servidor. Confira a conexão e tente novamente.";});
 logout.addEventListener("click",async()=>{
   logout.disabled=true;status.textContent="Encerrando sessão...";
   try{
@@ -67,7 +77,16 @@ form.addEventListener("submit",async e=>{
       method:"POST",headers:{"Content-Type":"application/json"},credentials:"same-origin",
       body:JSON.stringify({code:document.getElementById("code").value})
     });
-    if(!res.ok){status.textContent=res.status===429?"Muitas tentativas. Tente novamente mais tarde.":"Convite inválido, expirado ou indisponível.";return;}
+    if(!res.ok){
+      status.textContent=res.status===429
+        ?"Muitas tentativas. Tente novamente mais tarde."
+        :res.status===503
+          ?"Servidor beta temporariamente indisponível ou banco incompleto. O acesso não foi autorizado."
+          :res.status===403
+            ?"Convite inválido, expirado ou indisponível."
+            :"Não foi possível validar o convite (HTTP "+res.status+"). Tente novamente.";
+      return;
+    }
     window.location.replace("/kingdom.html");
   }catch{status.textContent="Sem conexão. Verifique a internet e tente novamente."}
   finally{button.disabled=false}
