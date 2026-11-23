@@ -219,6 +219,14 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(Array.isArray(started.state?.queues));
     }
     const tokenA = startA.token, tokenB = startB.token, tokenC = startC.token;
+    // Signed tokens with suffixes used to be accepted because verify()
+    // destructured the first two dot-separated components and ignored the rest.
+    expectStatus(await api("/api/game/state", { token: startA.token + ".unsigned-extension" }), 401,
+      "token HMAC with extra unsigned segment must not authenticate");
+    expectStatus(await api("/api/game/state", { token: startA.token + "." }), 401,
+      "token HMAC with trailing dot must not authenticate");
+    expectStatus(await api("/api/game/state", { token: startA.token.replace(".", "..") }), 401,
+      "token HMAC with empty segment must not authenticate");
     expectStatus(await api("/api/admin/health", { token: tokenA }), 401, "token de jogador não acessa health Master");
     let stateA = startA.state;
     const kingdomA = Number(stateA.kingdom.id);
