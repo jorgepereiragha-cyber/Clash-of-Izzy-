@@ -103,8 +103,12 @@ test("successful Angel of Death attack refreshes authoritative scores despite th
     "every refresh has a monotonically increasing generation");
   assert.ok(client.includes("if(generation!==refreshGeneration)return;state="),
     "a slow pre-attack state response cannot overwrite fresher post-attack data");
-  assert.match(client, /message\("Dano: "[\s\S]*?await refresh\(true\);\s*\}catch\(error\)/,
+  assert.match(client, /const resultMessage="Dano: "[\s\S]*?const refreshed=await refresh\(true\);[\s\S]*?\}catch\(error\)/,
     "after a confirmed attack, force server-state reconciliation before releasing the lock");
+  assert.ok(client.includes("loadValhallaEventConfig().catch(()=>valhallaConfig)"),
+    "an optional event catalog failure must not suppress the authoritative fight scoreboard");
+  assert.ok(client.includes('if(!refreshed)message(resultMessage+'),
+    "a confirmed attack must not look unprocessed when only post-attack refresh fails");
   assert.ok(client.includes("finally{busy=false;updateAttackButton();}"),
     "the mutation lock is always released, including after a failed refresh");
 });
