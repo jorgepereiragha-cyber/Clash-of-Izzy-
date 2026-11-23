@@ -68,11 +68,12 @@
   }
 
   function getGameToken() {
-    try {
-      return localStorage.getItem("coi_game_token") || sessionStorage.getItem("coi_game_token") || "";
-    } catch {
-      return "";
+    // A blocked localStorage must not hide an existing session in sessionStorage.
+    for (const store of [() => window.localStorage, () => window.sessionStorage]) {
+      try { const token = store().getItem("coi_game_token"); if (token) return token; }
+      catch {}
     }
+    return "";
   }
 
   const normalizeSearch = value => String(value||"").normalize("NFKD").replace(/[\p{M}]/gu,"").toLocaleLowerCase("pt-BR");
