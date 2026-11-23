@@ -9,9 +9,20 @@ export function assertCatalogReady(catalog) {
     const matches=catalog.packages.filter(p=>p && p.name===expected.name);
     if (matches.length!==1) {errors.push(expected.name+": expected exactly one offer");continue;}
     const item=matches[0];
-    const amount=Number(item.price_brl);
-    if (!Number.isFinite(amount) || Math.round(amount*100)!==expected.priceCents ||
-        Number(item.gems)!==expected.gems) errors.push(expected.name+": price/gems mismatch");
+    // Reject fractional cents and coercion of null/booleans/exponents to monetary values.
+    // Accept ordinary decimal strings because D1/API serialization may return numbers as text.
+    const priceText=typeof item.price_brl==="number" || typeof item.price_brl==="string"
+      ? String(item.price_brl) : "";
+    const priceValid=/^(?:0|[1-9]\\d*)(?:\\.\\d{1,2})?$/.test(priceText);
+    const amount=Number(priceText);
+    const gemsText=typeof item.gems==="number" || typeof item.gems==="string"
+      ? String(item.gems) : "";
+    const gemsValid=/^(?:0|[1-9]\\d*)$/.test(gemsText);
+    if (!priceValid || !Number.isSafeInteger(Math.round(amount*100)) ||
+        Math.round(amount*100)!==expected.priceCents ||
+        !gemsValid || !Number.isSafeInteger(Number(gemsText)) ||
+        Number(gemsText)!==expected.gems)
+      errors.push(expected.name+": price/gems mismatch");
     if (expected.daily && Number(item.dailyLimitHours)!==24)
       errors.push(expected.name+": daily limit mismatch");
     if (expected.master && (item.oneTime!==true || !item.bonus))
