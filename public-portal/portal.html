@@ -74,6 +74,7 @@ h1 .golden{display:block;color:#f6c96c;text-shadow:0 1px 0 #ffe9b0,0 5px 18px #0
   color:#16120c;font-size:16px;font-weight:900;text-decoration:none;text-align:center;
   box-shadow:inset 0 1px 0 #fff9,0 15px 35px #0008;transition:transform .18s,filter .18s
 }
+.download#play-browser{min-height:64px;border-width:3px;border-color:#ffedbe;box-shadow:inset 0 1px 0 #fffa,0 0 0 4px #f6c76b24,0 18px 39px #000a}
 .download[href]:hover{transform:translateY(-2px);filter:brightness(1.07)}
 .download:focus-visible,a:focus-visible{outline:3px solid white;outline-offset:4px}
 .download[aria-disabled="true"]{background:linear-gradient(#283d59,#19283e);color:#d2dfef;border-color:#6c819d;cursor:not-allowed;box-shadow:none}
@@ -101,6 +102,7 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
   .royal-titleline{justify-content:center}
   .lead{margin-inline:auto}
   .royal-features,.actions{justify-content:center;align-items:center}
+  .download#play-browser{width:100%}
   .grid{grid-template-columns:1fr}
 }
 @media(max-width:420px){
@@ -126,6 +128,10 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
 .launch-support{max-width:960px;margin:0 auto 30px;padding:26px 28px;border:1px solid #cda15e;border-radius:16px;background:linear-gradient(140deg,#153763,#0b1930)}
 .launch-support h2{color:#ffda91;font:700 27px Georgia,serif;margin:0 0 10px}
 .launch-support .cta{display:inline-flex;align-items:center;justify-content:center;min-height:50px;padding:12px 20px;border:1px solid #ffe4af;border-radius:10px;background:#edc078;color:#16141a;font-weight:850;text-decoration:none}
+.support-paths{display:flex;flex-wrap:wrap;align-items:stretch;gap:10px;margin:14px 0 10px}
+.support-paths a{display:inline-flex;min-height:46px;align-items:center;justify-content:center;border:1px solid #b8cce2;border-radius:9px;background:#183b60;color:#fff0cf;padding:9px 13px;text-decoration:none;font-weight:750}
+.support-paths a:focus-visible{outline:3px solid white;outline-offset:3px}
+.support-paths a:hover{background:#23557c}
 .launch-support .goal{margin:16px 0}.launch-support .goal label{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
 .launch-support .goal progress{width:100%;height:16px;accent-color:#e5b45b}
 .launch-support p,.launch-support small{color:#dbe4f4}
@@ -149,8 +155,8 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
 <p class="lead">Seu reino. Seu legado. Construa um castelo, convoque heróis e lidere alianças em um mundo de disputas e conquistas.</p>
 <div class="royal-features" aria-label="Destaques do jogo"><span>Castelos e reinos</span><span>Heróis e dragões</span><span>Alianças e batalhas</span></div>
 <div class="actions">
-<a class="download" id="play-browser" href="https://clash-of-izzy.jorgepereiragha.workers.dev/kingdom.html">Jogar no navegador</a>
-<p class="play-note">Acesso web ao reino, com conexão à internet. Alguns recursos ainda estão em homologação.</p>
+<a class="download" id="play-browser" href="https://clash-of-izzy.jorgepereiragha.workers.dev/kingdom.html" aria-describedby="play-browser-note">Jogar no navegador</a>
+<p class="play-note" id="play-browser-note">Sem instalar APK: entre no reino pelo navegador com conexão à internet. Alguns recursos ainda estão em homologação.</p>
 <a class="download" id="download-apk" aria-disabled="true" tabindex="-1">Baixar aplicativo Android (APK)</a>
 <p class="status" id="download-status" role="status" aria-live="polite">Verificando se existe uma versão oficial assinada disponível para download…</p>
 <a class="hash" id="checksum-link" hidden>Verificar arquivo SHA-256 da versão</a>
@@ -180,10 +186,14 @@ footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
   <p>Você pode ajudar a financiar a estabilidade do servidor, novos eventos e melhorias na arte do Clash of Izzy. Os pagamentos são opcionais, realizados somente pelo sistema oficial e associados ao seu reino.</p>
   <div class="goal"><label for="support-goal"><strong>Meta de infraestrutura</strong><span id="support-amount">Aguardando arrecadação verificada…</span></label><progress id="support-goal" value="0" max="2000"></progress></div>
   <a class="cta" href="/apoie.html">Conhecer os pacotes de apoio</a>
-  <p><small>Pacotes disponíveis após habilitação dos meios de pagamento e confirmação do servidor. Nenhum valor ou número de jogadores é inventado.</small></p>
+  <div class="support-paths" aria-label="Modalidades de apoio">
+    <a href="/apoie.html#pacotes">Pacotes pagos com gemas</a>
+    <a href="/apoie.html#contribuicao">Contribuição voluntária sem gemas</a>
+  </div>
+  <p><small>São modalidades distintas: pacotes concedem somente as gemas anunciadas após pagamento confirmado; contribuição voluntária não concede itens ou gemas. Compras dependem da homologação e liberação dos meios de pagamento.</small></p>
   <details><summary>O jogo é gratuito?</summary><p>O projeto oferece acesso básico gratuito. Pacotes de apoio são opcionais.</p></details>
   <details><summary>Quando posso instalar?</summary><p>Assim que o APK Android oficial assinado e seu arquivo de verificação forem publicados na seção de versões oficiais.</p></details>
-  <details><summary>Como funcionam os pagamentos?</summary><p>Os pacotes com gemas só são entregues após verificação do pagamento aprovado pelo servidor. Pix manual exige conciliação real no extrato.</p></details>
+  <details><summary>Como funcionam os pagamentos?</summary><p>Pacotes com gemas são compras com recompensa especificada e só são entregues após pagamento confirmado pelo servidor. Contribuições voluntárias não dão recompensas. Pix, quando habilitado, exige conferência manual do extrato.</p></details>
   <p id="launch-stats-status" class="status" role="status" aria-live="polite">Conferindo dados públicos verificados…</p>
 </section>
 <section class="instructions" aria-labelledby="install-title">
