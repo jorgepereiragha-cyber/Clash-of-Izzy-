@@ -24,6 +24,8 @@ test("reconexão de alianças mostra ação de retry e link de conta sem apagar 
   const html = await readFile(new URL("../alliance.html", import.meta.url), "utf8");
   assert.ok(html.includes('error.status=res.status'), "preserve HTTP status for session recovery");
   assert.ok(html.includes('retryAllianceConnection'), "retry button available after API errors");
+  assert.ok(html.includes('const synchronized=await load(false);if(synchronized)status("Aliança sincronizada.");'), "do not show success after failed state refresh");
+  assert.ok(html.includes('status("● Conectado ao reino");return true;'));
   assert.ok(html.includes('retry.addEventListener("click",()=>{retry.disabled=true;void load(false)})'));
   assert.ok(html.includes('if(e.status===401||e.status===403)'), "account link only for authentication errors");
   assert.ok(html.includes('link.href="/account.html"'));
