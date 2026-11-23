@@ -44,6 +44,7 @@ realm-progression.js
 throne-war.js
 march-capacity.js
 march-slots.js
+march-scheduler-policy.js
 valhalla-admin.js
 valhalla-config.js
 valhalla-rewards.js
