@@ -2048,7 +2048,17 @@ export default {
     return await env.ELDORIA_ROOM.get(roomId).fetch(new Request(request,{headers}));
   }
   if(url.pathname==="/api/email/verify"&&request.method==="GET")return await verifyEmailToken(env,url.searchParams.get("token"));
-  if(!url.pathname.startsWith("/api/"))return env.ASSETS.fetch(request);
+  if(!url.pathname.startsWith("/api/")){
+    const asset=await env.ASSETS.fetch(request);
+    if(env.ENVIRONMENT!=="beta")return asset;
+    // Prevent caching protected beta pages in browsers and shared proxies.
+    const headers=new Headers(asset.headers);
+    headers.set("Cache-Control","private, no-store");
+    headers.set("Referrer-Policy","no-referrer");
+    headers.set("X-Content-Type-Options","nosniff");
+    headers.set("X-Frame-Options","DENY");
+    return new Response(asset.body,{status:asset.status,statusText:asset.statusText,headers});
+  }
   if(url.pathname==="/api/admin/health"){
     if(request.method!=="GET")return json({error:"Método não permitido."},405);
     const auth=request.headers.get("Authorization")||"",token=auth.startsWith("Bearer ")?auth.slice(7):"";
