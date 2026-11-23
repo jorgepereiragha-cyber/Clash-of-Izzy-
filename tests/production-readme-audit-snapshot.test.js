@@ -10,7 +10,9 @@ test("README production snapshot distinguishes live health from failed post-depl
   assert.match(readme, /45121845533/);
   assert.match(readme, /fetch failed/);
   assert.match(readme, /prova final dos hashes foi ignorada/);
-  assert.match(readme, /não comprova disponibilidade global/);
+  // Equivalent negative wording must remain acceptable; the invariant is that
+  // the independent GET does not certify global availability.
+  assert.match(readme, /(?:não|nem) comprova disponibilidade global/);
 });
 
 test("README does not present an internal Android candidate as an official release", () => {
