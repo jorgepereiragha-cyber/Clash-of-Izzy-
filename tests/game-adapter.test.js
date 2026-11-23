@@ -65,6 +65,9 @@ test("arena oferece retry e recuperação de sessão após falha sem criar outro
   const connect=arena.slice(arena.indexOf("async function connectKingdom()"),arena.indexOf("\nfunction renderChronicle()"));
   assert.ok(connect.includes("kingdomConnectInFlight"),"guard against duplicate reconnect requests");
   assert.ok(connect.includes("retryArenaKingdom"),"show retry after connection failure");
+  assert.ok(connect.includes("if(savedToken){"),"guest creation never auto-retries after an ambiguous failed response");
+  assert.ok(connect.includes("if(!savedToken||error.status===401||error.status===403)"),
+    "guest failures and auth errors offer account recovery");
   assert.ok(connect.includes("void connectKingdom();"),"retry the existing connection flow");
   assert.ok(connect.includes("authError.status=response.status"),"remember HTTP error for recovery");
   assert.ok(connect.includes("if(error.status===401||error.status===403)"),"offer account recovery on unauthorized");
