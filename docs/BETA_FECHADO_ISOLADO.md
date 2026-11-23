@@ -32,6 +32,20 @@ Antes de acionar:
 
 Este workflow não aplica migrações, não configura secrets do Worker beta, não cria convites, não faz deploy e não altera D1s anteriores. Se o nome `clash-of-izzy-beta-db` já existir, a auditoria apenas informa seu UUID; o modo de criação recusa duplicatas. Configurar a branch `beta` e as credenciais beta continua sendo uma etapa distinta.
 
+## Workflow protegido de publicacao remota do beta (adicionado em 23/11/2026)
+
+O workflow [Beta isolado - implantar D1 e Worker (manual e protegido)](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/launch-isolated-beta.yml) vive na `main` apenas para permitir o disparo manual confiavel do GitHub Actions. Seu alvo de publicacao e **exclusivamente** o codigo fixado no SHA da branch `beta` e o Worker `clash-of-izzy-beta`; nao publica o Worker oficial.
+
+**Nao acionar enquanto o D1 beta tiver UUID placeholder.** Primeiro complete a auditoria/criacao do D1 por `provision-beta-d1.yml` e vincule o UUID a `wrangler.beta.jsonc` apenas na branch `beta`. A CI desse commit deve estar verde. Depois configure no ambiente GitHub `beta-infrastructure` os seguintes secrets distintos:
+- `CLOUDFLARE_ACCOUNT_ID`: conta onde reside o D1 beta (ja esperado pelo workflow de auditoria).
+- `CLOUDFLARE_BETA_D1_TOKEN`: token para consultar e migrar D1 somente no fluxo protegido; nunca reutilizar segredo de producao.
+- `CLOUDFLARE_BETA_WORKER_TOKEN`: token separado com permissoes adequadas para criar/implantar **somente** o Worker beta, sem rotas da producao.
+- `CLOUDFLARE_BETA_SESSION_SECRET`: segredo aleatorio independente com pelo menos 32 caracteres; nao colocar no codigo, no chat nem em `vars`.
+
+Acione na branch `main` e forneca o `beta_sha` **completo**, o `beta_d1_uuid` exclusivo e marque **as duas** confirmacoes `confirm_beta_only` e `confirm_beta_migrations`. O workflow recusa SHA desatualizado, CI sem sucesso, nome/UUID remotos divergentes, pagamentos ligados, D1 oficial/Preview, cron inesperado e qualquer segredo essencial ausente. Os testes locais e o dry-run rodam antes de receber credenciais remotas. Somente apos verificacao remota do UUID ele aplica as migrations no novo D1, implanta o Worker beta, instala `SESSION_SECRET` e faz smoke HTTP de `/api/health`, `/beta-access.html` e rotas privadas sem convite.
+
+Um workflow verde **nao** fornece convites de teste automaticamente nem homologa Google, dispositivos, cron remoto ou APK. Se falhar apos alguma etapa remota, auditar o estado do D1/Worker beta antes de repetir a execucao; nao modificar os ambientes oficiais para corrigir o beta.
+
 ## Operações manuais (somente após revisão e CI)
 
 1. Criar **terceiro** D1 no Cloudflare: `npx wrangler d1 create clash-of-izzy-beta-db`. Guardar o novo ID retornado e verificar que não coincide com produção nem Preview.
