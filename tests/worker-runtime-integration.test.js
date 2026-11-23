@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHmac } from "node:crypto";
 import { spawn } from "node:child_process";
 import net from "node:net";
 import os from "node:os";
@@ -1030,6 +1031,37 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(last.kingdom.castle_level,30);
     });
     
+    await t.test("retomada Google-only preserva versão de sessão e acesso ao reino", async () => {
+      // This synthetic local account has no password record, only a Google link.
+      // No real Google identity is used; verify the exact Worker token contract.
+      const created = expectStatus(await api("/api/game/start", {
+        method: "POST", body: {}
+      }), 201, "reino Google-only sintético");
+      const googleOnlyId = String(created.state.player.player_id);
+      assert.match(googleOnlyId, /^izzy_[a-f0-9]{32}$/);
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command",
+        "INSERT INTO google_account_links(player_id,google_sub,session_version) " +
+        "SELECT id,'google-only-local-test-12345',7 FROM players WHERE player_id='" + googleOnlyId + "';"
+      ]);
+      const payload = { sub: googleOnlyId, scope: "game", av: 7, exp: Math.floor(Date.now()/1000)+3600 };
+      const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
+      const sig = createHmac("sha256", SESSION_SECRET).update(body).digest("base64url");
+      const googleToken = body + "." + sig;
+      expectStatus(await api("/api/game/state", { token: googleToken }), 200, "token Google-only antes de retomar");
+      const resumed = expectStatus(await api("/api/game/start", {
+        method: "POST", token: googleToken, body: {}
+      }), 200, "renovação do token Google-only");
+      assert.equal(resumed.resumed, true);
+      assert.equal(resumed.state.player.player_id, googleOnlyId);
+      const renewedClaims = JSON.parse(Buffer.from(resumed.token.split(".")[0], "base64url").toString("utf8"));
+      assert.equal(renewedClaims.av, 7, "a versão do Google deve persistir no novo token");
+      expectStatus(await api("/api/game/state", { token: resumed.token }), 200,
+        "reino permanece autenticado após retomada Google-only");
+    });
+
     await t.test("todas as 40 ações previstas foram alcançadas no fluxo de integração", async () => {
       const actionTypes = [
         "set_nickname","equipment_craft","equipment_upgrade","equipment_equip","equipment_unequip","equipment_lock",
