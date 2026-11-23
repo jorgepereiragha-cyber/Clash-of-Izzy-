@@ -101,3 +101,23 @@ A CI `beta-isolation-ci.yml` agora acompanha mudanças no Worker, assetsignore, 
 ### Sobre limpeza do sistema legado
 
 **Nenhuma remoção destrutiva foi feita.** `/api/beta/signup` existe no Worker comum para a versão oficial e permanece inacessível no beta pelo gate. `portal.html` e `public-portal/` continuam para o marketing da versão oficial; não são a entrada do beta. Não excluir `assets/3d/`, `scripts/kingdom-3d.js`, `migrations/`, `sw.js` nem pagamentos compartilhados nesta fase. Uma otimização futura pode reduzir especificamente o bundle de assets do Worker beta sem modificar o portal oficial, após auditoria de referências e testes HTTP reais.
+
+## Preflight obrigatório antes de qualquer operação remota
+
+Execute na branch `beta` o verificador **somente leitura**, que não usa segredos e não acessa Cloudflare:
+
+```bash
+node beta/check-isolation.mjs
+```
+
+Enquanto o UUID for `REPLACE_WITH_NEW_BETA_D1_UUID`, ele deve informar **BETA ESQUELETO OK**; isso **não é autorização de deploy**. Depois de executar a auditoria do workflow `provision-beta-d1.yml` na `main`, criar o D1 **somente mediante confirmação protegida**, confrontar o novo UUID com produção e Preview e atualizar `wrangler.beta.jsonc` em PR para `beta`, execute:
+
+```bash
+node beta/check-isolation.mjs --require-provisioned
+```
+
+Esse segundo comando **falha** se o UUID ainda estiver como placeholder, for malformado ou coincidir com produção/Preview. Também rejeita qualquer mudança que desligue o convite, torne o beta um Worker da produção, desative `run_worker_first`, configure cron, adicione segredo em `vars` ou ligue flags comerciais. **Preflight não confirma existência do D1 na Cloudflare, migrações aplicadas, credenciais nem disponibilidade do Worker**; verificar essas condições separadamente antes de prosseguir.
+
+Os caminhos de marketing `/public-portal/*`, `/apoie` e `/apoie.html` retornam `404 BETA_MARKETING_DISABLED` no Worker beta, inclusive com convite ativo, para não confundir páginas de arrecadação da versão oficial com testes gratuitos. `portal-worker.js` é módulo de servidor e está excluído dos assets publicados pelo Worker do jogo. Nenhuma página de marketing, recurso 3D ou código do jogo foi apagado; a produção continua com suas próprias rotas.
+
+A CI beta executa o preflight em modo scaffold, testes de regressão de isolamento/4X/Android e a compilação Android **não assinada**. As etapas com Cloudflare e certificados exigem procedimentos explícitos e separados.
