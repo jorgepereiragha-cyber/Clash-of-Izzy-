@@ -95,7 +95,14 @@ const gameOrigin=isPortal?mainOrigin:location.origin;
 const status=document.getElementById("supportStatus");
 const method=document.getElementById("supportMethod");
 const currency=cents=>(Number(cents)/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"});
-const token=()=>{try{return localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token")||""}catch{return ""}};
+function readSupportToken(){
+  // A browser can deny one storage while a linked game session exists in the other.
+  for(const getter of [()=>window.localStorage,()=>window.sessionStorage]){
+   try{const saved=getter().getItem("coi_game_token");if(saved)return saved;}catch{}
+  }
+  return "";
+ }
+ const token=readSupportToken;
 async function loadStats(){
  try{
   const response=await fetch(gameOrigin+"/api/public/stats",{cache:"no-store"});
