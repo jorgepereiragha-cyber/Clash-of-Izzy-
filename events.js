@@ -2,7 +2,15 @@ import { renderWorldEventCards, loadValhallaEventConfig } from "./event-catalog.
 
 const API="/api";
 const $=id=>document.getElementById(id);
-const token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
+function readEventSession(){
+ let readable=false;
+ for(const getStore of [()=>window.localStorage,()=>window.sessionStorage]){
+  try{const saved=getStore().getItem("coi_game_token");readable=true;if(saved)return {token:saved,blocked:false};}catch{}
+ }
+ return {token:"",blocked:!readable};
+}
+const eventSession=readEventSession();
+const token=eventSession.token;
 const unitNames={militia:"Milícia",swordsman:"Espadachim",spearman:"Lanceiro",archer:"Arqueiro",crossbowman:"Besteiro",cavalry:"Cavalaria",knight:"Cavaleiro",catapult:"Catapulta",ram:"Aríete",trebuchet:"Trabuquete"};
 let state=null,eventState=null,valhallaConfig=null,busy=false,selected={},pendingRequestId=null,pendingAttackUnits=null,pendingEventId=null;
 let refreshGeneration=0;
@@ -91,7 +99,15 @@ function startEventTimers(){
  if(countdownTimer===null)countdownTimer=window.setInterval(renderCountdown,1000);
  if(eventRefreshTimer===null)eventRefreshTimer=window.setInterval(refresh,20000);
 }
-if(!token){location.replace("/kingdom.html");}else{
+if(!token){
+ if(eventSession.blocked){
+  $("eventStatus").textContent="Sessão indisponível";
+  const notice=$("message");
+  notice.replaceChildren(document.createTextNode("O navegador bloqueou o armazenamento da sessão. Autorize os dados do site e "));
+  const account=make("a","","acesse sua conta");account.href="/account.html";notice.append(account);
+  $("attack").disabled=true;
+ }else location.replace("/kingdom.html");
+}else{
  refresh();
  startEventTimers();
  document.addEventListener("visibilitychange",()=>{
