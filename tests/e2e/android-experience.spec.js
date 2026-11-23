@@ -155,6 +155,9 @@ test("city zoom toolbar only appears for WebGL and keeps accessible touch target
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto("/kingdom.html");
   const controls = page.locator("#coiCityCameraControls");
+  // Camera tools live inside the stage: desktop overlays do not create a
+  // full-height extra row, while mobile controls remain reachable below it.
+  await expect(page.locator(".coi-city-stage #coiCityCameraControls")).toHaveCount(1);
 
   // A failed GPU must not leave UI controls suggesting zoom works in 2D.
   await page.evaluate(() => window.dispatchEvent(new Event("coi:kingdom-2d-fallback")));
