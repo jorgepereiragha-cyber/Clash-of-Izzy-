@@ -225,7 +225,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     // Advance only disposable local D1 clock state; NEVER change a remote database.
     await command([...common, "execute", "clash-of-izzy-beta-db", "--local",
       "--persist-to", persist, "--command",
-      "UPDATE kingdom_queues SET completes_at=datetime('now','-1 minute') WHERE kingdom_id=" +
+      "UPDATE kingdom_queues SET started_at=datetime('now','-2 minutes'), completes_at=datetime('now','-1 minute') WHERE kingdom_id=" +
       Number(start.data.state.kingdom.id) +
       " AND queue_type='construction' AND target_key='castle' AND status='running'"]);
 
