@@ -63,6 +63,7 @@ export function startRealtimePresence({
   let reconnectTimer = null;
   let heartbeatTimer = null;
   let attempts = 0;
+  let pendingTicketController = null;
   const update = message => { status.textContent = message; };
 
   function clearTimers() {
@@ -74,6 +75,10 @@ export function startRealtimePresence({
 
   function disconnect() {
     clearTimers();
+    // Invalidate any pending ticket, even when a mocked fetch ignores abort.
+    const pending = pendingTicketController;
+    pendingTicketController = null;
+    if (pending) pending.abort();
     if (socket) {
       const previous = socket;
       socket = null;
@@ -92,7 +97,7 @@ export function startRealtimePresence({
   }
 
   async function connect() {
-    if (!active || documentRef.hidden || !windowRef.navigator.onLine || socket) return;
+    if (!active || documentRef.hidden || !windowRef.navigator.onLine || socket || pendingTicketController) return;
     if (windowRef.location.protocol !== "https:") {
       update("Tempo real requer HTTPS.");
       return;
@@ -103,9 +108,11 @@ export function startRealtimePresence({
       return;
     }
     update("Conectando ao tempo real…");
+    const controller = new AbortController();
+    pendingTicketController = controller;
     try {
-      const { ticket, room } = await requestRealtimeTicket({ token, fetchImpl });
-      if (!active || documentRef.hidden) return;
+      const { ticket, room } = await requestRealtimeTicket({ token, fetchImpl, signal: controller.signal });
+      if (pendingTicketController !== controller || !active || documentRef.hidden || !windowRef.navigator.onLine) return;
       const address = "wss://" + windowRef.location.host + "/api/realtime/eldoria" +
         (room === null ? "" : "?room=" + room);
       const client = new WebSocketImpl(address, ["coi-eldoria", "coi-ticket." + ticket]);
@@ -137,22 +144,31 @@ export function startRealtimePresence({
       });
       client.addEventListener("error", () => { update("Falha na conexão em tempo real."); });
     } catch {
-      update("Tempo real temporariamente indisponível.");
-      retry();
+      if (pendingTicketController === controller && active && !controller.signal.aborted) {
+        update("Tempo real temporariamente indisponível.");
+        retry();
+      }
+    } finally {
+      if (pendingTicketController === controller) pendingTicketController = null;
     }
   }
 
   const visibility = () => {
     if (documentRef.hidden) disconnect();
-    else connect();
+    else { attempts = 0; connect(); }
   };
-  const online = () => connect();
-  const offline = () => { disconnect(); update("Tempo real offline."); };
+  const online = () => { attempts = 0; connect(); };
+  const offline = () => { attempts = 0; disconnect(); update("Tempo real offline."); };
   const pagehide = () => { active = false; disconnect(); };
+  const pageshow = event => {
+    // A bfcache restores the same JS realm after pagehide: resume explicitly.
+    if (event.persisted) { active = true; attempts = 0; connect(); }
+  };
   documentRef.addEventListener("visibilitychange", visibility);
   windowRef.addEventListener("online", online);
   windowRef.addEventListener("offline", offline);
   windowRef.addEventListener("pagehide", pagehide);
+  windowRef.addEventListener("pageshow", pageshow);
   connect();
   return () => {
     active = false;
@@ -161,5 +177,6 @@ export function startRealtimePresence({
     windowRef.removeEventListener("online", online);
     windowRef.removeEventListener("offline", offline);
     windowRef.removeEventListener("pagehide", pagehide);
+    windowRef.removeEventListener("pageshow", pageshow);
   };
 }
