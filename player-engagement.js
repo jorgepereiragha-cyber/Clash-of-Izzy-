@@ -5,7 +5,15 @@
   const daily = document.getElementById("dailyRewardsPanel");
   if (!tutorial || !daily) return;
   const $ = id => document.getElementById(id);
-  const token = () => { try { return localStorage.getItem("coi_game_token") || sessionStorage.getItem("coi_game_token") || ""; } catch { return ""; } };
+  function readEngagementToken() {
+    // Privacy settings may deny one storage while keeping the other usable.
+    for (const getStorage of [() => window.localStorage, () => window.sessionStorage]) {
+      try { const saved=getStorage().getItem("coi_game_token"); if (saved) return saved; }
+      catch {}
+    }
+    return "";
+  }
+  const token = readEngagementToken;
   let latestRefresh = 0, busy = false, opened = false;
   let sessionId = null;
   try { sessionId = crypto.randomUUID(); } catch { sessionId = "engagement_" + Date.now(); }
