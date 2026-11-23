@@ -19,6 +19,7 @@ import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
 import {marchCapacity,marchCapacityForKingdom,withinMarchCapacity} from "./march-capacity.js";
 import {marchSlots} from "./march-slots.js";
+import { resolveDueMarchKingdoms } from "./march-scheduler-policy.js";
 import {realmStatusView} from "./realm-progression.js";
 import {getThroneStatus,assaultThrone} from "./throne-war.js";
 import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
@@ -1970,18 +1971,13 @@ async function processDueKingdomQueues(env,kingdomId=null){
 
 async function processDueMarches(env){
   if(!env.DB)return;
-  const now=new Date().toISOString();
-  const dueKingdoms=await env.DB.prepare(
-    "SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 1"
-  ).bind(now).all();
-  for(const row of dueKingdoms.results||[]){
-    try{
-      await processMarches(env,row.kingdom_id,2);
-    }catch(error){
-      // Uma falha num reino não impede a resolução das marchas dos demais.
-      console.error("scheduled_march_resolution_failed",row.kingdom_id,String(error?.message||error));
-    }
-  }
+  return resolveDueMarchKingdoms({
+    db:env.DB,
+    now:new Date().toISOString(),
+    resolveKingdom:(kingdomId,limit)=>processMarches(env,kingdomId,limit),
+    onFailure:(kingdomId,error)=>console.error(
+      "scheduled_march_resolution_failed",kingdomId,String(error?.message||error))
+  });
 }
 
 export default {

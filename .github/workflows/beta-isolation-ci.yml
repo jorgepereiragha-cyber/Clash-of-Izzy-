@@ -57,7 +57,7 @@ jobs:
       - name: Verificar preflight de isolamento sem exigir D1 remoto
         run: node beta/check-isolation.mjs
       - name: Node tests - beta/Android
-        run: node --test tests/beta-isolation.test.js tests/beta-preflight.test.js tests/android-apk-sideload.test.js tests/advanced-4x-systems.test.js
+        run: node --test tests/beta-isolation.test.js tests/beta-preflight.test.js tests/android-apk-sideload.test.js tests/advanced-4x-systems.test.js tests/march-scheduler.test.js
       - name: Validate beta invitation SQL locally (no remote D1)
         run: python3 beta/verify-schema-local.py
       - name: Validate existing 3D manifest and referenced GLB files
