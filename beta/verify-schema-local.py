@@ -13,7 +13,7 @@ TRIGGER = "beta_claim_invite_for_session"
 INSERT = (
     "INSERT INTO beta_access_sessions(session_hash,invite_id,expires_at) "
     "SELECT ?,id,? FROM beta_invites WHERE code_hash=? AND disabled=0 "
-    "AND uses<max_uses AND (expires_at IS NULL OR expires_at>unixepoch())"
+    "AND uses<max_uses AND (expires_at IS NULL OR expires_at>unixepoch()) RETURNING 1 AS issued"
 )
 
 
@@ -23,7 +23,8 @@ def check(condition, message):
 
 
 def claim(db, session_hash, code_hash):
-    return db.execute(INSERT, (session_hash, int(time.time()) + 3600, code_hash)).rowcount
+    row = db.execute(INSERT, (session_hash, int(time.time()) + 3600, code_hash)).fetchone()
+    return 1 if row == (1,) else 0
 
 
 def quota(db, code_hash):
@@ -36,6 +37,8 @@ def main():
     check("INSERT INTO beta_access_sessions(session_hash,invite_id,expires_at)" in gate,
           "runtime and SQLite test must use the same session insert")
     check("name='beta_claim_invite_for_session'" in gate, "runtime must verify trigger name")
+    check("RETURNING 1 AS issued" in gate, "runtime must confirm insertion via returned row")
+    check("meta?.changes" not in gate, "D1 changes counter must not decide invitation success")
 
     db = sqlite3.connect(":memory:")
     db.execute("PRAGMA foreign_keys=ON")
