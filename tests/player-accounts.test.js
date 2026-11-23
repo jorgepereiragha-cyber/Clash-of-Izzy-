@@ -62,3 +62,16 @@ test("account routes bind credentials to existing public player identity and ver
   assert.match(migration, /password_salt TEXT NOT NULL/);
   assert.match(migration, /password_iterations INTEGER NOT NULL/);
 });
+
+test("account logout distinguishes local sign-out from confirmed remote token revocation", async () => {
+  const { readFile } = await import("node:fs/promises");
+  const html = await readFile(new URL("../account.html", import.meta.url), "utf8");
+  assert.ok(html.includes("let remoteRevoked=false;"));
+  assert.ok(html.includes('await api("/account/logout",{method:"POST"});remoteRevoked=true;'));
+  assert.ok(html.includes('localStorage.removeItem("coi_game_token");sessionStorage.removeItem("coi_game_token");'),
+    "local credentials are cleared even if remote revocation fails");
+  assert.ok(html.includes('setStatus(remoteRevoked'),
+    "never show the confirmed-revocation success message after a server failure");
+  assert.ok(html.includes("não foi possível confirmar a revogação no servidor"));
+});
+
