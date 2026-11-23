@@ -383,8 +383,11 @@ test("the city ambient layer is loaded and respects Android power and lifecycle 
 
 
 test("WebGL shows 8/12/16 buildings by tier and Canvas keeps nine accessible slots", () => {
-  // Projection, rendering and camera zoom must use the same 16-building tier cap.
-  assert.equal(renderer.split("Math.min(16, qualityProfile?.maxBuildings || 9)").length - 1, 3);
+  // Assert the cap semantically rather than counting text occurrences: resize
+  // also needs the same limit, and refactors may add legitimate call sites.
+  assert.match(renderer, /Math\.min\(16, qualityProfile\?\.maxBuildings \|\| 9\)/);
+  assert.match(renderer, /const visibleBuildings = latestBuildings\.slice\(0, Math\.min\(16,/);
+  assert.match(renderer, /publishBuildingHitTargets\(list\)/);
   assert.match(renderer, /const columns = latestBuildings\.length > 9 \? 4 : 3/);
   assert.match(kingdom, /buildings\.slice\(0,16\)\.map\(\(b,i\)=>/);
   assert.ok(kingdom.includes("i>=9?' hidden':''"));
@@ -403,7 +406,10 @@ test("city camera touch zoom is view-only, bounded, and disabled after WebGL los
   assert.match(kingdom, /aria-label="Aproximar câmera da cidade"/);
   assert.match(kingdom, /coi:kingdom-3d-ready/);
   assert.match(kingdom, /if\(cityCameraControls\)cityCameraControls\.hidden=true/);
-  assert.match(renderer, /camera\.zoom = Math\.min\(1, 13 \/ span\) \* cameraZoomFactor/);
+  assert.match(renderer, /camera\.zoom = fitZoom \* cameraZoomFactor/);
+  assert.match(renderer, /new THREE\.Vector3\(x, \.18, z\)\.applyMatrix4\(camera\.matrixWorldInverse\)/);
+  assert.match(renderer, /viewportWidth \/ projectedWidth, viewportHeight \/ projectedHeight/);
+  assert.match(renderer, /if \(visibleBuildings\.length\) frameCityBuildings\(visibleBuildings\)/);
   assert.match(renderer, /Math\.max\(0\.7, Math\.min\(1\.6/);
   assert.match(renderer, /if \(disposed \|\| cinematicCaptureActive \|\| !renderer \|\| !scene \|\| !camera\) return/);
   assert.match(renderer, /publishBuildingHitTargets\(visible\)/);
