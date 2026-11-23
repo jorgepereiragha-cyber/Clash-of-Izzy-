@@ -16,6 +16,7 @@ skin-sets.js
 package.json
 
 # Worker-only modules are bundled by worker.js and must not be published as browser assets.
+portal-worker.js
 angel-death-event.js
 api-rate-limit.js
 beta-access.js

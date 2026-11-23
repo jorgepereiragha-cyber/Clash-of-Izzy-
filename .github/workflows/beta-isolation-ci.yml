@@ -54,8 +54,10 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+      - name: Verificar preflight de isolamento sem exigir D1 remoto
+        run: node beta/check-isolation.mjs
       - name: Node tests - beta/Android
-        run: node --test tests/beta-isolation.test.js tests/android-apk-sideload.test.js tests/advanced-4x-systems.test.js
+        run: node --test tests/beta-isolation.test.js tests/beta-preflight.test.js tests/android-apk-sideload.test.js tests/advanced-4x-systems.test.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

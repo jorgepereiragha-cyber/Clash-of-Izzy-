@@ -52,7 +52,7 @@ const betaEnv = db => ({ ENVIRONMENT: "beta", INVITE_ONLY: "true", BETA_LIVE_PAY
 
 test("the beta config never binds either existing D1 and intercepts all asset requests", () => {
   const excludes = new Set(read(".assetsignore").split("\n").map(v => v.trim()));
-  for (const item of ["beta-access.js", "wrangler.beta.jsonc", "beta/**"]) {
+  for (const item of ["beta-access.js", "portal-worker.js", "wrangler.beta.jsonc", "beta/**"]) {
     assert.ok(excludes.has(item), "private beta code/config leaked into assets: " + item);
   }
   assert.ok(!excludes.has("beta-access.html"), "the invitation page must remain available");
@@ -263,4 +263,22 @@ test("disabling an invite revokes already issued beta access without touching pl
   const session = await betaAccessGuard(request("/api/beta/access/status", { headers: { Cookie: cookie } }), env);
   assert.equal(session.status, 401);
   assert.equal(db.state.sessions.size, 1, "revocation is derived from invite status, not a destructive DB cleanup");
+});
+
+test("marketing and support pages never load inside the private beta, even after invitation", async () => {
+  const db = mockBetaDb(), env = betaEnv(db);
+  for (const path of ["/public-portal/portal.html", "/public-portal/apoie.html", "/public-portal/assets/brand/royal-king.webp", "/apoie", "/apoie.html"]) {
+    const denied = await betaAccessGuard(request(path), env);
+    assert.equal(denied.status, 404, path);
+    assert.equal((await denied.json()).code, "BETA_MARKETING_DISABLED");
+  }
+  const unlocked = await betaAccessGuard(request("/api/beta/invite/redeem", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: validCode })
+  }), env);
+  const cookie = unlocked.headers.get("Set-Cookie").split(";")[0];
+  const signed = await betaAccessGuard(request("/public-portal/apoie.html", { headers: { Cookie: cookie } }), env);
+  assert.equal(signed.status, 404);
+  assert.equal((await signed.json()).code, "BETA_MARKETING_DISABLED");
+  assert.equal(await betaAccessGuard(request("/public-portal/apoie.html"), { ENVIRONMENT: "production" }), null);
 });
