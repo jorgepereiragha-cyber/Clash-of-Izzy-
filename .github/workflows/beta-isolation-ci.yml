@@ -1,0 +1,52 @@
+name: Beta isolation checks (no deploy)
+on:
+  pull_request:
+    paths:
+      - wrangler.beta.jsonc
+      - beta-access.js
+      - beta-access.html
+      - beta/**
+      - android-sideload/**
+      - tests/beta-isolation.test.js
+      - .github/workflows/beta-isolation-ci.yml
+      - .github/workflows/android-beta-apk.yml
+  push:
+    branches: [main]
+    paths:
+      - wrangler.beta.jsonc
+      - beta-access.js
+      - beta-access.html
+      - beta/**
+      - android-sideload/**
+      - tests/beta-isolation.test.js
+      - .github/workflows/beta-isolation-ci.yml
+      - .github/workflows/android-beta-apk.yml
+permissions:
+  contents: read
+jobs:
+  beta-contract:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - name: Node tests - beta/Android
+        run: node --test tests/beta-isolation.test.js tests/android-apk-sideload.test.js
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Android SDK
+        shell: bash
+        run: |
+          set -euo pipefail
+          : "${ANDROID_HOME:?Android SDK ausente}"
+          sdkmanager_cmd="$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager"
+          test -x "$sdkmanager_cmd"
+          yes | "$sdkmanager_cmd" --licenses > /dev/null || true
+          "$sdkmanager_cmd" "platform-tools" "platforms;android-35" "build-tools;35.0.0"
+      - name: Compile beta without signing or publishing
+        working-directory: android-sideload
+        run: gradle --no-daemon assembleBeta
