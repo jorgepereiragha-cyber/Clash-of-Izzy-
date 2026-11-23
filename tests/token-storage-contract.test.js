@@ -18,6 +18,20 @@ test("account, kingdom and arena preserve coi_game_token in both browser storage
   }
 });
 
+test("arena handles denied browser storage, preserves a single kingdom and exposes retry", async () => {
+  const arena = await read("../arena.html");
+  assert.match(arena, /function readArenaGameToken\(\)/);
+  assert.match(arena, /if\(!readable\)throw new Error/);
+  assert.match(arena, /const savedToken=readArenaGameToken\(\)/);
+  assert.match(arena, /let arenaConnectionInProgress=false/);
+  assert.match(arena, /if\(arenaConnectionInProgress\)return/);
+  assert.match(arena, /retryArenaConnection/);
+  assert.match(arena, /if\(error\.status===401\|\|error\.status===403\)/);
+  assert.match(arena, /account\.href='\/account\.html'/);
+  assert.match(arena, /const persisted=!data\.token\|\|saveArenaGameToken\(data\.token\)/);
+  assert.match(arena, /function chatToken\(\)\{try\{return readArenaGameToken\(\)\}catch\{return ''\}\}/);
+});
+
 test("account logout clears both copies of the game token", async () => {
   const source = await read("../account.html");
   assert.match(source, /localStorage\.removeItem\(["']coi_game_token["']\);sessionStorage\.removeItem\(["']coi_game_token["']\)/);
