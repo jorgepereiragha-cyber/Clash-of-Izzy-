@@ -1,6 +1,7 @@
 name: Beta isolation checks (no deploy)
 on:
   pull_request:
+    branches: [beta]
     paths:
       - wrangler.beta.jsonc
       - beta-access.js
@@ -10,6 +11,18 @@ on:
       - tests/beta-isolation.test.js
       - .github/workflows/beta-isolation-ci.yml
       - .github/workflows/android-beta-apk.yml
+      - .assetsignore
+      - worker.js
+      - kingdom.html
+      - intermediate-production.js
+      - city-defense-rules.js
+      - player-progression-4x.js
+      - hero-assignments-4x.js
+      - scripts/kingdom-3d.js
+      - scripts/kingdom-4x-systems.js
+      - migrations/**
+      - tests/**
+      - package.json
   push:
     branches: [beta]
     paths:
@@ -21,6 +34,18 @@ on:
       - tests/beta-isolation.test.js
       - .github/workflows/beta-isolation-ci.yml
       - .github/workflows/android-beta-apk.yml
+      - .assetsignore
+      - worker.js
+      - kingdom.html
+      - intermediate-production.js
+      - city-defense-rules.js
+      - player-progression-4x.js
+      - hero-assignments-4x.js
+      - scripts/kingdom-3d.js
+      - scripts/kingdom-4x-systems.js
+      - migrations/**
+      - tests/**
+      - package.json
 permissions:
   contents: read
 jobs:
@@ -30,7 +55,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Node tests - beta/Android
-        run: node --test tests/beta-isolation.test.js tests/android-apk-sideload.test.js
+        run: node --test tests/beta-isolation.test.js tests/android-apk-sideload.test.js tests/advanced-4x-systems.test.js
       - uses: actions/setup-java@v4
         with:
           distribution: temurin

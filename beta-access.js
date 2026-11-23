@@ -48,7 +48,9 @@ async function hasValidAccess(request, env) {
   const token = cookieToken(request);
   if (!token) return false;
   const row = await env.DB.prepare(
-    "SELECT 1 AS permitted FROM beta_access_sessions WHERE session_hash=? AND revoked_at IS NULL AND expires_at>unixepoch()"
+    "SELECT 1 AS permitted FROM beta_access_sessions s " +
+    "JOIN beta_invites i ON i.id=s.invite_id " +
+    "WHERE s.session_hash=? AND s.revoked_at IS NULL AND s.expires_at>unixepoch() AND i.disabled=0"
   ).bind(await sha256(token)).first();
   return Boolean(row);
 }

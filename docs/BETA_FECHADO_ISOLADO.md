@@ -51,7 +51,7 @@ Este workflow não aplica migrações, não configura secrets do Worker beta, n�
 - Beta e produção têm nomes de Worker distintos, bindings D1 distintos, namespaces de Durable Objects distintos, `SESSION_SECRET` distintos, chaves de assinatura Android distintas e IDs Android distintos. **Não copiar contas, sessões, inventário, gemas nem pedidos da produção.**
 - Pagamentos reais ficam desligados em beta mesmo se um token de provedor for acidentalmente configurado. O código NÃO habilita cobrança por meio de uma flag isolada: a habilitação futura exige mudanças revisadas, homologação do provedor, webhook, origem, domínio e reconciliação.
 - O bloqueio de pagamento cobre as rotas de checkout, Pix/pedidos e webhook já existentes, além das futuras rotas de escrita sob `/api/store/`. Se o projeto criar novas rotas comerciais fora desse namespace, a auditoria deverá atualizar o bloqueio antes do merge.
-- Falha de D1 resulta em negação de acesso, não em passagem livre. Para revogar um convite, marcar `disabled=1`; para revogar sessões já emitidas, atualizar `revoked_at=unixepoch()` em `beta_access_sessions` para os `invite_id` correspondentes. Gerenciar expiração/limpeza de tabelas manualmente; não há cron beta nesta etapa.
+- Falha de D1 resulta em negação de acesso, não em passagem livre. Para revogar um convite, marcar `disabled=1`: o gate consulta `beta_invites` junto à sessão e **nega imediatamente o acesso das sessões emitidas por esse convite**. Para uma revogação de sessão individual, atualizar `revoked_at=unixepoch()` em `beta_access_sessions` no banco beta. Gerenciar expiração/limpeza de tabelas manualmente; não há cron beta nesta etapa.
 - Para rollback: desligar acesso no beta (`INVITE_ONLY=false` faz o Worker falhar fechado) ou despublicar **somente** o Worker beta. Não executar comandos no D1 da produção.
 - A versão Android beta seleciona a URL em compilação via `BuildConfig.BETA`; não aceita URL informada pelo usuário nem redirecionamento para domínio arbitrário. A flag é embutida no APK e o certificado beta não deve ser o mesmo da release oficial.
 
@@ -78,3 +78,26 @@ O gate de convite é uma autorização por sessão de navegador, não substitui 
 ## Pendências para lançamento comercial
 
 CI verde em SHA exato, criação e auditoria do terceiro D1, deploy beta, verificação de rotas reais, homologação de conta Google para a nova origem, proteção de uso por conta/dispositivo (se exigido), assinatura beta, testes em aparelhos e revisão jurídica/comercial. Nenhum desses marcos pode ser presumido por existir código na branch.
+
+## Reaproveitamento funcional 4X no beta isolado (23/11/2026)
+
+Esta melhoria é proposta **somente para a branch `beta`**, não para a produção. A configuração `wrangler.beta.jsonc` passa a definir `GAME_4X_SYSTEMS_ENABLED=true`. Isso reaproveita a implementação real já existente do jogo: `kingdom.html`, `scripts/kingdom-3d.js`, `scripts/kingdom-4x-systems.js`, `intermediate-production.js`, `city-defense-rules.js`, `player-progression-4x.js` e `hero-assignments-4x.js`. Mantém reinos, heróis, dragões, alianças, PvP, mundo, filas, recursos e apresentação visual compartilhados. **Não importa banco de produção nem inventário entre ambientes.**
+
+O backend passa a exigir adicionalmente no **health do beta com 4X habilitado** as tabelas da migração `0041`: `intermediate_resources`, `city_defenses`, `kingdom_progression`, `progression_xp_ledger`. Se não existirem, `/api/health` responde `503 not_ready`, em vez de sinalizar prontidão indevida. As migrações gerais devem ser aplicadas **exclusivamente no novo D1 beta** antes de liberar convites. Essa flag não faz deploy nem cria D1.
+
+O bloqueio de cobrança permanece explícito e independente da flag 4X. `LEVEL_PACKS_ENABLED`, `LEVEL_PACKS_PUBLIC_ENABLED` e demais flags comerciais continuam desativadas; a evolução 4X normal usa recursos do jogo, nunca cria checkout real. Se uma atualização futura alterar rotas comerciais, revisar `betaPaymentDisabled()` antes do merge.
+
+A CI `beta-isolation-ci.yml` agora acompanha mudanças no Worker, assetsignore, migrações e módulos de gameplay compartilhados, além de executar os testes legados de economia/defesas/progressão 4X. Não faz deploy e não assina APK. A alteração deve chegar à `beta` via PR revisada e CI verde; `main` continua preservada.
+
+### Critérios de aceite antes de disponibilizar aos convidados
+
+1. D1 novo com UUID distinto de produção e Preview, migrações completas, schema beta aplicado e secrets próprios; no momento deste commit o UUID continua placeholder.
+2. `/api/health` responde `200 ready` apenas com a base comum, as três tabelas de convite e as quatro tabelas 4X presentes.
+3. Usuário sem convite não acessa API de jogo, WebSocket nem HTML/GLB. Convite desabilitado invalida imediatamente as sessões associadas, sem apagar jogadores.
+4. Testador autenticado consegue criar/retomar reino, abrir cena 3D, atualizar filas, indústrias, defesas e progressão, com os dados persistidos no novo D1.
+5. Métodos de pagamento permanecem `false`, checkout e webhooks respondem `503 BETA_PAYMENTS_DISABLED`, mesmo com flags ou secrets acidentais.
+6. Testar reconexão, logout, celulares Android, desempenho e invasão de rotas antes de ativar qualquer link público ou APK beta.
+
+### Sobre limpeza do sistema legado
+
+**Nenhuma remoção destrutiva foi feita.** `/api/beta/signup` existe no Worker comum para a versão oficial e permanece inacessível no beta pelo gate. `portal.html` e `public-portal/` continuam para o marketing da versão oficial; não são a entrada do beta. Não excluir `assets/3d/`, `scripts/kingdom-3d.js`, `migrations/`, `sw.js` nem pagamentos compartilhados nesta fase. Uma otimização futura pode reduzir especificamente o bundle de assets do Worker beta sem modificar o portal oficial, após auditoria de referências e testes HTTP reais.

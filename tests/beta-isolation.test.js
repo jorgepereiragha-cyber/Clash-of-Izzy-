@@ -10,7 +10,7 @@ const validCode = "IZZY-" + "A".repeat(20);
 const validHash = createHash("sha256").update(validCode).digest("hex");
 
 function mockBetaDb(maxUses = 1) {
-  const state = { attempts: 0, uses: 0, sessions: new Set(), errors: false };
+  const state = { attempts: 0, uses: 0, sessions: new Set(), disabledInvites: false, errors: false };
   return {
     state,
     prepare(sql) {
@@ -26,7 +26,7 @@ function mockBetaDb(maxUses = 1) {
                 return { id: 123 };
               }
               if (sql.startsWith("SELECT 1 AS permitted FROM beta_access_sessions")) {
-                return state.sessions.has(args[0]) ? { permitted: 1 } : null;
+                return state.sessions.has(args[0]) && !state.disabledInvites ? { permitted: 1 } : null;
               }
               throw new Error("Unexpected SQL: " + sql);
             },
@@ -63,11 +63,14 @@ test("the beta config never binds either existing D1 and intercepts all asset re
   assert.equal(betaConfig.vars.ENVIRONMENT, "beta");
   assert.equal(betaConfig.vars.INVITE_ONLY, "true");
   assert.equal(betaConfig.vars.BETA_LIVE_PAYMENTS_APPROVED, "false");
+  assert.equal(betaConfig.vars.GAME_4X_SYSTEMS_ENABLED, "true");
+  assert.equal(prodConfig.vars.GAME_4X_SYSTEMS_ENABLED, "false");
   assert.notEqual(betaConfig.d1_databases[0].database_id, prodConfig.d1_databases[0].database_id);
   assert.notEqual(betaConfig.d1_databases[0].database_id, prodConfig.previews.d1_databases[0].database_id);
   assert.match(betaConfig.d1_databases[0].database_id, /^REPLACE_WITH_/);
   assert.equal(betaConfig.triggers, undefined);
   assert.match(read("worker.js"), /const betaGateResponse=await betaAccessGuard\(request,env\);/);
+  assert.match(read("worker.js"), /if\(env\.ENVIRONMENT==="beta"&&advanced4xEnabled\(env\)\)requiredTables\.push\("intermediate_resources","city_defenses","kingdom_progression","progression_xp_ledger"\)/);
 });
 
 test("production behavior stays unchanged and beta fails closed on missing prerequisites", async () => {
@@ -240,4 +243,24 @@ test("beta retires public marketing routes without deleting production code", as
   assert.equal(signedPortal.status, 302);
   assert.equal(new URL(signedPortal.headers.get("Location")).pathname, "/kingdom.html");
   assert.equal(await betaAccessGuard(request("/api/beta/signup"), {ENVIRONMENT:"production"}), null);
+});
+
+test("disabling an invite revokes already issued beta access without touching players", async () => {
+  const db = mockBetaDb(), env = betaEnv(db);
+  const unlocked = await betaAccessGuard(request("/api/beta/invite/redeem", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code: validCode })
+  }), env);
+  assert.equal(unlocked.status, 200);
+  const cookie = unlocked.headers.get("Set-Cookie").split(";")[0];
+  const privateRequest = () => betaAccessGuard(request("/api/game/state", { headers: { Cookie: cookie } }), env);
+  assert.equal(await privateRequest(), null);
+  db.state.disabledInvites = true; // Models beta_invites.disabled=1.
+  const denied = await privateRequest();
+  assert.equal(denied.status, 403);
+  assert.equal((await denied.json()).code, "BETA_INVITE_REQUIRED");
+  const session = await betaAccessGuard(request("/api/beta/access/status", { headers: { Cookie: cookie } }), env);
+  assert.equal(session.status, 401);
+  assert.equal(db.state.sessions.size, 1, "revocation is derived from invite status, not a destructive DB cleanup");
 });
