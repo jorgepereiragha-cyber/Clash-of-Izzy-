@@ -20,6 +20,21 @@ test("world map does not create a new realm or crash when browser token storage 
   expect(gameRequests).toBe(0);
 });
 
+test("world map offers account recovery after rejected saved session", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("coi_game_token", "expired-session-fixture");
+    localStorage.setItem("coi_graphics_preference", "2d");
+  });
+  await page.route("**/api/game/state", route => route.fulfill({
+    status: 401, contentType: "application/json",
+    body: JSON.stringify({ error: "Sessão do jogador inválida." })
+  }));
+  await page.goto("/world.html");
+  await expect(page.locator("#status")).toContainText("Sessão do jogador inválida");
+  await expect(page.locator("#marchNotice").getByRole("link", {name:"Acessar minha conta"}))
+    .toHaveAttribute("href", "/account.html");
+});
+
 test("world map obeys local 2D graphics choice and keeps tactical pins on Android", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("coi_graphics_preference", "2d");
