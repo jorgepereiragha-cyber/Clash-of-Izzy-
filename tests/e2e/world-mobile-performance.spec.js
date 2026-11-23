@@ -44,6 +44,7 @@ test("simulated desktop loads 3D just once through the existing lazy boot", asyn
     localStorage.setItem("coi_graphics_preference", "balanced");
     localStorage.setItem("coi_game_token", "world-performance-fixture");
   });
+  await fixtureWorldState(page);
   let worldModuleRequests = 0;
   // Isolate the boot mechanics from the runner's software WebGL implementation.
   await page.route("**/world-map-3d.js", route => {
