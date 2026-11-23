@@ -1,0 +1,41 @@
+import vm from "node:vm";
+import { readFile } from "node:fs/promises";
+
+const src = await readFile(new URL("../rally-ui.js", import.meta.url), "utf8");
+
+function runRallySession(storages) {
+  const status={ textContent:"",classList:{toggle() {}} };
+  const captured=[];
+  const document={hidden:false,getElementById:id=>id==="rally-status"?status:null,addEventListener(){}};
+  const window={...storages,setInterval() {}};
+  const fetch=async(path,options)=>{
+    captured.push({path,authorization:options.headers.Authorization});
+    return {ok:true,async json(){return path.endsWith("/nodes")?{nodes:[]}:{rallies:[],in_alliance:false}}};
+  };
+  vm.runInNewContext(src,{window,document,fetch,console}, {filename:"rally-ui.js"});
+  return {status,captured};
+}
+
+import test from "node:test";
+import assert from "node:assert/strict";
+
+test("rally uses sessionStorage when localStorage access raises SecurityError", async () => {
+  const client=runRallySession({
+    localStorage:{getItem(){throw new Error("SecurityError")}},
+    sessionStorage:{getItem(){return "valid-session-only"}}
+  });
+  for(let i=0;i<8;i++)await Promise.resolve();
+  assert.equal(client.captured.length,2);
+  assert.ok(client.captured.every(entry=>entry.authorization==="Bearer valid-session-only"));
+  assert.match(client.status.textContent,/sincronizados/);
+});
+
+test("rally shows actionable storage error without sending unauthorized requests", async () => {
+  const client=runRallySession({
+    localStorage:{getItem(){throw new Error("SecurityError")}},
+    sessionStorage:{getItem(){throw new Error("SecurityError")}}
+  });
+  await Promise.resolve();
+  assert.deepEqual(client.captured,[]);
+  assert.match(client.status.textContent,/bloqueou o armazenamento/);
+});
