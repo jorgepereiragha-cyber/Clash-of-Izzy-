@@ -59,6 +59,17 @@ function mockBetaDb(maxUses = 1) {
 const request = (path, init = {}) => new Request("https://clash-of-izzy-beta.jorgepereiragha.workers.dev" + path, init);
 const betaEnv = db => ({ ENVIRONMENT: "beta", INVITE_ONLY: "true", BETA_LIVE_PAYMENTS_APPROVED: "false", DB: db });
 
+test("beta invitation page reports backend readiness and distinguishes unavailable D1 from bad codes", () => {
+  const html = read("beta-access.html");
+  assert.match(html, /fetch\("\/api\/health"/);
+  assert.match(html, /health\?\.status==="ready"/);
+  assert.match(html, /health\?\.checks\?\.database===true/);
+  assert.match(html, /res\.status===503/);
+  assert.match(html, /res\.status===429/);
+  assert.match(html, /res\.status===403/);
+  assert.match(html, /Servidor beta temporariamente indisponível ou banco incompleto/);
+});
+
 test("the beta config never binds either existing D1 and intercepts all asset requests", () => {
   const excludes = new Set(read(".assetsignore").split("\n").map(v => v.trim()));
   for (const item of ["beta-access.js", "portal-worker.js", "march-scheduler-policy.js", "wrangler.beta.jsonc", "beta/**"]) {
