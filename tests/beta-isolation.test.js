@@ -222,3 +222,22 @@ test("beta session logout revokes server-side token and clears the cookie", asyn
   assert.equal(status.status, 401);
   assert.deepEqual(await status.json(), { authorized: false });
 });
+
+test("beta retires public marketing routes without deleting production code", async () => {
+  const db = mockBetaDb(), env = betaEnv(db);
+  const legacy = await betaAccessGuard(request("/api/beta/signup", {method: "POST"}), env);
+  assert.equal(legacy.status, 404);
+  assert.equal((await legacy.json()).code, "BETA_LEGACY_SIGNUP_DISABLED");
+  const initialPortal = await betaAccessGuard(request("/portal.html"), env);
+  assert.equal(initialPortal.status, 302);
+  assert.equal(new URL(initialPortal.headers.get("Location")).pathname, "/beta-access.html");
+  const unlocked = await betaAccessGuard(request("/api/beta/invite/redeem", {
+    method: "POST", headers: {"Content-Type":"application/json"},
+    body: JSON.stringify({code: validCode})
+  }), env);
+  const cookie = unlocked.headers.get("Set-Cookie").split(";")[0];
+  const signedPortal = await betaAccessGuard(request("/", {headers: {Cookie: cookie}}), env);
+  assert.equal(signedPortal.status, 302);
+  assert.equal(new URL(signedPortal.headers.get("Location")).pathname, "/kingdom.html");
+  assert.equal(await betaAccessGuard(request("/api/beta/signup"), {ENVIRONMENT:"production"}), null);
+});
