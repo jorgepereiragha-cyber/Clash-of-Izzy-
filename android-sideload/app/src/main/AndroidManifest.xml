@@ -5,7 +5,7 @@
     <application
         android:allowBackup="false"
         android:fullBackupContent="false"
-        android:label="Clash of Izzy"
+        android:label="${appLabel}"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
