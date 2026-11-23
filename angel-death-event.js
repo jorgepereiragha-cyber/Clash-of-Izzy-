@@ -64,6 +64,18 @@ export function getAngelDeathWeekendWindow(now = new Date()) {
   return { startsAt: start.toISOString(), endsAt: end.toISOString(), timezone: ANGEL_DEATH_EVENT.timezone };
 }
 
+// A repeated request id can only represent its original, server-persisted troop selection.
+// The comparison is independent of key insertion order and allows explicitly zero stacks.
+export function sameAngelDeathAttackUnits(snapshot, units) {
+  if(!snapshot||typeof snapshot!=="object"||Array.isArray(snapshot)||!units||typeof units!=="object"||Array.isArray(units))return false;
+  const submitted=Object.entries(units).filter(([,raw])=>Number(raw)!==0);
+  if(submitted.length!==Object.keys(snapshot).length)return false;
+  return submitted.every(([key,raw])=>{
+    const qty=Number(raw);
+    return Number.isSafeInteger(qty)&&qty>0&&Object.hasOwn(snapshot,key)&&Number(snapshot[key]?.quantity)===qty;
+  });
+}
+
 export function simulateAngelDeathAttack({ army, castleLevel = 1, heroLevel = 1, dragonLevel = 1, militaryLevel = 0, attackBonusPercent = 0, defenseBonusPercent = 0, seed = 1 }) {
   const stacks = (army || []).filter(row => Number(row.quantity) > 0 && COMBAT_UNIT_RULES[row.unit_type]);
   if (!stacks.length) throw new Error("Selecione pelo menos uma tropa válida.");

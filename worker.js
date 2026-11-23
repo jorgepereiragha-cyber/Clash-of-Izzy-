@@ -2,7 +2,7 @@ export { EldoriaRoom } from "./eldoria-room.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "./game-adapter.js";
 import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, HERO_SUMMON_RARITY_ODDS, heroView, getHeroCombatBonuses, getHeroSummonOdds } from "./hero-catalog.js";
-import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank } from "./angel-death-event.js";
+import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank, sameAngelDeathAttackUnits } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
 import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
@@ -1796,6 +1796,10 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
     .bind(event.id,kingdom.id,requestId).first();
   if(duplicate){
     const snapshot=JSON.parse(duplicate.troop_losses_json||"{}");
+    // A request id belongs to the exact troop composition originally charged.
+    // Do not replay an old success for a different army chosen after network failure.
+    if(!sameAngelDeathAttackUnits(snapshot,body.units))
+      return json({error:"Este identificador pertence a um ataque anterior com outras tropas. Reenvie a composição original antes de iniciar um novo ataque.",code:"EVENT_ATTACK_PAYLOAD_MISMATCH"},409);
     const losses=Object.fromEntries(Object.entries(snapshot).map(([key,value])=>[key,Number(value?.loss||0)]));
     return json({success:true,duplicate:true,damage:Number(duplicate.damage||0),score:Number(duplicate.score||0),losses,troopsLost:Object.values(losses).reduce((sum,value)=>sum+value,0)});
   }

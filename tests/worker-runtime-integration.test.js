@@ -310,6 +310,14 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         assert.equal(retry.damage, attack.damage);
         assert.equal(retry.troopsLost, attack.troopsLost);
 
+        // Reusing the same request id for a different army must not present
+        // the old attack's outcome as if this new selection were processed.
+        const mismatchedReplay = expectStatus(await api("/api/game/event/attack", {
+          method: "POST", token: tokenA,
+          body: { requestId: eventRequestId, units: { militia_1: 2 } },
+        }), 409, "chave de ataque não pode representar duas composições diferentes");
+        assert.equal(mismatchedReplay.code, "EVENT_ATTACK_PAYLOAD_MISMATCH");
+
         const afterAttack = expectStatus(await api("/api/game/state", { token: tokenA }), 200, "estado após ataque do evento");
         const remainingMilitia = afterAttack.state.troops.find(unit => unit.unit_type === "militia" && Number(unit.tier) === 1);
         assert.equal(Number(initialMilitia.quantity) - Number(remainingMilitia.quantity), Number(attack.troopsLost),
