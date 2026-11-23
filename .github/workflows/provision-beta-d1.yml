@@ -161,7 +161,7 @@ jobs:
                   fail("UUID beta ausente ou igual a um ambiente existente")
               print("D1 beta ja existe: " + candidate)
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
-                  f.write("### D1 beta encontrado (somente leitura)\nUUID: \`" + candidate + "\`\nNenhuma escrita realizada. Atualize apenas \`wrangler.beta.jsonc\` na branch beta, apos revisao.\n")
+                  f.write("### D1 beta encontrado (somente leitura)\nUUID: `" + candidate + "`\nNenhuma escrita realizada. Atualize apenas `wrangler.beta.jsonc` na branch beta, apos revisao.\n")
               if operation == "create":
                   fail("reutilize e audite o D1 beta existente; nao criar duplicata")
           elif operation == "audit":
@@ -180,6 +180,6 @@ jobs:
                   fail("isolamento do novo D1 nao comprovado; nenhuma migracao/deploy permitido")
               print("NOVO D1 beta criado: " + new_uuid)
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
-                  f.write("### Novo D1 beta criado\nNome: \`" + name + "\`\nUUID: \`" + new_uuid + "\`\nLocalizacao solicitada: \`" + location + "\`\n**Proximo passo:** vincular o UUID somente em \`wrangler.beta.jsonc\`; revisar antes de migrar.\n")
+                  f.write("### Novo D1 beta criado\nNome: `" + name + "`\nUUID: `" + new_uuid + "`\nLocalizacao solicitada: `" + location + "`\n**Proximo passo:** vincular o UUID somente em `wrangler.beta.jsonc`; revisar antes de migrar.\n")
           print("Sem migracoes, deploy, alteracao de secrets, reconfiguracao de Worker ou acesso de escrita aos D1 anteriores.")
           PY
