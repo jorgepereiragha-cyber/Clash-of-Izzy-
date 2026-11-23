@@ -1102,6 +1102,30 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
         "reino permanece autenticado após retomada Google-only");
     });
 
+    await t.test("limite de criação por IP não bloqueia reentrada autenticada em rede compartilhada", async () => {
+      // Exhaust the guest/IP window in local D1 without creating 20 disposable
+      // kingdoms. The default test Worker receives no CF-Connecting-IP header.
+      const now=Math.floor(Date.now()/1000);
+      const started=Math.floor(now/3600)*3600;
+      const key=createHmac("sha256",SESSION_SECRET).update("game-start-ip:unknown").digest("hex");
+      await runCli([
+        "--config","wrangler.jsonc","d1","execute","clash-of-izzy-db",
+        "--local","--persist-to",persistDir,
+        "--command",
+        "INSERT INTO api_rate_limits(rate_key,window_started_at,request_count,expires_at) " +
+        "VALUES('"+key+"',"+started+",20,"+(started+7200)+") " +
+        "ON CONFLICT(rate_key) DO UPDATE SET request_count=20,window_started_at="+started+",expires_at="+(started+7200)+";"
+      ]);
+      expectStatus(await api("/api/game/start",{method:"POST",body:{}}),429,
+        "novo reino continua bloqueado ao exceder 20 criações/IP/hora");
+      const returned=expectStatus(await api("/api/game/start",{method:"POST",token:tokenA,body:{}}),200,
+        "token válido retoma reino, embora IP compartilhado tenha esgotado a cota");
+      assert.equal(returned.resumed,true);
+      assert.equal(returned.state.kingdom.id,kingdomA);
+      expectStatus(await api("/api/game/state",{token:returned.token}),200,
+        "token de retomada permanece válido após bloqueio IP de criação");
+    });
+
     await t.test("todas as 40 ações previstas foram alcançadas no fluxo de integração", async () => {
       const actionTypes = [
         "set_nickname","equipment_craft","equipment_upgrade","equipment_equip","equipment_unequip","equipment_lock",
