@@ -32,6 +32,8 @@ Antes de acionar:
 
 Este workflow não aplica migrações, não configura secrets do Worker beta, não cria convites, não faz deploy e não altera D1s anteriores. Se o nome `clash-of-izzy-beta-db` já existir, a auditoria apenas informa seu UUID; o modo de criação recusa duplicatas. Configurar a branch `beta` e as credenciais beta continua sendo uma etapa distinta.
 
+**Auditoria repetível após provisionamento:** o workflow de `main` também aceita `operation=audit` quando `wrangler.beta.jsonc` já contém o UUID definitivo, verificando se o nome e o UUID coincidem com o D1 existente na conta. Divergência, remoção do banco ou tentativa de `create` com UUID já configurado interrompem a operação antes de qualquer escrita. Portanto, utilize o mesmo `audit` para conferir o binding antes da publicação, sem criar outro D1.
+
 ## Workflow protegido de publicacao remota do beta (adicionado em 23/11/2026)
 
 O workflow [Beta isolado - implantar D1 e Worker (manual e protegido)](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/launch-isolated-beta.yml) vive na `main` apenas para permitir o disparo manual confiavel do GitHub Actions. Seu alvo de publicacao e **exclusivamente** o codigo fixado no SHA da branch `beta` e o Worker `clash-of-izzy-beta`; nao publica o Worker oficial.
