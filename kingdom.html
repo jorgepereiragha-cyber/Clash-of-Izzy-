@@ -345,6 +345,28 @@ async function request(path,options={}){
 const analyticsSessionId=globalThis.crypto?.randomUUID?.()||("session_"+Date.now()+"_"+Math.random().toString(36).slice(2,10));
 let analyticsStarted=false;
 async function trackAnalytics(event,data={}){if(!token)return;try{await request("/game/analytics",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({event,sessionId:analyticsSessionId,data})});}catch(error){console.debug("analytics_unavailable",error?.message||error);}}
+// Browser privacy settings may block one storage while the other remains usable.
+// Do not discard an in-memory session or create an unsaveable guest realm.
+function readKingdomGameToken(){
+ let readable=false,saved="";
+ try{saved=localStorage.getItem("coi_game_token")||"";readable=true;}catch{}
+ if(!saved){try{saved=sessionStorage.getItem("coi_game_token")||"";readable=true;}catch{}}
+ if(!readable&&!token)throw new Error("O navegador bloqueou o armazenamento do reino. Autorize este site e tente novamente.");
+ return saved||token||"";
+}
+function saveKingdomGameToken(){
+ let persisted=false;
+ try{localStorage.setItem("coi_game_token",token);persisted=true;}catch{}
+ try{sessionStorage.setItem("coi_game_token",token);persisted=true;}catch{}
+ return persisted;
+}
+function canPersistKingdomGameToken(){
+ const key="coi_game_storage_probe";
+ for(const getStorage of [()=>localStorage,()=>sessionStorage]){
+  try{const storage=getStorage();storage.setItem(key,"1");storage.removeItem(key);return true;}catch{}
+ }
+ return false;
+}
 let kingdomConnectInFlight=false;
 async function connect(){
  if(kingdomConnectInFlight)return;
@@ -354,22 +376,24 @@ async function connect(){
  const previouslyPlayable=!game.hidden;
  setStatus("Sincronizando…");
  try{
-  token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
+  token=readKingdomGameToken();
+  let tokenPersisted=true;
   if(token){
-   localStorage.setItem("coi_game_token",token);
-   sessionStorage.setItem("coi_game_token",token);
+   tokenPersisted=saveKingdomGameToken();
   }
   let data;
   if(token){
    data=await request("/game/state");
   }else{
+   if(!canPersistKingdomGameToken()){
+    throw new Error("Não é possível salvar a sessão do reino neste navegador. Autorize o armazenamento para evitar perder seu progresso.");
+   }
    const referrerCode=new URLSearchParams(location.search).get("ref")||"";
    data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify(referrerCode?{referrer_code:referrerCode}:{})});
    if(data.token){
     token=data.token;
-    localStorage.setItem("coi_game_token",token);
-    sessionStorage.setItem("coi_game_token",token);
+    tokenPersisted=saveKingdomGameToken();
     if(referrerCode){
      const cleanUrl=new URL(location.href);
      cleanUrl.searchParams.delete("ref");
@@ -384,7 +408,7 @@ async function connect(){
   game.hidden=false;
   render();
   loading.hidden=true;
-  setStatus("● Reino sincronizado");
+  setStatus(tokenPersisted?"● Reino sincronizado":"● Reino sincronizado nesta aba. Autorize o armazenamento para preservar o acesso.");
   if(!analyticsStarted){
    analyticsStarted=true;
    void trackAnalytics("kingdom.opened",{castle_level:Number(state.kingdom.castle_level||1)});
