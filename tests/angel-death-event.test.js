@@ -98,10 +98,11 @@ test("leaderboard ties follow the same stable ordering as final reward payout", 
 test("successful Angel of Death attack refreshes authoritative scores despite the mutation lock", async () => {
   const client = await readFile(new URL("../events.js", import.meta.url), "utf8");
   assert.ok(client.includes("async function refresh(force=false){if(busy&&!force)return;"),
-  assert.ok(client.includes("const generation=++refreshGeneration"), "every refresh has a monotonically increasing generation");
+    "normal polling must pause during a mutation, while a forced post-attack refresh can run");
+  assert.ok(client.includes("const generation=++refreshGeneration"),
+    "every refresh has a monotonically increasing generation");
   assert.ok(client.includes("if(generation!==refreshGeneration)return;state="),
     "a slow pre-attack state response cannot overwrite fresher post-attack data");
-    "normal polling must pause during a mutation, while a forced post-attack refresh can run");
   assert.match(client, /message\("Dano: "[^\n]+await refresh\(true\);\}catch\(error\)/,
     "after a confirmed attack, force server-state reconciliation before releasing the lock");
   assert.ok(client.includes("finally{busy=false;updateAttackButton();}"),
