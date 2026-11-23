@@ -62,10 +62,10 @@ function makeKingdomState() {
   };
 }
 
-async function installApiFixtures(page) {
+async function installApiFixtures(page, overrides = {}) {
   const actions = [];
   const stateRequests = [];
-  const state = makeKingdomState();
+  const state = { ...makeKingdomState(), ...overrides };
 
   await page.addInitScript(token => {
     window.localStorage.setItem("coi_game_token", token);
@@ -234,6 +234,71 @@ test.describe("Mobile kingdom rendering", () => {
     await expect(page.locator("#coiActionNotice")).toContainText("Treinamento iniciado");
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
 
+  });
+
+
+  test("high-capability Android previews all 16 buildings and retains nine safe 2D controls", async ({ page }) => {
+    const types = [
+      "castle", "barracks", "farm", "quarry",
+      "lumber_mill", "iron_mine", "market", "academy",
+      "wall", "hospital", "watchtower", "stable",
+      "archery_range", "siege_workshop", "embassy", "warehouse"
+    ];
+    const buildings = types.map((building_type, index) => ({
+      building_type, level: index === 0 ? 8 : (index % 4) + 1
+    }));
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "deviceMemory", { configurable: true, value: 12 });
+      Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, value: 12 });
+      localStorage.setItem("coi_graphics_preference", "high");
+      window.__coiObservedProjections = [];
+      window.addEventListener("coi:kingdom-projection", event => {
+        window.__coiObservedProjections.push(event.detail?.positions || []);
+      });
+    });
+    await installApiFixtures(page, { buildings });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/kingdom.html");
+    await expect(page.locator("#game")).toBeVisible();
+    await expect(page.locator("#city .building")).toHaveCount(16);
+    await expect(page.locator("#city #kingdom3d")).toBeAttached();
+    await expect.poll(() => page.evaluate(() => window.__coiObservedProjections.at(-1)?.length)).toBe(16);
+    const metrics = await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll("#city .building")];
+      const stage = document.getElementById("city").getBoundingClientRect();
+      return {
+        tier: window.__coiKingdomQuality?.tier,
+        visible: buttons.filter(button => !button.hidden).length,
+        width: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+        targetCenters: buttons.filter(button => !button.hidden).map(button => {
+          const rect = button.getBoundingClientRect();
+          return {
+            name: button.dataset.building,
+            centerX: Math.round(rect.x + rect.width / 2 - stage.x),
+            centerY: Math.round(rect.y + rect.height / 2 - stage.y)
+          };
+        })
+      };
+    });
+    expect(metrics.tier).toBe("high");
+    expect(metrics.visible).toBe(16);
+    expect(metrics.width).toBeLessThanOrEqual(metrics.viewport + 1);
+    expect(new Set(metrics.targetCenters.map(target => target.centerX + ":" + target.centerY)).size).toBe(16);
+    await mkdir("test-results/visual-preview", { recursive: true });
+    await page.locator(".coi-city-stage").screenshot({
+      path: "test-results/visual-preview/cidade-16-edificios-390px.png"
+    });
+
+    // Simulate a WebGL loss: the existing nine-slot Canvas layout stays usable.
+    await page.evaluate(() => {
+      document.getElementById("city").classList.remove("has-3d");
+      window.dispatchEvent(new Event("coi:kingdom-2d-fallback"));
+    });
+    await expect(page.locator("#coiCityCameraControls")).toBeHidden();
+    const remaining = await page.locator("#city .building:visible").count();
+    expect(remaining).toBe(9);
+    await expect(page.locator('#city .building[data-building="castle"]')).toBeVisible();
   });
 
   test("graphics preferences persist and 2D mode keeps mobile controls usable", async ({ page }) => {
