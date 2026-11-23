@@ -122,8 +122,26 @@ test("Android native launcher presents the independent hero emblem and promo por
   const portal = await readFile(new URL("../portal.html", import.meta.url), "utf8");
   assert.match(activity, /heroEmblem\.setImageResource\(R\.drawable\.royal_king\)/);
   assert.match(icon, /fillColor="#E3B865"/);
-  assert.ok(manifest.includes('android:icon="@drawable/royal_king"'));
-  assert.ok(manifest.includes('android:roundIcon="@drawable/royal_king"'));
+  assert.ok(manifest.includes('android:icon="@mipmap/ic_launcher"'));
+  assert.ok(manifest.includes('android:roundIcon="@mipmap/ic_launcher_round"'));
+  const res = "../android-sideload/app/src/main/res/";
+  const launcher = await readFile(new URL(res + "mipmap-anydpi-v26/ic_launcher.xml", import.meta.url), "utf8");
+  const round = await readFile(new URL(res + "mipmap-anydpi-v26/ic_launcher_round.xml", import.meta.url), "utf8");
+  const foreground = await readFile(new URL(res + "drawable/ic_launcher_foreground.xml", import.meta.url), "utf8");
+  const legacy = await readFile(new URL(res + "mipmap-anydpi/ic_launcher.xml", import.meta.url), "utf8");
+  const legacyRound = await readFile(new URL(res + "mipmap-anydpi/ic_launcher_round.xml", import.meta.url), "utf8");
+  const systemSplash = await readFile(new URL(res + "values-v31/styles.xml", import.meta.url), "utf8");
+  for (const adaptive of [launcher, round]) {
+    assert.match(adaptive, /<adaptive-icon /);
+    assert.match(adaptive, /@drawable\/ic_launcher_foreground/);
+    assert.match(adaptive, /@color\/coi_icon_background/);
+  }
+  assert.match(foreground, /@drawable\/royal_king/);
+  assert.match(foreground, /android:width="72dp"/);
+  assert.match(legacy, /@drawable\/royal_king/);
+  assert.match(legacyRound, /@drawable\/royal_king/);
+  assert.match(systemSplash, /android:windowSplashScreenAnimatedIcon/);
+  assert.match(activity, /heroEmblem\.setAdjustViewBounds\(true\)/);
   assert.ok(kingdom.includes('class="coi-command-seal" src="/assets/brand/royal-king.webp"'));
   assert.match(portal, /assets\/brand\/royal-king\.webp/);
   assert.doesNotMatch(portal, /\/scripts\/pwa-runtime\.js|href="\/manifest\.json"/);
