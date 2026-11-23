@@ -101,13 +101,22 @@ jobs:
               fail("acesso ou pagamentos beta nao estao bloqueados")
           if bd["binding"] != "DB" or bd["database_name"] != name:
               fail("binding/nome do terceiro banco nao correspondem ao contrato")
-          if bd["database_id"] not in ("REPLACE_WITH_NEW_BETA_D1_UUID",):
-              fail("o ID beta ja esta configurado: use a homologacao, nao crie outro D1")
+          # Auditing an already provisioned beta must remain possible.
+          # Only a first-time CREATE may proceed while the beta binding is a placeholder.
+          placeholder = "REPLACE_WITH_NEW_BETA_D1_UUID"
+          configured_uuid = bd["database_id"]
+          is_configured = configured_uuid != placeholder
+          uuid_pattern = r"[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}"
+          if is_configured and (not re.fullmatch(uuid_pattern, str(configured_uuid))
+                                or configured_uuid in (prod_uuid, preview_uuid)):
+              fail("UUID beta configurado invalido ou igual a producao/Preview")
           if beta.get("triggers"):
               fail("beta nao deve conter crons")
           operation = os.environ.get("OPERATION", "")
           if operation not in ("audit", "create"):
               fail("operacao invalida")
+          if operation == "create" and is_configured:
+              fail("D1 beta ja vinculado; nunca criar outro banco. Use audit.")
           if operation == "create" and os.environ.get("CONFIRMATION") != "CRIAR-D1-BETA":
               fail("create requer confirmacao literal CRIAR-D1-BETA")
           location = os.environ.get("LOCATION_HINT", "")
@@ -157,13 +166,20 @@ jobs:
               fail("varios D1 com nome beta; exigir verificacao humana")
           if existing:
               candidate = existing[0].get("uuid")
-              if not candidate or candidate in (prod_uuid, preview_uuid):
-                  fail("UUID beta ausente ou igual a um ambiente existente")
-              print("D1 beta ja existe: " + candidate)
+              if not re.fullmatch(uuid_pattern, str(candidate)) or candidate in (prod_uuid, preview_uuid):
+                  fail("UUID beta ausente, malformado ou igual a um ambiente existente")
+              if is_configured and candidate != configured_uuid:
+                  fail("D1 beta vinculado diverge do UUID real; nenhuma operacao permitida")
+              print("D1 beta existente e isolado: " + candidate)
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
-                  f.write("### D1 beta encontrado (somente leitura)\nUUID: `" + candidate + "`\nNenhuma escrita realizada. Atualize apenas `wrangler.beta.jsonc` na branch beta, apos revisao.\n")
+                  f.write("### D1 beta auditado (somente leitura)\nUUID: `" + candidate + "`\n" +
+                          ("Binding beta corresponde ao D1 remoto.\n" if is_configured else
+                           "Ainda falta vincular este UUID apenas em `wrangler.beta.jsonc` na branch beta.\n") +
+                          "Nenhuma escrita realizada.\n")
               if operation == "create":
-                  fail("reutilize e audite o D1 beta existente; nao criar duplicata")
+                  fail("reutilize o D1 beta existente; nao criar duplicata")
+          elif is_configured:
+              fail("Binding beta configurado, mas D1 correspondente nao existe nesta conta")
           elif operation == "audit":
               print("AUDIT: D1 beta ainda nao existe. Nenhuma escrita realizada.")
               with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
