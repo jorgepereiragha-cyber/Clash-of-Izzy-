@@ -203,6 +203,9 @@ jobs:
       - name: Aplicar somente migrations essenciais ate 0039 em producao
         run: npx wrangler --config wrangler.core.generated.jsonc d1 migrations apply clash-of-izzy-db --remote
 
+      - name: Comprovar ledger 0037-0039, schema, indices e FKs apos reparo (somente leitura)
+        run: node scripts/verify-d1-core-repair-readonly.mjs
+
       - name: Verificar prontidao remota SEM allowlist (somente leitura)
         run: |
           node scripts/cloudflare-remote-audit.mjs
