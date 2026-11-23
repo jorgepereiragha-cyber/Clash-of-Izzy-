@@ -147,7 +147,7 @@ test("the Android beta uses a different application ID, origin and signing crede
 
 test("invitation code validation accepts only high entropy base32 format", () => {
   assert.equal(normalizeInviteCode(" " + validCode.toLowerCase() + " "), validCode);
-  for (const bad of ["IZZY-123", "IZZY-AAAAAAAAAAAAAAAAAAAI", "IZZY-" + "0".repeat(20), "IZZY-" + "A".repeat(100)]) {
+  for (const bad of ["IZZY-123", "IZZY-AAAAAAAAAAAAAAAAAAA1", "IZZY-" + "0".repeat(20), "IZZY-" + "A".repeat(100)]) {
     assert.equal(normalizeInviteCode(bad), null);
   }
 });
