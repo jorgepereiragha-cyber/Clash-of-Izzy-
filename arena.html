@@ -126,8 +126,9 @@ async function connectKingdom(){
  arenaConnectionInProgress=true;
  const status=document.getElementById('kingdomStatus');
  status.textContent='🌐 Conectando ao reino…';
+ let savedToken='';
  try{
-  const savedToken=readArenaGameToken();
+  savedToken=readArenaGameToken();
   let response;
   if(savedToken){
    response=await fetch(API_BASE+'/game/state',{headers:{Authorization:'Bearer '+savedToken}});
@@ -154,9 +155,13 @@ async function connectKingdom(){
   renderChronicle();
  }catch(error){
   status.replaceChildren(document.createTextNode('⚠️ Reino não conectado · '+(error.message||'Serviço indisponível')+' '));
-  const retry=document.createElement('button');retry.type='button';retry.id='retryArenaConnection';retry.textContent='Tentar novamente';
-  retry.addEventListener('click',()=>{void connectKingdom()});status.append(retry);
-  if(error.status===401||error.status===403){
+  // Do not repeat anonymous realm creation after a lost response: the first
+  // request might have succeeded without delivering its token to the client.
+  if(savedToken){
+   const retry=document.createElement('button');retry.type='button';retry.id='retryArenaConnection';retry.textContent='Tentar novamente';
+   retry.addEventListener('click',()=>{void connectKingdom()});status.append(retry);
+  }
+  if(!savedToken||error.status===401||error.status===403){
    const account=document.createElement('a');account.href='/account.html';account.textContent='Acessar minha conta';account.style.marginLeft='8px';status.append(account);
   }
   console.warn('Clash of Izzy: falha ao conectar ao reino:',error);
