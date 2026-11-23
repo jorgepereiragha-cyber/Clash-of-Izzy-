@@ -74,7 +74,8 @@ export async function runProductionSmokeTests({
       const cause = error?.cause;
       const code = typeof cause?.code === "string" && /^[A-Z][A-Z0-9_]{1,39}$/.test(cause.code) ? " [" + cause.code + "]" : "";
       const message = error?.name === "TimeoutError" ? "timeout" : "fetch failed";
-      throw new Error("Falha de rede no smoke GET " + target.pathname + ": " + message + code, { cause: error });
+      // Do not attach the original error: Node prints nested causes, which may contain secrets.
+      throw new Error("Falha de rede no smoke GET " + target.pathname + ": " + message + code);
     }
   };
 
