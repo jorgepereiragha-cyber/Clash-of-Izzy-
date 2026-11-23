@@ -507,11 +507,12 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   function checkAndDowngradeQuality(timestamp) {
     if (qualityDowngraded || quality === "low" || !renderer) return;
     if (!lastFpsCheck) lastFpsCheck = timestamp;
-    if (timestamp - lastFpsCheck < 3000) return;
+    // With extremely low FPS, allow the sample window to exceed three seconds.
+    // Otherwise a 5-FPS device would never accumulate the minimum 20 samples.
+    if (timestamp - lastFpsCheck < 3000 || fpsSamples.length < 20) return;
     lastFpsCheck = timestamp;
     const samples = fpsSamples;
     fpsSamples = [];
-    if (samples.length < 20) return;
     const avg = samples.reduce((total, fps) => total + fps, 0) / samples.length;
     if (avg >= 22) return;
 
@@ -541,7 +542,7 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
       // Only measure continuous, visible march frames; exclude tab resumption gaps.
       if (lastFrameTime > 0) {
         const delta = timestamp - lastFrameTime;
-        if (delta >= 8 && delta <= 250) {
+        if (delta >= 8 && delta <= 1000) {
           fpsSamples.push(1000 / delta);
           if (fpsSamples.length > 60) fpsSamples.shift();
         }
