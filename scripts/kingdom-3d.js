@@ -74,6 +74,8 @@ if (host && "WebGLRenderingContext" in window) {
   const surfaceMaterialCache = new Map();
   let disposed = false;
   let kingdomRenderHandler = null;
+  let kingdomZoomHandler = null;
+  let cameraZoomFactor = 1;
   let valhallaModeHandler = null;
   let developmentStatsBadge = null;
   let developmentStatsTimer = null;
@@ -662,7 +664,8 @@ if (host && "WebGLRenderingContext" in window) {
     const minZ = Math.min(...zs), maxZ = Math.max(...zs);
     const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
     const span = Math.max(maxX - minX + 4, maxZ - minZ + 4);
-    camera.zoom = Math.min(1, 13 / span);
+    // Zoom only affects the client camera; no game state is persisted.
+    camera.zoom = Math.min(1, 13 / span) * cameraZoomFactor;
     camera.position.set(cx + 10, 13, cz + 11);
     camera.lookAt(cx, .2, cz);
     camera.updateProjectionMatrix();
@@ -1235,6 +1238,7 @@ if (host && "WebGLRenderingContext" in window) {
       visibilityChangeHandler = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+      if (kingdomZoomHandler) window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler);
       if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
       if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
       valhallaModeHandler = null;
@@ -1267,6 +1271,19 @@ if (host && "WebGLRenderingContext" in window) {
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
     };
     window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
+    kingdomZoomHandler = event => {
+      if (disposed || cinematicCaptureActive || !renderer || !scene || !camera) return;
+      const action = event.detail?.action;
+      if (!["in", "out", "reset"].includes(action)) return;
+      cameraZoomFactor = action === "reset" ? 1
+        : Math.max(0.7, Math.min(1.6, Number((cameraZoomFactor + (action === "in" ? 0.2 : -0.2)).toFixed(2))));
+      const visible = latestBuildings.slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
+      if (!visible.length) return;
+      frameCityBuildings(visible);
+      renderer.render(scene, camera);
+      publishBuildingHitTargets(visible);
+    };
+    window.addEventListener("coi:kingdom-zoom", kingdomZoomHandler);
     defensePreviewHandler=event=>updateDefensePreview(event.detail||{});
     window.addEventListener("coi:defense-preview",defensePreviewHandler);
     if (Array.isArray(window.__coiKingdomBuildings)) {
@@ -1351,6 +1368,7 @@ if (host && "WebGLRenderingContext" in window) {
       sceneVisibilityObserver.observe(host);
     }
     resize();
+    window.dispatchEvent(new CustomEvent("coi:kingdom-3d-ready"));
     if (advancedShaders) startArmyAnimationLoop();
   } catch (error) {
     // Initialization can fail after GPU resources or listeners were already created.
@@ -1365,6 +1383,7 @@ if (host && "WebGLRenderingContext" in window) {
     visibilityChangeHandler = null;
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+    if (kingdomZoomHandler) window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler);
     if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
     if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
     valhallaModeHandler = null;
