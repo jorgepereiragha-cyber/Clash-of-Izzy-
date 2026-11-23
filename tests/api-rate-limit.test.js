@@ -57,6 +57,8 @@ test("Worker rate-limits authentication and game endpoints without wildcard CORS
   assert.ok(worker.includes('"game-resume-player",existingPlayerId,120,3600'),"authenticated resumes have their own player quota");
   assert.ok(worker.includes('code:"GAME_SESSION_INVALID"'),"invalid Bearer must not create guest kingdom");
   assert.ok(worker.includes('code:"GAME_REALM_MISSING"'),"valid Bearer without existing kingdom must fail closed");
+  assert.ok(worker.includes("if(!row)return null;"),"signed token of deleted player never authenticates");
+  assert.ok(worker.includes("if(version===null)return null;"));
   const resumeIdx=worker.indexOf('const existingPlayerId=await gameIdentity(request,env)');
   const guestLimitIdx=worker.indexOf('rateLimitDecision(env,"game-start-ip",ip,20,3600)',resumeIdx);
   const playerLimitIdx=worker.indexOf('rateLimitDecision(env,"game-resume-player",existingPlayerId,120,3600)',resumeIdx);
