@@ -131,3 +131,18 @@ jobs:
           node scripts/check-android-release-server.mjs
           node scripts/check-worker-only-payment-state.mjs
           node scripts/production-smoke.js
+
+      - name: Comprovar arquivos visuais 3D publicados por SHA-256 (somente GET)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # A propagacao de uma nova versao Cloudflare pode levar alguns segundos.
+          for attempt in 1 2 3 4 5; do
+            if node scripts/verify-live-3d-assets.mjs; then
+              echo "Castelo, arvores e manifesto 3D correspondem ao codigo aprovado."
+              exit 0
+            fi
+            if [[ "$attempt" -lt 5 ]]; then sleep 6; fi
+          done
+          echo "::error::Arquivos 3D em producao nao correspondem ao SHA aprovado; deploy nao homologado."
+          exit 1
