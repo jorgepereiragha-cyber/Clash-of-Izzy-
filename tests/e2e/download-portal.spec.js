@@ -58,3 +58,44 @@ test("Android: reject download redirection to another domain even if release met
   await expect(page.locator("#download-apk")).not.toHaveAttribute("href", /./);
   await expect(page.locator("#download-apk-final")).toHaveAttribute("aria-disabled", "true");
 });
+
+
+test("Android: portal release proxy enables download without a direct GitHub API response", async ({ page }) => {
+  await page.route("**/api/android/latest", route => route.fulfill({
+    status: 200,
+    headers: {"X-COI-Release-Proxy": "v1", "Cache-Control": "public, max-age=60"},
+    contentType: "application/json",
+    body: JSON.stringify({
+      draft: false, prerelease: false, tag_name: "v1.2.3",
+      assets: [
+        {name: apk, state: "uploaded", size: 4000000, browser_download_url: prefix + apk},
+        {name: apk + ".sha256", state: "uploaded", size: 96, browser_download_url: prefix + apk + ".sha256"}
+      ]
+    })
+  }));
+  await page.route(releases, route => route.fulfill({status: 429, body: "rate limit"}));
+  await page.goto("/portal.html");
+  await expect(page.locator("#download-apk")).toHaveAttribute("href", prefix + apk);
+  await expect(page.locator("#checksum-link")).toHaveAttribute("href", prefix + apk + ".sha256");
+});
+
+test("Android: verified proxy 404 never falls back to a stale or forged GitHub release", async ({ page }) => {
+  await page.route("**/api/android/latest", route => route.fulfill({
+    status: 404, headers: {"X-COI-Release-Proxy": "v1"},
+    contentType: "application/json", body: '{"available":false}'
+  }));
+  await page.route(releases, route => route.fulfill({
+    status: 200, contentType: "application/json",
+    headers: {"access-control-allow-origin": "*"},
+    body: JSON.stringify({
+      draft: false, prerelease: false, tag_name: "v1.2.3",
+      assets: [
+        {name: apk, state: "uploaded", size: 4000000, browser_download_url: prefix + apk},
+        {name: apk + ".sha256", state: "uploaded", size: 96, browser_download_url: prefix + apk + ".sha256"}
+      ]
+    })
+  }));
+  await page.goto("/portal.html");
+  await expect(page.locator("#download-apk")).toHaveAttribute("aria-disabled", "true");
+  await expect(page.locator("#download-apk")).not.toHaveAttribute("href", /./);
+});

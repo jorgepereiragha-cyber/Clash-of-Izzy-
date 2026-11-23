@@ -8,12 +8,12 @@ loja, painel administrativo, PWA ou endpoints de pagamento.
 ## Implementação
 - `portal-worker.js` aceita somente GET/HEAD e permite os cinco caminhos
   promocionais (HTML, CSS, favicon e emblema). Todas as outras URLs, inclusive
-  `/kingdom.html`, `/api/*`, `/sw.js` e `/manifest.json`, são recusadas.
+  `/kingdom.html`, `/api/*`, `/sw.js` e `/manifest.json`, são recusadas,\n  **exceto** `/api/android/latest` (apenas GET/HEAD, metadados públicos de release com APK e hash validados).
 - `wrangler.portal.jsonc` cria **outro Worker**, `clash-of-izzy-portal`,
   com diretório estático **isolado** `public-portal/`. Não tem acesso
   ao D1, Durable Objects, secrets, autenticação, nem ao código do jogo.
 - O conteúdo promocional é uma cópia da página oficial da candidata,
-  incluindo consulta da última release GitHub com APK e checksum SHA-256.
+  incluindo consulta da última release GitHub com APK e checksum SHA-256.\n  O portal prefere o proxy somente leitura `/api/android/latest`, com cache curto de sucesso/404,\n  e conserva consulta direta à API do GitHub apenas como fallback quando o proxy não está disponível.\n  O proxy jamais consulta D1, recebe tokens, cria pedidos ou ativa downloads sem APK e checksum oficiais.
   O download permanece desabilitado na falta da release oficial.
 - A raiz redireciona ao portal, preservando parâmetros UTM de campanhas.
 

@@ -42,6 +42,7 @@ test("links diretos de jogo, API, loja e PWA não são entregues pelo portal pú
     "/kingdom.html","/world.html","/arena.html","/account.html","/admin.html",
     "/market.html","/events.html","/alliance.html","/sw.js","/manifest.json",
     "/api/game/state","/api/health","/api/store/checkout","/api/realtime/eldoria",
+    "/api/android/latest/fake",
     "/worker.js","/hero-catalog.js","/assets/art/heroes/portraits.svg",
     "/.git/config","/%2e%2e/kingdom.html"
   ];
