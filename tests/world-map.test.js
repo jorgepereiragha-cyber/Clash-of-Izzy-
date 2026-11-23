@@ -30,6 +30,9 @@ test("world map handles inaccessible browser storage before importing world stat
   assert.ok(script.includes('if (!token && checked.blocked) { showWorldSessionRecovery(); return; }'));
   assert.ok(script.includes('retry.id = "retryWorldSession"'));
   assert.ok(script.includes('link.href = "/account.html"'));
+  assert.ok(script.includes("error.status = response.status;"), "preserve error status to display account recovery");
+  assert.ok(script.includes('if (error.status === 401 || error.status === 403)'));
+
 });
 
 test("world map presents an isometric 3D strategy view instead of a free-roaming arena hero", async () => {
