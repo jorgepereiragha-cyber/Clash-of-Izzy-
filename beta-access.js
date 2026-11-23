@@ -140,6 +140,10 @@ export async function betaAccessGuard(request, env) {
         path === "/apoie" || path === "/apoie.html") {
       return responseJson({ error: "Portal de divulgacao indisponivel no beta.", code: "BETA_MARKETING_DISABLED" }, 404);
     }
+    // A closed beta cannot ship the official install manifest or offline landing.
+    if (path === "/manifest.json" || path === "/offline.html") {
+      return responseJson({ error: "PWA oficial indisponivel neste beta.", code: "BETA_LEGACY_PWA_DISABLED" }, 404);
+    }
     // The public marketing portal and legacy beta sign-up are not part of this realm.
     if (path === "/api/beta/signup") {
       return responseJson({ error: "Use o convite do beta fechado.", code: "BETA_LEGACY_SIGNUP_DISABLED" }, 404);
