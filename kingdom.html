@@ -558,6 +558,8 @@ window.addEventListener("coi:kingdom-projection",event=>{
  });
 });
 window.addEventListener("coi:kingdom-2d-fallback",()=>{
+ // Context loss can hide the focused camera button. Preserve keyboard focus.
+ const cameraHadFocus=!!cityCameraControls?.contains(document.activeElement);
  if(cityCameraControls)cityCameraControls.hidden=true;
  const city=document.getElementById("city");if(!city)return;
  city.classList.remove("dense-3d");
@@ -567,6 +569,7 @@ window.addEventListener("coi:kingdom-2d-fallback",()=>{
   button.style.left="";
   button.style.top="";
  });
+ if(cameraHadFocus)city.querySelector("[data-building]:not([hidden])")?.focus({preventScroll:true});
 });
 function renderCastleSkins(){
  const root=document.getElementById("castleSkins");if(!root)return;
