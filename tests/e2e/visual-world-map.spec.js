@@ -1,6 +1,25 @@
 import { test, expect } from "@playwright/test";
 import { mkdir } from "node:fs/promises";
 
+test("world map does not create a new realm or crash when browser token storage is blocked", async ({ page }) => {
+  await page.addInitScript(() => {
+    localStorage.setItem("coi_graphics_preference", "2d");
+    const originalGet = Storage.prototype.getItem;
+    Storage.prototype.getItem = function(key) {
+      if (key === "coi_game_token") throw new DOMException("Storage blocked", "SecurityError");
+      return originalGet.call(this, key);
+    };
+  });
+  let gameRequests = 0;
+  await page.route("**/api/game/start", async route => { gameRequests++; await route.abort(); });
+  await page.goto("/world.html");
+  await expect(page.locator("#status")).toContainText("bloqueou o armazenamento");
+  await expect(page.locator("#retryWorldSession")).toBeVisible();
+  await expect(page.getByRole("link", { name:"Acessar minha conta" })).toHaveAttribute("href", "/account.html");
+  await expect(page).toHaveURL(/\/world(?:\.html)?$/);
+  expect(gameRequests).toBe(0);
+});
+
 test("world map obeys local 2D graphics choice and keeps tactical pins on Android", async ({ page }) => {
   await page.addInitScript(() => {
     localStorage.setItem("coi_graphics_preference", "2d");
