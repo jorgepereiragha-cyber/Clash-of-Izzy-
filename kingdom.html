@@ -313,6 +313,21 @@ window.__coiCityBuildingNames=Object.fromEntries(Object.entries(names).map(([key
 const fmt=n=>Number(n||0).toLocaleString("pt-BR");
 const esc=value=>String(value??"").replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;").replaceAll(String.fromCharCode(34),"&quot;").replaceAll(String.fromCharCode(39),"&#39;");
 function setStatus(message,error=false){const el=document.getElementById("status");el.textContent=message;el.classList.toggle("error",error)}
+// Storage access differs across browsers/WebViews. A blocked localStorage
+// must not hide a valid sessionStorage token or create a duplicate guest realm.
+function readKingdomGameToken(){
+ let readable=false;
+ try{const value=localStorage.getItem("coi_game_token");readable=true;if(value)return value;}catch{}
+ try{const value=sessionStorage.getItem("coi_game_token");readable=true;if(value)return value;}catch{}
+ if(!readable)throw new Error("O navegador bloqueou o armazenamento da sessão. Autorize este site e tente novamente.");
+ return "";
+}
+function saveKingdomGameToken(value){
+ let saved=false;
+ try{localStorage.setItem("coi_game_token",value);saved=true;}catch{}
+ try{sessionStorage.setItem("coi_game_token",value);saved=true;}catch{}
+ return saved;
+}
 let coiActionNoticeTimer = 0;
 function showActionNotice(message) {
  const notice = document.getElementById("coiActionNotice");
@@ -354,11 +369,9 @@ async function connect(){
  const previouslyPlayable=!game.hidden;
  setStatus("Sincronizando…");
  try{
-  token=localStorage.getItem("coi_game_token")||sessionStorage.getItem("coi_game_token");
-  if(token){
-   localStorage.setItem("coi_game_token",token);
-   sessionStorage.setItem("coi_game_token",token);
-  }
+  token=readKingdomGameToken();
+  if(token)saveKingdomGameToken(token);
+  let sessionStorageUnavailable=false;
   let data;
   if(token){
    data=await request("/game/state");
@@ -368,8 +381,7 @@ async function connect(){
     body:JSON.stringify(referrerCode?{referrer_code:referrerCode}:{})});
    if(data.token){
     token=data.token;
-    localStorage.setItem("coi_game_token",token);
-    sessionStorage.setItem("coi_game_token",token);
+    sessionStorageUnavailable=!saveKingdomGameToken(token);
     if(referrerCode){
      const cleanUrl=new URL(location.href);
      cleanUrl.searchParams.delete("ref");
@@ -384,7 +396,9 @@ async function connect(){
   game.hidden=false;
   render();
   loading.hidden=true;
-  setStatus("● Reino sincronizado");
+  setStatus(sessionStorageUnavailable
+   ?"● Reino sincronizado, mas o navegador não salvou a sessão. Vincule uma conta antes de sair."
+   :"● Reino sincronizado");
   if(!analyticsStarted){
    analyticsStarted=true;
    void trackAnalytics("kingdom.opened",{castle_level:Number(state.kingdom.castle_level||1)});
