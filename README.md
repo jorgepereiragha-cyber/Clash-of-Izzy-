@@ -1,6 +1,6 @@
 # Clash of Izzy
 
-**Distribuição Android:** o portal promocional e o Worker principal estão publicados. Em 22/11/2026, o backend de Eldoria recebeu as migrações D1 até 0035 e passou na auditoria remota, no contrato Android e no smoke test de produção. O aplicativo Android utiliza WebView. O **APK oficial assinado ainda não está publicado**; o APK interno de teste não equivale à distribuição comercial.
+**Status verificado em 22/11/2026:** código e CI aprovados na `main` (PR #277), mas a auditoria remota mais recente retornou **HTTP 503** por três tabelas D1 ainda não criadas. A recuperação 0037–0039 foi comprovada com Wrangler em banco local sintético, **não executada em produção**; use somente o [reparo D1 protegido](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/repair-production-d1-core.yml). Depois de comprovar `GET /api/health` como HTTP 200, use o [deploy Worker-only protegido](https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/deploy-worker-only.yml). O **APK oficial assinado ainda não foi publicado**; o APK interno de teste não equivale à distribuição comercial. A publicação e os recebimentos comerciais permanecem bloqueados.
 
 Veja [guia de distribuição](docs/DISTRIBUICAO_APK_OFICIAL.md), [auditoria da candidata](docs/AUDITORIA_COMPLETA_2026-11-21.md) [monetização segura](docs/MONETIZACAO_SEGURA.md) e [status auditado do lançamento](docs/STATUS_LANCAMENTO_ANDROID.md).
 
@@ -36,7 +36,7 @@ Comandos úteis:
 - `npm run check`: valida o bundle do Worker sem publicar.
 - `npm run assets:validate`: valida o manifesto 3D v2, GLBs locais, referências de textura e orçamento de arquivos.
 - `npm run db:migrate:local`: aplica as migrações no D1 local.
-- `npm run db:migrate:remote`: aplica as migrações no D1 remoto.
+- `npm run db:migrate:remote` e `npm run deploy`: **bloqueados intencionalmente** para impedir migrações 0040+ e publicações sem aprovação. Use os workflows protegidos com a autorização do responsável.
 
 ## Deploy manual protegido
 
@@ -46,7 +46,7 @@ Esta alteração de segurança aposenta dois antigos disparadores indiretos (`li
 
 O artifact `clash-of-izzy-d1-pre-migration-restore-point-*` registra o bookmark e o comando de recuperação. **Restaurar Time Travel sobrescreve o estado atual do banco**; não execute uma restauração sem plano de recuperação e autorização.
 
-Atenção: `npm run db:migrate:remote` aponta para o D1 configurado em `wrangler.jsonc`, que na `main` auditada é o banco de produção. Não execute esse comando como teste.
+Atenção: o D1 do `wrangler.jsonc` é o banco de **produção**. Os atalhos `npm run db:migrate:remote` e `npm run deploy` retornam erro sem alterar recursos. Não substitua essas proteções por invocação manual do Wrangler. A recuperação autorizada aplica somente 0037–0039; as migrações 0040+ e a ativação 4X/comercial dependem de homologação separada.
 
 Configure estes segredos no GitHub:
 

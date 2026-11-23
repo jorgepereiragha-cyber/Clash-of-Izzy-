@@ -1,120 +1,20 @@
-name: Publicar entrada Android no Worker atual - sem migracoes D1
+name: Legado desativado - publicar entrada Android no Worker atual
 
+# A antiga publicacao era acionada por push neste proprio YAML e sobrescrevia
+# o Worker atual com um snapshot antigo do backend (sem o gate de schema).
+# Nunca reativar deploy automatizado deste workflow.
 on:
-  push:
-    branches: [main]
-    paths:
-      - .github/workflows/publicar-entrada-worker-atual.yml
+  workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: clash-of-izzy-prod-landing-only
-  cancel-in-progress: false
-
 jobs:
-  publicar-entrada:
+  retired:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
-    environment:
-      name: production
     steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: main
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-      - name: Montar somente landing Android sobre backend atual validado
-        shell: bash
+      - name: Informar substituicao pelo fluxo protegido
         run: |
-          set -euo pipefail
-          stable="642bf2479735a2a8b96549c9fb7886f1eb1d9c18"
-          dest="$RUNNER_TEMP/izzy-marketing-hotfix"
-          mkdir -p "$dest"
-          git cat-file -e "$stable^{commit}"
-          git archive "$stable" | tar -x -C "$dest"
-          cp index.html portal.html "$dest/"
-          mkdir -p "$dest/assets/brand"
-          cp assets/brand/hero-emblem.svg "$dest/assets/brand/hero-emblem.svg"
-          # A landing legada tinha um menu que não pode reaparecer no portal.
-          sed -i '\@<script src="/navigation.js" defer></script>@d' "$dest/index.html"
-          grep -q 'url=/portal.html' "$dest/index.html"
-          grep -q 'id="download-apk"' "$dest/portal.html"
-          ! grep -q 'id="play-now"' "$dest/index.html"
-          # Preservar worker.js, bindings D1 e versao de runtime em producao.
-          test "$(sha256sum "$dest/worker.js" | cut -d ' ' -f 1)" = "$(git show "$stable:worker.js" | sha256sum | cut -d ' ' -f 1)"
-          # O Worker em produção já possui Durable Objects. Preservar a classe
-          # sem alterar sua lógica nem excluir objetos persistidos.
-          cp wrangler.jsonc "$dest/wrangler.jsonc"
-          # O backend estavel nao possui o comando vendor:three da main.
-          # Esta publicacao temporaria nao muda bundles ou shaders do jogo.
-          python3 - "$dest/wrangler.jsonc" <<'PY'
-          import json, sys
-          filename=sys.argv[1]
-          with open(filename,encoding="utf-8") as f: config=json.load(f)
-          config.pop("build",None)
-          assert config["durable_objects"]["bindings"][0]["class_name"]=="EldoriaRoom"
-          with open(filename,"w",encoding="utf-8") as f:
-            json.dump(config,f,indent=2)
-          PY
-          cp eldoria-room.js "$dest/eldoria-room.js"
-          printf '\nexport { EldoriaRoom } from "./eldoria-room.js";\n' >> "$dest/worker.js"
-          printf '\neldoria-room.js\n' >> "$dest/.assetsignore"
-          grep -q 'export { EldoriaRoom }' "$dest/worker.js"
-          grep -q 'new_sqlite_classes' "$dest/wrangler.jsonc"
-          echo "BUILD_DIR=$dest" >> "$GITHUB_ENV"
-      - name: Instalar dependencias do backend estavel
-        run: npm install --ignore-scripts --no-audit --no-fund
-        working-directory: ${{ env.BUILD_DIR }}
-      - name: Verificar bundle e arquivos promocionais sem alterar banco
-        run: |
-          npm run check
-          test -f portal.html
-          test -f assets/brand/hero-emblem.svg
-        working-directory: ${{ env.BUILD_DIR }}
-      - name: Normalizar credenciais Cloudflare
-        env:
-          RAW_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
-        run: |
-          python3 - <<'PY'
-          import os
-          token=os.environ.get("RAW_TOKEN","").strip()
-          account=os.environ.get("ACCOUNT_ID","").strip()
-          if token[:7].lower()=="bearer ": token=token[7:].strip()
-          if len(token)>1 and token[0]==token[-1] and token[0] in ("'",'"'):
-            token=token[1:-1].strip()
-          if not account or not token or any(c.isspace() for c in token):
-            raise SystemExit("Cloudflare token/conta nao configurados.")
-          print("::add-mask::"+token)
-          with open(os.environ["GITHUB_ENV"],"a",encoding="utf8") as f:
-            f.write("CLOUDFLARE_API_TOKEN="+token+"\n")
-            f.write("CLOUDFLARE_ACCOUNT_ID="+account+"\n")
-          PY
-      - name: Publicar somente entrada promocional com backend anterior intacto
-        working-directory: ${{ env.BUILD_DIR }}
-        run: npx wrangler --config wrangler.jsonc deploy
-      - name: Verificar propagacao, paginas e saude sem alterar dados
-        shell: bash
-        run: |
-          set -euo pipefail
-          base="https://clash-of-izzy.jorgepereiragha.workers.dev"
-          landing="$RUNNER_TEMP/landing-check.html"
-          for attempt in 1 2 3 4 5 6; do
-            code="$(curl -LsS -o "$landing" -w '%{http_code}' --max-time 20 "$base/portal.html")" || code="000"
-            if test "$code" = "200" && grep -q 'id="download-apk"' "$landing"; then break; fi
-            sleep 5
-          done
-          test "$code" = "200" && grep -q 'id="download-apk"' "$landing"
-          curl -LfsS --max-time 20 "$base/" > "$RUNNER_TEMP/index-check.html"
-          grep -q 'url=/portal.html' "$RUNNER_TEMP/index-check.html" || grep -q 'id="download-apk"' "$RUNNER_TEMP/index-check.html"
-          for path in /kingdom.html /api/health; do
-            # Cloudflare canoniza /kingdom.html para /kingdom via HTTP 307.
-            status="$(curl -L -s -o /dev/null -w '%{http_code}' --max-time 20 "$base$path")"
-            test "$status" = "200" || { echo "::error::$path indisponivel apos deploy ($status)"; exit 1; }
-          done
-          echo "Endereco antigo agora mostra divulgacao/download; backend e D1 preservados."
+          echo "::notice::Workflow legado desativado. Nenhum deploy nem acesso a D1."
+          echo "Para reparar o D1 ate 0039, use repair-production-d1-core.yml."
+          echo "Para publicar o Worker apos health=200, use deploy-worker-only.yml."

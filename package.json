@@ -4,10 +4,10 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "deploy": "wrangler --config wrangler.jsonc deploy",
+    "deploy": "node scripts/block-direct-production-operation.mjs deploy",
     "dev": "wrangler --config wrangler.jsonc dev",
     "db:migrate:local": "wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --local",
-    "db:migrate:remote": "wrangler --config wrangler.jsonc d1 migrations apply clash-of-izzy-db --remote",
+    "db:migrate:remote": "node scripts/block-direct-production-operation.mjs migrate",
     "db:migrate:preview:local": "wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --local",
     "db:migrate:preview:remote": "wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --remote",
     "check": "wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist",
