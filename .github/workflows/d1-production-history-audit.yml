@@ -110,7 +110,10 @@ jobs:
                   "position": 1, "expectedFilename": expected[0] if expected else None,
                   "appliedFilename": None,
               }
-          pending = expected[len(names):] if prefix_valid else []
+          # The historical baseline may be complete but recorded out of filename
+          # order. Calculate outstanding essentials by set membership, never by
+          # an ordered prefix which would hide genuinely pending 0037-0039.
+          pending = [name for name in expected if name not in observed_set] if baseline_complete else []
           last = names[-1] if names else None
           required_tables = {"daily_reward_claims", "onboarding_bonus_claims", "support_orders"}
           missing_tables = sorted(required_tables - existing)
