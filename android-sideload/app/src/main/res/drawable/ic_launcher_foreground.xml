@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- One existing royal-king image, centered inside the Android adaptive-icon safe area (72 / 108 dp). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:width="72dp" android:height="72dp" android:gravity="center">
+        <bitmap android:src="@drawable/royal_king" android:gravity="fill" />
+    </item>
+</layer-list>
