@@ -128,6 +128,24 @@ jobs:
           if tables!={"players"}:
               raise SystemExit("Unexpected D1 table state; do not repair until reviewed.")
 
+          # Cloudflare D1 supports PRAGMA foreign_key_check. A blank result
+          # means there are no known orphan foreign-key references.
+          # Fail closed before any migration if the legacy database is corrupt.
+          integrity_sql="PRAGMA foreign_key_check"
+          integrity_request=urllib.request.Request(url,
+              data=json.dumps({"sql":integrity_sql}).encode(),method="POST",
+              headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+          with urllib.request.urlopen(integrity_request,timeout=30) as response:
+              integrity_reply=json.load(response)
+          checks=integrity_reply.get("result")
+          if integrity_reply.get("success") is not True or not isinstance(checks,list) or len(checks)!=1 or not isinstance(checks[0].get("results"),list):
+              raise SystemExit("Cannot verify D1 foreign-key integrity; no production write.")
+          violations=checks[0]["results"]
+          if violations:
+              print("PROD_D1_FOREIGN_KEY_VIOLATIONS="+str(len(violations)))
+              raise SystemExit("Pre-existing foreign-key violations: production repair blocked for DBA review.")
+          print("PROD_D1_FOREIGN_KEY_CHECK=passed (read-only)")
+
           output=root/".coi-essential-0037-0039"
           output.mkdir(exist_ok=False)
           for name in essential:
