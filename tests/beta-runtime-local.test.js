@@ -229,6 +229,17 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       Number(start.data.state.kingdom.id) +
       " AND queue_type='construction' AND target_key='castle' AND status='running'"]);
 
+    // The deployed closed beta deliberately has no cron. A returning player must
+    // receive completed construction from the GET state path alone.
+    const withoutCron = await http(base, "/api/game/state", {cookie,bearer:start.data.token});
+    assert.equal(withoutCron.status, 200, "state works without a scheduled trigger");
+    assert.equal(Number(withoutCron.data.state?.kingdom?.castle_level), 2,
+      "a due castle upgrade completes when the player returns, without remote cron");
+    assert.equal(withoutCron.data.state?.queues?.filter(
+      row => row.queue_type === "construction" && row.target_key === "castle" && row.status === "running"
+    ).length, 0, "due construction no longer occupies a slot after state reload");
+
+    // Scheduled processing, if run later, must remain idempotent.
     // Wrangler exposes a local-only scheduled handler probe, without registering a remote cron.
     const cronResponse = await fetch(base + "/cdn-cgi/local/scheduled?format=json", {
       signal:AbortSignal.timeout(30_000)

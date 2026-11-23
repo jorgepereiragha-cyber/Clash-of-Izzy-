@@ -94,3 +94,25 @@ test("CLI reports the current D1 state and enforces the remote prerequisite", ()
     assert.match(remote.stderr, /BETA BLOQUEADO/);
   }
 });
+
+
+test("unreviewed beta Cloudflare routes and cross-environment bindings fail closed", () => {
+  const changes = [
+    b => { b.route = "clash-of-izzy.example.com/*"; },
+    b => { b.routes = [{ pattern: "game.example.com/*", zone_name: "example.com" }]; },
+    b => { b.custom_domains = ["game.example.com"]; },
+    b => { b.services = [{ binding: "PRODUCTION", service: "clash-of-izzy" }]; },
+    b => { b.kv_namespaces = [{ binding: "SHARED", id: "existing" }]; },
+    b => { b.r2_buckets = [{ binding: "FILES", bucket_name: "production" }]; },
+    b => { b.unsafe = { bindings: [{ name: "PRODUCTION", type: "plain_text", text: "oops" }] }; },
+    b => { b.durable_objects.bindings[0].script_name = "clash-of-izzy"; },
+    b => { b.d1_databases[0].preview_database_id = "6674c0ac-3636-4e57-bff8-23cf60ab9637"; }
+  ];
+  for (const modify of changes) {
+    const { beta, production } = configured();
+    modify(beta);
+    const result = checkBetaIsolation(beta, production, { requireProvisioned: true });
+    assert.equal(result.ok, false, JSON.stringify(beta));
+    assert.ok(result.errors.length > 0);
+  }
+});

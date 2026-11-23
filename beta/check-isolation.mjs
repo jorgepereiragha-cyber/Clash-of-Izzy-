@@ -11,6 +11,14 @@ const REQUIRED_DISABLED = [
   "LEVEL_PACKS_PUBLIC_ENABLED", "LEVEL_PACKS_PROPOSED_PRICES_APPROVED",
   "MASTER_PACK_ENABLED"
 ];
+// Only audited Worker beta resource declarations are allowed. In particular,
+ // no production route, service binding, or unexpected storage binding may be added.
+const ALLOWED_BETA_TOP_LEVEL = new Set([
+  "$schema", "name", "main", "build", "workers_dev", "compatibility_date",
+  "compatibility_flags", "assets", "d1_databases", "durable_objects",
+  "migrations", "vars"
+]);
+const ALLOWED_BETA_D1_FIELDS = new Set(["binding", "database_name", "database_id", "migrations_dir"]);
 const SENSITIVE = /(?:SECRET|TOKEN|PASSWORD|API_KEY|PRIVATE_KEY|ACCESS_KEY|CREDENTIAL)/i;
 
 export function checkBetaIsolation(beta, production, { requireProvisioned = false } = {}) {
@@ -20,6 +28,12 @@ export function checkBetaIsolation(beta, production, { requireProvisioned = fals
   const preview = production?.previews?.d1_databases?.[0];
   const db = beta?.d1_databases?.[0];
   const vars = beta?.vars ?? {};
+  expect(Object.keys(beta ?? {}).every(key => ALLOWED_BETA_TOP_LEVEL.has(key)),
+    "Configuracao beta inclui recurso Cloudflare nao autorizado (rota, servico, storage ou trigger)");
+  expect(Object.keys(db ?? {}).every(key => ALLOWED_BETA_D1_FIELDS.has(key)),
+    "D1 beta contem propriedades nao auditadas; nenhum binding adicional ou preview remoto");
+  expect(!beta?.durable_objects?.bindings?.[0]?.script_name,
+    "Durable Object beta nao deve referenciar outro Worker");
   const uuid = db?.database_id ?? "";
   const configured = UUID.test(uuid) && uuid !== prod?.database_id && uuid !== preview?.database_id;
 
