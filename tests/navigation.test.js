@@ -11,7 +11,7 @@ test("navigation online search keeps a saved game session when one storage is bl
   const to = nav.indexOf("const normalizeSearch", from);
   assert.ok(from >= 0 && to > from);
   const helper = nav.slice(from, to);
-  const readToken = (local, session) => vm.runInNewContext(helper + "\\ngetGameToken()", {
+  const readToken = (local, session) => vm.runInNewContext(helper + String.fromCharCode(10) + "getGameToken()", {
     window: {localStorage:local,sessionStorage:session}
   });
   const blocked = {getItem(){throw new Error("SecurityError")}};
