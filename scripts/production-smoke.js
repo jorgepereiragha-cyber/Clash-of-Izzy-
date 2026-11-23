@@ -16,6 +16,24 @@ function assert(condition, message) {
   if (!condition) throw new Error(message);
 }
 
+// Static HTML gate: Pix may appear in the selector but must start disabled.
+// Old /<option\\\\b/ pattern matched a literal backslash, not a word boundary.
+export function assertArenaPaymentOptionsSafe(html) {
+  const options = String(html || "").match(/<option\b[^>]*>/gi) || [];
+  for (const option of options) {
+    const match = option.match(/\bvalue\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+    if (!match) continue;
+    const value = String(match[1] ?? match[2] ?? match[3]).toLowerCase();
+    if (value === "bank_transfer" || value === "manual") {
+      throw new Error("A loja não pode publicar opções bancárias legadas no seletor.");
+    }
+    if (value === "pix" && !/(?:^|\s)disabled(?:\s|=|>)/i.test(option)) {
+      throw new Error("A opção Pix deve iniciar desabilitada até a verificação do recebedor.");
+    }
+  }
+  return true;
+}
+
 async function readJson(response, label) {
   const text = await response.text();
   try {
@@ -45,7 +63,7 @@ export async function runProductionSmokeTests({
   const get = async path => {
     const response = await fetchImpl(new URL(path.replace(/^\//, ""), base), {
       method: "GET",
-      redirect: "follow",
+      redirect: "error",
       signal: AbortSignal.timeout(timeoutMs),
       headers: { "User-Agent": "Clash-of-Izzy-production-smoke/1.0" },
     });
@@ -158,7 +176,7 @@ export async function runProductionSmokeTests({
     arena.includes("checkoutWindow") || arena.includes("paymentWindow"),
     "A abertura segura do checkout Mercado Pago não está disponível."
   );
-  assert(!/<option\\b[^>]*value=["'](?:pix|bank_transfer|manual)["']/i.test(arena), "A loja ainda oferece um método de pagamento desativado.");
+  assertArenaPaymentOptionsSafe(arena);
 
   const mapHelperResponse = await get("/world-map-viewport.js");
   assert(mapHelperResponse.status === 200, "Módulo de navegação do mapa indisponível.");
