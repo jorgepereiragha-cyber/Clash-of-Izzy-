@@ -7,6 +7,12 @@ def signingPassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
 def signingAlias = System.getenv('ANDROID_KEY_ALIAS')
 def signingKeyPassword = System.getenv('ANDROID_KEY_PASSWORD')
 def releaseSigningAvailable = signingStore && signingPassword && signingAlias && signingKeyPassword
+// Never reuse the official release keystore for the separately installable beta.
+def betaSigningStore = System.getenv('ANDROID_BETA_KEYSTORE_PATH')
+def betaSigningPassword = System.getenv('ANDROID_BETA_KEYSTORE_PASSWORD')
+def betaSigningAlias = System.getenv('ANDROID_BETA_KEY_ALIAS')
+def betaSigningKeyPassword = System.getenv('ANDROID_BETA_KEY_PASSWORD')
+def betaSigningAvailable = betaSigningStore && betaSigningPassword && betaSigningAlias && betaSigningKeyPassword
 // Preserve signing key and increment the version code for install-over updates.
 def androidVersionCode = (System.getenv('ANDROID_VERSION_CODE') ?: '1').toInteger()
 def androidVersionName = System.getenv('ANDROID_VERSION_NAME') ?: '1.0.0'
@@ -15,8 +21,13 @@ android {
     namespace 'com.clashofizzy.android'
     compileSdk 35
 
+    buildFeatures {
+        buildConfig true
+    }
+
     defaultConfig {
         applicationId 'com.clashofizzy.android'
+        manifestPlaceholders = [appLabel: 'Clash of Izzy']
         minSdk 24
         targetSdk 35
         versionCode androidVersionCode
@@ -32,6 +43,14 @@ android {
                 keyPassword signingKeyPassword
             }
         }
+        if (betaSigningAvailable) {
+            beta {
+                storeFile file(betaSigningStore)
+                storePassword betaSigningPassword
+                keyAlias betaSigningAlias
+                keyPassword betaSigningKeyPassword
+            }
+        }
     }
 
     buildTypes {
@@ -39,12 +58,23 @@ android {
             // Builds de teste não substituem o APK estável assinado.
             applicationIdSuffix '.debug'
             versionNameSuffix '-teste'
+            buildConfigField 'boolean', 'BETA', 'false'
         }
         release {
+            buildConfigField 'boolean', 'BETA', 'false'
             minifyEnabled false
             if (releaseSigningAvailable) {
                 signingConfig signingConfigs.release
             }
+        }
+        beta {
+            initWith release
+            applicationIdSuffix '.beta'
+            versionNameSuffix '-beta'
+            manifestPlaceholders = [appLabel: 'Clash of Izzy Beta']
+            buildConfigField 'boolean', 'BETA', 'true'
+            // Unsigned when beta credentials are absent: never fall back to release signing.
+            signingConfig betaSigningAvailable ? signingConfigs.beta : null
         }
     }
 
