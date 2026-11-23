@@ -28,7 +28,9 @@ export function normalizeInviteCode(raw) {
 }
 
 export function betaPaymentDisabled(path, method, env) {
-  if (env?.ENVIRONMENT !== "beta" || env?.BETA_LIVE_PAYMENTS_APPROVED === "true") return false;
+  // Payments are NOT activatable by a single flag in this implementation.
+  // A future commercial beta requires a separately reviewed payment integration.
+  if (env?.ENVIRONMENT !== "beta") return false;
   if (path === "/api/support/checkout" || path === "/api/admin/purchase-requests/review") return true;
   if (path.startsWith("/api/webhook/")) return true;
   if (path.startsWith("/api/store/") && method !== "GET") return true;
@@ -121,6 +123,23 @@ export async function betaAccessGuard(request, env) {
   try {
     if (path === "/api/beta/invite/redeem") return await redeemInvite(request, env, url);
     if (path === "/beta-access.html" && request.method === "GET") return null;
+    if (path === "/api/beta/access/status" && request.method === "GET") {
+      const permitted = await hasValidAccess(request, env);
+      return responseJson({ authorized: permitted }, permitted ? 200 : 401);
+    }
+    if (path === "/api/beta/access/logout") {
+      if (request.method !== "POST") return responseJson({ error: "Metodo nao permitido." }, 405);
+      if (request.headers.get("Origin") !== url.origin) return responseJson({ error: "Origem nao permitida." }, 403);
+      const token = cookieToken(request);
+      if (token) {
+        await env.DB.prepare(
+          "UPDATE beta_access_sessions SET revoked_at=unixepoch() WHERE session_hash=? AND revoked_at IS NULL"
+        ).bind(await sha256(token)).run();
+      }
+      return responseJson({ ok: true }, 200, {
+        "Set-Cookie": COOKIE_NAME + "=; Path=/; Max-Age=0; Secure; HttpOnly; SameSite=Strict"
+      });
+    }
     if (!(await hasValidAccess(request, env))) {
       if (path.startsWith("/api/")) return responseJson({ error: "Convite beta necessario.", code: "BETA_INVITE_REQUIRED" }, 403);
       return new Response(null, {
@@ -128,8 +147,27 @@ export async function betaAccessGuard(request, env) {
         headers: { Location: new URL("/beta-access.html", url).href, "Cache-Control": "no-store" }
       });
     }
-    if (path === "/api/store/payment-methods" && request.method === "GET"
-        && env.BETA_LIVE_PAYMENTS_APPROVED !== "true") {
+    if (path === "/sw.js" && request.method === "GET") {
+      // The production PWA precaches protected HTML; never install it for beta.
+      // A no-fetch SW also removes prior same-origin Clash caches upon activation.
+      const script = [
+        "self.addEventListener('install', () => self.skipWaiting());",
+        "self.addEventListener('activate', event => event.waitUntil((async () => {",
+        "const keys = await caches.keys();",
+        "await Promise.all(keys.filter(key => key.startsWith('clash-of-izzy-')).map(key => caches.delete(key)));",
+        "await self.clients.claim();",
+        "})()));"
+      ].join("\n");
+      return new Response(script, {
+        status: 200,
+        headers: {
+          "Content-Type": "text/javascript; charset=utf-8",
+          "Cache-Control": "private, no-store",
+          "X-Content-Type-Options": "nosniff"
+        }
+      });
+    }
+    if (path === "/api/store/payment-methods" && request.method === "GET") {
       return responseJson({ mercadoPago: false, nubankPix: false });
     }
     if (betaPaymentDisabled(path, request.method, env)) {
