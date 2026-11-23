@@ -31,11 +31,31 @@ O Worker beta usa `assets.run_worker_first=true` para que HTML, arquivos estáti
 ## Padrão de segurança e rollback
 
 - Beta e produção têm nomes de Worker distintos, bindings D1 distintos, namespaces de Durable Objects distintos, `SESSION_SECRET` distintos, chaves de assinatura Android distintas e IDs Android distintos. **Não copiar contas, sessões, inventário, gemas nem pedidos da produção.**
-- Pagamentos reais ficam desligados em beta mesmo se um token de provedor for acidentalmente configurado. Habilitação futura exige homologação separada de provedor, webhook, origem, domínio e reconciliação, além de aprovação formal da flag.
+- Pagamentos reais ficam desligados em beta mesmo se um token de provedor for acidentalmente configurado. O código NÃO habilita cobrança por meio de uma flag isolada: a habilitação futura exige mudanças revisadas, homologação do provedor, webhook, origem, domínio e reconciliação.
 - O bloqueio de pagamento cobre as rotas de checkout, Pix/pedidos e webhook já existentes, além das futuras rotas de escrita sob `/api/store/`. Se o projeto criar novas rotas comerciais fora desse namespace, a auditoria deverá atualizar o bloqueio antes do merge.
 - Falha de D1 resulta em negação de acesso, não em passagem livre. Para revogar um convite, marcar `disabled=1`; para revogar sessões já emitidas, atualizar `revoked_at=unixepoch()` em `beta_access_sessions` para os `invite_id` correspondentes. Gerenciar expiração/limpeza de tabelas manualmente; não há cron beta nesta etapa.
 - Para rollback: desligar acesso no beta (`INVITE_ONLY=false` faz o Worker falhar fechado) ou despublicar **somente** o Worker beta. Não executar comandos no D1 da produção.
 - A versão Android beta seleciona a URL em compilação via `BuildConfig.BETA`; não aceita URL informada pelo usuário nem redirecionamento para domínio arbitrário. A flag é embutida no APK e o certificado beta não deve ser o mesmo da release oficial.
+
+
+## Consolidação de componentes (revisão de 23/11/2026)
+
+- **Usar:** `beta-access.js` como única autorização de entrada do beta; `beta-access.html` como tela de convite; `beta/schema.sql` como migração exclusiva do novo D1; `wrangler.beta.jsonc` como única configuração de deploy do Worker beta; `assembleBeta` como variante Android própria.
+- **Desativar no ambiente beta:** `/api/beta/signup` (cadastro genérico antigo) retorna 404; `/` e `/portal.html` redirecionam para convite ou reino, conforme sessão. O catálogo/portal promocional original continua no repositório e na produção para não perder o funil de marketing existente.
+- **Não reutilizar:** D1 Preview, D1 produção, tokens de sessão, credenciais de pagamentos, keystore Android oficial ou URL de produção dentro do APK beta.
+- **Não apagar:** código de reino, combate, aliança, visual 3D, migrações comuns, módulos de pagamento mantidos para a versão oficial, testes da versão oficial, workflow do portal oficial e scripts de recuperação do D1 de produção. A remoção desses arquivos quebraria o jogo que continua operando fora do beta.
+
+### Sessão e cache
+
+O beta não instala o Service Worker offline da produção. A rota `/sw.js` devolve um worker mínimo **sem interceptação de rede e sem cache de gameplay**, limpando caches antigos com o prefixo `clash-of-izzy-`. Os arquivos estáticos servidos pelo Worker beta usam `Cache-Control: private, no-store`, com `X-Frame-Options: DENY` e `Referrer-Policy: no-referrer`. A sessão pode ser consultada via `GET /api/beta/access/status` e revogada via `POST /api/beta/access/logout` (mesma origem); revoga o token no D1 e limpa o cookie. Um convite de uso único **não volta a ficar disponível** quando o usuário faz logout.
+
+### Pagamentos
+
+Nesta versão, `BETA_LIVE_PAYMENTS_APPROVED` permanece com valor `false`, mas é apenas reserva para uma futura homologação. **Trocar essa variável para `true` não libera pagamentos**: o bloqueio do backend continua ativo. A ativação comercial futura requer alterações explícitas e revisadas no código, integração de webhooks sem depender de cookie de usuário, credenciais distintas e testes de reconciliação. Evita que um erro de configuração aceite cobranças reais.
+
+### Limitações que continuam
+
+O gate de convite é uma autorização por sessão de navegador, não substitui autenticação do jogador e ainda não vincula de forma irrevogável o convite a uma conta identificada. Não prometer limite de contas por pessoa. A validação das credenciais Google e do certificado da variante Android beta deve ser feita antes do lançamento, com client ID apropriado à nova origem/pacote. Limites de carga e testes em aparelhos físicos também estão pendentes.
 
 ## Pendências para lançamento comercial
 
