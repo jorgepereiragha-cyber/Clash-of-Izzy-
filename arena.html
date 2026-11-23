@@ -103,39 +103,64 @@ import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } 
 import { initTextureManager, loadTexture, preloadTextures, getTexture, disposeTextures } from './engine/texture-manager.js';
 const API_BASE='/api';
 let kingdomSession=null;
+let arenaSessionToken='';
+let arenaConnectionInProgress=false;
+function readArenaGameToken(){
+ if(arenaSessionToken)return arenaSessionToken;
+ let readable=false;
+ try{const token=localStorage.getItem("coi_game_token");readable=true;if(token)return token;}catch{}
+ try{const token=sessionStorage.getItem("coi_game_token");readable=true;if(token)return token;}catch{}
+ // Never silently create a new kingdom when both storages are blocked.
+ if(!readable)throw new Error('O navegador bloqueou o armazenamento da sessão. Ative o armazenamento deste site e tente novamente.');
+ return '';
+}
+function saveArenaGameToken(token){
+ arenaSessionToken=token;
+ let saved=false;
+ try{localStorage.setItem("coi_game_token",token);saved=true;}catch{}
+ try{sessionStorage.setItem("coi_game_token",token);saved=true;}catch{}
+ return saved;
+}
 async function connectKingdom(){
+ if(arenaConnectionInProgress)return;
+ arenaConnectionInProgress=true;
  const status=document.getElementById('kingdomStatus');
- const savedToken=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
+ status.textContent='🌐 Conectando ao reino…';
  try{
+  const savedToken=readArenaGameToken();
   let response;
   if(savedToken){
    response=await fetch(API_BASE+'/game/state',{headers:{Authorization:'Bearer '+savedToken}});
    if(!response.ok){
     const errorData=await response.json().catch(()=>({}));
     const reason=errorData.error||'Não foi possível validar a sessão do reino.';
-    throw new Error(reason+' Seu acesso foi preservado; tente novamente antes de criar outro reino.');
+    const error=new Error(reason+' Seu acesso foi preservado; tente novamente antes de criar outro reino.');
+    error.status=response.status;
+    throw error;
    }
   }else{
    response=await fetch(API_BASE+'/game/start',{method:'POST',headers:{'Content-Type':'application/json'},body:'{}'});
   }
   if(!response.ok)throw new Error((await response.json().catch(()=>({}))).error||'Servidor indisponível');
   const data=await response.json();
-  if(data.token){
-   localStorage.setItem('coi_game_token',data.token);
-   sessionStorage.setItem('coi_game_token',data.token);
-  }
+  const persisted=!data.token||saveArenaGameToken(data.token);
   kingdomSession=data.state;
   if(!kingdomSession)throw new Error('O servidor não retornou os dados do reino.');
   const k=kingdomSession.kingdom||{},p=kingdomSession.player||{};
-  status.textContent='🏰 '+(k.kingdom_name||'Reino')+' · 🪙 '+Number(k.gold||0).toLocaleString('pt-BR')+' ouro · 💎 '+Number(p.gems||0).toLocaleString('pt-BR')+' gemas · ⚔ '+Number(kingdomSession.totalTroops||0).toLocaleString('pt-BR')+' tropas';
+  status.textContent='🏰 '+(k.kingdom_name||'Reino')+' · 🪙 '+Number(k.gold||0).toLocaleString('pt-BR')+' ouro · 💎 '+Number(p.gems||0).toLocaleString('pt-BR')+' gemas · ⚔ '+Number(kingdomSession.totalTroops||0).toLocaleString('pt-BR')+' tropas'+(persisted?'':' · Atenção: esta sessão não foi salva neste aparelho.');
   document.getElementById('heroName').textContent=(p.name||'Lorde de Eldoria')+' · Reino conectado';
   document.getElementById('gold').textContent=Number(k.gold||0).toLocaleString('pt-BR');
   renderKingdomStore();
   renderChronicle();
  }catch(error){
-  status.textContent='⚠️ Reino não conectado · '+error.message;
+  status.replaceChildren(document.createTextNode('⚠️ Reino não conectado · '+(error.message||'Serviço indisponível')+' '));
+  const retry=document.createElement('button');retry.type='button';retry.id='retryArenaConnection';retry.textContent='Tentar novamente';
+  retry.addEventListener('click',()=>{void connectKingdom()});status.append(retry);
+  if(error.status===401||error.status===403){
+   const account=document.createElement('a');account.href='/account.html';account.textContent='Acessar minha conta';account.style.marginLeft='8px';status.append(account);
+  }
   console.warn('Clash of Izzy: falha ao conectar ao reino:',error);
- }
+ }finally{arenaConnectionInProgress=false}
 }
 
 function renderChronicle(){
@@ -223,7 +248,7 @@ document.getElementById('refreshTerritories').addEventListener('click',refreshTe
 // Chat persistente da aliança + tradução automática das mensagens recebidas.
 const chatPanel=document.getElementById('allianceChat'),chatList=document.getElementById('chatMessages'),chatLanguage=document.getElementById('chatLanguage'),chatAuto=document.getElementById('chatAutoTranslate');
 const translatedCache=new Map();let chatBusy=false,chatLastId=0;
-function chatToken(){return localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token')||''}
+function chatToken(){try{return readArenaGameToken()}catch{return ''}}
 async function chatApi(path,options={}){const token=chatToken();if(!token)throw new Error('Conecte seu reino primeiro.');const response=await fetch(API_BASE+path,{...options,headers:{...(options.headers||{}),Authorization:'Bearer '+token}});const data=await response.json().catch(()=>({}));if(!response.ok)throw new Error(data.error||'Falha na comunicação com o servidor.');return data}
 async function translateChatText(text,target){const key=target+'|'+text;if(translatedCache.has(key))return translatedCache.get(key);const url='https://translate.googleapis.com/translate_a/single?client=gtx&sl=auto&tl='+encodeURIComponent(target)+'&dt=t&q='+encodeURIComponent(text);const response=await fetch(url);if(!response.ok)throw new Error('Serviço de tradução indisponível.');const data=await response.json();const translated=(data[0]||[]).map(part=>part[0]||'').join('');if(!translated)throw new Error('Não foi possível traduzir esta mensagem.');translatedCache.set(key,translated);return translated}
 async function renderAllianceChat(state){const alliance=state?.alliance;if(!alliance){chatList.replaceChildren();const hint=document.createElement('div');hint.id='chatHint';hint.textContent='Você ainda não pertence a uma aliança. Entre ou crie uma para usar o chat.';chatList.append(hint);return}const messages=alliance.chat||[];if(!messages.length){chatList.replaceChildren();const hint=document.createElement('div');hint.id='chatHint';hint.textContent='Aliança '+alliance.name+' · Seja o primeiro a conversar!';chatList.append(hint);return}if(messages[messages.length-1]?.id===chatLastId&&chatList.children.length)return;chatLastId=messages[messages.length-1]?.id||0;chatList.replaceChildren();for(const msg of messages){const card=document.createElement('article');card.className='chatMsg';const author=document.createElement('b');author.textContent=msg.kingdom_name||'Jogador';const original=document.createElement('div');original.className='chatOriginal';original.textContent=msg.message;const translated=document.createElement('div');translated.className='chatTranslation';const meta=document.createElement('div');meta.className='chatMeta';meta.textContent=new Date(String(msg.created_at||'').replace(' ','T')+'Z').toLocaleString();card.append(author,original,translated,meta);chatList.append(card);if(chatAuto.checked){translated.textContent='Traduzindo…';translateChatText(msg.message,chatLanguage.value).then(value=>{translated.textContent='🌐 '+value}).catch(()=>{translated.textContent='Tradução indisponível · mensagem original preservada'})}}chatList.scrollTop=chatList.scrollHeight}
@@ -657,7 +682,7 @@ async function requestOfficialPurchase(item,kind,button){
  if(!paymentMethodStatus.known){notice.textContent='Verificando se o recebimento está habilitado. Tente novamente em instantes.';return}
  if(paymentMethod==='pix'&&!paymentMethodStatus.nubankPix){notice.textContent='Nubank Pix indisponível até a validação do recebedor e da conta.';return}
  if(paymentMethod==='mercadopago_link'&&!paymentMethodStatus.mercadoPago){notice.textContent='Mercado Pago indisponível até configurar o checkout e o webhook da conta autorizada.';return}
- const token=localStorage.getItem('coi_game_token')||sessionStorage.getItem('coi_game_token');
+ const token=chatToken();
  if(!token){notice.textContent='Conecte seu reino antes de comprar.';return}
  const checkoutWindow=paymentMethod==='mercadopago_link'?window.open('about:blank','_blank'):null;
  if(checkoutWindow)checkoutWindow.opener=null;
