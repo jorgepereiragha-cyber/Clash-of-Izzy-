@@ -21,7 +21,9 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   const cores = Number(navigator.hardwareConcurrency || 0);
   const lowMemory = memory > 0 && memory <= 2;
   const saveData = connection?.saveData === true;
-  const preference = readGraphicsChoice(window.localStorage);
+  // Reading the storage property itself may throw in restricted WebViews.
+  let preference = "auto";
+  try { preference = readGraphicsChoice(window.localStorage); } catch { /* Use automatic quality safely. */ }
   const automatic = lowMemory ? "low" : memory >= 8 ? "high" : "balanced";
   const highUnsafe = (memory > 0 && memory < 6) || (cores > 0 && cores < 6);
   let quality = lowMemory || saveData ? "low"
