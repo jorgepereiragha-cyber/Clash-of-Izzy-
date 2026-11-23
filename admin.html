@@ -30,6 +30,14 @@ footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
 <div id="notice" role="status" aria-live="polite"></div>
 <section id="dashboard">
 <div class="toolbar"><h2>👑 Jogadores do reino</h2><button class="secondary" id="logout" type="button">Sair</button></div>
+<section id="launchCenter" aria-labelledby="launchCenterTitle" style="margin:18px 0;padding:16px;border:1px solid #a98245;border-radius:12px;background:#0b1728">
+ <div class="toolbar"><h2 id="launchCenterTitle">Central de Lançamento</h2><button class="secondary" type="button" id="refreshLaunchCenter">Atualizar diagnóstico</button></div>
+ <p id="launchGate" role="status" aria-live="polite">NO-GO · Aguardando diagnóstico Master.</p>
+ <div id="launchSummary" class="results" aria-live="polite">Nenhum estado operacional foi presumido.</div>
+ <p class="sub">Valores aprovados no banco são nominais e não comprovam liquidação bancária. Auditoria de migrações e plano Paid exigem acesso ao Cloudflare.</p>
+ <p><a href="https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/cloudflare-paid-readiness.yml" target="_blank" rel="noopener noreferrer">Auditoria Cloudflare read-only</a> ·
+ <a href="https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/workflows/deploy-cloudflare.yml" target="_blank" rel="noopener noreferrer">Deploy protegido (somente após aprovação)</a></p>
+</section>
 <section id="purchaseQueue" style="margin:18px 0;padding:16px;border:1px solid #a98245;border-radius:12px;background:#0b1728">
  <div class="toolbar"><h2>🔔 Pedidos de compra <span id="pendingCount">0</span></h2><button class="secondary" id="refreshPurchases" type="button">Atualizar</button></div>
  <p class="sub">Pedidos Mercado Pago são confirmados pelo provedor, sem liberação manual. Para Nubank Pix, confira no extrato da conta autorizada o valor, o destinatário e o EndToEndId antes de liberar. Comprovantes enviados pelo jogador não bastam.</p>
@@ -141,6 +149,41 @@ function setLoggedIn(value){$("dashboard").style.display=value?"block":"none";$(
 function showNotice(message){$("notice").textContent=message}
 
 let purchasePoll=null;
+async function refreshLaunchCenter(){
+ if(!token)return;
+ const status=$("launchGate"),summary=$("launchSummary");
+ const response=await fetch("/api/admin/launch-center",{method:"GET",cache:"no-store",headers:{Authorization:"Bearer "+token,Accept:"application/json"}});
+ if(!response.ok){
+   if(response.status===401){
+     status.textContent="NO-GO · Sessão Master expirada.";
+     showNotice("Sessão administrativa expirada. Faça login novamente.");
+     token="";sessionStorage.removeItem("coi_admin_token");setLoggedIn(false);
+   }else status.textContent="NO-GO · Diagnóstico indisponível (HTTP "+response.status+").";
+   return;
+ }
+ const data=await response.json();
+ status.textContent=String(data.status)==="GO"?"GO · Verifique evidências externas":"NO-GO · Bloqueios operacionais pendentes";
+ const lines=[
+   "D1 essencial: "+(data.schema?.coreSchema?"Tabelas básicas encontradas":"Não confirmado"),
+   "Apoios: "+(data.schema?.supportSchema?"Tabela encontrada":"Migração/ledger não confirmado"),
+   "Última migração registrada: "+(data.schema?.latestMigration||"Não verificada"),
+   "Migrações pendentes: não mensuradas neste endpoint",
+   "Mercado Pago: "+(data.payments?.mercadoPago?"Configurado (não homologado)":"Desativado"),
+   "Nubank Pix: "+(data.payments?.nubankPix?"Configurado (não homologado)":"Desativado"),
+   "APK: "+(data.apk?.published?"Release detectada: "+data.apk.source:"Release não verificada"),
+   "Pedidos pendentes: "+(data.pending?.total??"indisponível")+" (MP "+(data.pending?.mercadoPago??"—")+", Pix "+(data.pending?.pix??"—")+")",
+   "Aprovado nominal (24 h): "+(data.recordedApproved? (data.recordedApproved.nominalDayCents/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"indisponível"),
+   "Aprovado nominal (7 dias): "+(data.recordedApproved? (data.recordedApproved.nominalWeekCents/100).toLocaleString("pt-BR",{style:"currency",currency:"BRL"}):"indisponível"),
+   "Falhas de webhook: não instrumentadas no ledger",
+   "Flags públicas 4X e pacotes: "+(data.flags?.GAME_4X_SYSTEMS_ENABLED?"4X ativo":"4X inativo")+", "+(data.flags?.LEVEL_PACKS_PUBLIC_ENABLED?"P1–P8 público":"P1–P8 restrito")
+ ];
+ const list=document.createElement("ul");
+ for(const line of lines){const item=document.createElement("li");item.textContent=line;list.append(item)}
+ const heading=document.createElement("strong");heading.textContent="Bloqueios para lançamento:";
+ const issues=document.createElement("ul");
+ for(const issue of (data.blockers||[])){const item=document.createElement("li");item.textContent=String(issue);issues.append(item)}
+ summary.replaceChildren(list,heading,issues);
+}
 function renderPurchaseRequests(requests){
  const root=$("purchaseRequests");root.replaceChildren();
  $("pendingCount").textContent=String(requests.length);
@@ -213,12 +256,13 @@ function renderPlayers(players){
  }
 }
 async function searchPlayers(query){showNotice("Consultando o reino…");const data=await api("/admin/player-search",{query});renderPlayers(data.players|| (data.player?[data.player]:[]));showNotice((data.players||[]).length+" resultado(s).")}
-$("loginForm").addEventListener("submit",async event=>{event.preventDefault();showNotice("Validando acesso…");try{const data=await api("/admin/login",{email:$("email").value,password:$("password").value},false);token=data.token;sessionStorage.setItem("coi_admin_token",token);$("password").value="";setLoggedIn(true);document.dispatchEvent(new Event("coi:admin-session-ready"));showNotice("Acesso administrativo liberado.");refreshPurchaseRequests().catch(e=>showNotice(e.message));if(!purchasePoll)purchasePoll=setInterval(()=>{if(!document.hidden&&token)refreshPurchaseRequests().catch(()=>{})},20000)}catch(e){showNotice(e.message)}});
+$("loginForm").addEventListener("submit",async event=>{event.preventDefault();showNotice("Validando acesso…");try{const data=await api("/admin/login",{email:$("email").value,password:$("password").value},false);token=data.token;sessionStorage.setItem("coi_admin_token",token);$("password").value="";setLoggedIn(true);document.dispatchEvent(new Event("coi:admin-session-ready"));showNotice("Acesso administrativo liberado.");refreshPurchaseRequests().catch(e=>showNotice(e.message));refreshLaunchCenter().catch(e=>showNotice(e.message));if(!purchasePoll)purchasePoll=setInterval(()=>{if(!document.hidden&&token){refreshPurchaseRequests().catch(e=>showNotice("Falha ao atualizar pedidos: "+e.message));refreshLaunchCenter().catch(e=>showNotice("Falha no diagnóstico: "+e.message))}},20000)}catch(e){showNotice(e.message)}});
 $("searchForm").addEventListener("submit",async event=>{event.preventDefault();try{await searchPlayers($("query").value.trim())}catch(e){showNotice(e.message);if(/sessão/i.test(e.message)){token="";sessionStorage.removeItem("coi_admin_token");setLoggedIn(false)}}});
 $("logout").addEventListener("click",()=>{token="";sessionStorage.removeItem("coi_admin_token");if(purchasePoll){clearInterval(purchasePoll);purchasePoll=null;}$("purchaseRequests").replaceChildren();$("results").replaceChildren();showNotice("Sessão encerrada.");setLoggedIn(false)});
 setLoggedIn(Boolean(token));
-if(token){showNotice("Sessão administrativa recuperada.");refreshPurchaseRequests().catch(e=>showNotice(e.message));purchasePoll=setInterval(()=>{if(!document.hidden&&token)refreshPurchaseRequests().catch(()=>{})},20000)}
+if(token){showNotice("Sessão administrativa recuperada.");refreshPurchaseRequests().catch(e=>showNotice(e.message));refreshLaunchCenter().catch(e=>showNotice(e.message));purchasePoll=setInterval(()=>{if(!document.hidden&&token)refreshPurchaseRequests().catch(()=>{})},20000)}
 $("refreshPurchases").addEventListener("click",()=>refreshPurchaseRequests().catch(e=>showNotice(e.message)));
+$("refreshLaunchCenter").addEventListener("click",()=>refreshLaunchCenter().catch(e=>showNotice("Diagnóstico indisponível: "+e.message)));
 </script>
 <script src="/valhalla-admin-ui.js" defer></script>
 <script src="/navigation.js" defer></script>

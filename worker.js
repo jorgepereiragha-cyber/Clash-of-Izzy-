@@ -16,6 +16,7 @@ import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaCon
 import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
+import { handleAdminLaunchCenter } from "./admin-launch-center.js";
 import { handleRally, processDueRallies } from "./rally.js";
 import {marchCapacity,marchCapacityForKingdom,withinMarchCapacity} from "./march-capacity.js";
 import {marchSlots} from "./march-slots.js";
@@ -2715,7 +2716,7 @@ export default {
     }catch(e){console.error("game_request_failed",String(e?.message||e));return json({error:"Falha ao processar o jogo. Tente novamente."},500)}
   }
   const valhallaAdminPath=url.pathname.startsWith("/api/valhalla-admin/");
-  if(request.method!=="POST"&&!(request.method==="GET"&&(valhallaAdminPath||url.pathname==="/api/admin/launch-metrics")))return json({error:"Método não permitido."},405);
+  if(request.method!=="POST"&&!(request.method==="GET"&&(valhallaAdminPath||url.pathname==="/api/admin/launch-metrics"||url.pathname==="/api/admin/launch-center")))return json({error:"Método não permitido."},405);
   const body=request.method==="POST"?await readBody(request):{};if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);
   if(url.pathname==="/api/admin/login"){
     if(!env.ADMIN_EMAIL||!env.ADMIN_PASSWORD||!env.SESSION_SECRET)return json({error:"Configure ADMIN_EMAIL, ADMIN_PASSWORD e SESSION_SECRET nos segredos do Worker."},503);
@@ -2730,13 +2731,18 @@ export default {
   }
   const auth=request.headers.get("Authorization")||"",token=auth.startsWith("Bearer ")?auth.slice(7):"";
   const payload=env.SESSION_SECRET?await verify(token,env.SESSION_SECRET):false;
-  if(!payload||payload.scope!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
+  if(!payload||payload.scope!=="admin"||payload.sub!=="admin")return json({error:"Sessão administrativa inválida ou expirada."},401);
   try{
     if(valhallaAdminPath){
       const scope=request.method==="GET"?"valhalla-admin-read":"valhalla-admin-write";
       const limited=await rateLimitDecision(env,scope,"master",request.method==="GET"?120:30,60);
       if(limited)return limited;
-      return await handleValhallaAdmin(request,env,body);
+      return await handleValhallaAdmin(request,env,body,payload);
+    }
+    if(url.pathname==="/api/admin/launch-center"&&request.method==="GET"){
+      const limited=await rateLimitDecision(env,"admin-launch-center","master",20,60);
+      if(limited)return limited;
+      return await handleAdminLaunchCenter(env,payload);
     }
     if(url.pathname==="/api/admin/launch-metrics"&&request.method==="GET"){
       const limited=await rateLimitDecision(env,"admin-launch-metrics","master",30,60);
