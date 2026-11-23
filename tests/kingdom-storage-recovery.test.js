@@ -46,7 +46,7 @@ test("reino não cria conta anônima quando nenhum armazenamento funciona", () =
   const preflight = connect.indexOf("if(!canPersistKingdomGameToken())");
   const createGuest = connect.indexOf('request("/game/start"');
   assert.ok(preflight >= 0 && createGuest > preflight, "storage must be writable before creating a guest account");
-  assert.doesNotMatch(connect, /localStorage\\.getItem|sessionStorage\\.getItem/);
+  assert.ok(!connect.includes('localStorage.getItem(') && !connect.includes('sessionStorage.getItem('), 'connect must use guarded readers');
 });
 
 test("token em memória permanece disponível após bloqueio de ambos os armazenamentos", () => {
