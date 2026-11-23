@@ -1989,7 +1989,8 @@ export default {
     const rewardResult=await distributeValhallaDailyRunes(env,scheduledAt);
     if(rewardResult.granted>0)console.log("valhalla_daily_runes_distributed",rewardResult);
   }catch(error){console.error("scheduled_valhalla_runes_failed",String(error?.message||error));}
-  await processDueMarches(env);
+  try{await processDueMarches(env);}
+  catch(error){console.error("scheduled_marches_failed",String(error?.message||error));}
   try{await processDueRallies(env);}
   catch(error){console.error("scheduled_rally_resolution_failed",String(error?.message||error));}
   try{await processAngelDeathEventLifecycle(env);}
