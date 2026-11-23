@@ -132,4 +132,15 @@ jobs:
           node scripts/check-worker-only-payment-state.mjs
           node scripts/production-smoke.js
       - name: Comprovar hashes do renderer, manifesto e GLBs publicados (somente GET)
-        run: node scripts/verify-deployed-assets.mjs worker
+        shell: bash
+        run: |
+          set -euo pipefail
+          for attempt in 1 2 3 4 5; do
+            if node scripts/verify-deployed-assets.mjs worker; then
+              echo "Assets worker publicados e íntegros no SHA aprovado."
+              exit 0
+            fi
+            if [[ "$attempt" -lt 5 ]]; then sleep 6; fi
+          done
+          echo "::error::Assets worker não correspondem ao SHA aprovado após cinco verificações."
+          exit 1
