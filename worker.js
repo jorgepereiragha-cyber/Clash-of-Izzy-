@@ -323,6 +323,8 @@ async function sessionVersionForPlayer(env,playerId){
     "LEFT JOIN player_accounts a ON a.player_id=p.id " +
     "LEFT JOIN google_account_links g ON g.player_id=p.id WHERE p.player_id=?"
   ).bind(playerId).first();
+  // A signed token for a deleted player must not be treated as a guest.
+  if(!row)return null;
   return row?.version ?? undefined;
 }
 async function gameIdentity(request,env){
@@ -332,6 +334,7 @@ async function gameIdentity(request,env){
   if(!p||p.scope!=="game"||!p.sub)return null;
   // Tokens anônimos antigos são rejeitados assim que Google é vinculado.
   const version=await sessionVersionForPlayer(env,String(p.sub));
+  if(version===null)return null;
   if(version!==undefined){
     if(!Number.isSafeInteger(p.av)||p.av!==Number(version))return null;
   }else if(p.av!==undefined)return null;
