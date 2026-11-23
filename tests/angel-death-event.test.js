@@ -123,6 +123,12 @@ test("the browser reuses a pending attack request ID after a network retry", asy
     "clear both only after a confirmed response");
   assert.ok(client.includes('units:pendingAttackUnits'),
     "retry must send the original army rather than new inputs with an old key");
+  assert.ok(client.includes('sessionStorage.setItem("coi_angel_death_event_id",String(pendingEventId))'),
+    "bind attack retries to their original event cycle");
+  assert.ok(client.includes("currentEventId!==pendingEventId"),
+    "never apply a previous weekend retry to a new active event");
+  assert.ok(client.includes('sessionStorage.removeItem("coi_angel_death_event_id")'),
+    "release event identity after success or detected rollover");
   assert.ok(client.includes("const units=pendingReplay?pendingAttackUnits:"),
     "user cannot silently change army composition for a pending idempotency key");
 });
