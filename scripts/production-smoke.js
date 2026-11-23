@@ -61,13 +61,21 @@ export async function runProductionSmokeTests({
   base.hash = "";
 
   const get = async path => {
-    const response = await fetchImpl(new URL(path.replace(/^\//, ""), base), {
-      method: "GET",
-      redirect: "error",
-      signal: AbortSignal.timeout(timeoutMs),
-      headers: { "User-Agent": "Clash-of-Izzy-production-smoke/1.0" },
-    });
-    return response;
+    const target = new URL(path.replace(/^\//, ""), base);
+    try {
+      return await fetchImpl(target, {
+        method: "GET",
+        redirect: "error",
+        signal: AbortSignal.timeout(timeoutMs),
+        headers: { "User-Agent": "Clash-of-Izzy-production-smoke/1.0" },
+      });
+    } catch (error) {
+      // Keep the URL path and network cause visible, but never log credentials or query strings.
+      const cause = error?.cause;
+      const code = typeof cause?.code === "string" ? " [" + cause.code + "]" : "";
+      const message = error?.name === "TimeoutError" ? "timeout" : String(error?.message || error);
+      throw new Error("Falha de rede no smoke GET " + target.pathname + ": " + message + code, { cause: error });
+    }
   };
 
   const healthResponse = await get("/api/health");
