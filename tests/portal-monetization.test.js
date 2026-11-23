@@ -4,12 +4,13 @@ import { readFile } from 'node:fs/promises';
 
 const read = path => readFile(new URL('../' + path, import.meta.url), 'utf8');
 
-test('isolated portal advertises external web gameplay without hosting game routes or PWA', async () => {
+test('isolated portal markets Android only without game routes or PWA', async () => {
   const [portal, index, navigation, sw] = await Promise.all([
     read('portal.html'), read('index.html'), read('navigation.js'), read('sw.js')
   ]);
   assert.match(portal, /id="download-apk"/);
-  assert.match(portal, /id="play-browser" href="https:\/\/clash-of-izzy\.jorgepereiragha\.workers\.dev\/kingdom\.html"/);
+  assert.doesNotMatch(portal, /id="play-browser"|kingdom\.html/);
+  assert.match(portal, /id="download-apk-final" aria-disabled="true"/);
   assert.match(portal, /releases\/latest/);
   assert.match(portal, /clash-of-izzy-android\.apk/);
   assert.match(portal, /\.sha256/);
@@ -63,7 +64,7 @@ test('public portal does not publish account details, banking data or payment co
   assert.doesNotMatch(portal, /(?:\b\d{11}\b|\b\d{14}\b)/);
   assert.doesNotMatch(portal, /NUBANK_PIX_ENABLED|MP_ACCESS_TOKEN|chave pix|Pix copia e cola/i);
   assert.doesNotMatch(portal, /href="\/arena\.html"|checkout|beforeinstallprompt/i);
-  assert.match(portal, /Baixar aplicativo Android/);
+  assert.match(portal, /Baixar APK Android/);
 });
 
 test('Nubank CPF recipient key is never hardcoded and is returned only to an authenticated pending-order owner',async()=>{
