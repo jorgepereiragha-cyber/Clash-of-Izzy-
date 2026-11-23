@@ -71,10 +71,11 @@ export async function runProductionSmokeTests({
     // GET-only retries handle short-lived transport errors. HTTP responses,
     // including non-200/401 statuses, are NEVER retried or reclassified.
     for (let attempt = 1; attempt <= networkRetries + 1; attempt++) {
+      let response;
       try {
-        return await fetchImpl(target, {
+        response = await fetchImpl(target, {
           method: "GET",
-          redirect: "error",
+          redirect: "manual",
           signal: AbortSignal.timeout(timeoutMs),
           headers: { "User-Agent": "Clash-of-Izzy-production-smoke/1.0" },
         });
@@ -93,7 +94,16 @@ export async function runProductionSmokeTests({
         if (networkRetryDelayMs > 0) {
           await new Promise(resolve => setTimeout(resolve, networkRetryDelayMs * attempt));
         }
+        continue;
       }
+      // A real HTTP redirect is not a transport failure: fail immediately
+      // without following Location or exposing its potentially private query.
+      if (response?.type === "opaqueredirect" ||
+          (response?.status >= 300 && response.status < 400)) {
+        throw new Error("Redirecionamento inesperado no smoke GET " + target.pathname +
+          " (HTTP " + (response?.status || "opaqueredirect") + ").");
+      }
+      return response;
     }
   };
 
