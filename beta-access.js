@@ -99,15 +99,18 @@ async function redeemInvite(request, env, url) {
   }
   const code = normalizeInviteCode(input?.code);
   if (!code) return responseJson({ error: "Convite invalido ou expirado." }, 403);
-  const invite = await env.DB.prepare(
-    "UPDATE beta_invites SET uses=uses+1 WHERE code_hash=? AND disabled=0 " +
-    "AND uses<max_uses AND (expires_at IS NULL OR expires_at>unixepoch()) RETURNING id"
-  ).bind(await sha256(code)).first();
-  if (!invite) return responseJson({ error: "Convite invalido ou expirado." }, 403);
+  // One INSERT claims the invite and issues its session atomically.
+  // The beta-only BEFORE INSERT trigger increments uses in the same SQLite
+  // statement; a rejected/failed insert never burns an invite.
   const token = newSessionToken();
-  await env.DB.prepare(
-    "INSERT INTO beta_access_sessions(session_hash,invite_id,expires_at) VALUES(?,?,?)"
-  ).bind(await sha256(token), invite.id, Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS).run();
+  const issued = await env.DB.prepare(
+    "INSERT INTO beta_access_sessions(session_hash,invite_id,expires_at) " +
+    "SELECT ?,id,? FROM beta_invites WHERE code_hash=? AND disabled=0 " +
+    "AND uses<max_uses AND (expires_at IS NULL OR expires_at>unixepoch())"
+  ).bind(await sha256(token), Math.floor(Date.now() / 1000) + ACCESS_TTL_SECONDS, await sha256(code)).run();
+  if (Number(issued?.meta?.changes) !== 1) {
+    return responseJson({ error: "Convite invalido ou expirado." }, 403);
+  }
   return responseJson({ ok: true, next: "/kingdom.html" }, 200, {
     "Set-Cookie": COOKIE_NAME + "=" + token + "; Path=/; Max-Age=" + ACCESS_TTL_SECONDS + "; Secure; HttpOnly; SameSite=Strict"
   });
