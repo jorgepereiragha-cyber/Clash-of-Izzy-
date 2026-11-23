@@ -29,6 +29,15 @@ test("not synchronized means no misleading progress or fake reward", () => {
   assert.equal(projectRoyalJourney().phase, "sync");
   assert.equal(projectRoyalJourney({kingdom:null}).href, "#city");
 });
+test("invalid or partial kingdom data never suggests a castle upgrade", () => {
+  for (const castle_level of [undefined, null, "", 0, -1, "unknown", Infinity, NaN]) {
+    const projected = projectRoyalJourney({kingdom:{castle_level},armyCount:100});
+    assert.equal(projected.phase, "sync");
+    assert.equal(projected.href, "#city");
+    assert.equal(projected.title, "Reino não sincronizado");
+  }
+  assert.equal(projectRoyalJourney({kingdom:{castle_level:1}}).phase, "castle");
+});
 test("castle guidance uses authoritative level and running queue", () => {
   const current = projectRoyalJourney({kingdom:{castle_level:1}, queues:[]});
   assert.equal(current.href, "#buildings");
