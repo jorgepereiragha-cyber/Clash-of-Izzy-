@@ -28,7 +28,7 @@ test("launch preserves one kingdom per player and existing kingdoms in map 1", a
   const schema = await read("migrations/0002_world.sql");
   const sharedRealm = await read("migrations/0026_single_shared_realm.sql");
   assert.ok(schema.includes("player_id INTEGER NOT NULL UNIQUE REFERENCES players(id)"));
-  assert.ok(worker.includes("const existingPlayerId=await gameIdentity(request,env)"));
+  assert.ok(worker.includes("const existingPlayerId=authorization?await gameIdentity(request,env):null;"));
   assert.ok(worker.includes("SELECT 1 FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?"));
   assert.ok(worker.includes("const sessionVersion=await sessionVersionForPlayer(env,existingPlayerId);"));
   assert.ok(worker.includes("if(sessionVersion!==undefined)payload.av=Number(sessionVersion);"));
