@@ -63,4 +63,7 @@ test("Default-off flag and independent worker gates are present in checked-in pr
   assert.match(workerSource,/mercadoPago:mercadoPagoNewCheckoutEnabled\(env\)/);
   assert.match(workerSource,/requestedPaymentMethod==="mercadopago_link"&&!mercadoPagoNewCheckoutEnabled\(env\)/);
   assert.match(workerSource,/hasMercadoPagoAutomaticCheckout:mercadoPagoNewCheckoutEnabled\(env\)/);
+  const workflow=await read(".github/workflows/deploy-worker-only.yml");
+  assert.match(workflow,/"MP_PAYMENTS_ENABLED"/);
+  assert.match(workflow,/vars\[name\] !== "false"/);
 });
