@@ -19,7 +19,7 @@
 
 ## Cena atual
 - `kingdom.html` mantém a arte procedural 2D em Canvas como fallback para WebGL indisponível.
-- `scripts/kingdom-3d.js` adiciona uma cena isométrica Three.js com terreno, estrada, árvores, iluminação e edifícios procedurais com mapas de textura tileáveis para pedra, madeira, telhado, grama e estrada. A grade de posicionamento e a camada de controles HTML limitam atualmente a nove edifícios visíveis (3×3); os perfis low/balanced/high ainda declaram limites nominais de 8/12/16, mas o teto global de nove prevalece nos três perfis.
+- `scripts/kingdom-3d.js` apresenta uma cena isométrica Three.js com terreno, estrada, árvores, iluminação e edifícios procedurais com texturas tileáveis. A cena WebGL permite até 8/12/16 edifícios visíveis nos perfis low/balanced/high. Os alvos HTML seguem a projeção da câmera e ficam compactos acima de nove itens; o fallback Canvas 2D mantém nove edifícios para preservar a legibilidade e o toque em dispositivos sem WebGL. As coordenadas canônicas persistidas têm prioridade; a disposição 4×4 só é usada quando faltam coordenadas, sem alterar o D1.
 - A vegetação usa `InstancedMesh` para agrupar partes repetidas em poucos draw calls. Os modelos procedurais antigos liberam geometrias e materiais próprios ao serem substituídos; texturas compartilhadas permanecem em cache.
 - `kingdom.html` declara um import map para que `GLTFLoader` e `KTX2Loader` resolvam a mesma instância do módulo `three` no navegador.
 - `assets/3d/manifest.json` é o catálogo versionado para substituição explícita por modelos GLB reais (`enabled: true`). O manifesto atualmente contém cinco entradas CC0 do Kenney habilitadas: duas estruturas (torre e muralha), dois props (trebuchet e árvore) e uma unidade (arqueiro). Os arquivos locais passam pela validação estrutural e de orçamento do CI. São assets reais de base, não a cobertura artística final de todos os edifícios, tropas, heróis, animações e cosméticos.
@@ -48,8 +48,8 @@
 
 ## Budgets adaptativos de cena (validados em CI)
 - Tier low: até 8 edifícios visíveis, DPR máximo 1.0, orçamento de 1,2 milhão de pixels e sombras desligadas.
-- Tier balanced: limite nominal de 12 edifícios, DPR máximo 1.25 e orçamento de 2,4 milhões de pixels; a grade atual continua limitada a nove edifícios visíveis.
-- Tier high: limite nominal de 16 edifícios, DPR máximo 1.5 e orçamento de 4,2 milhões de pixels; a grade atual continua limitada a nove edifícios visíveis.
+- Tier balanced: até 12 edifícios 3D visíveis, DPR máximo 1.25 e orçamento de 2,4 milhões de pixels; fallback Canvas 2D mantém nove.
+- Tier high: até 16 edifícios 3D visíveis, DPR máximo 1.5 e orçamento de 4,2 milhões de pixels; fallback Canvas 2D mantém nove.
 - O limite de pixels tem precedência sobre qualquer piso de resolução; em viewports extremos o DPR pode cair abaixo de 0.5 para não exceder o orçamento.
 - A quantidade de edifícios afeta apenas a representação 3D visível; o estado completo continua no servidor e na interface de gestão.
 
