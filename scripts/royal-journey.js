@@ -7,13 +7,15 @@ const action = document.getElementById("coiJourneyAction");
 const allowedLinks = new Set(["#city", "#buildings", "#queues", "#trainingForm", "/world.html", "/alliance.html"]);
 
 if (title && message && action) {
-  window.addEventListener("coi:command-state", event => {
-    const next = projectRoyalJourney(event.detail);
+  const updateJourney = detail => {
+    const next = projectRoyalJourney(detail);
     title.textContent = next.title;
     message.textContent = next.description;
     action.textContent = next.action;
     // No URL from a player, API response, or external community is followed.
     action.href = allowedLinks.has(next.href) ? next.href : "#city";
     action.dataset.phase = next.phase;
-  });
+  };
+  window.addEventListener("coi:command-state", event => updateJourney(event.detail));
+  if (window.__coiCommandSnapshot) updateJourney(window.__coiCommandSnapshot);
 }
