@@ -1,11 +1,13 @@
 worker.js
 wrangler.jsonc
+wrangler.beta.jsonc
 wrangler.preview-migrations.jsonc
 .assetsignore
 README.md
 .git/**
 .github/**
 migrations/**
+beta/**
 node_modules/**
 dist/**
 game-adapter.js
@@ -16,6 +18,7 @@ package.json
 # Worker-only modules are bundled by worker.js and must not be published as browser assets.
 angel-death-event.js
 api-rate-limit.js
+beta-access.js
 battle-replay.js
 email-system.js
 kingdom-queue-rules.js
