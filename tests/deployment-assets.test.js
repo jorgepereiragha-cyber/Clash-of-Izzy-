@@ -50,3 +50,20 @@ test("Durable Object source must not leak via public static hosting", () => {
 test("staging load probe is excluded from public assets", () => {
   assert.ok(ignore.split("\n").some(line => line.trim() === "scripts/staging-load-smoke.mjs"));
 });
+
+
+test("every root JavaScript Worker import is excluded from public assets", async () => {
+  // Workers bundles the modules itself: no backend JavaScript needs a static URL.
+  const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+  const modules = [...worker.matchAll(/^(?:import|export)[^\n]+from\s+"\.\/([^"/]+\.js)";/gm)]
+    .map(([, module]) => module);
+  assert.ok(modules.length >= 25, "Worker root-import discovery unexpectedly empty");
+  const excluded = new Set(ignore.split("\n").map(line => line.trim()));
+  for (const module of modules) {
+    assert.ok(excluded.has(module), "Worker module must never be a public asset: " + module);
+  }
+});
+
+test("D1 audit and validation CLIs do not deploy as public scripts", () => {
+  assert.ok(ignore.split("\n").includes("scripts/*.mjs"));
+});
