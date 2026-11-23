@@ -707,11 +707,15 @@ document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).
 renderPets();renderBattleReports();
 city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
 document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
-window.dispatchEvent(new CustomEvent("coi:command-state",{detail:{
+const commandSnapshot={
  kingdom:{castle_level:k.castle_level,power:k.power},
  queues:state.queues||[],armyCount:state.armyCount??total,troopCapacity:state.troopCapacity||500,
  marches:state.marches||[]
-}}));
+};
+// Modules may initialize after the first asynchronous state response; replay
+// only public command metrics (never tokens or personal account credentials).
+window.__coiCommandSnapshot=commandSnapshot;
+window.dispatchEvent(new CustomEvent("coi:command-state",{detail:commandSnapshot}));
 }
 const PET_RARITIES=Object.freeze({
  common:{label:"Comum",css:"pet-rarity-common"},
