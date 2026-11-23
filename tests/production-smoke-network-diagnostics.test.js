@@ -27,6 +27,6 @@ test("production smoke does not leak secrets embedded in network error messages"
     runProductionSmokeTests({ baseUrl: "https://example.test", fetchImpl: async () => {
       throw new TypeError("fetch failed " + secret + " https://example.test/?token=" + secret);
     } }),
-    error => error.message.includes("GET /api/health") && !error.message.includes(secret)
+    error => error.message.includes("GET /api/health") && !error.message.includes(secret) && error.cause === undefined
   );
 });
