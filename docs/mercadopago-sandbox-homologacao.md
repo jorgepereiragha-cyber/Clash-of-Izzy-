@@ -54,3 +54,56 @@ Estas consultas exigem schema correspondente e acesso ao Preview comercial; não
 ### Critério de GO
 
 Somente após CI, Preview, Sandbox, auditoria de segurança, procedimentos de estorno e autorização do proprietário, criar uma mudança explícita e reversível para ativar `MP_PAYMENTS_ENABLED`. A mera presença de credenciais nunca equivale à homologação.
+
+## Procedimento operacional detalhado (somente após autorização para staging)
+
+**Não executar estes passos no Worker ou D1 de produção.** Não reutilizar o D1 Preview 4X da PR #319 para testes comerciais se seu histórico for incompatível. Preparar um Worker de homologação com domínio distinto, D1 isolado e descartável, log protegido e `ENVIRONMENT` identificando o ambiente, sem jogadores ou credenciais reais. O endereço e o UUID exatos serão definidos pelo operador e verificados **antes** de qualquer escrita. Não criar valores fictícios para eles.
+
+1. **Conferir a aplicação Mercado Pago em Teste.** Abrir [Suas integrações](https://www.mercadopago.com.br/developers/pt), selecionar a aplicação de Orders, mudar o seletor para **Teste**, obter o **Access Token de teste** e configurar os usuários/contas de teste segundo a documentação oficial. Nunca usar vendedor e comprador reais para homologação. A conta compradora e a conta vendedora de teste devem ser do mesmo país.
+2. **Obter a assinatura Webhooks de teste.** No painel da aplicação, configurar o tópico **Orders (`order`)**, cadastrar a **URL HTTPS pública do Worker de staging** terminando em `/api/webhook/mp` e obter o segredo de assinatura daquela configuração. Não cadastrar o endpoint de produção e não confundir `MP_WEBHOOK_SECRET` com o Access Token.
+3. **Vincular secrets exclusivamente ao Worker de homologação:** `MP_ACCESS_TOKEN` = token de **teste** e `MP_WEBHOOK_SECRET` = segredo Webhooks de **teste**, ambos como *Secrets*, jamais no repositório, PRs, screenshots ou logs. Confirmar primeiro o binding `DB`, account ID e UUID do D1 de homologação; aplicar o histórico de migrações apropriado **somente após aprovação separada**, sem tocar produção. A instância de staging deve usar `MP_PAYMENTS_ENABLED="false"` até terminar o preflight de schema e configuração.
+4. **Pré-teste de interrupção:** com ambos os secrets provisionados mas `MP_PAYMENTS_ENABLED="false"`, conferir `GET /api/store/payment-methods` → `mercadoPago:false`; `POST /api/store/checkout` e `POST /api/support/checkout` devem falhar **antes de escrever em D1**. O webhook de pedidos antigos permanece habilitado para conciliação de pedidos já existentes (com assinatura válida).
+5. **Habilitar testes apenas no staging isolado:** colocar `MP_PAYMENTS_ENABLED="true"` exclusivamente no Worker de staging; manter `NUBANK_PIX_ENABLED`, `NUBANK_PIX_RECEIVER_VERIFIED`, `GAME_4X_SYSTEMS_ENABLED`, `LEVEL_PACKS_ENABLED`, `LEVEL_PACKS_PUBLIC_ENABLED` e `LEVEL_PACKS_PROPOSED_PRICES_APPROVED` desligados, salvo se houver homologação independente de cada sistema. Conferir `GET /api/store/payment-methods` → `mercadoPago:true,nubankPix:false`.
+6. **Testar checkout com conta sintética do jogo e comprador de teste:** selecionar o `Pacote Inicial de Eldoria` (R$ 3,99, 35 gemas), criar `POST /api/store/purchase-request` com idempotência única e `paymentMethod:"mercadopago_link"`, depois `POST /api/store/checkout` com o `requestId` correspondente. Usar somente o `checkoutUrl` retornado pelo servidor, validado contra o domínio oficial do Mercado Pago, e simular o pagamento com os instrumentos de teste atuais do provedor. Não assumir que um resultado de cartão de teste é aplicável a todos os meios de pagamento.
+7. **Conferir Orders e notificações:** verificar no painel de **Teste** que o evento `order` chegou ao endpoint de staging e consultar a Order de teste usando o Access Token de teste, para comparar `external_reference`, moeda `BRL`, total pago, estado `processed` e status local. **Não** forjar assinatura real no navegador ou compartilhar o secret. Se a notificação não chegar, tratar como falha; não marcar o teste como aprovado apenas porque o checkout exibiu sucesso.
+8. **Executar cada cenário da matriz abaixo e registrar evidências:** preferir execução ponta a ponta com o Mercado Pago de Teste. Se o provedor não permitir produzir determinado estado (ex.: chargeback), usar teste sintético com mock do provedor e registrar **separadamente**, sem marcar a homologação externa como concluída.
+9. **Encerrar staging:** confirmar nenhuma ordem incompleta ou reembolso pendente sem processo definido, voltar `MP_PAYMENTS_ENABLED="false"` no staging e preservar logs sanitizados. Nenhuma alteração no ambiente de produção decorre automaticamente da aprovação no staging.
+
+### Sequência de testes de aceitação e evidências
+
+| Caso | Ação no staging isolado | Prova exigida |
+| --- | --- | --- |
+| **G0** Credenciais sem ativação | Flag ausente ou `false`; tentar os dois checkouts e conferir método público | HTTP 503 em novos checkouts, `mercadoPago:false`, zero novas ordens |
+| **G1** Compra aprovada | Pacote Inicial de Eldoria de R$ 3,99, pagamento com comprador de teste, evento `order` assinado | Ordem local `approved`; crédito de **35 gemas apenas uma vez**; conferir saldo anterior/posterior e ID interno da operação |
+| **G2** Pendência | Simular pedido ainda não `processed` ou valor insuficiente | Ordem pendente e **zero crédito** |
+| **G3** Recusa/cancelamento | Simular pagamento recusado ou cancelado | Nenhuma concessão, situação final ou pendente reconciliável |
+| **G4** Assinatura inválida | Enviar notificação `type=order&data.id=...` com assinatura falsa para **staging** | HTTP 401, zero crédito e **nenhuma consulta** ao provedor nem escrita no D1 |
+| **G5** Reentrega do mesmo webhook | Repetir um evento de pedido de teste já processado pelo canal autorizado | Idempotência: nenhuma gema duplicada, ausência de segundo grant |
+| **G6** Divergência no valor | Ordem sintética cujo valor/BRL/reference não coincide com o pedido | Sem entrega e com motivo auditável |
+| **G7** Contribuição voluntária | Comprar `/api/support/checkout` com tier `escudeiro` | Registro em `support_orders`; **nenhuma gema ou item** |
+| **G8** Apoio com gemas | Produto `Apoio Escudeiro` originado em `0040`, compra real de teste | Crédito previsto de **500 gemas** somente após pagamento aprovado; ledger distinto da contribuição |
+| **G9** Replay e concorrência | Repetir checkout/idempotency key e webhook, inclusive simultaneamente | Uma Order/concessão por operação; sem dois saldos para uma compra |
+| **G10** Reembolso/disputa | Usar fluxo de estorno disponibilizado pelo provedor de teste ou fixture documentada | Incidente registrado, intervenção e reconciliação demonstradas; não presumir estorno automático de gemas |
+| **G11** Pausa durante pedido pendente | Desativar `MP_PAYMENTS_ENABLED` depois da criação do pedido | Novo checkout bloqueado; webhook assinado da operação existente ainda pode conciliar |
+
+### Evidência padronizada para cada cenário
+
+Registrar em documento privado: **ambiente staging**, SHA do Worker, migração mais recente no D1, identificador interno sintético da operação, cenário G0–G11, estado inicial/final, HTTP esperado/observado, valores antes/depois de gemas e recursos, número de concessões e resultado PASS/FAIL/BLOQUEADO. Jamais publicar token, segredo HMAC, endereço bancário, dados pessoais, payload completo de pagamento ou credenciais de teste.
+
+Consultas complementares **somente de leitura**, após confirmar o D1 isolado e a existência das tabelas:
+
+```sql
+SELECT status, COUNT(*) AS pedidos FROM purchase_requests GROUP BY status ORDER BY status;
+SELECT status, COUNT(*) AS contribuicoes FROM support_orders GROUP BY status ORDER BY status;
+SELECT id, status, product_name, price_brl, currency, gems_amount
+  FROM purchase_requests WHERE id = ?;
+PRAGMA foreign_key_check;
+```
+
+No último `SELECT`, usar exclusivamente um ID interno da conta sintética no staging; não publicar identificação de jogador. Para demonstrar crédito único, comparar saldos e ledgers internos em duas consultas read-only antes e depois do webhook. **Nunca** usar `UPDATE`, `DELETE`, `INSERT` ou `ALTER` manualmente para simular aprovação; o teste deve passar pelo Worker e pelo provedor/mocks.
+
+### Gate de ativação controlada de produção
+
+Só propor o merge de código e futura ativação quando estiverem documentados: CI da PR #322 e da main aprovadas; proteção de branch e ambiente; D1 comercial homologado **sem migrações históricas divergentes**; G0–G11 com evidências e plano formal para falhas que o provedor não reproduzir; autenticação, HMAC, idempotência e conciliação auditados; fluxos Pix/manual revisados separadamente; jogo web testado em celular de baixa memória; monitoramento de pedidos, atendimento e estornos definidos; consentimento explícito do proprietário. Mesmo que esse checklist passe, **a ativação exige uma mudança separada, revisável e reversível**, nunca automático pelo cadastro dos secrets.
+
+Referências oficiais: [Mercado Pago — testar checkout Orders](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-orders/integration-test/cards), [Mercado Pago — notificações Orders](https://www.mercadopago.com.br/developers/pt/docs/checkout-api-orders/notifications), [Cloudflare — ambientes de staging](https://developers.cloudflare.com/workers/wrangler/environments/).
