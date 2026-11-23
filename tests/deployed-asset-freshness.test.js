@@ -77,3 +77,17 @@ test("workflows pin SHA and verify deployed assets without D1 writes", async () 
   assert.doesNotMatch(worker, /d1 migrations apply clash-of-izzy-db --remote/);
   assert.doesNotMatch(portal, /d1 migrations apply clash-of-izzy-db --remote/);
 });
+
+test("release workflows retry briefly, but fail closed if Cloudflare never serves approved bytes", async () => {
+  for (const filename of [
+    ".github/workflows/publicar-portal-cloudflare.yml",
+    ".github/workflows/deploy-worker-only.yml",
+  ]) {
+    const workflow = await readFile(new URL("../" + filename, import.meta.url), "utf8");
+    assert.match(workflow, /for attempt in 1 2 3 4 5; do/);
+    assert.match(workflow, /if \[\[ "\$attempt" -lt 5 \]\]; then sleep 6; fi/);
+    assert.match(workflow, /echo "::error::Assets /);
+    assert.match(workflow, /\n          exit 1(?:\n|$)/);
+    assert.match(workflow, /environment:\s*\n\s+name: production/);
+  }
+});
