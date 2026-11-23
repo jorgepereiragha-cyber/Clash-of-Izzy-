@@ -16,7 +16,7 @@ test("release gate only performs read-only GET", async () => {
     calls++;
     assert.match(url, /\/api\/store\/payment-methods$/);
     assert.equal(options.method,"GET");
-    assert.equal(options.redirect,"error");
+    assert.equal(options.redirect,"manual");
     return {status:200,json:async()=>({mercadoPago:false,nubankPix:false})};
   });
   assert.equal(calls,1);
