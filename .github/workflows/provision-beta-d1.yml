@@ -1,0 +1,185 @@
+name: Beta fechado - auditar ou criar D1 exclusivo
+on:
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: "audit = consulta sem alterar nada; create = criar o terceiro D1"
+        type: choice
+        options:
+          - audit
+          - create
+        required: true
+        default: audit
+      confirm_new_beta_only:
+        description: "Para create, digite exatamente CRIAR-D1-BETA (audit nao precisa)"
+        type: string
+        required: false
+        default: ""
+      location_hint:
+        description: "Preferencia de localizacao primaria (nao garantia de jurisdicao)"
+        type: choice
+        options:
+          - enam
+          - auto
+        required: true
+        default: enam
+
+permissions:
+  contents: read
+
+concurrency:
+  group: clash-of-izzy-beta-d1-provision
+  cancel-in-progress: false
+
+jobs:
+  provision:
+    if: ${{ github.ref == 'refs/heads/main' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    environment: beta-infrastructure
+    steps:
+      - name: Checkout trusted main without persistent credentials
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Read beta configuration as DATA only
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --no-tags --depth=1 origin +refs/heads/beta:refs/remotes/origin/beta
+          git show origin/beta:wrangler.beta.jsonc > "$RUNNER_TEMP/wrangler-beta-readonly.json"
+
+      - name: Audit D1 account; create only with explicit double confirmation
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_BETA_D1_TOKEN: ${{ secrets.CLOUDFLARE_BETA_D1_TOKEN }}
+          OPERATION: ${{ inputs.operation }}
+          CONFIRMATION: ${{ inputs.confirm_new_beta_only }}
+          LOCATION_HINT: ${{ inputs.location_hint }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json
+          import os
+          import re
+          import urllib.error
+          import urllib.parse
+          import urllib.request
+          from pathlib import Path
+
+          def fail(message):
+              raise SystemExit("BETA D1 PRE-FLIGHT: " + message)
+
+          account = os.environ.get("CLOUDFLARE_ACCOUNT_ID", "").strip()
+          token = os.environ.get("CLOUDFLARE_BETA_D1_TOKEN", "").strip()
+          if token[:7].lower() == "bearer ":
+              token = token[7:].strip()
+          if not re.fullmatch(r"[a-zA-Z0-9]{32}", account):
+              fail("CLOUDFLARE_ACCOUNT_ID ausente/invalido")
+          if not token or any(c.isspace() for c in token):
+              fail("configure o secret CLOUDFLARE_BETA_D1_TOKEN; nao use token de producao")
+          print("::add-mask::" + token)
+
+          prod = json.loads(Path("wrangler.jsonc").read_text())
+          beta = json.loads(Path(os.environ["RUNNER_TEMP"], "wrangler-beta-readonly.json").read_text())
+          pd = prod["d1_databases"][0]
+          preview = prod["previews"]["d1_databases"][0]
+          bd = beta["d1_databases"][0]
+          prod_uuid, preview_uuid = pd["database_id"], preview["database_id"]
+          name = "clash-of-izzy-beta-db"
+          if pd["database_name"] != "clash-of-izzy-db" or prod["name"] != "clash-of-izzy":
+              fail("configuracao de producao mudou: abortando")
+          if preview["database_name"] != "izzy-preview-17112026":
+              fail("configuracao Preview mudou: abortando")
+          if prod_uuid == preview_uuid or not all(re.fullmatch(r"[0-9a-fA-F-]{36}", x) for x in (prod_uuid, preview_uuid)):
+              fail("IDs existentes nao atendem ao contrato de isolamento")
+          if beta["name"] != "clash-of-izzy-beta" or beta["vars"].get("ENVIRONMENT") != "beta":
+              fail("Worker beta inesperado")
+          if beta["vars"].get("INVITE_ONLY") != "true" or beta["vars"].get("BETA_LIVE_PAYMENTS_APPROVED") != "false":
+              fail("acesso ou pagamentos beta nao estao bloqueados")
+          if bd["binding"] != "DB" or bd["database_name"] != name:
+              fail("binding/nome do terceiro banco nao correspondem ao contrato")
+          if bd["database_id"] not in ("REPLACE_WITH_NEW_BETA_D1_UUID",):
+              fail("o ID beta ja esta configurado: use a homologacao, nao crie outro D1")
+          if beta.get("triggers"):
+              fail("beta nao deve conter crons")
+          operation = os.environ.get("OPERATION", "")
+          if operation not in ("audit", "create"):
+              fail("operacao invalida")
+          if operation == "create" and os.environ.get("CONFIRMATION") != "CRIAR-D1-BETA":
+              fail("create requer confirmacao literal CRIAR-D1-BETA")
+          location = os.environ.get("LOCATION_HINT", "")
+          if location not in ("enam", "auto"):
+              fail("localizacao invalida")
+
+          api_base = "https://api.cloudflare.com/client/v4/accounts/" + account + "/d1/database"
+          def api(method, suffix="", body=None):
+              data = json.dumps(body).encode("utf-8") if body is not None else None
+              request = urllib.request.Request(
+                  api_base + suffix, method=method, data=data,
+                  headers={"Authorization": "Bearer " + token, "Content-Type": "application/json"}
+              )
+              try:
+                  with urllib.request.urlopen(request, timeout=30) as response:
+                      result = json.load(response)
+              except urllib.error.HTTPError as error:
+                  fail("Cloudflare API retornou HTTP " + str(error.code) + "; sem prosseguir")
+              except Exception as error:
+                  fail("Cloudflare API indisponivel: " + type(error).__name__)
+              if not result.get("success"):
+                  fail("Cloudflare recusou a requisicao; sem prosseguir")
+              return result
+
+          databases = []
+          for page in range(1, 101):
+              query = "?" + urllib.parse.urlencode({"per_page": 100, "page": page})
+              response = api("GET", query)
+              rows = response.get("result")
+              if not isinstance(rows, list):
+                  fail("listagem de D1 inesperada")
+              databases.extend(rows)
+              info = response.get("result_info") or {}
+              total = info.get("total_count")
+              if (total is not None and len(databases) >= int(total)) or len(rows) < 100:
+                  break
+          else:
+              fail("listagem D1 muito grande ou paginacao incompleta")
+
+          ids = {item.get("uuid") for item in databases}
+          if prod_uuid not in ids:
+              fail("D1 producao nao foi encontrado nesta conta. Cheque a conta/token.")
+          if preview_uuid not in ids:
+              print("::warning::D1 Preview nao foi encontrado; usando apenas o ID conhecido da configuracao.")
+          existing = [item for item in databases if item.get("name") == name]
+          if len(existing) > 1:
+              fail("varios D1 com nome beta; exigir verificacao humana")
+          if existing:
+              candidate = existing[0].get("uuid")
+              if not candidate or candidate in (prod_uuid, preview_uuid):
+                  fail("UUID beta ausente ou igual a um ambiente existente")
+              print("D1 beta ja existe: " + candidate)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+                  f.write("### D1 beta encontrado (somente leitura)\nUUID: \`" + candidate + "\`\nNenhuma escrita realizada. Atualize apenas \`wrangler.beta.jsonc\` na branch beta, apos revisao.\n")
+              if operation == "create":
+                  fail("reutilize e audite o D1 beta existente; nao criar duplicata")
+          elif operation == "audit":
+              print("AUDIT: D1 beta ainda nao existe. Nenhuma escrita realizada.")
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+                  f.write("### Auditoria concluida\nD1 beta nao encontrado. Nenhuma escrita executada.\n")
+          else:
+              payload = {"name": name}
+              if location != "auto":
+                  payload["primary_location_hint"] = location
+              created = api("POST", "", payload).get("result") or {}
+              new_uuid = created.get("uuid")
+              if not re.fullmatch(r"[a-fA-F0-9]{8}(?:-[a-fA-F0-9]{4}){3}-[a-fA-F0-9]{12}", str(new_uuid)):
+                  fail("resposta de criacao sem UUID confiavel; verifique D1 no Dashboard")
+              if new_uuid in (prod_uuid, preview_uuid) or created.get("name") != name:
+                  fail("isolamento do novo D1 nao comprovado; nenhuma migracao/deploy permitido")
+              print("NOVO D1 beta criado: " + new_uuid)
+              with open(os.environ["GITHUB_STEP_SUMMARY"], "a") as f:
+                  f.write("### Novo D1 beta criado\nNome: \`" + name + "\`\nUUID: \`" + new_uuid + "\`\nLocalizacao solicitada: \`" + location + "\`\n**Proximo passo:** vincular o UUID somente em \`wrangler.beta.jsonc\`; revisar antes de migrar.\n")
+          print("Sem migracoes, deploy, alteracao de secrets, reconfiguracao de Worker ou acesso de escrita aos D1 anteriores.")
+          PY
