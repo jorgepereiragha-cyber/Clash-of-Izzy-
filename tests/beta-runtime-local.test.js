@@ -372,11 +372,23 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       });
       try {
         const context = await browser.newContext({
-          ...devices["Pixel 5"], serviceWorkers: "block"
+          ...devices["Pixel 5"], serviceWorkers: "allow"
         });
         await context.route("**/*", route => {
           const url = new URL(route.request().url());
           return url.origin === base ? route.continue() : route.abort();
+        });
+        const pwaRegistrationAttempts = [];
+        await context.exposeBinding("__betaRecordServiceWorkerRegistration", (_source, url) => {
+          pwaRegistrationAttempts.push(String(url));
+        });
+        await context.addInitScript(() => {
+          if (!navigator.serviceWorker) return;
+          const register = navigator.serviceWorker.register.bind(navigator.serviceWorker);
+          navigator.serviceWorker.register = (...args) => {
+            window.__betaRecordServiceWorkerRegistration(args[0]);
+            return register(...args);
+          };
         });
         const page = await context.newPage();
         const localAssetErrors = [];
@@ -516,6 +528,12 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         console.log("Beta WebGL recovery passed: actual context loss, playable 2D fallback, same-profile retry and persisted troops.");
         await page.goto(base + "/world.html");
         assert.equal(new URL(page.url()).pathname, "/world.html");
+        await page.waitForLoadState("load");
+        assert.deepEqual(pwaRegistrationAttempts, [], "closed beta must not attempt official service worker registration");
+        assert.equal(await page.evaluate(async () =>
+          (await navigator.serviceWorker.getRegistrations()).length), 0,
+          "closed beta has no installed service worker in a fresh browser");
+        console.log("Beta online-only runtime passed: service workers enabled in browser, no registration attempts.");
         console.log("Mobile Chromium beta passed: real invite, playable 2D realm, persisted session, WebGL initialization, world navigation.");
       } finally {
         await browser.close();

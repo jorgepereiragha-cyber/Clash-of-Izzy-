@@ -5,9 +5,7 @@
 
   let status = null;
   let statusText = null;
-  let updateButton = null;
   let hideTimer = 0;
-  let hadController = Boolean(navigator.serviceWorker?.controller);
 
   function ensureStatus() {
     if (status) return status;
@@ -36,21 +34,6 @@
     window.dispatchEvent(new CustomEvent("coi:app-resume", { detail: { reason } }));
   }
 
-  function updateReady() {
-    const node = ensureStatus();
-    window.clearTimeout(hideTimer);
-    node.dataset.kind = "update";
-    statusText.textContent = "Nova versão pronta. Atualize quando terminar sua ação.";
-    if (!updateButton) {
-      updateButton = document.createElement("button");
-      updateButton.type = "button";
-      updateButton.textContent = "Atualizar";
-      updateButton.addEventListener("click", () => window.location.reload());
-    }
-    if (!updateButton.isConnected) node.append(updateButton);
-    node.hidden = false;
-  }
-
   window.addEventListener("offline", () => {
     announce("Sem conexão. O reino precisa de internet para sincronizar; evite ações até reconectar.", "offline", true);
   });
@@ -69,17 +52,8 @@
     announce("Sem conexão. O reino precisa de internet para sincronizar; evite ações até reconectar.", "offline", true);
   }
 
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.addEventListener("controllerchange", () => {
-      if (hadController) updateReady();
-      hadController = true;
-    });
-    const register = () => {
-      navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" })
-        .catch(error => console.warn("Clash of Izzy: registro PWA indisponível.", error));
-    };
-    if (document.readyState === "complete") register();
-    else window.addEventListener("load", register, { once: true });
-  }
+  // Closed beta is online-only. Never register the official PWA worker:
+  // cached private pages could outlive invitation revocation. Keep network
+  // and lifecycle notifications, but leave offline installation disabled.
   appResumed("initial");
 })();
