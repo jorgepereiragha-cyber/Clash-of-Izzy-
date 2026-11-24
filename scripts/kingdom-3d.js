@@ -42,6 +42,7 @@ if (host && "WebGLRenderingContext" in window) {
   let manifestProps = [];
   let manifestUnits = [];
   let manifestLoad = null;
+  let optionalSceneRefreshes = 0;
   const material = (color, roughness = 0.92) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.02 });
   const mats = {
     grass: material("#577a49"), grassLight: material("#78945a"),
@@ -1089,6 +1090,9 @@ if (host && "WebGLRenderingContext" in window) {
           .filter(asset => asset?.enabled === true && presentUnits.has(asset.unit_type) && !glbUnitTemplates.has(asset.unit_type))
           .map(asset => ({ asset, kind: "unit", key: `unit:${asset.unit_type}` }))
       ].filter(entry => !glbLoadPromises.has(entry.key));
+      // Normal state refreshes already render the existing templates. Avoid a
+      // second scene rebuild when this call has no new assets to decode.
+      if (!queue.length) return;
       let cursor = 0;
       const worker = async () => {
         while (!disposed && cursor < queue.length) {
@@ -1097,6 +1101,7 @@ if (host && "WebGLRenderingContext" in window) {
       };
       await Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => worker()));
       if (!disposed && renderer) {
+        optionalSceneRefreshes += 1;
         renderBuildings(latestBuildings);
         renderManifestProps();
         renderKingdomTroops(latestTroops);
@@ -1204,6 +1209,7 @@ if (host && "WebGLRenderingContext" in window) {
         pbrMaps: qualityProfile.pbrMaps,
         loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
         pendingGlbLoads: glbLoadPromises.size,
+        optionalSceneRefreshes,
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };
