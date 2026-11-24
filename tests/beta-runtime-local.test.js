@@ -448,6 +448,33 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await writeFile(path.join(evidence,"renderer.json"), JSON.stringify(diagnostics,null,2));
         console.log("Decoded beta GLB templates: " + JSON.stringify(diagnostics.loadedGlbTemplates));
         assert.deepEqual(localAssetErrors, [], "browser must not encounter missing graphics/script/style assets");
+        // Trigger a real GPU context loss (not a synthetic DOM event).
+        const simulatedLoss = await page.evaluate(() => {
+          const canvas = document.querySelector("#kingdom3d");
+          const gl = canvas?.getContext("webgl2");
+          const extension = gl?.getExtension("WEBGL_lose_context");
+          if (!extension) return false;
+          extension.loseContext();
+          return true;
+        });
+        assert.equal(simulatedLoss,true,"software WebGL supports deliberate context loss");
+        await page.waitForFunction(() => !document.querySelector("#kingdom3d") &&
+          !document.querySelector("#city").classList.contains("has-3d") &&
+          document.querySelector("#coiGraphicsStatus").textContent.includes("Modo 2D ativo"));
+        assert.ok(await page.locator("#city .building").first().isVisible(),"2D building controls remain usable");
+        assert.equal(await page.locator("#coiGraphicsPreset").inputValue(),"balanced");
+        assert.equal(await page.locator("#coiGraphicsApply").isEnabled(),true,"same graphics profile can be retried");
+        assert.equal(await page.evaluate(() => localStorage.getItem("coi_game_token")),firstToken);
+        await page.locator("#city").screenshot({path:path.join(evidence,"kingdom-2d-fallback.png")});
+        await page.locator("#coiGraphicsApply").click();
+        await page.waitForFunction(() => window.__coiKingdomDiagnostics?.()?.available === true,
+          null,{timeout:45_000});
+        await page.locator("#game").waitFor({state:"visible",timeout:45_000});
+        await page.waitForFunction(() => window.__coiKingdomDiagnostics?.()?.loadedGlbTemplates?.units >= 1,
+          null,{timeout:45_000});
+        assert.equal(await page.evaluate(() => localStorage.getItem("coi_game_token")),firstToken);
+        assert.deepEqual(localAssetErrors, [], "graphics recovery must not lose private assets");
+        console.log("Beta WebGL recovery passed: actual context loss, playable 2D fallback, same-profile retry and persisted troops.");
         await page.goto(base + "/world.html");
         assert.equal(new URL(page.url()).pathname, "/world.html");
         console.log("Mobile Chromium beta passed: real invite, playable 2D realm, persisted session, WebGL initialization, world navigation.");
