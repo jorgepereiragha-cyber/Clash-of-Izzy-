@@ -387,10 +387,20 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(second.status,201,"independent second realm starts");
     assert.ok(second.data.token);
     assert.notEqual(second.data.state.kingdom.id,start.data.state.kingdom.id);
-    const tag = "BTEST";
-    const createdAlliance = await actionFor(cookie,start.data.token,{type:"alliance_create",name:"Beta Test Guild",tag});
-    assert.equal(createdAlliance.status,200,"alliance creation: " + JSON.stringify(createdAlliance.data).slice(0,300));
+    const candidates = [{name:"Beta Test Guild A",tag:"BTA"},{name:"Beta Test Guild B",tag:"BTB"}];
+    const creations = await Promise.all(candidates.map(candidate =>
+      actionFor(cookie,start.data.token,{type:"alliance_create",...candidate})));
+    assert.deepEqual(creations.map(result=>result.status).sort((a,b)=>a-b),[200,409],
+      "one realm cannot concurrently found two alliances");
+    const winner = creations.findIndex(result=>result.status===200);
+    const tag = candidates[winner].tag;
+    const rejectedTag = candidates[1-winner].tag;
+    const createdAlliance = creations[winner];
     assert.equal(createdAlliance.data.state.alliance.tag,tag);
+    assert.equal(createdAlliance.data.state.alliance.members.length,1);
+    assert.equal(createdAlliance.data.state.alliance.members[0].rank,"lider");
+    assert.equal((await actionFor(claimedCookie,second.data.token,{type:"alliance_join",tag:rejectedTag})).status,404,
+      "the rejected concurrent alliance must not leave a ghost record");
     const message = "Synthetic beta guild message";
     const refused = await actionFor(claimedCookie,second.data.token,{type:"alliance_chat",message});
     assert.equal(refused.status,409,"outsider cannot post to guild chat");
