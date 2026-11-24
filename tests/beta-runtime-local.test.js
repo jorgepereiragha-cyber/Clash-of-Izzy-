@@ -353,6 +353,58 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       initialMilitia, "another refresh cannot duplicate returned troops");
     console.log("Beta scout march passed: dispatch, local deadline, concurrent return and no duplicate troops.");
 
+    // Reuse legacy gameplay already shipped in the beta rather than copying
+    // old production code. Exercise real state mutations with synthetic realms.
+    const actionFor = (sessionCookie, gameToken, body) =>
+      http(base, "/api/game/action", {method:"POST",body,cookie:sessionCookie,bearer:gameToken});
+    const getStateFor = async (sessionCookie, gameToken) => {
+      const result = await http(base, "/api/game/state", {cookie:sessionCookie,bearer:gameToken});
+      assert.equal(result.status,200,"legacy gameplay state is readable");
+      return result.data.state;
+    };
+    const legacyBefore = await getStateFor(cookie,start.data.token);
+    const starterHero = legacyBefore.heroes.find(hero => hero.hero_key === "kael_sunwarden");
+    assert.ok(starterHero,"legacy starter hero exists");
+    const hero = await actionFor(cookie,start.data.token,{type:"hero_train",hero:starterHero.hero_key});
+    assert.equal(hero.status,200,"hero training: " + JSON.stringify(hero.data).slice(0,300));
+    assert.equal(Number(hero.data.state.heroes.find(h=>h.hero_key===starterHero.hero_key).level),
+      Number(starterHero.level)+1);
+    const dragon = await actionFor(cookie,start.data.token,{type:"dragon_upgrade"});
+    assert.equal(dragon.status,200,"dragon progression: " + JSON.stringify(dragon.data).slice(0,300));
+    assert.equal(Number(dragon.data.state.dragon.level),Number(legacyBefore.dragon.level)+1);
+    const welcome = legacyBefore.mailbox.find(mail=>mail.reward_key==="welcome_v1"&&!mail.claimed_at);
+    assert.ok(welcome,"starter mail exists");
+    const claimed = await actionFor(cookie,start.data.token,{type:"mail_claim",mailId:welcome.id});
+    assert.equal(claimed.status,200,"starter mail reward can be claimed");
+    assert.equal((await actionFor(cookie,start.data.token,{type:"mail_claim",mailId:welcome.id})).status,409,
+      "starter reward cannot be duplicated");
+    const legacyState = await getStateFor(cookie,start.data.token);
+    assert.equal(Number(legacyState.heroes.find(h=>h.hero_key===starterHero.hero_key).level),Number(starterHero.level)+1);
+    assert.equal(Number(legacyState.dragon.level),Number(legacyBefore.dragon.level)+1);
+    console.log("Beta legacy progression passed: hero, dragon and one-time mailbox reward.");
+
+    const second = await http(base,"/api/game/start",{method:"POST",body:{},cookie:claimedCookie});
+    assert.equal(second.status,201,"independent second realm starts");
+    assert.ok(second.data.token);
+    assert.notEqual(second.data.state.kingdom.id,start.data.state.kingdom.id);
+    const tag = "BTEST";
+    const createdAlliance = await actionFor(cookie,start.data.token,{type:"alliance_create",name:"Beta Test Guild",tag});
+    assert.equal(createdAlliance.status,200,"alliance creation: " + JSON.stringify(createdAlliance.data).slice(0,300));
+    assert.equal(createdAlliance.data.state.alliance.tag,tag);
+    const message = "Synthetic beta guild message";
+    const refused = await actionFor(claimedCookie,second.data.token,{type:"alliance_chat",message});
+    assert.equal(refused.status,409,"outsider cannot post to guild chat");
+    assert.equal((await getStateFor(claimedCookie,second.data.token)).alliance,null);
+    const joinedAlliance = await actionFor(claimedCookie,second.data.token,{type:"alliance_join",tag});
+    assert.equal(joinedAlliance.status,200,"second realm joins existing guild");
+    assert.equal(joinedAlliance.data.state.alliance.tag,tag);
+    assert.equal(joinedAlliance.data.state.alliance.members.length,2);
+    assert.equal((await actionFor(claimedCookie,second.data.token,{type:"alliance_chat",message})).status,200);
+    const guild = (await getStateFor(cookie,start.data.token)).alliance;
+    assert.equal(guild.members.length,2);
+    assert.ok(guild.chat.some(row=>row.message===message),"leader receives member chat");
+    console.log("Beta legacy alliance passed: two independent kingdoms, membership gate and shared chat.");
+
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
     assert.deepEqual(methods.data, {mercadoPago:false,nubankPix:false});
