@@ -148,6 +148,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(blocked.data.code, "BETA_INVITE_REQUIRED");
     const blockedRealtime = await http(base, "/api/realtime/eldoria/ticket", {method:"POST",body:{}});
     assert.equal(blockedRealtime.status, 403, "realtime tickets require an invitation");
+    const blockedJourney = await http(base, "/scripts/royal-journey.js");
+    assert.equal(blockedJourney.status, 302, "journey module is private before invitation");
     const blockedScript = await http(base, "/scripts/kingdom-3d.js");
     assert.equal(blockedScript.status, 302, "3D scripts are private before invitation");
 
@@ -203,6 +205,9 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     await checkAsset("/kingdom.html", /text\/html/i);
     await checkAsset("/styles/kingdom-4x-systems.css", /text\/css/i);
     await checkAsset("/scripts/kingdom-3d.js", /javascript/i);
+    await checkAsset("/scripts/royal-journey.js", /javascript/i);
+    await checkAsset("/scripts/royal-journey-state.js", /javascript/i);
+    await checkAsset("/styles/royal-journey.css", /text\/css/i);
     await checkAsset("/scripts/kingdom-quality.js", /javascript/i);
     await checkAsset("/vendor/three/build/three.module.js", /javascript/i);
     await checkAsset("/vendor/three/examples/jsm/loaders/GLTFLoader.js", /javascript/i);
@@ -658,6 +663,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         const firstToken = await page.evaluate(() => localStorage.getItem("coi_game_token"));
         assert.ok(firstToken, "browser persists the realm session");
         assert.ok(await page.locator("#city .building").count() > 0, "city controls render in lightweight mode");
+        await page.waitForFunction(() => ["castle", "castle-running", "army", "army-running", "world", "alliance"].includes(document.querySelector("#coiJourneyAction")?.dataset.phase));
+        assert.ok(await page.locator("#coiRoyalJourney").isVisible(), "server-backed journey is visible in the beta");
         await page.reload();
         await page.locator("#game").waitFor({state:"visible", timeout:45_000});
         await page.waitForFunction(() => document.querySelector("#status")?.textContent.includes("Reino sincronizado"));
@@ -847,6 +854,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(logout.status, 200);
     const after = await http(base, "/api/game/state", {cookie,bearer:start.data.token});
     assert.equal(after.status, 403, "logged-out beta cookie blocks former game token");
+    const revokedJourney = await http(base, "/scripts/royal-journey.js", {cookie});
+    assert.equal(revokedJourney.status, 302, "revoked invitation blocks the journey module");
     const revokedAsset = await http(base, "/scripts/kingdom-3d.js", {cookie});
     assert.equal(revokedAsset.status, 302, "revoked invite cannot reload private renderer");
     assert.equal(new URL(revokedAsset.headers.get("location")).pathname, "/beta-access.html");

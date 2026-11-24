@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="/styles/premium-ui.css">
 <link rel="stylesheet" href="/styles/city-layout.css">
 <link rel="stylesheet" href="/styles/kingdom-4x-systems.css">
+<link rel="stylesheet" href="/styles/royal-journey.css">
 <meta name="theme-color" content="#142b44"><meta name="description" content="Comande seu reino, evolua construções e prepare seu exército em Clash of Izzy.">
 <link rel="manifest" href="/manifest.json"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>Clash of Izzy — Reino</title>
@@ -125,6 +126,14 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <span id="coiHudOrderLabel">Sincronizando ordens…</span>
   <a id="coiHudOrderLink" href="#queues">Ver centro de operações</a>
  </div>
+</section>
+<section class="coi-royal-journey" id="coiRoyalJourney" aria-labelledby="coiJourneyTitle">
+ <div class="coi-royal-journey-copy">
+  <span class="coi-royal-journey-kicker">JORNADA DO TRONO · GUIA DO COMANDANTE</span>
+  <h2 id="coiJourneyTitle">Preparando sua próxima decisão…</h2>
+  <p id="coiJourneyMessage" role="status" aria-live="polite">Sincronizando o estado do reino.</p>
+ </div>
+ <a id="coiJourneyAction" class="coi-royal-journey-action" href="#city">Ver cidade</a>
 </section>
 <nav class="coi-mobile-dock" aria-label="Acesso rápido ao jogo">
  <a href="#city"><span aria-hidden="true">🏰</span><span>Cidade</span></a>
@@ -707,11 +716,15 @@ document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).
 renderPets();renderBattleReports();
 city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
 document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
-window.dispatchEvent(new CustomEvent("coi:command-state",{detail:{
+const commandSnapshot={
  kingdom:{castle_level:k.castle_level,power:k.power},
  queues:state.queues||[],armyCount:state.armyCount??total,troopCapacity:state.troopCapacity||500,
  marches:state.marches||[]
-}}));
+};
+// Modules may initialize after the first asynchronous state response; replay
+// only public command metrics (never tokens or personal account credentials).
+window.__coiCommandSnapshot=commandSnapshot;
+window.dispatchEvent(new CustomEvent("coi:command-state",{detail:commandSnapshot}));
 }
 const PET_RARITIES=Object.freeze({
  common:{label:"Comum",css:"pet-rarity-common"},
@@ -939,7 +952,7 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script type="module" src="/scripts/kingdom-4x-systems.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/royal-journey.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script type="module" src="/scripts/kingdom-4x-systems.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
 <script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>
