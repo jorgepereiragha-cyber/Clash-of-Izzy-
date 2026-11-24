@@ -526,6 +526,62 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.equal(await page.evaluate(() => localStorage.getItem("coi_game_token")),firstToken);
         assert.deepEqual(localAssetErrors, [], "graphics recovery must not lose private assets");
         console.log("Beta WebGL recovery passed: actual context loss, playable 2D fallback, same-profile retry and persisted troops.");
+        // A real temporary network outage must not hide the existing kingdom.
+        await context.setOffline(true);
+        await page.waitForFunction(() => !navigator.onLine);
+        await page.locator("#refresh").click();
+        await page.waitForFunction(() => document.querySelector("#status").classList.contains("error"));
+        assert.equal(await page.locator("#game").isVisible(),true,"last known kingdom stays visible offline");
+        const resumedState = page.waitForResponse(response =>
+          new URL(response.url()).pathname === "/api/game/state" && response.status() === 200);
+        await context.setOffline(false);
+        await resumedState;
+        await page.waitForFunction(() => document.querySelector("#status").textContent.includes("Reino sincronizado"));
+        assert.equal(await page.evaluate(() => localStorage.getItem("coi_game_token")),firstToken);
+        assert.equal(await page.evaluate(() => window.__coiKingdomTroops.find(row =>
+          row.unit_type === "archer" && Number(row.tier) === 1)?.quantity), beforeArchers + 3);
+        // A separate anonymous tab loses its creation response. Never repeat the
+        // uncertain POST automatically when an online event is received.
+        const guestContext = await browser.newContext({ ...devices["Pixel 5"], serviceWorkers:"block" });
+        try {
+          await guestContext.addCookies(await context.cookies());
+          await guestContext.addInitScript(() => localStorage.setItem("coi_graphics_preference","2d"));
+          let startAttempts = 0;
+          let createdStatus = null;
+          let createdRealm = null;
+          await guestContext.route("**/*", async route => {
+            const url = new URL(route.request().url());
+            if (url.origin !== base) return route.abort();
+            if (url.pathname === "/api/game/start" && route.request().method() === "POST") {
+              startAttempts += 1;
+              // Let the real Worker commit before discarding its response.
+              // Never forward or log the synthetic realm's returned token.
+              const response = await route.fetch({maxRedirects:0,maxRetries:0});
+              try {
+                createdStatus = response.status();
+                createdRealm = (await response.json()).state?.kingdom?.id;
+              } finally {
+                await response.dispose();
+                await route.abort("connectionreset");
+              }
+              return;
+            }
+            return route.continue();
+          });
+          const guest = await guestContext.newPage();
+          await guest.goto(base + "/kingdom.html");
+          await guest.waitForFunction(() => document.querySelector("#loading").textContent.includes("A criação pode ter sido processada"));
+          assert.equal(startAttempts,1,"first creation response was lost");
+          assert.equal(createdStatus,201,"Worker successfully created the realm before the response was lost");
+          assert.ok(Number(createdRealm)>0,"a real realm was committed");
+          await guest.evaluate(() => window.dispatchEvent(new Event("online")));
+          await guest.waitForFunction(() => document.querySelector("#status").textContent.includes("A criação anterior pode ter sido processada"));
+          assert.equal(startAttempts,1,"reconnection cannot duplicate uncertain guest creation");
+          assert.equal(await guest.locator("#retryConnection").count(),0);
+        } finally {
+          await guestContext.close();
+        }
+        console.log("Beta connection recovery passed: preserved realm, successful resync, no duplicate anonymous creation.");
         await page.goto(base + "/world.html");
         assert.equal(new URL(page.url()).pathname, "/world.html");
         await page.waitForLoadState("load");

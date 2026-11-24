@@ -368,6 +368,7 @@ function canPersistKingdomGameToken(){
  return false;
 }
 let kingdomConnectInFlight=false;
+let guestCreationUncertain=false;
 async function connect(){
  if(kingdomConnectInFlight)return;
  kingdomConnectInFlight=true;
@@ -386,15 +387,23 @@ async function connect(){
   if(token){
    data=await request("/game/state");
   }else{
+   // A lost anonymous POST response may hide a successfully created realm.
+   // Reconnection events must never repeat that mutation automatically.
+   if(guestCreationUncertain){
+    guestCreationAttempted=true;
+    throw new Error("A criação anterior pode ter sido processada. Acesse sua conta antes de tentar novamente.");
+   }
    if(!canPersistKingdomGameToken()){
     throw new Error("Não é possível salvar a sessão do reino neste navegador. Autorize o armazenamento para evitar perder seu progresso.");
    }
    const referrerCode=new URLSearchParams(location.search).get("ref")||"";
    guestCreationAttempted=true;
+   guestCreationUncertain=true;
    data=await request("/game/start",{method:"POST",headers:{"Content-Type":"application/json"},
     body:JSON.stringify(referrerCode?{referrer_code:referrerCode}:{})});
    if(data.token){
     token=data.token;
+    guestCreationUncertain=false;
     tokenPersisted=saveKingdomGameToken();
     if(referrerCode){
      const cleanUrl=new URL(location.href);
