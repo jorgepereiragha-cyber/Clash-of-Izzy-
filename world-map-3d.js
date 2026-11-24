@@ -21,10 +21,12 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   const cores = Number(navigator.hardwareConcurrency || 0);
   const lowMemory = memory > 0 && memory <= 2;
   const saveData = connection?.saveData === true;
-  const preference = readGraphicsChoice(window.localStorage);
+  // Reading the storage property itself may throw in restricted WebViews.
+  let preference = "auto";
+  try { preference = readGraphicsChoice(window.localStorage); } catch { /* Use automatic quality safely. */ }
   const automatic = lowMemory ? "low" : memory >= 8 ? "high" : "balanced";
   const highUnsafe = (memory > 0 && memory < 6) || (cores > 0 && cores < 6);
-  const quality = lowMemory || saveData ? "low"
+  let quality = lowMemory || saveData ? "low"
     : preference === "low" ? "low"
     : preference === "balanced" ? "balanced"
     : preference === "high" ? (highUnsafe ? "balanced" : "high")
@@ -47,6 +49,9 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   let homeCastleGroup = null;
   let projectionButtons = new Map();
   let lastFrameTime = 0;
+  let lastFpsCheck = 0;
+  let fpsSamples = [];
+  let qualityDowngraded = false;
   let valhallaModeActive = window.__COI_VALHALLA_ACTIVE === true;
   let valhallaAuroraLight = null;
   let worldHemisphereLight = null;
@@ -497,6 +502,32 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     if (frame) cancelAnimationFrame(frame);
     frame = 0;
     lastFrameTime = 0;
+    lastFpsCheck = 0;
+    fpsSamples = [];
+  }
+
+  function checkAndDowngradeQuality(timestamp) {
+    if (qualityDowngraded || quality === "low" || !renderer) return;
+    if (!lastFpsCheck) lastFpsCheck = timestamp;
+    // With extremely low FPS, allow the sample window to exceed three seconds.
+    // Otherwise a 5-FPS device would never accumulate the minimum 20 samples.
+    if (timestamp - lastFpsCheck < 3000 || fpsSamples.length < 20) return;
+    lastFpsCheck = timestamp;
+    const samples = fpsSamples;
+    fpsSamples = [];
+    const avg = samples.reduce((total, fps) => total + fps, 0) / samples.length;
+    if (avg >= 22) return;
+
+    // A visual-only update would not improve FPS: actually lower GPU work.
+    quality = "low";
+    qualityDowngraded = true;
+    window.__coiWorldGraphicsQuality = "low";
+    renderer.shadowMap.enabled = false;
+    if (worldSunLight) worldSunLight.castShadow = false;
+    worldRoot.traverse(object => { if ("castShadow" in object) object.castShadow = false; });
+    resize(); // Reapplies the low-end pixel budget and ratio cap.
+    console.warn("Clash of Izzy: qualidade reduzida para low (FPS médio: " + avg.toFixed(1) + ").");
+    window.dispatchEvent(new CustomEvent("coi:quality-downgraded", { detail: { avg } }));
   }
 
   function syncMarchAnimation() {
@@ -510,6 +541,16 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
     const tick = timestamp => {
       frame = 0;
       if (!canAnimateMarches() || !renderer || !scene) return;
+      // Only measure continuous, visible march frames; exclude tab resumption gaps.
+      if (lastFrameTime > 0) {
+        const delta = timestamp - lastFrameTime;
+        if (delta >= 8 && delta <= 1000) {
+          fpsSamples.push(1000 / delta);
+          if (fpsSamples.length > 60) fpsSamples.shift();
+        }
+      }
+      lastFrameTime = timestamp;
+      checkAndDowngradeQuality(timestamp);
       const now = Date.now();
       updateMarchPositions(now);
       renderer.render(scene, camera);

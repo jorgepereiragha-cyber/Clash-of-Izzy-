@@ -171,6 +171,27 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
   </aside>
  </div>
 </main>
+<style>
+/* Very low-end devices use the existing tactical 2D map without WebGL. */
+.force-2d-map .world-map #world3d { display: none !important; }
+.force-2d-map .world-map { background: radial-gradient(ellipse at 50% 50%, #78945a, #476b4b 58%, #243f3b); }
+</style>
+<script>
+(function () {
+  const mem = Number(navigator.deviceMemory || 4);
+  const cores = Number(navigator.hardwareConcurrency || 4);
+  if (mem <= 2 || (mem <= 3 && cores <= 4)) {
+    document.documentElement.classList.add('force-2d-map');
+  }
+  window.addEventListener('coi:quality-downgraded', () => {
+    const status = document.getElementById('worldGraphicsStatus');
+    if (status) {
+      status.textContent = 'Qualidade reduzida para melhor desempenho';
+      status.style.color = '#f1c46a';
+    }
+  });
+})();
+</script>
 <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
 <script type="module" src="/world-map.js"></script>
 <script type="module" src="/scripts/world-map-visual-boot.js"></script>
