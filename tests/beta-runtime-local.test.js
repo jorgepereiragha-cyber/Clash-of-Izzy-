@@ -206,6 +206,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     await checkAsset("/styles/kingdom-4x-systems.css", /text\/css/i);
     await checkAsset("/scripts/kingdom-3d.js", /javascript/i);
     await checkAsset("/scripts/kingdom-army-visual.js", /javascript/i);
+    await checkAsset("/scripts/kingdom-dragon-visual.js", /javascript/i);
     await checkAsset("/scripts/royal-journey.js", /javascript/i);
     await checkAsset("/scripts/royal-journey-state.js", /javascript/i);
     await checkAsset("/styles/royal-journey.css", /text\/css/i);
@@ -754,6 +755,10 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
         assert.ok(diagnostics.troopFigures.some(x=>x.type==="archer"&&!x.procedural),"trained archers use the decoded GLB");
         assert.ok(diagnostics.troopFigures.length<=8,"balanced figure budget");
+        const equippedDragon=await page.evaluate(()=>window.__coiKingdomDragon);
+        assert.ok(equippedDragon?.dragon_key,"server-backed equipped dragon");
+        assert.equal(diagnostics.dragonVisual?.key,equippedDragon.dragon_key,"only equipped dragon is represented");
+        assert.equal(diagnostics.dragonVisual.animated,false,"balanced profile keeps dragon static");
         const evidence = path.join(root, "test-results", "beta-visual");
         await mkdir(evidence, {recursive:true});
         await page.locator("#city").screenshot({path:path.join(evidence,"kingdom-3d.png")});

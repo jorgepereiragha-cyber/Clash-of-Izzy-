@@ -8,6 +8,7 @@ import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
 import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
 import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
+import { projectDragonVisual, makeDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
@@ -28,6 +29,8 @@ if (host && "WebGLRenderingContext" in window) {
   let activeHeroFigures = [];
   let activeProps = [];
   let activeTroops = [];
+  let activeDragon = null;
+  let dragonTime = 0;
   let armyMixers = [];
   let animationFrame = 0;
   let lastAnimationTime = 0;
@@ -198,6 +201,8 @@ if (host && "WebGLRenderingContext" in window) {
     defensePreviewMesh = null;
     activeProps = [];
     activeTroops = [];
+    activeDragon = null;
+    dragonTime = 0;
     armyMixers = [];
     manifestAssets = [];
     manifestProps = [];
@@ -901,6 +906,27 @@ if (host && "WebGLRenderingContext" in window) {
     scene.add(defensePreviewMesh);
     renderer.render(scene,camera);
   }
+  function renderEquippedDragon(row) {
+    const visual=projectDragonVisual(row);
+    if(activeDragon && (!visual || activeDragon.key!==visual.key || activeDragon.level!==visual.level)){
+      scene.remove(activeDragon.figure.root);
+      disposeDetachedObject3D(activeDragon.figure.root);
+      activeDragon=null;
+    }
+    if(!visual || !scene || disposed)return;
+    if(!activeDragon){
+      activeDragon={...visual,figure:makeDragonFigure(THREE,visual,qualityProfile?.tier)};
+      dragonTime=0;
+      scene.add(activeDragon.figure.root);
+      poseDragon(activeDragon.figure,0,false);
+    }
+    const castleIndex=latestBuildings.findIndex(b=>b.building_type==="castle");
+    const anchor=castleIndex>=0?cityWorldPoint(latestBuildings[castleIndex],castleIndex):{x:0,z:0};
+    activeDragon.figure.root.position.set(anchor.x+1.65,2.35,anchor.z-1.05);
+  }
+  function canAnimateDragon(){
+    return !!activeDragon && qualityProfile?.tier==="high" && !qualityProfile?.prefersReducedMotion;
+  }
   function canRunArmyAnimation() {
     return !disposed && !cinematicCaptureActive && !document.hidden && sceneInViewport;
   }
@@ -915,7 +941,7 @@ if (host && "WebGLRenderingContext" in window) {
     adaptivePixelScale.reset();
   }
   function renderArmyFrame(timestamp) {
-    if (!canRunArmyAnimation() || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders)) {
+    if (!canRunArmyAnimation() || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders && !canAnimateDragon())) {
       animationFrame = 0;
       lastAnimationTime = 0;
       return;
@@ -938,11 +964,15 @@ if (host && "WebGLRenderingContext" in window) {
     lastAnimationTime = timestamp;
     for (const mixer of armyMixers) mixer.update(delta);
     advancedShaders?.update(delta);
+    if(canAnimateDragon()){
+      dragonTime+=delta;
+      poseDragon(activeDragon.figure,dragonTime,true);
+    }
     renderer.render(scene, camera);
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
   function startArmyAnimationLoop() {
-    if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
+    if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders && !canAnimateDragon()) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
     lastAnimationTime = 0;
     animationFrameTiming.reset();
     adaptivePixelScale.reset();
@@ -1235,6 +1265,7 @@ if (host && "WebGLRenderingContext" in window) {
         pendingGlbLoads: glbLoadPromises.size,
         optionalSceneRefreshes,
         troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
+        dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon()} : null,
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };
@@ -1286,6 +1317,7 @@ if (host && "WebGLRenderingContext" in window) {
       renderBuildings(list,latestCastleSkinId);
       renderCityDefenses(latestDefenses);
       renderAssignedHeroFigures(latestHeroAssignments);
+      renderEquippedDragon(window.__coiKingdomDragon);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
@@ -1315,6 +1347,7 @@ if (host && "WebGLRenderingContext" in window) {
       renderBuildings(window.__coiKingdomBuildings,latestCastleSkinId);
       renderCityDefenses(latestDefenses);
       renderAssignedHeroFigures(latestHeroAssignments);
+      renderEquippedDragon(window.__coiKingdomDragon);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops);
