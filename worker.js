@@ -1208,9 +1208,13 @@ async function gameAction(env,playerId,body){
     const existing=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(existing)return json({error:"Seu reino já pertence a uma aliança."},409);
     try{
-      const made=await env.DB.prepare("INSERT INTO alliances(name,tag,leader_kingdom_id,description) VALUES(?,?,?,'Aliança de Eldoria')").bind(name,tag,k.id).run();
-      await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) VALUES(?,?,'leader')").bind(made.meta.last_row_id,k.id).run();
-      await env.DB.prepare("UPDATE alliance_members SET rank='lider' WHERE alliance_id=? AND kingdom_id=?").bind(made.meta.last_row_id,k.id).run();
+      // D1 batch is atomic: never leave an alliance without its leader.
+      // Recheck membership inside the transaction, not just the preflight.
+      const result=await env.DB.batch([
+        env.DB.prepare("INSERT INTO alliances(name,tag,leader_kingdom_id,description) SELECT ?,?,?,'Aliança de Eldoria' WHERE NOT EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=?)").bind(name,tag,k.id,k.id),
+        env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role,rank) SELECT id,?,'leader','lider' FROM alliances WHERE tag=? AND leader_kingdom_id=? AND changes()=1").bind(k.id,tag,k.id)
+      ]);
+      if(!result[0]?.meta?.changes||!result[1]?.meta?.changes)return json({error:"Seu reino já pertence a uma aliança."},409);
     }catch(e){return json({error:"Nome ou sigla já estão em uso."},409)}
   }else if(type==="alliance_join"){
     const tag=String(body.tag||"").trim().toUpperCase().replace(/[^A-Z0-9]/g,"").slice(0,5);
