@@ -62,10 +62,10 @@ function makeKingdomState() {
   };
 }
 
-async function installApiFixtures(page) {
+async function installApiFixtures(page, overrides = {}) {
   const actions = [];
   const stateRequests = [];
-  const state = makeKingdomState();
+  const state = { ...makeKingdomState(), ...overrides };
 
   await page.addInitScript(token => {
     window.localStorage.setItem("coi_game_token", token);
@@ -234,6 +234,107 @@ test.describe("Mobile kingdom rendering", () => {
     await expect(page.locator("#coiActionNotice")).toContainText("Treinamento iniciado");
     await expect(page.locator("#status")).toContainText("Reino sincronizado");
 
+  });
+
+
+  test("selecting a city building shows details without submitting an upgrade", async ({ page }) => {
+    const { actions } = await installApiFixtures(page);
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/kingdom.html");
+    await expect(page.locator("#coiCitySelection")).toBeHidden();
+
+    const farm = page.locator('#city .building[data-building="farm"]');
+    await farm.click();
+    await expect(farm).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator("#coiCitySelection")).toBeVisible();
+    await expect(page.locator("#coiCitySelectionName")).toHaveText("Fazenda");
+    await expect(page.locator("#coiCitySelectionLevel")).toContainText("Nível 2");
+    expect(actions).toHaveLength(0);
+
+    await page.locator("#coiCitySelectionDetails").click();
+    await expect(page.locator('#buildings [data-upgrade="farm"]')).toBeFocused();
+    expect(actions).toHaveLength(0);
+
+    await page.locator("#coiCitySelectionClose").focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#coiCitySelection")).toBeHidden();
+    await expect(farm).toHaveAttribute("aria-pressed", "false");
+    await expect(farm).toBeFocused();
+  });
+
+  test("high-capability Android previews all 16 buildings and retains nine safe 2D controls", async ({ page }) => {
+    const types = [
+      "castle", "barracks", "farm", "quarry",
+      "lumber_mill", "iron_mine", "market", "academy",
+      "wall", "hospital", "watchtower", "stable",
+      "archery_range", "siege_workshop", "embassy", "warehouse"
+    ];
+    const buildings = types.map((building_type, index) => ({
+      building_type, level: index === 0 ? 8 : (index % 4) + 1
+    }));
+    await page.addInitScript(() => {
+      Object.defineProperty(navigator, "deviceMemory", { configurable: true, value: 12 });
+      Object.defineProperty(navigator, "hardwareConcurrency", { configurable: true, value: 12 });
+      localStorage.setItem("coi_graphics_preference", "high");
+      window.__coiObservedProjections = [];
+      window.addEventListener("coi:kingdom-projection", event => {
+        window.__coiObservedProjections.push(event.detail?.positions || []);
+      });
+    });
+    await installApiFixtures(page, { buildings });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/kingdom.html");
+    await expect(page.locator("#game")).toBeVisible();
+    await expect(page.locator("#city .building")).toHaveCount(16);
+    await expect(page.locator("#city #kingdom3d")).toBeAttached();
+    await expect.poll(() => page.evaluate(() => window.__coiObservedProjections.at(-1)?.length)).toBe(16);
+    const metrics = await page.evaluate(() => {
+      const buttons = [...document.querySelectorAll("#city .building")];
+      const stage = document.getElementById("city").getBoundingClientRect();
+      return {
+        tier: window.__coiKingdomQuality?.tier,
+        visible: buttons.filter(button => !button.hidden).length,
+        width: document.documentElement.scrollWidth,
+        viewport: window.innerWidth,
+        targetCenters: buttons.filter(button => !button.hidden).map(button => {
+          const rect = button.getBoundingClientRect();
+          return {
+            name: button.dataset.building,
+            centerX: Math.round(rect.x + rect.width / 2 - stage.x),
+            centerY: Math.round(rect.y + rect.height / 2 - stage.y)
+          };
+        })
+      };
+    });
+    expect(metrics.tier).toBe("high");
+    expect(metrics.visible).toBe(16);
+    expect(metrics.width).toBeLessThanOrEqual(metrics.viewport + 1);
+    expect(new Set(metrics.targetCenters.map(target => target.centerX + ":" + target.centerY)).size).toBe(16);
+    // Dense 3D retains full accessible names while showing short captions.
+    const archers = page.locator('#city .building[data-building="archery_range"]');
+    await expect(archers).toHaveAttribute("aria-label", /Campo de arqueiros, nível/);
+    await expect(archers.locator("strong")).toHaveAttribute("data-compact", "Arqueiros");
+    // Even a sixteenth building can be selected without placing a game order.
+    await page.locator('#city .building[data-building="warehouse"]').click();
+    await expect(page.locator("#coiCitySelectionName")).toHaveText("Armazém");
+    await expect(page.locator("#coiCitySelectionLevel")).toContainText("Nível 4");
+    await page.locator("#coiCitySelectionClose").click();
+    await mkdir("test-results/visual-preview", { recursive: true });
+    await page.locator(".coi-city-stage").screenshot({
+      path: "test-results/visual-preview/cidade-16-edificios-390px.png"
+    });
+
+    // Trigger the actual canvas WebGL loss handler. Dispatching only the
+    // fallback notice would leave the WebGL renderer alive, which can emit a
+    // late projection and incorrectly reveal all sixteen buttons again.
+    await page.evaluate(() => {
+      const canvas = document.getElementById("kingdom3d");
+      canvas.dispatchEvent(new Event("webglcontextlost", { cancelable: true }));
+    });
+    await expect(page.locator("#city #kingdom3d")).toHaveCount(0);
+    await expect(page.locator("#coiCityCameraControls")).toBeHidden();
+    await expect.poll(() => page.locator("#city .building:visible").count()).toBe(9);
+    await expect(page.locator('#city .building[data-building="castle"]')).toBeVisible();
   });
 
   test("graphics preferences persist and 2D mode keeps mobile controls usable", async ({ page }) => {
