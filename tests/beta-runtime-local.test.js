@@ -367,6 +367,45 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         const sameToken = await page.evaluate(() => localStorage.getItem("coi_game_token"));
         assert.ok(sameToken === firstToken, "reloading must resume the same realm without creating a new one");
 
+        // Authenticate with the actual browser session, then exercise the real training API.
+        const auth = {Authorization:"Bearer " + firstToken, Origin:base};
+        const readBrowserState = async () => {
+          const response = await context.request.get(base + "/api/game/state", {headers:auth});
+          assert.equal(response.status(), 200, "browser kingdom state is readable");
+          return (await response.json()).state;
+        };
+        const beforeTraining = await readBrowserState();
+        const realmId = Number(beforeTraining.kingdom.id);
+        assert.ok(Number.isSafeInteger(realmId) && realmId > 0);
+        const archerCount = state => Number(state.troops.find(
+          unit => unit.unit_type === "archer" && Number(unit.tier) === 1
+        )?.quantity || 0);
+        const beforeArchers = archerCount(beforeTraining);
+        const training = await context.request.post(base + "/api/game/action", {
+          headers:auth, data:{type:"train",unit:"archer",quantity:3}
+        });
+        assert.equal(training.status(), 200, "archer training succeeds in a new kingdom");
+        const queued = (await training.json()).state;
+        assert.ok(queued.queues.some(row => row.queue_type === "training" &&
+          row.target_key === "archer" && row.status === "running" && Number(row.quantity) === 3));
+        assert.equal(archerCount(queued), beforeArchers, "queued troops are not granted early");
+        // Advance the queue only in the disposable local D1, using the same clock fixture
+        // as the construction test. The real Worker, not SQL, awards the troops.
+        await command([...common, "execute", "clash-of-izzy-beta-db", "--local",
+          "--persist-to", persist, "--command",
+          "UPDATE kingdom_queues SET started_at=datetime('now','-2 minutes'), completes_at=datetime('now','-1 minute') WHERE kingdom_id=" +
+          realmId + " AND queue_type='training' AND target_key='archer' AND status='running'"]);
+        const completedTraining = await readBrowserState();
+        assert.equal(archerCount(completedTraining), beforeArchers + 3);
+        assert.equal(archerCount(await readBrowserState()), beforeArchers + 3,
+          "repeated state reads cannot award the same training twice");
+        await page.reload();
+        await page.locator("#game").waitFor({state:"visible",timeout:45_000});
+        await page.waitForFunction(expected => window.__coiKingdomTroops?.some(
+          row => row.unit_type === "archer" && Number(row.quantity) === expected
+        ), beforeArchers + 3);
+        console.log("Beta training passed: 3 archers awarded once and persisted in browser state.");
+
         await page.locator("#coiGraphicsPreset").selectOption("balanced");
         await page.locator("#coiGraphicsApply").click();
         await page.waitForFunction(() => window.__coiKingdomDiagnostics?.()?.available === true,
@@ -378,7 +417,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await page.waitForFunction(() => {
           const info = window.__coiKingdomDiagnostics?.();
           return info?.available && info.loadedGlbTemplates?.buildings >= 2 &&
-            info.loadedGlbTemplates?.props >= 2 && info.pendingGlbLoads === 0 &&
+            info.loadedGlbTemplates?.props >= 2 && info.loadedGlbTemplates?.units >= 1 &&
+            info.pendingGlbLoads === 0 &&
             info.drawCalls > 0 && info.triangles > 0;
         }, null, {timeout:45_000});
         const refreshCounts = await page.evaluate(async () => {
