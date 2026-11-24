@@ -17,7 +17,7 @@
   "d1_databases": [{
     "binding": "DB",
     "database_name": "clash-of-izzy-beta-db",
-    "database_id": "REPLACE_WITH_NEW_BETA_D1_UUID",
+    "database_id": "858f895c-0ed0-4f86-b72d-6aa011bd106c",
     "migrations_dir": "migrations"
   }],
   "durable_objects": {
