@@ -53,5 +53,9 @@ jobs:
         run: npm install --no-save --no-audit --no-fund --package-lock=false
       - name: Vendor pinned Three.js for local static assets
         run: npm run vendor:three
+      - name: Install Chromium for real mobile browser smoke
+        run: npx playwright install --with-deps chromium
       - name: Smoke real beta Worker and local D1 (no deployment)
         run: node --test tests/beta-runtime-local.test.js
+        env:
+          BETA_BROWSER_SMOKE: '1'

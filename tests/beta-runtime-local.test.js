@@ -115,6 +115,14 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       "--persist-to", persist, "--command",
       "INSERT INTO beta_invites(code_hash,max_uses) VALUES('" + concurrentHash + "',1)"]);
 
+    const browserInvite = "IZZY-" + "C".repeat(20);
+    if (process.env.BETA_BROWSER_SMOKE === "1") {
+      const browserHash = createHash("sha256").update(browserInvite).digest("hex");
+      await command([...common, "execute", "clash-of-izzy-beta-db", "--local",
+        "--persist-to", persist, "--command",
+        "INSERT INTO beta_invites(code_hash,max_uses) VALUES('" + browserHash + "',1)"]);
+    }
+
     const port = await freePort();
     const base = "http://127.0.0.1:" + port;
     processWorker = spawn(process.execPath, [wrangler,
@@ -316,6 +324,63 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(world.status, 200, "world map from legacy game is available");
     const market = await http(base, "/market.html", {cookie});
     assert.equal(market.status, 200, "free resource market is available");
+
+    // Use a real browser with a fresh synthetic invite; never contact external services.
+    if (process.env.BETA_BROWSER_SMOKE === "1") {
+      const { chromium, devices } = await import("@playwright/test");
+      const browser = await chromium.launch({
+        headless: true, args: ["--use-gl=angle", "--use-angle=swiftshader", "--enable-unsafe-swiftshader"]
+      });
+      try {
+        const context = await browser.newContext({
+          ...devices["Pixel 5"], serviceWorkers: "block"
+        });
+        await context.route("**/*", route => {
+          const url = new URL(route.request().url());
+          return url.origin === base ? route.continue() : route.abort();
+        });
+        const page = await context.newPage();
+        const localAssetErrors = [];
+        page.on("response", response => {
+          const url = new URL(response.url());
+          if (url.origin === base && response.status() >= 400 &&
+              (url.pathname.endsWith(".js") || url.pathname.endsWith(".css") ||
+               url.pathname.startsWith("/assets/3d/") || url.pathname.startsWith("/vendor/three/"))) {
+            localAssetErrors.push(response.status() + " " + url.pathname);
+          }
+        });
+        await page.goto(base + "/kingdom.html");
+        await page.waitForURL(base + "/beta-access.html");
+        await page.evaluate(() => localStorage.setItem("coi_graphics_preference", "2d"));
+        await page.locator("#code").fill(browserInvite);
+        await page.locator("#submit").click();
+        await page.waitForURL(base + "/kingdom.html");
+        await page.locator("#game").waitFor({state:"visible", timeout:45_000});
+        await page.waitForFunction(() => document.querySelector("#status")?.textContent.includes("Reino sincronizado"));
+        await page.waitForFunction(() => window.__coiKingdomQuality?.tier === "2d");
+        const firstToken = await page.evaluate(() => localStorage.getItem("coi_game_token"));
+        assert.ok(firstToken, "browser persists the realm session");
+        assert.ok(await page.locator("#city .building").count() > 0, "city controls render in lightweight mode");
+        await page.reload();
+        await page.locator("#game").waitFor({state:"visible", timeout:45_000});
+        await page.waitForFunction(() => document.querySelector("#status")?.textContent.includes("Reino sincronizado"));
+        const sameToken = await page.evaluate(() => localStorage.getItem("coi_game_token"));
+        assert.ok(sameToken === firstToken, "reloading must resume the same realm without creating a new one");
+
+        await page.locator("#coiGraphicsPreset").selectOption("balanced");
+        await page.locator("#coiGraphicsApply").click();
+        await page.waitForFunction(() => window.__coiKingdomDiagnostics?.()?.available === true,
+          null, {timeout:45_000});
+        await page.locator("#game").waitFor({state:"visible", timeout:45_000});
+        assert.equal(await page.locator("#kingdom3d").count(), 1, "real WebGL canvas is attached");
+        assert.deepEqual(localAssetErrors, [], "browser must not encounter missing graphics/script/style assets");
+        await page.goto(base + "/world.html");
+        assert.equal(new URL(page.url()).pathname, "/world.html");
+        console.log("Mobile Chromium beta passed: real invite, playable 2D realm, persisted session, WebGL initialization, world navigation.");
+      } finally {
+        await browser.close();
+      }
+    }
 
     const logout = await http(base, "/api/beta/access/logout",
       {method:"POST",cookie,origin:base});
