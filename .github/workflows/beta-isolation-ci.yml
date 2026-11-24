@@ -59,3 +59,11 @@ jobs:
         run: node --test tests/beta-runtime-local.test.js
         env:
           BETA_BROWSER_SMOKE: '1'
+      - name: Archive synthetic kingdom rendering evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: beta-kingdom-visual-evidence
+          path: test-results/beta-visual/
+          if-no-files-found: ignore
+          retention-days: 7

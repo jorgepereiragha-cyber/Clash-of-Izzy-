@@ -1202,6 +1202,8 @@ if (host && "WebGLRenderingContext" in window) {
         premiumWater: Boolean(waterFeature),
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
+        loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
+        pendingGlbLoads: glbLoadPromises.size,
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };

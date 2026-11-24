@@ -4,7 +4,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
-import { mkdtemp, readFile, writeFile, rm } from "node:fs/promises";
+import { mkdtemp, readFile, writeFile, rm, mkdir } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import net from "node:net";
@@ -373,6 +373,20 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           null, {timeout:45_000});
         await page.locator("#game").waitFor({state:"visible", timeout:45_000});
         assert.equal(await page.locator("#kingdom3d").count(), 1, "real WebGL canvas is attached");
+        // A canvas may be present while the renderer silently uses fallback models.
+        // Require actual decoded GLB templates before recording visual evidence.
+        await page.waitForFunction(() => {
+          const info = window.__coiKingdomDiagnostics?.();
+          return info?.available && info.loadedGlbTemplates?.buildings >= 2 &&
+            info.loadedGlbTemplates?.props >= 2 && info.pendingGlbLoads === 0 &&
+            info.drawCalls > 0 && info.triangles > 0;
+        }, null, {timeout:45_000});
+        const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
+        const evidence = path.join(root, "test-results", "beta-visual");
+        await mkdir(evidence, {recursive:true});
+        await page.locator("#city").screenshot({path:path.join(evidence,"kingdom-3d.png")});
+        await writeFile(path.join(evidence,"renderer.json"), JSON.stringify(diagnostics,null,2));
+        console.log("Decoded beta GLB templates: " + JSON.stringify(diagnostics.loadedGlbTemplates));
         assert.deepEqual(localAssetErrors, [], "browser must not encounter missing graphics/script/style assets");
         await page.goto(base + "/world.html");
         assert.equal(new URL(page.url()).pathname, "/world.html");
