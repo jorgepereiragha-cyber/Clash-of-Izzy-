@@ -38,6 +38,8 @@ if (host && "WebGLRenderingContext" in window) {
   const glbPropTemplates = new Map();
   const glbUnitTemplates = new Map();
   const glbLoadPromises = new Map();
+  const glbLoadLanes = Array.from({ length: 3 }, () => Promise.resolve());
+  let nextGlbLane = 0;
   let manifestAssets = [];
   let manifestProps = [];
   let manifestUnits = [];
@@ -954,11 +956,10 @@ if (host && "WebGLRenderingContext" in window) {
     return url.href;
   }
   async function loadManifestAsset(entry) {
-    const { asset, kind, key } = entry;
+    const { asset, kind } = entry;
     try {
       const assetUrl = safeAssetUrl(asset);
       const loadPromise = gltfLoader.loadAsync(assetUrl);
-      glbLoadPromises.set(key, loadPromise);
       const gltf = await loadPromise;
       if (disposed || !renderer) {
         disposeDetachedObject3D(gltf.scene);
@@ -975,9 +976,17 @@ if (host && "WebGLRenderingContext" in window) {
       });
     } catch (assetError) {
       console.info(`Clash of Izzy: GLB ${asset.id || asset.type || asset.unit_type} indisponível; mantendo o fallback procedural.`, assetError);
-    } finally {
-      glbLoadPromises.delete(key);
     }
+  }
+  function scheduleManifestAsset(entry) {
+    if (glbLoadPromises.has(entry.key)) return null;
+    const lane = nextGlbLane++ % glbLoadLanes.length;
+    const pending = glbLoadLanes[lane].then(() => {
+      if (!disposed && renderer) return loadManifestAsset(entry);
+    }).finally(() => glbLoadPromises.delete(entry.key));
+    glbLoadPromises.set(entry.key, pending);
+    glbLoadLanes[lane] = pending.catch(() => {});
+    return pending;
   }
   function renderManifestProps() {
     for (const prop of activeProps) scene.remove(prop);
@@ -1093,13 +1102,9 @@ if (host && "WebGLRenderingContext" in window) {
       // Normal state refreshes already render the existing templates. Avoid a
       // second scene rebuild when this call has no new assets to decode.
       if (!queue.length) return;
-      let cursor = 0;
-      const worker = async () => {
-        while (!disposed && cursor < queue.length) {
-          await loadManifestAsset(queue[cursor++]);
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => worker()));
+      const pending = queue.map(scheduleManifestAsset).filter(Boolean);
+      if (!pending.length) return;
+      await Promise.all(pending);
       if (!disposed && renderer) {
         optionalSceneRefreshes += 1;
         renderBuildings(latestBuildings);
