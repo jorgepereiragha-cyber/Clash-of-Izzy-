@@ -53,6 +53,24 @@ test("production, preview and malformed database UUIDs fail closed", () => {
   }
 });
 
+test("D1 identifiers cannot bypass isolation through UUID letter case", () => {
+  for (const source of ["production", "preview"]) {
+    const { beta, production } = configured();
+    const actual = source === "production" ? production.d1_databases[0].database_id
+      : production.previews.d1_databases[0].database_id;
+    beta.d1_databases[0].database_id = actual.toUpperCase();
+    const result = checkBetaIsolation(beta, production, { requireProvisioned: true });
+    assert.equal(result.ok, false);
+    assert.equal(result.configured, false);
+  }
+  const { beta, production } = configured();
+  production.previews.d1_databases[0].database_id = production.d1_databases[0].database_id.toUpperCase();
+  assert.equal(checkBetaIsolation(beta, production, { requireProvisioned: true }).ok, false);
+  const distinct = configured();
+  distinct.beta.d1_databases[0].database_id = distinct.beta.d1_databases[0].database_id.toUpperCase();
+  assert.equal(checkBetaIsolation(distinct.beta, distinct.production, { requireProvisioned: true }).ok, true);
+});
+
 test("cannot bypass invite gate, real-money kill switches or worker-first asset filter", () => {
   const cases = [
     b => { b.vars.INVITE_ONLY = "false"; },
