@@ -183,8 +183,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         signal: AbortSignal.timeout(20_000)
       });
       assert.equal(response.status, 200, assetPath + " must be served after invite");
-      assert.match(response.headers.get("cache-control") || "", /\\bno-store\\b/i, assetPath + " must not be cached");
-      assert.match(response.headers.get("cache-control") || "", /\\bprivate\\b/i);
+      assert.match(response.headers.get("cache-control") || "", /\bno-store\b/i, assetPath + " must not be cached");
+      assert.match(response.headers.get("cache-control") || "", /\bprivate\b/i);
       if (contentType) assert.match(response.headers.get("content-type") || "", contentType, assetPath + " MIME");
       const bytes = Buffer.from(await response.arrayBuffer());
       const expected = await readFile(path.join(root, assetPath.slice(1)));
@@ -192,8 +192,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       assert.equal(createHash("sha256").update(bytes).digest("hex"),
         createHash("sha256").update(expected).digest("hex"), assetPath + " HTTP bytes differ from repository");
     };
-    await checkAsset("/kingdom.html", /text\\/html/i);
-    await checkAsset("/styles/kingdom-4x-systems.css", /text\\/css/i);
+    await checkAsset("/kingdom.html", /text\/html/i);
+    await checkAsset("/styles/kingdom-4x-systems.css", /text\/css/i);
     await checkAsset("/scripts/kingdom-3d.js", /javascript/i);
     await checkAsset("/scripts/kingdom-quality.js", /javascript/i);
     await checkAsset("/vendor/three/build/three.module.js", /javascript/i);
@@ -203,7 +203,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     for (const category of ["models", "props", "units"]) {
       const representative = manifest[category].find(asset => asset.enabled);
       if (representative) {
-        assert.match(representative.src, /^\\/assets\\/3d\\/[^?#]+\\.glb$/i);
+        assert.match(representative.src, /^\/assets\/3d\/[^?#]+\.glb$/i);
         await checkAsset(representative.src);
       }
     }
