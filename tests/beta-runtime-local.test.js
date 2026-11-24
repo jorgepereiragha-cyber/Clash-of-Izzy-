@@ -415,6 +415,58 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.ok(guild.chat.some(row=>row.message===message),"leader receives member chat");
     console.log("Beta legacy alliance passed: two independent kingdoms, membership gate and shared chat.");
 
+    // Exercise the previously untested attack branch with the second realm.
+    const attackerBefore = await getStateFor(claimedCookie,second.data.token);
+    const powerCrystalCount = state => {
+      assert.ok(Array.isArray(state.inventoryItems), "server inventory is present");
+      const quantity = Number(state.inventoryItems.find(item => item.item_key === "power_crystal")?.quantity ?? 0);
+      assert.ok(Number.isSafeInteger(quantity) && quantity >= 0, "valid crystal balance");
+      return quantity;
+    };
+    const crystalsBefore = powerCrystalCount(attackerBefore);
+    const neutral = attackerBefore.territories.find(t => !t.owner_kingdom_id &&
+      t.territory_kind !== "castle" && t.territory_kind !== "throne" &&
+      !String(t.territory_key).startsWith("royal_throne_"));
+    assert.ok(neutral,"PvE target exists");
+    const attackArmy = 10;
+    const attack = await actionFor(claimedCookie,second.data.token,
+      {type:"march",marchType:"attack",targetId:neutral.id,units:{militia:attackArmy}});
+    assert.equal(attack.status,200,"PvE attack dispatch");
+    const activeAttack = attack.data.state.marches.find(m=>m.status==="marching"&&m.march_type==="attack");
+    assert.ok(activeAttack,"PvE march exists");
+    assert.equal(militiaCount(attack.data.state),militiaCount(attackerBefore)-attackArmy);
+    const attackId=Number(activeAttack.id);
+    assert.ok(Number.isSafeInteger(attackId)&&attackId>0);
+    await command([...common,"execute","clash-of-izzy-beta-db","--local",
+      "--persist-to",persist,"--command",
+      "UPDATE marches SET arrives_at=datetime('now','-1 minute') WHERE id="+attackId+
+      " AND kingdom_id="+Number(second.data.state.kingdom.id)+" AND status='marching'"]);
+    await Promise.all([getStateFor(claimedCookie,second.data.token),getStateFor(claimedCookie,second.data.token)]);
+    const resolvedAttack = await getStateFor(claimedCookie,second.data.token);
+    assert.ok(!resolvedAttack.marches.some(m=>Number(m.id)===attackId&&m.status==="marching"));
+    const previousReports=new Set(attackerBefore.battleReports.map(r=>r.id));
+    const newReports=resolvedAttack.battleReports.filter(r=>!previousReports.has(r.id));
+    assert.equal(newReports.length,1,"concurrent resolution creates exactly one battle report");
+    const report=newReports[0];
+    assert.equal(report.battle_type,"territory_pve");
+    const losses=JSON.parse(report.losses_json||"{}");
+    const lost=Number(losses.militia||0);
+    assert.ok(Number.isInteger(lost)&&lost>=0&&lost<=attackArmy);
+    assert.equal(militiaCount(resolvedAttack),militiaCount(attackerBefore)-lost,
+      "survivors return once and casualties are conserved");
+    const rewards=JSON.parse(report.rewards_json||"{}");
+    assert.equal(typeof rewards.territoryCaptured,"boolean");
+    assert.ok(Number.isInteger(rewards.criticalHits)&&rewards.criticalHits>=0);
+    assert.equal(powerCrystalCount(resolvedAttack), crystalsBefore + (rewards.territoryCaptured ? 1 : 0),
+      "only a successful capture grants exactly one power crystal");
+    const repeated=await getStateFor(claimedCookie,second.data.token);
+    assert.equal(repeated.battleReports.filter(r=>!previousReports.has(r.id)).length,1);
+    assert.equal(militiaCount(repeated),militiaCount(resolvedAttack));
+    assert.equal(powerCrystalCount(repeated), powerCrystalCount(resolvedAttack),
+      "repeated state reads cannot grant another crystal");
+    console.log("Beta PvE attack passed: real combat resolution, one report, conserved troops and no duplicate return.");
+
+
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
     assert.deepEqual(methods.data, {mercadoPago:false,nubankPix:false});
