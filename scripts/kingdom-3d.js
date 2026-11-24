@@ -7,6 +7,7 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
 import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
+import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
@@ -1030,37 +1031,35 @@ if (host && "WebGLRenderingContext" in window) {
   function renderKingdomTroops(troops = []) {
     stopArmyAnimationLoop();
     for (const instance of activeTroops) {
-      instance.mixer.stopAllAction();
-      instance.mixer.uncacheRoot(instance.root);
+      instance.mixer?.stopAllAction();
+      instance.mixer?.uncacheRoot(instance.root);
       scene.remove(instance.root);
+      if (instance.procedural) disposeDetachedObject3D(instance.root);
     }
     activeTroops = [];
     armyMixers = [];
-    const archerCount = (Array.isArray(troops) ? troops : [])
-      .filter(unit => unit?.unit_type === "archer")
-      .reduce((sum, unit) => sum + Math.max(0, Number(unit.quantity) || 0), 0);
-    const asset = glbUnitTemplates.get("archer");
-    if (!asset || archerCount <= 0) {
-      renderer?.render(scene, camera);
-      return;
-    }
-    const tierLimit = qualityProfile?.tier === "low" ? 2 : qualityProfile?.tier === "high" ? 5 : 3;
-    const count = Math.min(tierLimit, asset.maxInstances, Math.max(1, Math.ceil(Math.log2(archerCount + 1))));
-    const spacing = .72;
-    for (let index = 0; index < count; index += 1) {
-      const root = cloneSkinned(asset.template);
-      root.position.set((index - (count - 1) / 2) * spacing, 0, 4.25 + (index % 2) * .22);
+    const plan = planArmyFigures(troops, qualityProfile?.tier);
+    const glbCounts = new Map();
+    for (const entry of plan) {
+      const asset = glbUnitTemplates.get(entry.type);
+      const used = glbCounts.get(entry.type) || 0;
+      const procedural = !asset || used >= asset.maxInstances;
+      const root = procedural ? createProceduralUnit(THREE, entry.type, qualityProfile?.tier) : cloneSkinned(asset.template);
+      root.position.set(entry.x, 0, entry.z);
       root.rotation.y = Math.PI;
-      root.userData.coIUnitType = "archer";
+      root.userData.coIUnitType = entry.type;
       scene.add(root);
-      const mixer = new THREE.AnimationMixer(root);
-      const clip = asset.animations.find(animation => animation.name.toLowerCase() === asset.animation.toLowerCase())
-        || asset.animations.find(animation => animation.name.toLowerCase() === "static")
-        || asset.animations[0];
-      if (clip) mixer.clipAction(clip).play();
-      activeTroops.push({ root, mixer });
-      armyMixers.push(mixer);
-      if (qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) mixer.update(0);
+      let mixer = null;
+      if (!procedural) {
+        glbCounts.set(entry.type, used + 1);
+        mixer = new THREE.AnimationMixer(root);
+        const clip = asset.animations.find(animation => animation.name.toLowerCase() === asset.animation.toLowerCase())
+          || asset.animations.find(animation => animation.name.toLowerCase() === "static")
+          || asset.animations[0];
+        if (clip) { mixer.clipAction(clip).play(); armyMixers.push(mixer); }
+        if (qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) mixer.update(0);
+      }
+      activeTroops.push({ root, mixer, procedural });
     }
     startArmyAnimationLoop();
     if (!animationFrame) renderer?.render(scene, camera);
@@ -1235,6 +1234,7 @@ if (host && "WebGLRenderingContext" in window) {
         loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
         pendingGlbLoads: glbLoadPromises.size,
         optionalSceneRefreshes,
+        troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };

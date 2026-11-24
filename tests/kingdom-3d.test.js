@@ -50,7 +50,7 @@ test("bundled CC0 models can render props and only display units present in the 
   assert.match(renderer, /manifestUnits = Array\.isArray\(manifest\.units\)/);
   assert.match(renderer, /function renderManifestProps\(\)/);
   assert.match(renderer, /function renderKingdomTroops\(troops = \[\]\)/);
-  assert.match(renderer, /unit\?\.unit_type === "archer"/);
+  assert.match(renderer, /planArmyFigures\(troops, qualityProfile\?\.tier\)/);
   assert.match(renderer, /cloneSkinned\(asset\.template\)/);
   assert.match(renderer, /new THREE\.AnimationMixer\(root\)/);
   assert.match(kingdom, /window\.__coiKingdomTroops=state\.troops\|\|\[\]/);

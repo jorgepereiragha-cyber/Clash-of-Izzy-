@@ -1,0 +1,25 @@
+name: Beta gameplay and economy checks (offline)
+on:
+  pull_request:
+    branches: [beta]
+  push:
+    branches: [beta]
+permissions:
+  contents: read
+jobs:
+  gameplay-contracts:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check closed-beta flags before regression tests
+        run: node beta/check-isolation.mjs
+      - name: Castle skins, ownership, combat and collection idempotency
+        run: node --test tests/castle-skin-equip.test.js tests/castle-skin-combat.test.js tests/skin-sets.test.js tests/skin-set-combat-integration.test.js tests/economy-atomicity.test.js
+      - name: Dragons and package rules (no real transactions)
+        run: node --test tests/dragons-master-pack.test.js tests/daily-package-offers.test.js tests/level-packs.test.js tests/starter-package-399.test.js
+      - name: Synthetic load harness checks (mock transport only)
+        run: node --test tests/staging-load-smoke.test.js
