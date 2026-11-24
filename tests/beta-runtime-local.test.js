@@ -381,6 +381,26 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
             info.loadedGlbTemplates?.props >= 2 && info.pendingGlbLoads === 0 &&
             info.drawCalls > 0 && info.triangles > 0;
         }, null, {timeout:45_000});
+        const refreshCounts = await page.evaluate(async () => {
+          const before = window.__coiKingdomDiagnostics().optionalSceneRefreshes;
+          window.dispatchEvent(new CustomEvent("coi:kingdom-render", {detail:{
+            buildings:window.__coiKingdomBuildings,
+            troops:window.__coiKingdomTroops,
+            defenses:window.__coiKingdomDefenses,
+            heroes:window.__coiKingdomHeroAssignments,
+            castleSkinId:window.__coiKingdomCastleSkin,
+            castleVipLevel:window.__coiKingdomCastleVipLevel
+          }}));
+          // The manifest promise is already resolved; flush its continuation
+          // and the former empty Promise.all continuation before sampling.
+          await Promise.resolve();
+          await Promise.resolve();
+          await Promise.resolve();
+          return {before,after:window.__coiKingdomDiagnostics().optionalSceneRefreshes};
+        });
+        assert.ok(refreshCounts.before >= 1, "initial optional models refresh the scene");
+        assert.equal(refreshCounts.after,refreshCounts.before,
+          "unchanged kingdom state must not trigger an extra optional model rebuild");
         const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
         const evidence = path.join(root, "test-results", "beta-visual");
         await mkdir(evidence, {recursive:true});
