@@ -1,0 +1,17 @@
+name: Beta troop visuals (offline)
+on:
+  pull_request:
+    branches: [beta]
+  push:
+    branches: [beta]
+permissions:
+  contents: read
+jobs:
+  troop-visuals:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node --test tests/kingdom-army-visual.test.js tests/kingdom-3d.test.js

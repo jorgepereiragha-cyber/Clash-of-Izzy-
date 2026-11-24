@@ -203,6 +203,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     await checkAsset("/kingdom.html", /text\/html/i);
     await checkAsset("/styles/kingdom-4x-systems.css", /text\/css/i);
     await checkAsset("/scripts/kingdom-3d.js", /javascript/i);
+    await checkAsset("/scripts/kingdom-army-visual.js", /javascript/i);
     await checkAsset("/scripts/kingdom-quality.js", /javascript/i);
     await checkAsset("/vendor/three/build/three.module.js", /javascript/i);
     await checkAsset("/vendor/three/examples/jsm/loaders/GLTFLoader.js", /javascript/i);
@@ -739,6 +740,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.equal(refreshCounts.after,refreshCounts.before,
           "unchanged kingdom state must not trigger an extra optional model rebuild");
         const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
+        assert.ok(diagnostics.troopFigures.some(x=>x.type==="archer"&&!x.procedural),"trained archers use the decoded GLB");
+        assert.ok(diagnostics.troopFigures.length<=8,"balanced figure budget");
         const evidence = path.join(root, "test-results", "beta-visual");
         await mkdir(evidence, {recursive:true});
         await page.locator("#city").screenshot({path:path.join(evidence,"kingdom-3d.png")});
