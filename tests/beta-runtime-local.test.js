@@ -523,6 +523,55 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(militiaCount(cancelledAgain),militiaCount(cancelled));
     console.log("Beta historical victory regression passed: cancelled attack returns troops without credit.");
 
+    // Gathering credits must agree with the persistent resource ledger, not passive income.
+    const gatherBefore = await getStateFor(cookie,start.data.token);
+    const gatherTarget = gatherBefore.territories.find(t =>
+      !t.owner_kingdom_id && t.territory_kind !== "castle" &&
+      !String(t.territory_key).startsWith("royal_throne_") &&
+      ["food","wood","stone","iron"].includes(t.resource_type));
+    assert.ok(gatherTarget,"neutral gathering node exists");
+    const gatherKingdom = Number(gatherBefore.kingdom.id);
+    assert.ok(Number.isSafeInteger(gatherKingdom)&&gatherKingdom>0);
+    const gatherRate = Math.max(1,Number(gatherTarget.resource_rate)||90);
+    const readGatherLedger = async () => {
+      const raw = await command([...common,"execute","clash-of-izzy-beta-db","--local",
+        "--persist-to",persist,"--json","--command",
+        "SELECT COUNT(*) AS entries, COALESCE(SUM(amount),0) AS total FROM resource_ledger "+
+        "WHERE kingdom_id="+gatherKingdom+" AND resource='"+gatherTarget.resource_type+
+        "' AND reason='coleta por marcha'"]);
+      const output=JSON.parse(raw.trim());
+      assert.equal(output.length,1);
+      assert.equal(output[0].success,true);
+      return output[0].results[0];
+    };
+    const ledgerBefore=await readGatherLedger();
+    const gather=await actionFor(cookie,start.data.token,
+      {type:"march",marchType:"gather",targetId:gatherTarget.id,units:{militia:1}});
+    assert.equal(gather.status,200);
+    const gatherMarch=gather.data.state.marches.find(m=>m.status==="marching"&&m.march_type==="gather");
+    assert.ok(gatherMarch);
+    const gatherId=Number(gatherMarch.id);
+    assert.ok(Number.isSafeInteger(gatherId)&&gatherId>0);
+    assert.equal(militiaCount(gather.data.state),militiaCount(gatherBefore)-1);
+    await command([...common,"execute","clash-of-izzy-beta-db","--local",
+      "--persist-to",persist,"--command",
+      "UPDATE marches SET arrives_at=datetime('now','-1 minute') WHERE id="+gatherId+
+      " AND kingdom_id="+gatherKingdom+" AND status='marching'"]);
+    await Promise.all([getStateFor(cookie,start.data.token),getStateFor(cookie,start.data.token)]);
+    const gathered=await getStateFor(cookie,start.data.token);
+    assert.equal(militiaCount(gathered),militiaCount(gatherBefore));
+    assert.equal(powerCrystalCount(gathered),powerCrystalCount(gatherBefore)+1);
+    assert.ok(!gathered.marches.some(m=>Number(m.id)===gatherId&&m.status==="marching"));
+    const ledgerAfter=await readGatherLedger();
+    assert.equal(Number(ledgerAfter.entries),Number(ledgerBefore.entries)+1);
+    assert.equal(Number(ledgerAfter.total),Number(ledgerBefore.total)+gatherRate);
+    const gatheredAgain=await getStateFor(cookie,start.data.token);
+    assert.equal(powerCrystalCount(gatheredAgain),powerCrystalCount(gathered));
+    assert.equal(militiaCount(gatheredAgain),militiaCount(gathered));
+    assert.deepEqual(await readGatherLedger(),ledgerAfter,"repeated reads cannot duplicate ledger credit");
+    console.log("Beta gathering passed: exact ledger credit, one crystal and returned troops.");
+
+
 
 
     const methods = await http(base, "/api/store/payment-methods", {cookie});
