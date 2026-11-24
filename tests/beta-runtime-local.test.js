@@ -466,6 +466,64 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       "repeated state reads cannot grant another crystal");
     console.log("Beta PvE attack passed: real combat resolution, one report, conserved troops and no duplicate return.");
 
+    // Regression: a historical victory must not pay for a newly cancelled march.
+    // Seed only the disposable local D1, using a different realm and neutral target.
+    const cancelBefore = await getStateFor(cookie,start.data.token);
+    const cancelTarget = cancelBefore.territories.find(t => !t.owner_kingdom_id &&
+      Number(t.id) !== Number(neutral.id) && t.territory_kind !== "castle" &&
+      t.territory_kind !== "throne" && !String(t.territory_key).startsWith("royal_throne_"));
+    assert.ok(cancelTarget, "second neutral territory exists");
+    assert.ok(militiaCount(cancelBefore) >= 1);
+    const cancelKingdom = Number(cancelBefore.kingdom.id);
+    const otherKingdom = Number(second.data.state.kingdom.id);
+    const cancelTargetId = Number(cancelTarget.id);
+    const sourceReportId = Number(report.id);
+    for (const id of [cancelKingdom, otherKingdom, cancelTargetId, sourceReportId]) {
+      assert.ok(Number.isSafeInteger(id) && id > 0);
+    }
+    const cancelDispatch = await actionFor(cookie,start.data.token,
+      {type:"march",marchType:"attack",targetId:cancelTarget.id,units:{militia:1}});
+    assert.equal(cancelDispatch.status,200);
+    const cancelMarch = cancelDispatch.data.state.marches.find(m =>
+      m.status === "marching" && m.march_type === "attack");
+    assert.ok(cancelMarch);
+    const cancelMarchId = Number(cancelMarch.id);
+    assert.ok(Number.isSafeInteger(cancelMarchId) && cancelMarchId > 0);
+    assert.equal(militiaCount(cancelDispatch.data.state),militiaCount(cancelBefore)-1);
+    // Historical report and newly occupied target simulate a contested territory.
+    await command([...common,"execute","clash-of-izzy-beta-db","--local","--persist-to",persist,"--command",
+      "INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log,replay_json) "+
+      "SELECT "+cancelKingdom+","+cancelKingdom+","+cancelTargetId+",battle_type,attacker_power,defender_power,'{}',json_object('territoryCaptured',json('true'),'criticalHits',0),'[]','{}' "+
+      "FROM battle_reports WHERE id="+sourceReportId+"; "+
+      "UPDATE world_territories SET owner_kingdom_id="+otherKingdom+" WHERE id="+cancelTargetId+" AND owner_kingdom_id IS NULL;"]);
+    const seeded = await getStateFor(cookie,start.data.token);
+    const oldIds = new Set(cancelBefore.battleReports.map(r=>r.id));
+    const historical = seeded.battleReports.filter(r=>!oldIds.has(r.id));
+    assert.equal(historical.length,1,"exactly one synthetic historical victory");
+    assert.equal(Number(historical[0].winner_kingdom_id),cancelKingdom);
+    assert.equal(Number(seeded.territories.find(t=>Number(t.id)===cancelTargetId).owner_kingdom_id),otherKingdom);
+    assert.equal(powerCrystalCount(seeded),powerCrystalCount(cancelBefore));
+    await command([...common,"execute","clash-of-izzy-beta-db","--local","--persist-to",persist,"--command",
+      "UPDATE marches SET arrives_at=datetime('now','-1 minute') WHERE id="+cancelMarchId+
+      " AND kingdom_id="+cancelKingdom+" AND status='marching'"]);
+    await Promise.all([getStateFor(cookie,start.data.token),getStateFor(cookie,start.data.token)]);
+    const cancelled = await getStateFor(cookie,start.data.token);
+    const seededIds = new Set(seeded.battleReports.map(r=>r.id));
+    const cancelledReports = cancelled.battleReports.filter(r=>!seededIds.has(r.id));
+    assert.equal(cancelledReports.length,1,"cancelled attack resolves exactly once");
+    assert.equal(cancelledReports[0].winner_kingdom_id,null);
+    assert.deepEqual(JSON.parse(cancelledReports[0].rewards_json),
+      {territoryCaptured:false,criticalHits:0});
+    assert.equal(powerCrystalCount(cancelled),powerCrystalCount(cancelBefore),
+      "historical victory cannot grant a crystal for this cancelled attack");
+    assert.equal(militiaCount(cancelled),militiaCount(cancelBefore),"cancelled troops return once");
+    assert.ok(!cancelled.marches.some(m=>Number(m.id)===cancelMarchId&&m.status==="marching"));
+    const cancelledAgain = await getStateFor(cookie,start.data.token);
+    assert.equal(powerCrystalCount(cancelledAgain),powerCrystalCount(cancelled));
+    assert.equal(militiaCount(cancelledAgain),militiaCount(cancelled));
+    console.log("Beta historical victory regression passed: cancelled attack returns troops without credit.");
+
+
 
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
