@@ -22,7 +22,9 @@ portal.html
 apoie.html
 admin.html
 offline.html
+# Exclude only the root PWA manifest; preserve nested gameplay manifests.
 manifest.json
+!assets/3d/manifest.json
 public-portal/**
 
 # Worker-only modules are bundled by worker.js and must not be published as browser assets.
