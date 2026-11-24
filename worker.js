@@ -25,6 +25,7 @@ import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
 import { handleMercadoPagoRoute } from "./mercadopago-orders.js";
+import { blockNewPaidOrders, visiblePaymentMethods } from "./free-first-payment-policy.js";
 import { normalizePixEndToEndId, preparePixApproval } from "./pix-reconciliation.js";
 import { PANTHEON_SKIN_ITEMS, buildSkinSetGallery } from "./skin-sets.js";
 import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "./dragon-catalog.js";
@@ -2121,6 +2122,13 @@ export default {
     }
   }
   if(!env.DB)return json({error:"Banco D1 não vinculado ao Worker."},503);
+  // Free-first is explicit, never inferred from absent checkout credentials.
+  // This runs before new order creation; existing valid payment webhooks and
+  // authenticated admin reconciliation remain available for historical orders.
+  if(blockNewPaidOrders(env,request.method,url.pathname)){
+    return json({error:"Compras e apoios pagos estão desabilitados nesta fase gratuita.",
+      code:"FREE_FIRST_PAYMENTS_DISABLED"},503);
+  }
   if(url.pathname.startsWith("/api/account/"))return await handlePlayerAccountRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   const mpRouteResponse=await handleMercadoPagoRoute(request,env,{json,readBody,gameIdentity,rateLimitDecision});
   if(mpRouteResponse)return mpRouteResponse;
@@ -2233,7 +2241,7 @@ export default {
       return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
-  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),nubankPix:nubankPixReady(env)});
+  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json(visiblePaymentMethods(env,nubankPixReady(env)));
   if(url.pathname==="/api/store/pix-instructions"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);
