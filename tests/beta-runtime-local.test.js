@@ -314,6 +314,45 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(Number(persistedMill.data.state?.intermediateResources?.mill_level), 2,
       "4X mill upgrade persists across subsequent reads");
 
+    // The beta has no remote cron. A real scout march must return exactly once
+    // when the player resumes, including concurrent state requests.
+    const militiaCount = state => Number(state.troops.find(
+      unit => unit.unit_type === "militia" && Number(unit.tier) === 1
+    )?.quantity || 0);
+    const scoutStart = persistedMill.data.state;
+    const scoutTarget = scoutStart.territories.find(t => !t.owner_kingdom_id &&
+      t.territory_kind !== "castle" && t.territory_kind !== "throne" &&
+      !String(t.territory_key).startsWith("royal_throne_"));
+    assert.ok(scoutTarget, "world has a neutral territory to scout");
+    const initialMilitia = militiaCount(scoutStart);
+    assert.ok(initialMilitia >= 3, "starter realm has troops");
+    const scout = await http(base, "/api/game/action", {
+      method:"POST", body:{type:"march",marchType:"scout",targetId:scoutTarget.id,units:{militia:3}},
+      cookie,bearer:start.data.token
+    });
+    assert.equal(scout.status, 200, "scout march starts: " + JSON.stringify(scout.data).slice(0,1000));
+    const outbound = scout.data.state;
+    const activeScout = outbound.marches.find(m => m.status === "marching" &&
+      m.march_type === "scout" && Number(m.target_territory_id) === Number(scoutTarget.id));
+    assert.ok(activeScout, "scout march is persisted");
+    assert.equal(militiaCount(outbound), initialMilitia - 3, "field troops are debited");
+    const scoutId = Number(activeScout.id);
+    assert.ok(Number.isSafeInteger(scoutId) && scoutId > 0);
+    await command([...common, "execute", "clash-of-izzy-beta-db", "--local",
+      "--persist-to", persist, "--command",
+      "UPDATE marches SET arrives_at=datetime('now','-1 minute') WHERE id=" + scoutId +
+      " AND kingdom_id=" + Number(start.data.state.kingdom.id) + " AND status='marching'"]);
+    const scoutReturns = await Promise.all(Array.from({length:2}, () =>
+      http(base, "/api/game/state", {cookie,bearer:start.data.token})));
+    for (const result of scoutReturns) assert.equal(result.status, 200, "concurrent state read succeeds");
+    const returned = await http(base, "/api/game/state", {cookie,bearer:start.data.token});
+    assert.equal(returned.status, 200);
+    assert.equal(militiaCount(returned.data.state), initialMilitia, "scout returns troops exactly once");
+    assert.ok(!returned.data.state.marches.some(m => Number(m.id) === scoutId && m.status === "marching"));
+    assert.equal(militiaCount((await http(base, "/api/game/state", {cookie,bearer:start.data.token})).data.state),
+      initialMilitia, "another refresh cannot duplicate returned troops");
+    console.log("Beta scout march passed: dispatch, local deadline, concurrent return and no duplicate troops.");
+
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
     assert.deepEqual(methods.data, {mercadoPago:false,nubankPix:false});
