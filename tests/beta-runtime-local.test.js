@@ -199,6 +199,10 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     await checkAsset("/vendor/three/build/three.module.js", /javascript/i);
     await checkAsset("/vendor/three/examples/jsm/loaders/GLTFLoader.js", /javascript/i);
     await checkAsset("/assets/3d/manifest.json", /json/i);
+    const legacyManifest = await http(base, "/manifest.json", {cookie});
+    assert.equal(legacyManifest.status, 404, "official PWA manifest remains disabled");
+    assert.equal(legacyManifest.data.code, "BETA_LEGACY_PWA_DISABLED");
+
     const manifest = JSON.parse(await readFile(path.join(root, "assets/3d/manifest.json"), "utf8"));
     for (const category of ["models", "props", "units"]) {
       const representative = manifest[category].find(asset => asset.enabled);
