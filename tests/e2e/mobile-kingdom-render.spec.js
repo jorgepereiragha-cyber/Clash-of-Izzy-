@@ -135,7 +135,7 @@ test.describe("Mobile kingdom rendering", () => {
       .toHaveText("2.100");
     await expect(page.locator("#resources .resource").filter({ hasText: "Ouro" }).locator("b"))
       .toHaveText("3.000");
-    await expect(page.locator("#resources .resource").filter({ hasText: "Gemas" }).locator("b"))
+    await expect(page.locator("#resources .resource").filter({ hasText: "Diamantes" }).locator("b"))
       .toHaveText("150");
 
     const displayedResources = await page.locator("#resources .resource b").allTextContents();
