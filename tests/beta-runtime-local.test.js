@@ -417,6 +417,13 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
 
     // Exercise the previously untested attack branch with the second realm.
     const attackerBefore = await getStateFor(claimedCookie,second.data.token);
+    const powerCrystalCount = state => {
+      assert.ok(Array.isArray(state.inventoryItems), "server inventory is present");
+      const quantity = Number(state.inventoryItems.find(item => item.item_key === "power_crystal")?.quantity ?? 0);
+      assert.ok(Number.isSafeInteger(quantity) && quantity >= 0, "valid crystal balance");
+      return quantity;
+    };
+    const crystalsBefore = powerCrystalCount(attackerBefore);
     const neutral = attackerBefore.territories.find(t => !t.owner_kingdom_id &&
       t.territory_kind !== "castle" && t.territory_kind !== "throne" &&
       !String(t.territory_key).startsWith("royal_throne_"));
@@ -450,9 +457,13 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const rewards=JSON.parse(report.rewards_json||"{}");
     assert.equal(typeof rewards.territoryCaptured,"boolean");
     assert.ok(Number.isInteger(rewards.criticalHits)&&rewards.criticalHits>=0);
+    assert.equal(powerCrystalCount(resolvedAttack), crystalsBefore + (rewards.territoryCaptured ? 1 : 0),
+      "only a successful capture grants exactly one power crystal");
     const repeated=await getStateFor(claimedCookie,second.data.token);
     assert.equal(repeated.battleReports.filter(r=>!previousReports.has(r.id)).length,1);
     assert.equal(militiaCount(repeated),militiaCount(resolvedAttack));
+    assert.equal(powerCrystalCount(repeated), powerCrystalCount(resolvedAttack),
+      "repeated state reads cannot grant another crystal");
     console.log("Beta PvE attack passed: real combat resolution, one report, conserved troops and no duplicate return.");
 
 
