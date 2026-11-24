@@ -35,13 +35,20 @@ export function checkBetaIsolation(beta, production, { requireProvisioned = fals
   expect(!beta?.durable_objects?.bindings?.[0]?.script_name,
     "Durable Object beta nao deve referenciar outro Worker");
   const uuid = db?.database_id ?? "";
-  const configured = UUID.test(uuid) && uuid !== prod?.database_id && uuid !== preview?.database_id;
+  // UUID hex digits are case-insensitive (RFC 9562). Compare canonical IDs,
+  // not their original spelling, so case alone cannot defeat isolation.
+  const canonicalUuid = value => typeof value === "string" && UUID.test(value)
+    ? value.toLowerCase() : null;
+  const betaId = canonicalUuid(uuid);
+  const prodId = canonicalUuid(prod?.database_id);
+  const previewId = canonicalUuid(preview?.database_id);
+  const configured = Boolean(betaId && prodId && previewId &&
+    prodId !== previewId && betaId !== prodId && betaId !== previewId);
 
   expect(production?.name === "clash-of-izzy" && prod?.database_name === "clash-of-izzy-db",
     "A referencia de producao mudou; interrompa a operacao");
   expect(preview?.database_name === "izzy-preview-17112026", "A referencia de Preview mudou");
-  expect(UUID.test(prod?.database_id || "") && UUID.test(preview?.database_id || "") &&
-    prod.database_id !== preview.database_id, "IDs de producao/Preview invalidos");
+  expect(prodId && previewId && prodId !== previewId, "IDs de producao/Preview invalidos");
   expect(beta?.name === "clash-of-izzy-beta" && beta?.main === "worker.js",
     "Worker beta ou entrypoint incorreto");
   expect(beta?.workers_dev === true, "O dominio de teste workers.dev deve estar habilitado");
