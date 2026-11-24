@@ -535,12 +535,24 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           await guestContext.addCookies(await context.cookies());
           await guestContext.addInitScript(() => localStorage.setItem("coi_graphics_preference","2d"));
           let startAttempts = 0;
-          await guestContext.route("**/*", route => {
+          let createdStatus = null;
+          let createdRealm = null;
+          await guestContext.route("**/*", async route => {
             const url = new URL(route.request().url());
             if (url.origin !== base) return route.abort();
             if (url.pathname === "/api/game/start" && route.request().method() === "POST") {
               startAttempts += 1;
-              return route.abort("connectionreset");
+              // Let the real Worker commit before discarding its response.
+              // Never forward or log the synthetic realm's returned token.
+              const response = await route.fetch({maxRedirects:0,maxRetries:0});
+              try {
+                createdStatus = response.status();
+                createdRealm = (await response.json()).state?.kingdom?.id;
+              } finally {
+                await response.dispose();
+                await route.abort("connectionreset");
+              }
+              return;
             }
             return route.continue();
           });
@@ -548,6 +560,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           await guest.goto(base + "/kingdom.html");
           await guest.waitForFunction(() => document.querySelector("#loading").textContent.includes("A criação pode ter sido processada"));
           assert.equal(startAttempts,1,"first creation response was lost");
+          assert.equal(createdStatus,201,"Worker successfully created the realm before the response was lost");
+          assert.ok(Number(createdRealm)>0,"a real realm was committed");
           await guest.evaluate(() => window.dispatchEvent(new Event("online")));
           await guest.waitForFunction(() => document.querySelector("#status").textContent.includes("A criação anterior pode ter sido processada"));
           assert.equal(startAttempts,1,"reconnection cannot duplicate uncertain guest creation");
