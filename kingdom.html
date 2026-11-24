@@ -6,6 +6,7 @@
 <link rel="stylesheet" href="/styles/premium-ui.css">
 <link rel="stylesheet" href="/styles/city-layout.css">
 <link rel="stylesheet" href="/styles/kingdom-4x-systems.css">
+<link rel="stylesheet" href="/styles/royal-journey.css">
 <meta name="theme-color" content="#142b44"><meta name="description" content="Comande seu reino, evolua construções e prepare seu exército em Clash of Izzy.">
 <link rel="manifest" href="/manifest.json"><link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <title>Clash of Izzy — Reino</title>
@@ -56,11 +57,36 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .city.has-3d{display:block;padding:0}
 .city.has-3d .building{position:absolute;left:50%;top:50%;width:clamp(76px,22%,112px);height:56px;min-height:44px;transform:translate(-50%,-18%);background:linear-gradient(180deg,#0c172500 38%,#0c1725bd 100%);backdrop-filter:none;border-color:#e7bd6866;box-shadow:0 3px 10px #07150e55;justify-content:end;padding:5px 4px 8px;z-index:2}
 .city.has-3d .building:hover{transform:translate(-50%,-18%) translateY(-2px) scale(1.02)}
-.city.has-3d .building[hidden]{display:none!important}
+.city .building[hidden]{display:none!important}
+.coi-city-camera-controls[hidden]{display:none!important}
+.coi-city-camera-controls{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 12px}
+.coi-city-camera-controls button{min-width:48px;min-height:48px;font-size:18px;touch-action:manipulation}
+.coi-city-camera-controls .coi-camera-reset{min-width:100px;font-size:12px}
+/* Desktop camera tools occupy the top-right of the scene without enlarging
+   the city panel. Mobile tools stay beneath the canvas to avoid blocking taps. */
+.coi-city-stage .coi-city-camera-controls{position:absolute;top:10px;right:10px;z-index:5;margin:0;padding:3px;border:1px solid #e7bd6855;border-radius:10px;background:#0d1c2ac9}
+@media(max-width:900px){
+ .coi-city-stage .coi-city-camera-controls{position:static;margin:8px 0 4px;padding:0;background:transparent;border:0}
+ .coi-city-stage:has(.coi-city-camera-controls:not([hidden])) .coi-city-stage-corner{bottom:72px}
+}
+.city.has-3d.dense-3d .building{width:clamp(48px,12%,65px);height:44px;min-height:44px;padding:4px 2px 6px}
+.city.has-3d.dense-3d .building strong{font-size:0;white-space:nowrap}
+.city.has-3d.dense-3d .building strong::after{content:attr(data-compact);font-size:9px;line-height:1.15}
+.city.has-3d.dense-3d .building small{font-size:9px;white-space:nowrap}
 .city.has-3d .building .emoji{display:none}
 .city.has-3d .building strong{font-size:12px;text-shadow:0 2px 4px #000}
 .city.has-3d .building small{font-size:10px;text-shadow:0 2px 4px #000}
 .city.has-3d .building.castle{background:linear-gradient(180deg,#0c172500 34%,#142b44d9 100%);border:1px solid #ffe09a;box-shadow:inset 0 0 0 1px #f4d78e55,0 4px 12px #0007}
+.city .building[aria-pressed="true"]{outline:3px solid #ffe39a;outline-offset:2px;z-index:4}
+#coiCitySelection[hidden]{display:none!important}
+#coiCitySelection{position:fixed;z-index:25;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;width:min(94vw,470px);padding:10px 12px;border:1px solid #e3bc72;border-radius:12px;background:#132739f5;box-shadow:0 12px 32px #000b;color:#fff2d7}
+#coiCitySelection .coi-selection-copy{display:grid;gap:3px;min-width:0;flex:1}
+#coiCitySelection strong{font-size:14px}
+#coiCitySelection small{font-size:11px;line-height:1.25;color:#d6e3ee}
+#coiCitySelection button{min-height:48px;touch-action:manipulation}
+#coiCitySelectionDetails{min-width:112px}
+#coiCitySelectionClose{min-width:48px;font-size:21px}
+@media(max-width:760px){#coiCitySelection{bottom:calc(86px + env(safe-area-inset-bottom));gap:7px;padding:9px}#coiCitySelectionDetails{min-width:106px;font-size:12px}}
 @media(prefers-reduced-motion:no-preference){.city .building{transition:transform .18s ease,border-color .18s ease}.city .building:hover{transform:translateY(-3px) scale(1.025)}}
   .coi-castle-vip{margin-top:14px;background:linear-gradient(145deg,#13263b,#2c2940);border:1px solid #d1a958;border-radius:10px;padding:12px}
 .coi-castle-vip h3{margin:0 0 8px;color:#f1d38b;font-size:15px}
@@ -126,6 +152,14 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <a id="coiHudOrderLink" href="#queues">Ver centro de operações</a>
  </div>
 </section>
+<section class="coi-royal-journey" id="coiRoyalJourney" aria-labelledby="coiJourneyTitle">
+ <div class="coi-royal-journey-copy">
+  <span class="coi-royal-journey-kicker">JORNADA DO TRONO · GUIA DO COMANDANTE</span>
+  <h2 id="coiJourneyTitle">Preparando sua próxima decisão…</h2>
+  <p id="coiJourneyMessage" role="status" aria-live="polite">Sincronizando o estado do reino.</p>
+ </div>
+ <a id="coiJourneyAction" class="coi-royal-journey-action" href="#city">Ver cidade</a>
+</section>
 <nav class="coi-mobile-dock" aria-label="Acesso rápido ao jogo">
  <a href="#city"><span aria-hidden="true">🏰</span><span>Cidade</span></a>
  <a href="#buildings"><span aria-hidden="true">🔨</span><span>Construir</span></a>
@@ -139,6 +173,11 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <div class="coi-city-stage-label" aria-hidden="true"><span>ELDORIA</span><small>CENTRO DO REINO</small></div>
   <div class="city" id="city"></div>
   <div class="coi-city-stage-corner" aria-hidden="true">Toque em um edifício para ver melhorias</div>
+ <div class="coi-city-camera-controls" id="coiCityCameraControls" role="group" aria-label="Aproximação da cidade 3D" hidden>
+  <button type="button" class="secondary" data-city-zoom="out" aria-label="Afastar câmera da cidade">−</button>
+  <button type="button" class="secondary coi-camera-reset" data-city-zoom="reset" aria-label="Restaurar enquadramento da cidade">Centralizar</button>
+  <button type="button" class="secondary" data-city-zoom="in" aria-label="Aproximar câmera da cidade">+</button>
+ </div>
  </div>
  <nav id="coiRecruitmentSites" class="coi-recruitment-sites" aria-label="Locais de recrutamento da cidade">
   <a id="coiSummonAltar" class="coi-recruitment-site coi-site-altar" href="/equipment-ui.html#hero-summon-title" aria-label="Entrar no Altar de Convocação e convocar heróis">
@@ -294,6 +333,11 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 </section>
 <div class="notice" style="margin-top:14px">O tempo e os recursos são processados pelo servidor. Fechar o jogo não interrompe a evolução do reino; ao retornar, o estado é sincronizado novamente.</div>
 </div></main>
+<div id="coiCitySelection" aria-label="Edifício selecionado" hidden>
+ <div class="coi-selection-copy" aria-live="polite"><strong id="coiCitySelectionName"></strong><small id="coiCitySelectionLevel"></small></div>
+ <button type="button" id="coiCitySelectionDetails" class="secondary">Ver melhorias</button>
+ <button type="button" id="coiCitySelectionClose" class="secondary" aria-label="Fechar seleção do edifício">×</button>
+</div>
 <div id="coiActionNotice" role="status" aria-live="polite" hidden></div>
 <script>
 const API="/api";let token=null,state=null,busy=false;let lastResourceSnapshot=null;
@@ -308,6 +352,9 @@ function renderResourceHud(kingdom){
  lastResourceSnapshot=snapshot;
 }
 const names={castle:["Castelo","🏰"],barracks:["Quartel","⚔️"],farm:["Fazenda","🌾"],quarry:["Pedreira","🪨"],lumber_mill:["Serraria","🪵"],iron_mine:["Mina de ferro","⛓️"],market:["Mercado","🏪"],academy:["Academia","📚"],wall:["Muralha","🧱"],hospital:["Hospital","🏥"],watchtower:["Torre de vigia","🔭"],stable:["Estábulo","🐎"],archery_range:["Campo de arqueiros","🏹"],siege_workshop:["Oficina de cerco","🛠️"],embassy:["Embaixada","🏳️"],warehouse:["Armazém","📦"]};
+// Compact one-word captions avoid covering the neighboring buildings in 4x4 mode.
+// Full names remain in the DOM and in each button's accessible label.
+const compactBuildingNames={castle:"Castelo",barracks:"Quartel",farm:"Fazenda",quarry:"Pedreira",lumber_mill:"Serraria",iron_mine:"Mina",market:"Mercado",academy:"Academia",wall:"Muralha",hospital:"Hospital",watchtower:"Torre",stable:"Estábulo",archery_range:"Arqueiros",siege_workshop:"Cerco",embassy:"Embaixada",warehouse:"Armazém"};
 window.__coiCityLayoutState=()=>state;
 window.__coiCityBuildingNames=Object.fromEntries(Object.entries(names).map(([key,value])=>[key,value[0]]));
 const fmt=n=>Number(n||0).toLocaleString("pt-BR");
@@ -507,9 +554,19 @@ function watchKingdomScene(){
  if("ResizeObserver" in window){kingdomResizeObserver=new ResizeObserver(()=>drawKingdomScene(state?.buildings||[],Number(state?.kingdom?.equipped_skin_id||0)));kingdomResizeObserver.observe(host);}
  else{kingdomResizeHandler=()=>drawKingdomScene(state?.buildings||[],Number(state?.kingdom?.equipped_skin_id||0));window.addEventListener("resize",kingdomResizeHandler,{passive:true});}
 }
+const cityCameraControls=document.getElementById("coiCityCameraControls");
+cityCameraControls?.querySelectorAll("[data-city-zoom]").forEach(button=>{
+ button.addEventListener("click",()=>{
+  window.dispatchEvent(new CustomEvent("coi:kingdom-zoom",{detail:{action:button.dataset.cityZoom}}));
+ });
+});
+window.addEventListener("coi:kingdom-3d-ready",()=>{
+ if(cityCameraControls)cityCameraControls.hidden=false;
+});
 window.addEventListener("coi:kingdom-projection",event=>{
  const city=document.getElementById("city");if(!city)return;
  const positions=Array.isArray(event.detail?.positions)?event.detail.positions:[];
+ city.classList.toggle("dense-3d",positions.length>9);
  city.querySelectorAll("[data-building]").forEach((button,index)=>{
   const point=positions[index];
   if(!point||point.visible!==true||!Number.isFinite(point.left)||!Number.isFinite(point.top)){button.hidden=true;return;}
@@ -519,12 +576,18 @@ window.addEventListener("coi:kingdom-projection",event=>{
  });
 });
 window.addEventListener("coi:kingdom-2d-fallback",()=>{
+ // Context loss can hide the focused camera button. Preserve keyboard focus.
+ const cameraHadFocus=!!cityCameraControls?.contains(document.activeElement);
+ if(cityCameraControls)cityCameraControls.hidden=true;
  const city=document.getElementById("city");if(!city)return;
- city.querySelectorAll("[data-building]").forEach(button=>{
-  button.hidden=false;
+ city.classList.remove("dense-3d");
+ city.querySelectorAll("[data-building]").forEach((button,index)=>{
+  // Canvas fallback has nine slots; never expose an unpositioned extra button.
+  button.hidden=index>=9;
   button.style.left="";
   button.style.top="";
  });
+ if(cameraHadFocus)city.querySelector("[data-building]:not([hidden])")?.focus({preventScroll:true});
 });
 function renderCastleSkins(){
  const root=document.getElementById("castleSkins");if(!root)return;
@@ -690,10 +753,48 @@ async function upgradeCastleVip(expectedVipLevel){
  }catch(error){setStatus(error.message||"Não foi possível evoluir o VIP.",true);}
  finally{busy=false;render();}
 }
+let selectedCityBuildingType = null;
+function selectCityBuilding(type){
+ const panel=document.getElementById("coiCitySelection");
+ const entry=state?.buildings?.find(building=>building.building_type===type);
+ if(!entry||!names[type]){
+  selectedCityBuildingType=null;
+  panel.hidden=true;
+  document.querySelectorAll("#city [data-building]").forEach(button=>button.setAttribute("aria-pressed","false"));
+  return;
+ }
+ selectedCityBuildingType=type;
+ const upgradeButton=[...document.querySelectorAll("#buildings [data-upgrade]")].find(button=>button.dataset.upgrade===type);
+ const [name]=names[type];
+ document.getElementById("coiCitySelectionName").textContent=name;
+ document.getElementById("coiCitySelectionLevel").textContent="Nível "+fmt(entry.level)+(upgradeButton?.disabled?" · Melhoria indisponível no momento":" · Ver progresso e melhorias");
+ panel.hidden=false;
+ document.querySelectorAll("#city [data-building]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.building===type)));
+}
+document.getElementById("coiCitySelectionClose").addEventListener("click",()=>{
+ const previous=selectedCityBuildingType;
+ selectCityBuilding(null);
+ if(previous){
+  const origin=[...document.querySelectorAll("#city [data-building]")].find(button=>button.dataset.building===previous&&!button.hidden);
+  origin?.focus({preventScroll:true});
+ }
+});
+document.getElementById("coiCitySelection").addEventListener("keydown",event=>{
+ if(event.key!=="Escape")return;
+ event.preventDefault();
+ document.getElementById("coiCitySelectionClose").click();
+});
+document.getElementById("coiCitySelectionDetails").addEventListener("click",()=>{
+ if(!selectedCityBuildingType)return;
+ const target=[...document.querySelectorAll("#buildings [data-upgrade]")].find(button=>button.dataset.upgrade===selectedCityBuildingType);
+ if(!target)return;
+ target.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
+ target.focus({preventScroll:true});
+});
 function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderCastleVip();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();
 const buildings=state.buildings||[];const city=document.getElementById("city");
 city.querySelectorAll(":scope > .building").forEach(button=>button.remove());
-city.insertAdjacentHTML("beforeend",buildings.slice(0,9).map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'" data-building="'+esc(b.building_type)+'"><span class="emoji">'+esc(emoji)+'</span><strong>'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join(""));drawKingdomScene(buildings,Number(k.equipped_skin_id||0));watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomDefenses=state.cityDefenses||[];window.__coiKingdomHeroAssignments=state.advanced4xEnabled?(state.heroes||[]):[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.__coiKingdomCastleVipLevel=Number(state.castleVip?.level??k.prestige??0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],defenses:state.cityDefenses||[],heroes:window.__coiKingdomHeroAssignments,castleSkinId:Number(k.equipped_skin_id||0),castleVipLevel:window.__coiKingdomCastleVipLevel}}));
+city.insertAdjacentHTML("beforeend",buildings.slice(0,16).map((b,i)=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'"'+(i>=9?' hidden':'')+' data-building="'+esc(b.building_type)+'" aria-label="'+esc(name+", nível "+fmt(b.level)+". Ver melhorias")+'"><span class="emoji">'+esc(emoji)+'</span><strong data-compact="'+esc(compactBuildingNames[b.building_type]||name)+'">'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join(""));drawKingdomScene(buildings,Number(k.equipped_skin_id||0));watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomDefenses=state.cityDefenses||[];window.__coiKingdomHeroAssignments=state.advanced4xEnabled?(state.heroes||[]):[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.__coiKingdomCastleVipLevel=Number(state.castleVip?.level??k.prestige??0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],defenses:state.cityDefenses||[],heroes:window.__coiKingdomHeroAssignments,castleSkinId:Number(k.equipped_skin_id||0),castleVipLevel:window.__coiKingdomCastleVipLevel}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["👑 VIP do Castelo",fmt(state.castleVip?.level??k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const blocked=maxed||activeConstructionCount>=2||alreadyQueued||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
@@ -705,13 +806,18 @@ document.getElementById("researchButton").disabled=busy||(state.queues||[]).some
 const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Exército / capacidade",fmt(state.armyCount??total)+" / "+fmt(state.troopCapacity||500)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).map(e=>'<div class="event">'+esc(String(e.event_type||"Atividade").replaceAll("_"," "))+'</div>').join("")||'<div class="muted">Seu reino está começando sua história.</div>';
 renderPets();renderBattleReports();
-city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>document.querySelector('[data-upgrade="'+el.dataset.building+'"]')?.scrollIntoView({behavior:"smooth",block:"center"})));
+city.querySelectorAll("[data-building]").forEach(el=>el.addEventListener("click",()=>selectCityBuilding(el.dataset.building)));
+if(selectedCityBuildingType)selectCityBuilding(selectedCityBuildingType);
 document.querySelectorAll("[data-upgrade]").forEach(el=>el.addEventListener("click",()=>upgrade(el.dataset.upgrade)));
-window.dispatchEvent(new CustomEvent("coi:command-state",{detail:{
+const commandSnapshot={
  kingdom:{castle_level:k.castle_level,power:k.power},
  queues:state.queues||[],armyCount:state.armyCount??total,troopCapacity:state.troopCapacity||500,
  marches:state.marches||[]
-}}));
+};
+// Modules may initialize after the first asynchronous state response; replay
+// only public command metrics (never tokens or personal account credentials).
+window.__coiCommandSnapshot=commandSnapshot;
+window.dispatchEvent(new CustomEvent("coi:command-state",{detail:commandSnapshot}));
 }
 const PET_RARITIES=Object.freeze({
  common:{label:"Comum",css:"pet-rarity-common"},
@@ -939,7 +1045,7 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script type="module" src="/scripts/kingdom-4x-systems.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/royal-journey.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script type="module" src="/scripts/kingdom-4x-systems.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
 <script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>

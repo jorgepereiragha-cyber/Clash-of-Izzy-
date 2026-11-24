@@ -55,6 +55,8 @@ jobs:
         run: npm run vendor:three
       - name: Install Chromium for real mobile browser smoke
         run: npx playwright install --with-deps chromium
+      - name: Targeted visual and journey regression tests
+        run: node --test tests/kingdom-3d.test.js tests/visual-identity.test.js tests/world-map-mobile-performance.test.js tests/royal-journey.test.js tests/royal-journey-late-load.test.mjs
       - name: Smoke real beta Worker and local D1 (no deployment)
         run: node --test tests/beta-runtime-local.test.js
         env:
