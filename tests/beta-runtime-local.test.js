@@ -571,6 +571,31 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.deepEqual(await readGatherLedger(),ledgerAfter,"repeated reads cannot duplicate ledger credit");
     console.log("Beta gathering passed: exact ledger credit, one crystal and returned troops.");
 
+    // A neutral resource node can be captured while a gathering march is in flight.
+    const occupiedBefore=await getStateFor(cookie,start.data.token);
+    const occupiedGather=await actionFor(cookie,start.data.token,
+      {type:"march",marchType:"gather",targetId:gatherTarget.id,units:{militia:1}});
+    assert.equal(occupiedGather.status,200);
+    const occupiedMarch=occupiedGather.data.state.marches.find(m=>m.status==="marching"&&m.march_type==="gather");
+    assert.ok(occupiedMarch);
+    const occupiedMarchId=Number(occupiedMarch.id);
+    const occupiedTargetId=Number(gatherTarget.id);
+    for(const id of [occupiedMarchId,occupiedTargetId,otherKingdom])assert.ok(Number.isSafeInteger(id)&&id>0);
+    await command([...common,"execute","clash-of-izzy-beta-db","--local",
+      "--persist-to",persist,"--command",
+      "UPDATE world_territories SET owner_kingdom_id="+otherKingdom+" WHERE id="+occupiedTargetId+
+      " AND owner_kingdom_id IS NULL; UPDATE marches SET arrives_at=datetime('now','-1 minute') WHERE id="+occupiedMarchId+
+      " AND kingdom_id="+gatherKingdom+" AND status='marching'"]);
+    await Promise.all([getStateFor(cookie,start.data.token),getStateFor(cookie,start.data.token)]);
+    const occupiedAfter=await getStateFor(cookie,start.data.token);
+    assert.equal(Number(occupiedAfter.territories.find(t=>Number(t.id)===occupiedTargetId).owner_kingdom_id),otherKingdom);
+    assert.equal(militiaCount(occupiedAfter),militiaCount(occupiedBefore),"troops return from occupied gathering node");
+    assert.equal(powerCrystalCount(occupiedAfter),powerCrystalCount(occupiedBefore),"occupied node grants no crystal");
+    assert.deepEqual(await readGatherLedger(),ledgerAfter,"occupied node grants no resource credit");
+    assert.ok(!occupiedAfter.marches.some(m=>Number(m.id)===occupiedMarchId&&m.status==="marching"));
+    console.log("Beta occupied gathering regression passed: no foreign territory credit, troops returned.");
+
+
 
 
 
