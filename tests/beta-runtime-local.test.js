@@ -174,6 +174,44 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
 
     const privatePage = await http(base, "/kingdom.html", {cookie});
     assert.equal(privatePage.status, 200, "authorized player can open kingdom");
+    // The beta asset directory is filtered by .assetsignore. A 200 for HTML
+    // alone is insufficient: a missing module or GLB leaves the city unusable.
+    // Compare real HTTP payloads against the exact local source files.
+    const checkAsset = async (assetPath, contentType) => {
+      const response = await fetch(base + assetPath, {
+        headers: { Cookie: cookie }, redirect: "manual",
+        signal: AbortSignal.timeout(20_000)
+      });
+      assert.equal(response.status, 200, assetPath + " must be served after invite");
+      assert.match(response.headers.get("cache-control") || "", /\bno-store\b/i, assetPath + " must not be cached");
+      assert.match(response.headers.get("cache-control") || "", /\bprivate\b/i);
+      if (contentType) assert.match(response.headers.get("content-type") || "", contentType, assetPath + " MIME");
+      const bytes = Buffer.from(await response.arrayBuffer());
+      const expected = await readFile(path.join(root, assetPath.slice(1)));
+      assert.ok(bytes.length > 0, assetPath + " must not be empty");
+      assert.equal(createHash("sha256").update(bytes).digest("hex"),
+        createHash("sha256").update(expected).digest("hex"), assetPath + " HTTP bytes differ from repository");
+    };
+    await checkAsset("/kingdom.html", /text\/html/i);
+    await checkAsset("/styles/kingdom-4x-systems.css", /text\/css/i);
+    await checkAsset("/scripts/kingdom-3d.js", /javascript/i);
+    await checkAsset("/scripts/kingdom-quality.js", /javascript/i);
+    await checkAsset("/vendor/three/build/three.module.js", /javascript/i);
+    await checkAsset("/vendor/three/examples/jsm/loaders/GLTFLoader.js", /javascript/i);
+    await checkAsset("/assets/3d/manifest.json", /json/i);
+    const legacyManifest = await http(base, "/manifest.json", {cookie});
+    assert.equal(legacyManifest.status, 404, "official PWA manifest remains disabled");
+    assert.equal(legacyManifest.data.code, "BETA_LEGACY_PWA_DISABLED");
+
+    const manifest = JSON.parse(await readFile(path.join(root, "assets/3d/manifest.json"), "utf8"));
+    for (const category of ["models", "props", "units"]) {
+      const representative = manifest[category].find(asset => asset.enabled);
+      if (representative) {
+        assert.match(representative.src, /^\/assets\/3d\/[^?#]+\.glb$/i);
+        await checkAsset(representative.src);
+      }
+    }
+
     const capabilities = await http(base, "/api/beta/capabilities", {cookie});
     assert.equal(capabilities.status, 200);
     assert.equal(capabilities.data.enabled.advanced4x, true);
@@ -284,6 +322,9 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(logout.status, 200);
     const after = await http(base, "/api/game/state", {cookie,bearer:start.data.token});
     assert.equal(after.status, 403, "logged-out beta cookie blocks former game token");
+    const revokedAsset = await http(base, "/scripts/kingdom-3d.js", {cookie});
+    assert.equal(revokedAsset.status, 302, "revoked invite cannot reload private renderer");
+    assert.equal(new URL(revokedAsset.headers.get("location")).pathname, "/beta-access.html");
     console.log("Offline beta runtime passed: health, invites, castle upgrade and scheduled completion, 4X mill persistence, kingdom, world, free market, payment lock, logout.");
   } finally {
     if (processWorker) {
