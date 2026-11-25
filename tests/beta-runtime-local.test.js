@@ -377,6 +377,9 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(Number(hero.data.state.heroes.find(h=>h.hero_key===starterHero.hero_key).level),
       Number(starterHero.level)+1);
     const dragonAction={type:"dragon_upgrade",dragonKey:legacyBefore.dragon.dragon_key,expectedLevel:Number(legacyBefore.dragon.level)};
+    const dragonPreview=legacyBefore.dragonCollection.find(d=>d.equipped)?.nextUpgrade;
+    assert.ok(dragonPreview,"equipped dragon has server-owned upgrade preview");
+    assert.deepEqual(dragonPreview.cost,{food:250*dragonAction.expectedLevel,wood:150*dragonAction.expectedLevel,stone:100*dragonAction.expectedLevel,iron:25*dragonAction.expectedLevel});
     assert.equal((await actionFor(cookie,start.data.token,{type:"dragon_upgrade"})).status,400);
     assert.equal((await actionFor(cookie,start.data.token,{...dragonAction,dragonKey:"mist_talon"})).status,409);
     assert.equal((await actionFor(cookie,start.data.token,{type:"dragon_unlock",dragonKey:"__proto__"})).status,404);
@@ -385,6 +388,12 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.deepEqual(dragonRace.map(x=>x.status).sort((a,b)=>a-b),[200,409]);
     const dragon=dragonRace.find(x=>x.status===200);
     assert.equal(Number(dragon.data.state.dragon.level),Number(legacyBefore.dragon.level)+1);
+    const upgradedView=dragon.data.state.dragonCollection.find(d=>d.equipped);
+    assert.equal(upgradedView.level,dragonPreview.level);
+    assert.equal(upgradedView.bond,dragonPreview.bond);
+    assert.equal(upgradedView.attackPercent,dragonPreview.attackPercent);
+    assert.equal(upgradedView.defensePercent,dragonPreview.defensePercent);
+    assert.deepEqual(upgradedView.elementalSkill,dragonPreview.elementalSkill);
     assert.equal((await actionFor(cookie,start.data.token,dragonAction)).status,409,"dragon replay cannot charge again");
     assert.equal(Number((await getStateFor(cookie,start.data.token)).dragon.level),Number(legacyBefore.dragon.level)+1);
     const welcome = legacyBefore.mailbox.find(mail=>mail.reward_key==="welcome_v1"&&!mail.claimed_at);

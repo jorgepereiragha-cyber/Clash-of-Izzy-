@@ -35,7 +35,13 @@ test("recruitment landmarks do not bypass the D1 building allowlist, economy or 
   assert.match(worker, /type==="dragon_unlock"/);
   assert.match(worker, /type==="dragon_upgrade"/);
   assert.match(worker, /bond\s*=\s*MIN\(\s*100\s*,\s*bond\s*\+\s*2\s*\)/);
-  assert.match(city, /costs=\{food:250\*level,wood:150\*level,stone:100\*level,iron:25\*level\}/);
+  // Keep the economic contract, but verify the shared authoritative rule rather than a duplicated UI formula.
+  const {dragonUpgradeCost}=await import("../dragon-catalog.js");
+  for(let level=1;level<100;level++)assert.deepEqual(dragonUpgradeCost(level),{food:250*level,wood:150*level,stone:100*level,iron:25*level});
+  assert.equal(dragonUpgradeCost(100),null);
+  assert.match(city,/const next=dragon\.nextUpgrade/);
+  assert.match(city,/const costs=next\?\.cost/);
+  assert.match(worker,/const cost=dragonUpgradeCost\(level\)/);
   assert.match(worker, /type==="hero_summon"/);
   assert.doesNotMatch(city, /type:"dragon_hatch"|type:"dragon_feed"|type:"hero_summon"/);
 });
