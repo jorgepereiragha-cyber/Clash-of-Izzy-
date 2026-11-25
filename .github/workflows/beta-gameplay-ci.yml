@@ -31,3 +31,6 @@ jobs:
         run: node --test tests/rally-capacity.test.js
       - name: Tactical combat versioning and deterministic simulations
         run: node --test tests/tactical-combat-v2.test.js
+
+      - name: Castle shield activation, concurrency and rollback
+        run: node --test tests/castle-shield.test.js
