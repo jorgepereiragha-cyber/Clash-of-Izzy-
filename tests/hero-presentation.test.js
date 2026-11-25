@@ -193,3 +193,13 @@ test("ficha dourada mantém raridade canônica mesmo se D1 legada gravou legenda
   assert.equal(seasonal.rarity_key,"purple");
   assert.equal(seasonal.rarity_label,"Mítico");
 });
+
+test("star progression reports only valid next-star costs for canonical rarity",()=>{
+  const before=heroView({hero_key:"kael_sunwarden",rarity:"gold",stars:1,fragments:100});
+  assert.equal(before.can_evolve,true);
+  assert.equal(before.fragments_to_next,10);
+  const max=heroView({hero_key:"kael_sunwarden",rarity:"gold",stars:6,fragments:1000});
+  assert.equal(max.max_stars,6);
+  assert.equal(max.can_evolve,false);
+  assert.equal(max.fragments_to_next,null);
+});

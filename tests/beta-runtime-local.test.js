@@ -727,6 +727,33 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(Number(binding?.level),finalSword.level);
     console.log("Beta normal equipment level and concurrent hero equip passed.");
 
+    // Synthetic fragments only: the production inventory is never touched.
+    await localSql("UPDATE hero_inventory SET stars=1,fragments=100 WHERE kingdom_id="+queueRealm+" AND hero_key='kael_sunwarden'");
+    const heroStars=state=>state.heroInventory.find(h=>h.hero_key==="kael_sunwarden");
+    const beforeStars=heroStars(await getStateFor(cookie,start.data.token));
+    assert.equal(beforeStars.stars,1);
+    assert.equal(beforeStars.fragments_to_next,10);
+    assert.equal(beforeStars.can_evolve,true);
+    assert.equal((await actionFor(cookie,start.data.token,{type:"hero_evolve",hero:"kael_sunwarden"})).status,400);
+    const evolve=()=>actionFor(cookie,start.data.token,{type:"hero_evolve",hero:"kael_sunwarden",expectedStars:1});
+    const starRace=await Promise.all([evolve(),evolve()]);
+    assert.deepEqual(starRace.map(x=>x.status).sort((a,b)=>a-b),[200,409]);
+    assert.equal((await evolve()).status,409,"old star requests cannot debit again");
+    const afterStars=heroStars(await getStateFor(cookie,start.data.token));
+    assert.equal(afterStars.stars,2);
+    assert.equal(afterStars.fragments,90);
+    assert.equal(afterStars.fragments_to_next,20);
+    assert.ok(afterStars.stats.attack>beforeStars.stats.attack);
+    const maxStars=Number(afterStars.max_stars);
+    assert.ok(Number.isSafeInteger(maxStars)&&maxStars>=2&&maxStars<=8);
+    await localSql("UPDATE hero_inventory SET stars="+maxStars+",fragments=1000 WHERE kingdom_id="+queueRealm+" AND hero_key='kael_sunwarden'");
+    const capped=heroStars(await getStateFor(cookie,start.data.token));
+    assert.equal(capped.can_evolve,false);
+    assert.equal(capped.fragments_to_next,null);
+    assert.equal((await actionFor(cookie,start.data.token,{type:"hero_evolve",hero:"kael_sunwarden",expectedStars:maxStars})).status,409);
+    assert.equal(heroStars(await getStateFor(cookie,start.data.token)).fragments,1000);
+    console.log("Beta hero stars passed: exact cost, concurrent CAS, replay, stat increase and rarity cap.");
+
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
     assert.deepEqual(methods.data, {mercadoPago:false,nubankPix:false});

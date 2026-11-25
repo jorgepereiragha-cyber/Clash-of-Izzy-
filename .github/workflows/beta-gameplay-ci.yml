@@ -18,7 +18,7 @@ jobs:
       - name: Check closed-beta flags before regression tests
         run: node beta/check-isolation.mjs
       - name: Castle skins, ownership, combat and collection idempotency
-        run: node --test tests/castle-skin-equip.test.js tests/castle-skin-combat.test.js tests/skin-sets.test.js tests/skin-set-combat-integration.test.js tests/economy-atomicity.test.js tests/equipment-enhancement.test.js tests/equipment-authority.test.js tests/equipment-hierarchy.test.js tests/equipment-progression.test.js
+        run: node --test tests/castle-skin-equip.test.js tests/castle-skin-combat.test.js tests/skin-sets.test.js tests/skin-set-combat-integration.test.js tests/economy-atomicity.test.js tests/equipment-enhancement.test.js tests/equipment-authority.test.js tests/equipment-hierarchy.test.js tests/equipment-progression.test.js tests/hero-presentation.test.js
       - name: Dragons and package rules (no real transactions)
         run: node --test tests/dragons-master-pack.test.js tests/daily-package-offers.test.js tests/level-packs.test.js tests/starter-package-399.test.js
       - name: Existing queue, march and realtime safety regressions

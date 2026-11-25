@@ -1456,11 +1456,20 @@ async function gameAction(env,playerId,body){
     battleOutcome={summons:results,cost};
   }else if(type==="hero_evolve"){
     const heroKey=String(body.hero||""),hero=await env.DB.prepare("SELECT rarity,stars,fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
-    if(!hero||!HERO_TEMPLATES[heroKey])return json({error:"Herói não encontrado na coleção."},404);
-    const rarity=HERO_RARITY[hero.rarity],next=hero.stars+1,needed=HERO_STAR_COST[next];
-    if(hero.stars>=rarity.maxStars||!needed)return json({error:"Herói já atingiu o máximo de estrelas."},409);
-    if(hero.fragments<needed)return json({error:"Fragmentos insuficientes. Necessário: "+needed+"."},409);
-    await env.DB.prepare("UPDATE hero_inventory SET stars=stars+1,fragments=fragments-? WHERE kingdom_id=? AND hero_key=? AND fragments>=?").bind(needed,k.id,heroKey,needed).run();
+    if(!hero||!Object.hasOwn(HERO_TEMPLATES,heroKey))return json({error:"Herói não encontrado na coleção."},404);
+    // Use the same canonical rarity as the collection view; never trust the client.
+    const rarity=HERO_RARITY[HERO_TEMPLATES[heroKey].rarity],stars=Number(hero.stars),next=stars+1,needed=HERO_STAR_COST[next];
+    if(!rarity||!Number.isSafeInteger(stars)||stars<1||stars>=rarity.maxStars||!needed)return json({error:"Herói já atingiu o máximo de estrelas ou possui estado inválido."},409);
+    if(env.ENVIRONMENT==="beta"||body.expectedStars!==undefined){
+      if(!Number.isSafeInteger(body.expectedStars)||body.expectedStars<1)return json({error:"Informe as estrelas atuais do herói."},400);
+      if(body.expectedStars!==stars)return json({error:"Estrelas desatualizadas. Sincronize a coleção."},409);
+    }
+    if(Number(hero.fragments)<needed)return json({error:"Fragmentos insuficientes. Necessário: "+needed+"."},409);
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE hero_inventory SET stars=stars+1,fragments=fragments-? WHERE kingdom_id=? AND hero_key=? AND stars=? AND stars<? AND fragments>=?").bind(needed,k.id,heroKey,stars,rarity.maxStars,needed),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(k.id,"hero_star_evolved",JSON.stringify({hero:heroKey,from:stars,to:next,fragments:needed}))
+    ]);
+    if(result[0]?.meta?.changes!==1||result[1]?.meta?.changes!==1)return json({error:"Fragmentos ou estrelas alterados. Sincronize a coleção."},409);
   }else if(type==="hero_train"){
     const key=String(body.hero||"kael_sunwarden");
     const [hero,inventoryHero]=await Promise.all([

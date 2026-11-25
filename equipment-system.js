@@ -403,8 +403,15 @@
       const fragments=document.createElement("p");
       fragments.className="hero-roster-fragments";
       fragments.textContent="Fragmentos: "+Number(hero.fragments||0).toLocaleString("pt-BR")+
-        (hero.fragments_to_next?" · Próxima estrela: "+hero.fragments_to_next:" · Estrelas máximas");
+        (hero.fragments_to_next?" · Próxima estrela: "+hero.fragments_to_next:Number(hero.stars)>=Number(hero.max_stars)?" · Estrelas máximas":" · Evolução indisponível");
       copy.append(name,title,origin,aura,meta,stats,combat,skill,fragments);
+      const evolve=document.createElement("button");
+      evolve.type="button";evolve.className="forge-action hero-star-evolve";
+      const cost=Number(hero.fragments_to_next||0),eligible=hero.can_evolve===true&&cost>0;
+      evolve.disabled=busy||!eligible||Number(hero.fragments||0)<cost;
+      evolve.textContent=eligible?"EVOLUIR ESTRELA · "+fmt(cost)+" FRAGMENTOS":Number(hero.stars)>=Number(hero.max_stars)?"ESTRELAS MÁXIMAS":"EVOLUÇÃO INDISPONÍVEL";
+      evolve.addEventListener("click",()=>perform({type:"hero_evolve",hero:hero.hero_key,expectedStars:Number(hero.stars)},"Estrela do herói evoluída."));
+      copy.append(evolve);
       if(hero.identity_lore){
         const story=document.createElement("details");story.className="hero-roster-story";
         const summary=document.createElement("summary");summary.textContent="História do herói";
