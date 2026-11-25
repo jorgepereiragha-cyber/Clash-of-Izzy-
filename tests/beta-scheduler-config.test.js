@@ -11,7 +11,7 @@ test("beta scheduler uses isolated D1, no automatic cron before homologation and
   assert.equal(beta.vars.ENVIRONMENT, "beta");
   assert.notEqual(beta.d1_databases[0].database_id, production.d1_databases[0].database_id);
   assert.equal(beta.triggers?.crons?.length ?? 0, 0);
-  assert.equal(beta.observability.enabled, true);
+  assert.equal(beta.observability, undefined);
   assert.equal(beta.vars.INVITE_ONLY, "true");
   assert.equal(beta.vars.GAME_4X_SYSTEMS_ENABLED, "true");
   assert.equal(beta.vars.BETA_LIVE_PAYMENTS_APPROVED, "false");
