@@ -19,7 +19,7 @@ import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaCon
 import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
-import { handleRally, processDueRallies } from "./rally.js";
+import { handleRally, processDueRallies, detachedTroops, DETACHED_TROOPS_SQL } from "./rally.js";
 import {marchCapacity,marchCapacityForKingdom,withinMarchCapacity} from "./march-capacity.js";
 import {marchSlots} from "./march-slots.js";
 import { resolveDueMarchKingdoms } from "./march-scheduler-policy.js";
@@ -901,7 +901,8 @@ async function gameState(env,playerId){
   },0);
   const queuedTraining=(queues.results||[]).filter(row=>row.queue_type==="training"&&row.status==="running").reduce((sum,row)=>sum+Math.max(0,Number(row.quantity)||0),0);
   const woundedTroops=hospitalEnabled(env)?(troops.results||[]).reduce((n,u)=>n+Number(u.wounded||0),0):0;
-  const armyCount=totalTroops+fieldTroops+queuedTraining+woundedTroops;
+  const rallyTroops=await detachedTroops(env,kingdom.id);
+  const armyCount=totalTroops+fieldTroops+queuedTraining+woundedTroops+rallyTroops;
   const hospital=hospitalEnabled(env)?{capacity:hospitalScienceCapacity((buildings.results||[]).find(b=>b.building_type==="hospital")?.level,(research.results||[]).find(r=>r.research_key==="military_medicine")?.level),wounded:woundedTroops,maxTreatment:HOSPITAL_HEAL_MAX,patients:(troops.results||[]).filter(u=>u.wounded>0&&Object.hasOwn(UNITS,u.unit_type)).map(u=>({unit:u.unit_type,tier:u.tier,wounded:u.wounded,label:UNITS[u.unit_type].label,foodPerUnit:hospitalHealCost(1,UNITS[u.unit_type].food)}))}:null;
   const academyLevel=(buildings.results||[]).find(row=>row.building_type==="academy")?.level||0;
   const militaryLevel=(research.results||[]).find(row=>row.research_key==="military")?.level||0;
@@ -948,7 +949,7 @@ async function gameState(env,playerId){
   const specialCityBuildings=specialCityEnabled(env)?(await env.DB.prepare("SELECT building_type,grid_x,grid_z,width,height FROM city_special_buildings WHERE kingdom_id=? ORDER BY building_type").bind(kingdom.id).all()).results||[]:[];
   return {activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
-    defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
+    defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,rallyTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
 async function gameAction(env,playerId,body){
   const p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
@@ -1403,7 +1404,8 @@ async function gameAction(env,playerId,body){
     if(membership.role==="leader"){
       const count=await env.DB.prepare("SELECT COUNT(*) AS total FROM alliance_members WHERE alliance_id=?").bind(membership.alliance_id).first();
       if(count.total>1)return json({error:"O líder deve transferir a liderança antes de sair."},409);
-      await env.DB.prepare("DELETE FROM alliances WHERE id=?").bind(membership.alliance_id).run();
+      const removed=await env.DB.prepare("DELETE FROM alliances WHERE id=? AND leader_kingdom_id=? AND (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=?)=1 AND NOT EXISTS(SELECT 1 FROM rallies WHERE alliance_id=? AND status IN ('gathering','marching'))").bind(membership.alliance_id,k.id,membership.alliance_id,membership.alliance_id).run();
+      if(removed.meta?.changes!==1)return json({error:"Aliança alterada ou rally ativo. Aguarde a resolução antes de sair."},409);
     }else await env.DB.prepare("DELETE FROM alliance_members WHERE kingdom_id=?").bind(k.id).run();
   }else if(type==="dragon_unlock"){
     const dragonKey=String(body.dragonKey||""),dragon=Object.hasOwn(DRAGON_BY_KEY,dragonKey)?DRAGON_BY_KEY[dragonKey]:null;
@@ -1648,7 +1650,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) AS total FROM marches m,json_each(m.units_json) j WHERE m.kingdom_id=? AND m.status='marching'").bind(k.id).first(),
       env.DB.prepare("SELECT COALESCE(SUM(quantity),0) AS total FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running'").bind(k.id).first()
     ]);
-    const usedCapacity=Number(ownedArmy?.total||0)+Number(fieldArmy?.total||0)+Number(pendingArmy?.total||0);
+    const usedCapacity=Number(ownedArmy?.total||0)+Number(fieldArmy?.total||0)+Number(pendingArmy?.total||0)+await detachedTroops(env,k.id);
     if(usedCapacity+quantity>troopCapacity)return json({error:"Capacidade do exército excedida. Quartel nível "+barracks.level+" permite "+troopCapacity+" tropas; já ocupadas: "+usedCapacity+".",capacity:troopCapacity,used:usedCapacity,available:Math.max(0,troopCapacity-usedCapacity)},409);
     const activeTraining=await env.DB.prepare("SELECT queue_slot FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running'").bind(k.id).all();
     const occupiedTrainingSlots=new Set((activeTraining.results||[]).map(row=>Number(row.queue_slot)||1));
@@ -1662,9 +1664,9 @@ async function gameAction(env,playerId,body){
     const debit=env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level>=1) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND queue_slot=? AND status='running')"+
       " AND ((SELECT COALESCE(SUM("+(hospitalEnabled(env)?"quantity+wounded":"quantity")+"),0) FROM army_units WHERE kingdom_id=?)"+
       "+(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM marches m,json_each(m.units_json) j WHERE m.kingdom_id=? AND m.status='marching')"+
-      "+(SELECT COALESCE(SUM(quantity),0) FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running')+?)<= "+
+      "+(SELECT COALESCE(SUM(quantity),0) FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running')+"+DETACHED_TROOPS_SQL+"+?)<= "+
       "(SELECT level*? FROM kingdom_buildings WHERE kingdom_id=? AND building_type='barracks')")
-      .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron,k.id,requiredBuilding,k.id,queueSlot,k.id,k.id,k.id,quantity,TROOP_CAPACITY_PER_BARRACKS_LEVEL,k.id);
+      .bind(cost.food,cost.wood,cost.iron,k.id,cost.food,cost.wood,cost.iron,k.id,requiredBuilding,k.id,queueSlot,k.id,k.id,k.id,k.id,k.id,k.id,quantity,TROOP_CAPACITY_PER_BARRACKS_LEVEL,k.id);
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
     statements.push(env.DB.prepare("INSERT INTO kingdom_queues(kingdom_id,queue_type,queue_slot,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at) SELECT ?,?,?,?,?,?,?,?,'running',?,? WHERE "+guard)
       .bind(k.id,"training",queueSlot,unit,quantity,0,0,"royal_blueprint",startedAt,completesAt,k.id,actionId));
