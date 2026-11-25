@@ -20,8 +20,14 @@ test("Jornada do Trono is real, discoverable and accessible on mobile", () => {
   assert.doesNotMatch(ui, /\.innerHTML|fetch\(|postMessage\(/);
   assert.match(css, /max-width:600px/);
   assert.match(css, /min-height:48px/);
-  // Closed beta must remain online-only; do not enable a service worker for private assets.
-  assert.doesNotMatch(pwa, /serviceWorker\.register\s*\(/);
+  // This production candidate preserves the official PWA. Closed-beta HTTP handling
+  // still replaces /sw.js with a no-fetch worker and blocks uninvited traffic.
+  assert.match(pwa,/navigator\.serviceWorker\.register\("\/sw\.js"/);
+  const guard=readFileSync(new URL("../beta-access.js",import.meta.url),"utf8");
+  assert.match(guard,/if \(env\?\.ENVIRONMENT !== "beta"\) return null/);
+  const privateSw=guard.slice(guard.indexOf('if (path === "/sw.js"'),guard.indexOf('// Legacy playable modules'));
+  assert.match(privateSw,/self\.clients\.claim/);
+  assert.doesNotMatch(privateSw,/addEventListener\('fetch'/);
 });
 
 test("not synchronized means no misleading progress or fake reward", () => {

@@ -75,3 +75,9 @@ test("diagnostic callback errors never starve later realms", async () => {
   assert.deepEqual(settled,[1,2,3]);
   assert.deepEqual(result,{selected:4,completed:2,failed:2});
 });
+
+test("production budget of one realm and two marches remains bounded",async()=>{
+ const db=dbFixture([{kingdom_id:1},{kingdom_id:2}]);const calls=[];
+ const result=await resolveDueMarchKingdoms({db,realmLimit:1,resolveKingdom:async(id,limit)=>calls.push([id,limit])});
+ assert.deepEqual(calls,[[1,2]]);assert.equal(db.called[0][1],1);assert.equal(result.selected,1);
+});

@@ -62,7 +62,7 @@ test("official store creates an auditable per-order Mercado Pago checkout", asyn
   assert.ok(arena.includes("checkout.checkoutUrl"));
   assert.ok(arena.includes("API_BASE+'/store/purchase-request'"));
   assert.ok(arena.includes("https://wa.me/"), "WhatsApp remains available for support, not automatic payment");
-  assert.ok(arena.includes("Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação'"));
+  assert.ok(arena.includes("Number(item.gems||0).toLocaleString('pt-BR')+' diamantes após confirmação'"));
   assert.ok(arena.includes("Skin de castelo · Ataque +"));
   assert.ok(arena.includes("defense_bonus_percent"));
   assert.ok(arena.includes("grid-template-columns:minmax(0,1fr) auto"));

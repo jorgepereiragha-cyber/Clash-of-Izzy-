@@ -2097,6 +2097,8 @@ async function processDueMarches(env){
   return resolveDueMarchKingdoms({
     db:env.DB,
     now:new Date().toISOString(),
+    // Keep the live cron at the proven legacy budget until measured under real load.
+    realmLimit:env.ENVIRONMENT==="production"?1:4,
     resolveKingdom:(kingdomId,limit)=>processMarches(env,kingdomId,limit),
     onFailure:(kingdomId,error)=>console.error(
       "scheduled_march_resolution_failed",kingdomId,String(error?.message||error))
@@ -2222,7 +2224,7 @@ export default {
     const ready=checks.database&&checks.session&&checks.schema;
     // Contrato de lançamento: o APK só pode ser publicado após esta versão de Eldoria estar ativa.
     // O Worker antigo não expõe o marcador e não deve passar no gate de release.
-    return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables,...(env.ENVIRONMENT==="beta"?{missingTriggers}:{}),androidApiContract:"eldoria-android-v1"},ready?200:503);
+    return json({ok:ready,status:ready?"ready":"not_ready",checks,missingTables,...(env.ENVIRONMENT==="beta"?{missingTriggers}:{}),androidApiContract:"eldoria-android-v1",gameplay4xEnabled:advanced4xEnabled(env)},ready?200:503);
   }
   // Contadores publicos verificaveis nao devem depender de tabelas comerciais opcionais.
   // As consultas de contadores são SELECTs; o limitador de taxa existente pode persistir seu estado.
