@@ -75,3 +75,38 @@ test("specialization matrix compares every family at levels zero, five and ten",
   }
  }
 });
+
+
+test("mixed formation science sensitivity with paired seeds and near-cap equipment",t=>{
+ const units=["spearman","archer","knight","catapult"];
+ const keys=Object.values(SPECIALIZED_SCIENCE_KEYS);
+ const formations=[[150,150,150,150],[420,60,60,60],[60,420,60,60],[60,60,420,60],[60,60,60,420]];
+ const profiles=[...keys.map(key=>({name:key,levels:{[key]:10}})),{name:"all",levels:Object.fromEntries(keys.map(key=>[key,10]))}];
+ const stats=new Map();
+ let simulations=0;
+ for(const [index,quantities] of formations.entries()){
+  const army=units.map((unit_type,i)=>({unit_type,tier:1,quantity:quantities[i]}));
+  const total=quantities.reduce((a,b)=>a+b,0);
+  for(const defenderLevel of [5,15,30])for(const criticalSeed of [1,17,113,2026])for(const equipmentAttackBonusPercent of [0,28]){
+   const opts={army,rulesVersion:2,castleLevel:30,defenderLevel,criticalSeed,criticalChancePercent:10,equipmentAttackBonusPercent,roll:1};
+   const base=simulateBattle(opts);simulations++;
+   for(const profile of profiles){
+    const outcome=simulateBattle({...opts,experimentalScienceLevels:profile.levels});simulations++;
+    assert.equal(outcome.defenderPower,base.defenderPower);
+    assert.ok(outcome.attackerPower>=base.attackerPower);
+    const cap=equipmentAttackBonusPercent===28?1.30/1.28:1.03;
+    assert.ok(outcome.attackerPower<=Math.ceil(base.attackerPower*cap)+1);
+    assert.equal(outcome.survivors+Object.values(outcome.losses).reduce((a,b)=>a+b,0),total);
+    assert.ok(Object.values(outcome.losses).every(n=>Number.isSafeInteger(n)&&n>=0));
+    const key=index+":"+profile.name+":"+equipmentAttackBonusPercent;
+    const row=stats.get(key)||{formation:index,profile:profile.name,equipmentAttackBonusPercent,cases:0,baseWins:0,wins:0,baseSurvivors:0,survivors:0};
+    row.cases++;row.baseWins+=Number(base.won);row.wins+=Number(outcome.won);
+    row.baseSurvivors+=base.survivors;row.survivors+=outcome.survivors;stats.set(key,row);
+   }
+  }
+ }
+ assert.equal(simulations,720);
+ assert.equal(stats.size,50);
+ // Report matched cases, not a prediction of player win rate.
+ t.diagnostic("science-sensitivity: "+JSON.stringify({simulations,rows:[...stats.values()]}));
+});
