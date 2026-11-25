@@ -42,6 +42,7 @@ import { handleOnboarding } from "./onboarding-bonus.js";
 import { createSupportCheckout } from "./support-orders.js";
 import { betaAccessGuard } from "./beta-access.js";
 import { productionWindow } from "./production-clock.js";
+import {activateCastleShield,castleShieldState} from "./castle-shield.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -227,7 +228,7 @@ async function getShopState(env,kingdomId){
   cycle,refreshAt:(cycle+1)*SHOP_CYCLE_MS,
   offers:offers.map(o=>({...SHOP_ITEMS[o.id],id:o.id,price:o.price,discount:o.discount,stock:stock[o.id]??o.stock,originalPrice:SHOP_ITEMS[o.id].price})),
   exchangeOffers:exchanges.map(o=>({...o,stock:stock[o.id]??o.stock,rewardName:SHOP_ITEMS[o.reward.item]?.name||o.reward.item})),
-  items:SHOP_ITEMS,inventory:inventory.results||[]
+  items:SHOP_ITEMS,inventory:inventory.results||[],castleShield:await castleShieldState(env,kingdomId)
  };
 }
 function rollHeroRarity(){
@@ -1162,6 +1163,9 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"skin_fused",JSON.stringify({inputs,output:output.id,shards:50}))
     ]);
     if(!fusion[0]?.meta?.changes)return json({error:"Fragmentos insuficientes, skins alteradas ou fusão já realizada."},409);
+  }else if(type==="castle_shield_activate"){
+    const result=await activateCastleShield(env,Number(k.id),body);
+    if(!result.ok)return json({error:result.error},result.status);
   }else if(type==="shop_buy"){
     const itemId=String(body.item||""),source=String(body.source||"shop"),item=Object.hasOwn(SHOP_ITEMS,itemId)?SHOP_ITEMS[itemId]:null;
     if(!item||!["shop","merchant"].includes(source))return json({error:"Produto ou origem inválidos."},400);
