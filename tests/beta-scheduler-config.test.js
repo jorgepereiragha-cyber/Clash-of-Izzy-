@@ -6,11 +6,11 @@ import worker from "../worker.js";
 const beta = JSON.parse(readFileSync(new URL("../wrangler.beta.jsonc", import.meta.url), "utf8"));
 const production = JSON.parse(readFileSync(new URL("../wrangler.jsonc", import.meta.url), "utf8"));
 
-test("beta scheduler uses isolated D1, one minute cron and safe defaults", () => {
+test("beta scheduler uses isolated D1, no automatic cron before homologation and safe defaults", () => {
   assert.equal(beta.name, "clash-of-izzy-beta");
   assert.equal(beta.vars.ENVIRONMENT, "beta");
   assert.notEqual(beta.d1_databases[0].database_id, production.d1_databases[0].database_id);
-  assert.deepEqual(beta.triggers.crons, ["* * * * *"]);
+  assert.equal(beta.triggers?.crons?.length ?? 0, 0);
   assert.equal(beta.observability.enabled, true);
   assert.equal(beta.vars.INVITE_ONLY, "true");
   assert.equal(beta.vars.GAME_4X_SYSTEMS_ENABLED, "true");
