@@ -108,7 +108,7 @@ const SEASONAL_COSMETICS=[
 const SKIN_FUSIONS=[
  {inputs:["c1","c2","c3"],output:{id:"f_medieval",name:"Fortaleza Medieval Suprema",icon:"🏰",rarity:"fundida",visual:"Pedra nobre, madeira entalhada e aço polido"}},
  {inputs:["c5","c6","c7"],output:{id:"f_elemental",name:"Convergência Elemental",icon:"🌪️",rarity:"fundida",visual:"Gelo, folhas e rocha vulcânica em harmonia"}},
- {inputs:["r1","r2","r3"],output:{id:"f_gemmaster",name:"Mestre das Gemas",icon:"💎",rarity:"fundida",visual:"Ouro, cristal azul e esmeralda"}},
+ {inputs:["r1","r2","r3"],output:{id:"f_gemmaster",name:"Mestre dos Diamantes",icon:"💎",rarity:"fundida",visual:"Ouro, cristal azul e esmeralda"}},
  {inputs:["e1","e2","e3"],output:{id:"f_ascendant",name:"Ascensão Divina",icon:"⚡",rarity:"fundida lendária",visual:"Cristal, fogo dracônico e relâmpagos"}},
  {inputs:["e2","e4","r4"],output:{id:"f_demonlord",name:"Senhor Demônio",icon:"👹",rarity:"fundida lendária",visual:"Chamas, obsidiana e rubi"}},
  {inputs:["l1","l2","l3"],output:{id:"f_cosmos",name:"Entidade Cósmica",icon:"🌌",rarity:"fundida mítica",visual:"Escamas ancestrais, luz celestial e runas cósmicas"}}
@@ -1063,7 +1063,7 @@ async function gameAction(env,playerId,body){
     const complete=col.special?COSMETIC_COLLECTIONS.filter(x=>!x.special).every(x=>x.skins.every(id=>owned.has(id))):col.skins.every(id=>owned.has(id));
     if(!complete)return json({error:"Ainda faltam skins para completar esta coleção."},409);
     // A chave única da recompensa é o bloqueio de idempotência. Só a requisição
-    // que inserir a reivindicação pode creditar gemas, fragmentos e evento.
+    // que inserir a reivindicação pode creditar diamantes, fragmentos e evento.
     const result=await env.DB.batch([
       env.DB.prepare("INSERT INTO kingdom_collection_claims(kingdom_id,collection_id) VALUES(?,?) ON CONFLICT(kingdom_id,collection_id) DO NOTHING").bind(k.id,collectionId),
       env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()>0").bind(col.gems,p.id),
@@ -1412,7 +1412,7 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("DELETE FROM hero_summon_history WHERE kingdom_id=? AND id NOT IN (SELECT id FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 100) AND "+guard).bind(k.id,k.id,k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const batch=await env.DB.batch(statements);
-    if(!batch[0]?.meta?.changes)return json({error:"Gemas insuficientes para invocar."},409);
+    if(!batch[0]?.meta?.changes)return json({error:"Diamantes insuficientes para invocar."},409);
     battleOutcome={summons:results,cost};
   }else if(type==="hero_evolve"){
     const heroKey=String(body.hero||""),hero=await env.DB.prepare("SELECT rarity,stars,fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
@@ -1456,7 +1456,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1")
         .bind(k.id,"castle_vip_upgraded",JSON.stringify({vipLevel:target,gemsSpent:cost,bonuses:getCastleVipBonuses(target),castleLevel:CASTLE_MAX_LEVEL}))
     ]);
-    if(!result[0]?.meta?.changes||!result[1]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Evolução VIP não concluída: gemas insuficientes ou estado alterado."},409);
+    if(!result[0]?.meta?.changes||!result[1]?.meta?.changes||!result[2]?.meta?.changes)return json({error:"Evolução VIP não concluída: diamantes insuficientes ou estado alterado."},409);
   }else if(type==="assign_hero_to_building"||type==="assign_hero_to_defense"||type==="unassign_hero_4x"){
     if(!advanced4xEnabled(env))return json({error:"Sistemas 4X ainda não habilitados no servidor."},503);
     const heroKey=typeof body.heroKey==="string"?body.heroKey:"";
@@ -2840,7 +2840,7 @@ export default {
     }
     if(url.pathname==="/api/admin/gems"){
       const id=String(body.playerId||"").trim(),amount=Number(body.amount);
-      if(!id||!Number.isSafeInteger(amount)||amount<=0||amount>100000000)return json({error:"ID ou quantidade de gemas inválida."},400);
+      if(!id||!Number.isSafeInteger(amount)||amount<=0||amount>100000000)return json({error:"ID ou quantidade de diamantes inválida."},400);
       const result=await env.DB.prepare("UPDATE players SET gems=gems+? WHERE player_id=?").bind(amount,id).run();
       if(!result.meta.changes)return json({error:"Jogador não encontrado."},404);
       const player=await env.DB.prepare("SELECT player_id,gems FROM players WHERE player_id=?").bind(id).first();return json({success:true,player});

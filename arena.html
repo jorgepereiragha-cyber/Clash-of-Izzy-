@@ -148,7 +148,7 @@ async function connectKingdom(){
   kingdomSession=data.state;
   if(!kingdomSession)throw new Error('O servidor não retornou os dados do reino.');
   const k=kingdomSession.kingdom||{},p=kingdomSession.player||{};
-  status.textContent='🏰 '+(k.kingdom_name||'Reino')+' · 🪙 '+Number(k.gold||0).toLocaleString('pt-BR')+' ouro · 💎 '+Number(p.gems||0).toLocaleString('pt-BR')+' gemas · ⚔ '+Number(kingdomSession.totalTroops||0).toLocaleString('pt-BR')+' tropas'+(persisted?'':' · Atenção: esta sessão não foi salva neste aparelho.');
+  status.textContent='🏰 '+(k.kingdom_name||'Reino')+' · 🪙 '+Number(k.gold||0).toLocaleString('pt-BR')+' ouro · 💎 '+Number(p.gems||0).toLocaleString('pt-BR')+' diamantes · ⚔ '+Number(kingdomSession.totalTroops||0).toLocaleString('pt-BR')+' tropas'+(persisted?'':' · Atenção: esta sessão não foi salva neste aparelho.');
   document.getElementById('heroName').textContent=(p.name||'Lorde de Eldoria')+' · Reino conectado';
   document.getElementById('gold').textContent=Number(k.gold||0).toLocaleString('pt-BR');
   renderKingdomStore();
@@ -204,7 +204,7 @@ connectKingdom();
 
 const materialsPanel=document.getElementById('materialsPanel');
 const materialCatalog={royal_blueprint:{icon:'📜',fallback:'Projeto Real'},imperial_seal:{icon:'🏅',fallback:'Brasão Imperial'},power_crystal:{icon:'💎',fallback:'Cristal de Poder'},imperial_crest:{icon:'👑',fallback:'Brasão de Prestígio'},svip_medal:{icon:'🎖️',fallback:'Medalha SVIP'}};
-function renderMaterials(){const list=document.getElementById('materialsList');if(!kingdomSession){list.innerHTML='<div class="materialItem">Conecte seu reino para consultar os materiais.</div>';return}const inventory=kingdomSession.inventoryItems||[];const catalog=kingdomSession.castleMaterials||{};list.replaceChildren();for(const [key,meta] of Object.entries(materialCatalog)){const definition=catalog[key]||{};const item=inventory.find(x=>x.item_key===key);const card=document.createElement('article');card.className='materialItem';const title=document.createElement('strong');title.textContent=meta.icon+' '+(definition.name||meta.fallback);const description=document.createElement('small');description.textContent=definition.description||'Material especial para a progressão do reino.';const quantity=document.createElement('div');quantity.className='materialQty';quantity.textContent=' x '+Number(item?.quantity||0).toLocaleString('pt-BR');card.append(title,description,quantity);list.append(card)}const level=Number(kingdomSession.kingdom?.castle_level||1);const requirements=level>=25?{imperial_crest:2,power_crystal:2}:level>=20?{imperial_crest:1,power_crystal:2}:level>=15?{power_crystal:2,imperial_seal:1}:level>=10?{imperial_seal:2,royal_blueprint:1}:level>=5?{royal_blueprint:2}:{};const names=Object.fromEntries(Object.entries(materialCatalog).map(([key,value])=>[key,(catalog[key]?.name||value.fallback)]));const have=Object.fromEntries(inventory.map(item=>[item.item_key,Number(item.quantity||0)]));const req=document.getElementById('castleNextUpgrade');if(level>=30){const vip=kingdomSession.castleVip;req.replaceChildren();const heading=document.createElement('strong');heading.textContent=vip?.completed?'🏆 Castelo VIP 7 · Evolução máxima':('👑 Castelo 30 · VIP '+Number(vip?.level||0));const info=document.createElement('small');info.textContent=vip?.next?'Próxima evolução VIP '+Number(vip.next.level)+' por '+Number(vip.next.gemCost).toLocaleString('pt-BR')+' gemas. Acesse o Castelo para evoluir sem reiniciar o nível 30.':'Todos os sete níveis VIP foram concluídos.';req.append(heading,info)}else{const rows=Object.entries(requirements);const missing=rows.filter(([key,qty])=>(have[key]||0)<qty);req.replaceChildren();const heading=document.createElement('strong');heading.textContent='🏰 Próxima evolução: Castelo '+(level+1);req.append(heading);const detail=document.createElement('small');detail.textContent=rows.length?rows.map(([key,qty])=>names[key]+': '+(have[key]||0)+'/'+qty).join(' · '):'Sem materiais especiais exigidos nesta faixa.';req.append(detail);const status=document.createElement('small');status.textContent=missing.length?'Faltam materiais especiais para esta evolução.':'Materiais especiais suficientes; confira também madeira, pedra, comida e ferro.';status.style.color=missing.length?'#f3a6a6':'#9ee6b0';req.append(status)}document.getElementById('materialsNote').textContent='Castelo nível '+level+'. Materiais obtidos em batalhas, marchas, melhorias, treinamento e pesquisas. A Medalha SVIP é especial e não bloqueia a progressão normal.'}
+function renderMaterials(){const list=document.getElementById('materialsList');if(!kingdomSession){list.innerHTML='<div class="materialItem">Conecte seu reino para consultar os materiais.</div>';return}const inventory=kingdomSession.inventoryItems||[];const catalog=kingdomSession.castleMaterials||{};list.replaceChildren();for(const [key,meta] of Object.entries(materialCatalog)){const definition=catalog[key]||{};const item=inventory.find(x=>x.item_key===key);const card=document.createElement('article');card.className='materialItem';const title=document.createElement('strong');title.textContent=meta.icon+' '+(definition.name||meta.fallback);const description=document.createElement('small');description.textContent=definition.description||'Material especial para a progressão do reino.';const quantity=document.createElement('div');quantity.className='materialQty';quantity.textContent=' x '+Number(item?.quantity||0).toLocaleString('pt-BR');card.append(title,description,quantity);list.append(card)}const level=Number(kingdomSession.kingdom?.castle_level||1);const requirements=level>=25?{imperial_crest:2,power_crystal:2}:level>=20?{imperial_crest:1,power_crystal:2}:level>=15?{power_crystal:2,imperial_seal:1}:level>=10?{imperial_seal:2,royal_blueprint:1}:level>=5?{royal_blueprint:2}:{};const names=Object.fromEntries(Object.entries(materialCatalog).map(([key,value])=>[key,(catalog[key]?.name||value.fallback)]));const have=Object.fromEntries(inventory.map(item=>[item.item_key,Number(item.quantity||0)]));const req=document.getElementById('castleNextUpgrade');if(level>=30){const vip=kingdomSession.castleVip;req.replaceChildren();const heading=document.createElement('strong');heading.textContent=vip?.completed?'🏆 Castelo VIP 7 · Evolução máxima':('👑 Castelo 30 · VIP '+Number(vip?.level||0));const info=document.createElement('small');info.textContent=vip?.next?'Próxima evolução VIP '+Number(vip.next.level)+' por '+Number(vip.next.gemCost).toLocaleString('pt-BR')+' diamantes. Acesse o Castelo para evoluir sem reiniciar o nível 30.':'Todos os sete níveis VIP foram concluídos.';req.append(heading,info)}else{const rows=Object.entries(requirements);const missing=rows.filter(([key,qty])=>(have[key]||0)<qty);req.replaceChildren();const heading=document.createElement('strong');heading.textContent='🏰 Próxima evolução: Castelo '+(level+1);req.append(heading);const detail=document.createElement('small');detail.textContent=rows.length?rows.map(([key,qty])=>names[key]+': '+(have[key]||0)+'/'+qty).join(' · '):'Sem materiais especiais exigidos nesta faixa.';req.append(detail);const status=document.createElement('small');status.textContent=missing.length?'Faltam materiais especiais para esta evolução.':'Materiais especiais suficientes; confira também madeira, pedra, comida e ferro.';status.style.color=missing.length?'#f3a6a6':'#9ee6b0';req.append(status)}document.getElementById('materialsNote').textContent='Castelo nível '+level+'. Materiais obtidos em batalhas, marchas, melhorias, treinamento e pesquisas. A Medalha SVIP é especial e não bloqueia a progressão normal.'}
 document.getElementById('openMaterials').addEventListener('click',()=>{renderMaterials();materialsPanel.classList.add('open')});document.getElementById('materialsClose').addEventListener('click',()=>materialsPanel.classList.remove('open'));
 
 const territoryPanel=document.getElementById('territoryPanel'),territoryList=document.getElementById('territoryList'),territoryTroops=document.getElementById('territoryTroops'),territoryNotice=document.getElementById('territoryNotice');
@@ -550,7 +550,7 @@ function renderKingdomStore(){
  const status=document.createElement('p');status.id='storeStatus';status.className='storeMuted';
  if(!kingdomSession){status.textContent='Conecte seu reino para acessar a loja interna.';root.append(status);return}
  const cosmetics=kingdomSession.cosmetics||{},shop=kingdomSession.shop||{},player=kingdomSession.player||{},kingdom=kingdomSession.kingdom||{};
- status.textContent='💎 '+Number(player.gems||0).toLocaleString('pt-BR')+' gemas · 🪙 '+Number(kingdom.gold||0).toLocaleString('pt-BR')+' ouro · ✨ '+Number(cosmetics.shards||0).toLocaleString('pt-BR')+' fragmentos';
+ status.textContent='💎 '+Number(player.gems||0).toLocaleString('pt-BR')+' diamantes · 🪙 '+Number(kingdom.gold||0).toLocaleString('pt-BR')+' ouro · ✨ '+Number(cosmetics.shards||0).toLocaleString('pt-BR')+' fragmentos';
  root.append(status);
  const castleSkins=Array.isArray(kingdomSession.castleSkins)?kingdomSession.castleSkins:[];
  const equippedCastleSkinId=Number(kingdom.equipped_skin_id||0);
@@ -572,7 +572,7 @@ function renderKingdomStore(){
   const uniqueRequired=[...new Set(required)],progress=uniqueRequired.filter(id=>owned.has(id)).length;
   const complete=progress===uniqueRequired.length,claimed=(cosmetics.claimed||[]).includes(collection.id);
   const description=collection.special?'Complete todas as coleções anteriores.':collection.desc+' · '+progress+'/'+uniqueRequired.length+' skins';
-  const buttonLabel=claimed?'Recompensa resgatada':complete?'Resgatar '+Number(collection.gems||0).toLocaleString('pt-BR')+' gemas + '+Number(collection.shards||0)+' fragmentos':'Coleção em andamento';
+  const buttonLabel=claimed?'Recompensa resgatada':complete?'Resgatar '+Number(collection.gems||0).toLocaleString('pt-BR')+' diamantes + '+Number(collection.shards||0)+' fragmentos':'Coleção em andamento';
   collectionGrid.append(storeCard(collection.icon+' '+collection.name,description,buttonLabel,()=>runStoreAction({type:'cosmetic_claim',collection:collection.id}),!complete||claimed));
  }
  root.append(collectionGrid);
@@ -602,7 +602,7 @@ function renderKingdomStore(){
    copy.append(slot,name,stateText);
    const button=document.createElement('button');button.type='button';
    if(!item.owned){
-    button.textContent='Adquirir · '+Number(item.price||0).toLocaleString('pt-BR')+' gemas';
+    button.textContent='Adquirir · '+Number(item.price||0).toLocaleString('pt-BR')+' diamantes';
     button.disabled=Number(player.gems||0)<Number(item.price||0);
     button.addEventListener('click',()=>runStoreAction({type:'cosmetic_buy',skin:item.id}));
    }else if(item.equipped){
@@ -641,7 +641,7 @@ function renderKingdomStore(){
  const seasonGrid=document.createElement('div');seasonGrid.className='storeGrid';
  for(const skin of cosmetics.seasonal||[]){
   const has=owned.has(skin.id),active=Boolean(cosmetics.seasonActive);
-  const desc=(skin.theme||'Skin especial')+' · Aparência visual temática'+(skin.legendary?' · Lendária':'')+' · '+Number(skin.price||0).toLocaleString('pt-BR')+' gemas';
+  const desc=(skin.theme||'Skin especial')+' · Aparência visual temática'+(skin.legendary?' · Lendária':'')+' · '+Number(skin.price||0).toLocaleString('pt-BR')+' diamantes';
   seasonGrid.append(storeCard(skin.icon+' '+skin.name,desc,has?'Já adquirida':active?'Adquirir skin':'Temporada encerrada',()=>runStoreAction({type:'seasonal_buy',skin:skin.id}),has||!active));
  }
  if(!seasonGrid.children.length){const note=document.createElement('p');note.className='storeMuted';note.textContent='Nenhuma skin sazonal disponível.';seasonGrid.append(note)}
@@ -658,7 +658,7 @@ function renderKingdomStore(){
  const itemTitle=document.createElement('h3');itemTitle.textContent='🛒 Mercado de recursos';root.append(itemTitle);
  const itemGrid=document.createElement('div');itemGrid.className='storeGrid';
  for(const [id,item] of Object.entries(items)){
-  const currency=item.currency==='gems'?'gemas':'ouro';
+  const currency=item.currency==='gems'?'diamantes':'ouro';
   itemGrid.append(storeCard((item.icon||'📦')+' '+item.name,item.desc+' · '+Number(item.price||0).toLocaleString('pt-BR')+' '+currency,'Comprar',()=>runStoreAction({type:'shop_buy',item:id,source:'shop'})));
  }
  root.append(itemGrid);
@@ -666,7 +666,7 @@ function renderKingdomStore(){
   const merchantTitle=document.createElement('h3');merchantTitle.textContent='🧳 Mercador itinerante';root.append(merchantTitle);
   const merchantGrid=document.createElement('div');merchantGrid.className='storeGrid';
   for(const offer of offers){
-   const currency=offer.currency==='gems'?'gemas':'ouro',stock=Number(offer.stock||0);
+   const currency=offer.currency==='gems'?'diamantes':'ouro',stock=Number(offer.stock||0);
    merchantGrid.append(storeCard((offer.icon||'🧳')+' '+offer.name,offer.desc+' · '+Number(offer.price||0).toLocaleString('pt-BR')+' '+currency+' · Estoque: '+stock,stock>0?'Comprar oferta':'Esgotado',()=>runStoreAction({type:'shop_buy',item:offer.id,source:'merchant'}),stock<=0));
   }
   root.append(merchantGrid);
@@ -769,8 +769,8 @@ async function loadCatalog(){
    const resourceText=Object.entries(resources).filter(([,qty])=>Number(qty)>0)
      .map(([key,qty])=>Number(qty).toLocaleString('pt-BR')+' '+(resourceNames[key]||key)).join(' · ');
    detail.textContent=item.levelPack
-     ? 'Nível '+Number(item.levelPack.requiredLevel)+'+ · '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas · '+resourceText+' · compra única por reino'+(item.levelPack.priceProvisional?' · PREÇO PROPOSTO':'')
-     :item.productKind==='vip_package'?(item.oneTime?'MASTER · '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas + 3 dragões dourados + 175 mil recursos (uma vez por reino)':' '+Number(item.gems||0).toLocaleString('pt-BR')+' gemas após confirmação'):'Skin de castelo · Ataque +'+Number(item.attack_bonus_percent||0).toFixed(2)+'% · Defesa +'+Number(item.defense_bonus_percent||0).toFixed(2)+'%';
+     ? 'Nível '+Number(item.levelPack.requiredLevel)+'+ · '+Number(item.gems||0).toLocaleString('pt-BR')+' diamantes · '+resourceText+' · compra única por reino'+(item.levelPack.priceProvisional?' · PREÇO PROPOSTO':'')
+     :item.productKind==='vip_package'?(item.oneTime?'MASTER · '+Number(item.gems||0).toLocaleString('pt-BR')+' diamantes + 3 dragões dourados + 175 mil recursos (uma vez por reino)':' '+Number(item.gems||0).toLocaleString('pt-BR')+' diamantes após confirmação'):'Skin de castelo · Ataque +'+Number(item.attack_bonus_percent||0).toFixed(2)+'% · Defesa +'+Number(item.defense_bonus_percent||0).toFixed(2)+'%';
    if(item.dailyLimitHours===24)detail.textContent+=' · limite: 1 compra a cada 24 horas';
    price.textContent='R$ '+Number(item.price_brl).toFixed(2).replace('.',',');
    b.disabled=Boolean(item.levelPack?.priceProvisional);

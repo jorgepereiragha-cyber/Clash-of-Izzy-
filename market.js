@@ -4,7 +4,7 @@
   window.__COI_MARKET__ = true;
   const $ = id => document.getElementById(id);
   const fmt = value => Number(value || 0).toLocaleString("pt-BR");
-  const labels = {food:"Comida",wood:"Madeira",stone:"Pedra",iron:"Ferro",gold:"Ouro",gems:"Gemas"};
+  const labels = {food:"Comida",wood:"Madeira",stone:"Pedra",iron:"Ferro",gold:"Ouro",gems:"Diamantes"};
   const icons = {food:"🌾",wood:"🪵",stone:"🪨",iron:"⛓️",gold:"🪙",gems:"💎"};
   const acceleratorSeconds = {
     acc_5min:300,acc_1h:3600,acc_8h:28800,acc_1d:86400,
@@ -94,7 +94,7 @@
     for(const offer of offers){
       const card=node("article","market-card");
       card.append(node("div","market-icon",offer.icon||"🎁"),node("h3","",offer.name),node("p","",offer.desc||"Oferta temporária do mercador."));
-      card.append(node("p","market-price","💎 "+fmt(offer.price)+" gemas · "+fmt(offer.discount)+"% de desconto"));
+      card.append(node("p","market-price","💎 "+fmt(offer.price)+" diamantes · "+fmt(offer.discount)+"% de desconto"));
       card.append(node("p","market-meta","Estoque: "+fmt(offer.stock)));
       card.append(button("COMPRAR OFERTA","buy",{item:offer.id,source:"merchant"},offer.stock<=0||Number(state.player?.gems||0)<Number(offer.price||0)));
       root.append(card);
@@ -109,7 +109,7 @@
     for(const option of options){
       const card=node("article","market-card");
       card.append(node("div","market-icon","📜"),node("h3","",option.label),node("p","",option.description));
-      card.append(node("p","market-price","💎 "+fmt(option.cost)+" gemas"));
+      card.append(node("p","market-price","💎 "+fmt(option.cost)+" diamantes"));
       card.append(node("p","market-meta","Probabilidades por convocação: 70% Comum · 25% Raro · 5% Lendário"));
       card.append(button(option.quantity===1?"CONVOCAR 1 HERÓI":"CONVOCAR 10 HERÓIS","hero-summon",{quantity:option.quantity},Number(state.player?.gems||0)<option.cost));
       root.append(card);
@@ -181,7 +181,7 @@
     for(const [id,item] of featured){
       const card=node("article","market-card");
       card.append(node("div","market-icon",item.icon||"🎁"),node("h3","",item.name),node("p","",item.desc||"Item do catálogo do reino."));
-      const currency=item.currency==="gems"?"gemas":"ouro";
+      const currency=item.currency==="gems"?"diamantes":"ouro";
       card.append(node("p","market-price",fmt(item.price)+" "+currency));
       const enough=Number(item.currency==="gems"?state.player?.gems:state.kingdom?.gold)>=Number(item.price||0);
       card.append(button("COMPRAR","buy",{item:id,source:"shop"},!enough));

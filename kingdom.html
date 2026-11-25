@@ -130,7 +130,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
  <p>Siga três ações reais. O servidor confirma seu progresso; não é necessário terminar em um minuto.</p>
  <progress id="onboardingProgress" max="3" value="0" aria-label="Tarefas do tutorial realizadas"></progress>
  <ol id="onboardingSteps"></ol>
- <div class="toolbar"><button type="button" id="onboardingClaim" disabled>Resgatar 500 gemas</button><button type="button" class="secondary" id="onboardingReload">Verificar progresso</button></div>
+ <div class="toolbar"><button type="button" id="onboardingClaim" disabled>Resgatar 500 diamantes</button><button type="button" class="secondary" id="onboardingReload">Verificar progresso</button></div>
  <p id="onboardingStatus" role="status" aria-live="polite">Verificando progresso no servidor…</p>
 </section>
 <section class="panel coi-engagement" id="dailyRewardsPanel" aria-labelledby="dailyRewardsTitle" hidden>
@@ -182,7 +182,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
  <nav id="coiRecruitmentSites" class="coi-recruitment-sites" aria-label="Locais de recrutamento da cidade">
   <a id="coiSummonAltar" class="coi-recruitment-site coi-site-altar" href="/equipment-ui.html#hero-summon-title" aria-label="Entrar no Altar de Convocação e convocar heróis">
    <span class="coi-site-crest" aria-hidden="true">🏛️</span>
-   <span class="coi-site-copy"><strong>Altar de Convocação</strong><small>Convocar heróis · 1 por 100 ou 10 por 900 gemas</small></span>
+   <span class="coi-site-copy"><strong>Altar de Convocação</strong><small>Convocar heróis · 1 por 100 ou 10 por 900 diamantes</small></span>
    <span class="coi-site-entry" aria-hidden="true">Entrar</span>
   </a>
   <a id="coiDragonNest" class="coi-recruitment-site coi-site-nest" href="#coiDragonPanel" aria-label="Entrar no Ninho de Dragões e abrir a coleção">
@@ -342,7 +342,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <script>
 const API="/api";let token=null,state=null,busy=false;let lastResourceSnapshot=null;
 function renderResourceHud(kingdom){
- const entries=[["🌾","Comida","food",kingdom?.food],["🪵","Madeira","wood",kingdom?.wood],["🪨","Pedra","stone",kingdom?.stone],["⛓️","Ferro","iron",kingdom?.iron],["🪙","Ouro","gold",kingdom?.gold],["💎","Gemas","gems",state?.player?.gems]];
+ const entries=[["🌾","Comida","food",kingdom?.food],["🪵","Madeira","wood",kingdom?.wood],["🪨","Pedra","stone",kingdom?.stone],["⛓️","Ferro","iron",kingdom?.iron],["🪙","Ouro","gold",kingdom?.gold],["💎","Diamantes","gems",state?.player?.gems]];
  const snapshot=Object.fromEntries(entries.map(([, ,key,value])=>[key,Number(value)||0]));
  document.getElementById("resources").innerHTML=entries.map(([icon,label,key])=>{
   const value=fmt(snapshot[key]);
@@ -732,11 +732,11 @@ function renderCastleVip(){
  root.append(badge,progress,values,note);
  if(vip.next){
   const next=document.createElement("p");next.className="coi-vip-detail";
-  next.textContent="Próximo VIP "+Number(vip.next.level)+" · "+fmt(vip.next.gemCost)+" gemas · produção +"+Number(vip.next.bonuses?.productionPercent||0)+"% · ataque +"+Number(vip.next.bonuses?.attackPercent||0).toFixed(1)+"% · defesa +"+Number(vip.next.bonuses?.defensePercent||0).toFixed(1)+"%.";
+  next.textContent="Próximo VIP "+Number(vip.next.level)+" · "+fmt(vip.next.gemCost)+" diamantes · produção +"+Number(vip.next.bonuses?.productionPercent||0)+"% · ataque +"+Number(vip.next.bonuses?.attackPercent||0).toFixed(1)+"% · defesa +"+Number(vip.next.bonuses?.defensePercent||0).toFixed(1)+"%.";
   const action=document.createElement("button");action.type="button";
   const enough=Number(state?.player?.gems||0)>=Number(vip.next.gemCost||0);
   action.disabled=busy||!vip.eligible||!enough;
-  action.textContent=!vip.eligible?"Libera no castelo 30":!enough?"Gemas insuficientes":"Evoluir para VIP "+Number(vip.next.level);
+  action.textContent=!vip.eligible?"Libera no castelo 30":!enough?"Diamantes insuficientes":"Evoluir para VIP "+Number(vip.next.level);
   if(vip.eligible&&enough)action.addEventListener("click",()=>upgradeCastleVip(level));
   root.append(next,action);
  }
@@ -795,7 +795,7 @@ function render(){const k=state.kingdom;document.getElementById("kingdomName").t
 const buildings=state.buildings||[];const city=document.getElementById("city");
 city.querySelectorAll(":scope > .building").forEach(button=>button.remove());
 city.insertAdjacentHTML("beforeend",buildings.slice(0,16).map((b,i)=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'"'+(i>=9?' hidden':'')+' data-building="'+esc(b.building_type)+'" aria-label="'+esc(name+", nível "+fmt(b.level)+". Ver melhorias")+'"><span class="emoji">'+esc(emoji)+'</span><strong data-compact="'+esc(compactBuildingNames[b.building_type]||name)+'">'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join(""));drawKingdomScene(buildings,Number(k.equipped_skin_id||0));watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomDragon=state.dragon?{dragon_key:state.dragon.dragon_key,level:state.dragon.level}:null;window.__coiKingdomDefenses=state.cityDefenses||[];window.__coiKingdomHeroAssignments=state.advanced4xEnabled?(state.heroes||[]):[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.__coiKingdomCastleVipLevel=Number(state.castleVip?.level??k.prestige??0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],defenses:state.cityDefenses||[],heroes:window.__coiKingdomHeroAssignments,castleSkinId:Number(k.equipped_skin_id||0),castleVipLevel:window.__coiKingdomCastleVipLevel}}));
-document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Gemas",fmt(state.player?.gems)],["👑 VIP do Castelo",fmt(state.castleVip?.level??k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
+document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Diamantes",fmt(state.player?.gems)],["👑 VIP do Castelo",fmt(state.castleVip?.level??k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const blocked=maxed||activeConstructionCount>=2||alreadyQueued||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
 renderQueues();

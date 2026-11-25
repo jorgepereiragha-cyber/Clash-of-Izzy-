@@ -122,7 +122,7 @@ footer{color:#93a4b9;font-size:12px;text-align:center;margin-top:16px}
   <div id="valhalla-admin-notice" role="status" aria-live="polite"></div>
 </section>
 
-<p class="sub">Pesquise por nickname ou ID. Selecione um jogador para consultar os dados e, se necessário, creditar gemas.</p>
+<p class="sub">Pesquise por nickname ou ID. Selecione um jogador para consultar os dados e, se necessário, creditar diamantes.</p>
 <form id="searchForm" class="form"><input id="query" maxlength="64" placeholder="Digite nickname ou ID do jogador" required><button type="submit">Pesquisar</button></form>
 <div id="results" class="results"></div>
 </section>
@@ -151,7 +151,7 @@ function renderPurchaseRequests(requests){
   name.textContent="#"+request.id+" · "+request.product_name;
   const automatic=request.payment_method==="mercadopago_link"||Boolean(request.mp_order_id);
   const providerStatus=request.mp_payment_status||"aguardando confirmação";
-  meta.textContent=(request.player_name||"Jogador")+" · "+(request.kingdom_name||"Reino")+" · ID "+request.player_id+" · R$ "+Number(request.price_brl).toFixed(2).replace(".",",")+(request.product_kind==="vip_package"?" · "+Number(request.gems_amount||0).toLocaleString("pt-BR")+" gemas":" · Skin")+" · "+(automatic?"Mercado Pago · "+providerStatus+" · Liberação automática após webhook":"Canal manual · aguardando conferência");
+  meta.textContent=(request.player_name||"Jogador")+" · "+(request.kingdom_name||"Reino")+" · ID "+request.player_id+" · R$ "+Number(request.price_brl).toFixed(2).replace(".",",")+(request.product_kind==="vip_package"?" · "+Number(request.gems_amount||0).toLocaleString("pt-BR")+" diamantes":" · Skin")+" · "+(automatic?"Mercado Pago · "+providerStatus+" · Liberação automática após webhook":"Canal manual · aguardando conferência");
   info.append(name,meta);
   const actions=document.createElement("div");actions.className="actions";
   if(automatic){
@@ -203,12 +203,12 @@ function renderPlayers(players){
  for(const p of players){
   const card=document.createElement("article");card.className="player";
   const info=document.createElement("div"),name=document.createElement("strong"),meta=document.createElement("small");
-  name.textContent=p.name||"Jogador";meta.textContent="ID: "+p.player_id+" · Gemas: "+Number(p.gems||0).toLocaleString("pt-BR")+" · Cadastro: "+(p.created_at||"—");
+  name.textContent=p.name||"Jogador";meta.textContent="ID: "+p.player_id+" · Diamantes: "+Number(p.gems||0).toLocaleString("pt-BR")+" · Cadastro: "+(p.created_at||"—");
   info.append(name,meta);
   const actions=document.createElement("div");actions.className="actions";
-  const amount=document.createElement("input");amount.type="number";amount.min="1";amount.max="100000000";amount.step="1";amount.placeholder="Gemas";
+  const amount=document.createElement("input");amount.type="number";amount.min="1";amount.max="100000000";amount.step="1";amount.placeholder="Diamantes";
   const grant=document.createElement("button");grant.type="button";grant.textContent="Creditar";
-  grant.addEventListener("click",async()=>{const value=Number(amount.value);if(!Number.isSafeInteger(value)||value<1||value>100000000){showNotice("Informe uma quantidade válida de gemas.");return}grant.disabled=true;try{const result=await api("/admin/gems",{playerId:p.player_id,amount:value});showNotice("Crédito realizado. Saldo de "+result.player.gems+" gemas.");await searchPlayers($("query").value)}catch(e){showNotice(e.message)}finally{grant.disabled=false}});
+  grant.addEventListener("click",async()=>{const value=Number(amount.value);if(!Number.isSafeInteger(value)||value<1||value>100000000){showNotice("Informe uma quantidade válida de diamantes.");return}grant.disabled=true;try{const result=await api("/admin/gems",{playerId:p.player_id,amount:value});showNotice("Crédito realizado. Saldo de "+result.player.gems+" diamantes.");await searchPlayers($("query").value)}catch(e){showNotice(e.message)}finally{grant.disabled=false}});
   actions.append(amount,grant);card.append(info,actions);root.append(card);
  }
 }

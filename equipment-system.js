@@ -148,18 +148,18 @@
       const description=document.createElement("p");description.textContent=skin.visual||"Visual cosmético exclusivo.";
       const button=document.createElement("button");button.type="button";button.className="skin-buy-btn";
       const hasSkin=owned.has(id);button.disabled=busy||hasSkin;
-      button.textContent=hasSkin?"ADQUIRIDA":"Comprar · "+fmt(skin.price)+" gemas";
+      button.textContent=hasSkin?"ADQUIRIDA":"Comprar · "+fmt(skin.price)+" diamantes";
       button.addEventListener("click",()=>perform({type:"cosmetic_buy",skin:id},"Skin "+skin.name+" adquirida."));
       card.append(title,rarity,description,button);return card;
     }));
-    $("skin-gems").textContent="Gemas: "+fmt(state?.player?.gems);
+    $("skin-gems").textContent="Diamantes: "+fmt(state?.player?.gems);
     $("skin-shards").textContent="Fragmentos: "+fmt(cosmetics.shards);
     const collection=cosmetics.collections?.find(item=>item.id==="col_norse");
     const complete=Boolean(collection?.skins?.every(id=>owned.has(id)));
     const claimed=(cosmetics.claimed||[]).includes("col_norse");
     const claim=$("claim-norse-collection");
     claim.disabled=busy||!complete||claimed;
-    claim.textContent=claimed?"RECOMPENSA RESGATADA":complete?"RESGATAR COLEÇÃO · +5.000 GEMAS / 200 FRAGMENTOS":"COLEÇÃO "+skins.filter(([id])=>owned.has(id)).length+"/6";
+    claim.textContent=claimed?"RECOMPENSA RESGATADA":complete?"RESGATAR COLEÇÃO · +5.000 DIAMANTES / 200 FRAGMENTOS":"COLEÇÃO "+skins.filter(([id])=>owned.has(id)).length+"/6";
   }
   function describeSkinBonuses(bonuses={}){
     const fields=[["attackPercent","ATQ"],["defensePercent","DEF"],["healthPercent","VIDA"],["criticalChancePercent","CRÍT"]];
@@ -284,7 +284,7 @@
           button.disabled=busy;
           button.textContent=item.equipped
             ?"DESEQUIPAR"
-            :item.owned?"EQUIPAR":"COMPRAR · "+fmt(item.price)+" gemas";
+            :item.owned?"EQUIPAR":"COMPRAR · "+fmt(item.price)+" diamantes";
           button.setAttribute("aria-label",button.textContent+" "+(item.name||"relíquia"));
           button.addEventListener("click",()=>{
             if(item.equipped){
@@ -468,7 +468,7 @@
   function renderSummonControls(){
     const gems=$("hero-gem-balance"),one=$("hero-summon-one"),ten=$("hero-summon-ten");
     const balance=Math.max(0,Number(state?.player?.gems)||0);
-    if(gems)gems.textContent="Gemas: "+fmt(balance);
+    if(gems)gems.textContent="Diamantes: "+fmt(balance);
     if(one)one.disabled=busy||balance<100;
     if(ten)ten.disabled=busy||balance<900;
   }
