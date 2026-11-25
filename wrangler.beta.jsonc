@@ -30,9 +30,6 @@
     "tag": "v1-eldoria-room",
     "new_sqlite_classes": ["EldoriaRoom"]
   }],
-  "triggers": {
-    "crons": ["* * * * *"]
-  },
   "observability": {
     "enabled": true,
     "head_sampling_rate": 0.1
