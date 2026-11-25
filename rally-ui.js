@@ -42,17 +42,53 @@ function addAction(parent,label,action,disabled=false){
  parent.append(button);
  return button;
 }
-function askTroops(){
- const raw=window.prompt('Informe as tropas em JSON. Exemplo: {"militia": 50, "archer": 10}');
- if(!raw)return null;
- try{
-  const value=JSON.parse(raw);
-  if(!value||typeof value!=="object"||Array.isArray(value))throw new Error();
-  return value;
- }catch{
-  notify("Formato inválido. Use um objeto JSON com quantidades inteiras.",true);
-  return null;
+const TROOP_LABELS=Object.freeze({militia:"Milícia",swordsman:"Espadachim",spearman:"Lanceiro",archer:"Arqueiro",cavalry:"Cavalaria",knight:"Cavaleiro",mage:"Mago",crossbowman:"Besteiro",catapult:"Catapulta",ram:"Aríete",trebuchet:"Trabuco"});
+function rallyCapacityView(rally){
+ const total=rally.total_troops,capacity=rally.troop_capacity;
+ if(!Number.isSafeInteger(total)||total<0||!Number.isSafeInteger(capacity)||capacity<1)return null;
+ return {total,capacity,remaining:Math.max(0,capacity-total)};
+}
+function parseFormation(entries,limit=200000){
+ if(!Number.isSafeInteger(limit)||limit<1)return null;
+ const troops={};let total=0;
+ for(const [type,raw] of entries){
+  if(!Object.hasOwn(TROOP_LABELS,type)||Object.hasOwn(troops,type)||!/^[0-9]+$/.test(String(raw)))return null;
+  const qty=Number(raw);
+  if(!Number.isSafeInteger(qty)||qty<0||qty>limit)return null;
+  if(qty){troops[type]=qty;total+=qty;if(total>limit)return null;}
  }
+ return total>0?troops:null;
+}
+let formationOpen=false;
+async function askTroops(limit=200000){
+ if(formationOpen||busy||limit<1)return null;
+ const dialog=make("dialog","rally-formation-dialog");
+ if(typeof dialog.showModal!=="function"){notify("Atualize o navegador ou Android System WebView para selecionar tropas.",true);return null;}
+ formationOpen=true;
+ const form=make("form","rally-formation-form");
+ const heading=make("h2","","Formação militar");
+ const description=make("p","","Limite desta seleção: "+fmt(limit)+" soldados. O servidor valida suas tropas e sua capacidade individual.");
+ const grid=make("div","rally-formation-grid"),fields=[];
+ for(const [key,name] of Object.entries(TROOP_LABELS)){
+  const label=make("label","",name),input=make("input","");
+  input.type="number";input.inputMode="numeric";input.min="0";input.max=String(limit);input.step="1";input.value="0";input.required=true;
+  label.append(input);grid.append(label);fields.push([key,input]);
+ }
+ const status=make("p","rally-formation-total","0 soldados selecionados");
+ status.setAttribute("aria-live","polite");
+ const actions=make("div","resource-node-actions"),cancel=make("button","rally-action","Cancelar"),confirm=make("button","rally-action","Confirmar tropas");
+ cancel.type="button";confirm.type="submit";confirm.disabled=true;
+ actions.append(cancel,confirm);form.append(heading,description,grid,status,actions);dialog.append(form);document.body.append(dialog);
+ return new Promise(resolve=>{
+  let selection=null;
+  const read=()=>parseFormation(fields.map(([key,input])=>[key,input.value]),limit);
+  const refreshTotal=()=>{const valid=read();const total=valid?Object.values(valid).reduce((a,b)=>a+b,0):0;confirm.disabled=!valid;status.textContent=valid?fmt(total)+" soldados selecionados":"Selecione uma quantidade válida dentro do limite.";};
+  form.addEventListener("input",refreshTotal);
+  form.addEventListener("submit",event=>{event.preventDefault();selection=read();if(selection)dialog.close();});
+  cancel.addEventListener("click",()=>dialog.close());
+  dialog.addEventListener("close",()=>{formationOpen=false;dialog.remove();resolve(selection);},{once:true});
+  try{dialog.showModal();}catch{formationOpen=false;dialog.remove();notify("Não foi possível abrir a formação militar.",true);resolve(null);}
+ });
 }
 function nodeLabel(node){
  const type=NODE_TYPES[node.node_type]||{icon:"📍",name:"Nó",resource:"recurso"};
@@ -73,8 +109,8 @@ function selectNode(node){
 }
 async function runNodeAction(action,node){
  if(busy)return;
- const troops=action==="collect"||action==="recall"?undefined:askTroops();
- if(action!=="collect"&&action!=="recall"&&!troops)return;
+ const troops=action==="collect"||action==="recall"?undefined:await askTroops();
+ if(busy||(action!=="collect"&&action!=="recall"&&!troops))return;
  busy=true;
  try{
   const data=await api(action,{method:"POST",body:JSON.stringify({node_id:node.id,...(troops?{troops}:{})})});
@@ -103,9 +139,9 @@ function renderNodeList(){
    addAction(actions,"Ocupado",()=>selectNode(node),true);
   }else{
    const locked=Boolean(node.reserved_by_rally);
-   addAction(actions,inAlliance?"Criar rally":"Ocupar nó",()=>{
+   addAction(actions,inAlliance?"Criar rally":"Ocupar nó",async()=>{
     if(inAlliance){
-     const troops=askTroops();if(!troops)return;
+     const troops=await askTroops();if(!troops)return;
      runRallyCreate(node,troops);
     }else runNodeAction("occupy",node);
    },locked||busy);
@@ -135,13 +171,15 @@ function renderRallies(){
   heading.append(make("strong","",rally.leader_name||"Líder do rally"),make("span","rally-state",rally.status==="gathering"?"Reunindo":"Marchando"));
   const meta=make("p","",nodeLabel({node_type:rally.node_type,level:rally.node_level})+" · "+fmt(rally.total_power)+" poder");
   const members=make("p","",fmt(rally.member_count)+" participantes");
+  const capacity=rallyCapacityView(rally);
   card.append(heading,meta,members);
+  card.append(make("p","rally-capacity",capacity?fmt(capacity.total)+" / "+fmt(capacity.capacity)+" soldados · "+fmt(capacity.remaining)+" vagas":"Capacidade aguardando sincronização"));
   if(inAlliance&&rally.status==="gathering"&&!rally.joined){
    addAction(card,"Enviar reforços",async()=>{
-    const troops=askTroops();if(!troops||busy)return;busy=true;
+    const troops=await askTroops(capacity?.remaining??0);if(!troops||busy)return;busy=true;
     try{const data=await api("join",{method:"POST",body:JSON.stringify({rally_id:rally.id,troops})});notify("Reforços enviados: +"+fmt(data.power_added)+" poder.");await refresh();}
     catch(error){notify(error.message,true);}finally{busy=false;}
-   },busy);
+   },busy||!capacity||capacity.remaining===0);
   }
   root.append(card);
  }
