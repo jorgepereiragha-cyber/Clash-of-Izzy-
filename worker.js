@@ -1402,13 +1402,14 @@ async function gameAction(env,playerId,body){
     const t=await env.DB.prepare("SELECT id,territory_key,alliance_id,owner_kingdom_id FROM world_territories WHERE id=? AND map_region=?").bind(territoryId,Number(k.map_region)||1).first();
     if(!t)return json({error:"Território não encontrado."},404);
     if(t.territory_key?.startsWith("royal_throne_"))return json({error:"O Trono Imperial não pode ser reivindicado fora da Guerra do Trono."},409);
-    if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
-    const cost=await env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000").bind(member.alliance_id).run();
-    if(!cost.meta.changes)return json({error:"A aliança precisa de 1.000 comida e 1.000 madeira no depósito."},409);
-    if(!t.alliance_id){
-      await env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL").bind(member.alliance_id,territoryId).run();
-      await env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=?").bind(member.alliance_id).run();
-    }
+    if(t.alliance_id)return json({error:"Território já controlado por uma aliança."},409);
+    // Ownership, permission, balance and counter must agree in one D1 batch.
+    // A repeated or competing claim cannot debit resources or increase the counter.
+    const claim=await env.DB.batch([
+      env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND map_region=? AND alliance_id IS NULL AND substr(territory_key,1,13)<>'royal_throne_' AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=? AND rank IN ('lider','co_lider','oficial')) AND EXISTS(SELECT 1 FROM alliances WHERE id=? AND shared_food>=1000 AND shared_wood>=1000)").bind(member.alliance_id,territoryId,Number(k.map_region)||1,member.alliance_id,k.id,member.alliance_id),
+      env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000,territory_count=territory_count+1 WHERE id=? AND changes()=1").bind(member.alliance_id)
+    ]);
+    if(claim[0]?.meta?.changes!==1||claim[1]?.meta?.changes!==1)return json({error:"Território indisponível, permissão alterada ou depósito insuficiente (1.000 comida e 1.000 madeira)."},409);
   }else if(type==="alliance_leave"){
     const membership=await env.DB.prepare("SELECT alliance_id,role FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(!membership)return json({error:"Seu reino não pertence a uma aliança."},409);

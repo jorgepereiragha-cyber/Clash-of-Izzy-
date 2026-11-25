@@ -1080,7 +1080,17 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       stateA = (await api("/api/game/state", { token: tokenA })).data.state;
       const claimable = stateA.territories.find(item => item.territory_kind==="resource" && item.resource_type && !item.alliance_id && !item.owner_kingdom_id);
       assert.ok(claimable?.id, "há território disponível para reivindicação");
+      // Leave enough in the treasury for a second debit, so the repeat really tests ownership.
+      await action(tokenA, { type: "alliance_donate", resource: "food", amount: 1000 }, 200);
+      await action(tokenA, { type: "alliance_donate", resource: "wood", amount: 1000 }, 200);
+      const beforeClaim = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
+      assert.ok(beforeClaim.shared_food >= 2000 && beforeClaim.shared_wood >= 2000);
       await action(tokenA, { type: "alliance_claim_territory", territoryId: claimable.id }, 200);
+      await action(tokenA, { type: "alliance_claim_territory", territoryId: claimable.id }, 409, "repetição não cobra território já controlado");
+      const afterClaim = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
+      assert.equal(afterClaim.shared_food, beforeClaim.shared_food - 1000);
+      assert.equal(afterClaim.shared_wood, beforeClaim.shared_wood - 1000);
+      assert.equal(afterClaim.territory_count, beforeClaim.territory_count + 1);
 
       await action(tokenC, { type: "alliance_join", tag: "ALFA" }, 200);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomC }, 200);
