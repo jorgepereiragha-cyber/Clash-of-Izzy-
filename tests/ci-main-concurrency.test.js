@@ -13,3 +13,13 @@ test("CI keeps running main validations while cancelling superseded PR revisions
   assert.match(source, /push:\s*\n\s*branches:\s*\[main\]/);
   assert.match(source, /pull_request:/);
 });
+
+test("stacked production-candidate PRs receive the same non-deploying quality checks", async () => {
+  const source = await readFile(new URL("../.github/workflows/ci.yml", import.meta.url), "utf8");
+  const trigger = source.split("pull_request:")[1]?.split("\n\n")[0];
+  assert.match(trigger, /release\/production-gameplay-hardened-20261125/);
+  assert.match(source, /npm test/);
+  assert.match(source, /npm run test:e2e/);
+  assert.match(source, /npm run check/);
+  assert.doesNotMatch(source, /d1 migrations apply[^\n]*--remote|actions:\s*write/);
+});
