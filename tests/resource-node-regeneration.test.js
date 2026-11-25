@@ -8,18 +8,19 @@ test("node occupation and recall preserve accrued resources and return troops on
  try {
   db.exec(`
    CREATE TABLE players(id INTEGER PRIMARY KEY,player_id TEXT);
-   CREATE TABLE kingdoms(id INTEGER PRIMARY KEY,player_id INTEGER,castle_level INTEGER);
+   CREATE TABLE kingdoms(id INTEGER PRIMARY KEY,player_id INTEGER,castle_level INTEGER,wood INTEGER DEFAULT 0,updated_at TEXT);
    CREATE TABLE kingdom_buildings(kingdom_id INTEGER,building_type TEXT,level INTEGER);
    CREATE TABLE research(kingdom_id INTEGER,research_key TEXT,level INTEGER);
    CREATE TABLE hero_inventory(kingdom_id INTEGER,hero_key TEXT,level INTEGER,stars INTEGER,rarity TEXT);
    CREATE TABLE heroes(kingdom_id INTEGER,hero_key TEXT,hero_name TEXT);
    CREATE TABLE army_units(kingdom_id INTEGER,unit_type TEXT,tier INTEGER,quantity INTEGER,UNIQUE(kingdom_id,unit_type,tier));
-   CREATE TABLE resource_nodes(id TEXT PRIMARY KEY,occupied_by INTEGER,occupation_start INTEGER,garrison_json TEXT,reserved_by_rally TEXT,last_regen INTEGER,current_resources INTEGER,max_resources INTEGER,regen_rate INTEGER);
+   CREATE TABLE resource_nodes(id TEXT PRIMARY KEY,occupied_by INTEGER,occupation_start INTEGER,garrison_json TEXT,reserved_by_rally TEXT,last_regen INTEGER,current_resources INTEGER,max_resources INTEGER,regen_rate INTEGER,node_type TEXT DEFAULT 'forest');
+   CREATE TABLE resource_ledger(kingdom_id INTEGER,resource TEXT,amount INTEGER,reason TEXT);
    CREATE TABLE kingdom_events(kingdom_id INTEGER,event_type TEXT,payload_json TEXT);
    INSERT INTO players VALUES(1,'player');
-   INSERT INTO kingdoms VALUES(1,1,1);
+   INSERT INTO kingdoms(id,player_id,castle_level) VALUES(1,1,1);
    INSERT INTO army_units VALUES(1,'militia',1,20),(1,'archer',1,10);
-   INSERT INTO resource_nodes VALUES('node_001',NULL,NULL,'{}',NULL,unixepoch()-3600,10,100,1);
+   INSERT INTO resource_nodes(id,occupied_by,occupation_start,garrison_json,reserved_by_rally,last_regen,current_resources,max_resources,regen_rate) VALUES('node_001',NULL,NULL,'{}',NULL,unixepoch()-3600,10,100,1);
   `);
   const adapter={prepare(sql){return {bind(...args){return {sql,args,
    async first(){return db.prepare(sql).get(...args)}}}}},async batch(statements){
@@ -46,5 +47,25 @@ test("node occupation and recall preserve accrued resources and return troops on
   db.exec("UPDATE resource_nodes SET current_resources=99,last_regen=unixepoch()-7200");
   assert.equal((await action("occupy",{node_id:"node_001",troops:{militia:1}})).status,200);
   assert.equal(node().current_resources,100);
+  // A future timestamp must not move backwards on collection.
+  db.exec("UPDATE resource_nodes SET last_regen=unixepoch()+3600");
+  const future=node().last_regen;
+  assert.equal((await action("collect",{node_id:"node_001"})).status,200);
+  assert.equal(node().last_regen,future);
+  assert.equal(node().current_resources,50);
+  assert.equal(db.prepare("SELECT wood FROM kingdoms WHERE id=1").get().wood,50);
+  assert.equal(db.prepare("SELECT SUM(amount) AS total FROM resource_ledger").get().total,50);
+  // Reject corrupt or partially valid garrisons without clearing occupation or crediting troops.
+  for(const malformed of ["{", "{}", JSON.stringify({militia:1,unknown:3})]){
+   db.prepare("UPDATE resource_nodes SET garrison_json=?").run(malformed);
+   const before=quantity("militia");
+   assert.equal((await action("recall",{node_id:"node_001"})).status,409);
+   assert.equal(node().occupied_by,1);
+   assert.equal(node().garrison_json,malformed);
+   assert.equal(quantity("militia"),before);
+  }
+  db.prepare("UPDATE resource_nodes SET garrison_json=?").run(JSON.stringify({militia:1}));
+  assert.equal((await action("recall",{node_id:"node_001"})).status,200);
+  assert.equal(quantity("militia"),20);
  } finally {db.close();}
 });
