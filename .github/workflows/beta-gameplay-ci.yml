@@ -23,5 +23,7 @@ jobs:
         run: node --test tests/dragons-master-pack.test.js tests/daily-package-offers.test.js tests/level-packs.test.js tests/starter-package-399.test.js
       - name: Existing queue, march and realtime safety regressions
         run: node --test tests/castle-science.test.js tests/hospital-policy.test.js tests/city-layout-rules.test.js tests/recruitment-sites.test.js tests/kingdom-queues.test.js tests/march-capacity.test.js tests/march-slots.test.js tests/eldoria-realtime-client.test.js tests/eldoria-realtime-routing.test.js tests/eldoria-room.test.js tests/throne-war.test.js
+      - name: Collective rally capacity and concurrent joins
+        run: node --test tests/rally-capacity.test.js
       - name: Synthetic load harness checks (mock transport only)
         run: node --test tests/staging-load-smoke.test.js
