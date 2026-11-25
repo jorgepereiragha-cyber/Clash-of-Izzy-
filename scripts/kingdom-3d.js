@@ -13,6 +13,7 @@ import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
+import { MODEL_LIMITS, selectBuildingAsset } from "./kingdom-model-selection.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -865,8 +866,10 @@ if (host && "WebGLRenderingContext" in window) {
     frameCityBuildings(list);
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
-      const template = glbTemplates.get(b.building_type);
-      const group = b.building_type==="castle"||!template
+      const selected = selectBuildingAsset(manifestAssets, b.building_type, b.level, qualityProfile?.tier);
+      // Preserve existing skin appearance until skin-aware GLB materials are implemented.
+      const template = (b.building_type === "castle" && latestCastleSkinId) ? null : glbTemplates.get(selected?.id);
+      const group = !template
         ? createBuilding(b.building_type, b.level, x, z, latestCastleSkinId) : template.clone(true);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
@@ -1162,7 +1165,7 @@ if (host && "WebGLRenderingContext" in window) {
         return;
       }
       const template = normalizeGlbTemplate(gltf, asset);
-      if (kind === "building") glbTemplates.set(asset.type, template);
+      if (kind === "building") glbTemplates.set(asset.id, template);
       else if (kind === "prop") glbPropTemplates.set(asset.id, template);
       else if (kind === "unit") glbUnitTemplates.set(asset.unit_type, {
         template,
@@ -1254,9 +1257,9 @@ if (host && "WebGLRenderingContext" in window) {
           if (!response.ok) throw new Error("Manifesto 3D indisponível.");
           const manifest = await response.json();
           if (disposed || !renderer) return;
-          manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [];
-          manifestProps = Array.isArray(manifest.props) ? manifest.props.slice(0, 16) : [];
-          manifestUnits = Array.isArray(manifest.units) ? manifest.units.slice(0, 8) : [];
+          manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, MODEL_LIMITS.models) : [];
+          manifestProps = Array.isArray(manifest.props) ? manifest.props.slice(0, MODEL_LIMITS.props) : [];
+          manifestUnits = Array.isArray(manifest.units) ? manifest.units.slice(0, MODEL_LIMITS.units) : [];
         })().catch(error => {
           manifestLoad = null;
           throw error;
@@ -1265,12 +1268,13 @@ if (host && "WebGLRenderingContext" in window) {
       await manifestLoad;
       if (disposed || !renderer) return;
 
-      const neededTypes = new Set(
-        (Array.isArray(buildings) ? buildings : [])
-          .map(item => item?.building_type)
-          .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
-      );
-      // Optional GLBs replace only their own building type, never the original keep.
+      const visibleBuildings = (Array.isArray(buildings) ? buildings : [])
+        .slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
+      const selectedBuildings = [...new Map(visibleBuildings
+        .filter(b => b && Object.hasOwn(palettes, b.building_type) && !(b.building_type === "castle" && latestCastleSkinId))
+        .map(b => selectBuildingAsset(manifestAssets, b.building_type, b.level, qualityProfile?.tier))
+        .filter(Boolean).map(asset => [asset.id, asset])).values()];
+      // Fetch only the currently visible tier/LOD, never all upgrade variants.
       const presentUnits = new Set(
         (Array.isArray(troops) ? troops : [])
           .filter(unit => Number(unit?.quantity) > 0)
@@ -1278,9 +1282,9 @@ if (host && "WebGLRenderingContext" in window) {
           .filter(type => typeof type === "string")
       );
       const queue = [
-        ...manifestAssets
-          .filter(asset => asset?.enabled === true && neededTypes.has(asset.type) && !glbTemplates.has(asset.type))
-          .map(asset => ({ asset, kind: "building", key: `building:${asset.type}` })),
+        ...selectedBuildings
+          .filter(asset => !glbTemplates.has(asset.id))
+          .map(asset => ({ asset, kind: "building", key: `building:${asset.id}` })),
         ...manifestProps
           .filter(asset => asset?.enabled === true && typeof asset.id === "string" && !glbPropTemplates.has(asset.id))
           .map(asset => ({ asset, kind: "prop", key: `prop:${asset.id}` })),

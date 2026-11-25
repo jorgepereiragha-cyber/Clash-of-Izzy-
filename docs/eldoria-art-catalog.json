@@ -1,0 +1,771 @@
+{
+  "status": "production-spec-only; not a runtime manifest",
+  "buildings": [
+    {
+      "id": "castle",
+      "footprint": [
+        5,
+        5
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/castle_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, weathered limestone royal keep, blue slate roofs, warm gold heraldry, progressive towers, throne, wings and crown accents, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/castle_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, weathered limestone royal keep, blue slate roofs, warm gold heraldry, progressive towers, throne, wings and crown accents, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 20,
+          "file": "/assets/3d/eldoria/buildings/castle_L20.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, weathered limestone royal keep, blue slate roofs, warm gold heraldry, progressive towers, throne, wings and crown accents, visual stage 20, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 25,
+          "file": "/assets/3d/eldoria/buildings/castle_L25.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, weathered limestone royal keep, blue slate roofs, warm gold heraldry, progressive towers, throne, wings and crown accents, visual stage 25, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 30,
+          "file": "/assets/3d/eldoria/buildings/castle_L30.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, weathered limestone royal keep, blue slate roofs, warm gold heraldry, progressive towers, throne, wings and crown accents, visual stage 30, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        45000,
+        12000,
+        3000
+      ]
+    },
+    {
+      "id": "farm",
+      "footprint": [
+        2,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/farm_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, barn, wheat, well, hay, oak fence, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/farm_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, barn, wheat, well, hay, oak fence, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/farm_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, barn, wheat, well, hay, oak fence, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "lumber_mill",
+      "footprint": [
+        2,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/lumber_mill_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, sawmill, stacked timber, carpenter tools, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/lumber_mill_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, sawmill, stacked timber, carpenter tools, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/lumber_mill_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, sawmill, stacked timber, carpenter tools, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "quarry",
+      "footprint": [
+        2,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/quarry_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, limestone extraction, crane, stone blocks, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/quarry_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, limestone extraction, crane, stone blocks, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/quarry_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, limestone extraction, crane, stone blocks, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "iron_mine",
+      "footprint": [
+        2,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/iron_mine_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, iron ore mine, rails, timber supports, ore carts, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/iron_mine_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, iron ore mine, rails, timber supports, ore carts, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/iron_mine_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, iron ore mine, rails, timber supports, ore carts, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "warehouse",
+      "footprint": [
+        3,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/warehouse_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, storage hall, sacks, barrels and crates, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/warehouse_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, storage hall, sacks, barrels and crates, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/warehouse_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, storage hall, sacks, barrels and crates, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "market",
+      "footprint": [
+        3,
+        3
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/market_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, merchant stalls, blue and crimson cloth, produce, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/market_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, merchant stalls, blue and crimson cloth, produce, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/market_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, merchant stalls, blue and crimson cloth, produce, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "barracks",
+      "footprint": [
+        3,
+        3
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/barracks_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, military hall, shields, practice dummies, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/barracks_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, military hall, shields, practice dummies, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/barracks_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, military hall, shields, practice dummies, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "archery_range",
+      "footprint": [
+        3,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/archery_range_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, targets, archery pavilion, bow racks, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/archery_range_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, targets, archery pavilion, bow racks, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/archery_range_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, targets, archery pavilion, bow racks, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "stable",
+      "footprint": [
+        3,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/stable_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, horse stable, corral, hay, tack, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/stable_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, horse stable, corral, hay, tack, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/stable_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, horse stable, corral, hay, tack, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "watchtower",
+      "footprint": [
+        2,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/watchtower_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, stone lookout tower, banner, arrow slits, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/watchtower_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, stone lookout tower, banner, arrow slits, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/watchtower_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, stone lookout tower, banner, arrow slits, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "academy",
+      "footprint": [
+        3,
+        3
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/academy_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, scholarly stone hall, library, observatory, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/academy_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, scholarly stone hall, library, observatory, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/academy_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, scholarly stone hall, library, observatory, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "hospital",
+      "footprint": [
+        3,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/hospital_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, healing hall, linen, medicinal herbs, blue white insignia, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/hospital_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, healing hall, linen, medicinal herbs, blue white insignia, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/hospital_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, healing hall, linen, medicinal herbs, blue white insignia, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "wall",
+      "footprint": [
+        3,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/wall_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, fortified stone wall segment, battlements, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/wall_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, fortified stone wall segment, battlements, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/wall_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, fortified stone wall segment, battlements, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "siege_workshop",
+      "footprint": [
+        3,
+        3
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/siege_workshop_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, siege engineering workshop, timber, pulleys, wheels, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/siege_workshop_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, siege engineering workshop, timber, pulleys, wheels, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/siege_workshop_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, siege engineering workshop, timber, pulleys, wheels, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "embassy",
+      "footprint": [
+        2,
+        2
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/embassy_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, diplomatic stone hall, alliance banners, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/embassy_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, diplomatic stone hall, alliance banners, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/embassy_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, diplomatic stone hall, alliance banners, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    },
+    {
+      "id": "dragon_nest",
+      "footprint": [
+        3,
+        3
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/dragon_nest_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, rock sanctuary with eggs, ember cracks, stone platforms, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/dragon_nest_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, rock sanctuary with eggs, ember cracks, stone platforms, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/dragon_nest_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, rock sanctuary with eggs, ember cracks, stone platforms, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        15000,
+        5000,
+        1500
+      ]
+    },
+    {
+      "id": "summon_altar",
+      "footprint": [
+        3,
+        3
+      ],
+      "variants": [
+        {
+          "minLevel": 1,
+          "file": "/assets/3d/eldoria/buildings/summon_altar_L1.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, ceremonial summoning dais, engraved runes and pillars, visual stage 1, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 5,
+          "file": "/assets/3d/eldoria/buildings/summon_altar_L5.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, ceremonial summoning dais, engraved runes and pillars, visual stage 5, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        },
+        {
+          "minLevel": 10,
+          "file": "/assets/3d/eldoria/buildings/summon_altar_L10.glb",
+          "prompt": "Original Eldoria medieval realistic game asset, ceremonial summoning dais, engraved runes and pillars, visual stage 10, retain base silhouette and footprint, clean PBR, no baked lighting, base-centered pivot, no background, no copyrighted game assets."
+        }
+      ],
+      "lodTriangles": [
+        8000,
+        2500,
+        800
+      ]
+    }
+  ],
+  "troops": [
+    {
+      "id": "militia",
+      "file": "/assets/3d/eldoria/units/militia.glb",
+      "rig": "humanoid",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "swordsman",
+      "file": "/assets/3d/eldoria/units/swordsman.glb",
+      "rig": "humanoid",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "spearman",
+      "file": "/assets/3d/eldoria/units/spearman.glb",
+      "rig": "humanoid",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "archer",
+      "file": "/assets/3d/eldoria/units/archer.glb",
+      "rig": "humanoid",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "crossbowman",
+      "file": "/assets/3d/eldoria/units/crossbowman.glb",
+      "rig": "humanoid",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "cavalry",
+      "file": "/assets/3d/eldoria/units/cavalry.glb",
+      "rig": "horse-and-rider",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "knight",
+      "file": "/assets/3d/eldoria/units/knight.glb",
+      "rig": "horse-and-rider",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "mage",
+      "file": "/assets/3d/eldoria/units/mage.glb",
+      "rig": "humanoid",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "catapult",
+      "file": "/assets/3d/eldoria/units/catapult.glb",
+      "rig": "mechanical",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "ram",
+      "file": "/assets/3d/eldoria/units/ram.glb",
+      "rig": "mechanical",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    },
+    {
+      "id": "trebuchet",
+      "file": "/assets/3d/eldoria/units/trebuchet.glb",
+      "rig": "mechanical",
+      "lodTriangles": [
+        6000,
+        2000,
+        500
+      ]
+    }
+  ],
+  "dragons": [
+    {
+      "id": "ember_wyrm",
+      "element": "fire",
+      "rarity": "blue",
+      "file": "/assets/3d/eldoria/dragons/ember_wyrm.glb",
+      "lodTriangles": [
+        25000,
+        12000,
+        3000
+      ]
+    },
+    {
+      "id": "mist_talon",
+      "element": "mist and air",
+      "rarity": "blue",
+      "file": "/assets/3d/eldoria/dragons/mist_talon.glb",
+      "lodTriangles": [
+        25000,
+        12000,
+        3000
+      ]
+    },
+    {
+      "id": "frost_glimmer",
+      "element": "ice",
+      "rarity": "blue",
+      "file": "/assets/3d/eldoria/dragons/frost_glimmer.glb",
+      "lodTriangles": [
+        25000,
+        12000,
+        3000
+      ]
+    },
+    {
+      "id": "storm_rune",
+      "element": "lightning",
+      "rarity": "purple",
+      "file": "/assets/3d/eldoria/dragons/storm_rune.glb",
+      "lodTriangles": [
+        25000,
+        12000,
+        3000
+      ]
+    },
+    {
+      "id": "jade_guardian",
+      "element": "earth",
+      "rarity": "purple",
+      "file": "/assets/3d/eldoria/dragons/jade_guardian.glb",
+      "lodTriangles": [
+        25000,
+        12000,
+        3000
+      ]
+    },
+    {
+      "id": "abyss_wing",
+      "element": "shadow",
+      "rarity": "purple",
+      "file": "/assets/3d/eldoria/dragons/abyss_wing.glb",
+      "lodTriangles": [
+        25000,
+        12000,
+        3000
+      ]
+    },
+    {
+      "id": "sun_ascendant",
+      "element": "sun",
+      "rarity": "gold",
+      "file": "/assets/3d/eldoria/dragons/sun_ascendant.glb",
+      "lodTriangles": [
+        25000,
+        12000,
+        3000
+      ]
+    },
+    {
+      "id": "astral_aegis",
+      "element": "stars",
+      "rarity": "gold",
+      "file": "/assets/3d/eldoria/dragons/astral_aegis.glb",
+      "lodTriangles": [
+        25000,
+        12000,
+        3000
+      ]
+    },
+    {
+      "id": "imperial_drake",
+      "element": "gold",
+      "rarity": "gold",
+      "file": "/assets/3d/eldoria/dragons/imperial_drake.glb",
+      "lodTriangles": [
+        25000,
+        12000,
+        3000
+      ]
+    }
+  ],
+  "portraits": {
+    "count": 70,
+    "format": "webp",
+    "identity": "derive from canonical hero catalog; preserve rarity white/blue/purple/gold"
+  },
+  "materials": {
+    "stone": "#B8A98C",
+    "wood": "#6B4A2A",
+    "gold": "#D4A62B",
+    "blue": "#1E3A8B",
+    "slate": "#3B424D",
+    "grass": "#4A6B3A",
+    "iron": "#2A2D33",
+    "water": "#2E5468",
+    "maps": [
+      "baseColor",
+      "normal",
+      "ORM"
+    ],
+    "compression": "KTX2 ETC1S color/ORM subject to quality; UASTC normal; linear data maps"
+  }
+}

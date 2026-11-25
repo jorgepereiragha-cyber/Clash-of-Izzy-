@@ -2,7 +2,9 @@ import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const MAX_ASSETS = 64;
+import { MODEL_LIMITS, modelMinLevel } from "./kingdom-model-selection.js";
+
+const MAX_ASSETS = MODEL_LIMITS.total;
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
 const MAX_TOTAL_BYTES = 48 * 1024 * 1024;
 const JSON_CHUNK = 0x4e4f534a;
@@ -75,6 +77,7 @@ function validateManifestEntry(asset, category, index) {
   if (typeof asset.sourceUrl !== "string" || !/^https:\/\//i.test(asset.sourceUrl)) fail(label + ".sourceUrl deve usar HTTPS.");
   if (typeof asset.license !== "string" || !asset.license.trim()) fail(label + ".license deve informar a licença.");
   if (category === "models" && (typeof asset.type !== "string" || !asset.type.trim())) fail(label + ".type é obrigatório.");
+  if (category === "models" && (!Number.isSafeInteger(modelMinLevel(asset)) || modelMinLevel(asset) < 1 || modelMinLevel(asset) > 100 || (asset.lod !== undefined && ![0,1,2].includes(asset.lod)))) fail(label + " possui minLevel/LOD inválido.");
   if (category === "units" && (typeof asset.unit_type !== "string" || !asset.unit_type.trim())) fail(label + ".unit_type é obrigatório.");
   if (category === "props" && (!Array.isArray(asset.positions) || asset.positions.some(position =>
     !Array.isArray(position) || position.length !== 3 || position.some(value => !Number.isFinite(Number(value)))
@@ -100,12 +103,15 @@ export async function validateAssetManifest(root = process.cwd()) {
   const categories = ["models", "props", "units"];
   for (const category of categories) {
     if (!Array.isArray(manifest[category])) fail(category + " deve ser uma lista.");
+    if (manifest[category].length > MODEL_LIMITS[category]) fail(category + " excede limite do renderer.");
   }
 
   const entries = categories.flatMap(category => manifest[category].map((asset, index) => ({ asset, category, index })));
   if (entries.length > MAX_ASSETS) fail("máximo de " + MAX_ASSETS + " assets no manifesto.");
   const ids = new Set();
   const sources = new Set();
+  const modelSlots = new Set();
+  const unitSlots = new Set();
   let totalBytes = 0;
   let enabled = 0;
 
@@ -115,6 +121,15 @@ export async function validateAssetManifest(root = process.cwd()) {
     if (ids.has(asset.id)) fail("id duplicado: " + asset.id + ".");
     ids.add(asset.id);
     if (!asset.enabled) continue;
+    if (category === "models") {
+      const slot = JSON.stringify([asset.type, modelMinLevel(asset), asset.lod ?? 1]);
+      if (modelSlots.has(slot)) fail("tipo/nível/LOD duplicado: " + slot);
+      modelSlots.add(slot);
+    }
+    if (category === "units") {
+      if (unitSlots.has(asset.unit_type)) fail("tipo de unidade duplicado: " + asset.unit_type);
+      unitSlots.add(asset.unit_type);
+    }
 
     const decodedSrc = decodePath(asset.src, label + ".src");
     if (!decodedSrc.startsWith("/assets/3d/")) fail(label + ".src não está dentro de /assets/3d/.");
