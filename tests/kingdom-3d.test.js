@@ -461,3 +461,15 @@ test("graphics settings survive storage property and method failures",async()=>{
  assert.match(boot,/persistGraphicsChoice\(getGraphicsStorage\(window\), value\)/);
  assert.match(renderer,/readGraphicsChoice\(getGraphicsStorage\(window\)\)/);
 });
+
+test("scenic city uses flat bounded paving and a subdued placement guide",()=>{
+ assert.match(renderer,/grid\.material\.opacity = \.025/);
+ assert.match(renderer,/grid\.material\.depthWrite = false/);
+ assert.match(renderer,/const segments = 36, arcLength = curve\.getLength\(\)/);
+ assert.match(renderer,/indices\.push\(a, a \+ 1, a \+ 2, a \+ 1, a \+ 3, a \+ 2\)/);
+ assert.match(renderer,/geometry\.computeVertexNormals\(\)/);
+ assert.match(renderer,/pathRibbon\(\.46, -\.06, mats\.roadEdge\)/);
+ assert.match(renderer,/pathRibbon\(\.36, -\.045, mats\.road\)/);
+ assert.doesNotMatch(renderer,/new THREE\.TubeGeometry\(curve, 36/);
+ assert.match(renderer,/ctx\.createRadialGradient\(x \+ dx, y \+ dy/);
+});
