@@ -175,8 +175,8 @@ async function occupyNode(env,kingdomId,body){
   [nodeId]);
  const result=await env.DB.batch([
   env.DB.prepare(withdrawal.sql).bind(...withdrawal.bindings),
-  env.DB.prepare("UPDATE resource_nodes SET occupied_by=?,occupation_start=?,garrison_json=?,last_regen=? WHERE id=? AND occupied_by IS NULL AND reserved_by_rally IS NULL AND changes()=?")
-   .bind(kingdomId,now,troopJson,now,nodeId,count),
+  env.DB.prepare("UPDATE resource_nodes SET occupied_by=?,occupation_start=?,garrison_json=?,current_resources=MIN(max_resources,current_resources+CAST(MAX(0,?-last_regen)*regen_rate/3600 AS INTEGER)),last_regen=MAX(last_regen,?) WHERE id=? AND occupied_by IS NULL AND reserved_by_rally IS NULL AND changes()=?")
+   .bind(kingdomId,now,troopJson,now,now,nodeId,count),
   env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,'resource_node_occupied',? WHERE changes()=1")
    .bind(kingdomId,JSON.stringify({nodeId})),
  ]);
@@ -208,10 +208,11 @@ async function recallNode(env,kingdomId,body){
  const node=await env.DB.prepare("SELECT garrison_json FROM resource_nodes WHERE id=? AND occupied_by=? AND reserved_by_rally IS NULL").bind(nodeId,kingdomId).first();
  if(!node)return reply({error:"Este nó não está ocupado pelo seu reino ou pertence a um rally."},404);
  let garrison={};try{garrison=JSON.parse(node.garrison_json||"{}")}catch{}
+ const now=Math.floor(Date.now()/1000);
  const entries=Object.entries(garrison).filter(([type,count])=>Object.hasOwn(UNIT_POWER,type)&&Number.isSafeInteger(count)&&count>0);
  const result=await env.DB.batch([
-  env.DB.prepare("UPDATE resource_nodes SET occupied_by=NULL,occupation_start=NULL,garrison_json='{}',last_regen=? WHERE id=? AND occupied_by=? AND reserved_by_rally IS NULL AND garrison_json=?")
-   .bind(Math.floor(Date.now()/1000),nodeId,kingdomId,node.garrison_json),
+  env.DB.prepare("UPDATE resource_nodes SET occupied_by=NULL,occupation_start=NULL,garrison_json='{}',current_resources=MIN(max_resources,current_resources+CAST(MAX(0,?-last_regen)*regen_rate/3600 AS INTEGER)),last_regen=MAX(last_regen,?) WHERE id=? AND occupied_by=? AND reserved_by_rally IS NULL AND garrison_json=?")
+   .bind(now,now,nodeId,kingdomId,node.garrison_json),
   ...entries.map(([type,count])=>env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,1,? WHERE changes()=1 ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,type,count))
  ]);
  if(Number(result[0]?.meta?.changes||0)!==1)return reply({error:"O estado do nó mudou; atualize e tente novamente."},409);
