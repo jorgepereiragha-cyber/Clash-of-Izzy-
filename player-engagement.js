@@ -15,6 +15,7 @@
   }
   const token = readEngagementToken;
   let latestRefresh = 0, busy = false, opened = false;
+  let refreshGeneration = 0, refreshAuth = "";
   let sessionId = null;
   try { sessionId = crypto.randomUUID(); } catch { sessionId = "engagement_" + Date.now(); }
   const fmt = value => Number(value || 0).toLocaleString("pt-BR");
@@ -28,8 +29,7 @@
     if (reward.heroFragments) parts.push(fmt(reward.heroFragments) + " fragmento comum");
     return parts.join(" + ");
   };
-  async function api(path, method="GET") {
-    const auth = token();
+  async function api(path, method="GET", auth=token()) {
     if (!auth) throw Error("Sessão indisponível. Abra seu reino primeiro.");
     const response = await fetch("/api/game/" + path, {
       method, cache:"no-store",
@@ -92,26 +92,45 @@
       : "Próximo resgate: dia " + data.day + " · " + rewardText(data.reward) + ".";
   }
   async function refresh(force=false) {
-    if (busy || !token() || (!force && Date.now()-latestRefresh < 10000)) return;
+    const auth = token();
+    if (busy) return;
+    if (!auth) {
+      ++refreshGeneration; refreshAuth=""; latestRefresh=0;
+      tutorial.hidden=true; daily.hidden=true;
+      $("onboardingClaim").disabled=true; $("dailyClaim").disabled=true;
+      return;
+    }
+    if (!force && auth===refreshAuth && Date.now()-latestRefresh < 10000) return;
+    if (auth!==refreshAuth) {
+      opened=false; tutorial.hidden=true; daily.hidden=true;
+      $("onboardingClaim").disabled=true; $("dailyClaim").disabled=true;
+    }
+    refreshAuth=auth;
     latestRefresh = Date.now();
-    const [onboarding,rewards] = await Promise.allSettled([api("onboarding"),api("daily-reward")]);
+    const generation = ++refreshGeneration;
+    const [onboarding,rewards] = await Promise.allSettled([api("onboarding","GET",auth),api("daily-reward","GET",auth)]);
+    // A delayed response must not overwrite a newer refresh or a completed claim.
+    if (generation!==refreshGeneration || busy || token()!==auth) return;
     if (onboarding.status==="fulfilled") drawOnboarding(onboarding.value);
     else { tutorial.hidden=true; $("onboardingClaim").disabled=true; }
     if (rewards.status==="fulfilled") drawDaily(rewards.value);
     else { daily.hidden=true; $("dailyClaim").disabled=true; }
   }
   async function claim(endpoint,statusId,event) {
-    if (busy) return;
+    const auth = token();
+    if (busy || !auth || auth!==refreshAuth) return;
     busy = true;
+    ++refreshGeneration;
     $(statusId).textContent = "Confirmando o resgate no servidor…";
     $("dailyClaim").disabled = true; $("onboardingClaim").disabled = true;
     try {
-      const result = await api(endpoint,"POST");
+      const result = await api(endpoint,"POST",auth);
+      if (token()!==auth) return;
       $(statusId).textContent = result.message || "Resgate confirmado.";
       void track(event);
       $("refresh")?.click();
     } catch (error) {
-      $(statusId).textContent = String(error?.message||"Não foi possível resgatar.");
+      if (token()===auth) $(statusId).textContent = String(error?.message||"Não foi possível resgatar.");
     } finally {
       busy=false;latestRefresh=0;
       void refresh(true);
