@@ -41,6 +41,7 @@ import { handleDailyReward } from "./daily-rewards.js";
 import { handleOnboarding } from "./onboarding-bonus.js";
 import { createSupportCheckout } from "./support-orders.js";
 import { betaAccessGuard } from "./beta-access.js";
+import { livePaymentsEnabled,blocksNewCharge } from "./live-payment-gate.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -2129,6 +2130,7 @@ export default {
   const url=new URL(request.url);
   const betaGateResponse=await betaAccessGuard(request,env);
   if(betaGateResponse)return betaGateResponse;
+  if(blocksNewCharge(url.pathname,request.method,env))return json({error:"Novos pagamentos temporariamente indisponíveis.",code:"LIVE_PAYMENTS_DISABLED"},503);
   if(url.pathname==="/api/realtime/eldoria/ticket"){
     if(request.method!=="POST")return json({error:"Método não permitido."},405);
     if(!env.ELDORIA_ROOM)return json({error:"Sala realtime ainda não implantada."},503);
@@ -2208,6 +2210,8 @@ export default {
           const existingTriggers=new Set((triggerRows.results||[]).map(row=>row.name));
           missingTriggers=missingTriggers.filter(name=>!existingTriggers.has(name));
         }
+        // 0045 and 0046 columns must be present before gameplay reads are accepted.
+        await env.DB.prepare("SELECT enhancement FROM kingdom_equipment LIMIT 0").all();
         // 0046 must be present before individual dragon queries are accepted.
         await env.DB.prepare("SELECT level,experience,bond FROM kingdom_dragons LIMIT 0").all();
         checks.schema=missingTables.length===0&&missingTriggers.length===0;
@@ -2379,7 +2383,7 @@ export default {
       return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
-  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),nubankPix:nubankPixReady(env)});
+  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:livePaymentsEnabled(env)&&Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),nubankPix:livePaymentsEnabled(env)&&nubankPixReady(env)});
   if(url.pathname==="/api/store/pix-instructions"&&request.method==="POST"){
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);

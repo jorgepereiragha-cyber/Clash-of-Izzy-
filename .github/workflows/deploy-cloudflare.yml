@@ -157,6 +157,14 @@ jobs:
           print("Commercial migration history complete; full deploy requires separate existing approval gates.")
           PY
 
+      - name: Verify new-payment gate and legacy dragon integrity (read-only)
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          node -e 'const c=JSON.parse(require("fs").readFileSync("wrangler.jsonc","utf8")); if(c.vars.LIVE_PAYMENTS_APPROVED!=="false")process.exit(1)'
+          node scripts/check-worker-only-payment-state.mjs
+          node scripts/verify-production-dragon-integrity.mjs
+
       - name: Capture D1 pre-deployment restore point
         id: capture_d1
         shell: bash
@@ -248,6 +256,8 @@ jobs:
           node scripts/check-android-release-server.mjs
 
       - name: Smoke test production Worker
-        run: node scripts/production-smoke.js
+        run: |
+          node scripts/production-smoke.js
+          node scripts/check-worker-only-payment-state.mjs
         env:
           WORKER_BASE_URL: ${{ env.WORKER_BASE_URL }}
