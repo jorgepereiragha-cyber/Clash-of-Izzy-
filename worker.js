@@ -2,7 +2,7 @@ export { EldoriaRoom } from "./eldoria-room.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses, combatRulesVersion } from "./game-adapter.js";
 import { hospitalEnabled,HOSPITAL_PER_LEVEL,HOSPITAL_HEAL_MAX,recoverableLosses,hospitalHealCost,hospitalAdmission } from "./hospital-policy.js";
-import { scienceEnabled,SCIENCE_CATALOG,sciencePercent,scienceRequirement,scienceDuration,scienceView,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses } from "./castle-science.js";
+import { scienceEnabled,SCIENCE_CATALOG,sciencePercent,scienceRequirement,scienceDuration,scienceView,scienceUpgradeCost,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses } from "./castle-science.js";
 import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, HERO_SUMMON_RARITY_ODDS, heroView, getHeroCombatBonuses, getHeroSummonOdds } from "./hero-catalog.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank, sameAngelDeathAttackUnits } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
@@ -1713,7 +1713,8 @@ async function gameAction(env,playerId,body){
     }
     const activeQueue=await env.DB.prepare("SELECT id FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running'").bind(k.id).first();
     if(activeQueue)return json({error:"Sua fila de pesquisa já está ocupada. Aguarde a tecnologia atual."},409);
-    const c=science?.cost||allowed[key],factor=level+1,cost={wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
+    const c=allowed[key],factor=level+1,cost=science?scienceUpgradeCost(key,level):{wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
+    if(!cost)return json({error:"Custo da ciência indisponível. Sincronize a Academia."},409);
     const valhallaMultipliers=await getValhallaMultipliers(env);
     const durationSeconds=await scaleKingdomQueueDurationSeconds(env,k.id,calculateQueueDurationSeconds("research",{level:level+1,facilityLevel:Math.max(1,centerLevel)}),"research",valhallaMultipliers);
     const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();
