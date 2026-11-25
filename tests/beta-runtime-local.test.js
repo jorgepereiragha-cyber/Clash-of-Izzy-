@@ -699,6 +699,18 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(researchLevel(await getStateFor(cookie,start.data.token)),researchLevel(researchDone));
     assert.equal(await countEvents("research_upgraded"),researchFinishes+1);
 
+    // New science requires completed economy and exact level, with the existing single research slot.
+    const scienceBefore=await getStateFor(cookie,start.data.token);
+    const scholarship=scienceBefore.academyScience.find(x=>x.key==="scholarship");
+    assert.equal(scholarship.available,true);assert.equal(scholarship.level,0);
+    assert.equal((await actionFor(cookie,start.data.token,{type:"research",research:"field_logistics",expectedLevel:0})).status,409);
+    const study={type:"research",research:"scholarship",expectedLevel:0};
+    const scienceRace=await Promise.all([actionFor(cookie,start.data.token,study),actionFor(cookie,start.data.token,study)]);
+    assert.deepEqual(scienceRace.map(x=>x.status).sort((a,b)=>a-b),[200,409]);
+    await localSql("UPDATE kingdom_queues SET started_at='2000-01-01T00:00:00.000Z',completes_at='2000-01-01T00:01:00.000Z' WHERE kingdom_id="+queueRealm+" AND queue_type='research' AND status='running'");
+    const scienceDone=await getStateFor(cookie,start.data.token);
+    assert.equal(scienceDone.academyScience.find(x=>x.key==="scholarship").bonusPercent,1.5);
+    assert.equal((await actionFor(cookie,start.data.token,study)).status,409);
     const initialTraining = await getStateFor(cookie,start.data.token);
     assert.ok(Number(initialTraining.troopCapacity)-Number(initialTraining.armyCount)>=6,
       "synthetic kingdom has room for two small training batches");

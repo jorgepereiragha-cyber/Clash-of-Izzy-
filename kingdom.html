@@ -286,6 +286,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <option value="gear_forging">Metalurgia rúnica</option><option value="gear_ward">Runas de proteção</option>
 <option value="gear_vitality">Forja vital</option><option value="gear_logistics">Logística rúnica</option>
 </select>
+<div id="coiScienceDetails" class="muted" aria-live="polite"></div>
 <button id="researchButton" type="submit">Iniciar pesquisa</button>
 <p class="muted">Uma pesquisa por vez. O nível só aumenta depois da conclusão confirmada pelo servidor.</p>
 </form>
@@ -725,6 +726,22 @@ async function runKingdomPanelAction(payload,successMessage){
  }catch(error){setStatus(error.message||"Operação não concluída.",true);}
  finally{busy=false;render();}
 }
+function renderAcademyScience(){
+ const select=document.getElementById("researchKey"),details=document.getElementById("coiScienceDetails"),button=document.getElementById("researchButton");
+ if(!select||!details||!button)return;
+ const rows=state?.academyScience||[];
+ const old=select.querySelector("optgroup[data-science]");
+ if(rows.length&&!old){const group=document.createElement("optgroup");group.label="Ciências avançadas de Eldoria";group.dataset.science="true";
+  for(const row of rows){const opt=document.createElement("option");opt.value=row.key;opt.textContent=row.name;group.append(opt);}select.append(group);
+ }else if(!rows.length&&old)old.remove();
+ const row=rows.find(x=>x.key===select.value);
+ if(row){
+  const names={economy:"Economia",military:"Doutrina militar",defense:"Defesa"};
+  details.textContent=row.category+" · Nv. "+row.level+"/"+row.maxLevel+" · "+row.effect+": "+row.bonusPercent+"% · Academia "+row.requiredAcademy+" · "+(names[row.requiredKey]||row.requiredKey)+" "+row.requiredLevel+(row.nextCost?" · Custo: "+fmt(row.nextCost.wood)+" madeira, "+fmt(row.nextCost.stone)+" pedra, "+fmt(row.nextCost.iron)+" ferro":" · Máximo");
+ }else details.textContent=select.value==="economy"&&rows.length?"Produção de recursos +1% por nível (até 30%).":"";
+ button.disabled=busy||(state?.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running")||Boolean(row&&!row.available);
+}
+document.getElementById("researchKey")?.addEventListener("change",renderAcademyScience);
 function renderHospital(){
  const panel=document.getElementById("coiHospitalPanel"),root=document.getElementById("coiHospitalPatients"),hospital=state?.hospital;
  if(!panel||!root)return;
@@ -826,7 +843,7 @@ renderQueues();
 document.getElementById("researchLevels").innerHTML=(state.research||[]).map(r=>'<div class="event">'+esc(String(r.research_key).replaceAll("_"," "))+' · nível '+fmt(r.level)+'</div>').join("")||'<div class="muted">Nenhuma pesquisa concluída ainda.</div>';
 const activeTrainingCount=(state.queues||[]).filter(q=>q.queue_type==="training"&&q.status==="running").length;
 document.getElementById("trainButton").disabled=busy||activeTrainingCount>=2||Number(state.armyCount||0)>=Number(state.troopCapacity||500);
-document.getElementById("researchButton").disabled=busy||(state.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running");
+renderAcademyScience();
 const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Exército / capacidade",fmt(state.armyCount??total)+" / "+fmt(state.troopCapacity||500)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).map(e=>'<div class="event">'+esc(String(e.event_type||"Atividade").replaceAll("_"," "))+'</div>').join("")||'<div class="muted">Seu reino está começando sua história.</div>';
 renderPets();renderBattleReports();
@@ -965,7 +982,9 @@ async function startTraining(event){
 }
 async function startResearch(event){
  event.preventDefault();
- await submitQueue("research",{research:document.getElementById("researchKey").value},"Pesquisa iniciada. O bônus será ativado ao concluir.");
+ const research=document.getElementById("researchKey").value;
+ const expectedLevel=Number((state.research||[]).find(r=>r.research_key===research)?.level||0);
+ await submitQueue("research",{research,expectedLevel},"Pesquisa iniciada. O bônus será ativado ao concluir.");
 }
 async function submit4xAction(payload){
  if(busy)throw new Error("Aguarde a ação atual terminar.");
