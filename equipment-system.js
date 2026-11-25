@@ -405,6 +405,14 @@
       fragments.textContent="Fragmentos: "+Number(hero.fragments||0).toLocaleString("pt-BR")+
         (hero.fragments_to_next?" · Próxima estrela: "+hero.fragments_to_next:Number(hero.stars)>=Number(hero.max_stars)?" · Estrelas máximas":" · Evolução indisponível");
       copy.append(name,title,origin,aura,meta,stats,combat,skill,fragments);
+      if(hero.talent){
+        const talent=hero.talent,line=document.createElement("p");line.className="hero-roster-skill";
+        const effects=[["Ataque",talent.attackPercent],["Defesa",talent.defensePercent],["Vida",talent.healthPercent],["Crítico",talent.criticalChancePercent]].filter(([,value])=>Number(value)>0).map(([label,value])=>label+" +"+Number(value).toFixed(2)+"%");
+        line.textContent=talent.name+" · Talento "+talent.rank+"/"+talent.maxRank+
+          (effects.length?" · "+effects.join(" · ")+" (incluído nos passivos, sujeito ao limite)":" · Bloqueado")+
+          (talent.nextMilestone?" · Próximo: Nv. "+talent.nextMilestone.level+" e "+talent.nextMilestone.stars+" estrelas":" · Talento máximo");
+        copy.append(line);
+      }
       const evolve=document.createElement("button");
       evolve.type="button";evolve.className="forge-action hero-star-evolve";
       const cost=Number(hero.fragments_to_next||0),eligible=hero.can_evolve===true&&cost>0;

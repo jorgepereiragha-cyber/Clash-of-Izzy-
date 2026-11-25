@@ -75,11 +75,31 @@ const HERO_COMBAT_BANDS=Object.freeze({
  purple:{attack:[7.0,11.0],defense:[7.0,11.0]},
  gold:{attack:[13.0,20.0],defense:[13.0,20.0]}
 });
+// Role specialization is derived from persistent progression; no extra currency or client bonus.
+const HERO_TALENT_ROLES=Object.freeze({
+  infantaria:Object.freeze({name:"Bastião da Linha",attack:0,defense:0.3,health:0,critical:0}),
+  arqueiro:Object.freeze({name:"Precisão de Eldoria",attack:0.15,defense:0,health:0,critical:0.15}),
+  cavalaria:Object.freeze({name:"Vanguarda Montada",attack:0.3,defense:0,health:0,critical:0}),
+  suporte:Object.freeze({name:"Juramento Vital",attack:0,defense:0.1,health:0.2,critical:0})
+});
+const SEASONAL_TALENT_ROLES=Object.freeze({odin_awakened:"infantaria",thor_ragnarok:"infantaria",freya_vanir:"suporte",loki_chaos:"arqueiro",valhalla_king:"cavalaria"});
+export function getHeroTalent(hero={}){
+ const key=String(hero?.hero_key||"");
+ const template=Object.hasOwn(HERO_TEMPLATES,key)?HERO_TEMPLATES[key]:null;
+ const role=template?.type||(Object.hasOwn(SEASONAL_TALENT_ROLES,key)?SEASONAL_TALENT_ROLES[key]:null);
+ if(!role||!Object.hasOwn(HERO_TALENT_ROLES,role))return null;
+ const rarity=HERO_RARITY[template?.rarity||normalizedRarity(hero.rarity)]||HERO_RARITY.white;
+ const level=integerInRange(hero.level,1,1,rarity.maxLevel),stars=integerInRange(hero.stars,1,1,rarity.maxStars);
+ const milestones=[.25,.5,.75].map((fraction,i)=>({level:Math.ceil(rarity.maxLevel*fraction),stars:i+2}));
+ const rank=milestones.filter(m=>level>=m.level&&stars>=m.stars).length;
+ const def=HERO_TALENT_ROLES[role],scale=key=>Number((def[key]*rank/3).toFixed(2));
+ return {name:def.name,role,rank,maxRank:3,nextMilestone:milestones[rank]||null,attackPercent:scale("attack"),defensePercent:scale("defense"),healthPercent:scale("health"),criticalChancePercent:scale("critical")};
+}
 export function getHeroCombatBonuses(hero = {}) {
   const key=String(hero.hero_key||"");
-  const profile=HERO_COMBAT_PROFILES[key] || {attack:1,defense:1,health:0.8,critical:0.2};
+  const profile=Object.hasOwn(HERO_COMBAT_PROFILES,key)?HERO_COMBAT_PROFILES[key]:{attack:1,defense:1,health:0.8,critical:0.2};
   const zero={attackPercent:0,defensePercent:0,healthPercent:0,criticalChancePercent:0};
-  if(!HERO_TEMPLATES[key]&&!HERO_COMBAT_PROFILES[key])return zero;
+  if(!Object.hasOwn(HERO_TEMPLATES,key)&&!Object.hasOwn(HERO_COMBAT_PROFILES,key))return zero;
   // Preserve rarity for old heroes rows (gold is stored as 'legendary' in the
   // legacy heroes table but is gold in the canonical template/inventory).
   const rarityKey=HERO_TEMPLATES[key]?.rarity||normalizedRarity(hero.rarity);
@@ -98,11 +118,12 @@ export function getHeroCombatBonuses(hero = {}) {
     const variation=.3+.7*((seed+offset)%1);
     return Number((min+(max-min)*variation*(.25+.75*progression)).toFixed(2));
   };
+  const talent=getHeroTalent({...hero,level,stars}),round=n=>Number(n.toFixed(2));
   return {
-    attackPercent:value("attack",0),
-    defensePercent:value("defense",.37),
-    healthPercent:Number((Math.max(0,profile.health)*(.45+.55*progression)).toFixed(2)),
-    criticalChancePercent:Number((Math.max(0,profile.critical)*(.45+.55*progression)).toFixed(2))
+    attackPercent:round(Math.min(bands.attack[1],value("attack",0)+(talent?.attackPercent||0))),
+    defensePercent:round(Math.min(bands.defense[1],value("defense",.37)+(talent?.defensePercent||0))),
+    healthPercent:round(Math.min(3,Math.max(0,profile.health)*(.45+.55*progression)+(talent?.healthPercent||0))),
+    criticalChancePercent:round(Math.min(2,Math.max(0,profile.critical)*(.45+.55*progression)+(talent?.criticalChancePercent||0)))
   };
 }
 
@@ -199,6 +220,7 @@ export function heroView(row = {}) {
     identity_faction: identity?.faction || null,
     identity_lore: identity?.lore || null,
     identity_motto: identity?.motto || null,
+    talent: getHeroTalent({ ...row, hero_key: heroKey, rarity: row.rarity, level, stars }),
     combat_bonuses: getHeroCombatBonuses({ ...row, hero_key: heroKey, rarity: row.rarity, level, stars })
   };
 }

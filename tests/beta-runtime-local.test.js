@@ -761,6 +761,9 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const heroStars=state=>state.heroInventory.find(h=>h.hero_key==="kael_sunwarden");
     const beforeStars=heroStars(await getStateFor(cookie,start.data.token));
     assert.equal(beforeStars.stars,1);
+    assert.equal(beforeStars.talent.rank,0);
+    assert.equal(beforeStars.talent.role,"infantaria");
+    assert.equal(beforeStars.talent.nextMilestone.stars,2);
     assert.equal(beforeStars.fragments_to_next,10);
     assert.equal(beforeStars.can_evolve,true);
     assert.equal((await actionFor(cookie,start.data.token,{type:"hero_evolve",hero:"kael_sunwarden"})).status,400);
