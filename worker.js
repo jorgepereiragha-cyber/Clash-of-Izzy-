@@ -568,10 +568,13 @@ async function processMarches(env,kingdomId,batchSize=50){
    env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
   ];
   if(m.march_type==="attack"){
-   const target=await env.DB.prepare("SELECT id,territory_key,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+   const target=await env.DB.prepare("SELECT t.id,t.territory_key,t.name,t.level,t.owner_kingdom_id,t.territory_kind FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1)").bind(kingdomId,m.target_territory_id).first();
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,criticalHits=0,losses={},battleLog=[],survivors={},replayData={};
-   if(target&&!target.territory_key?.startsWith("royal_throne_")&&!target.owner_kingdom_id&&army.length){
+   if(target&&!target.territory_key?.startsWith("royal_throne_")&&target.territory_kind!=="castle"&&!target.owner_kingdom_id&&army.length){
+    // If a rival captures the target during simulation, do not settle stale
+    // casualties or rewards. The next resolution returns the full army.
+    statements[0]=env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=? AND EXISTS(SELECT 1 FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1) AND t.owner_kingdom_id IS NULL AND t.territory_kind<>'castle' AND t.territory_key=? AND substr(t.territory_key,1,13)<>'royal_throne_' AND t.level IS ?)").bind(resolvedAt,resolutionToken,m.id,kingdomId,now,kingdomId,target.id,target.territory_key,target.level);
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level,prestige,equipped_skin_id FROM kingdoms WHERE id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,hi.hero_key,h.id LIMIT 1").bind(kingdomId).first(),
