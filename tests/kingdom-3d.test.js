@@ -7,18 +7,17 @@ const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 
-test("Kenney castle kit progressively replaces the default castle without leaking shared GLB geometry", () => {
-  assert.match(renderer, /function createCastleGlbGroup\(\)/);
-  assert.match(renderer, /glbTemplates\.get\("watchtower"\)/);
-  assert.match(renderer, /glbTemplates\.get\("wall"\)/);
-  assert.match(renderer, /towerTemplate\.clone\(true\)/);
-  assert.match(renderer, /wallTemplate\.clone\(true\)/);
-  assert.match(renderer, /latestCastleSkinId === 0/);
-  assert.match(renderer, /const group = castleKit \|\| \(template \? template\.clone\(true\) : createBuilding/);
-  assert.match(renderer, /neededTypes\.add\("watchtower"\)/);
-  assert.match(renderer, /neededTypes\.add\("wall"\)/);
-  assert.match(renderer, /if \(!towerTemplate \|\| !wallTemplate \|\| qualityProfile\?\.tier === "low"\) return null/);
-  assert.match(renderer, /PCFSoftShadowMap/);
+test("original imperial keep is rendered at every skin and quality without substituting standalone wall GLBs", () => {
+  assert.match(renderer,/function addEldoriaCastle/);
+  assert.match(renderer,/eldoria-imperial-v1/);
+  assert.match(renderer,/level>=30\?4:level>=20\?3:level>=10\?2:1/);
+  assert.match(renderer,/if\(type==="castle"\)\{\s*addEldoriaCastle/);
+  assert.match(renderer,/b\.building_type==="castle"\|\|!template/);
+  assert.doesNotMatch(renderer,/createCastleGlbGroup|kenney-castle-kit-composite/);
+  assert.match(renderer,/PCFSoftShadowMap/);
+  for(const type of ["barracks","farm","quarry","lumber_mill","iron_mine","market","academy","wall","hospital","watchtower","stable","archery_range","siege_workshop","embassy","warehouse"]){
+    assert.ok(renderer.slice(renderer.indexOf("const buildingProfiles"),renderer.indexOf("function addEldoriaCastle")).includes(type+":["));
+  }
 });
 
 test("mobile GLB trees scale to device tier without discarding instanced procedural forest", () => {

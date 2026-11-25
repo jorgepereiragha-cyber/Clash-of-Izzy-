@@ -994,6 +994,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.equal(refreshCounts.after,refreshCounts.before,
           "unchanged kingdom state must not trigger an extra optional model rebuild");
         const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
+        assert.ok(diagnostics.architecture.some(x=>x.type==="castle"&&x.design==="eldoria-imperial-v1"&&x.tier===1),"new realm uses original tier-one keep");
         assert.ok(diagnostics.troopFigures.some(x=>x.type==="archer"&&!x.procedural),"trained archers use the decoded GLB");
         assert.ok(diagnostics.troopFigures.length<=8,"balanced figure budget");
         const equippedDragon=await page.evaluate(()=>window.__coiKingdomDragon);

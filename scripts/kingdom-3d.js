@@ -415,6 +415,68 @@ if (host && "WebGLRenderingContext" in window) {
     parent.add(wheel);
     addCylinder(parent, .055, .055, .18, mats.darkStone, x, y, z, 8).rotation.z = Math.PI / 2;
   }
+  // Original Eldoria architecture. All dimensions remain inside the existing
+  // visual footprint. These are owned procedural meshes, not shared GLB clones.
+  const buildingProfiles = Object.freeze({
+    barracks:[1.42,1.05,.99,.48],farm:[1.4,.78,1.0,.54],
+    quarry:[1.18,.67,1.0,.25],lumber_mill:[1.46,.83,1.0,.48],
+    iron_mine:[1.24,.74,1.02,.31],market:[1.44,.82,1.08,.35],
+    academy:[1.38,1.24,1.02,.57],wall:[1.52,.68,.55,.05],
+    hospital:[1.40,.93,1.04,.48],watchtower:[.72,1.67,.72,.48],
+    stable:[1.48,.75,1.0,.47],archery_range:[1.32,.76,1.0,.42],
+    siege_workshop:[1.48,.96,1.12,.55],embassy:[1.40,1.16,1.03,.54],
+    warehouse:[1.46,.9,1.1,.52]
+  });
+  function addEldoriaCastle(group,level,skin,wall,roof,stone,accent){
+    const tier=level>=30?4:level>=20?3:level>=10?2:1;
+    const high=qualityProfile?.tier==="high",low=qualityProfile?.tier==="low";
+    const keepHeight=1.42+(tier-1)*.19;
+    const towerHeight=1.28+(tier-1)*.16;
+    group.userData.coIArchitecture="eldoria-imperial-v1";
+    group.userData.coIArchitectureTier=tier;
+    box(group,1.75,.15,1.52,mats.darkStone,0,.075,0);
+    box(group,1.60,.12,1.38,stone,0,.19,0);
+    // The central inhabited keep remains visible even in balanced mode.
+    box(group,.94,keepHeight, .85,wall,0,.25+keepHeight/2,-.12);
+    box(group,1.04,.14,.95,stone,0,.25+keepHeight,-.12);
+    const mainRoof=new THREE.Mesh(new THREE.ConeGeometry(.73,.68+(tier-1)*.07,4),roof);
+    mainRoof.rotation.y=Math.PI/4;mainRoof.position.set(0,.32+keepHeight+(.68+(tier-1)*.07)/2,-.12);group.add(mainRoof);
+    // Front gateway, recessed entry, stone lintel, and stepped approach.
+    box(group,.66,.72,.27,stone,0,.58,.54);
+    box(group,.36,.49,.035,mats.darkStone,0,.50,.695);
+    box(group,.30,.45,.045,mats.wood,0,.48,.72);
+    box(group,.44,.075,.08,accent,0,.74,.725);
+    box(group,.66,.09,.24,stone,0,.09,.77);
+    const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
+    for(const [x,z] of towers){
+      addCylinder(group,.22,.26,towerHeight,stone,x,.25+towerHeight/2,z,low?6:10);
+      addCylinder(group,.29,.25,.13,stone,x,.25+towerHeight,z,low?6:10);
+      addCylinder(group,0,.30,.47+(tier-1)*.035,roof,x,.25+towerHeight+.30,z,low?6:10);
+      box(group,.09,.25,.04,mats.darkStone,x,.25+towerHeight*.65,z+.255);
+      if(!low)box(group,.11,.04,.06,accent,x,.25+towerHeight*.65-.14,z+.26);
+    }
+    for(const x of [-.47,.47])box(group,.32,.56,.18,wall,x,.48,.55);
+    for(const z of [-.38,.23]){
+      box(group,.14,.58,.54,wall,-.65,.45,z);
+      box(group,.14,.58,.54,wall,.65,.45,z);
+    }
+    for(const x of [-.24,.24]){
+      box(group,.12,.30,.045,mats.darkStone,x,.25+keepHeight*.65,.32);
+      box(group,.075,.22,.055,mats.window,x,.25+keepHeight*.65,.35);
+    }
+    // Tier-dependent buttresses and royal ornaments; no effect on gameplay.
+    if(tier>=2&&!low)for(const x of [-.43,.43])box(group,.12,.76,.14,stone,x,.63,.42);
+    if(tier>=3){
+      addCylinder(group,.028,.028,.42,accent,0,.90+keepHeight,-.12,6);
+      const finial=new THREE.Mesh(new THREE.OctahedronGeometry(.10),accent);
+      finial.position.set(0,1.13+keepHeight,-.12);group.add(finial);
+    }
+    if(high)for(const x of [-.48,-.24,0,.24,.48])box(group,.14,.16,.14,stone,x,.90,.51);
+    if(!low){
+      const bannerMaterial=material(skin?.banner||"#24476B",.82);
+      for(const x of [-.40,.40])box(group,.13,.34,.035,bannerMaterial,x,.99,.65);
+    }
+  }
   function createBuilding(type, level, x, z, castleSkinId = 0) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
@@ -428,61 +490,42 @@ if (host && "WebGLRenderingContext" in window) {
     const castleStone=castleSkin?surfaceMaterial(castleSkin.stone,"stone",seed+207):mats.stone;
     const castleRoof=castleSkin?surfaceMaterial(castleSkin.roof,"roof",seed+309):mats.roof;
     const castleAccent=castleSkin?material(castleSkin.accent,.52):mats.gold;
-    const height = 1.0 + Math.min(30, Math.max(1, Number(level) || 1)) * .035;
+    const safeLevel=Math.min(30,Math.max(1,Math.floor(Number(level)||1)));
+    if(type==="castle"){
+      addEldoriaCastle(group,safeLevel,castleSkin,wall,roof,castleStone,castleAccent);
+      return group;
+    }
+    const [bodyWidth,baseHeight,bodyDepth,roofHeight]=buildingProfiles[type]||buildingProfiles.warehouse;
+    const height = baseHeight + safeLevel * .024;
+    group.userData.coIArchitecture="eldoria-civic-v1";
 
     // Shared architectural language: visible stone footing, timber eaves and a
     // readable roof silhouette, while each building keeps its own landmark.
     box(group, 1.56, .14, 1.32, mats.darkStone, 0, .05, 0);
-    box(group, 1.48, height, 1.22, wall, 0, height / 2, 0);
-    box(group, 1.55, .09, 1.29, mats.wood, 0, height + .035, 0);
-    const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(1.02, .88, 4), roof);
-    roofMesh.rotation.y = Math.PI / 4;
-    roofMesh.position.y = height + .48;
-    roofMesh.castShadow = true;
-    group.add(roofMesh);
+    box(group, bodyWidth, height, bodyDepth, wall, 0, height / 2, 0);
+    box(group, bodyWidth+.08, .09, bodyDepth+.08, mats.wood, 0, height + .035, 0);
+    if(type==="wall"||type==="quarry"||type==="iron_mine"){
+      box(group,bodyWidth+.09,.12,bodyDepth+.09,mats.darkStone,0,height+.10,0);
+    }else{
+      const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(1, roofHeight, 4), roof);
+      roofMesh.rotation.y = Math.PI / 4;
+      roofMesh.scale.set((bodyWidth+.14)/Math.SQRT2,1,(bodyDepth+.14)/Math.SQRT2);
+      roofMesh.position.y = height + .08 + roofHeight/2;
+      roofMesh.castShadow = true;
+      group.add(roofMesh);
+    }
 
     // Warm emissive windows stay legible in the isometric view without adding
     // real-time point lights to every building.
-    box(group, .23, .48, .04, mats.wood, 0, .24, .635);
-    for (const wx of [-.45, .45]) {
-      box(group, .18, .22, .045, mats.window, wx, height * .63, .635);
-      box(group, .035, .25, .055, mats.wood, wx, height * .63, .66);
-      box(group, .2, .035, .055, mats.wood, wx, height * .63, .66);
+    const facade=bodyDepth/2+.025;
+    box(group, .23, Math.min(.48,height*.70), .04, mats.wood, 0, Math.min(.24,height*.35), facade);
+    for (const wx of [-bodyWidth*.30, bodyWidth*.30]) {
+      box(group, .18, .22, .045, mats.window, wx, height * .63, facade);
+      box(group, .035, .25, .055, mats.wood, wx, height * .63, facade+.025);
+      box(group, .2, .035, .055, mats.wood, wx, height * .63, facade+.025);
     }
 
-    if (type === "castle") {
-      // Four corner keeps, crenellated parapet, royal standards and a heraldic seal.
-      for (const tx of [-.56, .56]) for (const tz of [-.43, .43]) {
-        box(group, .36, 1.5, .36, castleStone, tx, .75, tz);
-        const turret = new THREE.Mesh(new THREE.ConeGeometry(.27, .54, 4), castleRoof);
-        turret.position.set(tx, 1.78, tz);
-        turret.rotation.y = Math.PI / 4;
-        turret.castShadow = true;
-        group.add(turret);
-        box(group, .4, .09, .4, castleAccent, tx, 1.51, tz);
-      }
-      for (let i = -2; i <= 2; i++) {
-        box(group, .18, .22, .18, castleStone, i * .24, height + .16, -.58);
-        box(group, .18, .22, .18, castleStone, i * .24, height + .16, .58);
-      }
-      for (const tx of [-.56, .56]) {
-        box(group, .045, .52, .045, castleAccent, tx, 1.92, .49);
-        const banner = new THREE.Mesh(new THREE.PlaneGeometry(.34, .42), new THREE.MeshStandardMaterial({
-          color: castleSkin ? castleSkin.banner : "#E7BD68", roughness: .82, side: THREE.DoubleSide
-        }));
-        banner.position.set(tx + .18, 1.86, .515);
-        banner.castShadow = true;
-        group.add(banner);
-      }
-      const seal = new THREE.Mesh(new THREE.CircleGeometry(.2, 8), castleAccent);
-      seal.position.set(0, 1.02, .66);
-      seal.castShadow = true;
-      group.add(seal);
-      const sealCore = new THREE.Mesh(new THREE.CircleGeometry(.12, 8), material(castleSkin ? castleSkin.seal : "#24476B", .58));
-      sealCore.position.set(0, 1.02, .668);
-      group.add(sealCore);
-      box(group, .62, .24, .24, castleAccent, 0, height + .08, .76);
-    } else if (type === "watchtower") {
+    if (type === "watchtower") {
       box(group, .16, .95, .16, mats.wood, 0, height + .42, 0);
       const flag = new THREE.Mesh(new THREE.PlaneGeometry(.48, .28), material("#A9433B"));
       flag.position.set(.25, height + .78, 0);
@@ -603,37 +646,6 @@ if (host && "WebGLRenderingContext" in window) {
     }
     return group;
   }
-  // Reuse licensed, textured Kenney tower + wall GLBs for the default main castle.
-  // Never mutate or dispose template geometries/materials: clone(true) shares them.
-  // Owned castle skins continue through the established procedural palette path.
-  function createCastleGlbGroup() {
-    const towerTemplate = glbTemplates.get("watchtower");
-    const wallTemplate = glbTemplates.get("wall");
-    if (!towerTemplate || !wallTemplate || qualityProfile?.tier === "low") return null;
-    const castle = new THREE.Group();
-    castle.userData.coIAssetId = "kenney-castle-kit-composite";
-    const high = qualityProfile?.tier === "high";
-    const towerPositions = high
-      ? [[-.87, -.73], [.87, -.73], [-.87, .73], [.87, .73]]
-      : [[-.87, -.73], [.87, .73]];
-    for (const [x, z] of towerPositions) {
-      const tower = towerTemplate.clone(true);
-      tower.scale.setScalar(.76);
-      tower.position.set(x, 0, z);
-      castle.add(tower);
-    }
-    const wallPositions = high
-      ? [[0, -.73, 0], [0, .73, Math.PI], [-.87, 0, Math.PI / 2], [.87, 0, -Math.PI / 2]]
-      : [[0, -.73, 0], [0, .73, Math.PI]];
-    for (const [x, z, angle] of wallPositions) {
-      const wall = wallTemplate.clone(true);
-      wall.position.set(x, 0, z);
-      wall.rotation.y = angle;
-      wall.scale.setScalar(.88);
-      castle.add(wall);
-    }
-    return castle;
-  }
   function buildGround() {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(32, 32), mats.grass);
     ground.rotation.x = -Math.PI / 2; ground.position.y = -.08; ground.receiveShadow = true; scene.add(ground);
@@ -714,7 +726,7 @@ if (host && "WebGLRenderingContext" in window) {
     const screenXs = projected.map(point => point.x);
     const screenYs = projected.map(point => point.y);
     const projectedWidth = Math.max(...screenXs) - Math.min(...screenXs) + 3.2;
-    const projectedHeight = Math.max(...screenYs) - Math.min(...screenYs) + 4.0;
+    const projectedHeight = Math.max(...screenYs) - Math.min(...screenYs) + 4.6;
     const viewportWidth = Math.max(1, camera.right - camera.left);
     const viewportHeight = Math.max(1, camera.top - camera.bottom);
     // Player zoom remains view-only. A reset always restores the safe fit.
@@ -763,9 +775,8 @@ if (host && "WebGLRenderingContext" in window) {
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
       const template = glbTemplates.get(b.building_type);
-      const castleKit = b.building_type === "castle" && latestCastleSkinId === 0
-        ? createCastleGlbGroup() : null;
-      const group = castleKit || (template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId));
+      const group = b.building_type==="castle"||!template
+        ? createBuilding(b.building_type, b.level, x, z, latestCastleSkinId) : template.clone(true);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       // Adicionar acessórios depois das sombras: ornamentos mobile não projetam sombras.
@@ -1168,12 +1179,7 @@ if (host && "WebGLRenderingContext" in window) {
           .map(item => item?.building_type)
           .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
       );
-      // The textured main castle is assembled from already licensed watchtower/wall GLBs.
-      // When those assets cannot load, the original castle still renders unmodified.
-      if (neededTypes.has("castle") && latestCastleSkinId === 0) {
-        neededTypes.add("watchtower");
-        neededTypes.add("wall");
-      }
+      // Optional GLBs replace only their own building type, never the original keep.
       const presentUnits = new Set(
         (Array.isArray(troops) ? troops : [])
           .filter(unit => Number(unit?.quantity) > 0)
@@ -1307,6 +1313,7 @@ if (host && "WebGLRenderingContext" in window) {
         loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
         pendingGlbLoads: glbLoadPromises.size,
         optionalSceneRefreshes,
+        architecture:activeModels.filter(model=>model.userData.coIArchitecture).map(model=>({type:model.userData.coIType,design:model.userData.coIArchitecture,tier:model.userData.coIArchitectureTier||null})),
         specialLandmarks:activeModels.filter(model=>model.userData.coISpecial).map(model=>({type:model.userData.coIType,x:model.position.x,z:model.position.z})),
         troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
         dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon()} : null,
