@@ -347,46 +347,45 @@ async function gameIdentity(request,env){
   }else if(p.av!==undefined)return null;
   return String(p.sub);
 }
-async function ensureKingdom(env,playerId){
-  let p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
-  if(!p){
-    await env.DB.prepare("INSERT OR IGNORE INTO players(player_id,name,gems) VALUES(?,?,?)").bind(playerId,"Lorde de Eldoria",50).run();
-    p=await env.DB.prepare("SELECT id FROM players WHERE player_id=?").bind(playerId).first();
-  }
-  let k=await env.DB.prepare("SELECT id FROM kingdoms WHERE player_id=?").bind(p.id).first();
-  if(!k){
+export async function ensureKingdom(env,playerId){
+  // The entire foundation is one transaction. A random guard identifies
+  // only the kingdom inserted by this invocation, never a legacy kingdom.
+  const actionId=crypto.randomUUID();
+  const guard="EXISTS(SELECT 1 FROM kingdom_events e WHERE e.kingdom_id=k.id AND e.event_type='__internal_action_guard' AND e.payload_json=?)";
+  const fresh=" FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=? AND "+guard;
+  const seed=(sql,...params)=>env.DB.prepare(sql+fresh).bind(...params,playerId,actionId);
+  await env.DB.batch([
+    env.DB.prepare("INSERT OR IGNORE INTO players(player_id,name,gems) VALUES(?,?,?)").bind(playerId,"Lorde de Eldoria",50),
     // A região e a posição são reservadas no mesmo INSERT para evitar
     // dois castelos na mesma coordenada. Nunca remapear reinos antigos.
-    const created=await env.DB.prepare(
+    env.DB.prepare(
       "WITH destination AS (SELECT MAX(COALESCE((SELECT MAX(realm_id) FROM realm_openings),1),"+
       "CASE WHEN (SELECT COUNT(*) FROM kingdoms)>=1000 THEN 3 WHEN (SELECT COUNT(*) FROM kingdoms)>=700 THEN 2 ELSE 1 END) AS realm_id), "+
       "next_slot AS (SELECT realm_id,COALESCE((SELECT MAX(map_slot)+1 FROM kingdoms WHERE map_region=destination.realm_id),0) AS slot FROM destination) "+
       "INSERT INTO kingdoms(player_id,kingdom_name,food,wood,stone,iron,gold,last_production_at,map_region,map_slot,map_x,map_z) "+
-      "SELECT ?,?,?,?,?,?,?,?,realm_id,slot,((slot%20)-10)*5,(CAST(slot/20 AS INTEGER)-10)*5 FROM next_slot"
-    ).bind(p.id,"Reino de Eldoria",5000,5000,3000,1000,1000,new Date().toISOString()).run();
-    const id=Number(created.meta.last_row_id);
-    if(!Number.isSafeInteger(id)||id<1)throw new Error("Não foi possível reservar o castelo");
-    const buildingRows=Object.keys(BUILDINGS).map((key,i)=>env.DB.prepare("INSERT OR IGNORE INTO kingdom_buildings(kingdom_id,building_type,level,position_x,position_z) VALUES(?,?,1,?,?)").bind(id,key,((i%4)-1.5)*7,Math.floor(i/4)*7-7));
-    const unitRows=Object.keys(UNITS).map((key)=>env.DB.prepare("INSERT OR IGNORE INTO army_units(kingdom_id,unit_type,tier,quantity) VALUES(?,?,1,?)").bind(id,key,key==="militia"?30:0));
-    await env.DB.batch([
-      ...buildingRows,...unitRows,
-      env.DB.prepare("INSERT OR IGNORE INTO heroes(kingdom_id,hero_key,hero_name,rarity) VALUES(?,?,?,?)").bind(id,"kael_sunwarden","Kael, Guardião do Sol","rare"),
-      env.DB.prepare("INSERT OR IGNORE INTO dragons(kingdom_id,dragon_key,dragon_name) VALUES(?,?,?)").bind(id,"ember_wyrm","Brasa"),
-      env.DB.prepare("INSERT OR IGNORE INTO kingdom_dragons(kingdom_id,dragon_key,source) VALUES(?,'ember_wyrm','starter')").bind(id),
-      env.DB.prepare("INSERT OR IGNORE INTO kingdom_mailbox(kingdom_id,source_key,title,body,reward_key) VALUES(?,'welcome:v1','Boas-vindas a Eldoria','Abra a mochila e receba 1.000 comida e 500 madeira.','welcome_v1')").bind(id),
-      env.DB.prepare("INSERT OR IGNORE INTO kingdom_pets(kingdom_id,pet_id,level,experience,is_active) SELECT ?,'pet_raven',1,0,1 WHERE EXISTS(SELECT 1 FROM pet_catalog WHERE id='pet_raven' AND active=1)").bind(id),
-      // Marcos permanentes: 700 reinos liberam o mapa 2; 1.000 liberam o mapa 3.
-      env.DB.prepare("INSERT OR IGNORE INTO realm_openings(realm_id) SELECT 2 WHERE (SELECT COUNT(*) FROM kingdoms)>=700"),
-      env.DB.prepare("INSERT OR IGNORE INTO realm_openings(realm_id) SELECT 3 WHERE (SELECT COUNT(*) FROM kingdoms)>=1000"),
-      // O trono nasce na abertura do mapa; proteção persistente de 35 dias.
-      env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,level,resource_type,resource_rate,territory_kind,map_region,shield_until) "+
-        "SELECT 'royal_throne_'||realm_id,'Trono Imperial de Eldoria','royal',0,0,30,NULL,0,'resource',realm_id,datetime(unlocked_at,'+35 days') FROM realm_openings"),
-      env.DB.prepare("INSERT OR IGNORE INTO realm_thrones(realm_id,territory_id,shield_until) "+
-        "SELECT r.realm_id,t.id,datetime(r.unlocked_at,'+35 days') FROM realm_openings r "+
-        "JOIN world_territories t ON t.territory_key='royal_throne_'||r.realm_id AND t.map_region=r.realm_id")
-    ]);
-    k={id};
-  }
+      "SELECT p.id,?,?,?,?,?,?,?,realm_id,slot,((slot%20)-10)*5,(CAST(slot/20 AS INTEGER)-10)*5 FROM next_slot CROSS JOIN players p WHERE p.player_id=? AND NOT EXISTS(SELECT 1 FROM kingdoms WHERE player_id=p.id)"
+    ).bind("Reino de Eldoria",5000,5000,3000,1000,1000,new Date().toISOString(),playerId),
+    env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT k.id,'__internal_action_guard',? FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=? AND changes()=1").bind(actionId,playerId),
+    ...Object.keys(BUILDINGS).map((key,i)=>seed("INSERT INTO kingdom_buildings(kingdom_id,building_type,level,position_x,position_z) SELECT k.id,?,1,?,?",key,((i%4)-1.5)*7,Math.floor(i/4)*7-7)),
+    ...Object.keys(UNITS).map(key=>seed("INSERT OR IGNORE INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT k.id,?,1,?",key,key==="militia"?30:0)),
+    seed("INSERT INTO heroes(kingdom_id,hero_key,hero_name,rarity) SELECT k.id,'kael_sunwarden','Kael, Guardião do Sol','rare'"),
+    seed("INSERT INTO dragons(kingdom_id,dragon_key,dragon_name) SELECT k.id,'ember_wyrm','Brasa'"),
+    seed("INSERT INTO kingdom_dragons(kingdom_id,dragon_key,source) SELECT k.id,'ember_wyrm','starter'"),
+    seed("INSERT INTO kingdom_mailbox(kingdom_id,source_key,title,body,reward_key) SELECT k.id,'welcome:v1','Boas-vindas a Eldoria','Abra a mochila e receba 1.000 comida e 500 madeira.','welcome_v1'"),
+    env.DB.prepare("INSERT INTO kingdom_pets(kingdom_id,pet_id,level,experience,is_active) SELECT k.id,'pet_raven',1,0,1"+fresh+" AND EXISTS(SELECT 1 FROM pet_catalog WHERE id='pet_raven' AND active=1)").bind(playerId,actionId),
+    // Marcos permanentes: 700 reinos liberam o mapa 2; 1.000 liberam o mapa 3.
+    env.DB.prepare("INSERT OR IGNORE INTO realm_openings(realm_id) SELECT 2 WHERE (SELECT COUNT(*) FROM kingdoms)>=700"),
+    env.DB.prepare("INSERT OR IGNORE INTO realm_openings(realm_id) SELECT 3 WHERE (SELECT COUNT(*) FROM kingdoms)>=1000"),
+    env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,level,resource_type,resource_rate,territory_kind,map_region,shield_until) "+
+      "SELECT 'royal_throne_'||realm_id,'Trono Imperial de Eldoria','royal',0,0,30,NULL,0,'resource',realm_id,datetime(unlocked_at,'+35 days') FROM realm_openings"),
+    env.DB.prepare("INSERT OR IGNORE INTO realm_thrones(realm_id,territory_id,shield_until) "+
+      "SELECT r.realm_id,t.id,datetime(r.unlocked_at,'+35 days') FROM realm_openings r "+
+      "JOIN world_territories t ON t.territory_key='royal_throne_'||r.realm_id AND t.map_region=r.realm_id"),
+    seed("INSERT INTO world_territories(territory_key,name,terrain,x,z,owner_kingdom_id,level,resource_type,resource_rate,territory_kind,map_region) SELECT 'kingdom_castle_'||k.id,'Castelo de '||k.kingdom_name,'plains',k.map_x,k.map_z,k.id,k.castle_level,'castle',0,'castle',k.map_region"),
+    env.DB.prepare("DELETE FROM kingdom_events WHERE event_type='__internal_action_guard' AND payload_json=? AND kingdom_id=(SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?)").bind(actionId,playerId)
+  ]);
+  const k=await env.DB.prepare("SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
+  if(!k)throw new Error("Não foi possível reservar o castelo");
   const kingdom=await env.DB.prepare("SELECT id,kingdom_name,castle_level,map_x,map_z,map_region FROM kingdoms WHERE id=?").bind(k.id).first();
   await env.DB.prepare(
     "INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,owner_kingdom_id,level,resource_type,resource_rate,territory_kind,map_region) VALUES(?,?,'plains',?,?,?,?,'castle',0,'castle',?)"
@@ -1163,7 +1162,6 @@ async function gameAction(env,playerId,body){
     ]);
     if(!fusion[0]?.meta?.changes)return json({error:"Fragmentos insuficientes, skins alteradas ou fusão já realizada."},409);
   }else if(type==="shop_buy"){
-
     const itemId=String(body.item||""),source=String(body.source||"shop"),item=Object.hasOwn(SHOP_ITEMS,itemId)?SHOP_ITEMS[itemId]:null;
     if(!item||!["shop","merchant"].includes(source))return json({error:"Produto ou origem inválidos."},400);
     let price=item.price,cycle=null,offer=null;
@@ -1171,24 +1169,27 @@ async function gameAction(env,playerId,body){
       cycle=merchantCycle();offer=merchantOffers(cycle).find(x=>x.id===itemId);
       if(!offer)return json({error:"Esta oferta não pertence à rotação atual."},409);
       price=offer.price;
-      await env.DB.prepare("INSERT OR IGNORE INTO merchant_stock(kingdom_id,cycle_id,item_id,stock) VALUES(?,?,?,?)").bind(k.id,cycle,itemId,offer.stock).run();
-      const stock=await env.DB.prepare("UPDATE merchant_stock SET stock=stock-1 WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND stock>0").bind(k.id,cycle,itemId).run();
-      if(!stock.meta.changes)return json({error:"Oferta esgotada. O mercador retorna na próxima rotação."},409);
-    }else if(source!=="shop")return json({error:"Origem da compra inválida."},400);
-    const debit=item.currency==="gems"
-      ?await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(price,p.id,price).run()
-      :await env.DB.prepare("UPDATE kingdoms SET gold=gold-? WHERE id=? AND gold>=?").bind(price,k.id,price).run();
-    if(!debit.meta.changes){
-      if(source==="merchant")await env.DB.prepare("UPDATE merchant_stock SET stock=stock+1 WHERE kingdom_id=? AND cycle_id=? AND item_id=?").bind(k.id,cycle,itemId).run();
-      return json({error:item.currency==="gems"?"Diamantes insuficientes.":"Ouro insuficiente."},409);
     }
+    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const statements=[];
+    if(offer)statements.push(env.DB.prepare("INSERT OR IGNORE INTO merchant_stock(kingdom_id,cycle_id,item_id,stock) VALUES(?,?,?,?)").bind(k.id,cycle,itemId,offer.stock));
+    const stockCheck=offer?" AND EXISTS(SELECT 1 FROM merchant_stock WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND stock>0)":"";
+    const stockBindings=offer?[k.id,cycle,itemId]:[];
+    const debitIndex=statements.length;
+    statements.push(item.currency==="gems"
+      ?env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?"+stockCheck).bind(price,p.id,price,...stockBindings)
+      :env.DB.prepare("UPDATE kingdoms SET gold=gold-? WHERE id=? AND gold>=?"+stockCheck).bind(price,k.id,price,...stockBindings));
+    if(offer)statements.push(env.DB.prepare("UPDATE merchant_stock SET stock=stock-1 WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND stock>0 AND changes()=1").bind(k.id,cycle,itemId));
+    const guardIndex=statements.length;
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(k.id,"__internal_action_guard",actionId));
     for(const [key,amount] of Object.entries(item.gives)){
-      if(["food","wood","stone","iron","gold"].includes(key))statements.push(env.DB.prepare("UPDATE kingdoms SET "+key+"="+key+"+? WHERE id=?").bind(amount,k.id));
-      else statements.push(env.DB.prepare("INSERT INTO shop_inventory(kingdom_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(kingdom_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,key,amount));
+      if(["food","wood","stone","iron","gold"].includes(key))statements.push(env.DB.prepare("UPDATE kingdoms SET "+key+"="+key+"+? WHERE id=? AND "+guard).bind(amount,k.id,k.id,actionId));
+      else statements.push(env.DB.prepare("INSERT INTO shop_inventory(kingdom_id,item_id,quantity) SELECT ?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,key,amount,k.id,actionId));
     }
-    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"shop_purchase",JSON.stringify({item:itemId,source,price,currency:item.currency})));
-    await env.DB.batch(statements);
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"shop_purchase",JSON.stringify({item:itemId,source,price,currency:item.currency}),k.id,actionId));
+    statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
+    const purchase=await env.DB.batch(statements);
+    if(purchase[debitIndex]?.meta?.changes!==1||purchase[guardIndex]?.meta?.changes!==1)return json({error:"Saldo insuficiente ou oferta esgotada. Nenhum valor foi debitado."},409);
 
   }else if(type==="merchant_exchange"){
     const offerId=String(body.offerId||""),cycle=merchantCycle(),offer=merchantExchangeOffers(cycle).find(item=>item.id===offerId);
