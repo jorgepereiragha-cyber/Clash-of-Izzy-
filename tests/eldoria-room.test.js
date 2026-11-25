@@ -177,3 +177,38 @@ test("Eldoria broadcasts only the aggregate online connection count", () => {
     { type: "presence", online: 2, room: "eldoria" }
   ]);
 });
+
+
+test("Eldoria configures exact hibernation heartbeat when supported", () => {
+  const previous = globalThis.WebSocketRequestResponsePair;
+  let pair;
+  try {
+    globalThis.WebSocketRequestResponsePair = class { constructor(request, response) { this.request = request; this.response = response; } };
+    const fake = roomContext([]);
+    fake.ctx.setWebSocketAutoResponse = value => { pair = value; };
+    new EldoriaRoom(fake.ctx, {});
+    assert.equal(pair.request, JSON.stringify({type:"ping"}));
+    assert.deepEqual(JSON.parse(pair.response), {type:"pong"});
+  } finally {
+    if (previous === undefined) delete globalThis.WebSocketRequestResponsePair;
+    else globalThis.WebSocketRequestResponsePair = previous;
+  }
+});
+
+test("Eldoria rechecks capacity after ticket consumption", async () => {
+  const sockets = Array.from({length:199}, () => ({}));
+  const fake = roomContext(sockets);
+  const room = new EldoriaRoom(fake.ctx, {});
+  const ticket = "a".repeat(72);
+  fake.entries.set("realtime-ticket:" + ticket, {playerId:"izzy_0123456789abcdef0123456789abcdef",expiresAt:Date.now()+30000});
+  const transaction = fake.ctx.storage.transaction;
+  fake.ctx.storage.transaction = async callback => {
+    const result = await transaction(callback);
+    sockets.push({});
+    return result;
+  };
+  const response = await room.fetch(new Request("https://eldoria.internal/socket", {headers:{Upgrade:"websocket","Sec-WebSocket-Protocol":"coi-eldoria","X-COI-Realtime-Ticket":ticket}}));
+  assert.equal(response.status,503);
+  assert.equal(fake.entries.has("realtime-ticket:" + ticket),false);
+  assert.equal(sockets.length,200);
+});
