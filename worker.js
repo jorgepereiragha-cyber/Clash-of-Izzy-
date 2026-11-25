@@ -1162,7 +1162,6 @@ async function gameAction(env,playerId,body){
     ]);
     if(!fusion[0]?.meta?.changes)return json({error:"Fragmentos insuficientes, skins alteradas ou fusão já realizada."},409);
   }else if(type==="shop_buy"){
-
     const itemId=String(body.item||""),source=String(body.source||"shop"),item=Object.hasOwn(SHOP_ITEMS,itemId)?SHOP_ITEMS[itemId]:null;
     if(!item||!["shop","merchant"].includes(source))return json({error:"Produto ou origem inválidos."},400);
     let price=item.price,cycle=null,offer=null;
@@ -1170,24 +1169,27 @@ async function gameAction(env,playerId,body){
       cycle=merchantCycle();offer=merchantOffers(cycle).find(x=>x.id===itemId);
       if(!offer)return json({error:"Esta oferta não pertence à rotação atual."},409);
       price=offer.price;
-      await env.DB.prepare("INSERT OR IGNORE INTO merchant_stock(kingdom_id,cycle_id,item_id,stock) VALUES(?,?,?,?)").bind(k.id,cycle,itemId,offer.stock).run();
-      const stock=await env.DB.prepare("UPDATE merchant_stock SET stock=stock-1 WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND stock>0").bind(k.id,cycle,itemId).run();
-      if(!stock.meta.changes)return json({error:"Oferta esgotada. O mercador retorna na próxima rotação."},409);
-    }else if(source!=="shop")return json({error:"Origem da compra inválida."},400);
-    const debit=item.currency==="gems"
-      ?await env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(price,p.id,price).run()
-      :await env.DB.prepare("UPDATE kingdoms SET gold=gold-? WHERE id=? AND gold>=?").bind(price,k.id,price).run();
-    if(!debit.meta.changes){
-      if(source==="merchant")await env.DB.prepare("UPDATE merchant_stock SET stock=stock+1 WHERE kingdom_id=? AND cycle_id=? AND item_id=?").bind(k.id,cycle,itemId).run();
-      return json({error:item.currency==="gems"?"Diamantes insuficientes.":"Ouro insuficiente."},409);
     }
+    const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const statements=[];
+    if(offer)statements.push(env.DB.prepare("INSERT OR IGNORE INTO merchant_stock(kingdom_id,cycle_id,item_id,stock) VALUES(?,?,?,?)").bind(k.id,cycle,itemId,offer.stock));
+    const stockCheck=offer?" AND EXISTS(SELECT 1 FROM merchant_stock WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND stock>0)":"";
+    const stockBindings=offer?[k.id,cycle,itemId]:[];
+    const debitIndex=statements.length;
+    statements.push(item.currency==="gems"
+      ?env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?"+stockCheck).bind(price,p.id,price,...stockBindings)
+      :env.DB.prepare("UPDATE kingdoms SET gold=gold-? WHERE id=? AND gold>=?"+stockCheck).bind(price,k.id,price,...stockBindings));
+    if(offer)statements.push(env.DB.prepare("UPDATE merchant_stock SET stock=stock-1 WHERE kingdom_id=? AND cycle_id=? AND item_id=? AND stock>0 AND changes()=1").bind(k.id,cycle,itemId));
+    const guardIndex=statements.length;
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(k.id,"__internal_action_guard",actionId));
     for(const [key,amount] of Object.entries(item.gives)){
-      if(["food","wood","stone","iron","gold"].includes(key))statements.push(env.DB.prepare("UPDATE kingdoms SET "+key+"="+key+"+? WHERE id=?").bind(amount,k.id));
-      else statements.push(env.DB.prepare("INSERT INTO shop_inventory(kingdom_id,item_id,quantity) VALUES(?,?,?) ON CONFLICT(kingdom_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,key,amount));
+      if(["food","wood","stone","iron","gold"].includes(key))statements.push(env.DB.prepare("UPDATE kingdoms SET "+key+"="+key+"+? WHERE id=? AND "+guard).bind(amount,k.id,k.id,actionId));
+      else statements.push(env.DB.prepare("INSERT INTO shop_inventory(kingdom_id,item_id,quantity) SELECT ?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,item_id) DO UPDATE SET quantity=quantity+excluded.quantity").bind(k.id,key,amount,k.id,actionId));
     }
-    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"shop_purchase",JSON.stringify({item:itemId,source,price,currency:item.currency})));
-    await env.DB.batch(statements);
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"shop_purchase",JSON.stringify({item:itemId,source,price,currency:item.currency}),k.id,actionId));
+    statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
+    const purchase=await env.DB.batch(statements);
+    if(purchase[debitIndex]?.meta?.changes!==1||purchase[guardIndex]?.meta?.changes!==1)return json({error:"Saldo insuficiente ou oferta esgotada. Nenhum valor foi debitado."},409);
 
   }else if(type==="merchant_exchange"){
     const offerId=String(body.offerId||""),cycle=merchantCycle(),offer=merchantExchangeOffers(cycle).find(item=>item.id===offerId);
