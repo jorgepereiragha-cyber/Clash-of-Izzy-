@@ -706,6 +706,27 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal((await getStateFor(cookie,start.data.token)).equipmentFragments.comum.balance,shardBefore);
     console.log("Beta equipment reinforcement passed: free forge, concurrent CAS, persisted stat and replay.");
 
+    // Normal equipment level is separate from reinforcement and must also reject replay.
+    const normalBefore=await getStateFor(cookie,start.data.token);
+    const normalSword=normalBefore.equipment.find(e=>e.id==="iron_sword");
+    const heroId=Number(normalBefore.heroes[0]?.id);
+    assert.ok(Number.isSafeInteger(heroId)&&heroId>0,"starter hero available");
+    assert.equal((await actionFor(cookie,start.data.token,{type:"equipment_upgrade",itemId:"iron_sword"})).status,400);
+    const upgrade=()=>actionFor(cookie,start.data.token,{type:"equipment_upgrade",itemId:"iron_sword",expectedLevel:normalSword.level});
+    const equip=()=>actionFor(cookie,start.data.token,{type:"equipment_equip",itemId:"iron_sword",heroId});
+    const [upgradeA,upgradeB,equipped]=await Promise.all([upgrade(),upgrade(),equip()]);
+    assert.deepEqual([upgradeA.status,upgradeB.status].sort((a,b)=>a-b),[200,409]);
+    assert.equal(equipped.status,200);
+    assert.equal((await upgrade()).status,409,"sequential replay must be rejected");
+    const normalAfter=await getStateFor(cookie,start.data.token);
+    const finalSword=normalAfter.equipment.find(e=>e.id==="iron_sword");
+    assert.equal(finalSword.level,normalSword.level+1);
+    assert.equal(finalSword.enhancement,normalSword.enhancement);
+    const binding=normalAfter.heroEquipment.find(e=>e.item_key==="iron_sword");
+    assert.equal(Number(binding?.hero_id),heroId);
+    assert.equal(Number(binding?.level),finalSword.level);
+    console.log("Beta normal equipment level and concurrent hero equip passed.");
+
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
     assert.deepEqual(methods.data, {mercadoPago:false,nubankPix:false});

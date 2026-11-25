@@ -996,6 +996,14 @@ async function gameAction(env,playerId,body){
     if(!row)return json({error:"Equipamento não encontrado."},404);
     if(Number(row.is_locked))return json({error:"Destrave o equipamento antes de evoluir."},409);
     const level=Number(row.level);
+    // Beta clients must confirm the exact displayed level. Legacy public clients
+    // remain compatible until their own release is approved.
+    if(env.ENVIRONMENT==="beta"||body.expectedLevel!==undefined){
+      if(!Number.isSafeInteger(body.expectedLevel)||body.expectedLevel<1)
+        return json({error:"Informe o nível atual do equipamento."},400);
+      if(body.expectedLevel!==level)
+        return json({error:"Nível desatualizado. Sincronize o equipamento antes de evoluir."},409);
+    }
     if(level>=def.maxLevel)return json({error:"Este equipamento já atingiu o nível máximo."},409);
     const multiplier=({comum:1,raro:1.1,epico:1.2,lendario:1.5})[def.rarity]||1;
     const cost=Math.floor(100*Math.pow(1.3,level)*multiplier);
@@ -1039,10 +1047,13 @@ async function gameAction(env,playerId,body){
     if(!row)return json({error:"Equipamento não encontrado no inventário."},404);
     const hero=await env.DB.prepare("SELECT id FROM heroes WHERE id=? AND kingdom_id=?").bind(heroId,k.id).first();
     if(!hero)return json({error:"Herói não pertence a este reino."},404);
-    await env.DB.batch([
-      env.DB.prepare("DELETE FROM hero_equipment WHERE item_key=? AND hero_id IN (SELECT id FROM heroes WHERE kingdom_id=?)").bind(itemKey,k.id),
-      env.DB.prepare("INSERT INTO hero_equipment(hero_id,slot,item_key,level) VALUES(?,?,?,?) ON CONFLICT(hero_id,slot) DO UPDATE SET item_key=excluded.item_key,level=excluded.level").bind(heroId,def.slot,itemKey,row.level)
+    // Read the canonical level within the same D1 transaction, not the stale
+    // value observed before another concurrent equipment upgrade.
+    const result=await env.DB.batch([
+      env.DB.prepare("DELETE FROM hero_equipment WHERE item_key=? AND hero_id IN (SELECT id FROM heroes WHERE kingdom_id=?) AND EXISTS(SELECT 1 FROM heroes WHERE id=? AND kingdom_id=?) AND EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=?)").bind(itemKey,k.id,heroId,k.id,k.id,itemKey),
+      env.DB.prepare("INSERT INTO hero_equipment(hero_id,slot,item_key,level) SELECT ?,?,ke.item_key,ke.level FROM kingdom_equipment ke JOIN heroes h ON h.id=? AND h.kingdom_id=ke.kingdom_id WHERE ke.kingdom_id=? AND ke.item_key=? ON CONFLICT(hero_id,slot) DO UPDATE SET item_key=excluded.item_key,level=excluded.level").bind(heroId,def.slot,heroId,k.id,itemKey)
     ]);
+    if(result[1]?.meta?.changes!==1)return json({error:"Não foi possível equipar a peça. Sincronize o reino."},409);
   }else if(type==="equipment_unequip"){
     const itemKey=String(body.itemId||""),heroId=Number(body.heroId);
     if(!EQUIPMENT_CATALOG[itemKey]||!Number.isSafeInteger(heroId)||heroId<1)return json({error:"Equipamento ou herói inválido."},400);

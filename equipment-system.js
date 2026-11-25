@@ -591,7 +591,10 @@
     }
     finally{busy=false;render();}
   }
-  window.upgradeEquipment=()=>perform({type:"equipment_upgrade",itemId:selected},"Equipamento evoluído e salvo no servidor.");
+  window.upgradeEquipment=()=>{
+    const item=state?.equipment?.find(x=>x.id===selected);
+    if(item)return perform({type:"equipment_upgrade",itemId:item.id,expectedLevel:item.level},"Equipamento evoluído e salvo no servidor.");
+  };
   window.toggleLock=()=>perform({type:"equipment_lock",itemId:selected},"Bloqueio do equipamento atualizado no servidor.");
   window.equipEquipment=()=>selectedHeroId?perform({type:"equipment_equip",itemId:selected,heroId:selectedHeroId},"Equipamento atribuído ao herói."):setStatus("Selecione um herói válido.",true);
   window.unequipEquipment=()=>{
