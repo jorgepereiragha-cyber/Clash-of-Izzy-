@@ -649,6 +649,9 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(Number(restored.data.state.dragon.level),Number(originalDragon.level));
     assert.equal(Number(restored.data.state.dragon.bond),Number(originalDragon.bond));
     assert.equal(Number(restored.data.state.dragon.experience),Number(originalDragon.experience));
+    // Real API collection returns the passive for each individually persisted creature.
+    assert.equal(restored.data.state.dragonCollection.find(x=>x.key===originalDragon.dragon_key).elementalSkill.rank,0);
+    assert.equal(swapped.data.state.dragonCollection.find(x=>x.key==="mist_talon").elementalSkill.nextMilestone,20);
     console.log("Beta individual dragon progression passed: switch and restore without transferring progress.");
     const countEvents = async type => {
       assert.ok(["research_started","research_upgraded","troop_training_started","troops_trained"].includes(type));

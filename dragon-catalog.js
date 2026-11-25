@@ -119,15 +119,38 @@ export const DRAGON_CATALOG=Object.freeze([
 export const DRAGON_BY_KEY=Object.freeze(Object.fromEntries(DRAGON_CATALOG.map(dragon=>[dragon.key,dragon])));
 export const MASTER_DRAGON_KEYS=Object.freeze(DRAGON_CATALOG.filter(x=>x.master).map(x=>x.key));
 export const DRAGON_BONUS_CAP=5.5;
+// Original passive affinities. Unlock from individual level AND bond, never from client input.
+export const DRAGON_ELEMENTAL_SKILLS=Object.freeze(Object.fromEntries(Object.entries({
+ ember_wyrm:{name:"Chama Guardiã",attack:0.1,defense:0.2},
+ mist_talon:{name:"Rajada Cortante",attack:0.3,defense:0},
+ frost_glimmer:{name:"Escudo Glacial",attack:0,defense:0.3},
+ storm_rune:{name:"Fulgor Rúnico",attack:0.3,defense:0},
+ jade_guardian:{name:"Muralha Esmeralda",attack:0,defense:0.3},
+ abyss_wing:{name:"Véu do Abismo",attack:0.15,defense:0.15},
+ sun_ascendant:{name:"Coroa Solar",attack:0.3,defense:0},
+ astral_aegis:{name:"Égide Estelar",attack:0,defense:0.3},
+ imperial_drake:{name:"Juramento Imperial",attack:0.15,defense:0.15}
+}).map(([key,value])=>[key,Object.freeze(value)])));
+const DRAGON_SKILL_MILESTONES=Object.freeze([20,50,80]);
+function validProgress(value){const n=Number(value);return Number.isFinite(n)?Math.max(1,Math.min(100,Math.floor(n))):1;}
+export function getDragonElementalSkill(row={}){
+ const key=String(row?.dragon_key||"");
+ if(!Object.hasOwn(DRAGON_ELEMENTAL_SKILLS,key))return null;
+ const skill=DRAGON_ELEMENTAL_SKILLS[key],level=validProgress(row.level),bond=validProgress(row.bond);
+ const rank=DRAGON_SKILL_MILESTONES.filter(n=>level>=n&&bond>=n).length;
+ const round=n=>Number(n.toFixed(2));
+ return {name:skill.name,rank,maxRank:3,nextMilestone:DRAGON_SKILL_MILESTONES[rank]??null,
+   attackPercent:round(skill.attack*rank/3),defensePercent:round(skill.defense*rank/3)};
+}
 export function getDragonCombatBonuses(row={}){
- const dragon=DRAGON_BY_KEY[String(row.dragon_key||"")];
+ const key=String(row?.dragon_key||""),dragon=Object.hasOwn(DRAGON_BY_KEY,key)?DRAGON_BY_KEY[key]:null;
  if(!dragon)return {attackPercent:0,defensePercent:0};
- const level=Math.max(1,Math.min(100,Number(row.level)||1));
- const bond=Math.max(1,Math.min(100,Number(row.bond)||1));
+ const level=validProgress(row.level),bond=validProgress(row.bond);
+ const skill=getDragonElementalSkill({dragon_key:key,level,bond});
  const factor=dragon.rarity==="gold"?.85+.1*((level-1)/99)+.05*((bond-1)/99):.65+.25*((level-1)/99)+.1*((bond-1)/99);
  return {
-   attackPercent:Math.min(DRAGON_BONUS_CAP,Number((dragon.attack*factor).toFixed(2))),
-   defensePercent:Math.min(DRAGON_BONUS_CAP,Number((dragon.defense*factor).toFixed(2)))
+   attackPercent:Math.min(DRAGON_BONUS_CAP,Number((dragon.attack*factor+(skill?.attackPercent||0)).toFixed(2))),
+   defensePercent:Math.min(DRAGON_BONUS_CAP,Number((dragon.defense*factor+(skill?.defensePercent||0)).toFixed(2)))
  };
 }
 export function getDragonCollectionView(ownedKeys=[],activeKey="ember_wyrm",level=1,bond=1,progressRows=[]){
@@ -137,7 +160,8 @@ export function getDragonCollectionView(ownedKeys=[],activeKey="ember_wyrm",leve
    const saved=owned.has(dragon.key)?progress.get(dragon.key):null;
    const individualLevel=Math.max(1,Math.min(100,Number(equipped?level:saved?.level)||1));
    const individualBond=Math.max(1,Math.min(100,Number(equipped?bond:saved?.bond)||1));
+   const individual={dragon_key:dragon.key,level:individualLevel,bond:individualBond};
    return {...dragon,owned:owned.has(dragon.key),equipped,level:individualLevel,bond:individualBond,
-     ...getDragonCombatBonuses({dragon_key:dragon.key,level:individualLevel,bond:individualBond})};
+     elementalSkill:getDragonElementalSkill(individual),...getDragonCombatBonuses(individual)};
  });
 }

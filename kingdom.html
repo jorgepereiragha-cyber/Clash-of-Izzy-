@@ -636,6 +636,14 @@ function renderDragonCollection(){
    stats.textContent+=" · Nível "+level+"/100 · Vínculo "+bond+"/100";
   }
   card.append(name,stats);
+  if(dragon.elementalSkill){
+   const skill=dragon.elementalSkill,info=document.createElement("p");info.className="muted";
+   info.textContent=skill.name+" · Habilidade passiva "+skill.rank+"/"+skill.maxRank+
+    (skill.rank>0?" · Ataque +"+Number(skill.attackPercent).toFixed(2)+"% · Defesa +"+Number(skill.defensePercent).toFixed(2)+"% (incluídos no total, até o teto de 5,5%)":" · Bloqueada")+
+    (skill.nextMilestone?" · Próximo: nível e vínculo "+skill.nextMilestone:" · Habilidade máxima")+
+    (dragon.equipped?" · Ativa quando desbloqueada":" · Equipe para aplicar");
+   card.append(info);
+  }
   const action=document.createElement("button");action.type="button";
   action.disabled=busy||dragon.equipped||Boolean(dragon.master&&!dragon.owned);
   if(dragon.equipped)action.textContent="✓ Equipado";
