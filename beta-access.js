@@ -105,7 +105,7 @@ async function redeemInvite(request, env, url) {
     "SELECT 1 AS installed FROM sqlite_master WHERE type='trigger' AND name='beta_claim_invite_for_session'"
   ).first();
   if (!claimTrigger) {
-    return responseJson({ error: "Controle de convites beta nao instalado.", code: "BETA_SCHEMA_INCOMPLETE" }, 503);
+    return responseJson({ error: "Controle de convites indisponível.", code: "BETA_SCHEMA_INCOMPLETE" }, 503);
   }
   // One INSERT claims the invite and issues its session atomically.
   // The beta-only BEFORE INSERT trigger increments uses in the same SQLite
@@ -128,7 +128,7 @@ async function redeemInvite(request, env, url) {
 export async function betaAccessGuard(request, env) {
   if (env?.ENVIRONMENT !== "beta") return null; // Existing production behavior is untouched.
   if (!env.DB || env.INVITE_ONLY !== "true") {
-    return responseJson({ error: "Beta nao configurado com isolamento seguro." }, 503);
+    return responseJson({ error: "Servidor de acesso restrito indisponível." }, 503);
   }
   const url = new URL(request.url);
   const path = url.pathname;
@@ -142,23 +142,23 @@ export async function betaAccessGuard(request, env) {
     if (path === "/admin" || path === "/admin.html" ||
         path === "/api/admin" || path.startsWith("/api/admin/")) {
       if (path === "/api/admin/purchase-requests/review") {
-        return responseJson({ error: "Pagamento real indisponivel neste beta.", code: "BETA_PAYMENTS_DISABLED" }, 503);
+        return responseJson({ error: "Pagamentos reais indisponíveis neste servidor.", code: "BETA_PAYMENTS_DISABLED" }, 503);
       }
-      return responseJson({ error: "Painel administrativo oficial indisponivel no beta.", code: "BETA_ADMIN_DISABLED" }, 404);
+      return responseJson({ error: "Painel administrativo indisponível neste servidor.", code: "BETA_ADMIN_DISABLED" }, 404);
     }
     // Never expose promotional contribution pages inside the private beta realm.
     // This also covers assets physically present in the shared repository.
     if (path === "/public-portal" || path.startsWith("/public-portal/") ||
         path === "/apoie" || path === "/apoie.html") {
-      return responseJson({ error: "Portal de divulgacao indisponivel no beta.", code: "BETA_MARKETING_DISABLED" }, 404);
+      return responseJson({ error: "Portal de divulgação indisponível neste servidor.", code: "BETA_MARKETING_DISABLED" }, 404);
     }
     // A closed beta cannot ship the official install manifest or offline landing.
     if (path === "/manifest.json" || path === "/offline.html") {
-      return responseJson({ error: "PWA oficial indisponivel neste beta.", code: "BETA_LEGACY_PWA_DISABLED" }, 404);
+      return responseJson({ error: "Instalação web indisponível neste servidor.", code: "BETA_LEGACY_PWA_DISABLED" }, 404);
     }
     // The public marketing portal and legacy beta sign-up are not part of this realm.
     if (path === "/api/beta/signup") {
-      return responseJson({ error: "Use o convite do beta fechado.", code: "BETA_LEGACY_SIGNUP_DISABLED" }, 404);
+      return responseJson({ error: "Utilize um convite de acesso.", code: "BETA_LEGACY_SIGNUP_DISABLED" }, 404);
     }
     if (path === "/api/beta/access/status" && request.method === "GET") {
       const permitted = await hasValidAccess(request, env);
@@ -189,7 +189,7 @@ export async function betaAccessGuard(request, env) {
       });
     }
     if (!hasAccess) {
-      if (path.startsWith("/api/")) return responseJson({ error: "Convite beta necessario.", code: "BETA_INVITE_REQUIRED" }, 403);
+      if (path.startsWith("/api/")) return responseJson({ error: "Convite de acesso necessário.", code: "BETA_INVITE_REQUIRED" }, 403);
       return new Response(null, {
         status: 302,
         headers: { Location: new URL("/beta-access.html", url).href, "Cache-Control": "no-store" }
@@ -238,11 +238,11 @@ export async function betaAccessGuard(request, env) {
     }
     if (betaPaymentDisabled(path, request.method, env) ||
         path === "/api/store" || path.startsWith("/api/store/")) {
-      return responseJson({ error: "Pagamento real indisponivel neste beta.", code: "BETA_PAYMENTS_DISABLED" }, 503);
+      return responseJson({ error: "Pagamentos reais indisponíveis neste servidor.", code: "BETA_PAYMENTS_DISABLED" }, 503);
     }
     return null;
   } catch {
     // D1 schema missing or unavailable: never grant access on an error.
-    return responseJson({ error: "Controle de acesso beta temporariamente indisponivel." }, 503);
+    return responseJson({ error: "Controle de acesso temporariamente indisponível." }, 503);
   }
 }
