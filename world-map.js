@@ -268,6 +268,10 @@ function updateActionButtons() {
     !state?.alliance?.id||Number(state?.kingdom?.castle_level||0)<10||
     siegeTotal<200||siegeTotal>10000;
 }
+// The server owns the duration; do not display a guessed rule.
+function throneHoldLabel(minutes) {
+  return Number.isSafeInteger(minutes) && minutes>0 ? fmt(minutes)+" minutos" : "tempo definido pelo servidor";
+}
 function renderDetails() {
   const root = $("territoryDetails");
   root.replaceChildren();
@@ -293,7 +297,7 @@ function renderDetails() {
     addStat(grid,"Aliança ocupante",throne?.occupantAllianceTag||"Nenhuma");
     addStat(grid,"Reino coroado",throne?.reigningKingdom||"Nenhum");
     addStat(grid,"Requisito","Aliança · Castelo 10 · 200 tropas");
-    if(throne?.phase==="contest")addStat(grid,"Ocupação para vencer","30 minutos contínuos");
+    if(throne?.phase==="contest")addStat(grid,"Ocupação para vencer",throneHoldLabel(throne.holdRequiredMinutes)+" de ocupação contínua");
   }else if (isCastle) {
     addStat(grid, "Comandante", territory.commander_name || "Comandante");
     addStat(grid, "Poder", fmt(territory.power));
@@ -307,7 +311,7 @@ function renderDetails() {
   }
   root.append(grid);
   $("marchNotice").textContent = isThrone
-    ? "Guerra do Trono: 35 dias de proteção, alianças rivais, cerco de tropas e 30 minutos de ocupação para coroação."
+    ? "Guerra do Trono: alianças rivais, cerco de tropas e "+throneHoldLabel(state?.throne?.holdRequiredMinutes)+" de ocupação para coroação."
     : isCastle
     ? "Castelo de outro comandante detectado. Você pode consultar comandante, poder e aliança; o envio de ataques PvP será ativado na Fase 10."
     : territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
@@ -414,7 +418,7 @@ async function sendThroneAssault(){
     await refreshState();
     await updateRealmCards();
     $("marchNotice").textContent=outcome.battle?.won?
-      "Cerco vitorioso! Sua aliança deve manter o trono por 30 minutos.":
+      "Cerco vitorioso! Sua aliança deve manter o trono por "+throneHoldLabel(outcome.battle.holdMinutes??state?.throne?.holdRequiredMinutes)+".":
       "O cerco não superou as defesas. Confira as baixas no relatório.";
   }catch(e){$("marchNotice").textContent=e.message;setStatus(e.message,true)}
   finally{busy=false;updateActionButtons()}

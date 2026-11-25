@@ -178,3 +178,21 @@ test("replay de cerco não autoriza efeitos a partir de tentativa histórica", a
  const source=await read("throne-war.js");
  assert.match(source,/env\.DB\.batch\(\[debit,attempt,record,capture\]\)/);
 });
+
+
+test("coronation requires a real cycle and occupancy inside that contest",()=>{
+ const row={occupation_cycle:0,occupying_alliance_id:7,occupied_since:at(35).toISOString(),crowned_cycle:null};
+ assert.equal(mayCoronate(row,origin,at(35,2.5)),true);
+ assert.equal(mayCoronate({...row,occupation_cycle:null},origin,at(35,3)),false);
+ assert.equal(mayCoronate({...row,occupied_since:at(34,23).toISOString()},origin,at(35,3)),false);
+ assert.equal(mayCoronate({...row,occupation_cycle:1},origin,at(42,3)),false);
+ const last={...row,occupied_since:at(35,5.5).toISOString()};
+ assert.equal(mayCoronate(last,origin,at(35,8)),true);
+ assert.equal(mayCoronate({...last,occupied_since:new Date(at(35,5.5).getTime()+1).toISOString()},origin,at(35,9)),false);
+});
+test("map displays the authoritative duration rather than obsolete fixed text",async()=>{
+ const ui=await read("world-map.js");
+ assert.doesNotMatch(ui,/30 minutos/);
+ assert.match(ui,/throneHoldLabel\(throne\.holdRequiredMinutes\)/);
+ assert.match(ui,/throneHoldLabel\(outcome\.battle\.holdMinutes\?\?state\?\.throne\?\.holdRequiredMinutes\)/);
+});
