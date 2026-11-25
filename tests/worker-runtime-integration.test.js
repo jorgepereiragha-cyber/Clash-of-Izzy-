@@ -1024,6 +1024,12 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(stateA.queues.filter(item => item.status === "running" && item.queue_type === "training").length === 2,
         "dois treinamentos simultâneos permanecem persistidos");
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "research"));
+      // Reject inherited Object.prototype keys, not just unknown/incorrect item IDs.
+      const activeConstruction = stateA.queues.find(item => item.status === "running" && item.queue_type === "construction");
+      assert.ok(activeConstruction?.id);
+      for (const itemId of ["constructor", "__proto__", "toString", "res_1h"]) {
+        await action(tokenA, { type: "queue_speedup", queueId: activeConstruction.id, itemId, quantity: 1 }, 400);
+      }
 
       const resourcesAfterDebit = Object.fromEntries(coreResourceKeys.map(key => [key, Number(stateA.kingdom[key])]));
       assert.ok(coreResourceKeys.some(key => resourcesAfterDebit[key] < resourcesBeforeQueues[key]),

@@ -1259,7 +1259,7 @@ async function gameAction(env,playerId,body){
     const queue=await env.DB.prepare("SELECT id,queue_type,status,started_at,completes_at FROM kingdom_queues WHERE id=? AND kingdom_id=? AND status='running'").bind(queueId,k.id).first();
     if(!queue)return json({error:"Fila ativa não encontrada neste reino."},404);
     const secondsPerItem=speedups[queue.queue_type]?.[itemId];
-    if(!secondsPerItem)return json({error:"Este acelerador não corresponde ao tipo desta fila."},400);
+    if(!Number.isSafeInteger(secondsPerItem)||secondsPerItem<=0)return json({error:"Este acelerador não corresponde ao tipo desta fila."},400);
     const inventory=await env.DB.prepare("SELECT quantity FROM shop_inventory WHERE kingdom_id=? AND item_id=?").bind(k.id,itemId).first();
     if(Number(inventory?.quantity||0)<quantity)return json({error:"Quantidade de aceleradores insuficiente."},409);
     const now=Date.now(),remaining=Math.max(0,Date.parse(queue.completes_at)-now);
