@@ -291,7 +291,7 @@ test("GLB assets are normalized to a mobile building footprint and grounded at y
 test("optional GLB assets load only for present building types with bounded concurrency", () => {
   assert.ok(renderer.includes("const neededTypes = new Set"));
   assert.ok(renderer.includes("glbLoadPromises.has(entry.key)"));
-  assert.ok(renderer.includes("Math.min(3, queue.length)"));
+  assert.ok(renderer.includes("const glbLoadLanes = Array.from({ length: 3 }"));
   assert.ok(renderer.includes("loadOptionalGlbAssets(list, latestTroops)"));
   assert.ok(renderer.includes("loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops)"));
   assert.ok(renderer.includes("manifestLoad = null"));
@@ -299,7 +299,7 @@ test("optional GLB assets load only for present building types with bounded conc
 
 test("failed optional GLB downloads preserve procedural models and allow later retries", () => {
   assert.ok(renderer.includes("GLB assets not ready; procedural models remain active"));
-  assert.ok(renderer.includes("glbLoadPromises.delete(key)"));
+  assert.ok(renderer.includes("glbLoadPromises.delete(entry.key)"));
   assert.ok(renderer.includes("manifestLoad = null"));
 });
 
