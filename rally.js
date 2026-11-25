@@ -224,18 +224,50 @@ export async function processDueRallies(env,batchSize=1){
  await env.DB.prepare("UPDATE rallies SET status='marching' WHERE id IN (SELECT id FROM rallies WHERE status='gathering' AND departure_time<=? ORDER BY departure_time,id LIMIT ?)").bind(now,limit).run();
  const due=await env.DB.prepare("SELECT id,leader_kingdom_id,target_id FROM rallies WHERE status='marching' AND arrival_time<=? ORDER BY arrival_time,id LIMIT ?").bind(now,limit).all();
  for(const rally of due.results||[]){
-  const rows=await env.DB.prepare("SELECT troop_data FROM rally_reinforcements WHERE rally_id=? ORDER BY id").bind(rally.id).all();
-  const garrison={};
+  const rows=await env.DB.prepare("SELECT kingdom_id,troop_data FROM rally_reinforcements WHERE rally_id=? ORDER BY id").bind(rally.id).all();
+  // A resource node has a single owner. Retain only that owner's troops in
+  // its garrison; return allied reinforcements to their original kingdoms.
+  // Legacy ambiguous settlements are never automatically refunded.
+  const leader=Number(rally.leader_kingdom_id);
+  let garrison=null,valid=true;
+  const allies=[],seen=new Set();
   for(const row of rows.results||[]){
-   let troops={};try{troops=JSON.parse(row.troop_data||"{}")}catch{}
-   for(const [type,count] of Object.entries(troops)){
-    if(Object.hasOwn(UNIT_POWER,type))garrison[type]=(garrison[type]||0)+Number(count||0);
-   }
+   const owner=Number(row.kingdom_id);
+   let troops=null;
+   try{troops=parseTroops(JSON.parse(row.troop_data));}catch{}
+   if(!Number.isSafeInteger(owner)||owner<=0||!troops||seen.has(owner)){valid=false;break;}
+   seen.add(owner);
+   if(owner===leader)garrison=troops;
+   else allies.push({owner,troops});
   }
-  const occupied=await env.DB.prepare("UPDATE resource_nodes SET occupied_by=?,occupation_start=?,garrison_json=?,reserved_by_rally=NULL,last_regen=? WHERE id=? AND reserved_by_rally=? AND occupied_by IS NULL")
-   .bind(rally.leader_kingdom_id,now,JSON.stringify(garrison),now,rally.target_id,rally.id).run();
-  await env.DB.prepare("UPDATE rallies SET status=? WHERE id=? AND status='marching'")
-   .bind(Number(occupied.meta?.changes||0)===1?"completed":"cancelled",rally.id).run();
+  if(!valid||!garrison){
+   console.error("rally_reinforcement_integrity_failed",rally.id);
+   continue;
+  }
+  // The reservation, terminal state and refunds commit together. A competing
+  // cron that lost the reservation cannot change a completed rally or refund twice.
+  const result=await env.DB.batch([
+   env.DB.prepare(`UPDATE resource_nodes SET occupied_by=?,occupation_start=?,garrison_json=?,reserved_by_rally=NULL,
+     current_resources=MIN(max_resources,current_resources+CAST(MAX(0,?-last_regen)*regen_rate/3600 AS INTEGER)),
+     last_regen=MAX(last_regen,?)
+     WHERE id=? AND reserved_by_rally=? AND occupied_by IS NULL
+     AND EXISTS(SELECT 1 FROM rallies r WHERE r.id=? AND r.status='marching' AND r.arrival_time<=?)`)
+    .bind(leader,now,JSON.stringify(garrison),now,now,rally.target_id,rally.id,rally.id,now),
+   env.DB.prepare("UPDATE rallies SET status='completed' WHERE id=? AND status='marching' AND changes()=1")
+    .bind(rally.id),
+   env.DB.prepare(`INSERT INTO army_units(kingdom_id,unit_type,tier,quantity)
+     SELECT CAST(json_extract(owner.value,'$.owner') AS INTEGER),troop.key,1,CAST(troop.value AS INTEGER)
+     FROM json_each(?) owner,json_each(json_extract(owner.value,'$.troops')) troop
+     WHERE changes()=1
+     ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity`)
+    .bind(JSON.stringify(allies))
+  ]);
+  if(Number(result[1]?.meta?.changes||0)!==1){
+   // A lost reservation may be a legacy partial settlement. Never guess
+   // whether troops were already credited; keep the evidence for reconciliation.
+   const current=await env.DB.prepare("SELECT status FROM rallies WHERE id=?").bind(rally.id).first();
+   if(current?.status==="marching")console.error("rally_reservation_integrity_failed",rally.id);
+  }
  }
 }
 export async function handleRally(request,env,publicPlayerId,path,body={}){
