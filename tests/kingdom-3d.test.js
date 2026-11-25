@@ -245,7 +245,7 @@ test("late GLB loads are disposed when WebGL context is lost during async loadin
 test("GLTF ImageBitmap resources are explicitly closed with GPU textures", () => {
   assert.match(renderer, /resources\.imageBitmaps\.add\(bitmap\)/);
   assert.match(renderer, /for \(const bitmap of resources\.imageBitmaps\) bitmap\.close\(\)/);
-  assert.match(renderer, /const resources = \{ geometries: new Set\(\), materials: new Set\(\), textures: new Set\(\), imageBitmaps: new Set\(\) \}/);
+  assert.match(renderer, /const resources = \{ geometries: new Set\(\), materials: new Set\(\), textures: new Set\(\), imageBitmaps: new Set\(\), instances: new Set\(\) \}/);
 });
 
 
@@ -436,4 +436,13 @@ test("special landmarks render only persisted distinct bounded positions",async(
  assert.match(renderer,/scene\.add\(group\);activeModels\.push\(group\)/);
  assert.match(renderer,/specialLandmarks:activeModels\.filter/);
  assert.match(kingdom,/window\.__coiKingdomSpecialBuildings=state\.specialCityBuildings/);
+});
+
+
+test("instanced forest and distant defenses release instance buffers through both cleanup paths",()=>{
+ assert.match(renderer,/if \(node\.isInstancedMesh\) resources\.instances\.add\(node\)/);
+ assert.match(renderer,/for \(const instance of resources\.instances\) instance\.dispose\(\)/);
+ assert.equal((renderer.match(/instances: new Set\(\)/g)||[]).length,2);
+ assert.match(renderer,/function disposeDetachedObject3D\(root\) \{[\s\S]*?disposeObject3D\(root, resources\);[\s\S]*?disposeResourceSet\(resources\)/);
+ assert.match(renderer,/function disposeSceneResources\(\) \{[\s\S]*?disposeObject3D\(scene, resources\);[\s\S]*?disposeResourceSet\(resources\)/);
 });

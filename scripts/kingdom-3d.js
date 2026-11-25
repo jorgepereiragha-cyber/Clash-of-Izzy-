@@ -150,6 +150,7 @@ if (host && "WebGLRenderingContext" in window) {
   function disposeObject3D(root, resources) {
     if (!root) return;
     root.traverse(node => {
+      if (node.isInstancedMesh) resources.instances.add(node);
       if (node.geometry) resources.geometries.add(node.geometry);
       const materials = Array.isArray(node.material) ? node.material : [node.material];
       for (const mat of materials) {
@@ -165,18 +166,20 @@ if (host && "WebGLRenderingContext" in window) {
     });
   }
   function disposeResourceSet(resources) {
+    // InstancedMesh owns GPU instance buffers independently of geometry/material.
+    for (const instance of resources.instances) instance.dispose();
     for (const geometry of resources.geometries) geometry.dispose();
     for (const texture of resources.textures) texture.dispose();
     for (const mat of resources.materials) mat.dispose();
     for (const bitmap of resources.imageBitmaps) bitmap.close();
   }
   function disposeDetachedObject3D(root) {
-    const resources = { geometries: new Set(), materials: new Set(), textures: new Set(), imageBitmaps: new Set() };
+    const resources = { geometries: new Set(), materials: new Set(), textures: new Set(), imageBitmaps: new Set(), instances: new Set() };
     disposeObject3D(root, resources);
     disposeResourceSet(resources);
   }
   function disposeSceneResources() {
-    const resources = { geometries: new Set(), materials: new Set(), textures: new Set(), imageBitmaps: new Set() };
+    const resources = { geometries: new Set(), materials: new Set(), textures: new Set(), imageBitmaps: new Set(), instances: new Set() };
     disposeObject3D(scene, resources);
     for (const template of glbTemplates.values()) disposeObject3D(template, resources);
     for (const template of glbPropTemplates.values()) disposeObject3D(template, resources);
