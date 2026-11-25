@@ -79,7 +79,19 @@ test("invocações em lote debitam gemas e gravam heróis/histórico atomicament
   assert.ok(summon.includes("env.DB.batch(statements)"));
   assert.ok(summon.includes("__internal_action_guard"));
   assert.ok(summon.includes("UPDATE players SET gems=gems-?"));
-  assert.ok(summon.includes("INSERT INTO hero_summon_history"));
+  const helperStart = worker.indexOf("export function appendHeroSummonDraw(");
+  const helperEnd = worker.indexOf("export function heroSummonResult(", helperStart);
+  assert.ok(helperStart >= 0 && helperEnd > helperStart);
+  const draw = worker.slice(helperStart, helperEnd);
+  assert.ok(summon.includes("appendHeroSummonDraw(env.DB,statements,"));
+  assert.ok(draw.includes("INSERT INTO hero_summon_history"));
+  assert.ok(draw.includes("INSERT INTO hero_inventory"));
+  assert.ok(draw.includes("INSERT INTO heroes("));
+  assert.ok(draw.includes("RETURNING result_type"));
+  assert.ok(draw.includes("__internal_action_guard"));
+  assert.ok(draw.indexOf("INSERT INTO hero_summon_history") < draw.indexOf("INSERT INTO hero_inventory"));
+  assert.ok(!draw.includes(".run()"));
+  assert.ok(summon.includes("heroSummonResult(draw,batch[draw.historyIndex])"));
   assert.ok(!summon.includes(".run()"));
 });
 
