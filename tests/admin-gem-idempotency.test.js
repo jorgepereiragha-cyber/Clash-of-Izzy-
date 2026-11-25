@@ -35,3 +35,20 @@ test("admin gem credit has transactional unique ledger, no secret leakage and cl
   assert.match(admin,/Máx|máx|1000000/);
   assert.match(ignore,/admin-gem-grants\.js/);
 });
+
+
+test("pending administrative grants persist across reloads and serialize same-origin tabs",async()=>{
+  const admin=await read("admin.html");
+  const start=admin.indexOf('const pendingKey="coi_admin_gem_pending:"');
+  const end=admin.indexOf("actions.append(amount,reason,grant)",start);
+  assert.ok(start>=0 && end>start);
+  const block=admin.slice(start,end);
+  assert.match(block,/localStorage\.getItem\(pendingKey\)/);
+  assert.doesNotMatch(block,/sessionStorage\./);
+  assert.match(block,/navigator\.locks\.request\(pendingKey,\{ifAvailable:true\}/);
+  assert.match(block,/if\(!lock\)/);
+  assert.match(block,/if\(!navigator\.locks\?\.request\)/);
+  assert.ok(block.indexOf("localStorage.setItem(pendingKey")<block.indexOf('await api("/admin/gems"'));
+  assert.ok(block.indexOf('await api("/admin/gems"')<block.indexOf("localStorage.removeItem(pendingKey)"));
+  assert.match(admin,/sessionStorage\.getItem\("coi_admin_token"\)/);
+});
