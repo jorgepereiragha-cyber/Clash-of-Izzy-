@@ -230,3 +230,28 @@ test("70 heróis têm talentos limitados, com marcos de nível e estrelas",()=>{
   assert.deepEqual(getHeroCombatBonuses({hero_key:key}),{attackPercent:0,defensePercent:0,healthPercent:0,criticalChancePercent:0});
  }
 });
+
+test("expanded heroes have role-specific vitality and critical, all progress monotonically",()=>{
+ const rows=Object.entries(HERO_TEMPLATES);
+ for(const [hero_key,def] of rows){
+  const rarity=HERO_RARITY[def.rarity];let prev=null;
+  for(let level=1;level<=rarity.maxLevel;level++){
+   const next=getHeroCombatBonuses({hero_key,level,stars:rarity.maxStars});
+   assert.ok(Object.values(next).every(Number.isFinite));
+   if(prev)for(const key of Object.keys(next))assert.ok(next[key]>=prev[key],hero_key+" "+key);
+   prev=next;
+  }
+ }
+ const expanded=rows.filter(([key])=>key.startsWith("eldoria_"));
+ assert.equal(expanded.length,47);
+ for(const [hero_key,def] of expanded){
+  const rarity=HERO_RARITY[def.rarity],bonus=getHeroCombatBonuses({hero_key,level:rarity.maxLevel,stars:rarity.maxStars});
+  if(def.type==="suporte")assert.ok(bonus.healthPercent>=2);
+  if(def.type==="arqueiro")assert.ok(bonus.criticalChancePercent>=1);
+ }
+});
+test("commander selection uses consistent deterministic tie break",async()=>{
+ const worker=await readFile(new URL("../worker.js",import.meta.url),"utf8");
+ assert.doesNotMatch(worker,/ORDER BY hi\.level DESC,hi\.stars DESC,h\.id LIMIT 1/);
+ assert.match(worker,/activeCommanderHeroId:activeHeroId/);
+});

@@ -95,9 +95,17 @@ export function getHeroTalent(hero={}){
  const def=HERO_TALENT_ROLES[role],scale=key=>Number((def[key]*rank/3).toFixed(2));
  return {name:def.name,role,rank,maxRank:3,nextMilestone:milestones[rank]||null,attackPercent:scale("attack"),defensePercent:scale("defense"),healthPercent:scale("health"),criticalChancePercent:scale("critical")};
 }
+// Expansion heroes have real role profiles instead of one generic fallback.
+const EXPANSION_ROLE_PROFILES=Object.freeze({
+ infantaria:Object.freeze({health:1.35,critical:0.1,attackWeight:.52,defenseWeight:.94}),
+ arqueiro:Object.freeze({health:.55,critical:.85,attackWeight:.96,defenseWeight:.48}),
+ cavalaria:Object.freeze({health:.95,critical:.45,attackWeight:.9,defenseWeight:.58}),
+ suporte:Object.freeze({health:1.85,critical:.1,attackWeight:.45,defenseWeight:.85})
+});
 export function getHeroCombatBonuses(hero = {}) {
   const key=String(hero.hero_key||"");
-  const profile=Object.hasOwn(HERO_COMBAT_PROFILES,key)?HERO_COMBAT_PROFILES[key]:{attack:1,defense:1,health:0.8,critical:0.2};
+  const expansionRole=Object.hasOwn(EXPANSION_HERO_TEMPLATES,key)?EXPANSION_ROLE_PROFILES[EXPANSION_HERO_TEMPLATES[key].type]:null;
+  const profile=Object.hasOwn(HERO_COMBAT_PROFILES,key)?HERO_COMBAT_PROFILES[key]:expansionRole||{attack:1,defense:1,health:0.8,critical:0.2};
   const zero={attackPercent:0,defensePercent:0,healthPercent:0,criticalChancePercent:0};
   if(!Object.hasOwn(HERO_TEMPLATES,key)&&!Object.hasOwn(HERO_COMBAT_PROFILES,key))return zero;
   // Preserve rarity for old heroes rows (gold is stored as 'legendary' in the
@@ -115,7 +123,9 @@ export function getHeroCombatBonuses(hero = {}) {
   const bands=HERO_COMBAT_BANDS[rarityKey]||HERO_COMBAT_BANDS.white;
   const value=(kind,offset)=>{
     const [min,max]=bands[kind];
-    const variation=.3+.7*((seed+offset)%1);
+    const legacyVariation=.3+.7*((seed+offset)%1);
+    const roleWeight=kind==="attack"?expansionRole?.attackWeight:expansionRole?.defenseWeight;
+    const variation=roleWeight===undefined?legacyVariation:.35*legacyVariation+.65*roleWeight;
     return Number((min+(max-min)*variation*(.25+.75*progression)).toFixed(2));
   };
   const talent=getHeroTalent({...hero,level,stars}),round=n=>Number(n.toFixed(2));

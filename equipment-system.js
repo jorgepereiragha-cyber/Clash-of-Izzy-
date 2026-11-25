@@ -128,7 +128,7 @@
     const summary=$("equipment-bonus-summary"),skinSummary=$("castle-skin-bonus-summary"),skin=state?.activeCastleSkin;
     if(summary){
       const setText=bonus.legendarySetActive===true?" · Conjunto completo: +1% Ataque / +1% Defesa / +0,5% Vida":"";
-      summary.textContent="Bônus do herói em combate: Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%"+setText+(bonus.reinforcementBonus?.stage?" · Conjunto reforçado +"+bonus.reinforcementBonus.stage:"");
+      summary.textContent="Equipamentos do comandante ativo ("+((state?.heroInventory||[]).find(h=>h.hero_key===state?.activeCommanderHeroKey)?.name||"não selecionado")+"): Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%"+setText+(bonus.reinforcementBonus?.stage?" · Conjunto reforçado +"+bonus.reinforcementBonus.stage:"");
     }
     if(skinSummary){
       skinSummary.textContent=skin?.id

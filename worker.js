@@ -485,7 +485,7 @@ async function applyProduction(env,kingdomId){
     gold:1.5*(levels.market||1)
   };
   await ensureEquipmentTables(env,kingdomId);
-  const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first();
+  const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,hi.hero_key,h.id LIMIT 1").bind(kingdomId).first();
   const [equippedRows,gearResearchRows]=await Promise.all([
     activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked,ke.enhancement FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key JOIN heroes h ON h.id=he.hero_id WHERE ke.kingdom_id=? AND he.hero_id=? AND h.kingdom_id=?").bind(kingdomId,activeHero.id,kingdomId).all():Promise.resolve({results:[]}),
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
@@ -575,7 +575,7 @@ async function processMarches(env,kingdomId,batchSize=50){
    if(target&&!target.territory_key?.startsWith("royal_throne_")&&!target.owner_kingdom_id&&army.length){
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level,prestige,equipped_skin_id FROM kingdoms WHERE id=?").bind(kingdomId).first(),
-     env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdomId).first(),
+     env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,hi.hero_key,h.id LIMIT 1").bind(kingdomId).first(),
      env.DB.prepare("SELECT dragon_key,level,bond FROM dragons WHERE kingdom_id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdomId).first(),
      env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(kingdomId).first()
@@ -694,22 +694,22 @@ const EQUIPMENT_CATALOG={
  iron_helm:{name:"Elmo do Recruta",slot:"helmet",rarity:"comum",tierRank:1,tierLabel:"Comum",maxLevel:20,icon:"⛑️",description:"Proteção básica para o comandante.",base:{defense:10,health:10},growth:{defense:2.5,health:2}},
  raven_helm:{name:"Elmo dos Corvos",slot:"helmet",rarity:"raro",tierRank:2,tierLabel:"Raro",requiresItem:"iron_helm",maxLevel:20,icon:"🪶",description:"Elmo de Odin com proteção e precisão.",base:{defense:13,critical:0.25},growth:{defense:3,critical:0.05},craft:{gold:1250,iron:60},requiredResearch:{gear_ward:1}},
  runic_helm:{name:"Elmo Rúnico de Asgard",slot:"helmet",rarity:"epico",tierRank:3,tierLabel:"Épico",requiresItem:"raven_helm",maxLevel:20,icon:"🛡️",description:"Runas antigas ampliam defesa e vitalidade.",base:{defense:22,health:35,critical:0.2},growth:{defense:4.2,health:4,critical:0.04},craft:{gold:3600,iron:150},requiredResearch:{gear_ward:3,gear_vitality:1}},
- coroa_izzy:{name:"Coroa de Izzy",slot:"helmet",rarity:"lendario",tierRank:4,tierLabel:"Lendário",requiresItem:"runic_helm",maxLevel:20,icon:"👑",description:"Relíquia real: equilíbrio de ataque, defesa e produção.",base:{attack:8,defense:24,health:25,resourceBonus:5},growth:{attack:1.5,defense:2.5,health:3,resourceBonus:2},craft:{gold:7000,iron:260},requiredResearch:{gear_ward:5,gear_vitality:3}},
+ coroa_izzy:{name:"Coroa de Izzy",slot:"helmet",rarity:"lendario",tierRank:4,tierLabel:"Lendário",requiresItem:"runic_helm",maxLevel:20,icon:"👑",description:"Relíquia real: equilíbrio de ataque, defesa e produção.",base:{attack:8,defense:24,health:25,resourceBonus:5},growth:{attack:1.5,defense:4.2,health:3,resourceBonus:2},craft:{gold:7000,iron:260},requiredResearch:{gear_ward:5,gear_vitality:3}},
  // ARMADURA: Comum → Raro → Épico → Lendário
  leather_armor:{name:"Gibão de Couro",slot:"armor",rarity:"comum",tierRank:1,tierLabel:"Comum",maxLevel:20,icon:"🥋",description:"Armadura inicial, leve e resistente.",base:{defense:12,health:20},growth:{defense:2,health:3}},
  warden_plate:{name:"Couraça do Guardião",slot:"armor",rarity:"raro",tierRank:2,tierLabel:"Raro",requiresItem:"leather_armor",maxLevel:20,icon:"🛡️",description:"Placas reforçadas para a linha de frente.",base:{defense:20,health:25},growth:{defense:4,health:6},craft:{gold:1600,iron:80},requiredResearch:{gear_ward:2}},
  manto_real:{name:"Manto Real",slot:"armor",rarity:"epico",tierRank:3,tierLabel:"Épico",requiresItem:"warden_plate",maxLevel:15,icon:"🧥",description:"Manto real encantado que aumenta a vitalidade.",base:{defense:8,health:50},growth:{defense:1.5,health:25},craft:{gold:3800,iron:160},requiredResearch:{gear_ward:3,gear_vitality:2}},
- aegis_asgard:{name:"Égide de Asgard",slot:"armor",rarity:"lendario",tierRank:4,tierLabel:"Lendário",requiresItem:"manto_real",maxLevel:20,icon:"🛡️",description:"Armadura lendária de proteção e vigor.",base:{attack:5,defense:26,health:50},growth:{attack:1,defense:2.2,health:4},craft:{gold:7600,iron:300},requiredResearch:{gear_ward:5,gear_vitality:4}},
+ aegis_asgard:{name:"Égide de Asgard",slot:"armor",rarity:"lendario",tierRank:4,tierLabel:"Lendário",requiresItem:"manto_real",maxLevel:20,icon:"🛡️",description:"Armadura lendária de proteção e vigor.",base:{attack:5,defense:26,health:50},growth:{attack:1,defense:4.0,health:8},craft:{gold:7600,iron:300},requiredResearch:{gear_ward:5,gear_vitality:4}},
  // BOTAS: Comum → Raro → Épico → Lendário
  scout_boots:{name:"Botas do Batedor",slot:"boots",rarity:"comum",tierRank:1,tierLabel:"Comum",maxLevel:20,icon:"🥾",description:"Calçado simples para as primeiras marchas.",base:{march:0.4,health:10},growth:{march:0.1,health:2}},
  wolf_boots:{name:"Botas do Lobo Cinzento",slot:"boots",rarity:"raro",tierRank:2,tierLabel:"Raro",requiresItem:"scout_boots",maxLevel:20,icon:"🐺",description:"Couro nórdico reforçado para marchas velozes.",base:{march:0.8,defense:5,health:15},growth:{march:0.2,defense:1,health:2},craft:{gold:1450,iron:65},requiredResearch:{gear_logistics:2}},
  storm_boots:{name:"Botas da Tempestade",slot:"boots",rarity:"epico",tierRank:3,tierLabel:"Épico",requiresItem:"wolf_boots",maxLevel:20,icon:"🌩️",description:"Botas encantadas que aceleram as marchas.",base:{march:1.4,defense:4,health:20},growth:{march:0.3,defense:0.8,health:3},craft:{gold:3600,iron:150},requiredResearch:{gear_logistics:3,gear_vitality:1}},
- asgardian_greaves:{name:"Grevas da Valquíria",slot:"boots",rarity:"lendario",tierRank:4,tierLabel:"Lendário",requiresItem:"storm_boots",maxLevel:20,icon:"🪽",description:"Grevas lendárias de ataque, defesa e mobilidade.",base:{attack:4,defense:8,health:30,march:1.5},growth:{attack:0.8,defense:1.2,health:3,march:0.2},craft:{gold:6900,iron:260},requiredResearch:{gear_logistics:5,gear_vitality:3}},
+ asgardian_greaves:{name:"Grevas da Valquíria",slot:"boots",rarity:"lendario",tierRank:4,tierLabel:"Lendário",requiresItem:"storm_boots",maxLevel:20,icon:"🪽",description:"Grevas lendárias de ataque, defesa e mobilidade.",base:{attack:4,defense:8,health:30,march:1.5},growth:{attack:0.8,defense:1.2,health:3,march:0.33},craft:{gold:6900,iron:260},requiredResearch:{gear_logistics:5,gear_vitality:3}},
  // ACESSÓRIO: Comum → Raro → Épico → Lendário
  copper_ring:{name:"Anel de Cobre",slot:"accessory",rarity:"comum",tierRank:1,tierLabel:"Comum",maxLevel:20,icon:"💍",description:"Acessório básico com bônus pequeno de ataque.",base:{attack:8,critical:0.1},growth:{attack:1.5,critical:0.02}},
  frost_ring:{name:"Anel do Inverno",slot:"accessory",rarity:"raro",tierRank:2,tierLabel:"Raro",requiresItem:"copper_ring",maxLevel:20,icon:"❄️",description:"Equilibra ataque e defesa com runas de gelo.",base:{attack:6,defense:6},growth:{attack:1.5,defense:1.5},craft:{gold:1350,iron:60},requiredResearch:{gear_ward:1}},
  moon_charm:{name:"Amuleto da Lua Prateada",slot:"accessory",rarity:"epico",tierRank:3,tierLabel:"Épico",requiresItem:"frost_ring",maxLevel:20,icon:"🌙",description:"Amuleto de equilíbrio entre ataque crítico e vida.",base:{attack:12,defense:8,health:25,critical:0.35},growth:{attack:2,defense:1,health:3,critical:0.05},craft:{gold:3500,iron:145},requiredResearch:{gear_forging:2,gear_vitality:2}},
- valkyrie_charm:{name:"Talismã das Valquírias",slot:"accessory",rarity:"lendario",tierRank:4,tierLabel:"Lendário",requiresItem:"moon_charm",maxLevel:20,icon:"✨",description:"Relíquia lendária de ataque, defesa e vitalidade.",base:{attack:12,defense:16,health:45,critical:0.15},growth:{attack:1.2,defense:1.8,health:3.5,critical:0.05},craft:{gold:6500,iron:220},requiredResearch:{gear_vitality:4,gear_forging:3}},
+ valkyrie_charm:{name:"Talismã das Valquírias",slot:"accessory",rarity:"lendario",tierRank:4,tierLabel:"Lendário",requiresItem:"moon_charm",maxLevel:20,icon:"✨",description:"Relíquia lendária de ataque, defesa e vitalidade.",base:{attack:12,defense:16,health:45,critical:0.35},growth:{attack:2.2,defense:1.8,health:3.5,critical:0.07},craft:{gold:6500,iron:220},requiredResearch:{gear_vitality:4,gear_forging:3}},
  // Peça alternativa antiga preservada para quem já a possui.
  anel_poder:{name:"Anel do Poder",slot:"accessory",rarity:"raro",tierRank:2,tierLabel:"Raro alternativo",requiresItem:"copper_ring",maxLevel:10,icon:"💍",description:"Anel antigo que fortalece o ataque.",base:{attack:20},growth:{attack:8},craft:{gold:950,iron:45},requiredResearch:{gear_forging:1}}
 };
@@ -946,7 +946,7 @@ async function gameState(env,playerId){
     getKingdomProgression(env,kingdom.id)
   ]):null;
   const specialCityBuildings=specialCityEnabled(env)?(await env.DB.prepare("SELECT building_type,grid_x,grid_z,width,height FROM city_special_buildings WHERE kingdom_id=? ORDER BY building_type").bind(kingdom.id).all()).results||[]:[];
-  return {academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
+  return {activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
     defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
@@ -1750,7 +1750,7 @@ async function gameAction(env,playerId,body){
     const unitsJson=JSON.stringify(selected);
     const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
     await ensureEquipmentTables(env,k.id);
-    const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(k.id).first();
+    const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,hi.hero_key,h.id LIMIT 1").bind(k.id).first();
     const [equippedRows,gearResearchRows]=await Promise.all([
       activeHero?env.DB.prepare("SELECT ke.item_key,ke.level,ke.is_locked,ke.enhancement FROM kingdom_equipment ke JOIN hero_equipment he ON he.item_key=ke.item_key WHERE ke.kingdom_id=? AND he.hero_id=?").bind(k.id,activeHero.id).all():Promise.resolve({results:[]}),
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
@@ -1785,7 +1785,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first(),
       env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='defense'").bind(k.id).first(),
       env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(k.id).first(),
-      env.DB.prepare("SELECT hero_key,rarity,level,experience,stars FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC LIMIT 1").bind(k.id).first(),
+      env.DB.prepare("SELECT hero_key,rarity,level,experience,stars FROM hero_inventory WHERE kingdom_id=? ORDER BY level DESC,stars DESC,hero_key LIMIT 1").bind(k.id).first(),
     ]);
     const gearHero=activeHero?.hero_key?await env.DB.prepare("SELECT id FROM heroes WHERE kingdom_id=? AND hero_key=?").bind(k.id,activeHero.hero_key).first():null;
     await ensureEquipmentTables(env,k.id);
@@ -1950,7 +1950,7 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   if(!selected.length)return json({error:"Selecione pelo menos uma tropa."},400);
   if(total>50000)return json({error:"O limite por ataque é de 50.000 tropas."},400);
   const [hero,dragon,tech,battleState]=await Promise.all([
-    env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,h.id LIMIT 1").bind(kingdom.id).first(),
+    env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,hi.hero_key,h.id LIMIT 1").bind(kingdom.id).first(),
     env.DB.prepare("SELECT level FROM dragons WHERE kingdom_id=?").bind(kingdom.id).first(),
     env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(kingdom.id).first(),
     env.DB.prepare("SELECT battle_token FROM kingdoms WHERE id=?").bind(kingdom.id).first()
