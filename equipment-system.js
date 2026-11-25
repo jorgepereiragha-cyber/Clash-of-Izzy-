@@ -128,7 +128,7 @@
     const summary=$("equipment-bonus-summary"),skinSummary=$("castle-skin-bonus-summary"),skin=state?.activeCastleSkin;
     if(summary){
       const setText=bonus.legendarySetActive===true?" · Conjunto completo: +1% Ataque / +1% Defesa / +0,5% Vida":"";
-      summary.textContent="Bônus do herói em combate: Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%"+setText;
+      summary.textContent="Bônus do herói em combate: Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%"+setText+(bonus.reinforcementBonus?.stage?" · Conjunto reforçado +"+bonus.reinforcementBonus.stage:"");
     }
     if(skinSummary){
       skinSummary.textContent=skin?.id
@@ -504,7 +504,7 @@
       picker.addEventListener("change",()=>{selected=picker.value;render()});
     }
     if(picker){
-      picker.replaceChildren(...equipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
+      picker.replaceChildren(...equipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" +"+(entry.enhancement||0)+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
     }
     const item=equipment.find(x=>x.id===selected)||equipment[0];
     if(!item){setStatus("Nenhum equipamento disponível neste reino.",true);return;}
@@ -530,7 +530,7 @@
     renderSummonOdds();
     renderSummonControls();
     renderSummonResults();
-    $("item-name").textContent=item.name;
+    $("item-name").textContent=item.name+" +"+(item.enhancement||0);
     $("current-level").textContent=item.level;
     $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";
     const current=item.stats||{},next=item.nextLevelStats||{};
@@ -546,6 +546,13 @@
     const lock=$("lock-btn");lock.textContent=item.isLocked?"🔒 Travado":"🔓 Destravado";lock.setAttribute("aria-pressed",String(item.isLocked));
     const upgrade=$("upgrade-btn");upgrade.disabled=busy||item.isLocked||item.level>=item.maxLevel;
     upgrade.textContent=item.level>=item.maxLevel?"NÍVEL MÁXIMO":item.isLocked?"DESTRAVE PARA EVOLUIR":"⚒️ EVOLUIR EQUIPAMENTO";
+    const enhancement=Number(item.enhancement||0),fragment=state.equipmentFragments?.[item.rarity];
+    $("enhancement-title").textContent="Reforço +"+enhancement+" / +10";
+    $("enhancement-preview").textContent=item.nextEnhancementStats?Object.entries(item.nextEnhancementStats).map(([key,value])=>(labels[key]||key)+": "+formatGearStat(key,value)).join(" · "):"Reforço máximo";
+    $("fragment-balance").textContent="Fragmentos "+(rarityLabels[item.rarity]||item.rarity)+": "+fmt(fragment?.balance)+" · Próximo custo: "+(item.enhancementCost??"—");
+    $("fragment-recipe").textContent=fragment?"Forja: "+fmt(fragment.gold)+" ouro · "+fmt(fragment.iron)+" ferro · Castelo Nv. "+fragment.castle:"";
+    $("enhance-btn").disabled=busy||item.isLocked||enhancement>=10||!fragment||Number(fragment.balance)<Number(item.enhancementCost);
+    $("fragment-forge-btn").disabled=busy||!fragment||Number(state.kingdom?.castle_level)<fragment.castle||Number(state.kingdom?.gold)<fragment.gold||Number(state.kingdom?.iron)<fragment.iron;
     const equip=$("equip-btn");equip.disabled=busy||!selectedHeroId||Number(item.equippedHeroId)===selectedHeroId;
     equip.textContent=Number(item.equippedHeroId)===selectedHeroId?"EQUIPADO NESTE HERÓI":"EQUIPAR NESTE HERÓI";
     $("unequip-btn").disabled=busy||!item.equippedHeroId;
@@ -595,6 +602,8 @@
   document.addEventListener("DOMContentLoaded",()=>{
     $("hero-select").addEventListener("change",event=>{selectedHeroId=Number(event.target.value)||null;render();});
     $("upgrade-btn").addEventListener("click",()=>window.upgradeEquipment());
+    $("enhance-btn").addEventListener("click",()=>{const item=state?.equipment?.find(x=>x.id===selected);if(item)perform({type:"equipment_enhance",itemId:item.id,expectedEnhancement:item.enhancement},"Reforço aplicado e salvo.");});
+    $("fragment-forge-btn").addEventListener("click",()=>{const item=state?.equipment?.find(x=>x.id===selected);if(item)perform({type:"equipment_fragment_forge",rarity:item.rarity},"Fragmentos forjados.");});
     $("lock-btn").addEventListener("click",()=>window.toggleLock());
     $("equip-btn").addEventListener("click",()=>window.equipEquipment());
     $("unequip-btn").addEventListener("click",()=>window.unequipEquipment());

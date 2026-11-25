@@ -635,7 +635,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(researchQueue.length,1);
     assert.equal(researchQueue[0].target_key,"economy");
     assert.equal(await countEvents("research_started"),researchStarts+1);
-    await localSql("UPDATE kingdom_queues SET completes_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id="+queueRealm+
+    await localSql("UPDATE kingdom_queues SET started_at='2000-01-01T00:00:00.000Z',completes_at='2000-01-01T00:01:00.000Z' WHERE kingdom_id="+queueRealm+
       " AND queue_type='research' AND status='running'");
     await Promise.all([getStateFor(cookie,start.data.token),getStateFor(cookie,start.data.token)]);
     const researchDone = await getStateFor(cookie,start.data.token);
@@ -661,7 +661,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(new Set(activeTraining.map(q=>q.queue_slot)).size,accepted);
     assert.equal(activeTraining.reduce((n,q)=>n+Number(q.quantity),0),accepted*3);
     assert.equal(await countEvents("troop_training_started"),trainingStarts+accepted);
-    await localSql("UPDATE kingdom_queues SET completes_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id="+queueRealm+
+    await localSql("UPDATE kingdom_queues SET started_at='2000-01-01T00:00:00.000Z',completes_at='2000-01-01T00:01:00.000Z' WHERE kingdom_id="+queueRealm+
       " AND queue_type='training' AND status='running'");
     await Promise.all([getStateFor(cookie,start.data.token),getStateFor(cookie,start.data.token)]);
     const trainingDone = await getStateFor(cookie,start.data.token);
@@ -671,6 +671,28 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(militiaCount(await getStateFor(cookie,start.data.token)),militiaCount(trainingDone));
     assert.equal(await countEvents("troops_trained"),trainingFinishes+accepted);
     console.log("Beta queue races passed: research once, training slot bounds and exactly-once completion.");
+
+    // Real D1/Worker path: free fragment forge, compare-and-swap reinforcement and replay.
+    await localSql("UPDATE kingdoms SET gold=10000,iron=10000 WHERE id="+queueRealm);
+    const gearBefore=await getStateFor(cookie,start.data.token);
+    const sword=gearBefore.equipment.find(e=>e.id==="iron_sword");
+    assert.equal(sword.enhancement,0);
+    const shardBefore=gearBefore.equipmentFragments.comum.balance;
+    const forged=await actionFor(cookie,start.data.token,{type:"equipment_fragment_forge",rarity:"comum"});
+    assert.equal(forged.status,200);
+    assert.equal(forged.data.state.equipmentFragments.comum.balance,shardBefore+10);
+    const enhance=()=>actionFor(cookie,start.data.token,{type:"equipment_enhance",itemId:"iron_sword",expectedEnhancement:0});
+    const enhancementRace=await Promise.all([enhance(),enhance()]);
+    assert.deepEqual(enhancementRace.map(x=>x.status).sort((a,b)=>a-b),[200,409]);
+    const gearAfter=await getStateFor(cookie,start.data.token);
+    const reinforced=gearAfter.equipment.find(e=>e.id==="iron_sword");
+    assert.equal(reinforced.enhancement,1);
+    assert.equal(reinforced.level,sword.level);
+    assert.equal(reinforced.stats.attack,Number((sword.stats.attack*1.025).toFixed(4)));
+    assert.equal(gearAfter.equipmentFragments.comum.balance,shardBefore);
+    assert.equal((await enhance()).status,409,"replay cannot charge again");
+    assert.equal((await getStateFor(cookie,start.data.token)).equipmentFragments.comum.balance,shardBefore);
+    console.log("Beta equipment reinforcement passed: free forge, concurrent CAS, persisted stat and replay.");
 
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
