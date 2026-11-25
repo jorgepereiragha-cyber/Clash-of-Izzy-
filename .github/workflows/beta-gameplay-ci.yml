@@ -27,5 +27,7 @@ jobs:
         run: node --test tests/staging-load-smoke.test.js
       - name: Rally ownership, settlement rollback and resource regeneration
         run: node --test tests/rally-troop-ownership.test.js
+      - name: Collective rally capacity and concurrent joins
+        run: node --test tests/rally-capacity.test.js
       - name: Solo attack target race and settlement guard
         run: node --test tests/attack-target-race.test.js
