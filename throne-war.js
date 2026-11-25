@@ -58,13 +58,14 @@ export function throneCombat(attackerPower,defenderPower){
 export function mayCoronate(throne,openedAt,now=new Date()){
   const cycle=Number(throne?.occupation_cycle);
   const since=Date.parse(String(throne?.occupied_since||""));
-  if(!Number.isSafeInteger(cycle)||cycle<0||!Number.isFinite(since)||
+  if(throne?.occupation_cycle==null||!Number.isSafeInteger(cycle)||cycle<0||!Number.isFinite(since)||
      !Number.isSafeInteger(Number(throne?.occupying_alliance_id))||
      Number(throne.occupying_alliance_id)<1) return false;
   const opened=Date.parse(String(openedAt).replace(" ","T")+(String(openedAt).includes("Z")?"":"Z"));
-  const contestEnd=opened+THRONE_SHIELD_DAYS*DAY+cycle*THRONE_CYCLE_DAYS*DAY+THRONE_CONTEST_HOURS*HOUR;
+  const contestStart=opened+THRONE_SHIELD_DAYS*DAY+cycle*THRONE_CYCLE_DAYS*DAY;
+  const contestEnd=contestStart+THRONE_CONTEST_HOURS*HOUR;
   const finish=since+THRONE_HOLD_MINUTES*60000;
-  return Number.isFinite(opened)&&finish<=contestEnd&&
+  return Number.isFinite(opened)&&since>=contestStart&&finish<=contestEnd&&
     new Date(now).getTime()>=finish&&!(throne.crowned_cycle!=null&&Number(throne.crowned_cycle)===cycle);
 }
 export function thronePublicView(opening,throne,at=new Date()){

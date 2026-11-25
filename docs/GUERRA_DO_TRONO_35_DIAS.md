@@ -19,7 +19,7 @@ O escudo de cada trono começa no instante em que o respectivo mapa é aberto e 
 2. Ataque por composição de **200 a 10.000 soldados** de nível 1. Força calculada por tipo de tropa, nunca por dados enviados pelo cliente.
 3. A defesa inicial é de uma guarnição neutra. Depois de uma vitória, a força de quem ocupa o trono define a resistência dos cercos seguintes.
 4. Uma vitória coloca a aliança no trono; vitória de outra aliança reinicia a contagem de ocupação.
-5. **30 minutos de ocupação ininterrupta dentro das oito horas de disputa** coroam o rei e a aliança. Após a coroação, novos cercos da mesma edição são bloqueados.
+5. **150 minutos de ocupação ininterrupta dentro das oito horas de disputa** coroam o rei e a aliança. Após a coroação, novos cercos da mesma edição são bloqueados.
 6. Cada ataque sofre baixas: aproximadamente 12% das tropas lançadas em caso de vitória e 24% na derrota; estas baixas são debitadas no D1. Ataques repetidos pelo mesmo reino exigem intervalo de cinco minutos.
 7. Um identificador único por ataque, conferência de tropas e atualização condicional de revisão do trono são aplicados na mesma transação D1 para impedir replay, tropas negativas e capturas simultâneas incorretas.
 8. O vencedor fica registrado. O próximo evento não apaga a coroação anterior até que exista novo vencedor.
@@ -40,7 +40,7 @@ O escudo de cada trono começa no instante em que o respectivo mapa é aberto e 
 - No GitHub, executar deploy-cloudflare.yml de produção com plano pago, proteção de ambiente e backup Time Travel, incluindo migrations 0034 e 0035.
 - Conferir GET /api/health com schema pronto e sem tabelas faltando.
 - Conferir GET /api/throne/status?realm=1: shieldUntil exato, phase=shield/preparation/contest/recovery; não permitir ataque durante proteção.
-- Simular em staging a passagem das fases e as regras de ataque, consumo de tropas, duas alianças rivais e coroação 30 min; verificar ausência de compras/recursos alterados.
+- Simular em staging a passagem das fases e as regras de ataque, consumo de tropas, duas alianças rivais e coroação 150 min; verificar ausência de compras/recursos alterados.
 - Confirmar que o APK Android comercial pode ser instalado pelo portal; itens e pagamentos precisam dos demais requisitos comerciais já documentados.
 
-Referência de mecânica: atualizações oficiais de Clash of Kings no App Store (versões recentes), que usam Preparação, Disputa e Recuperação. A duração do escudo de 35 dias, a janela de oito horas e o tempo de ocupação de 30 minutos são **regras próprias escolhidas para o Clash of Izzy**.
+Referência de mecânica: atualizações oficiais de Clash of Kings no App Store (versões recentes), que usam Preparação, Disputa e Recuperação. A duração do escudo de 35 dias, a janela de oito horas e o tempo de ocupação de 150 minutos são **regras próprias escolhidas para o Clash of Izzy**.
