@@ -16,6 +16,7 @@ import { getValhallaMultipliers, scaleValhallaDurationSeconds, handleValhallaCon
 import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.js";
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
+import { grantAdminGems } from "./admin-gem-grants.js";
 import { handleRally, processDueRallies } from "./rally.js";
 import {marchCapacity,marchCapacityForKingdom,withinMarchCapacity} from "./march-capacity.js";
 import {marchSlots} from "./march-slots.js";
@@ -2055,7 +2056,7 @@ export default {
   }
   if(url.pathname==="/api/health"&&request.method==="GET"){
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
-    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","daily_reward_claims","onboarding_bonus_claims","support_orders","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
+    const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","daily_reward_claims","onboarding_bonus_claims","support_orders","admin_gem_grants","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     let missingTables=[...requiredTables];
     if(env.DB){
       try{
@@ -2810,11 +2811,7 @@ export default {
       return json({players,player:players[0]||null});
     }
     if(url.pathname==="/api/admin/gems"){
-      const id=String(body.playerId||"").trim(),amount=Number(body.amount);
-      if(!id||!Number.isSafeInteger(amount)||amount<=0||amount>100000000)return json({error:"ID ou quantidade de gemas inválida."},400);
-      const result=await env.DB.prepare("UPDATE players SET gems=gems+? WHERE player_id=?").bind(amount,id).run();
-      if(!result.meta.changes)return json({error:"Jogador não encontrado."},404);
-      const player=await env.DB.prepare("SELECT player_id,gems FROM players WHERE player_id=?").bind(id).first();return json({success:true,player});
+      return await grantAdminGems(env,body,payload);
     }
     if(url.pathname==="/api/admin/unlock-skin"){
       const id=String(body.playerId||"").trim(),name=String(body.skin||"").trim();if(!id||!name)return json({error:"Informe o ID do jogador e a skin."},400);
