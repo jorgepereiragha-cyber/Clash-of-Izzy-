@@ -17,6 +17,7 @@ import { handleValhallaShop, getValhallaBuffMultipliers } from "./valhalla-shop.
 import { distributeValhallaDailyRunes } from "./valhalla-rewards.js";
 import { handleValhallaAdmin } from "./valhalla-admin.js";
 import { handleRally, processDueRallies } from "./rally.js";
+import { productionWindow } from "./production-clock.js";
 import {marchCapacity,marchCapacityForKingdom,withinMarchCapacity} from "./march-capacity.js";
 import {marchSlots} from "./march-slots.js";
 import {realmStatusView} from "./realm-progression.js";
@@ -462,7 +463,7 @@ async function applyProduction(env,kingdomId){
   const row=await env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdomId).first();
   if(!row)return;
   const now=Date.now(),last=Date.parse(row.last_production_at||row.updated_at||new Date(now).toISOString());
-  const elapsed=Math.max(0,Math.min(7*24*3600,Math.floor((now-(Number.isFinite(last)?last:now))/1000)));
+  const {elapsed,timestamp:productionTimestamp}=productionWindow(now,last);
   if(elapsed<1)return;
   const b=await env.DB.prepare("SELECT building_type,level FROM kingdom_buildings WHERE kingdom_id=?").bind(kingdomId).all();
   const levels=Object.fromEntries((b.results||[]).map(x=>[x.building_type,x.level]));
@@ -513,7 +514,6 @@ async function applyProduction(env,kingdomId){
   }
   // Guarda as frações de produção: consultas frequentes não descartam os segundos acumulados.
   // Compare-and-set impede duas chamadas simultâneas de creditar o mesmo intervalo.
-  const productionTimestamp=new Date(now).toISOString();
   const productionUpdate=env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,last_production_at=?,production_remainders=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND COALESCE(last_production_at,'')=COALESCE(?, '')")
     .bind(gains.food,gains.wood,gains.stone,gains.iron,gains.gold,productionTimestamp,JSON.stringify(nextRemainders),kingdomId,row.last_production_at??"");
   const ledgerRows=Object.entries(gains).filter(([,amount])=>amount>0);
@@ -1241,10 +1241,11 @@ async function gameAction(env,playerId,body){
     if(current)return json({error:"Seu reino já pertence a uma aliança."},409);
     const count=await env.DB.prepare("SELECT COUNT(*) AS n FROM alliance_members WHERE alliance_id=?").bind(invite.alliance_id).first();
     if(count.n>=invite.max_members)return json({error:"A aliança está cheia."},409);
-    await env.DB.batch([
-      env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role,rank) VALUES(?,?,'member','membro')").bind(invite.alliance_id,k.id),
-      env.DB.prepare("DELETE FROM alliance_invites WHERE id=?").bind(inviteId)
+    const accepted=await env.DB.batch([
+      env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role,rank) SELECT i.alliance_id,?,'member','membro' FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.id=? AND i.target_kingdom_id=? AND NOT EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=?) AND (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=i.alliance_id)<a.max_members").bind(k.id,inviteId,k.id,k.id),
+      env.DB.prepare("DELETE FROM alliance_invites WHERE id=? AND target_kingdom_id=? AND changes()=1").bind(inviteId,k.id)
     ]);
+    if(accepted[0]?.meta?.changes!==1)return json({error:"Convite alterado, aliança cheia ou reino já associado."},409);
   }else if(type==="alliance_promote"){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const targetId=Number(body.targetKingdomId),newRank=String(body.rank||"");
@@ -1270,14 +1271,14 @@ async function gameAction(env,playerId,body){
     const resource=String(body.resource||""),amount=Number(body.amount);
     const allowed={food:"shared_food",wood:"shared_wood",stone:"shared_stone",iron:"shared_iron",gold:"shared_gold"};
     if(!member||!Object.hasOwn(allowed,resource)||!Number.isSafeInteger(amount)||amount<100||amount>1000000)return json({error:"Doação inválida. Mínimo de 100 recursos."},400);
-    const debit=await env.DB.prepare("UPDATE kingdoms SET "+resource+"="+resource+"-? WHERE id=? AND "+resource+">=?").bind(amount,k.id,amount).run();
-    if(!debit.meta.changes)return json({error:"Recursos insuficientes."},409);
     const xp=Math.floor(amount/100);
-    await env.DB.batch([
-      env.DB.prepare("UPDATE alliances SET "+allowed[resource]+"="+allowed[resource]+"+?,xp=xp+? WHERE id=?").bind(amount,xp,member.alliance_id),
-      env.DB.prepare("UPDATE alliance_members SET contribution=contribution+? WHERE alliance_id=? AND kingdom_id=?").bind(xp,member.alliance_id,k.id),
-      env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(k.id,resource,-amount,"doação para aliança")
+    const donation=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET "+resource+"="+resource+"-? WHERE id=? AND "+resource+">=? AND EXISTS(SELECT 1 FROM alliance_members m JOIN alliances a ON a.id=m.alliance_id WHERE m.kingdom_id=? AND m.alliance_id=?)").bind(amount,k.id,amount,k.id,member.alliance_id),
+      env.DB.prepare("UPDATE alliances SET "+allowed[resource]+"="+allowed[resource]+"+?,xp=xp+? WHERE id=? AND changes()=1").bind(amount,xp,member.alliance_id),
+      env.DB.prepare("UPDATE alliance_members SET contribution=contribution+? WHERE alliance_id=? AND kingdom_id=? AND changes()=1").bind(xp,member.alliance_id,k.id),
+      env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE changes()=1").bind(k.id,resource,-amount,"doação para aliança")
     ]);
+    if(donation[0]?.meta?.changes!==1)return json({error:"Recursos insuficientes ou associação alterada."},409);
     let a=await env.DB.prepare("SELECT level,xp,max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
     while(a.xp>=a.level*1000){
       const need=a.level*1000;
@@ -1292,8 +1293,11 @@ async function gameAction(env,playerId,body){
     const today=new Date().toISOString().slice(0,10),used=member.help_reset_at===today?member.help_count:0;
     const alliance=await env.DB.prepare("SELECT level FROM alliances WHERE id=?").bind(member.alliance_id).first();
     if(used>=5+alliance.level*2)return json({error:"Você atingiu o limite diário de ajudas."},409);
-    await env.DB.prepare("UPDATE alliance_members SET help_count=?,help_reset_at=? WHERE alliance_id=? AND kingdom_id=?").bind(used+1,today,member.alliance_id,k.id).run();
-    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(targetId,"alliance_help",JSON.stringify({from:k.id,fromName:k.kingdom_name||"Aliado"})).run();
+    const help=await env.DB.batch([
+      env.DB.prepare("UPDATE alliance_members SET help_count=CASE WHEN help_reset_at=? THEN help_count+1 ELSE 1 END,help_reset_at=? WHERE alliance_id=? AND kingdom_id=? AND (CASE WHEN help_reset_at=? THEN help_count ELSE 0 END)<(SELECT 5+level*2 FROM alliances WHERE id=?) AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=?)").bind(today,today,member.alliance_id,k.id,today,member.alliance_id,member.alliance_id,targetId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(targetId,"alliance_help",JSON.stringify({from:k.id,fromName:k.kingdom_name||"Aliado"}))
+    ]);
+    if(help[0]?.meta?.changes!==1)return json({error:"Limite diário atingido ou associação alterada."},409);
   }else if(type==="alliance_chat"){
     const member=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const message=String(body.message||"").trim().slice(0,300);
@@ -1319,12 +1323,13 @@ async function gameAction(env,playerId,body){
     if(!t)return json({error:"Território não encontrado."},404);
     if(t.territory_key?.startsWith("royal_throne_"))return json({error:"O Trono Imperial não pode ser reivindicado fora da Guerra do Trono."},409);
     if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
-    const cost=await env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000").bind(member.alliance_id).run();
-    if(!cost.meta.changes)return json({error:"A aliança precisa de 1.000 comida e 1.000 madeira no depósito."},409);
-    if(!t.alliance_id){
-      await env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL").bind(member.alliance_id,territoryId).run();
-      await env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=?").bind(member.alliance_id).run();
-    }
+    if(t.alliance_id!=null)return json({error:"Este território já pertence a uma aliança."},409);
+    const claim=await env.DB.batch([
+      env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000 AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=? AND rank IN ('lider','co_lider','oficial')) AND EXISTS(SELECT 1 FROM world_territories WHERE id=? AND map_region=? AND alliance_id IS NULL AND territory_key NOT LIKE 'royal_throne_%')").bind(member.alliance_id,member.alliance_id,k.id,territoryId,Number(k.map_region)||1),
+      env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL AND changes()=1").bind(member.alliance_id,territoryId),
+      env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=? AND changes()=1").bind(member.alliance_id)
+    ]);
+    if(claim[0]?.meta?.changes!==1)return json({error:"Território ocupado, cargo alterado ou recursos insuficientes no depósito."},409);
   }else if(type==="alliance_leave"){
     const membership=await env.DB.prepare("SELECT alliance_id,role FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(!membership)return json({error:"Seu reino não pertence a uma aliança."},409);
