@@ -732,12 +732,18 @@ function renderAcademyScience(){
  const rows=state?.academyScience||[];
  const old=select.querySelector("optgroup[data-science]");
  if(rows.length&&!old){const group=document.createElement("optgroup");group.label="Ciências avançadas de Eldoria";group.dataset.science="true";
-  for(const row of rows){const opt=document.createElement("option");opt.value=row.key;opt.textContent=row.name;group.append(opt);}select.append(group);
+  for(const row of rows.filter(x=>!x.imperial)){const opt=document.createElement("option");opt.value=row.key;opt.textContent=row.name;group.append(opt);}select.append(group);
  }else if(!rows.length&&old)old.remove();
+ const imperialRows=rows.filter(x=>x.imperial);
+ const imperialGroup=select.querySelector("optgroup[data-imperial]");
+ if(imperialRows.length&&!imperialGroup){
+   const group=document.createElement("optgroup");group.label="Ciências imperiais · Castelo 30 / VIP 1+";group.dataset.imperial="true";
+   for(const row of imperialRows){const opt=document.createElement("option");opt.value=row.key;opt.textContent=row.name;group.append(opt);}select.append(group);
+ }else if(!imperialRows.length&&imperialGroup)imperialGroup.remove();
  const row=rows.find(x=>x.key===select.value);
  if(row){
   const names={economy:"Economia",military:"Doutrina militar",defense:"Defesa"};
-  details.textContent=row.category+" · Nv. "+row.level+"/"+row.maxLevel+" · "+row.effect+": "+row.bonusPercent+"% · Academia "+row.requiredAcademy+" · "+(names[row.requiredKey]||row.requiredKey)+" "+row.requiredLevel+(row.nextCost?" · Custo: "+fmt(row.nextCost.wood)+" madeira, "+fmt(row.nextCost.stone)+" pedra, "+fmt(row.nextCost.iron)+" ferro":" · Máximo");
+  details.textContent=row.category+" · Nv. "+row.level+"/"+row.maxLevel+" · "+row.effect+": "+row.bonusPercent+"%"+(row.imperial?" · Limite VIP atual: "+row.unlockedMax+(row.level>=row.unlockedMax&&row.nextVip?" · Exige Castelo 30 / VIP "+row.nextVip:""):"")+" · Academia "+row.requiredAcademy+" · "+(names[row.requiredKey]||row.requiredKey)+" "+row.requiredLevel+(row.nextCost?" · Custo: "+fmt(row.nextCost.wood)+" madeira, "+fmt(row.nextCost.stone)+" pedra, "+fmt(row.nextCost.iron)+" ferro":" · Máximo");
  }else details.textContent=select.value==="economy"&&rows.length?"Produção de recursos +1% por nível (até 30%).":"";
  button.disabled=busy||(state?.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running")||Boolean(row&&!row.available);
 }

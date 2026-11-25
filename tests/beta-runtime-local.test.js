@@ -711,6 +711,10 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const scienceDone=await getStateFor(cookie,start.data.token);
     assert.equal(scienceDone.academyScience.find(x=>x.key==="scholarship").bonusPercent,1.5);
     assert.equal((await actionFor(cookie,start.data.token,study)).status,409);
+    const lockedImperial=scienceDone.academyScience.find(x=>x.key==="imperial_attack");
+    assert.equal(lockedImperial.unlockedMax,0);
+    assert.equal(lockedImperial.available,false);
+    assert.equal((await actionFor(cookie,start.data.token,{type:"research",research:"imperial_attack",expectedLevel:0})).status,409);
     const initialTraining = await getStateFor(cookie,start.data.token);
     assert.ok(Number(initialTraining.troopCapacity)-Number(initialTraining.armyCount)>=6,
       "synthetic kingdom has room for two small training batches");

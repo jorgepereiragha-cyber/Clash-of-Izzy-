@@ -2,7 +2,7 @@ export { EldoriaRoom } from "./eldoria-room.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "./game-adapter.js";
 import { hospitalEnabled,HOSPITAL_PER_LEVEL,HOSPITAL_HEAL_MAX,recoverableLosses,hospitalHealCost,hospitalAdmission } from "./hospital-policy.js";
-import { scienceEnabled,SCIENCE_CATALOG,sciencePercent,scienceRequirement,scienceDuration,scienceView,hospitalScienceCapacity } from "./castle-science.js";
+import { scienceEnabled,SCIENCE_CATALOG,sciencePercent,scienceRequirement,scienceDuration,scienceView,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses } from "./castle-science.js";
 import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, HERO_SUMMON_RARITY_ODDS, heroView, getHeroCombatBonuses, getHeroSummonOdds } from "./hero-catalog.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank, sameAngelDeathAttackUnits } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
@@ -585,6 +585,7 @@ async function processMarches(env,kingdomId,batchSize=50){
      env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
     ]);
     const gear=equipmentBonuses(equipmentRows.results||[],gearResearchRows.results||[]);
+    const imperial= scienceEnabled(env)&&imperialScienceCap(kingdom||{})?imperialCombatBonuses((await env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('imperial_attack','imperial_defense','imperial_health')").bind(kingdomId).all()).results||[],kingdom):imperialCombatBonuses();
     const heroCombat=getHeroCombatBonuses(hero||{});
     const skinBonus=await getEquippedCastleSkinCombatBonuses(env,kingdomId,kingdom?.equipped_skin_id);
     const [valhallaBuffs,petBonuses,cosmeticState]=await Promise.all([getValhallaBuffMultipliers(env,kingdomId),getPetBonuses(env,kingdomId),getCosmeticState(env,kingdomId)]);
@@ -603,6 +604,7 @@ async function processMarches(env,kingdomId,batchSize=50){
      skinSetAttackBonusPercent:cosmeticState.skinSetBonuses.attackPercent,skinSetDefenseBonusPercent:cosmeticState.skinSetBonuses.defensePercent,
      skinSetHealthBonusPercent:cosmeticState.skinSetBonuses.healthPercent,skinSetCriticalChancePercent:cosmeticState.skinSetBonuses.criticalChancePercent,
      equipmentHealthBonusPercent:gear.healthPercent,
+     imperialAttackBonusPercent:imperial.attackPercent,imperialDefenseBonusPercent:imperial.defensePercent,imperialHealthBonusPercent:imperial.healthPercent,
      heroAttackBonusPercent:heroCombat.attackPercent,heroDefenseBonusPercent:heroCombat.defensePercent,heroHealthBonusPercent:heroCombat.healthPercent,heroCriticalChancePercent:heroCombat.criticalChancePercent,
      infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
      criticalChancePercent:gear.criticalChancePercent,
@@ -614,7 +616,7 @@ async function processMarches(env,kingdomId,batchSize=50){
     simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
     criticalHits=simulation.criticalHits||0;
     losses=simulation.losses||{};
-    replayData={version:1,mode:"territory_pve",seed:{criticalSeed,roll:battleRoll},participants:{attacker:{kingdom_id:kingdomId,army:army.map(unit=>({...unit}))},defender:{territory_id:target.id,level:Math.max(1,Math.min(30,Number(target.level)||1))}},modifiers:{hero:heroCombat,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,skin_sets:cosmeticState.skinSetBonuses,pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses:simulation.losses||{}},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
+    replayData={version:1,mode:"territory_pve",seed:{criticalSeed,roll:battleRoll},participants:{attacker:{kingdom_id:kingdomId,army:army.map(unit=>({...unit}))},defender:{territory_id:target.id,level:Math.max(1,Math.min(30,Number(target.level)||1))}},modifiers:{hero:heroCombat,imperialScience:imperial,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,skin_sets:cosmeticState.skinSetBonuses,pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses:simulation.losses||{}},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
     battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,hero:heroCombat,equipment:gear,castleSkin:skinBonus,skinSets:cosmeticState.skinSetBonuses,pet:petBonuses,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
     Object.assign(survivors, applyUnitLosses(army, losses));
    }else{
@@ -944,7 +946,7 @@ async function gameState(env,playerId){
     getKingdomProgression(env,kingdom.id)
   ]):null;
   const specialCityBuildings=specialCityEnabled(env)?(await env.DB.prepare("SELECT building_type,grid_x,grid_z,width,height FROM city_special_buildings WHERE kingdom_id=? ORDER BY building_type").bind(kingdom.id).all()).results||[]:[];
-  return {academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
+  return {academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
     defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
@@ -1691,6 +1693,7 @@ async function gameAction(env,playerId,body){
     if((key==="defense"||key.startsWith("gear_"))&&level>=Math.min(maxLevel,centerLevel*3))return json({error:"Melhore o Centro de Pesquisa Militar para desbloquear mais níveis desta ciência."},409);
     const requiredAcademy=science?scienceRequirement(key,level):0;
     if(science){
+      if(science.imperial&&level>=imperialScienceCap(k))return json({error:"Ciências imperiais exigem castelo nível 30 e VIP suficiente."},409);
       if(centerLevel<requiredAcademy)return json({error:"Academia nível "+requiredAcademy+" necessária."},409);
       const prerequisite=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key=?").bind(k.id,science.prerequisite[0]).first();
       if(Number(prerequisite?.level||0)<science.prerequisite[1])return json({error:"Conclua a ciência anterior antes de avançar."},409);
@@ -1702,8 +1705,8 @@ async function gameAction(env,playerId,body){
     const durationSeconds=await scaleKingdomQueueDurationSeconds(env,k.id,calculateQueueDurationSeconds("research",{level:level+1,facilityLevel:Math.max(1,centerLevel)}),"research",valhallaMultipliers);
     const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();
     const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
-    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND (? NOT IN ('defense','gear_forging','gear_ward','gear_vitality','gear_logistics') OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running')"+(science?" AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?) AND EXISTS(SELECT 1 FROM research WHERE kingdom_id=? AND research_key=? AND level>=?)":""))
-      .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,key,k.id,Math.ceil((level+1)/3),k.id,...(science?[k.id,requiredAcademy,k.id,...science.prerequisite]:[]));
+    const debit=env.DB.prepare("UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND COALESCE((SELECT level FROM research WHERE kingdom_id=? AND research_key=?),0)=? AND (? NOT IN ('defense','gear_forging','gear_ward','gear_vitality','gear_logistics') OR EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?)) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running')"+(science?" AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='academy' AND level>=?) AND EXISTS(SELECT 1 FROM research WHERE kingdom_id=? AND research_key=? AND level>=?)":"")+(science?.imperial?" AND castle_level=30 AND prestige>=? AND prestige<=7":""))
+      .bind(cost.wood,cost.stone,cost.iron,k.id,cost.wood,cost.stone,cost.iron,k.id,key,level,key,k.id,Math.ceil((level+1)/3),k.id,...(science?[k.id,requiredAcademy,k.id,...science.prerequisite]:[]),...(science?.imperial?[Number(k.prestige)]:[]));
     const statements=[debit,env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId)];
     statements.push(env.DB.prepare("INSERT INTO kingdom_queues(kingdom_id,queue_type,target_key,quantity,from_level,to_level,reward_item,status,started_at,completes_at) SELECT ?,?,?,?,?,?,?,'running',?,? WHERE "+guard)
       .bind(k.id,"research",key,1,level,level+1,"imperial_crest",startedAt,completesAt,k.id,actionId));
@@ -1791,6 +1794,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(k.id).all()
     ]);
     const gear=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]);
+    const imperial= scienceEnabled(env)&&imperialScienceCap(k)?imperialCombatBonuses((await env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('imperial_attack','imperial_defense','imperial_health')").bind(k.id).all()).results||[],k):imperialCombatBonuses();
     const heroCombat=getHeroCombatBonuses(activeHero||{});
     const skinBonus=await getEquippedCastleSkinCombatBonuses(env,k.id,k.equipped_skin_id);
     const [valhallaBuffs,petBonuses,cosmeticState]=await Promise.all([getValhallaBuffMultipliers(env,k.id),getPetBonuses(env,k.id),getCosmeticState(env,k.id)]);
@@ -1804,6 +1808,7 @@ async function gameAction(env,playerId,body){
       castleVipAttackBonusPercent:getCastleVipBonuses(k.prestige).attackPercent,castleVipDefenseBonusPercent:getCastleVipBonuses(k.prestige).defensePercent,
       researchLevel:Number(tech?.level||0),defenseBonusPercent,
       equipmentAttackBonusPercent:gear.attackPercent+Math.round((valhallaBuffs.attackPower-1)*100),skinAttackBonusPercent:skinBonus.attackPercent,skinDefenseBonusPercent:skinBonus.defensePercent,skinSetAttackBonusPercent:cosmeticState.skinSetBonuses.attackPercent,skinSetDefenseBonusPercent:cosmeticState.skinSetBonuses.defensePercent,skinSetHealthBonusPercent:cosmeticState.skinSetBonuses.healthPercent,skinSetCriticalChancePercent:cosmeticState.skinSetBonuses.criticalChancePercent,equipmentHealthBonusPercent:gear.healthPercent,
+     imperialAttackBonusPercent:imperial.attackPercent,imperialDefenseBonusPercent:imperial.defensePercent,imperialHealthBonusPercent:imperial.healthPercent,
      heroAttackBonusPercent:heroCombat.attackPercent,heroDefenseBonusPercent:heroCombat.defensePercent,heroHealthBonusPercent:heroCombat.healthPercent,heroCriticalChancePercent:heroCombat.criticalChancePercent,
       infantryAttackBonusPercent:petBonuses.infantryAttackPercent,
       criticalChancePercent:gear.criticalChancePercent,criticalDamageMultiplier:1.5,
@@ -1819,7 +1824,7 @@ async function gameAction(env,playerId,body){
       snapshot[unit.unit_type+"_"+unit.tier]={quantity:unit.quantity,loss:lost};
     }
     const snapshotJson=JSON.stringify(snapshot),expectedRows=armyRows.length;
-    const replayData={version:1,mode:"pve",seed:{criticalSeed,roll},participants:{attacker:{kingdom_id:k.id,army:armyRows.map(unit=>({...unit}))},defender:{type:"pve",castle_level:Number(k.castle_level||1)}},modifiers:{hero:heroCombat,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,skin_sets:cosmeticState.skinSetBonuses,valhalla:{attack_power:valhallaBuffs.attackPower},pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won,rounds:simulation.rounds,attacker_power:attackerPower,defender_power:defenderPower,losses},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
+    const replayData={version:1,mode:"pve",seed:{criticalSeed,roll},participants:{attacker:{kingdom_id:k.id,army:armyRows.map(unit=>({...unit}))},defender:{type:"pve",castle_level:Number(k.castle_level||1)}},modifiers:{hero:heroCombat,imperialScience:imperial,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,skin_sets:cosmeticState.skinSetBonuses,valhalla:{attack_power:valhallaBuffs.attackPower},pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won,rounds:simulation.rounds,attacker_power:attackerPower,defender_power:defenderPower,losses},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
     const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID(),actionId=crypto.randomUUID();
     const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const battleLock=env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,k.id,previousBattleToken);
