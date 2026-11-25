@@ -67,3 +67,16 @@ test("Worker valida propriedade dos dragões e bloqueia resgate duplicado de men
  assert.match(game,/dragonAttackBonusPercent\) \|\| 0, 0, 5\.5/);
  for(const id of ["dragonCollection","kingdomMailbox","kingdomBackpack"])assert.ok(page.includes('id="'+id+'"'));
 });
+
+test("beta dragon progression binds key and level, and rejects replay",async()=>{
+ const worker=await readFile(new URL("../worker.js",import.meta.url),"utf8");
+ const page=await readFile(new URL("../kingdom.html",import.meta.url),"utf8");
+ const start=worker.indexOf('type==="dragon_upgrade"');
+ const end=worker.indexOf('type==="hero_summon"',start);
+ assert.ok(start>=0&&end>start);
+ const action=worker.slice(start,end);
+ assert.match(action,/body\.expectedLevel!==level\|\|body\.dragonKey!==dragonKey/);
+ assert.match(action,/level=\? AND dragon_key=\? AND changes\(\)=1/);
+ assert.match(action,/INSERT INTO kingdom_events.*WHERE changes\(\)=1/);
+ assert.match(page,/type:"dragon_upgrade",dragonKey:dragon\.key,expectedLevel:level/);
+});

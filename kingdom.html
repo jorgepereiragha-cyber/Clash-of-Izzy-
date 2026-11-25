@@ -657,7 +657,7 @@ function renderDragonCollection(){
    upgrade.disabled=busy||level>=100||!enough;
    const costLine=document.createElement("small");costLine.className="muted";
    costLine.textContent=level>=100?"Vínculo máximo: 100.":("Custo: "+fmt(costs.food)+" comida · "+fmt(costs.wood)+" madeira · "+fmt(costs.stone)+" pedra · "+fmt(costs.iron)+" ferro. Vínculo limitado a 100.");
-   if(level<100)upgrade.addEventListener("click",()=>runKingdomPanelAction({type:"dragon_upgrade"},"Dragão evoluído. Nível e vínculo sincronizados."));
+   if(level<100)upgrade.addEventListener("click",()=>runKingdomPanelAction({type:"dragon_upgrade",dragonKey:dragon.key,expectedLevel:level},"Dragão evoluído. Nível e vínculo sincronizados."));
    card.append(costLine,upgrade);
   }
   root.append(card);

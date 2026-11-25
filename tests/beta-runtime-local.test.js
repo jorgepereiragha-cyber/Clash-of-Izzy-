@@ -376,9 +376,17 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(hero.status,200,"hero training: " + JSON.stringify(hero.data).slice(0,300));
     assert.equal(Number(hero.data.state.heroes.find(h=>h.hero_key===starterHero.hero_key).level),
       Number(starterHero.level)+1);
-    const dragon = await actionFor(cookie,start.data.token,{type:"dragon_upgrade"});
-    assert.equal(dragon.status,200,"dragon progression: " + JSON.stringify(dragon.data).slice(0,300));
+    const dragonAction={type:"dragon_upgrade",dragonKey:legacyBefore.dragon.dragon_key,expectedLevel:Number(legacyBefore.dragon.level)};
+    assert.equal((await actionFor(cookie,start.data.token,{type:"dragon_upgrade"})).status,400);
+    assert.equal((await actionFor(cookie,start.data.token,{...dragonAction,dragonKey:"mist_talon"})).status,409);
+    assert.equal((await actionFor(cookie,start.data.token,{type:"dragon_unlock",dragonKey:"__proto__"})).status,404);
+    assert.equal((await actionFor(cookie,start.data.token,{type:"dragon_equip",dragonKey:"constructor"})).status,404);
+    const dragonRace=await Promise.all([actionFor(cookie,start.data.token,dragonAction),actionFor(cookie,start.data.token,dragonAction)]);
+    assert.deepEqual(dragonRace.map(x=>x.status).sort((a,b)=>a-b),[200,409]);
+    const dragon=dragonRace.find(x=>x.status===200);
     assert.equal(Number(dragon.data.state.dragon.level),Number(legacyBefore.dragon.level)+1);
+    assert.equal((await actionFor(cookie,start.data.token,dragonAction)).status,409,"dragon replay cannot charge again");
+    assert.equal(Number((await getStateFor(cookie,start.data.token)).dragon.level),Number(legacyBefore.dragon.level)+1);
     const welcome = legacyBefore.mailbox.find(mail=>mail.reward_key==="welcome_v1"&&!mail.claimed_at);
     assert.ok(welcome,"starter mail exists");
     const claimed = await actionFor(cookie,start.data.token,{type:"mail_claim",mailId:welcome.id});
