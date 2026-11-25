@@ -85,6 +85,9 @@ test("invocações em lote debitam gemas e gravam heróis/histórico atomicament
 
 test("sincronização dos heróis evita atualizações sem mudança", async () => {
   const worker = await read("worker.js");
-  assert.ok(worker.includes("WHERE heroes.level<excluded.level OR heroes.experience<excluded.experience"));
-  assert.ok(worker.includes("WHERE kingdom_id=? AND (level<COALESCE"));
+  const sync=worker.slice(worker.indexOf("function syncHeroSystems("),worker.indexOf("async function gameState("));
+  assert.ok(sync.includes("WHERE heroes.level<>excluded.level OR heroes.experience<>excluded.experience"));
+  assert.ok(sync.includes("SET level=excluded.level,experience=excluded.experience"));
+  assert.ok(sync.includes("INSERT OR IGNORE INTO hero_inventory"));
+  assert.ok(!sync.includes("UPDATE hero_inventory SET level=MAX("));
 });
