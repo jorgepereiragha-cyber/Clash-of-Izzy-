@@ -473,7 +473,12 @@ if (host && "WebGLRenderingContext" in window) {
     }
     if(high)for(const x of [-.48,-.24,0,.24,.48])box(group,.14,.16,.14,stone,x,.90,.51);
     if(!low){
-      const bannerMaterial=material(skin?.banner||"#24476B",.82);
+      const bannerMaterial=material(skin?.banner||"#E7BD68",.82);
+      // The heraldic seal keeps the original royal palette and respects owned skins.
+      const seal=new THREE.Mesh(new THREE.CircleGeometry(.105,10),accent);
+      seal.position.set(0,.25+keepHeight*.84,.323);group.add(seal);
+      const sealCore=new THREE.Mesh(new THREE.CircleGeometry(.064,10),material(skin?.seal||"#24476B",.58));
+      sealCore.position.set(0,.25+keepHeight*.84,.328);group.add(sealCore);
       for(const x of [-.40,.40])box(group,.13,.34,.035,bannerMaterial,x,.99,.65);
     }
   }

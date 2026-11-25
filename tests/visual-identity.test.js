@@ -17,8 +17,9 @@ test("cidade 3D segue a bíblia visual com telhados azul-real e detalhes dourado
   assert.match(bible, /telhados azul-real e detalhes dourados/i);
   assert.match(renderer, /roof: material\("#24476B"\)/);
   assert.match(renderer, /\[mats\.roof, "#24476B", "roof"/);
-  assert.match(renderer, /color: castleSkin \? castleSkin\.banner : "#E7BD68"/);
-  assert.match(renderer, /heraldic seal/);
+  assert.match(renderer, /bannerMaterial=material\(skin\?\.banner\|\|"#E7BD68"/);
+  assert.match(renderer, /const seal=new THREE\.Mesh\(new THREE\.CircleGeometry/);
+  assert.match(renderer, /material\(skin\?\.seal\|\|"#24476B"/);
 });
 
 test("edifícios 3D possuem silhuetas e marcos próprios por função", async () => {
