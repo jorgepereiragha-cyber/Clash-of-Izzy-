@@ -27,3 +27,5 @@ jobs:
         run: node --test tests/staging-load-smoke.test.js
       - name: Rally ownership, settlement rollback and resource regeneration
         run: node --test tests/rally-troop-ownership.test.js
+      - name: Tactical combat versioning and deterministic simulations
+        run: node --test tests/tactical-combat-v2.test.js
