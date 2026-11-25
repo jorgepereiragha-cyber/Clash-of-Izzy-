@@ -18,6 +18,11 @@ function fixture(occupied = null) {
  INSERT INTO rallies VALUES('r1',10,'node_001','marching',0,0);
  INSERT INTO rally_reinforcements VALUES(1,'r1',10,'{"militia":7,"archer":2}'),(2,'r1',20,'{"militia":11}');
  INSERT INTO resource_nodes VALUES('node_001',NULL,NULL,'{}','r1',unixepoch()-3600,10,100,1);
+ ALTER TABLE resource_nodes ADD COLUMN node_type TEXT DEFAULT 'mine';
+ ALTER TABLE kingdoms ADD COLUMN iron INTEGER DEFAULT 0;
+ ALTER TABLE kingdoms ADD COLUMN updated_at TEXT;
+ CREATE TABLE resource_ledger(kingdom_id INTEGER,resource TEXT,amount INTEGER,reason TEXT);
+
  `);
  if(occupied!==null)sql.prepare("UPDATE resource_nodes SET occupied_by=?").run(occupied);
  let fail=false;
@@ -107,5 +112,34 @@ test("legacy mixed garrison is not incorrectly transferred to the leader",async(
   const after=sql.prepare("SELECT current_resources,last_regen FROM resource_nodes").get();
   assert.equal(after.current_resources,40);
   assert.equal(after.last_regen,before);
+ }finally{sql.close()}
+});
+
+const collect = env => handleRally(new Request("https://test.example/collect",{method:"POST"}),env,"leader","collect",{node_id:"node_001"});
+
+test("collection conserves balance and ledger without rewinding a future clock",async()=>{
+ const {sql,env}=fixture();
+ try{
+  await processDueRallies(env);
+  sql.exec("UPDATE resource_nodes SET current_resources=40,last_regen=unixepoch()+7200");
+  const before=sql.prepare("SELECT last_regen FROM resource_nodes").get().last_regen;
+  const responses=await Promise.all([collect(env),collect(env)]);
+  assert.deepEqual(responses.map(r=>r.status).sort(),[200,409]);
+  assert.equal(sql.prepare("SELECT last_regen FROM resource_nodes").get().last_regen,before);
+  assert.equal(sql.prepare("SELECT current_resources FROM resource_nodes").get().current_resources,20);
+  assert.equal(sql.prepare("SELECT iron FROM kingdoms WHERE id=10").get().iron,20);
+  assert.equal(sql.prepare("SELECT SUM(amount) AS amount FROM resource_ledger").get().amount,20);
+ }finally{sql.close()}
+});
+
+test("collection rejects legacy or actively reserved garrisons without credit",async()=>{
+ const {sql,env}=fixture(10);
+ try{
+  sql.exec("UPDATE resource_nodes SET reserved_by_rally=NULL,garrison_json='{\"militia\":18}'");
+  assert.equal((await collect(env)).status,409);
+  sql.exec("UPDATE resource_nodes SET reserved_by_rally='r1',garrison_json='{\"owners\":{\"10\":{\"militia\":7}}}'");
+  assert.equal((await collect(env)).status,409);
+  assert.equal(sql.prepare("SELECT iron FROM kingdoms WHERE id=10").get().iron,0);
+  assert.equal(sql.prepare("SELECT COUNT(*) AS count FROM resource_ledger").get().count,0);
  }finally{sql.close()}
 });
