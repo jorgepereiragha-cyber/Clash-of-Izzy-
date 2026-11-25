@@ -67,3 +67,14 @@ test("every root JavaScript Worker import is excluded from public assets", async
 test("D1 audit and validation CLIs do not deploy as public scripts", () => {
   assert.ok(ignore.split("\n").includes("scripts/*.mjs"));
 });
+
+test("game deployment excludes the separate portal bundle, its config and shell tooling",async()=>{
+ const lines=new Set(ignore.split("\n").map(line=>line.trim()));
+ for(const pattern of ["portal-worker.js","wrangler.portal.jsonc","public-portal/**","scripts/*.sh"])assert.ok(lines.has(pattern),"missing exclusion: "+pattern);
+ for(const path of ["portal.html","apoie.html","favicon.svg","styles/coi-theme.css","assets/brand/royal-king.webp"])assert.ok(!lines.has(path),"required game asset excluded: "+path);
+ const portal=JSON.parse(await readFile(new URL("../wrangler.portal.jsonc",import.meta.url),"utf8"));
+ assert.equal(portal.assets.directory,"./public-portal");
+ assert.equal(portal.main,"portal-worker.js");
+ const game=JSON.parse(await readFile(new URL("../wrangler.jsonc",import.meta.url),"utf8"));
+ assert.equal(game.assets.directory,".");
+});
