@@ -193,14 +193,16 @@ async function collectResources(env,kingdomId,body){
  const nodeId=String(body.node_id||"").trim();
  const node=await env.DB.prepare("SELECT * FROM resource_nodes WHERE id=?").bind(nodeId).first();
  if(!node||Number(node.occupied_by)!==kingdomId)return reply({error:"Seu reino não ocupa este nó."},403);
+ const owners=parseOwnedGarrison(node.garrison_json);
+ if(node.reserved_by_rally!==null||!owners||!owners.some(([id])=>Number(id)===kingdomId))return reply({error:"Guarnição sem origem comprovada ou com reserva ativa. A coleta exige reconciliação.",code:"GARRISON_RECONCILIATION_REQUIRED"},409);
  const resource=resourceForNode(node.node_type);
  if(!resource)return reply({error:"Tipo de recurso inválido."},409);
  const now=Math.floor(Date.now()/1000),available=nodeRegeneration(node,now),amount=Math.floor(available*0.5);
  if(amount<1)return reply({error:"O nó ainda não acumulou recursos suficientes."},409);
  const next=available-amount;
  const result=await env.DB.batch([
-  env.DB.prepare("UPDATE resource_nodes SET current_resources=?,last_regen=? WHERE id=? AND occupied_by=? AND last_regen=? AND current_resources=?")
-   .bind(next,now,nodeId,kingdomId,node.last_regen,node.current_resources),
+  env.DB.prepare("UPDATE resource_nodes SET current_resources=?,last_regen=MAX(last_regen,?) WHERE id=? AND occupied_by=? AND last_regen=? AND current_resources=? AND reserved_by_rally IS NULL AND garrison_json=? AND occupation_start IS ?")
+   .bind(next,now,nodeId,kingdomId,node.last_regen,node.current_resources,node.garrison_json,node.occupation_start),
   env.DB.prepare(`UPDATE kingdoms SET ${resource}=${resource}+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()=1`)
    .bind(amount,kingdomId),
   env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE changes()=1")
