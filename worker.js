@@ -41,6 +41,7 @@ import { handleDailyReward } from "./daily-rewards.js";
 import { handleOnboarding } from "./onboarding-bonus.js";
 import { createSupportCheckout } from "./support-orders.js";
 import { betaAccessGuard } from "./beta-access.js";
+import { productionWindow } from "./production-clock.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -473,7 +474,7 @@ async function applyProduction(env,kingdomId){
   const row=await env.DB.prepare("SELECT * FROM kingdoms WHERE id=?").bind(kingdomId).first();
   if(!row)return;
   const now=Date.now(),last=Date.parse(row.last_production_at||row.updated_at||new Date(now).toISOString());
-  const elapsed=Math.max(0,Math.min(7*24*3600,Math.floor((now-(Number.isFinite(last)?last:now))/1000)));
+  const {elapsed,timestamp:productionTimestamp}=productionWindow(now,last);
   if(elapsed<1)return;
   const b=await env.DB.prepare("SELECT building_type,level FROM kingdom_buildings WHERE kingdom_id=?").bind(kingdomId).all();
   const levels=Object.fromEntries((b.results||[]).map(x=>[x.building_type,x.level]));
@@ -527,7 +528,6 @@ async function applyProduction(env,kingdomId){
   }
   // Guarda as frações de produção: consultas frequentes não descartam os segundos acumulados.
   // Compare-and-set impede duas chamadas simultâneas de creditar o mesmo intervalo.
-  const productionTimestamp=new Date(now).toISOString();
   const productionUpdate=env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,last_production_at=?,production_remainders=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND COALESCE(last_production_at,'')=COALESCE(?, '')")
     .bind(gains.food,gains.wood,gains.stone,gains.iron,gains.gold,productionTimestamp,JSON.stringify(nextRemainders),kingdomId,row.last_production_at??"");
   const ledgerRows=Object.entries(gains).filter(([,amount])=>amount>0);
