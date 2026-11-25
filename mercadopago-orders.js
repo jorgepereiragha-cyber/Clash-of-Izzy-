@@ -241,12 +241,15 @@ async function handleWebhook(request, env, ctx) {
     (levelPack ? " AND EXISTS(SELECT 1 FROM level_pack_claims WHERE request_id=?)" : "")
   ).bind(...(levelPack ? [orderId,purchase.id,purchase.id] : [orderId,purchase.id])));
   try {
-    const results = await env.DB.batch(common);
-    // Quando dois pedidos distintos foram pagos para um pacote de compra unica,
-    // nao conceder duas vezes nem marcar a segunda order como entregue.
-    if (levelPack && purchase.status === "pending" && !results[2]?.meta?.changes) {
-      console.error("level_pack_duplicate_payment_requires_reconciliation", orderId, purchase.id);
-      return ctx.json({received:true,processed:true,manualReview:true});
+    await env.DB.batch(common);
+    // Use the committed claim, not a stale pending snapshot or the current batch's
+    // insertion count: concurrent notifications of the same paid order are replays.
+    if(levelPack){
+      const claim=await env.DB.prepare("SELECT 1 AS granted FROM level_pack_claims WHERE request_id=?").bind(purchase.id).first();
+      if(!claim){
+        console.error("level_pack_duplicate_payment_requires_reconciliation", orderId, purchase.id);
+        return ctx.json({received:true,processed:true,manualReview:true});
+      }
     }
   } catch (error) {
     console.error("mercadopago_fulfillment_failed", orderId, String(error?.message || error));
