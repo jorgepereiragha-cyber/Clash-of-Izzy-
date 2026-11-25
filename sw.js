@@ -1,4 +1,4 @@
-const CACHE_NAME="clash-of-izzy-shell-v59";
+const CACHE_NAME="clash-of-izzy-shell-v60";
 const CORE_ASSETS=["/","/index.html","/portal.html","/assets/brand/hero-emblem.svg","/assets/brand/royal-king.webp","/account.html","/arena.html","/kingdom.html","/world.html","/world-map.js","/world-map-3d.js","/world-map-viewport.js","/rally-ui.js","/styles/rally.css","/events.html","/events.js","/event-catalog.js","/styles/events-hub.css","/assets/art/events/angel-of-death.svg","/assets/art/events/valhalla.svg","/assets/art/events/wild-hunt.svg","/assets/art/events/shiva.svg","/assets/art/events/khali.svg","/assets/art/events/siege-of-eldoria.svg","/assets/art/events/champions-tournament.svg","/scripts/kingdom-3d.js","/scripts/castle-visual-upgrades.js","/scripts/kingdom-quality.js","/scripts/kingdom-materials.js","/scripts/pwa-runtime.js","/styles/android-experience.css","/assets/3d/manifest.json","/assets/art/landing-kingdom.svg","/assets/art/heroes/portraits.svg","/assets/art/skins/pantheon-relics.svg","/styles/heroes.css","/engine/asset-loader.js","/engine/resource-disposal.js","/engine/texture-manager.js","/equipment-ui.html","/equipment-system.js","/equipment-styles.css","/admin.html","/valhalla-admin-ui.js","/styles/valhalla-admin.css","/valhalla-shop-ui.js","/styles/valhalla-shop.css","/player-engagement.js","/apoie.html","/navigation.js","/styles/navigation.css","/alliance.html","/styles/coi-theme.css","/manifest.json","/icon-192.svg","/icon-512.svg","/favicon.svg","/logo.svg","/styles/premium-ui.css","/scripts/ambient-particles.js","/scripts/advanced-shaders.js","/offline.html","/styles/kingdom-4x-command.css","/scripts/kingdom-command-hud.js","/scripts/kingdom-command-state.js","/scripts/eldoria-realtime-client.js","/market.html","/market.css","/market.js","/scripts/kingdom-visual-boot.js","/scripts/kingdom-visual-preferences.js","/scripts/world-map-visual-boot.js"];
 // O shell 2D mínimo deve ser atômico: se falhar, o Service Worker antigo
 // continua ativo. Three.js e imagens são opcionais e nunca bloqueiam a instalação.
@@ -65,6 +65,15 @@ function isShellPath(pathname) {
   return shellCacheKey(pathname) !== null;
 }
 
+async function matchCurrentShell(key) {
+  return caches.match(key, { cacheName: CACHE_NAME });
+}
+
+async function matchCurrentAsset(key, runtime) {
+  const shell = await matchCurrentShell(key);
+  return shell || (runtime ? await caches.match(key, { cacheName: RUNTIME_CACHE_NAME }) : undefined);
+}
+
 function isRuntimeAsset(pathname) {
   return (pathname.startsWith("/assets/") || pathname.startsWith("/vendor/three/")) && RUNTIME_ASSET_PATTERN.test(pathname);
 }
@@ -119,8 +128,8 @@ self.addEventListener("fetch", event => {
       } catch {
         // The shell is stored under pathname only. Client-side routes retain
         // their query parameters in the browser even while offline.
-        return (await caches.match(shellCacheKey(url.pathname) || url.pathname)) ||
-          (await caches.match("/offline.html")) ||
+        return (await matchCurrentShell(shellCacheKey(url.pathname) || url.pathname)) ||
+          (await matchCurrentShell("/offline.html")) ||
           new Response("Sem conexão. Reconecte-se para abrir o Clash of Izzy.", {
             status: 503, headers: { "content-type": "text/plain; charset=utf-8" }
           });
@@ -134,7 +143,8 @@ self.addEventListener("fetch", event => {
   if (url.search || (!isShellPath(url.pathname) && !isRuntimeAsset(url.pathname))) return;
   event.respondWith((async () => {
     const cacheKey = shellCacheKey(url.pathname) || url.pathname;
-    const cached = await caches.match(cacheKey);
+    const runtime = isRuntimeAsset(url.pathname) && !isShellPath(url.pathname);
+    const cached = await matchCurrentAsset(cacheKey, runtime);
     if (cached) return cached;
     const response = await fetch(request);
     // Avoid persisting live HTML via fetch('/kingdom') either: only the
@@ -142,7 +152,6 @@ self.addEventListener("fetch", event => {
     const isHtmlDocument = cacheKey === "/" || cacheKey.endsWith(".html");
     if (!isHtmlDocument && canStoreResponse(response)) {
       try {
-        const runtime = isRuntimeAsset(url.pathname) && !isShellPath(url.pathname);
         const cache = await caches.open(runtime ? RUNTIME_CACHE_NAME : CACHE_NAME);
         await cache.put(cacheKey, response.clone());
         if (runtime) await limitRuntimeCache(cache);
