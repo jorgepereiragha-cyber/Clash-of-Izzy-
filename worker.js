@@ -6,7 +6,8 @@ import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack
 import { consumeRateLimit } from "./api-rate-limit.js";
 import { buildTrigramSearchQuery, fuzzyTokenDistance } from "./search-ranking.js";
 import { calculateQueueDurationSeconds } from "./kingdom-queue-rules.js";
-import { cityLayoutConfig, moveCityBuilding } from "./city-layout-rules.js";
+import { cityLayoutConfig, moveCityBuilding, specialCityEnabled } from "./city-layout-rules.js";
+import { SPECIAL_CITY_CATALOG, positionSpecialCityBuilding } from "./city-special-buildings.js";
 import { advanced4xEnabled,calculateChainProduction,ensureIntermediateResources,upgradeIndustry } from "./intermediate-production.js";
 import { DEFENSE_CATALOG,placeCityDefense,movePlacedDefense,defensePowerFromRows } from "./city-defense-rules.js";
 import { getKingdomProgression,progressionQueueStatements } from "./player-progression-4x.js";
@@ -925,7 +926,8 @@ async function gameState(env,playerId){
     env.DB.prepare("SELECT id,defense_type,grid_x,grid_z,width,height,level FROM city_defenses WHERE kingdom_id=? ORDER BY id").bind(kingdom.id).all(),
     getKingdomProgression(env,kingdom.id)
   ]):null;
-  return {advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
+  const specialCityBuildings=specialCityEnabled(env)?(await env.DB.prepare("SELECT building_type,grid_x,grid_z,width,height FROM city_special_buildings WHERE kingdom_id=? ORDER BY building_type").bind(kingdom.id).all()).results||[]:[];
+  return {specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
     defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
@@ -1544,6 +1546,11 @@ async function gameAction(env,playerId,body){
       await recalculateKingdomPower(env,k.id);
     }
     await logKingdomAction(env,k.id,p.id,type,result);
+  }else if(type==="city_special_position"){
+    if(!specialCityEnabled(env))return json({error:"Estruturas especiais indisponíveis."},503);
+    const result=await positionSpecialCityBuilding(env,k.id,body);
+    if(!result.ok)return json({error:result.error},result.status);
+    await logKingdomAction(env,k.id,p.id,type,result);
   }else if(type==="city_layout_move"){
     const move=await moveCityBuilding(env,k.id,body);
     if(!move.ok)return json({error:move.error},move.status);
@@ -2135,6 +2142,7 @@ export default {
     const checks={database:false,session:Boolean(env.SESSION_SECRET),schema:false};
     const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","daily_reward_claims","onboarding_bonus_claims","support_orders","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     requiredTables.push("equipment_fragments");
+    if(specialCityEnabled(env))requiredTables.push("city_special_buildings");
     if(env.ENVIRONMENT==="beta")requiredTables.push("beta_invites","beta_access_sessions","beta_redeem_attempts");
     // An enabled 4X beta must fail readiness until all additive 0041 tables exist.
     if(env.ENVIRONMENT==="beta"&&advanced4xEnabled(env))requiredTables.push("intermediate_resources","city_defenses","kingdom_progression","progression_xp_ledger");

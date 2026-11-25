@@ -8,8 +8,12 @@ if (root) {
   const zInput = document.getElementById("coiCityZ");
   const submit = document.getElementById("coiCityMove");
   const status = document.getElementById("coiCityGridStatus");
-  const config = () => window.__coiCityLayoutState?.()?.cityLayout;
-  const buildings = () => window.__coiCityLayoutState?.()?.buildings || [];
+  const state = () => window.__coiCityLayoutState?.() || {};
+  const config = () => state().cityLayout ? {...state().cityLayout,footprints:{...state().cityLayout.footprints,...state().specialCityCatalog}} : null;
+  const buildings = () => [...(state().buildings||[]),...Object.entries(state().specialCityCatalog||{}).map(([type,def])=>{
+    const saved=state().specialCityBuildings?.find(row=>row.building_type===type);
+    return {building_type:type,level:1,special:true,name:def.name,position_x:saved?Number(saved.grid_x):null,position_z:saved?Number(saved.grid_z):null};
+  })];
   const defenses = () => window.__coiCityLayoutState?.()?.cityDefenses || [];
   const selected = () => buildings().find(item => item.building_type === selector.value);
   let moving = false;
@@ -39,10 +43,10 @@ if (root) {
     });
     rows.forEach(b => {
       const fp = layout.footprints[b.building_type];
-      if (!fp) return;
+      if (!fp || b.position_x===null || b.position_z===null) return;
       const px = (Number(b.position_x) - min) * unit;
       const py = (Number(b.position_z) - min) * unit;
-      ctx.fillStyle = b.building_type === selector.value ? "#cfb05d" : "#53799a";
+      ctx.fillStyle = b.building_type === selector.value ? "#cfb05d" : b.special?"#8c69b3":"#53799a";
       ctx.fillRect(px,py,fp.width*unit,fp.height*unit);
       ctx.strokeStyle = "#e8e0c5";
       ctx.strokeRect(px,py,fp.width*unit,fp.height*unit);
@@ -55,7 +59,7 @@ if (root) {
       ctx.strokeRect((x-min)*unit,(z-min)*unit,size.width*unit,size.height*unit);
     }
     submit.disabled = moving || !valid || !current ||
-      (Number(current.position_x) === x && Number(current.position_z) === z);
+      (current.position_x!==null && Number(current.position_x) === x && Number(current.position_z) === z);
     if (!moving) status.textContent = !current ? "Aguardando a cidade" :
       valid ? "Prévia livre. Confirme para salvar a posição no servidor." :
       "Posição inválida ou ocupada. Escolha outro ponto.";
@@ -68,7 +72,7 @@ if (root) {
       x + fp.width > layout.max || z + fp.height > layout.max) return false;
     return defenses().every(d => !(x < Number(d.grid_x)+Number(d.width) && x+fp.width > Number(d.grid_x) &&
       z < Number(d.grid_z)+Number(d.height) && z+fp.height > Number(d.grid_z))) && rows.every(other => {
-      if (other.building_type === current.building_type) return true;
+      if (other.building_type === current.building_type || other.position_x===null || other.position_z===null) return true;
       const footprint = layout.footprints[other.building_type];
       if (!footprint) return false;
       const ox = Number(other.position_x), oz = Number(other.position_z);
@@ -86,7 +90,7 @@ if (root) {
       rows.forEach(row => {
         const option = document.createElement("option");
         option.value = row.building_type;
-        option.textContent = (window.__coiCityBuildingNames?.[row.building_type] || row.building_type) + " · Nv. " + row.level;
+        option.textContent = row.special?row.name+(row.position_x===null?" · Posicionar":" · Estrutura especial"):(window.__coiCityBuildingNames?.[row.building_type] || row.building_type) + " · Nv. " + row.level;
         selector.appendChild(option);
       });
     }
@@ -138,8 +142,8 @@ if (root) {
     try {
       if (typeof window.__coiCityLayoutMove !== "function") throw new Error("Jogo não está pronto para salvar.");
       await window.__coiCityLayoutMove({
-        building:b.building_type,gridX:x,gridZ:z,
-        fromX:Number(b.position_x),fromZ:Number(b.position_z)
+        type:b.special?"city_special_position":"city_layout_move",building:b.building_type,gridX:x,gridZ:z,
+        fromX:b.position_x===null?null:Number(b.position_x),fromZ:b.position_z===null?null:Number(b.position_z)
       });
       status.textContent = "Edifício reposicionado e sincronizado.";
     } catch(error) {

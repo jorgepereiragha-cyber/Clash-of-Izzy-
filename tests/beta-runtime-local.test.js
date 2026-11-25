@@ -653,6 +653,19 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(restored.data.state.dragonCollection.find(x=>x.key===originalDragon.dragon_key).elementalSkill.rank,0);
     assert.equal(swapped.data.state.dragonCollection.find(x=>x.key==="mist_talon").elementalSkill.nextMilestone,20);
     console.log("Beta individual dragon progression passed: switch and restore without transferring progress.");
+    const siteBefore=await getStateFor(cookie,start.data.token);
+    const sitePos={type:"city_special_position",building:"dragon_nest",gridX:22,gridZ:22,fromX:null,fromZ:null};
+    const siteRace=await Promise.all([actionFor(cookie,start.data.token,sitePos),actionFor(cookie,start.data.token,{...sitePos,building:"summon_altar"})]);
+    assert.deepEqual(siteRace.map(x=>x.status).sort((a,b)=>a-b),[200,409]);
+    const siteAfter=await getStateFor(cookie,start.data.token);
+    assert.equal(siteAfter.specialCityBuildings.length,1);
+    const site=siteAfter.specialCityBuildings[0],farm=siteAfter.buildings.find(x=>x.building_type==="farm");
+    assert.equal((await actionFor(cookie,start.data.token,{type:"city_layout_move",building:"farm",gridX:22,gridZ:22,fromX:Number(farm.position_x),fromZ:Number(farm.position_z)})).status,409);
+    assert.equal((await actionFor(cookie,start.data.token,{...sitePos,building:site.building_type,gridX:23})).status,400);
+    assert.equal((await actionFor(cookie,start.data.token,{...sitePos,building:site.building_type,gridX:-25,gridZ:-25,fromX:22,fromZ:22})).status,200);
+    assert.equal((await actionFor(cookie,start.data.token,{...sitePos,building:site.building_type,gridX:0,gridZ:0,fromX:22,fromZ:22})).status,409);
+    assert.equal((await getStateFor(claimedCookie,second.data.token)).specialCityBuildings.length,0);
+    console.log("Beta special city placements passed: concurrent collision, normal building guard, CAS and ownership.");
     const countEvents = async type => {
       assert.ok(["research_started","research_upgraded","troop_training_started","troops_trained"].includes(type));
       const raw = await command([...common,"execute","clash-of-izzy-beta-db","--local",
