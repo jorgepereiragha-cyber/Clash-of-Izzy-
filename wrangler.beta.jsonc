@@ -34,6 +34,7 @@
     "ENVIRONMENT": "beta",
     "INVITE_ONLY": "true",
     "BETA_LIVE_PAYMENTS_APPROVED": "false",
+    "BETA_EMAIL_DELIVERY_APPROVED": "false",
     "GAME_4X_SYSTEMS_ENABLED": "true",
     "LEVEL_PACKS_ENABLED": "false",
     "LEVEL_PACKS_PUBLIC_ENABLED": "false",
