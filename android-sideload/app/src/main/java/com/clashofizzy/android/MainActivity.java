@@ -181,7 +181,7 @@ public final class MainActivity extends Activity {
 
         TextView loadingMessage = new TextView(this);
         loadingMessage.setText("Preparando Eldoria e sincronizando seu reino…");
-        if (BuildConfig.BETA) loadingMessage.setText("Beta fechado · reino de testes independente");
+        if (BuildConfig.BETA) loadingMessage.setText("Acesso por convite · sincronizando Eldoria");
         loadingMessage.setTextColor(Color.rgb(216, 228, 233));
         loadingMessage.setTextSize(14);
         loadingMessage.setGravity(Gravity.CENTER);

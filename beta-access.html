@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex,nofollow">
 <meta name="referrer" content="no-referrer">
-<title>Clash of Izzy | Beta fechado</title>
+<title>Clash of Izzy | Acesso por convite</title>
 <style>
 :root{color-scheme:dark;font-family:system-ui,-apple-system,sans-serif}
 *{box-sizing:border-box}body{margin:0;min-height:100dvh;background:radial-gradient(circle at top,#263d67,#081525 70%);color:#f8edda;display:grid;place-items:center;padding:18px}
@@ -18,15 +18,15 @@ button:disabled{opacity:.65;cursor:wait}#status{min-height:26px;font-weight:600}
 </head>
 <body>
 <main>
-<h1>Clash of Izzy · Beta fechado</h1>
+<h1>Clash of Izzy</h1>
 <p>Este ambiente é separado do jogo oficial. Digite o código recebido no convite para acessar o seu reino de teste.</p>
 <form id="form">
 <label for="code">Código de convite</label>
 <input id="code" name="code" type="text" placeholder="IZZY-..." autocomplete="off" maxlength="25" required spellcheck="false">
-<button id="submit" type="submit">Entrar no beta</button>
+<button id="submit" type="submit">Entrar no reino</button>
 </form>
 <section id="active-session" hidden>
-<p>Esta sessão já tem autorização para o beta fechado.</p>
+<p>Esta sessão já tem autorização para o acesso por convite.</p>
 <p>Os sistemas legados de estratégia foram reaproveitados sem ativar pagamentos: evolua o castelo 4X, negocie recursos virtuais e explore o mundo medieval.</p>
 <nav aria-label="Sistemas liberados para testar" style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:16px 0">
 <a href="/kingdom.html" style="color:#f4d69a">Castelo e 4X</a>
@@ -36,11 +36,11 @@ button:disabled{opacity:.65;cursor:wait}#status{min-height:26px;font-weight:600}
 <a href="/alliance.html" style="color:#f4d69a">Alianças</a>
 <a href="/events.html" style="color:#f4d69a">Eventos</a>
 </nav>
-<button type="button" id="logout">Encerrar sessão beta</button>
+<button type="button" id="logout">Encerrar sessão</button>
 </section>
 <p id="status" role="status" aria-live="polite"></p>
-<p id="server-status" role="status" aria-live="polite"><small>Consultando disponibilidade do servidor beta...</small></p>
-<small>O acesso é limitado. O beta não aceita pagamentos reais nesta fase.</small>
+<p id="server-status" role="status" aria-live="polite"><small>Consultando disponibilidade do servidor...</small></p>
+<small>O acesso é limitado. Pagamentos reais não estão disponíveis nesta fase.</small>
 </main>
 <script>
 const form=document.getElementById("form"),button=document.getElementById("submit"),status=document.getElementById("status");
@@ -53,8 +53,8 @@ fetch("/api/health",{cache:"no-store",credentials:"same-origin"})
   .then(async response=>{
     const health=await response.json().catch(()=>null);
     serverStatus.textContent=response.ok&&health?.status==="ready"&&health?.checks?.database===true
-      ?"Servidor beta disponível para testes."
-      :"Servidor beta ainda não está pronto. Verifique a configuração do banco e tente novamente.";
+      ?"Servidor disponível para acesso por convite."
+      :"Servidor ainda não está pronto. Tente novamente mais tarde.";
   })
   .catch(()=>{serverStatus.textContent="Não foi possível verificar o servidor. Confira a conexão e tente novamente.";});
 logout.addEventListener("click",async()=>{
@@ -81,7 +81,7 @@ form.addEventListener("submit",async e=>{
       status.textContent=res.status===429
         ?"Muitas tentativas. Tente novamente mais tarde."
         :res.status===503
-          ?"Servidor beta temporariamente indisponível ou banco incompleto. O acesso não foi autorizado."
+          ?"Servidor temporariamente indisponível ou banco incompleto. O acesso não foi autorizado."
           :res.status===403
             ?"Convite inválido, expirado ou indisponível."
             :"Não foi possível validar o convite (HTTP "+res.status+"). Tente novamente.";
