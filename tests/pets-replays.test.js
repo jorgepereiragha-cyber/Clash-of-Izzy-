@@ -70,3 +70,48 @@ test("alimentação tem request_key e grava a deduplicação no D1", async () =>
   assert.match(pets, /kingdom_pet_feed_requests/);
   assert.match(pets, /changes\(\)>0/);
 });
+
+test("mascote desativado não consome ouro nem substitui o mascote ativo, inclusive durante uma operação",async()=>{
+  const {DatabaseSync}=await import("node:sqlite");
+  const {handlePetsRoute}=await import("../pets.js");
+  const db=new DatabaseSync(":memory:");
+  try{
+    db.exec(`
+      CREATE TABLE players(id INTEGER PRIMARY KEY,player_id TEXT);
+      CREATE TABLE kingdoms(id INTEGER PRIMARY KEY,player_id INTEGER,gold INTEGER,updated_at TEXT);
+      CREATE TABLE pet_catalog(id TEXT PRIMARY KEY,name TEXT,active INTEGER,unlock_cost_gold INTEGER,base_skill_json TEXT);
+      CREATE TABLE kingdom_pets(kingdom_id INTEGER,pet_id TEXT,level INTEGER,experience INTEGER,is_active INTEGER,updated_at INTEGER,UNIQUE(kingdom_id,pet_id));
+      CREATE UNIQUE INDEX one_active ON kingdom_pets(kingdom_id) WHERE is_active=1;
+      CREATE TABLE kingdom_events(kingdom_id INTEGER,event_type TEXT,payload_json TEXT);
+      CREATE TABLE kingdom_pet_feed_requests(kingdom_id INTEGER,request_key TEXT,pet_id TEXT,food_amount INTEGER,gold_spent INTEGER,exp_gained INTEGER,level_after INTEGER,experience_after INTEGER,UNIQUE(kingdom_id,request_key));
+      INSERT INTO players VALUES(1,'public');
+      INSERT INTO kingdoms VALUES(10,1,10000,NULL);
+      INSERT INTO pet_catalog VALUES('pet_raven','Raven',1,0,'{}'),('pet_wolf','Wolf',0,100,'{}'),('pet_dragon','Dragon',1,100,'{}');
+      INSERT INTO kingdom_pets VALUES(10,'pet_raven',1,0,1,0),(10,'pet_wolf',1,0,0,0);
+    `);
+    let disableBeforeBatch=null;
+    const adapter={prepare(sql){return {bind(...args){return {sql,args,first:async()=>db.prepare(sql).get(...args)||null}}}},async batch(statements){
+      if(disableBeforeBatch){db.prepare("UPDATE pet_catalog SET active=0 WHERE id=?").run(disableBeforeBatch);disableBeforeBatch=null;}
+      db.exec("BEGIN");
+      try{const result=statements.map(({sql,args})=>({meta:{changes:db.prepare(sql).run(...args).changes}}));db.exec("COMMIT");return result;}
+      catch(error){db.exec("ROLLBACK");throw error;}
+    }};
+    const call=(path,body)=>handlePetsRoute({method:"POST"},{DB:adapter},"public",path,body);
+    const feed={pet_id:"pet_wolf",food_amount:5,request_key:"request_1234567890"};
+    assert.equal((await call("feed",feed)).status,404);
+    assert.equal((await call("activate",{pet_id:"pet_wolf"})).status,404);
+    db.exec("UPDATE pet_catalog SET active=1 WHERE id='pet_wolf'");
+    disableBeforeBatch="pet_wolf";
+    assert.equal((await call("feed",feed)).status,409);
+    db.exec("UPDATE pet_catalog SET active=1 WHERE id='pet_wolf'");
+    disableBeforeBatch="pet_wolf";
+    assert.equal((await call("activate",{pet_id:"pet_wolf"})).status,409);
+    disableBeforeBatch="pet_dragon";
+    assert.equal((await call("unlock",{pet_id:"pet_dragon"})).status,409);
+    assert.equal(db.prepare("SELECT gold FROM kingdoms").get().gold,10000);
+    assert.equal(db.prepare("SELECT pet_id FROM kingdom_pets WHERE is_active=1").get().pet_id,"pet_raven");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_pet_feed_requests").get().n,0);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_pets").get().n,2);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_events").get().n,0);
+  }finally{db.close();}
+});

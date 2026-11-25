@@ -125,8 +125,9 @@ async function unlockPet(env, kingdomId, body) {
     env.DB.prepare(
       "UPDATE kingdoms SET gold=gold-?,updated_at=CURRENT_TIMESTAMP " +
       "WHERE id=? AND gold>=? AND NOT EXISTS(" +
-      "SELECT 1 FROM kingdom_pets WHERE kingdom_id=? AND pet_id=?)"
-    ).bind(cost, kingdomId, cost, kingdomId, petId),
+      "SELECT 1 FROM kingdom_pets WHERE kingdom_id=? AND pet_id=?) " +
+      "AND EXISTS(SELECT 1 FROM pet_catalog WHERE id=? AND active=1 AND unlock_cost_gold=?)"
+    ).bind(cost, kingdomId, cost, kingdomId, petId, petId, cost),
     env.DB.prepare(
       "INSERT INTO kingdom_pets(kingdom_id,pet_id,level,experience,is_active) " +
       "SELECT ?,?,1,0,0 WHERE changes()>0"
@@ -154,13 +155,13 @@ async function activatePet(env, kingdomId, body) {
   if (!/^[a-z0-9_]{3,64}$/.test(petId)) return reply({ error: "Mascote inválido." }, 400);
 
   const owned = await env.DB.prepare(
-    "SELECT pet_id FROM kingdom_pets WHERE kingdom_id=? AND pet_id=?"
+    "SELECT kp.pet_id FROM kingdom_pets kp JOIN pet_catalog pc ON pc.id=kp.pet_id WHERE kp.kingdom_id=? AND kp.pet_id=? AND pc.active=1"
   ).bind(kingdomId, petId).first();
   if (!owned) return reply({ error: "Desbloqueie este mascote antes de ativá-lo." }, 404);
 
   const result = await env.DB.batch([
-    env.DB.prepare("UPDATE kingdom_pets SET is_active=0,updated_at=unixepoch() WHERE kingdom_id=? AND is_active=1").bind(kingdomId),
-    env.DB.prepare("UPDATE kingdom_pets SET is_active=1,updated_at=unixepoch() WHERE kingdom_id=? AND pet_id=?").bind(kingdomId, petId),
+    env.DB.prepare("UPDATE kingdom_pets SET is_active=0,updated_at=unixepoch() WHERE kingdom_id=? AND is_active=1 AND EXISTS(SELECT 1 FROM kingdom_pets kp JOIN pet_catalog pc ON pc.id=kp.pet_id WHERE kp.kingdom_id=? AND kp.pet_id=? AND pc.active=1)").bind(kingdomId, kingdomId, petId),
+    env.DB.prepare("UPDATE kingdom_pets SET is_active=1,updated_at=unixepoch() WHERE kingdom_id=? AND pet_id=? AND EXISTS(SELECT 1 FROM pet_catalog WHERE id=? AND active=1)").bind(kingdomId, petId, petId),
     env.DB.prepare(
       "INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) " +
       "SELECT ?,'pet_activated',? WHERE changes()>0"
@@ -207,8 +208,8 @@ async function feedPet(env, kingdomId, body) {
 
   const state = await env.DB.prepare(
     "SELECT kp.level,kp.experience,k.gold " +
-    "FROM kingdom_pets kp JOIN kingdoms k ON k.id=kp.kingdom_id " +
-    "WHERE kp.kingdom_id=? AND kp.pet_id=?"
+    "FROM kingdom_pets kp JOIN kingdoms k ON k.id=kp.kingdom_id JOIN pet_catalog pc ON pc.id=kp.pet_id " +
+    "WHERE kp.kingdom_id=? AND kp.pet_id=? AND pc.active=1"
   ).bind(kingdomId, petId).first();
   if (!state) return reply({ error: "Mascote não desbloqueado." }, 404);
 
@@ -228,7 +229,7 @@ async function feedPet(env, kingdomId, body) {
       "SELECT ?,?,?,?,?,?,?,? WHERE NOT EXISTS(" +
       "SELECT 1 FROM kingdom_pet_feed_requests WHERE kingdom_id=? AND request_key=?) " +
       "AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND gold>=?) " +
-      "AND EXISTS(SELECT 1 FROM kingdom_pets WHERE kingdom_id=? AND pet_id=? AND level=? AND experience=?)"
+      "AND EXISTS(SELECT 1 FROM kingdom_pets kp JOIN pet_catalog pc ON pc.id=kp.pet_id WHERE kp.kingdom_id=? AND kp.pet_id=? AND kp.level=? AND kp.experience=? AND pc.active=1)"
     ).bind(
       kingdomId, requestKey, petId, amount, goldCost, expGained, next.level, next.experience,
       kingdomId, requestKey, kingdomId, goldCost, kingdomId, petId, currentLevel, currentExperience

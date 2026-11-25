@@ -257,6 +257,21 @@ async function getShopState(env,kingdomId){
   items:SHOP_ITEMS,inventory:inventory.results||[]
  };
 }
+// Determine ownership in the same transaction as the debit and each draw.
+export function appendHeroSummonDraw(db,statements,{kingdomId,actionId,heroKey,rarity,name,fragmentGain,tableRarity}){
+ const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+ const historyIndex=statements.length;
+ statements.push(db.prepare("INSERT INTO hero_summon_history(kingdom_id,hero_key,rarity,result_type) SELECT ?,?,?,CASE WHEN EXISTS(SELECT 1 FROM hero_inventory WHERE kingdom_id=? AND hero_key=?) THEN 'duplicate' ELSE 'new' END WHERE "+guard+" RETURNING result_type").bind(kingdomId,heroKey,rarity,kingdomId,heroKey,kingdomId,actionId));
+ statements.push(db.prepare("INSERT INTO hero_inventory(kingdom_id,hero_key,rarity,level,experience,stars,skill_level,fragments) SELECT ?,?,?,1,0,1,1,0 WHERE "+guard+" ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET fragments=hero_inventory.fragments+?").bind(kingdomId,heroKey,rarity,kingdomId,actionId,fragmentGain));
+ statements.push(db.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) SELECT ?,?,?,1,0,? WHERE "+guard+" ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END").bind(kingdomId,heroKey,name,tableRarity,kingdomId,actionId));
+ return historyIndex;
+}
+export function heroSummonResult(draw,result){
+ const resultType=result?.results?.[0]?.result_type;
+ if(resultType!=="new"&&resultType!=="duplicate")throw Error("Missing committed hero summon history");
+ return {hero_key:draw.heroKey,name:draw.name,rarity:draw.rarity,result_type:resultType,fragments:resultType==="duplicate"?draw.fragmentGain:0};
+}
+
 function rollHeroRarity(){
  const n=crypto.getRandomValues(new Uint32Array(1))[0]/4294967296*100;
  let cumulative=0;
@@ -1477,33 +1492,32 @@ async function gameAction(env,playerId,body){
     if(result.some(entry=>entry?.meta?.changes!==1))return json({error:"Recursos insuficientes ou dragão alterado."},409);
   }else if(type==="hero_summon"){
     const quantity=Number(body.quantity)===10?10:1,cost=quantity===10?900:100;
-    const ownedRows=await env.DB.prepare("SELECT hero_key FROM hero_inventory WHERE kingdom_id=?").bind(k.id).all();
-    const owned=new Set((ownedRows.results||[]).map(row=>row.hero_key));
-    const results=[],statements=[],actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+    const draws=[],statements=[],actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     statements.push(env.DB.prepare("UPDATE players SET gems=gems-? WHERE id=? AND gems>=?").bind(cost,p.id,cost));
     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"__internal_action_guard",actionId));
     for(let i=0;i<quantity;i++){
       const rarity=rollHeroRarity(),pool=Object.entries(HERO_TEMPLATES).filter(([,hero])=>hero.rarity===rarity);
       if(!pool.length)throw new Error("Nenhum herói disponível para a raridade sorteada.");
       const pick=Math.floor(crypto.getRandomValues(new Uint32Array(1))[0]/4294967296*pool.length),heroKey=pool[pick][0];
-      const duplicate=owned.has(heroKey),fragmentGain=HERO_RARITY[rarity].fragments;
-      if(duplicate){
-        statements.push(env.DB.prepare("UPDATE hero_inventory SET fragments=fragments+? WHERE kingdom_id=? AND hero_key=? AND "+guard).bind(fragmentGain,k.id,heroKey,k.id,actionId));
-      }else{
-        statements.push(env.DB.prepare("INSERT INTO hero_inventory(kingdom_id,hero_key,rarity,level,experience,stars,skill_level,fragments) SELECT ?,?,?,1,0,1,1,0 WHERE "+guard+" ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET fragments=hero_inventory.fragments+?").bind(k.id,heroKey,rarity,k.id,actionId,fragmentGain));
-        owned.add(heroKey);
-      }
-      const tableRarity=rarity==="white"?"common":rarity==="blue"?"rare":"legendary"; // gold maps to legacy heroes.rarity CHECK, while inventory stores gold
-      statements.push(env.DB.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) SELECT ?,?,?,1,0,? WHERE "+guard+" ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END").bind(k.id,heroKey,HERO_TEMPLATES[heroKey].name,tableRarity,k.id,actionId));
-      statements.push(env.DB.prepare("INSERT INTO hero_summon_history(kingdom_id,hero_key,rarity,result_type) SELECT ?,?,?,? WHERE "+guard).bind(k.id,heroKey,rarity,duplicate?"duplicate":"new",k.id,actionId));
-      results.push({hero_key:heroKey,name:HERO_TEMPLATES[heroKey].name,rarity,result_type:duplicate?"duplicate":"new",fragments:duplicate?fragmentGain:0});
+      const draw={heroKey,rarity,name:HERO_TEMPLATES[heroKey].name,fragmentGain:HERO_RARITY[rarity].fragments};
+      const tableRarity=rarity==="white"?"common":rarity==="blue"?"rare":"legendary";
+      draw.historyIndex=appendHeroSummonDraw(env.DB,statements,{kingdomId:k.id,actionId,...draw,tableRarity});
+      draws.push(draw);
     }
-    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE "+guard).bind(k.id,"hero_summoned",JSON.stringify({quantity,cost,summons:results}),k.id,actionId));
+    // The most recent quantity rows are exactly these draws: no other writer
+    // can interleave in this D1 batch. Keep the event and response consistent.
+    const details=JSON.stringify(Object.fromEntries(draws.map(d=>[d.heroKey,{name:d.name,fragments:d.fragmentGain}])));
+    statements.push(env.DB.prepare(`INSERT INTO kingdom_events(kingdom_id,event_type,payload_json)
+      SELECT ?,'hero_summoned',json_object('quantity',?,'cost',?,'summons',json((
+        SELECT json_group_array(json_object('hero_key',hero_key,'name',json_extract(?, '$.'||hero_key||'.name'),
+          'rarity',rarity,'result_type',result_type,'fragments',CASE WHEN result_type='duplicate' THEN json_extract(?, '$.'||hero_key||'.fragments') ELSE 0 END))
+        FROM (SELECT * FROM (SELECT id,hero_key,rarity,result_type FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT ?) ORDER BY id)
+      ))) WHERE `+guard).bind(k.id,quantity,cost,details,details,k.id,quantity,k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM hero_summon_history WHERE kingdom_id=? AND id NOT IN (SELECT id FROM hero_summon_history WHERE kingdom_id=? ORDER BY id DESC LIMIT 100) AND "+guard).bind(k.id,k.id,k.id,actionId));
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const batch=await env.DB.batch(statements);
     if(!batch[0]?.meta?.changes)return json({error:"Diamantes insuficientes para invocar."},409);
-    battleOutcome={summons:results,cost};
+    battleOutcome={summons:draws.map(draw=>heroSummonResult(draw,batch[draw.historyIndex])),cost};
   }else if(type==="hero_evolve"){
     const heroKey=String(body.hero||""),hero=await env.DB.prepare("SELECT rarity,stars,fragments FROM hero_inventory WHERE kingdom_id=? AND hero_key=?").bind(k.id,heroKey).first();
     if(!hero||!Object.hasOwn(HERO_TEMPLATES,heroKey))return json({error:"Herói não encontrado na coleção."},404);
