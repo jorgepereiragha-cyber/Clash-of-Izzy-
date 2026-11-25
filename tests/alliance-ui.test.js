@@ -45,8 +45,15 @@ test("estado do reino entrega os saldos do depósito da aliança", async () => {
 
 test("entrada por sigla respeita o limite de membros da aliança", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
-  assert.ok(worker.includes("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT ?,?,'member' WHERE (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=?) < ?"));
-  assert.ok(worker.includes("A aliança atingiu o limite de membros."));
+  const start=worker.indexOf('}else if(type==="alliance_join"){');
+  const end=worker.indexOf('}else if(type==="alliance_invite"){',start);
+  assert.ok(start>=0&&end>start);
+  const join=worker.slice(start,end);
+  assert.ok(join.includes("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT a.id,?,'member' FROM alliances a"));
+  assert.ok(join.includes("NOT EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=?)"));
+  assert.ok(join.includes("(SELECT COUNT(*) FROM alliance_members WHERE alliance_id=a.id)<a.max_members"));
+  assert.ok(join.includes("if(joined.meta?.changes!==1)"));
+  assert.ok(join.includes("A aliança atingiu o limite de membros"));
 });
 
 test("chat da arena usa feed autenticado compacto em vez de consultar o estado inteiro do reino", async () => {
