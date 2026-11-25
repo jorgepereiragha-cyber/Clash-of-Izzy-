@@ -244,7 +244,11 @@ if (host && "WebGLRenderingContext" in window) {
       for (let y = 0; y < 128; y += 22) {
         const offset = (Math.floor(y / 22) % 2) * 16;
         for (let x = -16; x < 144; x += 32) {
-          ctx.strokeStyle = "rgba(35,39,37,.22)";
+          ctx.fillStyle = rand() > .5 ? "rgba(242,226,194,.11)" : "rgba(34,38,34,.10)";
+          ctx.fillRect(x + offset + 2, y + 2, 28, 18);
+          ctx.fillStyle = "rgba(255,244,215,.18)";
+          ctx.fillRect(x + offset + 2, y + 2, 28, 1);
+          ctx.strokeStyle = "rgba(35,39,37,.28)";
           ctx.lineWidth = 1.5;
           ctx.strokeRect(x + offset + 1, y + 1, 30, 20);
         }
@@ -255,6 +259,17 @@ if (host && "WebGLRenderingContext" in window) {
         ctx.fillRect(x + ((y / 12) % 2) * 8, y, 14, 9);
       }
     } else if (kind === "grass") {
+      // Seamless deterministic turf variation within the existing texture budget.
+      for (let i = 0; i < 24; i++) {
+        const x = rand() * 128, y = rand() * 128, radius = 9 + rand() * 19;
+        for (const dx of [-128, 0, 128]) for (const dy of [-128, 0, 128]) {
+          const gradient = ctx.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, radius);
+          gradient.addColorStop(0, i % 2 ? "rgba(184,164,92,.16)" : "rgba(30,52,27,.20)");
+          gradient.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x + dx - radius, y + dy - radius, radius * 2, radius * 2);
+        }
+      }
       for (let i = 0; i < 700; i++) {
         ctx.strokeStyle = rand() > .5 ? "rgba(25,65,28,.20)" : "rgba(210,220,135,.16)";
         ctx.lineWidth = 1;
@@ -262,6 +277,18 @@ if (host && "WebGLRenderingContext" in window) {
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + rand() * 3, y - 2 - rand() * 5); ctx.stroke();
       }
     } else if (kind === "road") {
+      // Individual paving stones with alternating joints and weathered faces.
+      for (let y = 0; y < 128; y += 16) {
+        const offset = (y / 16 % 2) * 16;
+        for (let x = -32; x < 144; x += 32) {
+          ctx.fillStyle = "rgba(48,40,29,.22)";
+          ctx.fillRect(x + offset, y, 32, 16);
+          ctx.fillStyle = rand() > .5 ? "rgba(238,222,184,.28)" : "rgba(103,91,68,.16)";
+          ctx.fillRect(x + offset + 1, y + 1, 30, 14);
+          ctx.fillStyle = "rgba(255,245,214,.16)";
+          ctx.fillRect(x + offset + 2, y + 2, 28, 1);
+        }
+      }
       for (let i = 0; i < 90; i++) {
         const x = rand() * 128, y = rand() * 128;
         ctx.fillStyle = rand() > .5 ? "rgba(45,39,29,.15)" : "rgba(255,245,215,.18)";
@@ -655,7 +682,8 @@ if (host && "WebGLRenderingContext" in window) {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(32, 32), mats.grass);
     ground.rotation.x = -Math.PI / 2; ground.position.y = -.08; ground.receiveShadow = true; scene.add(ground);
     const grid = new THREE.GridHelper(32, 50, "#91a36d", "#91a36d");
-    grid.position.y = -.055; grid.material.transparent = true; grid.material.opacity = .12; scene.add(grid);
+    grid.position.y = -.055; grid.material.transparent = true; grid.material.opacity = .025;
+    grid.material.depthWrite = false; scene.add(grid);
     // A winding stone road crosses the settlement.
     const points = [
       new THREE.Vector3(-6.4, .015, 4.2), new THREE.Vector3(-3.8, .015, 3.3),
@@ -663,10 +691,34 @@ if (host && "WebGLRenderingContext" in window) {
       new THREE.Vector3(2.8, .015, -.8), new THREE.Vector3(5.8, .015, -3.7)
     ];
     const curve = new THREE.CatmullRomCurve3(points);
-    const road = new THREE.Mesh(new THREE.TubeGeometry(curve, 36, .32, 6, false), mats.road);
-    road.receiveShadow = true; scene.add(road);
-    const verge = new THREE.Mesh(new THREE.TubeGeometry(curve, 36, .38, 6, false), mats.roadEdge);
-    verge.position.y = -.025; scene.add(verge);
+    // Ground-conforming paved ribbon instead of a raised tube.
+    // Two bounded static meshes, shared materials and no per-frame work.
+    const pathRibbon = (width, height, mat) => {
+      const positions = [], uvs = [], indices = [];
+      const segments = 36, arcLength = curve.getLength();
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments, p = curve.getPointAt(t), tangent = curve.getTangentAt(t);
+        const length = Math.hypot(tangent.x, tangent.z) || 1;
+        const nx = -tangent.z / length, nz = tangent.x / length;
+        for (const side of [-1, 1]) {
+          positions.push(p.x + nx * width * side, height, p.z + nz * width * side);
+          uvs.push((side + 1) / 2, t * arcLength / 2);
+        }
+        if (i < segments) {
+          const a = i * 2;
+          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(geometry, mat);
+      mesh.receiveShadow = true; scene.add(mesh);
+    };
+    pathRibbon(.46, -.06, mats.roadEdge);
+    pathRibbon(.36, -.045, mats.road);
     // Forest is batched into three instanced draw calls instead of one per tree part.
     addForestInstances();
   }
