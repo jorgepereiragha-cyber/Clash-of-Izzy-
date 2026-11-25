@@ -44,11 +44,11 @@ test("verificador lê exclusivamente health HTTPS do Worker real e rejeita JSON 
   assert.equal(good.compatible,true);
   assert.equal(captured.url,LIVE_API_URL);
   assert.equal(captured.options.method,"GET");
-  assert.equal(captured.options.redirect,"error");
+  assert.equal(captured.options.redirect,"manual");
   assert.equal(captured.options.headers.Accept,"application/json");
   await assert.rejects(checkAndroidReleaseServer(async()=>new Response("<html>fail</html>",{
     status:200, headers:{"Content-Type":"text/html"}
-  })),/API de produção indisponível/);
+  })),/Resposta JSON inválida/);
 });
 
 test("Worker anuncia o contrato e APK oficial exige o health antes e depois do build",async()=>{

@@ -52,7 +52,7 @@ test("commercial audit only performs two read-only GET requests",async()=>{
   for(const {url,options} of requests){
     assert.equal(new URL(url).protocol,"https:");
     assert.equal(options.method,"GET");
-    assert.equal(options.redirect,"error");
+    assert.equal(options.redirect,"manual");
     assert.equal(options.body,undefined);
   }
 });
