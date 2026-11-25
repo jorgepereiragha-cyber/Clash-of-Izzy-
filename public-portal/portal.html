@@ -142,11 +142,35 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
 .support-mini a{color:#ffdc9b;font-weight:800}
 @media(max-width:800px){.feature-grid,.gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.install-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:540px){.feature-grid,.gallery-grid,.install-steps{grid-template-columns:1fr}.shot-placeholder{height:175px}.support-mini{justify-content:center;text-align:center}.final-cta{padding:30px 15px}.download{width:100%}}
+
+/* Eldoria: composição premium, sem dependências externas ou arte simulada. */
+.site-nav{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;border-bottom:1px solid #b38a4955;padding:16px 0}
+.site-brand{font:800 18px Georgia,serif;color:#ffe0a0;text-decoration:none;letter-spacing:.09em}
+.site-nav nav{display:flex;flex-wrap:wrap;gap:6px 16px}
+.site-nav nav a{display:inline-flex;align-items:center;min-height:44px;color:#e4d5b7;text-decoration:none;font-weight:700;font-size:13px}
+.site-nav nav a:hover{color:#fff0c5;text-decoration:underline}
+.royal-art{background:radial-gradient(ellipse at 50% 30%,#3e659b,#142743 45%,#080e19 82%);border-radius:20px}
+.royal-titleline{letter-spacing:.14em}
+.royal-hero{padding-top:clamp(24px,5vw,58px)}
+.feature-card{background:linear-gradient(150deg,#1b304c,#0b1729);border-color:#a8824866;box-shadow:inset 0 2px 0 #e7bc6820,0 8px 22px #0003}
+.feature-icon{background:#1d2f45;color:#ffe0a0;border-color:#a88248}
+.section h2{letter-spacing:.01em}
+.section .eyebrow{margin-bottom:7px}
+.actions{gap:9px}
+.status{min-height:0}
+.final-cta .fine-print{margin-inline:auto}
+#official-release-page{overflow-wrap:anywhere}
+.gallery-grid figure{border-color:#a8824866}
+.shot-placeholder{background:linear-gradient(150deg,#1c304a,#0b1525);height:145px}
+.shot-placeholder span{border:0;padding:12px;font-size:14px;color:#dfc99d}
+@media(max-width:540px){.site-nav{justify-content:center;text-align:center;padding:10px 0}.site-nav nav{justify-content:center;gap:4px 12px}.royal-hero{padding-top:24px;gap:22px}.royal-art{min-height:240px}.feature-card{padding:18px}.shot-placeholder{height:95px}.section{margin-bottom:38px}.share-row{justify-content:center}.fine-print{overflow-wrap:anywhere}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}.download[href]:hover{transform:none}}
 </style>
 </head>
 <body>
 
-<main class="wrap">
+<header class="wrap site-nav"><a class="site-brand" href="#inicio">CLASH OF IZZY</a><nav aria-label="Navegação principal"><a href="#benefits-title">O jogo</a><a href="#gallery-title">Galeria</a><a href="#install-title">Instalação</a><a href="#download-apk">Android</a></nav></header>
+<main class="wrap" id="inicio">
 <header class="royal-hero">
   <div class="royal-art">
     <div class="royal-sun" aria-hidden="true"></div>
@@ -156,8 +180,8 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
   <div class="royal-copy">
     <div class="royal-titleline">Estratégia medieval para Android</div>
     <h1>CLASH OF <span class="golden">IZZY</span><small>O Reino no Seu Celular</small></h1>
-    <p class="lead">Baixe o app oficial Android quando lançado. Construa, lute e domine um mundo de castelos, heróis e alianças.</p>
-    <div class="royal-features" aria-label="Sobre o aplicativo"><span>App Android</span><span>Grátis para jogar</span><span>Em desenvolvimento</span></div>
+    <p class="lead">Construa seu império, comande seus exércitos e dispute o destino de Eldoria. Descubra Clash of Izzy, estratégia medieval para Android.</p>
+    <div class="royal-features" aria-label="Sobre o aplicativo"><span>App Android</span><span>Grátis para jogar</span><span>Reino de Eldoria</span></div>
     <div class="actions">
       <a class="download" id="download-apk" aria-disabled="true" tabindex="-1">Baixar APK Android</a>
       <p class="status" id="download-status" role="status" aria-live="polite">Verificando se uma versão Android oficial foi publicada…</p>
@@ -173,7 +197,7 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
         <a class="share-link" id="share-facebook" target="_blank" rel="noopener noreferrer">Facebook</a>
         <button class="share-link" id="copy-portal" type="button">Copiar link</button>
       </div>
-      <p class="status" id="share-status" role="status" aria-live="polite">Compartilhe esta página sem anunciar que o APK já está disponível.</p>
+      <p class="status" id="share-status" role="status" aria-live="polite">Compartilhe o portal oficial com seus aliados.</p>
     </div>
   </div>
 </header>
@@ -208,10 +232,10 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
 </section>
 <section class="final-cta" aria-labelledby="final-title">
   <div class="eyebrow">Sua próxima conquista</div>
-  <h2 id="final-title">Seu reino está esperando. Baixe agora.</h2>
-  <p>Instale o Clash of Izzy assim que a versão Android oficial estiver liberada.</p>
+  <h2 id="final-title">Seu reino está esperando.</h2>
+  <p>Prepare-se para construir seu legado em Eldoria.</p>
   <a class="download" id="download-apk-final" aria-disabled="true" tabindex="-1">Baixar APK Android</a>
-  <p class="fine-print">Download indisponível até a publicação da release oficial.</p>
+  <p class="fine-print" id="download-status-final" role="status" aria-live="polite">Verificando a disponibilidade do APK oficial…</p>
 </section>
 <aside class="support-mini" aria-label="Apoio ao desenvolvimento">
   <span><strong>Projeto independente.</strong> Apoiar é opcional e depende da habilitação dos pagamentos.</span>
@@ -226,6 +250,7 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
   const filename = "clash-of-izzy-android.apk";
   const buttons = [document.getElementById("download-apk"), document.getElementById("download-apk-final")];
   const status = document.getElementById("download-status");
+  const finalStatus = document.getElementById("download-status-final");
   const checksum = document.getElementById("checksum-link");
   const prefix = "/" + repo + "/releases/download/";
   const publicUrl = "https://clash-of-izzy-portal.jorgepereiragha.workers.dev/portal.html";
@@ -240,7 +265,7 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
     const link = publicUrl + "?utm_source=compartilhamento&utm_medium=social&utm_campaign=eldoria_pre_lancamento";
     try {
       await navigator.clipboard.writeText(link);
-      shareStatus.textContent = "Link oficial copiado. Compartilhe nas redes sociais sem anunciar que o APK já está disponível.";
+      shareStatus.textContent = "Link oficial copiado. Compartilhe com seus aliados.";
     } catch {
       shareStatus.textContent = "Link para compartilhar: " + link;
     }
@@ -274,11 +299,15 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
   async function findOfficialApk() {
     try {
       const release = await fetchReleaseJson("/releases/latest");
-      if (release.draft || release.prerelease || !Array.isArray(release.assets)) throw new Error("release não oficial");
-      const apk = release.assets.find(asset => validAsset(asset, filename) && asset.size > 0);
-      const hash = release.assets.find(asset => validAsset(asset, filename + ".sha256"));
-      if (!apk || !hash || hash.size <= 0) throw new Error("APK e SHA-256 não publicados");
-      if (!release.tag_name || ![apk,hash].every(asset => new URL(asset.browser_download_url).pathname.startsWith(prefix + encodeURIComponent(release.tag_name) + "/"))) throw new Error("tag da release incompatível");
+      if (!release || release.draft !== false || release.prerelease !== false || !Array.isArray(release.assets) || typeof release.tag_name !== "string" || !release.tag_name) throw new Error("release não oficial");
+      const exactAsset = expected => {
+        const matches = release.assets.filter(asset => validAsset(asset, expected) &&
+          Number.isSafeInteger(asset.size) && asset.size > 0 &&
+          new URL(asset.browser_download_url).pathname === prefix + encodeURIComponent(release.tag_name) + "/" + expected);
+        return matches.length === 1 ? matches[0] : null;
+      };
+      const apk = exactAsset(filename), hash = exactAsset(filename + ".sha256");
+      if (!apk || !hash) throw new Error("APK e SHA-256 não publicados");
       for (const button of buttons) {
         button.href = apk.browser_download_url;
         button.setAttribute("download", filename);
@@ -286,6 +315,7 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
         button.removeAttribute("tabindex");
       }
       status.textContent = "Versão " + String(release.tag_name) + " disponível no GitHub. Confira o SHA-256 e a assinatura antes de instalar.";
+      finalStatus.textContent = "APK oficial disponível para Android. Confira a assinatura e o SHA-256 antes de instalar.";
       checksum.href = hash.browser_download_url;
       checksum.rel = "noopener noreferrer";
       checksum.hidden = false;
@@ -298,6 +328,7 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
       checksum.removeAttribute("href");
       checksum.hidden = true;
       status.textContent = "O APK comercial ainda não está disponível ou não foi possível verificar a publicação oficial. Use somente um instalador autorizado nesta página.";
+      finalStatus.textContent = "Download indisponível até a confirmação da release oficial.";
     }
   }
 
