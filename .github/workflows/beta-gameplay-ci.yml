@@ -31,3 +31,5 @@ jobs:
         run: node --test tests/rally-capacity.test.js
       - name: Tactical combat versioning and deterministic simulations
         run: node --test tests/tactical-combat-v2.test.js
+      - name: Solo attack target race and settlement guard
+        run: node --test tests/attack-target-race.test.js
