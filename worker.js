@@ -2969,6 +2969,9 @@ export default {
       if(pending.payment_method==="mercadopago_link"||pending.mp_order_id){
         return json({error:"Pedido Mercado Pago: alterações manuais bloqueadas. O estado é controlado pela confirmação ou operação de estorno no provedor."},409);
       }
+      if(decision==="approve"&&pending.product_kind==="vip_package"&&getLevelPackByName(pending.product_name)){
+        return json({error:"Pacote de progressão exige confirmação e concessão pelo Mercado Pago. Pedido legado requer conciliação.",manualReview:true},409);
+      }
       let pixReference=null;
       if(decision==="approve"&&pending.payment_method==="pix"){
         if(body.bankStatementConfirmed!==true)return json({error:"Confirme no extrato da conta autorizada o recebimento real do Pix antes de liberar."},400);

@@ -64,7 +64,8 @@ export function levelPackGrantStatements(db, requestId, productId, pack) {
       "INSERT OR IGNORE INTO level_pack_claims(request_id,kingdom_id,pack_level) " +
       "SELECT id,kingdom_id,? FROM purchase_requests " +
       "WHERE id=? AND status='approved' AND product_kind='vip_package' " +
-      "AND product_id=? AND product_name=? AND gems_amount=? AND ROUND(price_brl*100)=?"
+      "AND product_id=? AND product_name=? AND gems_amount=? AND ROUND(price_brl*100)=? " +
+      "AND changes()=1 AND EXISTS(SELECT 1 FROM kingdoms k WHERE k.id=purchase_requests.kingdom_id AND k.player_id=purchase_requests.player_id)"
     ).bind(pack.level, requestId, productId, pack.name, pack.gems, pack.priceCents),
     db.prepare(
       "UPDATE players SET gems=gems+? " +

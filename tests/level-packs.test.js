@@ -129,3 +129,47 @@ test("catalogo P1-P8 segue os valores solicitados e migracao 0044 nao substitui 
   assert.match(sql,/AND NOT EXISTS\s*\(/);
   assert.equal(levelPackPriceApproved({},LEVEL_PACKS[7]),false);
 });
+
+test("level pack delivery is atomic, bound to the approved order and unique by kingdom and level",async()=>{
+ const {DatabaseSync}=await import("node:sqlite");
+ const db=new DatabaseSync(":memory:");
+ try{
+  db.exec(`
+   CREATE TABLE players(id INTEGER PRIMARY KEY,gems INTEGER);
+   CREATE TABLE kingdoms(id INTEGER PRIMARY KEY,player_id INTEGER,wood INTEGER,food INTEGER,stone INTEGER,iron INTEGER,gold INTEGER,updated_at TEXT);
+   CREATE TABLE purchase_requests(id INTEGER PRIMARY KEY,kingdom_id INTEGER,player_id INTEGER,status TEXT,product_kind TEXT,product_id INTEGER,product_name TEXT,gems_amount INTEGER,price_brl REAL);
+   CREATE TABLE level_pack_claims(request_id INTEGER UNIQUE,kingdom_id INTEGER,pack_level INTEGER,UNIQUE(kingdom_id,pack_level));
+   INSERT INTO players VALUES(1,0),(2,0);
+   INSERT INTO kingdoms VALUES(1,1,0,0,0,0,0,NULL),(2,2,0,0,0,0,0,NULL);
+  `);
+  const pack=LEVEL_PACKS[0];
+  const insert=db.prepare("INSERT INTO purchase_requests VALUES(?,?,?,'pending','vip_package',11,?,500,9.9)");
+  insert.run(1,1,1,pack.name);insert.run(2,1,1,pack.name);insert.run(3,2,1,pack.name);insert.run(4,2,2,pack.name);
+  const adapter={prepare(sql){return {bind(...args){return {sql,args}}}}};
+  const approve=(id,fail=false)=>{
+   const stmts=[adapter.prepare("UPDATE purchase_requests SET status='approved' WHERE id=? AND status='pending'").bind(id),...levelPackGrantStatements(adapter,id,11,pack)];
+   db.exec("BEGIN");
+   try{
+    for(const {sql,args} of stmts){if(fail&&sql.startsWith("UPDATE kingdoms"))throw Error("simulated credit failure");db.prepare(sql).run(...args);}
+    db.exec("COMMIT");
+   }catch(e){db.exec("ROLLBACK");throw e;}
+  };
+  assert.throws(()=>approve(1,true),/simulated credit failure/);
+  assert.equal(db.prepare("SELECT status FROM purchase_requests WHERE id=1").get().status,"pending");
+  approve(1);approve(1);approve(2);approve(3);approve(4);
+  assert.equal(db.prepare("SELECT gems FROM players WHERE id=1").get().gems,500);
+  assert.equal(db.prepare("SELECT gems FROM players WHERE id=2").get().gems,500);
+  assert.equal(db.prepare("SELECT wood FROM kingdoms WHERE id=1").get().wood,5000);
+  assert.equal(db.prepare("SELECT food FROM kingdoms WHERE id=2").get().food,5000);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM level_pack_claims").get().n,2);
+  assert.equal(db.prepare("SELECT COUNT(*) AS n FROM level_pack_claims WHERE request_id IN (2,3)").get().n,0);
+ }finally{db.close();}
+});
+
+test("manual review cannot partially deliver a legacy level pack, and provider replays use committed claims",async()=>{
+ const worker=await read("worker.js");
+ const mp=await read("mercadopago-orders.js");
+ assert.match(worker,/decision==="approve"&&pending\.product_kind==="vip_package"&&getLevelPackByName\(pending\.product_name\)/);
+ assert.match(mp,/SELECT 1 AS granted FROM level_pack_claims WHERE request_id=\?/);
+ assert.doesNotMatch(mp,/levelPack && purchase\.status === "pending" && !results\[2\]/);
+});
