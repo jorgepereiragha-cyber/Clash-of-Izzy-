@@ -1069,13 +1069,25 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       expectStatus(chatFeed, 200, "feed compacto do chat da aliança");
       assert.equal(chatFeed.data.alliance?.name, "Guardioes Alfa");
       assert.ok(chatFeed.data.chat?.some(message => message.message === "Teste de comunicação entre aliados"));
+      const beforeDonation = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
       await action(tokenA, { type: "alliance_donate", resource: "food", amount: 1000 }, 200);
       await action(tokenA, { type: "alliance_donate", resource: "wood", amount: 1000 }, 200);
+      const afterDonation = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
+      assert.equal(afterDonation.shared_food, beforeDonation.shared_food + 1000);
+      assert.equal(afterDonation.shared_wood, beforeDonation.shared_wood + 1000);
+      assert.equal(afterDonation.contribution, beforeDonation.contribution + 20);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomB }, 200);
       await action(tokenA, { type: "alliance_kick", targetKingdomId: kingdomB }, 200);
 
       await action(tokenB, { type: "alliance_create", name: "Guardioes Beta", tag: "BETA" }, 200);
-      await action(tokenA, { type: "alliance_war_declare", targetTag: "BETA" }, 200);
+      executedActions.add("alliance_war_declare");
+      const wars = await Promise.all([
+        api("/api/game/action", { method: "POST", token: tokenA, body: { type: "alliance_war_declare", targetTag: "BETA" } }),
+        api("/api/game/action", { method: "POST", token: tokenB, body: { type: "alliance_war_declare", targetTag: "ALFA" } })
+      ]);
+      assert.deepEqual(wars.map(result => result.status).sort(), [200, 409]);
+      const warState = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
+      assert.equal(warState.wars.filter(war => war.status === "active").length, 1);
 
       stateA = (await api("/api/game/state", { token: tokenA })).data.state;
       const claimable = stateA.territories.find(item => item.territory_kind==="resource" && item.resource_type && !item.alliance_id && !item.owner_kingdom_id);
@@ -1094,6 +1106,16 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
       await action(tokenC, { type: "alliance_join", tag: "ALFA" }, 200);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomC }, 200);
+      // Set the isolated fixture one below the daily cap; only one concurrent help may succeed.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE alliance_members SET help_count=(SELECT 4+2*level FROM alliances WHERE id=alliance_members.alliance_id),help_reset_at=date('now') WHERE kingdom_id="+Number(kingdomA)+";"
+      ]);
+      const helps = await Promise.all([1,2].map(() => api("/api/game/action", {
+        method: "POST", token: tokenA, body: { type: "alliance_help", targetKingdomId: kingdomC }
+      })));
+      assert.deepEqual(helps.map(result => result.status).sort(), [200, 409]);
       await action(tokenC, { type: "alliance_leave" }, 200);
     });
 

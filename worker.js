@@ -1354,30 +1354,33 @@ async function gameAction(env,playerId,body){
     const resource=String(body.resource||""),amount=Number(body.amount);
     const allowed={food:"shared_food",wood:"shared_wood",stone:"shared_stone",iron:"shared_iron",gold:"shared_gold"};
     if(!member||!Object.hasOwn(allowed,resource)||!Number.isSafeInteger(amount)||amount<100||amount>1000000)return json({error:"Doação inválida. Mínimo de 100 recursos."},400);
-    const debit=await env.DB.prepare("UPDATE kingdoms SET "+resource+"="+resource+"-? WHERE id=? AND "+resource+">=?").bind(amount,k.id,amount).run();
-    if(!debit.meta.changes)return json({error:"Recursos insuficientes."},409);
     const xp=Math.floor(amount/100);
-    await env.DB.batch([
-      env.DB.prepare("UPDATE alliances SET "+allowed[resource]+"="+allowed[resource]+"+?,xp=xp+? WHERE id=?").bind(amount,xp,member.alliance_id),
-      env.DB.prepare("UPDATE alliance_members SET contribution=contribution+? WHERE alliance_id=? AND kingdom_id=?").bind(xp,member.alliance_id,k.id),
-      env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(k.id,resource,-amount,"doação para aliança")
+    // Debit, treasury, contribution and ledger commit together.
+    const donation=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET "+resource+"="+resource+"-? WHERE id=? AND "+resource+">=? AND EXISTS(SELECT 1 FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=? AND am.alliance_id=?)").bind(amount,k.id,amount,k.id,member.alliance_id),
+      env.DB.prepare("UPDATE alliances SET "+allowed[resource]+"="+allowed[resource]+"+?,xp=xp+? WHERE id=? AND changes()=1").bind(amount,xp,member.alliance_id),
+      env.DB.prepare("UPDATE alliance_members SET contribution=contribution+? WHERE alliance_id=? AND kingdom_id=? AND changes()=1").bind(xp,member.alliance_id,k.id),
+      env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE changes()=1").bind(k.id,resource,-amount,"doação para aliança")
     ]);
+    if(donation.some(entry=>entry?.meta?.changes!==1))return json({error:"Recursos insuficientes ou aliança alterada."},409);
     let a=await env.DB.prepare("SELECT level,xp,max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
-    while(a.xp>=a.level*1000){
+    while(a&&a.level>0&&a.xp>=a.level*1000){
       const need=a.level*1000;
-      await env.DB.prepare("UPDATE alliances SET xp=xp-?,level=level+1,max_members=max_members+10 WHERE id=? AND level=?").bind(need,member.alliance_id,a.level).run();
+      await env.DB.prepare("UPDATE alliances SET xp=xp-?,level=level+1,max_members=max_members+10 WHERE id=? AND level=? AND xp>=?").bind(need,member.alliance_id,a.level,need).run();
       a=await env.DB.prepare("SELECT level,xp,max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
     }
   }else if(type==="alliance_help"){
     const member=await env.DB.prepare("SELECT alliance_id,help_count,help_reset_at FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const targetId=Number(body.targetKingdomId);
-    const target=await env.DB.prepare("SELECT kingdom_name FROM alliance_members am JOIN kingdoms k ON k.id=am.kingdom_id WHERE am.alliance_id=? AND am.kingdom_id=?").bind(member?.alliance_id,targetId).first();
-    if(!member||!target)return json({error:"Membro não encontrado nesta aliança."},404);
-    const today=new Date().toISOString().slice(0,10),used=member.help_reset_at===today?member.help_count:0;
-    const alliance=await env.DB.prepare("SELECT level FROM alliances WHERE id=?").bind(member.alliance_id).first();
-    if(used>=5+alliance.level*2)return json({error:"Você atingiu o limite diário de ajudas."},409);
-    await env.DB.prepare("UPDATE alliance_members SET help_count=?,help_reset_at=? WHERE alliance_id=? AND kingdom_id=?").bind(used+1,today,member.alliance_id,k.id).run();
-    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(targetId,"alliance_help",JSON.stringify({from:k.id,fromName:k.kingdom_name||"Aliado"})).run();
+    if(!member||!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Membro não encontrado nesta aliança."},404);
+    const target=await env.DB.prepare("SELECT kingdom_name FROM alliance_members am JOIN kingdoms k ON k.id=am.kingdom_id WHERE am.alliance_id=? AND am.kingdom_id=?").bind(member.alliance_id,targetId).first();
+    if(!target)return json({error:"Membro não encontrado nesta aliança."},404);
+    const today=new Date().toISOString().slice(0,10);
+    const help=await env.DB.batch([
+      env.DB.prepare("UPDATE alliance_members SET help_count=CASE WHEN help_reset_at=? THEN COALESCE(help_count,0)+1 ELSE 1 END,help_reset_at=? WHERE alliance_id=? AND kingdom_id=? AND (CASE WHEN help_reset_at=? THEN COALESCE(help_count,0) ELSE 0 END)<(SELECT 5+level*2 FROM alliances WHERE id=?) AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=?)").bind(today,today,member.alliance_id,k.id,today,member.alliance_id,member.alliance_id,targetId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(targetId,"alliance_help",JSON.stringify({from:k.id,fromName:k.kingdom_name||"Aliado"}))
+    ]);
+    if(help.some(entry=>entry?.meta?.changes!==1))return json({error:"Limite diário de ajudas atingido ou membro alterado."},409);
   }else if(type==="alliance_chat"){
     const member=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const message=String(body.message||"").trim().slice(0,300);
@@ -1391,10 +1394,10 @@ async function gameAction(env,playerId,body){
     if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não pode declarar guerra."},403);
     const enemy=await env.DB.prepare("SELECT id FROM alliances WHERE tag=?").bind(targetTag).first();
     if(!enemy||enemy.id===member.alliance_id)return json({error:"Aliança adversária inválida."},404);
-    const active=await env.DB.prepare("SELECT id FROM alliance_wars WHERE status='active' AND ends_at>? AND ((alliance_a_id=? AND alliance_b_id=?) OR (alliance_a_id=? AND alliance_b_id=?))").bind(new Date().toISOString(),member.alliance_id,enemy.id,enemy.id,member.alliance_id).first();
-    if(active)return json({error:"Já existe uma guerra ativa entre essas alianças."},409);
     const start=new Date(),end=new Date(start.getTime()+24*60*60*1000);
-    await env.DB.prepare("INSERT INTO alliance_wars(alliance_a_id,alliance_b_id,starts_at,ends_at) VALUES(?,?,?,?)").bind(member.alliance_id,enemy.id,start.toISOString(),end.toISOString()).run();
+    // Check both directions and current permission in the same write.
+    const war=await env.DB.prepare("INSERT INTO alliance_wars(alliance_a_id,alliance_b_id,starts_at,ends_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=? AND rank IN ('lider','co_lider','oficial')) AND EXISTS(SELECT 1 FROM alliances WHERE id=?) AND NOT EXISTS(SELECT 1 FROM alliance_wars WHERE status='active' AND ends_at>? AND ((alliance_a_id=? AND alliance_b_id=?) OR (alliance_a_id=? AND alliance_b_id=?)))").bind(member.alliance_id,enemy.id,start.toISOString(),end.toISOString(),member.alliance_id,k.id,enemy.id,start.toISOString(),member.alliance_id,enemy.id,enemy.id,member.alliance_id).run();
+    if(war.meta?.changes!==1)return json({error:"Já existe uma guerra ativa entre essas alianças ou a permissão foi alterada."},409);
   }else if(type==="alliance_claim_territory"){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const territoryId=Number(body.territoryId);
