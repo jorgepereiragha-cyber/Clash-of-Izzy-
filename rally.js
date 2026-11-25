@@ -193,7 +193,7 @@ async function collectResources(env,kingdomId,body){
  if(amount<1)return reply({error:"O nó ainda não acumulou recursos suficientes."},409);
  const next=available-amount;
  const result=await env.DB.batch([
-  env.DB.prepare("UPDATE resource_nodes SET current_resources=?,last_regen=? WHERE id=? AND occupied_by=? AND last_regen=? AND current_resources=?")
+  env.DB.prepare("UPDATE resource_nodes SET current_resources=?,last_regen=MAX(last_regen,?) WHERE id=? AND occupied_by=? AND last_regen=? AND current_resources=?")
    .bind(next,now,nodeId,kingdomId,node.last_regen,node.current_resources),
   env.DB.prepare(`UPDATE kingdoms SET ${resource}=${resource}+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()=1`)
    .bind(amount,kingdomId),
@@ -207,9 +207,13 @@ async function recallNode(env,kingdomId,body){
  const nodeId=String(body.node_id||"").trim();
  const node=await env.DB.prepare("SELECT garrison_json FROM resource_nodes WHERE id=? AND occupied_by=? AND reserved_by_rally IS NULL").bind(nodeId,kingdomId).first();
  if(!node)return reply({error:"Este nó não está ocupado pelo seu reino ou pertence a um rally."},404);
- let garrison={};try{garrison=JSON.parse(node.garrison_json||"{}")}catch{}
+ let garrison=null;try{garrison=parseTroops(JSON.parse(node.garrison_json));}catch{}
+ if(!garrison){
+  console.error("resource_node_garrison_integrity_failed",nodeId);
+  return reply({error:"Guarnição inconsistente. A ocupação foi preservada para conciliação."},409);
+ }
  const now=Math.floor(Date.now()/1000);
- const entries=Object.entries(garrison).filter(([type,count])=>Object.hasOwn(UNIT_POWER,type)&&Number.isSafeInteger(count)&&count>0);
+ const entries=Object.entries(garrison);
  const result=await env.DB.batch([
   env.DB.prepare("UPDATE resource_nodes SET occupied_by=NULL,occupation_start=NULL,garrison_json='{}',current_resources=MIN(max_resources,current_resources+CAST(MAX(0,?-last_regen)*regen_rate/3600 AS INTEGER)),last_regen=MAX(last_regen,?) WHERE id=? AND occupied_by=? AND reserved_by_rally IS NULL AND garrison_json=?")
    .bind(now,now,nodeId,kingdomId,node.garrison_json),
