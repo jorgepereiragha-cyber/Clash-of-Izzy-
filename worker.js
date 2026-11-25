@@ -799,24 +799,24 @@ async function getEquippedCastleSkinCombatBonuses(env,kingdomId,skinId){
  return castleSkinCombatView(row);
 }
 
-async function syncHeroSystems(env,kingdomId){
-  // hero_inventory is canonical for collection progression; heroes is the equipment binding.
-  const [,inventory]=await env.DB.batch([
+export async function syncHeroSystems(env,kingdomId){
+  // Inventory owns the progression pair (level, experience). Import legacy
+  // heroes only once, when their inventory row does not yet exist.
+  // Never merge the fields independently: XP can decrease on level-up.
+  const names=JSON.stringify(Object.fromEntries(Object.entries(HERO_TEMPLATES).map(([key,hero])=>[key,hero.name])));
+  await env.DB.batch([
     env.DB.prepare("INSERT OR IGNORE INTO hero_inventory(kingdom_id,hero_key,rarity,level,experience) SELECT kingdom_id,hero_key,CASE rarity WHEN 'common' THEN 'white' WHEN 'rare' THEN 'blue' WHEN 'epic' THEN 'purple' WHEN 'legendary' THEN 'purple' WHEN 'mythic' THEN 'purple' ELSE 'white' END,level,experience FROM heroes WHERE kingdom_id=?").bind(kingdomId),
     env.DB.prepare(
-      "SELECT hi.hero_key,hi.rarity,hi.level,hi.experience,vhc.hero_name AS seasonal_hero_name,vhc.rarity AS seasonal_hero_rarity " +
-      "FROM hero_inventory hi LEFT JOIN valhalla_hero_catalog vhc ON vhc.hero_key=hi.hero_key " +
-      "WHERE hi.kingdom_id=? ORDER BY hi.hero_key"
-    ).bind(kingdomId)
+      "INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) "+
+      "SELECT hi.kingdom_id,hi.hero_key,COALESCE(names.value,vhc.hero_name,hi.hero_key),hi.level,hi.experience,"+
+      "COALESCE(vhc.rarity,CASE hi.rarity WHEN 'white' THEN 'common' WHEN 'blue' THEN 'rare' ELSE 'legendary' END) "+
+      "FROM hero_inventory hi LEFT JOIN valhalla_hero_catalog vhc ON vhc.hero_key=hi.hero_key "+
+      "LEFT JOIN json_each(?) names ON names.key=hi.hero_key WHERE hi.kingdom_id=? "+
+      "ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET level=excluded.level,experience=excluded.experience,rarity=excluded.rarity,"+
+      "hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END "+
+      "WHERE heroes.level<>excluded.level OR heroes.experience<>excluded.experience OR heroes.rarity<>excluded.rarity OR heroes.hero_name IS NULL OR heroes.hero_name=''"
+    ).bind(names,kingdomId)
   ]);
-  const statements=(inventory.results||[]).map(hero=>{
-    const rarity=hero.seasonal_hero_rarity || (hero.rarity==="white"?"common":hero.rarity==="blue"?"rare":"legendary");
-    const name=HERO_TEMPLATES[hero.hero_key]?.name||hero.seasonal_hero_name||hero.hero_key;
-    return env.DB.prepare("INSERT INTO heroes(kingdom_id,hero_key,hero_name,level,experience,rarity) VALUES(?,?,?,?,?,?) ON CONFLICT(kingdom_id,hero_key) DO UPDATE SET level=MAX(heroes.level,excluded.level),experience=MAX(heroes.experience,excluded.experience),rarity=excluded.rarity,hero_name=CASE WHEN heroes.hero_name IS NULL OR heroes.hero_name='' THEN excluded.hero_name ELSE heroes.hero_name END WHERE heroes.level<excluded.level OR heroes.experience<excluded.experience OR heroes.rarity<>excluded.rarity OR heroes.hero_name IS NULL OR heroes.hero_name=''")
-      .bind(kingdomId,hero.hero_key,name,Math.max(1,Number(hero.level)||1),Math.max(0,Number(hero.experience)||0),rarity);
-  });
-  statements.push(env.DB.prepare("UPDATE hero_inventory SET level=MAX(level,COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level)),experience=MAX(experience,COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience)) WHERE kingdom_id=? AND (level<COALESCE((SELECT h.level FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),level) OR experience<COALESCE((SELECT h.experience FROM heroes h WHERE h.kingdom_id=hero_inventory.kingdom_id AND h.hero_key=hero_inventory.hero_key),experience))").bind(kingdomId));
-  await env.DB.batch(statements);
 }
 
 async function gameState(env,playerId){
