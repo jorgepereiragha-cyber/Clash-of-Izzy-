@@ -4,7 +4,7 @@ on:
   push:
     branches: [main]
   pull_request:
-    branches: [main, release/one-shared-realm-early-access]
+    branches: [main, release/one-shared-realm-early-access, release/production-gameplay-hardened-20261125]
 
 concurrency:
   group: clash-of-izzy-ci-${{ github.ref }}
