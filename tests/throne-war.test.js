@@ -161,3 +161,20 @@ test("modelo 3D e mapa exibem Trono sem liberar marcha comum ou captura de terri
  assert.match(flow,/COI_ALLOW_PENDING_0035: "true"/);
  assert.doesNotMatch(migration,/DROP TABLE|DELETE FROM kingdoms/i);
 });
+
+test("replay de cerco não autoriza efeitos a partir de tentativa histórica", async () => {
+ const row={realm_id:1,unlocked_at:origin,territory_id:3,revision:9,crowned_cycle:null,
+   crowned_alliance_id:null,occupation_cycle:0,occupying_alliance_id:11,occupying_power:1200};
+ const db=fakeDb(row,{alliance_id:10},false);
+ const result=await assaultThrone(db,{id:8,map_region:1,castle_level:10},
+   {units:{knight:200},requestId:"00000000-0000-4000-8000-000000000001"},at(35,1));
+ assert.equal(result.status,409);
+ const debit=db.calls.find(sql=>sql.startsWith("UPDATE army_units"));
+ assert.match(debit,/EXISTS\(SELECT 1 FROM alliance_members WHERE kingdom_id=\? AND alliance_id=\?\)/);
+ const statements=db.calls.filter(sql=>sql.startsWith("INSERT INTO throne_assaults")||sql.startsWith("INSERT INTO kingdom_events")||sql.startsWith("UPDATE realm_thrones SET occupying"));
+ assert.equal(statements.length,3);
+ assert.match(statements[1],/AND changes\(\)=1/);
+ assert.match(statements[2],/WHERE changes\(\)=1 AND EXISTS/);
+ const source=await read("throne-war.js");
+ assert.match(source,/env\.DB\.batch\(\[debit,attempt,record,capture\]\)/);
+});

@@ -262,11 +262,18 @@ export async function handlePlayerAccountRoute(request, env, ctx) {
     if (existing) return ctx.json({ error: "Este reino já está vinculado a uma conta." }, 409);
 
     const record = await createPasswordRecord(password);
+    let sessionVersion;
     try {
-      await env.DB.prepare(
-        "INSERT INTO player_accounts(player_id,username,username_key,email,email_key,password_salt,password_hash,password_iterations) " +
-        "VALUES(?,?,?,?,?,?,?,?)"
-      ).bind(player.id, username.display, username.key, email.display, email.key, record.salt, record.hash, record.iterations).run();
+      // Password accounts take precedence over Google links in gameIdentity.
+      // Never reset the effective version: previously revoked Google tokens
+      // could otherwise become valid again when a password is registered.
+      const inserted = await env.DB.prepare(
+        "INSERT INTO player_accounts(player_id,username,username_key,email,email_key,password_salt,password_hash,password_iterations,session_version) " +
+        "SELECT ?,?,?,?,?,?,?,?,COALESCE((SELECT session_version FROM google_account_links WHERE player_id=?),0)+1 " +
+        "RETURNING session_version"
+      ).bind(player.id, username.display, username.key, email.display, email.key, record.salt, record.hash, record.iterations, player.id).first();
+      sessionVersion = Number(inserted?.session_version);
+      if (!Number.isSafeInteger(sessionVersion) || sessionVersion < 1) throw new Error("Invalid account session version");
     } catch (error) {
       const message = String(error?.message || error);
       if (message.includes("UNIQUE")) return ctx.json({ error: "Este nome de usuário ou e-mail já está em uso." }, 409);
@@ -275,7 +282,7 @@ export async function handlePlayerAccountRoute(request, env, ctx) {
     }
 
     // A versão de sessão passa a exigir o claim av; tokens anônimos antigos deixam de autenticar este reino.
-    const token = await issueGameToken(String(player.player_id), 1, env.SESSION_SECRET);
+    const token = await issueGameToken(String(player.player_id), sessionVersion, env.SESSION_SECRET);
     return ctx.json({ success: true, token, account: { username: username.display, emailMasked: maskAccountEmail(email.display) } }, 201);
   }
 
