@@ -43,7 +43,8 @@ function makeHarness(responder = () => makeResponse(), { failCacheWrites = false
         async delete(key) { return store.delete(key); },
       };
     },
-    async match(key) {
+    async match(key, options = {}) {
+      if (options.cacheName) return stores.get(options.cacheName)?.get(key);
       for (const store of stores.values()) {
         if (store.has(key)) return store.get(key);
       }
@@ -292,4 +293,28 @@ test("shell v53 mantém fallback se o manifesto 3D estiver indisponível", async
   await h.lifecycle("install");
   assert.equal(h.stores.get(SHELL_CACHE).has("/kingdom.html"), true);
   assert.equal(h.stores.get(SHELL_CACHE).has("/offline.html"), true);
+});
+
+test("new service worker never reads stale or unrelated origin caches", async () => {
+  const h = makeHarness(() => makeResponse({headers:{"x-version":"network"}}));
+  const stale = await h.caches.open("clash-of-izzy-shell-v59");
+  const foreign = await h.caches.open("other-app");
+  for (const cache of [stale, foreign]) {
+    await cache.put("/market.js", makeResponse({headers:{"x-version":"stale"}}));
+    await cache.put("/kingdom.html", makeResponse({headers:{"x-version":"stale"}}));
+    await cache.put("/assets/3d/castle.glb", makeResponse({headers:{"x-version":"stale"}}));
+  }
+  const asset = await h.dispatch("/market.js");
+  assert.equal(asset.result.headers.get("x-version"), "network");
+  const model = await h.dispatch("/assets/3d/castle.glb");
+  assert.equal(model.result.headers.get("x-version"), "network");
+  const shell = await h.caches.open(SHELL_CACHE);
+  await shell.put("/offline.html", makeResponse({headers:{"x-version":"offline"}}));
+  await shell.put("/kingdom.html", makeResponse({headers:{"x-version":"current"}}));
+  h.offline();
+  const navigation = await h.dispatch("/kingdom", {mode:"navigate"});
+  assert.equal(navigation.result.headers.get("x-version"), "current");
+  await shell.delete("/kingdom.html");
+  const fallback = await h.dispatch("/kingdom", {mode:"navigate"});
+  assert.equal(fallback.result.headers.get("x-version"), "offline");
 });
