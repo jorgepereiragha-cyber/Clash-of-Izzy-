@@ -45,7 +45,7 @@ test("Master só é concedido com compra aprovada e ledger único",async()=>{
  assert.deepEqual(MASTER_PACK_BONUSES.dragons,MASTER_DRAGON_KEYS);
  const sql=[];
  const db={prepare(statement){sql.push(statement);return {bind(){return {sql:statement}}}}};
- assert.equal(masterGrantStatements(db,123).length,6);
+ assert.equal(masterGrantStatements(db,123).length,7);
  assert.ok(sql.some(s=>s.includes("status='approved'")));
  assert.ok(sql.some(s=>s.includes("AND changes()=1")));
  assert.equal(sql.filter(s=>s.includes("INSERT OR IGNORE INTO kingdom_dragons")).length,3);
@@ -117,4 +117,37 @@ test("nine elemental passives unlock by both individual level and bond, without 
  const view=getDragonCollectionView(["ember_wyrm","mist_talon"],"mist_talon",50,50,[{dragon_key:"ember_wyrm",level:1,bond:1}]);
  assert.equal(view.find(x=>x.key==="ember_wyrm").elementalSkill.rank,0);
  assert.equal(view.find(x=>x.key==="mist_talon").elementalSkill.rank,2);
+});
+
+test("Master grants diamonds, resources and dragons only once with the same claim",async()=>{
+ const {DatabaseSync}=await import("node:sqlite");
+ const db=new DatabaseSync(":memory:");
+ try{
+  db.exec(`
+   CREATE TABLE players(id INTEGER PRIMARY KEY,gems INTEGER);
+   CREATE TABLE kingdoms(id INTEGER PRIMARY KEY,player_id INTEGER,food INTEGER,wood INTEGER,stone INTEGER,iron INTEGER,gold INTEGER);
+   CREATE TABLE purchase_requests(id INTEGER PRIMARY KEY,kingdom_id INTEGER,player_id INTEGER,status TEXT,product_kind TEXT,product_name TEXT,gems_amount INTEGER);
+   CREATE TABLE master_bonus_claims(request_id INTEGER UNIQUE,kingdom_id INTEGER UNIQUE);
+   CREATE TABLE kingdom_dragons(kingdom_id INTEGER,dragon_key TEXT,source TEXT,UNIQUE(kingdom_id,dragon_key));
+   CREATE TABLE kingdom_mailbox(kingdom_id INTEGER,source_key TEXT,title TEXT,body TEXT,reward_key TEXT,UNIQUE(kingdom_id,source_key));
+   INSERT INTO players VALUES(1,0);
+   INSERT INTO kingdoms VALUES(1,1,0,0,0,0,0);
+  `);
+  // Deliberately omit the order-level unique index to exercise the independent grant guard.
+  const insert=db.prepare("INSERT INTO purchase_requests VALUES(?,1,1,'pending','vip_package',?,10000)");
+  insert.run(1,MASTER_PACK_NAME);insert.run(2,MASTER_PACK_NAME);
+  const adapter={prepare(sql){return {bind(...args){return {sql,args}}}}};
+  const approve=id=>{
+   const statements=[adapter.prepare("UPDATE purchase_requests SET status='approved' WHERE id=? AND status='pending'").bind(id),...masterGrantStatements(adapter,id)];
+   db.exec("BEGIN");
+   try{for(const {sql,args} of statements)db.prepare(sql).run(...args);db.exec("COMMIT");}
+   catch(e){db.exec("ROLLBACK");throw e;}
+  };
+  approve(1);approve(1);approve(2);
+  assert.equal(db.prepare("SELECT gems FROM players").get().gems,10000);
+  assert.equal(db.prepare("SELECT food FROM kingdoms").get().food,50000);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM master_bonus_claims").get().n,1);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM kingdom_dragons").get().n,3);
+  assert.equal(db.prepare("SELECT COUNT(*) n FROM kingdom_mailbox").get().n,1);
+ }finally{db.close();}
 });
