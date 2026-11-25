@@ -26,3 +26,14 @@ export function reinforcementSetBonus(levels){
   if(min>=10){result.attackPercent+=5;result.defensePercent+=5;result.healthPercent+=5;result.stage=10;}
   return result;
 }
+
+ // Free rewards come from actual captured PvE territory, not client-supplied rarity.
+ // Conservative initial thresholds; calibrate with real encounter telemetry.
+export function pveFragmentReward(level){
+  const n=Number(level);
+  if(!Number.isSafeInteger(n)||n<1||n>30)return null;
+  if(n>=20)return {rarity:"lendario",quantity:1};
+  if(n>=12)return {rarity:"epico",quantity:1};
+  if(n>=6)return {rarity:"raro",quantity:1};
+  return {rarity:"comum",quantity:1};
+}

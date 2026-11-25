@@ -20,7 +20,7 @@ import { handleRally, processDueRallies } from "./rally.js";
 import {marchCapacity,marchCapacityForKingdom,withinMarchCapacity} from "./march-capacity.js";
 import {marchSlots} from "./march-slots.js";
 import { resolveDueMarchKingdoms } from "./march-scheduler-policy.js";
-import { ENHANCEMENT_COSTS, FRAGMENT_RECIPES, enhancementLevel, enhancementCost, enhancedStats, reinforcementSetBonus } from "./equipment-enhancement.js";
+import { ENHANCEMENT_COSTS, FRAGMENT_RECIPES, enhancementLevel, enhancementCost, enhancedStats, reinforcementSetBonus, pveFragmentReward } from "./equipment-enhancement.js";
 import {realmStatusView} from "./realm-progression.js";
 import {getThroneStatus,assaultThrone} from "./throne-war.js";
 import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
@@ -610,16 +610,17 @@ async function processMarches(env,kingdomId,batchSize=50){
     for(const u of army)survivors[u.unit_type]=u.quantity;
     battleLog=[{event:"attack_cancelled",reason:target?"territory_already_owned":"territory_missing"}];
    }
+   const fragmentReward=pveFragmentReward(target?.level);
    // A captura é condicional e imediatamente seguida pelo relatório, que lê changes() da captura.
    statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND territory_key NOT LIKE 'royal_throne_%' AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log,replay_json) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,?,? WHERE "+guard)
-    .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits}),JSON.stringify({territoryCaptured:false,criticalHits}),JSON.stringify(battleLog),JSON.stringify(replayData),m.id,kingdomId,resolutionToken));
+    .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits,...(fragmentReward?{equipmentFragments:fragmentReward}:{})}),JSON.stringify({territoryCaptured:false,criticalHits}),JSON.stringify(battleLog),JSON.stringify(replayData),m.id,kingdomId,resolutionToken));
    // Uma pequena recompensa de material acompanha cada conquista válida.
    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE (SELECT winner_kingdom_id FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1)=? AND "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1")
     .bind(kingdomId,"power_crystal",kingdomId,m.target_territory_id,kingdomId,m.id,kingdomId,resolutionToken));
-   // Only the actual winning report for this guarded march grants a common fragment.
-   statements.push(env.DB.prepare("INSERT INTO equipment_fragments(kingdom_id,rarity,quantity) SELECT ?,'comum',1 WHERE (SELECT winner_kingdom_id FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1)=? AND "+guard+" ON CONFLICT(kingdom_id,rarity) DO UPDATE SET quantity=quantity+1")
-    .bind(kingdomId,kingdomId,m.target_territory_id,kingdomId,m.id,kingdomId,resolutionToken));
+   // Only the winning report for this guarded march grants its level-based fragment.
+   if(fragmentReward)statements.push(env.DB.prepare("INSERT INTO equipment_fragments(kingdom_id,rarity,quantity) SELECT ?,?,? WHERE (SELECT winner_kingdom_id FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1)=? AND "+guard+" ON CONFLICT(kingdom_id,rarity) DO UPDATE SET quantity=quantity+excluded.quantity")
+    .bind(kingdomId,fragmentReward.rarity,fragmentReward.quantity,kingdomId,m.target_territory_id,kingdomId,m.id,kingdomId,resolutionToken));
    for(const [unit,qty] of Object.entries(survivors)){
     if(qty>0)statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,1,qty,m.id,kingdomId,resolutionToken));
    }

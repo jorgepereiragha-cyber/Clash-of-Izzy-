@@ -430,6 +430,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       assert.ok(Number.isSafeInteger(quantity) && quantity >= 0, "valid crystal balance");
       return quantity;
     };
+    const fragmentBalances=state=>Object.fromEntries(Object.entries(state.equipmentFragments).map(([rarity,row])=>[rarity,Number(row.balance)]));
+    const fragmentsBefore=fragmentBalances(attackerBefore);
     const crystalsBefore = powerCrystalCount(attackerBefore);
     const neutral = attackerBefore.territories.find(t => !t.owner_kingdom_id &&
       t.territory_kind !== "castle" && t.territory_kind !== "throne" &&
@@ -466,7 +468,15 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.ok(Number.isInteger(rewards.criticalHits)&&rewards.criticalHits>=0);
     assert.equal(powerCrystalCount(resolvedAttack), crystalsBefore + (rewards.territoryCaptured ? 1 : 0),
       "only a successful capture grants exactly one power crystal");
+    const expectedFragments={...fragmentsBefore};
+    if(rewards.territoryCaptured){
+      const level=Number(neutral.level),rarity=level>=20?"lendario":level>=12?"epico":level>=6?"raro":"comum";
+      assert.deepEqual(rewards.equipmentFragments,{rarity,quantity:1});
+      expectedFragments[rarity]+=1;
+    }else assert.equal(rewards.equipmentFragments,undefined);
+    assert.deepEqual(fragmentBalances(resolvedAttack),expectedFragments,"only actual capture awards its fragment");
     const repeated=await getStateFor(claimedCookie,second.data.token);
+    assert.deepEqual(fragmentBalances(repeated),expectedFragments,"replay does not award another fragment");
     assert.equal(repeated.battleReports.filter(r=>!previousReports.has(r.id)).length,1);
     assert.equal(militiaCount(repeated),militiaCount(resolvedAttack));
     assert.equal(powerCrystalCount(repeated), powerCrystalCount(resolvedAttack),
@@ -525,7 +535,9 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       "historical victory cannot grant a crystal for this cancelled attack");
     assert.equal(militiaCount(cancelled),militiaCount(cancelBefore),"cancelled troops return once");
     assert.ok(!cancelled.marches.some(m=>Number(m.id)===cancelMarchId&&m.status==="marching"));
+    assert.deepEqual(fragmentBalances(cancelled),fragmentBalances(cancelBefore),"cancelled attack cannot grant fragments");
     const cancelledAgain = await getStateFor(cookie,start.data.token);
+    assert.deepEqual(fragmentBalances(cancelledAgain),fragmentBalances(cancelBefore));
     assert.equal(powerCrystalCount(cancelledAgain),powerCrystalCount(cancelled));
     assert.equal(militiaCount(cancelledAgain),militiaCount(cancelled));
     console.log("Beta historical victory regression passed: cancelled attack returns troops without credit.");
