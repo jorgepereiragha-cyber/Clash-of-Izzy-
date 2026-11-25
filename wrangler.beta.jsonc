@@ -30,10 +30,6 @@
     "tag": "v1-eldoria-room",
     "new_sqlite_classes": ["EldoriaRoom"]
   }],
-  "observability": {
-    "enabled": true,
-    "head_sampling_rate": 0.1
-  },
   "vars": {
     "ENVIRONMENT": "beta",
     "INVITE_ONLY": "true",
