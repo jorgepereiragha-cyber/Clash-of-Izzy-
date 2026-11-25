@@ -31,3 +31,21 @@ test("dragon migration preflight only reads fixed production D1 and rejects inco
  await assert.rejects(call(1),/not verified/);
  await assert.rejects(call(undefined),/not verified/);
 });
+
+test("Worker runtime denies every new charge before touching D1 when production approval is absent",async()=>{
+ const {default:worker}=await import("../worker.js");
+ const db=new Proxy({}, {get(){throw Error("payment gate must run before D1");}});
+ for(const flag of [undefined,"false",true,"TRUE"]){
+  const env={ENVIRONMENT:"production",LIVE_PAYMENTS_APPROVED:flag,DB:db,MP_ACCESS_TOKEN:"fixture",MP_WEBHOOK_SECRET:"fixture"};
+  for(const path of ["/api/store/checkout","/api/store/purchase-request","/api/store/pix-instructions","/api/support/checkout"]){
+   const res=await worker.fetch(new Request("https://fixture.invalid"+path,{method:"POST",headers:{"Content-Type":"application/json"},body:"{}"}),env);
+   assert.equal(res.status,503,path);
+   assert.equal((await res.json()).code,"LIVE_PAYMENTS_DISABLED");
+   assert.equal(res.headers.get("cache-control"),"no-store");
+  }
+ }
+ const preview={ENVIRONMENT:"preview",LIVE_PAYMENTS_APPROVED:"true",DB:db};
+ const denied=await worker.fetch(new Request("https://fixture.invalid/api/store/purchase-request",{method:"POST",body:"{}"}),preview);
+ assert.equal(denied.status,503);
+ assert.equal((await denied.json()).code,"LIVE_PAYMENTS_DISABLED");
+});

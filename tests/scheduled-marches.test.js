@@ -14,7 +14,7 @@ test("Worker processa marchas vencidas sem depender do login do jogador", async 
   assert.ok(scheduler.includes("await processDueKingdomQueues(env)"));
   assert.ok(scheduler.includes("await processDueMarches(env)"));
   assert.ok(scheduler.indexOf("await processDueKingdomQueues(env)") < scheduler.indexOf("await processDueMarches(env)"));
-  assert.ok(worker.includes('console.error("scheduled_march_resolution_failed"'));
+  assert.match(worker,/onFailure:\(kingdomId,error\)=>console\.error\(\s*"scheduled_march_resolution_failed",kingdomId,String\(error\?\.message\|\|error\)/);
 });
 
 test("Cloudflare agenda a resolução automática de marchas a cada minuto", async () => {

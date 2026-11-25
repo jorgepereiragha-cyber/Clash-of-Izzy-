@@ -150,6 +150,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       "SESSION_SECRET:" + SESSION_SECRET,
       "ADMIN_EMAIL:" + ADMIN_EMAIL,
       "ADMIN_PASSWORD:" + ADMIN_PASSWORD,
+      // Only this loopback Wrangler fixture may exercise approved manual orders.
+      // Production defaults and deploy confirmations stay unchanged.
+      "LIVE_PAYMENTS_APPROVED:true",
       "--log-level", "error",
     ], {
       cwd: root,
@@ -164,6 +167,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
     await waitForWorker(baseUrl, workerProcess, () => workerOutput);
     const api = makeApi(baseUrl);
+    const fixtureMethods = expectStatus(await api("/api/store/payment-methods"), 200, "provedores externos indisponíveis no D1 local");
+    assert.deepEqual(fixtureMethods, {mercadoPago:false,nubankPix:false});
 
     const health = await api("/api/health");
     const healthData = expectStatus(health, 200, "health da API");
