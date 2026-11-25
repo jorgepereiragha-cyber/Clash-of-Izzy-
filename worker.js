@@ -1274,7 +1274,7 @@ async function gameAction(env,playerId,body){
     const queue=await env.DB.prepare("SELECT id,queue_type,status,started_at,completes_at FROM kingdom_queues WHERE id=? AND kingdom_id=? AND status='running'").bind(queueId,k.id).first();
     if(!queue)return json({error:"Fila ativa não encontrada neste reino."},404);
     const secondsPerItem=speedups[queue.queue_type]?.[itemId];
-    if(!secondsPerItem)return json({error:"Este acelerador não corresponde ao tipo desta fila."},400);
+    if(!Number.isSafeInteger(secondsPerItem)||secondsPerItem<=0)return json({error:"Este acelerador não corresponde ao tipo desta fila."},400);
     const inventory=await env.DB.prepare("SELECT quantity FROM shop_inventory WHERE kingdom_id=? AND item_id=?").bind(k.id,itemId).first();
     if(Number(inventory?.quantity||0)<quantity)return json({error:"Quantidade de aceleradores insuficiente."},409);
     const now=Date.now(),remaining=Math.max(0,Date.parse(queue.completes_at)-now);
@@ -1316,9 +1316,9 @@ async function gameAction(env,playerId,body){
     if(existing)return json({error:"Seu reino já pertence a uma aliança."},409);
     const alliance=await env.DB.prepare("SELECT id,max_members FROM alliances WHERE tag=?").bind(tag).first();
     if(!alliance)return json({error:"Aliança não encontrada."},404);
-    const joined=await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT ?,?,'member' WHERE (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=?) < ?")
-      .bind(alliance.id,k.id,alliance.id,alliance.max_members).run();
-    if(!joined.meta.changes)return json({error:"A aliança atingiu o limite de membros."},409);
+    const joined=await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT a.id,?,'member' FROM alliances a WHERE a.id=? AND NOT EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=?) AND (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=a.id)<a.max_members")
+      .bind(k.id,alliance.id,k.id).run();
+    if(joined.meta?.changes!==1)return json({error:"A aliança atingiu o limite de membros ou seu reino já pertence a uma aliança."},409);
   }else if(type==="alliance_invite"){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não permite convidar jogadores."},403);
@@ -1331,7 +1331,8 @@ async function gameAction(env,playerId,body){
     const count=await env.DB.prepare("SELECT COUNT(*) AS n FROM alliance_members WHERE alliance_id=?").bind(member.alliance_id).first();
     const cap=await env.DB.prepare("SELECT max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
     if(count.n>=cap.max_members)return json({error:"Aliança atingiu o limite de membros."},409);
-    await env.DB.prepare("INSERT OR IGNORE INTO alliance_invites(alliance_id,target_kingdom_id,invited_by_kingdom_id) VALUES(?,?,?)").bind(member.alliance_id,target.id,k.id).run();
+    const invited=await env.DB.prepare("INSERT OR IGNORE INTO alliance_invites(alliance_id,target_kingdom_id,invited_by_kingdom_id) SELECT a.id,?,? FROM alliances a WHERE a.id=? AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=a.id AND kingdom_id=? AND rank IN ('lider','co_lider','oficial')) AND NOT EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=?) AND (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=a.id)<a.max_members").bind(target.id,k.id,member.alliance_id,k.id,target.id).run();
+    if(invited.meta?.changes!==1)return json({error:"Convite já existente, aliança cheia ou permissão alterada."},409);
   }else if(type==="alliance_accept_invite"){
     const inviteId=Number(body.inviteId);
     const invite=await env.DB.prepare("SELECT i.alliance_id,a.max_members FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.id=? AND i.target_kingdom_id=?").bind(inviteId,k.id).first();
@@ -1340,10 +1341,12 @@ async function gameAction(env,playerId,body){
     if(current)return json({error:"Seu reino já pertence a uma aliança."},409);
     const count=await env.DB.prepare("SELECT COUNT(*) AS n FROM alliance_members WHERE alliance_id=?").bind(invite.alliance_id).first();
     if(count.n>=invite.max_members)return json({error:"A aliança está cheia."},409);
-    await env.DB.batch([
-      env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role,rank) VALUES(?,?,'member','membro')").bind(invite.alliance_id,k.id),
-      env.DB.prepare("DELETE FROM alliance_invites WHERE id=?").bind(inviteId)
+    // Recheck the invitation, membership and capacity inside the same D1 transaction.
+    const accepted=await env.DB.batch([
+      env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role,rank) SELECT a.id,?,'member','membro' FROM alliances a JOIN alliance_invites i ON i.alliance_id=a.id WHERE i.id=? AND i.target_kingdom_id=? AND a.id=? AND NOT EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=?) AND (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=a.id)<a.max_members").bind(k.id,inviteId,k.id,invite.alliance_id,k.id),
+      env.DB.prepare("DELETE FROM alliance_invites WHERE id=? AND target_kingdom_id=? AND changes()=1").bind(inviteId,k.id)
     ]);
+    if(accepted[0]?.meta?.changes!==1||accepted[1]?.meta?.changes!==1)return json({error:"Convite indisponível, aliança cheia ou reino já vinculado."},409);
   }else if(type==="alliance_promote"){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const targetId=Number(body.targetKingdomId),newRank=String(body.rank||"");
@@ -1369,30 +1372,33 @@ async function gameAction(env,playerId,body){
     const resource=String(body.resource||""),amount=Number(body.amount);
     const allowed={food:"shared_food",wood:"shared_wood",stone:"shared_stone",iron:"shared_iron",gold:"shared_gold"};
     if(!member||!Object.hasOwn(allowed,resource)||!Number.isSafeInteger(amount)||amount<100||amount>1000000)return json({error:"Doação inválida. Mínimo de 100 recursos."},400);
-    const debit=await env.DB.prepare("UPDATE kingdoms SET "+resource+"="+resource+"-? WHERE id=? AND "+resource+">=?").bind(amount,k.id,amount).run();
-    if(!debit.meta.changes)return json({error:"Recursos insuficientes."},409);
     const xp=Math.floor(amount/100);
-    await env.DB.batch([
-      env.DB.prepare("UPDATE alliances SET "+allowed[resource]+"="+allowed[resource]+"+?,xp=xp+? WHERE id=?").bind(amount,xp,member.alliance_id),
-      env.DB.prepare("UPDATE alliance_members SET contribution=contribution+? WHERE alliance_id=? AND kingdom_id=?").bind(xp,member.alliance_id,k.id),
-      env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) VALUES(?,?,?,?)").bind(k.id,resource,-amount,"doação para aliança")
+    // Debit, treasury, contribution and ledger commit together.
+    const donation=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET "+resource+"="+resource+"-? WHERE id=? AND "+resource+">=? AND EXISTS(SELECT 1 FROM alliance_members am JOIN alliances a ON a.id=am.alliance_id WHERE am.kingdom_id=? AND am.alliance_id=?)").bind(amount,k.id,amount,k.id,member.alliance_id),
+      env.DB.prepare("UPDATE alliances SET "+allowed[resource]+"="+allowed[resource]+"+?,xp=xp+? WHERE id=? AND changes()=1").bind(amount,xp,member.alliance_id),
+      env.DB.prepare("UPDATE alliance_members SET contribution=contribution+? WHERE alliance_id=? AND kingdom_id=? AND changes()=1").bind(xp,member.alliance_id,k.id),
+      env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE changes()=1").bind(k.id,resource,-amount,"doação para aliança")
     ]);
+    if(donation.some(entry=>entry?.meta?.changes!==1))return json({error:"Recursos insuficientes ou aliança alterada."},409);
     let a=await env.DB.prepare("SELECT level,xp,max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
-    while(a.xp>=a.level*1000){
+    while(a&&a.level>0&&a.xp>=a.level*1000){
       const need=a.level*1000;
-      await env.DB.prepare("UPDATE alliances SET xp=xp-?,level=level+1,max_members=max_members+10 WHERE id=? AND level=?").bind(need,member.alliance_id,a.level).run();
+      await env.DB.prepare("UPDATE alliances SET xp=xp-?,level=level+1,max_members=max_members+10 WHERE id=? AND level=? AND xp>=?").bind(need,member.alliance_id,a.level,need).run();
       a=await env.DB.prepare("SELECT level,xp,max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
     }
   }else if(type==="alliance_help"){
     const member=await env.DB.prepare("SELECT alliance_id,help_count,help_reset_at FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const targetId=Number(body.targetKingdomId);
-    const target=await env.DB.prepare("SELECT kingdom_name FROM alliance_members am JOIN kingdoms k ON k.id=am.kingdom_id WHERE am.alliance_id=? AND am.kingdom_id=?").bind(member?.alliance_id,targetId).first();
-    if(!member||!target)return json({error:"Membro não encontrado nesta aliança."},404);
-    const today=new Date().toISOString().slice(0,10),used=member.help_reset_at===today?member.help_count:0;
-    const alliance=await env.DB.prepare("SELECT level FROM alliances WHERE id=?").bind(member.alliance_id).first();
-    if(used>=5+alliance.level*2)return json({error:"Você atingiu o limite diário de ajudas."},409);
-    await env.DB.prepare("UPDATE alliance_members SET help_count=?,help_reset_at=? WHERE alliance_id=? AND kingdom_id=?").bind(used+1,today,member.alliance_id,k.id).run();
-    await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(targetId,"alliance_help",JSON.stringify({from:k.id,fromName:k.kingdom_name||"Aliado"})).run();
+    if(!member||!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Membro não encontrado nesta aliança."},404);
+    const target=await env.DB.prepare("SELECT kingdom_name FROM alliance_members am JOIN kingdoms k ON k.id=am.kingdom_id WHERE am.alliance_id=? AND am.kingdom_id=?").bind(member.alliance_id,targetId).first();
+    if(!target)return json({error:"Membro não encontrado nesta aliança."},404);
+    const today=new Date().toISOString().slice(0,10);
+    const help=await env.DB.batch([
+      env.DB.prepare("UPDATE alliance_members SET help_count=CASE WHEN help_reset_at=? THEN COALESCE(help_count,0)+1 ELSE 1 END,help_reset_at=? WHERE alliance_id=? AND kingdom_id=? AND (CASE WHEN help_reset_at=? THEN COALESCE(help_count,0) ELSE 0 END)<(SELECT 5+level*2 FROM alliances WHERE id=?) AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=?)").bind(today,today,member.alliance_id,k.id,today,member.alliance_id,member.alliance_id,targetId),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(targetId,"alliance_help",JSON.stringify({from:k.id,fromName:k.kingdom_name||"Aliado"}))
+    ]);
+    if(help.some(entry=>entry?.meta?.changes!==1))return json({error:"Limite diário de ajudas atingido ou membro alterado."},409);
   }else if(type==="alliance_chat"){
     const member=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const message=String(body.message||"").trim().slice(0,300);
@@ -1406,10 +1412,10 @@ async function gameAction(env,playerId,body){
     if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não pode declarar guerra."},403);
     const enemy=await env.DB.prepare("SELECT id FROM alliances WHERE tag=?").bind(targetTag).first();
     if(!enemy||enemy.id===member.alliance_id)return json({error:"Aliança adversária inválida."},404);
-    const active=await env.DB.prepare("SELECT id FROM alliance_wars WHERE status='active' AND ends_at>? AND ((alliance_a_id=? AND alliance_b_id=?) OR (alliance_a_id=? AND alliance_b_id=?))").bind(new Date().toISOString(),member.alliance_id,enemy.id,enemy.id,member.alliance_id).first();
-    if(active)return json({error:"Já existe uma guerra ativa entre essas alianças."},409);
     const start=new Date(),end=new Date(start.getTime()+24*60*60*1000);
-    await env.DB.prepare("INSERT INTO alliance_wars(alliance_a_id,alliance_b_id,starts_at,ends_at) VALUES(?,?,?,?)").bind(member.alliance_id,enemy.id,start.toISOString(),end.toISOString()).run();
+    // Check both directions and current permission in the same write.
+    const war=await env.DB.prepare("INSERT INTO alliance_wars(alliance_a_id,alliance_b_id,starts_at,ends_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=? AND rank IN ('lider','co_lider','oficial')) AND EXISTS(SELECT 1 FROM alliances WHERE id=?) AND NOT EXISTS(SELECT 1 FROM alliance_wars WHERE status='active' AND ends_at>? AND ((alliance_a_id=? AND alliance_b_id=?) OR (alliance_a_id=? AND alliance_b_id=?)))").bind(member.alliance_id,enemy.id,start.toISOString(),end.toISOString(),member.alliance_id,k.id,enemy.id,start.toISOString(),member.alliance_id,enemy.id,enemy.id,member.alliance_id).run();
+    if(war.meta?.changes!==1)return json({error:"Já existe uma guerra ativa entre essas alianças ou a permissão foi alterada."},409);
   }else if(type==="alliance_claim_territory"){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const territoryId=Number(body.territoryId);
@@ -1417,13 +1423,14 @@ async function gameAction(env,playerId,body){
     const t=await env.DB.prepare("SELECT id,territory_key,alliance_id,owner_kingdom_id FROM world_territories WHERE id=? AND map_region=?").bind(territoryId,Number(k.map_region)||1).first();
     if(!t)return json({error:"Território não encontrado."},404);
     if(t.territory_key?.startsWith("royal_throne_"))return json({error:"O Trono Imperial não pode ser reivindicado fora da Guerra do Trono."},409);
-    if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
-    const cost=await env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000").bind(member.alliance_id).run();
-    if(!cost.meta.changes)return json({error:"A aliança precisa de 1.000 comida e 1.000 madeira no depósito."},409);
-    if(!t.alliance_id){
-      await env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL").bind(member.alliance_id,territoryId).run();
-      await env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=?").bind(member.alliance_id).run();
-    }
+    if(t.alliance_id)return json({error:"Território já controlado por uma aliança."},409);
+    // Ownership, permission, balance and counter must agree in one D1 batch.
+    // A repeated or competing claim cannot debit resources or increase the counter.
+    const claim=await env.DB.batch([
+      env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND map_region=? AND alliance_id IS NULL AND substr(territory_key,1,13)<>'royal_throne_' AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=? AND rank IN ('lider','co_lider','oficial')) AND EXISTS(SELECT 1 FROM alliances WHERE id=? AND shared_food>=1000 AND shared_wood>=1000)").bind(member.alliance_id,territoryId,Number(k.map_region)||1,member.alliance_id,k.id,member.alliance_id),
+      env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000,territory_count=territory_count+1 WHERE id=? AND changes()=1").bind(member.alliance_id)
+    ]);
+    if(claim[0]?.meta?.changes!==1||claim[1]?.meta?.changes!==1)return json({error:"Território indisponível, permissão alterada ou depósito insuficiente (1.000 comida e 1.000 madeira)."},409);
   }else if(type==="alliance_leave"){
     const membership=await env.DB.prepare("SELECT alliance_id,role FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(!membership)return json({error:"Seu reino não pertence a uma aliança."},409);
@@ -1934,6 +1941,21 @@ async function angelDeathEventState(env,playerId){
   return {event:{...event,boss_name:ANGEL_DEATH_EVENT.name,boss_epithet:ANGEL_DEATH_EVENT.epithet,boss_level:ANGEL_DEATH_EVENT.level,timezone:ANGEL_DEATH_EVENT.timezone,schedule:ANGEL_DEATH_EVENT.schedule},participant,leaderboard:rows.results||[]};
 }
 
+// Only an attack inserted by this batch may update boss HP or participant totals.
+export function appendAngelDeathAttackSettlement(db,statements,{eventId,kingdomId,requestId,instant,troopsLost,actionId}){
+  const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+  statements.push(
+    db.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(kingdomId,"__internal_action_guard",actionId),
+    db.prepare("UPDATE world_events SET boss_hp_remaining=MAX(0,boss_hp_remaining-(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)),boss_defeated_at=CASE WHEN boss_hp_remaining<=(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?) THEN COALESCE(boss_defeated_at,?) ELSE boss_defeated_at END WHERE id=? AND "+guard)
+      .bind(eventId,kingdomId,requestId,eventId,kingdomId,requestId,instant,eventId,kingdomId,actionId),
+    db.prepare("INSERT OR IGNORE INTO world_event_participants(event_id,kingdom_id,first_attack_at,last_attack_at) SELECT ?,?,?,? WHERE "+guard)
+      .bind(eventId,kingdomId,instant,instant,kingdomId,actionId),
+    db.prepare("UPDATE world_event_participants SET score=score+(SELECT score FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),damage=damage+(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),attacks=attacks+1,troops_lost=troops_lost+?,last_attack_at=? WHERE event_id=? AND kingdom_id=? AND "+guard)
+      .bind(eventId,kingdomId,requestId,eventId,kingdomId,requestId,troopsLost,instant,eventId,kingdomId,kingdomId,actionId),
+    db.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(kingdomId,actionId)
+  );
+}
+
 async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   const requestId=String(body.requestId||"").trim();
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId))return json({error:"Identificador de ataque inválido. Atualize a página e tente novamente."},400);
@@ -2004,20 +2026,15 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   }
   const snapshotJson=JSON.stringify(snapshot),expectedRows=selected.length;
   const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID();
-  const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND EXISTS(SELECT 1 FROM json_each(?) AS selected WHERE selected.key=army_units.unit_type||'_'||army_units.tier) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) AND EXISTS(SELECT 1 FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>?)")
-    .bind(snapshotJson,kingdom.id,snapshotJson,snapshotJson,kingdom.id,expectedRows,kingdom.id,battleToken,event.id,instant,instant);
+  const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND EXISTS(SELECT 1 FROM json_each(?) AS selected WHERE selected.key=army_units.unit_type||'_'||army_units.tier) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) AND EXISTS(SELECT 1 FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>?) AND NOT EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
+    .bind(snapshotJson,kingdom.id,snapshotJson,snapshotJson,kingdom.id,expectedRows,kingdom.id,battleToken,event.id,instant,instant,event.id,kingdom.id,requestId);
   const statements=[
     env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,kingdom.id,previousBattleToken),
     troopUpdate,
     env.DB.prepare("INSERT INTO world_event_attacks(event_id,kingdom_id,request_id,damage,score,troop_losses_json) SELECT ?,?,?,MIN(?,boss_hp_remaining),MIN(?,boss_hp_remaining),? FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>? AND changes()=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
-      .bind(event.id,kingdom.id,requestId,simulation.damage,simulation.damage,snapshotJson,event.id,instant,instant,expectedRows,kingdom.id,battleToken),
-    env.DB.prepare("UPDATE world_events SET boss_hp_remaining=MAX(0,boss_hp_remaining-(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)),boss_defeated_at=CASE WHEN boss_hp_remaining<=(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?) THEN COALESCE(boss_defeated_at,?) ELSE boss_defeated_at END WHERE id=? AND EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
-      .bind(event.id,kingdom.id,requestId,event.id,kingdom.id,requestId,instant,event.id,event.id,kingdom.id,requestId),
-    env.DB.prepare("INSERT OR IGNORE INTO world_event_participants(event_id,kingdom_id,first_attack_at,last_attack_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
-      .bind(event.id,kingdom.id,instant,instant,event.id,kingdom.id,requestId),
-    env.DB.prepare("UPDATE world_event_participants SET score=score+(SELECT score FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),damage=damage+(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),attacks=attacks+1,troops_lost=troops_lost+?,last_attack_at=? WHERE event_id=? AND kingdom_id=? AND EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
-      .bind(event.id,kingdom.id,requestId,event.id,kingdom.id,requestId,simulation.troopsLost,instant,event.id,kingdom.id,event.id,kingdom.id,requestId)
+      .bind(event.id,kingdom.id,requestId,simulation.damage,simulation.damage,snapshotJson,event.id,instant,instant,expectedRows,kingdom.id,battleToken)
   ];
+  appendAngelDeathAttackSettlement(env.DB,statements,{eventId:event.id,kingdomId:kingdom.id,requestId,instant,troopsLost:simulation.troopsLost,actionId:crypto.randomUUID()});
   const result=await env.DB.batch(statements);
   if(!result[2]?.meta?.changes)return json({error:"O exército mudou, o chefe foi derrotado ou outro ataque foi processado. Atualize e tente novamente."},409);
   const [updated,attackRecord]=await Promise.all([
@@ -2025,6 +2042,19 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
     env.DB.prepare("SELECT damage,score FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?").bind(event.id,kingdom.id,requestId).first()
   ]);
   return json({success:true,damage:Number(attackRecord?.damage||0),score:Number(attackRecord?.score||0),losses:simulation.losses,troopsLost:simulation.troopsLost,lossRatePercent:Math.round(simulation.lossRate*100),bossHpRemaining:Number(updated?.boss_hp_remaining||0),message:"Ataque registrado. As baixas foram aplicadas permanentemente ao exército deste evento."});
+}
+
+// Claim an unpaid reward and credit it in the same D1 transaction.
+export function appendAngelDeathReward(db,statements,{eventId,participant,rank,paidAt}){
+  const reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
+  const eligible="EXISTS(SELECT 1 FROM world_events WHERE id=? AND ends_at<=? AND status IN ('scheduled','active'))";
+  statements.push(
+    db.prepare("INSERT OR IGNORE INTO world_event_rewards(event_id,kingdom_id,rank,score,reward_json) SELECT ?,?,?,?,? WHERE "+eligible).bind(eventId,participant.kingdom_id,rank,participant.score,rewardJson,eventId,paidAt),
+    db.prepare("UPDATE world_event_rewards SET paid_at=?,rank=?,score=?,reward_json=? WHERE event_id=? AND kingdom_id=? AND paid_at IS NULL AND "+eligible+" AND EXISTS(SELECT 1 FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE k.id=? AND p.id=?)").bind(paidAt,rank,participant.score,rewardJson,eventId,participant.kingdom_id,eventId,paidAt,participant.kingdom_id,participant.player_id),
+    db.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()=1").bind(reward.food,reward.wood,reward.stone,reward.iron,reward.gold,participant.kingdom_id),
+    db.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()=1").bind(reward.gems,participant.player_id),
+    db.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?, 'death_essence', ? WHERE changes()=1 ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+excluded.quantity").bind(participant.kingdom_id,reward.deathEssence)
+  );
 }
 
 async function distributeAngelDeathRewards(env,eventId,now=new Date()){
@@ -2039,16 +2069,12 @@ async function distributeAngelDeathRewards(env,eventId,now=new Date()){
   if(rows.length){
     const statements=[];
     for(let index=0;index<rows.length;index++){
-      const participant=rows[index],rank=Number(participant.final_rank)||index+1,reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
-      statements.push(env.DB.prepare("INSERT OR IGNORE INTO world_event_rewards(event_id,kingdom_id,rank,score,reward_json) VALUES(?,?,?,?,?)").bind(eventId,participant.kingdom_id,rank,participant.score,rewardJson));
-      statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()>0").bind(reward.food,reward.wood,reward.stone,reward.iron,reward.gold,participant.kingdom_id));
-      statements.push(env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()>0").bind(reward.gems,participant.player_id));
-      statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?, 'death_essence', ? WHERE changes()>0 ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+excluded.quantity").bind(participant.kingdom_id,reward.deathEssence));
-      statements.push(env.DB.prepare("UPDATE world_event_rewards SET paid_at=? WHERE event_id=? AND kingdom_id=? AND paid_at IS NULL AND changes()>0").bind(now.toISOString(),eventId,participant.kingdom_id));
+      const participant=rows[index],rank=Number(participant.final_rank)||index+1;
+      appendAngelDeathReward(env.DB,statements,{eventId,participant,rank,paidAt:now.toISOString()});
     }
     await env.DB.batch(statements);
   }
-  await env.DB.prepare("UPDATE world_events SET status='completed',rewards_distributed_at=? WHERE id=? AND ends_at<=? AND NOT EXISTS(SELECT 1 FROM world_event_participants ep LEFT JOIN world_event_rewards wr ON wr.event_id=ep.event_id AND wr.kingdom_id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0 AND (wr.id IS NULL OR wr.paid_at IS NULL))")
+  await env.DB.prepare("UPDATE world_events SET status='completed',rewards_distributed_at=COALESCE(rewards_distributed_at,?) WHERE id=? AND status IN ('scheduled','active') AND ends_at<=? AND NOT EXISTS(SELECT 1 FROM world_event_participants ep LEFT JOIN world_event_rewards wr ON wr.event_id=ep.event_id AND wr.kingdom_id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0 AND (wr.id IS NULL OR wr.paid_at IS NULL))")
     .bind(now.toISOString(),eventId,now.toISOString(),eventId).run();
 }
 
