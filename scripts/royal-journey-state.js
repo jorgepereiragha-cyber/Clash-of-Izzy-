@@ -21,7 +21,9 @@ export function projectRoyalJourney(detail = {}) {
       "Aguarde a conexão antes de planejar ordens. Nenhuma ação é executada aqui.",
       "Ver cidade", "#city", "sync");
   }
-  const army = natural(detail.armyCount);
+  // The army capacity includes wounded, marching and queued units; only
+  // the server-backed ready troop count represents troops available at home.
+  const army = natural(detail.readyTroops ?? detail.armyCount);
   const active = (Array.isArray(detail.queues) ? detail.queues : [])
     .filter(q => q && q.status === "running");
   const constructing = active.some(q => q.queue_type === "construction" && q.target_key === "castle");
@@ -34,6 +36,17 @@ export function projectRoyalJourney(detail = {}) {
       "Consulte os custos e inicie uma melhoria do castelo. Os recursos e o nível são validados no servidor.",
       "Ver construções", "#buildings", "castle");
   }
+  const marches = Array.isArray(detail.marches) ? detail.marches : [];
+  const explored = marches.some(m => m && ["marching", "traveling", "completed"].includes(m.status));
+  // A completed march remains evidence of exploration even after troops return.
+  if (explored) {
+    if (detail.allianceJoined === true) return directive("Planeje sua próxima conquista",
+      "Acompanhe os territórios e coordene novas operações com seus aliados.",
+      "Abrir mapa", "/world.html", "strategy");
+    return directive("Organize sua aliança",
+      "Você já iniciou a exploração de Eldoria. Coordene seus próximos objetivos com outros comandantes.",
+      "Ver alianças", "/alliance.html", "alliance");
+  }
   if (army < 30) {
     if (training) return directive("Exército em formação",
       "O recrutamento está em andamento. As tropas só chegam após a conclusão no servidor.",
@@ -42,12 +55,7 @@ export function projectRoyalJourney(detail = {}) {
       "Organize um exército antes de avançar pelo mapa. Verifique capacidade, recursos e tempo.",
       "Treinar tropas", "#trainingForm", "army");
   }
-  const marches = Array.isArray(detail.marches) ? detail.marches : [];
-  const marching = marches.some(m => m && (m.status === "marching" || m.status === "traveling"));
-  if (!marching) return directive("Explore o mapa de Eldoria",
+  return directive("Explore o mapa de Eldoria",
     "Localize territórios, confira suas defesas e planeje marchas pelo mapa estratégico.",
     "Abrir mapa", "/world.html", "world");
-  return directive("Organize sua aliança",
-    "Com tropas em movimento, coordene seus próximos objetivos com outros comandantes.",
-    "Ver alianças", "/alliance.html", "alliance");
 }

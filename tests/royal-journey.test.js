@@ -67,3 +67,18 @@ test("untrusted values cannot create links, HTML, or rewards", () => {
   assert.equal(model.href,"/alliance.html");
   assert.doesNotMatch(JSON.stringify(model), /onerror|javascript:|gems|recompensa|bonus/i);
 });
+
+
+test("journey uses ready troops, not reserved capacity or units still training",()=>{
+ const base={kingdom:{castle_level:4},armyCount:100,readyTroops:0,marches:[]};
+ assert.equal(projectRoyalJourney(base).phase,"army");
+ assert.equal(projectRoyalJourney({...base,queues:[{queue_type:"training",status:"running"}]}).phase,"army-running");
+ assert.equal(projectRoyalJourney({...base,readyTroops:30}).phase,"world");
+});
+test("completed exploration does not reset to recruitment and alliance members get strategic guidance",()=>{
+ const base={kingdom:{castle_level:4},armyCount:0,readyTroops:0,marches:[{status:"completed"}]};
+ assert.equal(projectRoyalJourney({...base,allianceJoined:false}).phase,"alliance");
+ assert.equal(projectRoyalJourney({...base,allianceJoined:true}).phase,"strategy");
+ assert.equal(projectRoyalJourney({...base,allianceJoined:true,marches:[{status:"cancelled"}]}).phase,"army");
+ assert.equal(projectRoyalJourney({...base,allianceJoined:true,marches:[{status:"marching"}]}).href,"/world.html");
+});

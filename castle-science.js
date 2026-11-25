@@ -30,6 +30,10 @@ export function scienceView(rows=[],academy=0,kingdom={}){
   const level=scienceLevel(levels.get(key),d.maxLevel),requiredAcademy=scienceRequirement(key,level),[requiredKey,requiredLevel]=d.prerequisite;
   const unlockedMax=d.imperial?imperialScienceCap(kingdom):d.maxLevel;
   const nextVip=d.imperial&&level<d.maxLevel?IMPERIAL_VIP_CAPS.findIndex(cap=>cap>level):null;
-  return {key,...d,level,unlockedMax,nextVip,requiredAcademy,requiredKey,requiredLevel,prerequisiteMet:(levels.get(requiredKey)||0)>=requiredLevel,available:level<unlockedMax&&academy>=requiredAcademy&&(levels.get(requiredKey)||0)>=requiredLevel,bonusPercent:sciencePercent(key,Math.min(level,unlockedMax)),nextCost:level<d.maxLevel?Object.fromEntries(Object.entries(d.cost).map(([k,v])=>[k,v*(level+1)])):null};
+  const prerequisiteMet=(levels.get(requiredKey)||0)>=requiredLevel;
+  const academyMet=academy>=requiredAcademy;
+  const lockedReason=level>=d.maxLevel?"max_level":level>=unlockedMax?"vip":!academyMet?"academy":!prerequisiteMet?"prerequisite":null;
+  const nextBonusPercent=level<unlockedMax?sciencePercent(key,level+1):null;
+  return {key,...d,level,unlockedMax,nextVip,requiredAcademy,requiredKey,requiredLevel,prerequisiteMet,academyMet,lockedReason,available:lockedReason===null,bonusPercent:sciencePercent(key,Math.min(level,unlockedMax)),nextBonusPercent,nextCost:level<d.maxLevel?Object.fromEntries(Object.entries(d.cost).map(([k,v])=>[k,v*(level+1)])):null};
  });
 }
