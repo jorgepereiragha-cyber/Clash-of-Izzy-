@@ -7,12 +7,13 @@ const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 
-test("original imperial keep is rendered at every skin and quality without substituting standalone wall GLBs", () => {
+test("original imperial keep remains the fallback and preserves equipped skins without substituting standalone wall GLBs", () => {
   assert.match(renderer,/function addEldoriaCastle/);
   assert.match(renderer,/eldoria-imperial-v1/);
   assert.match(renderer,/level>=30\?4:level>=20\?3:level>=10\?2:1/);
   assert.match(renderer,/if\(type==="castle"\)\{\s*addEldoriaCastle/);
-  assert.match(renderer,/b\.building_type==="castle"\|\|!template/);
+  assert.match(renderer,/b\.building_type === "castle" && latestCastleSkinId\) \? null : glbTemplates\.get\(selected\?\.id\)/);
+  assert.match(renderer,/const group = !template/);
   assert.doesNotMatch(renderer,/createCastleGlbGroup|kenney-castle-kit-composite/);
   assert.match(renderer,/PCFSoftShadowMap/);
   for(const type of ["barracks","farm","quarry","lumber_mill","iron_mine","market","academy","wall","hospital","watchtower","stable","archery_range","siege_workshop","embassy","warehouse"]){
@@ -91,8 +92,8 @@ test("glTF and KTX2/Basis loaders are configured for production assets", () => {
 
 test("procedural buildings are replaceable by explicitly enabled GLB assets", () => {
   assert.match(renderer, /asset\?\.enabled === true/);
-  assert.match(renderer, /glbTemplates\.set\(asset\.type, template\)/);
-  assert.match(renderer, /glbTemplates\.get\(b\.building_type\)/);
+  assert.match(renderer, /glbTemplates\.set\(asset\.id, template\)/);
+  assert.match(renderer, /glbTemplates\.get\(selected\?\.id\)/);
   assert.match(renderer, /coIType/);
 });
 
@@ -152,10 +153,10 @@ test("WebGL loss disconnects resize observers and prevents rendering through a d
 
 
 test("GLB manifest accepts only bounded same-origin assets for known buildings", () => {
-  assert.match(renderer, /manifest\.models\.slice\(0, 32\)/);
-  assert.match(renderer, /const neededTypes = new Set/);
-  assert.match(renderer, /Object\.hasOwn\(palettes, type\)/);
-  assert.match(renderer, /neededTypes\.has\(asset\.type\)/);
+  assert.match(renderer, /manifest\.models\.slice\(0, MODEL_LIMITS\.models\)/);
+  assert.match(renderer, /const selectedBuildings =/);
+  assert.match(renderer, /Object\.hasOwn\(palettes, b\.building_type\)/);
+  assert.match(renderer, /selectBuildingAsset\(manifestAssets, b\.building_type, b\.level, qualityProfile\?\.tier\)/);
   assert.match(renderer, /url\.origin !== window\.location\.origin/);
   assert.match(renderer, /url\.pathname\.startsWith\("\/assets\/3d\/"\)/);
   assert.match(renderer, /pathname\.toLowerCase\(\)\.endsWith\("\.glb"\)/);
@@ -288,7 +289,7 @@ test("GLB assets are normalized to a mobile building footprint and grounded at y
 
 
 test("optional GLB assets load only for present building types with bounded concurrency", () => {
-  assert.ok(renderer.includes("const neededTypes = new Set"));
+  assert.ok(renderer.includes("const selectedBuildings ="));
   assert.ok(renderer.includes("glbLoadPromises.has(entry.key)"));
   assert.ok(renderer.includes("const glbLoadLanes = Array.from({ length: 3 }"));
   assert.ok(renderer.includes("loadOptionalGlbAssets(list, latestTroops)"));

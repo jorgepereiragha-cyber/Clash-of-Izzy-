@@ -140,3 +140,24 @@ test("rejects an enabled GLB whose external texture or buffer path escapes the a
   try { await assert.rejects(validateAssetManifest(escaping), /traversal|escapa/); }
   finally { await rm(escaping, { recursive: true, force: true }); }
 });
+
+
+test("rejects enabled duplicate building type, minimum level and LOD slots", async () => {
+  const root = await fixture({models:[
+    {...baseAsset("one","/assets/3d/models/a.glb"),minLevel:10,lod:0},
+    {...baseAsset("two","/assets/3d/models/b.glb"),minLevel:10,lod:0}
+  ],files:{"models/a.glb":glb(),"models/b.glb":glb()}});
+  try { await assert.rejects(validateAssetManifest(root), /tipo\/nível\/LOD duplicado/); }
+  finally { await rm(root,{recursive:true,force:true}); }
+});
+test("allows independent minimum level and LOD slots and rejects invalid metadata", async () => {
+  const root = await fixture({models:[
+    {...baseAsset("one","/assets/3d/models/a.glb"),minLevel:10,lod:0},
+    {...baseAsset("two","/assets/3d/models/b.glb"),minLevel:10,lod:2}
+  ],files:{"models/a.glb":glb(),"models/b.glb":glb()}});
+  try { assert.equal((await validateAssetManifest(root)).enabled,2); }
+  finally { await rm(root,{recursive:true,force:true}); }
+  const invalid=await fixture({models:[{...baseAsset("bad","/assets/3d/models/a.glb",false),minLevel:0,lod:3}]});
+  try { await assert.rejects(validateAssetManifest(invalid), /minLevel\/LOD inválido/); }
+  finally { await rm(invalid,{recursive:true,force:true}); }
+});

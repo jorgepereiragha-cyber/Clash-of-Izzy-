@@ -14,3 +14,6 @@ https://threejs.org/docs/pages/GLTFLoader.html
 https://threejs.org/docs/pages/KTX2Loader.html
 https://docs.blender.org/manual/en/latest/addons/import_export/scene_gltf2.html
 https://developer.android.com/games/optimize/gameperformance
+
+## Staging Blender
+Utilize docs/art-pipeline/prepare_static_lods.py em Blender headless com arquivo GLB estático licenciado e três budgets. Exporta três GLBs separados sem sobrescrever, centraliza no chão, verifica triângulos e recusa rig/animação. Exemplo: `blender -b --python-exit-code 1 --python docs/art-pipeline/prepare_static_lods.py -- source.glb /tmp/eldoria/farm_L1 --budgets 8000 2500 800`. Validação de sintaxe no CI; execução real Blender, retopologia, UV, Draco e KTX2 ainda exigem homologação. Nunca usar o decimador estático para dragões ou tropas animadas.
