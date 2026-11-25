@@ -276,7 +276,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <p class="muted">Os recursos são cobrados ao iniciar. As tropas entram no exército ao concluir. A capacidade é de 500 tropas por nível do quartel e considera o exército no castelo, em marcha e em treinamento.</p>
 </form>
 </section>
-<section class="panel"><h2>🔬 Academia e pesquisas</h2>
+<section class="panel"><h2>🔬 Faculdade e pesquisas</h2>
 <div id="researchLevels" class="events"></div>
 <form id="researchForm" class="queue-form">
 <label for="researchKey">Tecnologia</label>
@@ -732,9 +732,13 @@ function renderAcademyScience(){
  if(!select||!details||!button)return;
  const rows=state?.academyScience||[];
  const old=select.querySelector("optgroup[data-science]");
- if(rows.length&&!old){const group=document.createElement("optgroup");group.label="Ciências avançadas de Eldoria";group.dataset.science="true";
-  for(const row of rows.filter(x=>!x.imperial)){const opt=document.createElement("option");opt.value=row.key;opt.textContent=row.name;group.append(opt);}select.append(group);
- }else if(!rows.length&&old)old.remove();
+ if(rows.length&&!old){
+  const categories=new Map();
+  for(const row of rows.filter(x=>!x.imperial)){
+   if(!categories.has(row.category)){const group=document.createElement("optgroup");group.label=row.category;group.dataset.science="true";categories.set(row.category,group);select.append(group);}
+   const opt=document.createElement("option");opt.value=row.key;opt.textContent=row.name;categories.get(row.category).append(opt);
+  }
+ }else if(!rows.length&&old)select.querySelectorAll("optgroup[data-science]").forEach(group=>group.remove());
  const imperialRows=rows.filter(x=>x.imperial);
  const imperialGroup=select.querySelector("optgroup[data-imperial]");
  if(imperialRows.length&&!imperialGroup){
@@ -743,7 +747,7 @@ function renderAcademyScience(){
  }else if(!imperialRows.length&&imperialGroup)imperialGroup.remove();
  const row=rows.find(x=>x.key===select.value);
  if(row){
-  const names={economy:"Economia",military:"Doutrina militar",defense:"Defesa"};
+  const names={economy:"Economia",military:"Doutrina militar",defense:"Defesa",...Object.fromEntries(rows.map(x=>[x.key,x.name]))};
   const lockText={max_level:"Nível máximo concluído.",vip:"Limite da progressão VIP atingido.",academy:"Melhore a Academia.",prerequisite:"Conclua a pesquisa anterior."}[row.lockedReason]||"";
   const nextBonus=Number.isFinite(row.nextBonusPercent)?" · Próximo nível: "+row.nextBonusPercent+"%":"";
   details.textContent=row.category+" · Nv. "+row.level+"/"+row.maxLevel+" · "+row.effect+": "+row.bonusPercent+"%"+nextBonus+(row.imperial?" · Limite VIP atual: "+row.unlockedMax+(row.level>=row.unlockedMax&&row.nextVip?" · Exige Castelo 30 / VIP "+row.nextVip:""):"")+" · Academia "+row.requiredAcademy+" · "+(names[row.requiredKey]||row.requiredKey)+" "+row.requiredLevel+(row.nextCost?" · Custo: "+fmt(row.nextCost.wood)+" madeira, "+fmt(row.nextCost.stone)+" pedra, "+fmt(row.nextCost.iron)+" ferro":" · Máximo")+(lockText?" · "+lockText:"");
@@ -849,7 +853,7 @@ document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const blocked=maxed||activeConstructionCount>=2||alreadyQueued||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
 renderQueues();
-document.getElementById("researchLevels").innerHTML=(state.research||[]).map(r=>'<div class="event">'+esc(String(r.research_key).replaceAll("_"," "))+' · nível '+fmt(r.level)+'</div>').join("")||'<div class="muted">Nenhuma pesquisa concluída ainda.</div>';
+document.getElementById("researchLevels").innerHTML=(state.research||[]).map(r=>'<div class="event">'+esc((state.academyScience||[]).find(x=>x.key===r.research_key)?.name||String(r.research_key).replaceAll("_"," "))+' · nível '+fmt(r.level)+'</div>').join("")||'<div class="muted">Nenhuma pesquisa concluída ainda.</div>';
 const activeTrainingCount=(state.queues||[]).filter(q=>q.queue_type==="training"&&q.status==="running").length;
 document.getElementById("trainButton").disabled=busy||activeTrainingCount>=2||Number(state.armyCount||0)>=Number(state.troopCapacity||500);
 renderAcademyScience();
