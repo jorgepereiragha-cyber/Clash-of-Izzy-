@@ -175,8 +175,8 @@ async function occupyNode(env,kingdomId,body){
   [nodeId]);
  const result=await env.DB.batch([
   env.DB.prepare(withdrawal.sql).bind(...withdrawal.bindings),
-  env.DB.prepare("UPDATE resource_nodes SET occupied_by=?,occupation_start=?,garrison_json=?,last_regen=? WHERE id=? AND occupied_by IS NULL AND reserved_by_rally IS NULL AND changes()=?")
-   .bind(kingdomId,now,JSON.stringify({owners:{[kingdomId]:troops}}),now,nodeId,count),
+  env.DB.prepare("UPDATE resource_nodes SET occupied_by=?,occupation_start=?,garrison_json=?,current_resources=MIN(max_resources,current_resources+CAST(MAX(0,?-last_regen)*regen_rate/3600 AS INTEGER)),last_regen=MAX(last_regen,?) WHERE id=? AND occupied_by IS NULL AND reserved_by_rally IS NULL AND changes()=?")
+   .bind(kingdomId,now,JSON.stringify({owners:{[kingdomId]:troops}}),now,now,nodeId,count),
   env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,'resource_node_occupied',? WHERE changes()=1")
    .bind(kingdomId,JSON.stringify({nodeId})),
  ]);
@@ -216,7 +216,7 @@ function parseOwnedGarrison(raw){
 }
 export const DETACHED_TROOPS_SQL =
  "(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM rally_reinforcements rr JOIN rallies r ON r.id=rr.rally_id,json_each(rr.troop_data) j WHERE rr.kingdom_id=? AND r.status IN ('gathering','marching'))"+
- "+(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM resource_nodes n,json_each(n.garrison_json,'$.owners') o,json_each(o.value) j WHERE n.occupied_by IS NOT NULL AND o.key=CAST(? AS TEXT))"+
+ "+(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM resource_nodes n,json_each(n.garrison_json,'$.owners') o,json_each(o.value) j WHERE n.occupied_by IS NOT NULL AND o.key=CAST(CAST(? AS INTEGER) AS TEXT))"+
  "+(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM resource_nodes n,json_each(n.garrison_json) j WHERE n.occupied_by=? AND json_type(n.garrison_json,'$.owners') IS NULL AND j.type='integer')";
 export async function detachedTroops(env,kingdomId){
  const row=await env.DB.prepare("SELECT "+DETACHED_TROOPS_SQL+" AS total").bind(kingdomId,kingdomId,kingdomId).first();
@@ -227,12 +227,13 @@ async function recallNode(env,kingdomId,body){
  const node=await env.DB.prepare("SELECT garrison_json FROM resource_nodes WHERE id=? AND occupied_by=? AND reserved_by_rally IS NULL").bind(nodeId,kingdomId).first();
  if(!node)return reply({error:"Este nó não está ocupado pelo seu reino ou pertence a um rally."},404);
  const owners=parseOwnedGarrison(node.garrison_json);
+ const now=Math.floor(Date.now()/1000);
  if(!owners)return reply({error:"Guarnição antiga sem origem comprovada. A devolução exige reconciliação administrativa.",code:"GARRISON_RECONCILIATION_REQUIRED"},409);
  // One set-based credit, guarded by the exact garrison snapshot released above.
  // JSON owner IDs, not the leader's ID, determine the recipients.
  const result=await env.DB.batch([
-  env.DB.prepare("UPDATE resource_nodes SET occupied_by=NULL,occupation_start=NULL,garrison_json='{}',last_regen=? WHERE id=? AND occupied_by=? AND reserved_by_rally IS NULL AND garrison_json=?")
-   .bind(Math.floor(Date.now()/1000),nodeId,kingdomId,node.garrison_json),
+  env.DB.prepare("UPDATE resource_nodes SET occupied_by=NULL,occupation_start=NULL,garrison_json='{}',current_resources=MIN(max_resources,current_resources+CAST(MAX(0,?-last_regen)*regen_rate/3600 AS INTEGER)),last_regen=MAX(last_regen,?) WHERE id=? AND occupied_by=? AND reserved_by_rally IS NULL AND garrison_json=?")
+   .bind(now,now,nodeId,kingdomId,node.garrison_json),
   env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT CAST(o.key AS INTEGER),j.key,1,CAST(j.value AS INTEGER) FROM json_each(?,'$.owners') o,json_each(o.value) j WHERE changes()=1 ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(node.garrison_json)
  ]);
  if(Number(result[0]?.meta?.changes||0)!==1)return reply({error:"O estado do nó mudou; atualize e tente novamente."},409);
@@ -259,8 +260,8 @@ export async function processDueRallies(env,batchSize=1){
    // The same D1 transaction changes node and rally state. A stale invocation
    // cannot overwrite a successful settlement or subsequently cancel it.
    const result=await env.DB.batch([
-    env.DB.prepare("UPDATE resource_nodes SET occupied_by=?,occupation_start=?,garrison_json=?,reserved_by_rally=NULL,last_regen=? WHERE id=? AND reserved_by_rally=? AND occupied_by IS NULL AND EXISTS(SELECT 1 FROM rallies WHERE id=? AND status='marching' AND arrival_time<=?)")
-     .bind(rally.leader_kingdom_id,now,JSON.stringify({owners}),now,rally.target_id,rally.id,rally.id,now),
+    env.DB.prepare("UPDATE resource_nodes SET occupied_by=?,occupation_start=?,garrison_json=?,reserved_by_rally=NULL,current_resources=MIN(max_resources,current_resources+CAST(MAX(0,?-last_regen)*regen_rate/3600 AS INTEGER)),last_regen=MAX(last_regen,?) WHERE id=? AND reserved_by_rally=? AND occupied_by IS NULL AND EXISTS(SELECT 1 FROM rallies WHERE id=? AND status='marching' AND arrival_time<=?)")
+     .bind(rally.leader_kingdom_id,now,JSON.stringify({owners}),now,now,rally.target_id,rally.id,rally.id,now),
     env.DB.prepare("UPDATE rallies SET status='completed' WHERE id=? AND status='marching' AND changes()=1").bind(rally.id)
    ]);
    if(Number(result[0]?.meta?.changes||0)===1)continue;

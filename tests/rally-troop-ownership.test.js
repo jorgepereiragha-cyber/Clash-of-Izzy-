@@ -9,7 +9,7 @@ function fixture(occupied = null) {
  CREATE TABLE players(id INTEGER PRIMARY KEY,player_id TEXT);
  CREATE TABLE kingdoms(id INTEGER PRIMARY KEY,player_id INTEGER);
  CREATE TABLE army_units(kingdom_id INTEGER,unit_type TEXT,tier INTEGER,quantity INTEGER,PRIMARY KEY(kingdom_id,unit_type,tier));
- CREATE TABLE resource_nodes(id TEXT PRIMARY KEY,occupied_by INTEGER,occupation_start INTEGER,garrison_json TEXT,reserved_by_rally TEXT,last_regen INTEGER);
+ CREATE TABLE resource_nodes(id TEXT PRIMARY KEY,occupied_by INTEGER,occupation_start INTEGER,garrison_json TEXT,reserved_by_rally TEXT,last_regen INTEGER,current_resources INTEGER,max_resources INTEGER,regen_rate INTEGER);
  CREATE TABLE rallies(id TEXT PRIMARY KEY,leader_kingdom_id INTEGER,target_id TEXT,status TEXT,departure_time INTEGER,arrival_time INTEGER);
  CREATE TABLE rally_reinforcements(id INTEGER PRIMARY KEY,rally_id TEXT,kingdom_id INTEGER,troop_data TEXT);
  INSERT INTO players VALUES(1,'leader'),(2,'ally');
@@ -17,7 +17,7 @@ function fixture(occupied = null) {
  INSERT INTO army_units VALUES(10,'militia',1,3),(20,'militia',1,4);
  INSERT INTO rallies VALUES('r1',10,'node_001','marching',0,0);
  INSERT INTO rally_reinforcements VALUES(1,'r1',10,'{"militia":7,"archer":2}'),(2,'r1',20,'{"militia":11}');
- INSERT INTO resource_nodes VALUES('node_001',NULL,NULL,'{}','r1',0);
+ INSERT INTO resource_nodes VALUES('node_001',NULL,NULL,'{}','r1',unixepoch()-3600,10,100,1);
  `);
  if(occupied!==null)sql.prepare("UPDATE resource_nodes SET occupied_by=?").run(occupied);
  let fail=false;
@@ -45,11 +45,14 @@ test("rally settlement preserves ownership, capacity and exactly-once recall", a
   assert.equal(sql.prepare("SELECT status FROM rallies").get().status,"completed");
   assert.equal(await detachedTroops(env,10),9);
   assert.equal(await detachedTroops(env,20),11);
+  assert.equal(sql.prepare("SELECT current_resources FROM resource_nodes").get().current_resources,11);
+  sql.exec("UPDATE resource_nodes SET last_regen=unixepoch()-3600");
   const result=await recall(env);
   assert.equal(result.status,200);
   const body=await result.json();
   assert.equal(body.returned,9);
   assert.equal(body.returned_allies,11);
+  assert.equal(sql.prepare("SELECT current_resources FROM resource_nodes").get().current_resources,12);
   assert.equal((await recall(env)).status,404);
   assert.deepEqual(army(sql),[[10,"archer",2],[10,"militia",10],[20,"militia",15]]);
   assert.equal(await detachedTroops(env,10),0);
@@ -89,5 +92,20 @@ test("legacy mixed garrison is not incorrectly transferred to the leader",async(
   assert.deepEqual(army(sql),[[10,"militia",3],[20,"militia",4]]);
   await processDueRallies(env);
   assert.equal(sql.prepare("SELECT status FROM rallies").get().status,"marching");
+ }finally{sql.close()}
+});
+
+ test("rally regeneration caps resources and never rewinds a future clock",async()=>{
+ const {sql,env}=fixture();
+ try{
+  sql.exec("UPDATE resource_nodes SET current_resources=99,last_regen=unixepoch()-7200");
+  await processDueRallies(env);
+  assert.equal(sql.prepare("SELECT current_resources FROM resource_nodes").get().current_resources,100);
+  sql.exec("UPDATE resource_nodes SET current_resources=40,last_regen=unixepoch()+7200");
+  const before=sql.prepare("SELECT last_regen FROM resource_nodes").get().last_regen;
+  assert.equal((await recall(env)).status,200);
+  const after=sql.prepare("SELECT current_resources,last_regen FROM resource_nodes").get();
+  assert.equal(after.current_resources,40);
+  assert.equal(after.last_regen,before);
  }finally{sql.close()}
 });
