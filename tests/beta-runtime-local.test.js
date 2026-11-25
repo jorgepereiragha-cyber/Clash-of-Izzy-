@@ -606,6 +606,72 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
 
 
 
+    // Exercise competing queue mutations against the real local Worker and D1.
+    // Only the disposable realm is funded; production and beta remote D1 are untouched.
+    const queueRealm = Number(start.data.state.kingdom.id);
+    assert.ok(Number.isSafeInteger(queueRealm) && queueRealm > 0);
+    const localSql = async sql => command([...common,"execute","clash-of-izzy-beta-db","--local",
+      "--persist-to",persist,"--command",sql]);
+    const countEvents = async type => {
+      assert.ok(["research_started","research_upgraded","troop_training_started","troops_trained"].includes(type));
+      const raw = await command([...common,"execute","clash-of-izzy-beta-db","--local",
+        "--persist-to",persist,"--json","--command",
+        "SELECT COUNT(*) AS n FROM kingdom_events WHERE kingdom_id="+queueRealm+" AND event_type='"+type+"'"]);
+      const result = JSON.parse(raw.trim());
+      assert.equal(result[0].success,true);
+      return Number(result[0].results[0].n);
+    };
+    await localSql("UPDATE kingdoms SET wood=10000,food=10000,stone=10000,iron=10000 WHERE id="+queueRealm);
+    const researchLevel = state => Number(state.research.find(row=>row.research_key==="economy")?.level||0);
+    const initialResearch = await getStateFor(cookie,start.data.token);
+    const researchStarts = await countEvents("research_started");
+    const researchFinishes = await countEvents("research_upgraded");
+    const researchRace = await Promise.all(Array.from({length:2},()=>actionFor(cookie,start.data.token,
+      {type:"research",research:"economy"})));
+    assert.deepEqual(researchRace.map(x=>x.status).sort((a,b)=>a-b),[200,409],
+      "only one competing research action may reserve the single slot");
+    const researchQueued = await getStateFor(cookie,start.data.token);
+    const researchQueue = researchQueued.queues.filter(q=>q.queue_type==="research"&&q.status==="running");
+    assert.equal(researchQueue.length,1);
+    assert.equal(researchQueue[0].target_key,"economy");
+    assert.equal(await countEvents("research_started"),researchStarts+1);
+    await localSql("UPDATE kingdom_queues SET completes_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id="+queueRealm+
+      " AND queue_type='research' AND status='running'");
+    await Promise.all([getStateFor(cookie,start.data.token),getStateFor(cookie,start.data.token)]);
+    const researchDone = await getStateFor(cookie,start.data.token);
+    assert.equal(researchLevel(researchDone),researchLevel(initialResearch)+1);
+    assert.equal(await countEvents("research_upgraded"),researchFinishes+1);
+    assert.equal(researchDone.queues.filter(q=>q.queue_type==="research"&&q.status==="running").length,0);
+    assert.equal(researchLevel(await getStateFor(cookie,start.data.token)),researchLevel(researchDone));
+    assert.equal(await countEvents("research_upgraded"),researchFinishes+1);
+
+    const initialTraining = await getStateFor(cookie,start.data.token);
+    assert.ok(Number(initialTraining.troopCapacity)-Number(initialTraining.armyCount)>=6,
+      "synthetic kingdom has room for two small training batches");
+    const trainingStarts = await countEvents("troop_training_started");
+    const trainingFinishes = await countEvents("troops_trained");
+    const trainingRace = await Promise.all(Array.from({length:3},()=>actionFor(cookie,start.data.token,
+      {type:"train",unit:"militia",quantity:3})));
+    const accepted = trainingRace.filter(x=>x.status===200).length;
+    assert.ok(accepted>=1&&accepted<=2,"one or two slots can be reserved, never three");
+    assert.ok(trainingRace.every(x=>[200,409].includes(x.status)),"all conflicting requests fail safely");
+    const trainingQueued = await getStateFor(cookie,start.data.token);
+    const activeTraining = trainingQueued.queues.filter(q=>q.queue_type==="training"&&q.status==="running");
+    assert.equal(activeTraining.length,accepted);
+    assert.equal(new Set(activeTraining.map(q=>q.queue_slot)).size,accepted);
+    assert.equal(activeTraining.reduce((n,q)=>n+Number(q.quantity),0),accepted*3);
+    assert.equal(await countEvents("troop_training_started"),trainingStarts+accepted);
+    await localSql("UPDATE kingdom_queues SET completes_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id="+queueRealm+
+      " AND queue_type='training' AND status='running'");
+    await Promise.all([getStateFor(cookie,start.data.token),getStateFor(cookie,start.data.token)]);
+    const trainingDone = await getStateFor(cookie,start.data.token);
+    assert.equal(militiaCount(trainingDone),militiaCount(initialTraining)+accepted*3);
+    assert.equal(trainingDone.queues.filter(q=>q.queue_type==="training"&&q.status==="running").length,0);
+    assert.equal(await countEvents("troops_trained"),trainingFinishes+accepted);
+    assert.equal(militiaCount(await getStateFor(cookie,start.data.token)),militiaCount(trainingDone));
+    assert.equal(await countEvents("troops_trained"),trainingFinishes+accepted);
+    console.log("Beta queue races passed: research once, training slot bounds and exactly-once completion.");
+
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);
     assert.deepEqual(methods.data, {mercadoPago:false,nubankPix:false});
