@@ -216,7 +216,7 @@ function parseOwnedGarrison(raw){
 }
 export const DETACHED_TROOPS_SQL =
  "(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM rally_reinforcements rr JOIN rallies r ON r.id=rr.rally_id,json_each(rr.troop_data) j WHERE rr.kingdom_id=? AND r.status IN ('gathering','marching'))"+
- "+(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM resource_nodes n,json_each(n.garrison_json,'$.owners') o,json_each(o.value) j WHERE n.occupied_by IS NOT NULL AND o.key=CAST(? AS TEXT))"+
+ "+(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM resource_nodes n,json_each(n.garrison_json,'$.owners') o,json_each(o.value) j WHERE n.occupied_by IS NOT NULL AND o.key=CAST(CAST(? AS INTEGER) AS TEXT))"+
  "+(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM resource_nodes n,json_each(n.garrison_json) j WHERE n.occupied_by=? AND json_type(n.garrison_json,'$.owners') IS NULL AND j.type='integer')";
 export async function detachedTroops(env,kingdomId){
  const row=await env.DB.prepare("SELECT "+DETACHED_TROOPS_SQL+" AS total").bind(kingdomId,kingdomId,kingdomId).first();
