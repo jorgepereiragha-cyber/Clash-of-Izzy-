@@ -211,32 +211,49 @@ function renderPlayers(players){
   reason.setAttribute("aria-label","Motivo do crédito administrativo");
   const grant=document.createElement("button");grant.type="button";grant.textContent="Creditar";
   const pendingKey="coi_admin_gem_pending:"+p.player_id;
-  const getPending=()=>{try{return JSON.parse(sessionStorage.getItem(pendingKey)||"null")}catch{return null}};
-  const pending=getPending();
-  if(pending&&Number.isSafeInteger(pending.amount)&&typeof pending.reason==="string"){
-    amount.value=String(pending.amount);reason.value=pending.reason;
+  // Preserve uncertain grants across browser restarts, without persisting the admin token.
+  const getPending=()=>{
+    const raw=localStorage.getItem(pendingKey);
+    if(raw===null)return null;
+    const item=JSON.parse(raw);
+    if(!item||!Number.isSafeInteger(item.amount)||item.amount<1||item.amount>1000000||
+       typeof item.reason!=="string"||item.reason.length<8||item.reason.length>200||
+       typeof item.request_key!=="string"||!/^[a-zA-Z0-9_-]{16,80}$/.test(item.request_key))
+      throw new Error("Registro de crédito pendente inválido.");
+    return item;
+  };
+  try{
+    const pending=getPending();
+    if(pending){amount.value=String(pending.amount);reason.value=pending.reason}
+  }catch{
+    grant.disabled=true;
+    showNotice("Não foi possível verificar o crédito pendente. Concilie a operação antes de prosseguir.");
   }
   grant.addEventListener("click",async()=>{
     const value=Number(amount.value),why=reason.value.trim();
     if(!Number.isSafeInteger(value)||value<1||value>1000000||why.length<8||why.length>200){
       showNotice("Informe de 1 a 1.000.000 diamantes e motivo com 8–200 caracteres.");return;
     }
-    let previous=getPending();
-    if(previous&&(previous.amount!==value||previous.reason!==why)){
-      showNotice("Há um crédito com resultado incerto. Repita os dados originais para consultar a mesma chave antes de iniciar outro.");return;
-    }
-    if(!confirm("Confirma crédito de "+value.toLocaleString("pt-BR")+" diamantes ao jogador "+p.player_id+"? Motivo: "+why))return;
-    const requestKey=previous?.request_key||("admin-"+crypto.randomUUID().replaceAll("-",""));
-    try{sessionStorage.setItem(pendingKey,JSON.stringify({amount:value,reason:why,request_key:requestKey}))}catch{
-      showNotice("Armazenamento da chave indisponível: crédito bloqueado para evitar duplicidade.");return;
+    if(!navigator.locks?.request){
+      showNotice("Use um navegador compatível com bloqueio de operações entre abas para creditar diamantes.");return;
     }
     grant.disabled=true;
     try{
-      const result=await api("/admin/gems",{playerId:p.player_id,amount:value,reason:why,request_key:requestKey});
-      sessionStorage.removeItem(pendingKey);
-      showNotice((result.reused?"Crédito já processado. ":"Crédito confirmado. ")+"Saldo: "+Number(result.player.gems).toLocaleString("pt-BR")+" diamantes.");
-      await searchPlayers($("query").value);
-    }catch(e){showNotice("Crédito não confirmado; tente novamente com a mesma chave. "+e.message)}
+      await navigator.locks.request(pendingKey,{ifAvailable:true},async lock=>{
+        if(!lock){showNotice("Já existe uma operação de crédito em andamento para este jogador.");return}
+        const previous=getPending();
+        if(previous&&(previous.amount!==value||previous.reason!==why)){
+          showNotice("Há um crédito com resultado incerto. Repita os dados originais para consultar a mesma chave antes de iniciar outro.");return;
+        }
+        if(!confirm("Confirma crédito de "+value.toLocaleString("pt-BR")+" diamantes ao jogador "+p.player_id+"? Motivo: "+why))return;
+        const requestKey=previous?.request_key||("admin-"+crypto.randomUUID().replaceAll("-",""));
+        // If storage is unavailable, this throws before any request reaches the server.
+        localStorage.setItem(pendingKey,JSON.stringify({amount:value,reason:why,request_key:requestKey}));
+        const result=await api("/admin/gems",{playerId:p.player_id,amount:value,reason:why,request_key:requestKey});
+        localStorage.removeItem(pendingKey);
+        showNotice((result.reused?"Crédito já processado. ":"Crédito confirmado. ")+"Saldo: "+Number(result.player.gems).toLocaleString("pt-BR")+" diamantes.");
+      });
+    }catch(e){showNotice("Crédito não confirmado ou armazenamento indisponível; preserve a chave e concilie a operação. "+e.message)}
     finally{grant.disabled=false}
   });
   actions.append(amount,reason,grant);card.append(info,actions);root.append(card);
