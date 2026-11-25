@@ -17,9 +17,37 @@ const UNIT_RULES = Object.freeze({
 
 const clamp = (n, min, max) => Math.max(min, Math.min(max, n));
 
-function makeStack(row, side, index) {
+// Experimental server-owned ruleset. Legacy battles remain unchanged.
+export function combatRulesVersion(env){
+  return env?.ENVIRONMENT==="beta"&&env?.COMBAT_TACTICS_ENABLED==="true"?2:1;
+}
+const CLASS=Object.freeze({militia:"infantry",swordsman:"infantry",spearman:"infantry",archer:"ranged",crossbowman:"ranged",mage:"ranged",cavalry:"cavalry",knight:"cavalry",catapult:"siege",ram:"siege",trebuchet:"siege"});
+const COUNTER=Object.freeze({infantry:"ranged",ranged:"cavalry",cavalry:"infantry"});
+export function tacticalMultiplier(attacker,defender){
+  const a=Object.hasOwn(CLASS,attacker)?CLASS[attacker]:null;
+  const d=Object.hasOwn(CLASS,defender)?CLASS[defender]:null;
+  return a&&d&&COUNTER[a]===d?1.15:1;
+}
+export function tacticalActiveUnits(quantity){
+  if(!Number.isSafeInteger(quantity)||quantity<1||quantity>200000)return 0;
+  return quantity<=40?quantity:Math.floor(Math.sqrt(40*quantity));
+}
+function canonicalArmy(rows){
+  const stacks=new Map();let total=0;
+  for(const row of rows||[]){
+    if(!Object.hasOwn(UNIT_RULES,row?.unit_type)||!Number.isSafeInteger(row.quantity)||row.quantity<1||!Number.isSafeInteger(row.tier)||row.tier<1||row.tier>10)throw Error("Formação inválida.");
+    total+=row.quantity;if(total>200000)throw Error("Capacidade tática excedida.");
+    const key=row.unit_type+":"+row.tier;
+    const current=stacks.get(key)||{unit_type:row.unit_type,tier:row.tier,quantity:0};
+    current.quantity+=row.quantity;stacks.set(key,current);
+  }
+  const laneOrder={front:0,back:1,siege:2};
+  return [...stacks.values()].sort((a,b)=>laneOrder[UNIT_RULES[a.unit_type].lane]-laneOrder[UNIT_RULES[b.unit_type].lane]||a.unit_type.localeCompare(b.unit_type,"en")||a.tier-b.tier);
+}
+
+function makeStack(row, side, index, rulesVersion=1) {
   const rule = UNIT_RULES[row.unit_type] || UNIT_RULES.militia;
-  const quantity = clamp(Math.floor(Number(row.quantity) || 0), 0, 100000);
+  const quantity = clamp(Math.floor(Number(row.quantity) || 0), 0, rulesVersion===2?200000:100000);
   const tier = clamp(Math.floor(Number(row.tier) || 1), 1, 10);
   const hpPerUnit = rule.hp * tier;
   return {
@@ -66,7 +94,7 @@ function criticalRoll(seed, round, index, side) {
   return (value >>> 0) / 4294967296;
 }
 
-function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, metrics = { criticalHits: 0 }) {
+function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, metrics = { criticalHits: 0 }, rulesVersion=1) {
   for (const unit of acting) {
     if (!alive(unit)) continue;
     const target = selectTarget(opposing, unit);
@@ -74,9 +102,9 @@ function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, met
       unit.position = Math.min(20, unit.position + 1);
       continue;
     }
-    const activeUnits = Math.min(unit.quantity, 40);
+    const activeUnits = rulesVersion===2?tacticalActiveUnits(unit.quantity):Math.min(unit.quantity, 40);
     const criticalHit = Number(critical.chance) > 0 && criticalRoll(critical.seed, round, unit.index, unit.side) < Number(critical.chance) / 100;
-    const baseDamage = activeUnits * unit.power * 1.65 + bonus;
+    const baseDamage = (activeUnits * unit.power * 1.65 + bonus) * (rulesVersion===2?tacticalMultiplier(unit.key,target.key):1);
     const damage = Math.max(1, Math.floor(baseDamage * (criticalHit ? critical.multiplier : 1)));
     const dealt = applyDamage(target, damage);
     if (criticalHit) metrics.criticalHits++;
@@ -87,10 +115,9 @@ function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, met
   }
 }
 
-export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, skinAttackBonusPercent = 0, skinDefenseBonusPercent = 0, skinSetAttackBonusPercent = 0, skinSetDefenseBonusPercent = 0, skinSetHealthBonusPercent = 0, skinSetCriticalChancePercent = 0, heroAttackBonusPercent = 0, heroDefenseBonusPercent = 0, dragonAttackBonusPercent = 0, dragonDefenseBonusPercent = 0, castleVipAttackBonusPercent = 0, castleVipDefenseBonusPercent = 0, imperialAttackBonusPercent = 0, imperialDefenseBonusPercent = 0, imperialHealthBonusPercent = 0, heroHealthBonusPercent = 0, heroCriticalChancePercent = 0, infantryAttackBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1 }) {
-  const attackers = (army || [])
-    .filter(row => Number(row.quantity) > 0)
-    .map((row, index) => makeStack(row, "attacker", index));
+export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, skinAttackBonusPercent = 0, skinDefenseBonusPercent = 0, skinSetAttackBonusPercent = 0, skinSetDefenseBonusPercent = 0, skinSetHealthBonusPercent = 0, skinSetCriticalChancePercent = 0, heroAttackBonusPercent = 0, heroDefenseBonusPercent = 0, dragonAttackBonusPercent = 0, dragonDefenseBonusPercent = 0, castleVipAttackBonusPercent = 0, castleVipDefenseBonusPercent = 0, imperialAttackBonusPercent = 0, imperialDefenseBonusPercent = 0, imperialHealthBonusPercent = 0, heroHealthBonusPercent = 0, heroCriticalChancePercent = 0, infantryAttackBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1, rulesVersion=1 }) {
+  const attackers = (rulesVersion===2?canonicalArmy(army):(army || []).filter(row => Number(row.quantity) > 0))
+    .map((row, index) => makeStack(row, "attacker", index, rulesVersion));
   const defenseBonus = clamp((Number(defenseBonusPercent) || 0) + clamp(Number(skinDefenseBonusPercent) || 0, 0, 2.5) + clamp(Number(skinSetDefenseBonusPercent) || 0, 0, 2.5) + clamp(Number(heroDefenseBonusPercent) || 0, 0, 20) + clamp(Number(dragonDefenseBonusPercent) || 0, 0, 5.5) + clamp(Number(castleVipDefenseBonusPercent) || 0, 0, 7) + clamp(Number(imperialDefenseBonusPercent) || 0, 0, 6), 0, 30);
   const attackGearBonus = clamp((Number(equipmentAttackBonusPercent) || 0) + clamp(Number(skinAttackBonusPercent) || 0, 0, 2.5) + clamp(Number(skinSetAttackBonusPercent) || 0, 0, 2.5) + clamp(Number(heroAttackBonusPercent) || 0, 0, 20) + clamp(Number(dragonAttackBonusPercent) || 0, 0, 5.5) + clamp(Number(castleVipAttackBonusPercent) || 0, 0, 3.5) + clamp(Number(imperialAttackBonusPercent) || 0, 0, 6), 0, 30) / 100;
   const infantryAttackBonus = clamp(Number(infantryAttackBonusPercent) || 0, 0, 30) / 100;
@@ -127,8 +154,8 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
 
   for (let round = 1; round <= 30; round++) {
     rounds = round;
-    attackPhase(attackers, defenders, round, log, heroBonus + dragonBonus + techBonus, critical, metrics);
-    attackPhase(defenders, attackers, round, log, 0, {}, metrics);
+    attackPhase(attackers, defenders, round, log, heroBonus + dragonBonus + techBonus, critical, metrics, rulesVersion);
+    attackPhase(defenders, attackers, round, log, 0, {}, metrics, rulesVersion);
     if (!attackers.some(alive) || !defenders.some(alive)) break;
   }
 
@@ -146,6 +173,7 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   }
   return {
     won, rounds, attackerPower: Math.floor(attackerPower * multiplier), defenderPower,
+    ...(rulesVersion===2?{rulesVersion:2,defenderLosses:Object.fromEntries(defenders.map(u=>[u.key,u.initialQuantity-u.quantity]))}:{}),
     losses, log, criticalHits: metrics.criticalHits, survivors: attackers.reduce((sum, unit) => sum + unit.quantity, 0)
   };
 }
