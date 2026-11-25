@@ -164,16 +164,20 @@ h1 .golden{display:block;color:var(--gold);text-shadow:0 1px 0 #ffedb5,0 5px 20p
         url.pathname.startsWith(prefix) && url.search === "" && url.hash === "";
     } catch { return false; }
   }
+  function uniqueReleaseAsset(release, expected) {
+    const matches = release.assets.filter(asset => asset && asset.name === expected);
+    if (!(matches.length === 1)) return null;
+    const asset = matches[0];
+    return validAsset(asset, expected) &&
+      Number.isSafeInteger(asset.size) && asset.size > 0 &&
+      new URL(asset.browser_download_url).pathname === prefix + encodeURIComponent(release.tag_name) + "/" + expected
+      ? asset : null;
+  }
   async function findOfficialApk() {
     try {
       const release = await fetchReleaseJson("/releases/latest");
       if (!release || release.draft !== false || release.prerelease !== false || !Array.isArray(release.assets) || typeof release.tag_name !== "string" || !release.tag_name) throw new Error("release não oficial");
-      const exactAsset = expected => {
-        const matches = release.assets.filter(asset => validAsset(asset, expected) &&
-          Number.isSafeInteger(asset.size) && asset.size > 0 &&
-          new URL(asset.browser_download_url).pathname === prefix + encodeURIComponent(release.tag_name) + "/" + expected);
-        return matches.length === 1 ? matches[0] : null;
-      };
+      const exactAsset = expected => uniqueReleaseAsset(release, expected);
       const apk = exactAsset(filename), hash = exactAsset(filename + ".sha256");
       if (!apk || !hash) throw new Error("APK e SHA-256 não publicados");
       for (const button of buttons) {
@@ -210,12 +214,7 @@ h1 .golden{display:block;color:var(--gold);text-shadow:0 1px 0 #ffedb5,0 5px 20p
         /^android-access-v[1-9][0-9]{0,8}$/.test(r.tag_name))
         .sort((a,b) => Number(b.tag_name.slice(16)) - Number(a.tag_name.slice(16)))[0];
       if (!release || !Array.isArray(release.assets)) throw new Error("sem instalador");
-      const asset = expected => {
-        const matches = release.assets.filter(a => validAsset(a, expected) &&
-          Number.isSafeInteger(a.size) && a.size > 0 &&
-          new URL(a.browser_download_url).pathname === prefix + release.tag_name + "/" + expected);
-        return matches.length === 1 ? matches[0] : null;
-      };
+      const asset = expected => uniqueReleaseAsset(release, expected);
       const apk = asset(name), hash = asset(name + ".sha256");
       if (!apk || !hash) throw new Error("arquivos ausentes");
       button.href = apk.browser_download_url;

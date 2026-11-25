@@ -72,3 +72,24 @@ test("portal runtime: commercial download fails closed on invalid release metada
   assert.equal(r.button.href,root+"android-access-v11/"+name);
  }
 });
+
+// Regressão: a unicidade é por nome, antes da validação dos metadados.
+test("portal bloqueia APK ou checksum homônimo mesmo quando só um arquivo é válido",async()=>{
+ for(const index of [0,1]){
+  for(const changes of [{state:"new"},{size:0},{browser_download_url:"https://example.invalid/file"}]){
+   const invite=release(11), official=commercialRelease();
+   invite.assets.push({...invite.assets[index],...changes});
+   official.assets.push({...official.assets[index],...changes});
+   const inviteOnly=await render([invite],commercialRelease());
+   assert.equal(inviteOnly.button.href,undefined);
+   assert.equal(inviteOnly.hash.hidden,true);
+   assert.equal(inviteOnly.button.getAttribute("aria-disabled"),"true");
+   assert.ok(inviteOnly.official.href);
+   const officialOnly=await render([release(11)],official);
+   assert.equal(officialOnly.official.href,undefined);
+   assert.equal(officialOnly.officialHash.hidden,true);
+   assert.equal(officialOnly.official.getAttribute("aria-disabled"),"true");
+   assert.ok(officialOnly.button.href);
+  }
+ }
+});
