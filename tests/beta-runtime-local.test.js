@@ -712,6 +712,9 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const scienceBefore=await getStateFor(cookie,start.data.token);
     const scholarship=scienceBefore.academyScience.find(x=>x.key==="scholarship");
     assert.equal(scholarship.available,true);assert.equal(scholarship.level,0);
+    assert.equal(scholarship.resourcesReady,true);
+    assert.deepEqual(scholarship.nextCost,{wood:320,stone:220,iron:15});
+    assert.deepEqual(scholarship.resourceShortfall,{wood:0,stone:0,iron:0});
     assert.equal((await actionFor(cookie,start.data.token,{type:"research",research:"field_logistics",expectedLevel:0})).status,409);
     const study={type:"research",research:"scholarship",expectedLevel:0};
     const scienceRace=await Promise.all([actionFor(cookie,start.data.token,study),actionFor(cookie,start.data.token,study)]);
@@ -719,6 +722,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     await localSql("UPDATE kingdom_queues SET started_at='2000-01-01T00:00:00.000Z',completes_at='2000-01-01T00:01:00.000Z' WHERE kingdom_id="+queueRealm+" AND queue_type='research' AND status='running'");
     const scienceDone=await getStateFor(cookie,start.data.token);
     assert.equal(scienceDone.academyScience.find(x=>x.key==="scholarship").bonusPercent,1.5);
+    assert.deepEqual(scienceDone.academyScience.find(x=>x.key==="scholarship").nextCost,{wood:640,stone:440,iron:30});
     assert.equal((await actionFor(cookie,start.data.token,study)).status,409);
     const lockedImperial=scienceDone.academyScience.find(x=>x.key==="imperial_attack");
     assert.equal(lockedImperial.unlockedMax,0);
