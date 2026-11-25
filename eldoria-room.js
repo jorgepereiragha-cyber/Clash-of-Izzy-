@@ -19,6 +19,10 @@ export class EldoriaRoom {
   constructor(ctx, env) {
     this.ctx = ctx;
     this.env = env;
+    // Exact application heartbeat: keep idle sockets hibernated when supported.
+    if (typeof ctx.setWebSocketAutoResponse === "function" && typeof globalThis.WebSocketRequestResponsePair === "function") {
+      ctx.setWebSocketAutoResponse(new globalThis.WebSocketRequestResponsePair('{"type":"ping"}', '{"type":"pong"}'));
+    }
   }
 
   async issueTicket(request) {
@@ -74,6 +78,11 @@ export class EldoriaRoom {
     const ticket = String(request.headers.get("X-COI-Realtime-Ticket") || "");
     const ticketData = await this.consumeTicket(ticket);
     if (!ticketData) return new Response("Unauthorized", { status: 401 });
+    // Recheck after the asynchronous ticket transaction; another handshake may have filled the room.
+    // No await between this check and acceptWebSocket.
+    if (this.ctx.getWebSockets().length >= MAX_CONNECTIONS) {
+      return new Response("Eldoria realtime capacity reached", { status: 503 });
+    }
 
     const [client, server] = Object.values(new WebSocketPair());
     this.ctx.acceptWebSocket(server);

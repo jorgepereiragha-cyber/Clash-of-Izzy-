@@ -2,6 +2,15 @@
 const TICKET_PATTERN = /^[a-f0-9-]{72}$/i;
 const MAX_RETRIES = 5;
 
+// Equal jitter spreads reconnects while preserving a nonzero delay.
+export function realtimeRetryDelay(attempt, random = Math.random) {
+  const n = Number.isSafeInteger(attempt) ? Math.max(1, Math.min(6, attempt)) : 1;
+  const cap = Math.min(30000, 1000 * (2 ** (n - 1)));
+  const sample = random();
+  const fraction = Number.isFinite(sample) ? Math.max(0, Math.min(1, sample)) : 0.5;
+  return Math.floor(cap / 2 + fraction * cap / 2);
+}
+
 export function readGameToken(storageA, storageB) {
   for (const storage of [storageA, storageB]) {
     try {
@@ -91,13 +100,14 @@ export function startRealtimePresence({
       if (attempts >= MAX_RETRIES) update("Tempo real indisponível; atualize para tentar novamente.");
       return;
     }
+    if (reconnectTimer !== null) return;
     attempts++;
-    const delay = Math.min(30000, 1000 * (2 ** (attempts - 1)));
+    const delay = realtimeRetryDelay(attempts);
     reconnectTimer = setTimeout(() => { reconnectTimer = null; connect(); }, delay);
   }
 
   async function connect() {
-    if (!active || documentRef.hidden || !windowRef.navigator.onLine || socket || pendingTicketController) return;
+    if (!active || documentRef.hidden || !windowRef.navigator.onLine || socket || pendingTicketController || reconnectTimer !== null) return;
     if (windowRef.location.protocol !== "https:") {
       update("Tempo real requer HTTPS.");
       return;

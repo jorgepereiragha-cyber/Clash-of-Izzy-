@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { readGameToken, readRealtimePacket, requestRealtimeTicket, startRealtimePresence } from "../scripts/eldoria-realtime-client.js";
+import { readGameToken, readRealtimePacket, requestRealtimeTicket, startRealtimePresence, realtimeRetryDelay } from "../scripts/eldoria-realtime-client.js";
 
 test("realtime client reads only existing game session storage", () => {
   const fail = { getItem() { throw new Error("storage blocked"); } };
@@ -153,4 +153,14 @@ test("bfcache pageshow restores WebSocket presence and shutdown removes listener
     assert.equal(client.sockets.length, 2, "restored page must reconnect");
   } finally { client.stop(); }
   assert.equal(client.windowRef.handlers.has("pageshow"), false, "cleanup detaches pageshow listener");
+});
+
+
+test("reconnect delay uses bounded exponential equal jitter", () => {
+  for (const [attempt, cap] of [[1,1000],[2,2000],[3,4000],[4,8000],[5,16000],[6,30000],[99,30000]]) {
+    assert.equal(realtimeRetryDelay(attempt,()=>0),cap/2);
+    assert.equal(realtimeRetryDelay(attempt,()=>1),cap);
+    assert.ok(realtimeRetryDelay(attempt,()=>0.4)<realtimeRetryDelay(attempt,()=>0.8));
+  }
+  assert.equal(realtimeRetryDelay(NaN,()=>NaN),750);
 });
