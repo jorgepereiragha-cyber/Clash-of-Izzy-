@@ -32,7 +32,7 @@ import { handlePlayerAccountRoute } from "./player-accounts.js";
 import { handleMercadoPagoRoute } from "./mercadopago-orders.js";
 import { normalizePixEndToEndId, preparePixApproval } from "./pix-reconciliation.js";
 import { PANTHEON_SKIN_ITEMS, buildSkinSetGallery } from "./skin-sets.js";
-import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "./dragon-catalog.js";
+import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView, dragonUpgradeCost } from "./dragon-catalog.js";
 import { MASTER_PACK_NAME, MASTER_PACK_BONUSES, masterGrantStatements } from "./master-pack.js";
 import { isDailyPackage, DAILY_PACKAGE_COOLDOWN_HOURS } from "./daily-package-offers.js";
 import { getLevelPackByName, publicLevelPack, levelPacksEnabledForPlayer, levelPackPriceApproved } from "./level-packs.js";
@@ -1455,7 +1455,7 @@ async function gameAction(env,playerId,body){
       if(body.expectedLevel!==level||body.dragonKey!==dragonKey)
         return json({error:"Dragão ou nível desatualizado. Sincronize a coleção."},409);
     }
-    const cost={food:250*level,wood:150*level,stone:100*level,iron:25*level};
+    const cost=dragonUpgradeCost(level);
     // Same D1 transaction: compare identity and level, debit, evolve and record.
     const result=await env.DB.batch([
       env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,stone=stone-?,iron=iron-? WHERE id=? AND food>=? AND wood>=? AND stone>=? AND iron>=? AND EXISTS(SELECT 1 FROM dragons d JOIN kingdom_dragons kd ON kd.kingdom_id=d.kingdom_id AND kd.dragon_key=d.dragon_key AND kd.level=d.level AND kd.experience=d.experience AND kd.bond=d.bond WHERE d.kingdom_id=? AND d.level=? AND d.dragon_key=?)").bind(cost.food,cost.wood,cost.stone,cost.iron,k.id,cost.food,cost.wood,cost.stone,cost.iron,k.id,level,dragonKey),

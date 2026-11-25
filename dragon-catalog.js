@@ -153,15 +153,29 @@ export function getDragonCombatBonuses(row={}){
    defensePercent:Math.min(DRAGON_BONUS_CAP,Number((dragon.defense*factor+(skill?.defensePercent||0)).toFixed(2)))
  };
 }
+// Same cost policy for the authoritative debit and the read-only UI preview.
+export function dragonUpgradeCost(level){
+ if(!Number.isSafeInteger(level)||level<1||level>=100)return null;
+ return {food:250*level,wood:150*level,stone:100*level,iron:25*level};
+}
+export function getDragonUpgradePreview(row={}){
+ const key=row?.dragon_key;
+ if(!Object.hasOwn(DRAGON_BY_KEY,key))return null;
+ const level=validProgress(row.level),bond=validProgress(row.bond),cost=dragonUpgradeCost(level);
+ if(!cost)return null;
+ const next={dragon_key:key,level:level+1,bond:Math.min(100,bond+2)};
+ return {cost,level:next.level,bond:next.bond,...getDragonCombatBonuses(next),elementalSkill:getDragonElementalSkill(next)};
+}
 export function getDragonCollectionView(ownedKeys=[],activeKey="ember_wyrm",level=1,bond=1,progressRows=[]){
  const owned=new Set(ownedKeys.map(String)),progress=new Map(progressRows.map(row=>[row.dragon_key,row]));
  return DRAGON_CATALOG.map(dragon=>{
    const equipped=owned.has(dragon.key)&&dragon.key===activeKey;
    const saved=owned.has(dragon.key)?progress.get(dragon.key):null;
-   const individualLevel=Math.max(1,Math.min(100,Number(equipped?level:saved?.level)||1));
-   const individualBond=Math.max(1,Math.min(100,Number(equipped?bond:saved?.bond)||1));
+   const individualLevel=validProgress(equipped?level:saved?.level);
+   const individualBond=validProgress(equipped?bond:saved?.bond);
    const individual={dragon_key:dragon.key,level:individualLevel,bond:individualBond};
    return {...dragon,owned:owned.has(dragon.key),equipped,level:individualLevel,bond:individualBond,
-     elementalSkill:getDragonElementalSkill(individual),...getDragonCombatBonuses(individual)};
+     elementalSkill:getDragonElementalSkill(individual),...getDragonCombatBonuses(individual),
+     nextUpgrade:equipped?getDragonUpgradePreview(individual):null};
  });
 }

@@ -657,16 +657,17 @@ function renderDragonCollection(){
   card.append(action);
   if(dragon.owned&&dragon.equipped){
    const level=Math.max(1,Math.min(100,Math.floor(Number(state?.dragon?.level)||1)));
-   const costs={food:250*level,wood:150*level,stone:100*level,iron:25*level};
+   const next=dragon.nextUpgrade;
+   const costs=next?.cost;
    const resources=state?.kingdom||{};
-   const enough=Object.entries(costs).every(([key,cost])=>Number(resources[key]||0)>=cost);
+   const enough=Boolean(costs)&&["food","wood","stone","iron"].every(key=>Number.isSafeInteger(costs[key])&&costs[key]>0&&Number(resources[key]||0)>=costs[key]);
    const upgrade=document.createElement("button");upgrade.type="button";
    upgrade.className="secondary";
    upgrade.dataset.dragonUpgrade="true";
-   upgrade.textContent=level>=100?"✓ Dragão no nível máximo":"Evoluir dragão · +1 nível, +2 vínculo";
-   upgrade.disabled=busy||level>=100||!enough;
+   upgrade.textContent=level>=100?"✓ Dragão no nível máximo":!next?"Sincronize a coleção":"Evoluir dragão · nível "+next.level+" · vínculo "+next.bond;
+   upgrade.disabled=busy||level>=100||!enough||next?.level!==level+1;
    const costLine=document.createElement("small");costLine.className="muted";
-   costLine.textContent=level>=100?"Vínculo máximo: 100.":("Custo: "+fmt(costs.food)+" comida · "+fmt(costs.wood)+" madeira · "+fmt(costs.stone)+" pedra · "+fmt(costs.iron)+" ferro. Vínculo limitado a 100.");
+   costLine.textContent=level>=100?"Nível máximo atingido. Vínculo atual: "+fmt(dragon.bond)+"/100.":!costs?"Dados da evolução indisponíveis. Atualize o reino.":("Custo: "+fmt(costs.food)+" comida · "+fmt(costs.wood)+" madeira · "+fmt(costs.stone)+" pedra · "+fmt(costs.iron)+" ferro. Próximos bônus totais: ataque +"+Number(next.attackPercent).toFixed(2)+"% · defesa +"+Number(next.defensePercent).toFixed(2)+"%.");
    if(level<100)upgrade.addEventListener("click",()=>runKingdomPanelAction({type:"dragon_upgrade",dragonKey:dragon.key,expectedLevel:level},"Dragão evoluído. Nível e vínculo sincronizados."));
    card.append(costLine,upgrade);
   }
