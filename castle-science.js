@@ -8,6 +8,10 @@ export const SCIENCE_CATALOG=Object.freeze({
  conscription:def("Disciplina de recrutas","Militar","Redução do tempo de treinamento",1.5,2,["military",1],{wood:400,stone:240,iron:40}),
  field_logistics:def("Estradas de campanha","Logística","Velocidade de marcha",1,3,["military",2],{wood:420,stone:300,iron:50}),
  military_medicine:def("Medicina de campanha","Hospital","Capacidade hospitalar",2,2,["defense",1],{wood:340,stone:260,iron:25}),
+ forestry:def("Silvicultura","Recursos","Produção de madeira",1,3,["economy",3],{wood:260,stone:220,iron:20}),
+ masonry:def("Cantaria avançada","Recursos","Produção de pedra",1,3,["economy",3],{wood:300,stone:240,iron:20}),
+ metallurgy:def("Metalurgia de Eldoria","Recursos","Produção de ferro",1,5,["economy",5],{wood:450,stone:350,iron:60}),
+ fortification:def("Engenharia de fortificações","Defesa urbana","Poder defensivo das estruturas",1,5,["defense",3],{wood:480,stone:600,iron:80}),
  imperial_attack:imperial("Ofensiva imperial","Ataque das tropas",["military",10],{wood:900,stone:600,iron:180}),
  imperial_defense:imperial("Bastião imperial","Defesa das tropas",["defense",10],{wood:650,stone:1000,iron:160}),
  imperial_health:imperial("Vitalidade imperial","Vida das tropas",["defense",10],{wood:800,stone:800,iron:150})
@@ -50,4 +54,15 @@ export function scienceView(rows=[],academy=0,kingdom={}){
   const resourcesReady=resourceShortfall===null?null:Object.values(resourceShortfall).every(n=>n===0);
   return {key,...d,level,unlockedMax,nextVip,requiredAcademy,academyLevel,requiredKey,requiredLevel,prerequisiteLevel,prerequisiteMet,academyMet,lockedReason,available:lockedReason===null,bonusPercent:sciencePercent(key,Math.min(level,unlockedMax)),nextBonusPercent,nextCost,resourceShortfall,resourcesReady};
  });
+}
+
+// Individual resource bonuses are additive to economy, not multiplied into it.
+export function resourceScienceMultipliers(rows=[]){
+ const levels=new Map(rows.map(r=>[r.research_key,r.level]));
+ const economy=scienceLevel(levels.get("economy"),30);
+ const keys={wood:"forestry",stone:"masonry",iron:"metallurgy"};
+ return Object.fromEntries(["food","wood","stone","iron","gold"].map(resource=>[resource,1+(economy+sciencePercent(keys[resource],levels.get(keys[resource])))/100]));
+}
+export function structuralDefenseScience(base,level){
+ const power=Number(base);return Math.floor((Number.isFinite(power)?Math.max(0,power):0)*(100+sciencePercent("fortification",level))/100);
 }
