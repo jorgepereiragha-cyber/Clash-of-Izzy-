@@ -70,8 +70,8 @@ android {
         beta {
             initWith release
             applicationIdSuffix '.beta'
-            versionNameSuffix '-beta'
-            manifestPlaceholders = [appLabel: 'Clash of Izzy Beta']
+            versionNameSuffix '-acesso'
+            manifestPlaceholders = [appLabel: 'Clash of Izzy']
             buildConfigField 'boolean', 'BETA', 'true'
             // Unsigned when beta credentials are absent: never fall back to release signing.
             signingConfig betaSigningAvailable ? signingConfigs.beta : null

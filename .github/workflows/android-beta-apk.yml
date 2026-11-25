@@ -7,8 +7,16 @@ on:
         type: boolean
         required: true
         default: false
+      publish_invite_installer:
+        description: "Publicar instalador por convite após validação do servidor e assinatura"
+        type: boolean
+        required: true
+        default: false
 permissions:
   contents: read
+concurrency:
+  group: clash-of-izzy-android-access
+  cancel-in-progress: false
 jobs:
   apk_beta:
     if: ${{ github.ref == 'refs/heads/beta' && inputs.confirm_beta_build == true }}
@@ -20,6 +28,8 @@ jobs:
         uses: actions/checkout@v4
       - name: Conferir contrato beta
         run: node --test tests/beta-isolation.test.js
+      - name: Validar servidor remoto e acesso por convite
+        run: node scripts/check-android-access-server.mjs
       - name: Java 17
         uses: actions/setup-java@v4
         with:
@@ -59,6 +69,8 @@ jobs:
       - name: Compilar variante beta assinada
         working-directory: android-sideload
         env:
+          ANDROID_VERSION_CODE: ${{ github.run_number }}
+          ANDROID_VERSION_NAME: '1.0.${{ github.run_number }}'
           ANDROID_BETA_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_BETA_STORE_PASSWORD }}
           ANDROID_BETA_KEY_ALIAS: ${{ secrets.ANDROID_BETA_KEY_ALIAS }}
           ANDROID_BETA_KEY_PASSWORD: ${{ secrets.ANDROID_BETA_KEY_PASSWORD }}
@@ -94,3 +106,34 @@ jobs:
       - name: Eliminar keystore temporaria
         if: always()
         run: rm -f "$RUNNER_TEMP/izzy-beta.jks"
+
+  publicar_acesso:
+    needs: apk_beta
+    if: ${{ github.ref == 'refs/heads/beta' && inputs.confirm_beta_build == true && inputs.publish_invite_installer == true }}
+    runs-on: ubuntu-latest
+    environment: beta-signing
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: clash-of-izzy-beta-apk-assinado
+          path: verified-apk
+      - name: Verificar servidor e integridade novamente
+        run: |
+          node scripts/check-android-access-server.mjs
+          cd verified-apk
+          sha256sum -c app-beta.apk.sha256
+          mv app-beta.apk clash-of-izzy-access.apk
+          sha256sum clash-of-izzy-access.apk > clash-of-izzy-access.apk.sha256
+      - name: Publicar versão por convite sem substituir release comercial
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: android-access-v${{ github.run_number }}
+        run: |
+          set -euo pipefail
+          gh release create "$TAG" --target "$GITHUB_SHA" --title "Clash of Izzy — acesso por convite" --notes "Instalador Android assinado para acesso por convite. Não é a versão comercial. Verifique SHA-256." --prerelease --draft --latest=false verified-apk/clash-of-izzy-access.apk verified-apk/clash-of-izzy-access.apk.sha256
+          gh release edit "$TAG" --draft=false --prerelease --latest=false

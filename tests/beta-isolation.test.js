@@ -68,7 +68,7 @@ test("beta invitation page reports backend readiness and distinguishes unavailab
   assert.match(html, /res\.status===503/);
   assert.match(html, /res\.status===429/);
   assert.match(html, /res\.status===403/);
-  assert.match(html, /Servidor beta temporariamente indisponível ou banco incompleto/);
+  assert.match(html, /Servidor temporariamente indisponível ou banco incompleto/);
 });
 
 test("the beta config never binds either existing D1 and intercepts all asset requests", () => {
