@@ -114,3 +114,6 @@ hospital-policy.js
 equipment-enhancement.js
 march-scheduler-policy.js
 live-payment-gate.js
+
+# Backend-only administrative diamond credit ledger.
+admin-gem-grants.js

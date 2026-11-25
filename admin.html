@@ -206,10 +206,40 @@ function renderPlayers(players){
   name.textContent=p.name||"Jogador";meta.textContent="ID: "+p.player_id+" · Gemas: "+Number(p.gems||0).toLocaleString("pt-BR")+" · Cadastro: "+(p.created_at||"—");
   info.append(name,meta);
   const actions=document.createElement("div");actions.className="actions";
-  const amount=document.createElement("input");amount.type="number";amount.min="1";amount.max="100000000";amount.step="1";amount.placeholder="Gemas";
+  const amount=document.createElement("input");amount.type="number";amount.min="1";amount.max="1000000";amount.step="1";amount.placeholder="Diamantes (máx. 1 milhão)";
+  const reason=document.createElement("input");reason.type="text";reason.maxLength=200;reason.placeholder="Motivo auditável (8–200 caracteres)";
+  reason.setAttribute("aria-label","Motivo do crédito administrativo");
   const grant=document.createElement("button");grant.type="button";grant.textContent="Creditar";
-  grant.addEventListener("click",async()=>{const value=Number(amount.value);if(!Number.isSafeInteger(value)||value<1||value>100000000){showNotice("Informe uma quantidade válida de gemas.");return}grant.disabled=true;try{const result=await api("/admin/gems",{playerId:p.player_id,amount:value});showNotice("Crédito realizado. Saldo de "+result.player.gems+" gemas.");await searchPlayers($("query").value)}catch(e){showNotice(e.message)}finally{grant.disabled=false}});
-  actions.append(amount,grant);card.append(info,actions);root.append(card);
+  const pendingKey="coi_admin_gem_pending:"+p.player_id;
+  const getPending=()=>{try{return JSON.parse(sessionStorage.getItem(pendingKey)||"null")}catch{return null}};
+  const pending=getPending();
+  if(pending&&Number.isSafeInteger(pending.amount)&&typeof pending.reason==="string"){
+    amount.value=String(pending.amount);reason.value=pending.reason;
+  }
+  grant.addEventListener("click",async()=>{
+    const value=Number(amount.value),why=reason.value.trim();
+    if(!Number.isSafeInteger(value)||value<1||value>1000000||why.length<8||why.length>200){
+      showNotice("Informe de 1 a 1.000.000 diamantes e motivo com 8–200 caracteres.");return;
+    }
+    let previous=getPending();
+    if(previous&&(previous.amount!==value||previous.reason!==why)){
+      showNotice("Há um crédito com resultado incerto. Repita os dados originais para consultar a mesma chave antes de iniciar outro.");return;
+    }
+    if(!confirm("Confirma crédito de "+value.toLocaleString("pt-BR")+" diamantes ao jogador "+p.player_id+"? Motivo: "+why))return;
+    const requestKey=previous?.request_key||("admin-"+crypto.randomUUID().replaceAll("-",""));
+    try{sessionStorage.setItem(pendingKey,JSON.stringify({amount:value,reason:why,request_key:requestKey}))}catch{
+      showNotice("Armazenamento da chave indisponível: crédito bloqueado para evitar duplicidade.");return;
+    }
+    grant.disabled=true;
+    try{
+      const result=await api("/admin/gems",{playerId:p.player_id,amount:value,reason:why,request_key:requestKey});
+      sessionStorage.removeItem(pendingKey);
+      showNotice((result.reused?"Crédito já processado. ":"Crédito confirmado. ")+"Saldo: "+Number(result.player.gems).toLocaleString("pt-BR")+" diamantes.");
+      await searchPlayers($("query").value);
+    }catch(e){showNotice("Crédito não confirmado; tente novamente com a mesma chave. "+e.message)}
+    finally{grant.disabled=false}
+  });
+  actions.append(amount,reason,grant);card.append(info,actions);root.append(card);
  }
 }
 async function searchPlayers(query){showNotice("Consultando o reino…");const data=await api("/admin/player-search",{query});renderPlayers(data.players|| (data.player?[data.player]:[]));showNotice((data.players||[]).length+" resultado(s).")}

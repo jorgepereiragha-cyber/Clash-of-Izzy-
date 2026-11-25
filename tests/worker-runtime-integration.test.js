@@ -688,7 +688,16 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
     await t.test("painel Master, catálogo e pedidos de compra", async () => {
       expectStatus(await admin("/api/admin/player-search", { query: playerA }), 200, "busca administrativa de jogador");
-      expectStatus(await admin("/api/admin/gems", { playerId: playerA, amount: 10 }), 200, "crédito administrativo de gemas");
+      const credit={playerId:playerA,amount:10,reason:"Crédito de integração auditado",request_key:"admin-grant-integration-0001"};
+      const beforeCredit=await admin("/api/admin/player-search",{query:playerA});
+      const credits=await Promise.all([admin("/api/admin/gems",credit),admin("/api/admin/gems",credit)]);
+      for(const result of credits)expectStatus(result,200,"crédito administrativo idempotente");
+      assert.equal(credits.filter(result=>result.data.reused===false).length,1);
+      assert.equal(credits.filter(result=>result.data.reused===true).length,1);
+      const afterCredit=await admin("/api/admin/player-search",{query:playerA});
+      assert.equal(Number(afterCredit.data.player.gems),Number(beforeCredit.data.player.gems)+10);
+      expectStatus(await admin("/api/admin/gems",{...credit,amount:11}),409,"chave de crédito não pode mudar quantidade");
+      expectStatus(await admin("/api/admin/gems",{playerId:playerA,amount:10}),400,"crédito sem chave e motivo bloqueado");
       expectStatus(await admin("/api/admin/gems", { playerId: playerA, amount: 0 }), 400, "bloqueio de crédito inválido");
 
       expectStatus(await admin("/api/admin/vip-packages", {
