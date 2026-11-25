@@ -509,6 +509,70 @@ if (host && "WebGLRenderingContext" in window) {
       for(const x of [-.40,.40])box(group,.13,.34,.035,bannerMaterial,x,.99,.65);
     }
   }
+  // Resource plots have their own silhouette instead of the common civic house.
+  // Local decor stays inside the 2x2 plot (1.06 scene units), never changing D1.
+  const ruralTypes=new Set(["farm","quarry","lumber_mill","iron_mine"]);
+  function addRuralBuilding(group,type,level,wall,roof){
+    const high=qualityProfile?.tier==="high";
+    const low=qualityProfile?.tier==="low";
+    const stage=level>=20?3:level>=10?2:1;
+    group.userData.coIArchitecture="eldoria-rural-v1";
+    group.userData.coIArchitectureTier=stage;
+    box(group,1.02,.08,1.02,mats.darkStone,0,.04,0);
+    if(type==="farm"){
+      const earth=material("#725033"),grain=material("#d4ad52");
+      box(group,.98,.05,.98,earth,0,.10,0);
+      // Barn and foreground crop field are separate readable volumes.
+      box(group,.78,.46+.06*stage,.38,wall,0,.35+.03*stage,-.27);
+      const barnRoof=new THREE.Mesh(new THREE.ConeGeometry(1,.3,4),roof);
+      barnRoof.rotation.y=Math.PI/4;barnRoof.scale.set(.86/Math.SQRT2,1,.48/Math.SQRT2);
+      barnRoof.position.set(0,.76+.06*stage,-.27);group.add(barnRoof);
+      box(group,.21,.32,.035,mats.wood,0,.28,-.06);
+      for(const x of [-.32,0,.32])box(group,.20,.035,.49,earth,x,.145,.23);
+      const rows=low?2:high?5:3;
+      const stems=new THREE.InstancedMesh(new THREE.CylinderGeometry(.014,.022,.15,5),grain,rows*3);
+      const dummy=new THREE.Object3D();
+      let i=0;
+      for(const x of [-.32,0,.32])for(let j=0;j<rows;j++){
+        dummy.position.set(x,.23,.02+j*.42/(rows-1));
+        dummy.scale.setScalar(1);dummy.updateMatrix();stems.setMatrixAt(i++,dummy.matrix);
+      }
+      stems.instanceMatrix.needsUpdate=true;stems.computeBoundingSphere();group.add(stems);
+    }else if(type==="lumber_mill"){
+      // Open timber shed with stacked logs, not a closed stone house.
+      for(const x of [-.42,.42])for(const z of [-.42,-.02])
+        box(group,.075,.62,.075,mats.wood,x,.39,z);
+      box(group,.98,.10,.54,roof,0,.76,-.22);
+      box(group,.80,.09,.40,mats.wood,0,.36,-.22);
+      for(let i=0;i<3+stage;i++){
+        const log=addCylinder(group,.055,.055,.72,mats.wood,0,.16+Math.floor(i/3)*.12,.07+(i%3)*.14,7);
+        log.rotation.z=Math.PI/2;
+      }
+      const saw=new THREE.Mesh(new THREE.TorusGeometry(.14,.025,5,12),mats.gold);
+      saw.position.set(.22,.51,-.02);group.add(saw);
+    }else{
+      // Excavated working area, distinct ore colors and a mine entrance.
+      const oreMat=type==="iron_mine"?material("#788c9d",.38):mats.stone;
+      box(group,.96,.09,.96,mats.roadEdge,0,.11,0);
+      if(type==="iron_mine"){
+        box(group,.80,.64+.06*stage,.48,mats.darkStone,0,.43,-.24);
+        box(group,.37,.46,.035,mats.wood,0,.36,.012);
+        box(group,.26,.37,.04,material("#242823"),0,.32,.035);
+        for(const x of [-.21,.21])box(group,.07,.51,.08,mats.wood,x,.36,.045);
+        box(group,.51,.08,.09,mats.wood,0,.64,.045);
+        for(const x of [-.12,.12])box(group,.032,.03,.39,mats.gold,x,.18,.30);
+      }else{
+        box(group,.86,.30+.05*stage,.44,wall,0,.28,-.26);
+        box(group,.65,.17,.32,mats.stone,0,.51+.05*stage,-.28);
+      }
+      for(let i=0;i<(low?3:5);i++){
+        const size=.105+(i%3)*.025;
+        const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(size,0),oreMat);
+        rock.position.set(-.32+(i%3)*.32,.16+size*.55,.22+Math.floor(i/3)*.22);
+        rock.rotation.set(.2,i*.7,.3);group.add(rock);
+      }
+    }
+  }
   function createBuilding(type, level, x, z, castleSkinId = 0) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
@@ -525,6 +589,10 @@ if (host && "WebGLRenderingContext" in window) {
     const safeLevel=Math.min(30,Math.max(1,Math.floor(Number(level)||1)));
     if(type==="castle"){
       addEldoriaCastle(group,safeLevel,castleSkin,wall,roof,castleStone,castleAccent);
+      return group;
+    }
+    if(ruralTypes.has(type)){
+      addRuralBuilding(group,type,safeLevel,wall,roof);
       return group;
     }
     const [bodyWidth,baseHeight,bodyDepth,roofHeight]=buildingProfiles[type]||buildingProfiles.warehouse;
@@ -564,15 +632,6 @@ if (host && "WebGLRenderingContext" in window) {
       flag.rotation.y = Math.PI / 2;
       group.add(flag);
       box(group, .48, .12, .48, mats.gold, 0, height + .82, 0);
-    } else if (type === "farm") {
-      // Crop beds with raised furrows and golden grain heads.
-      for (let i = -1; i <= 1; i++) {
-        const row = box(group, .17, .045, .96, material("#9A682D"), i * .42, .06, -.82);
-        row.rotation.y = .08;
-        for (let j = 0; j < 3; j++) {
-          addCylinder(group, .018, .025, .22, material("#D6BD65"), i * .42, .2, -.48 - j * .22, 5);
-        }
-      }
     } else if (type === "barracks") {
       // Weapon rack and practice dummies make the military function obvious.
       box(group, .9, .08, .12, mats.wood, 0, .48, -.7);
@@ -598,32 +657,6 @@ if (host && "WebGLRenderingContext" in window) {
         stripe.rotation.x = -.12;
         group.add(stripe);
       }
-    } else if (type === "quarry") {
-      for (const [sx, sz, scale] of [[-.48, -.72, .22], [0, -.78, .3], [.48, -.7, .2]]) {
-        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(scale, 0), mats.darkStone);
-        rock.position.set(sx, scale * .72, sz);
-        rock.rotation.set(.2, sx * 2, .35);
-        rock.castShadow = true;
-        group.add(rock);
-      }
-      addCylinder(group, .035, .035, .7, mats.gold, .55, .48, .72, 6);
-    } else if (type === "lumber_mill") {
-      for (let i = 0; i < 4; i++) {
-        const log = addCylinder(group, .11, .11, .82, mats.wood, -.52 + i * .28, .2, -.76, 7);
-        log.rotation.z = Math.PI / 2;
-      }
-      box(group, .12, .82, .12, mats.darkStone, .58, .48, .65);
-      const saw = new THREE.Mesh(new THREE.TorusGeometry(.22, .045, 6, 12), mats.gold);
-      saw.position.set(.58, .76, .73);
-      group.add(saw);
-    } else if (type === "iron_mine") {
-      for (const [sx, sz, scale] of [[-.4, -.72, .2], [0, -.8, .27], [.42, -.72, .18]]) {
-        const ore = new THREE.Mesh(new THREE.IcosahedronGeometry(scale, 0), material("#8798A5", .32));
-        ore.position.set(sx, scale * .72, sz);
-        ore.castShadow = true;
-        group.add(ore);
-      }
-      box(group, .62, .08, .12, mats.wood, 0, .32, .75);
     } else if (type === "academy") {
       addCylinder(group, .26, .32, 1.05, mats.stone, .52, height + .48, -.25, 8);
       const spire = new THREE.Mesh(new THREE.ConeGeometry(.34, .68, 6), mats.roof);
@@ -819,6 +852,7 @@ if (host && "WebGLRenderingContext" in window) {
       scene.remove(item);
       if (item.userData.coIProcedural) item.traverse(node => {
         if (!node.isMesh) return;
+        if (node.isInstancedMesh) node.dispose();
         node.geometry?.dispose();
         const materials = Array.isArray(node.material) ? node.material : [node.material];
         materials.forEach(mat => { if (mat && !sharedMaterials.has(mat)) mat.dispose(); });
