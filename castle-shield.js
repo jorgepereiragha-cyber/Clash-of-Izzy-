@@ -3,7 +3,7 @@
 const DURATION=Object.freeze({shield_8h:28800,shield_3d:259200});
 export const castleShieldsEnabled=env=>env?.ENVIRONMENT==="beta"&&env?.CASTLE_PVP_ENABLED==="true"&&env?.CASTLE_SHIELDS_ENABLED==="true";
 export function shieldActive(until,now=Date.now()){
- if(until==null||until==="")return false;
+ if(until==null)return false;
  const raw=String(until),parsed=Date.parse(/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d$/.test(raw)?raw.replace(" ","T")+"Z":raw);
  return !Number.isFinite(parsed)||parsed>now; // malformed stored dates fail closed
 }
@@ -13,7 +13,8 @@ export async function castleShieldState(env,kingdomId){
 }
 export async function activateCastleShield(env,kingdomId,body){
  if(!castleShieldsEnabled(env))return {ok:false,status:409,error:"Proteção PvP ainda indisponível; nenhum item consumido."};
- const item=body?.itemId,requestId=body?.requestId;
+ const item=body?.itemId,rawRequestId=body?.requestId;
+ const requestId=typeof rawRequestId==="string"?rawRequestId.toLowerCase():null;
  if(!Number.isSafeInteger(kingdomId)||kingdomId<1||typeof item!=="string"||!Object.hasOwn(DURATION,item)||typeof requestId!=="string"||!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId))return {ok:false,status:400,error:"Escudo ou identificador inválido."};
  const key="kingdom_castle_"+kingdomId;
  const event=JSON.stringify({requestId,itemId:item});
