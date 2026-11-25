@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {DRAGON_CATALOG,DRAGON_BY_KEY,MASTER_DRAGON_KEYS,getDragonCombatBonuses,getDragonCollectionView,getDragonElementalSkill,DRAGON_ELEMENTAL_SKILLS} from "../dragon-catalog.js";
+import {DRAGON_CATALOG,DRAGON_BY_KEY,MASTER_DRAGON_KEYS,getDragonCombatBonuses,getDragonCollectionView,getDragonElementalSkill,DRAGON_ELEMENTAL_SKILLS,dragonUpgradeCost,getDragonUpgradePreview} from "../dragon-catalog.js";
 import {MASTER_PACK_NAME,MASTER_PACK_GEMS,MASTER_PACK_BONUSES,masterGrantStatements} from "../master-pack.js";
 import {readFile} from "node:fs/promises";
 test("9 dragões distintos: três de cada cor, somente dourados Master",()=>{
@@ -117,4 +117,32 @@ test("nine elemental passives unlock by both individual level and bond, without 
  const view=getDragonCollectionView(["ember_wyrm","mist_talon"],"mist_talon",50,50,[{dragon_key:"ember_wyrm",level:1,bond:1}]);
  assert.equal(view.find(x=>x.key==="ember_wyrm").elementalSkill.rank,0);
  assert.equal(view.find(x=>x.key==="mist_talon").elementalSkill.rank,2);
+});
+
+
+test("preview de evolução usa a mesma economia e fórmulas de combate para os nove dragões",()=>{
+ for(const d of DRAGON_CATALOG){
+  for(const level of [1,19,49,79,99]){
+   const row={dragon_key:d.key,level,bond:Math.min(100,level+1)};
+   const next=getDragonUpgradePreview(row);
+   assert.deepEqual(next.cost,{food:250*level,wood:150*level,stone:100*level,iron:25*level});
+   assert.equal(next.level,level+1);assert.equal(next.bond,Math.min(100,row.bond+2));
+   const expected={dragon_key:d.key,level:next.level,bond:next.bond};
+   assert.deepEqual({attackPercent:next.attackPercent,defensePercent:next.defensePercent},getDragonCombatBonuses(expected));
+   assert.deepEqual(next.elementalSkill,getDragonElementalSkill(expected));
+   assert.ok(next.attackPercent<=5.5&&next.defensePercent<=5.5);
+  }
+  assert.equal(getDragonUpgradePreview({dragon_key:d.key,level:100,bond:100}),null);
+ }
+ for(const invalid of [0,100,1.5,Infinity,NaN,"2"])assert.equal(dragonUpgradeCost(invalid),null);
+ const view=getDragonCollectionView(["ember_wyrm","mist_talon"],"mist_talon",19.9,Infinity,[{dragon_key:"ember_wyrm",level:50,bond:50}]);
+ assert.equal(view.find(d=>d.key==="ember_wyrm").nextUpgrade,null);
+ const active=view.find(d=>d.equipped);assert.equal(active.level,19);assert.equal(active.bond,1);assert.equal(active.nextUpgrade.level,20);
+ assert.equal(view.filter(d=>d.nextUpgrade).length,1);
+});
+test("a interface consome o custo autoritativo e o Worker reutiliza a mesma regra",async()=>{
+ const [worker,page]=await Promise.all(["../worker.js","../kingdom.html"].map(p=>readFile(new URL(p,import.meta.url),"utf8")));
+ assert.match(worker,/const cost=dragonUpgradeCost\(level\)/);
+ assert.match(page,/const next=dragon\.nextUpgrade/);
+ assert.doesNotMatch(page,/const costs=\{food:250\*level/);
 });
