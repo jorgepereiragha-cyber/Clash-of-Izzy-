@@ -110,3 +110,60 @@ test("mixed formation science sensitivity with paired seeds and near-cap equipme
  // Report matched cases, not a prediction of player win rate.
  t.diagnostic("science-sensitivity: "+JSON.stringify({simulations,rows:[...stats.values()]}));
 });
+
+
+test("experimental defense and health are class-isolated and preserve existing caps",()=>{
+ const army=[{unit_type:"militia",tier:1,quantity:100}];
+ const levels={science_infantry:10};
+ const options={army,rulesVersion:2,castleLevel:10,defenderLevel:15,criticalSeed:17,roll:1};
+ const base=simulateBattle(options);
+ const defense=simulateBattle({...options,experimentalDefenseScienceLevels:levels});
+ const health=simulateBattle({...options,experimentalHealthScienceLevels:levels});
+ assert.equal(defense.attackerPower,base.attackerPower);
+ assert.equal(health.attackerPower,base.attackerPower);
+ const hit=x=>x.log.find(r=>r.side==="defender")?.damage;
+ assert.ok(hit(base)>0);
+ assert.ok(hit(defense)<hit(base));
+ for(const value of [defense,health])assert.equal(value.survivors+Object.values(value.losses).reduce((a,b)=>a+b,0),100);
+ const combined={experimentalDefenseScienceLevels:levels,experimentalHealthScienceLevels:levels};
+ assert.deepEqual(simulateBattle({...options,army:[{unit_type:"archer",tier:1,quantity:100}],...combined}),simulateBattle({...options,army:[{unit_type:"archer",tier:1,quantity:100}]}));
+ assert.deepEqual(simulateBattle({...options,rulesVersion:1,...combined}),simulateBattle({...options,rulesVersion:1}));
+ const capped={...options,defenseBonusPercent:30,equipmentHealthBonusPercent:30};
+ assert.deepEqual(simulateBattle({...capped,...combined}),simulateBattle(capped));
+ const invalid={science_infantry:11};
+ assert.deepEqual(simulateBattle({...options,experimentalDefenseScienceLevels:invalid,experimentalHealthScienceLevels:invalid}),base);
+});
+test("small and contested armies reveal wins and losses across independent science attributes",t=>{
+ const units=["spearman","archer","knight","catapult"];
+ const keys=Object.values(SPECIALIZED_SCIENCE_KEYS);
+ const all=Object.fromEntries(keys.map(k=>[k,10]));
+ const profiles=[
+  ["control",{}],
+  ["attack",{experimentalScienceLevels:all}],
+  ["defense",{experimentalDefenseScienceLevels:all}],
+  ["health",{experimentalHealthScienceLevels:all}],
+  ["combined",{experimentalScienceLevels:all,experimentalDefenseScienceLevels:all,experimentalHealthScienceLevels:all}]
+ ];
+ const formations=[[1,1,1,1],[7,1,1,1],[1,7,1,1],[1,1,7,1],[1,1,1,7]];
+ const stats=Object.fromEntries(profiles.map(([name])=>[name,{cases:0,wins:0,survivors:0,changedWins:0,changedLosses:0}]));
+ let simulations=0;
+ for(const mix of formations)for(const scale of [1,2,4,8,16,32,64])for(const defenderLevel of [15,30])for(const criticalSeed of [1,17,113,2026]){
+  const army=units.map((unit_type,i)=>({unit_type,tier:1,quantity:mix[i]*scale}));
+  const quantity=army.reduce((n,row)=>n+row.quantity,0);
+  const opts={army,rulesVersion:2,castleLevel:20,defenderLevel,criticalSeed,criticalChancePercent:10,roll:1};
+  let base;
+  for(const [name,profile] of profiles){
+   const result=simulateBattle({...opts,...profile});simulations++;
+   if(name==="control")base=result;
+   const row=stats[name];row.cases++;row.wins+=Number(result.won);row.survivors+=result.survivors;
+   row.changedWins+=Number(!base.won&&result.won);row.changedLosses+=Number(base.won&&!result.won);
+   assert.equal(result.survivors+Object.values(result.losses).reduce((a,b)=>a+b,0),quantity);
+   assert.equal(result.defenderPower,base.defenderPower);
+   assert.ok(result.attackerPower>=base.attackerPower&&result.attackerPower<=Math.ceil(base.attackerPower*1.03)+1);
+   if(name==="defense"||name==="health")assert.equal(result.attackerPower,base.attackerPower);
+  }
+ }
+ assert.equal(simulations,1400);
+ assert.ok(stats.control.wins>0&&stats.control.wins<stats.control.cases,"control must contain both victories and defeats");
+ t.diagnostic("science-contested: "+JSON.stringify({simulations,stats}));
+});
