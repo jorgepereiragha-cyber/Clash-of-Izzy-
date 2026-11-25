@@ -203,7 +203,7 @@ function renderPlayers(players){
  for(const p of players){
   const card=document.createElement("article");card.className="player";
   const info=document.createElement("div"),name=document.createElement("strong"),meta=document.createElement("small");
-  name.textContent=p.name||"Jogador";meta.textContent="ID: "+p.player_id+" · Gemas: "+Number(p.gems||0).toLocaleString("pt-BR")+" · Cadastro: "+(p.created_at||"—");
+  name.textContent=p.name||"Jogador";meta.textContent="ID: "+p.player_id+" · Diamantes: "+Number(p.gems||0).toLocaleString("pt-BR")+" · Cadastro: "+(p.created_at||"—");
   info.append(name,meta);
   const actions=document.createElement("div");actions.className="actions";
   const amount=document.createElement("input");amount.type="number";amount.min="1";amount.max="1000000";amount.step="1";amount.placeholder="Diamantes (máx. 1 milhão)";
@@ -251,6 +251,8 @@ function renderPlayers(players){
         localStorage.setItem(pendingKey,JSON.stringify({amount:value,reason:why,request_key:requestKey}));
         const result=await api("/admin/gems",{playerId:p.player_id,amount:value,reason:why,request_key:requestKey});
         localStorage.removeItem(pendingKey);
+        meta.textContent="ID: "+p.player_id+" · Diamantes: "+Number(result.player.gems).toLocaleString("pt-BR")+" · Cadastro: "+(p.created_at||"—");
+        amount.value="";reason.value="";
         showNotice((result.reused?"Crédito já processado. ":"Crédito confirmado. ")+"Saldo: "+Number(result.player.gems).toLocaleString("pt-BR")+" diamantes.");
       });
     }catch(e){showNotice("Crédito não confirmado ou armazenamento indisponível; preserve a chave e concilie a operação. "+e.message)}
