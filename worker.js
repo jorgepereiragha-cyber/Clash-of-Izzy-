@@ -2,7 +2,7 @@ export { EldoriaRoom } from "./eldoria-room.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses, combatRulesVersion } from "./game-adapter.js";
 import { hospitalEnabled,HOSPITAL_PER_LEVEL,HOSPITAL_HEAL_MAX,recoverableLosses,hospitalHealCost,hospitalAdmission } from "./hospital-policy.js";
-import { scienceEnabled,SCIENCE_CATALOG,sciencePercent,scienceRequirement,scienceDuration,scienceView,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses } from "./castle-science.js";
+import { scienceEnabled,SCIENCE_CATALOG,sciencePercent,scienceRequirement,scienceDuration,scienceView,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses,resourceScienceMultipliers,structuralDefenseScience } from "./castle-science.js";
 import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, HERO_SUMMON_RARITY_ODDS, heroView, getHeroCombatBonuses, getHeroSummonOdds } from "./hero-catalog.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank, sameAngelDeathAttackUnits } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
@@ -407,7 +407,7 @@ async function scaleKingdomQueueDurationSeconds(env,kingdomId,baseSeconds,queueT
 }
 async function recalculateKingdomStats(env,kingdomId){
   const reads=await env.DB.batch([
-    env.DB.prepare("SELECT food,wood,stone,iron,gold,wall_hp,castle_level FROM kingdoms WHERE id=?").bind(kingdomId),
+    env.DB.prepare("SELECT food,wood,stone,iron,gold,wall_hp,castle_level,COALESCE((SELECT level FROM research WHERE kingdom_id=kingdoms.id AND research_key='fortification'),0) AS fortification_level FROM kingdoms WHERE id=?").bind(kingdomId),
     env.DB.prepare("SELECT building_type,level FROM kingdom_buildings WHERE kingdom_id=?").bind(kingdomId)
   ]);
   const kingdom=reads[0]?.results?.[0]||null;
@@ -428,6 +428,7 @@ async function recalculateKingdomStats(env,kingdomId){
     const defenseRows=await env.DB.prepare("SELECT defense_type,level FROM city_defenses WHERE kingdom_id=?").bind(kingdomId).all();
     defense+=Math.floor(defensePowerFromRows(defenseRows.results||[])*towerHeroMultiplier(await assigned4xHeroLevel(env,kingdomId,"defense:tower")));
   }
+  if(scienceEnabled(env))defense=structuralDefenseScience(defense,kingdom.fortification_level);
   await env.DB.prepare(
     "UPDATE kingdoms SET food_capacity=MAX(?,food),wood_capacity=MAX(?,wood),stone_capacity=MAX(?,stone),iron_capacity=MAX(?,iron),gold_capacity=MAX(?,gold),wall_max_hp=?,wall_hp=MIN(wall_hp,?),defense_power=? WHERE id=?"
   ).bind(capacities.food,capacities.wood,capacities.stone,capacities.iron,capacities.gold,wallMax,wallMax,defense,kingdomId).run();
@@ -491,10 +492,9 @@ async function applyProduction(env,kingdomId){
     env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('gear_forging','gear_ward','gear_vitality','gear_logistics')").bind(kingdomId).all()
   ]);
   const equipmentProductionBonus=equipmentBonuses(equippedRows.results||[],gearResearchRows.results||[]).resourcePercent/100;
-  const economy= scienceEnabled(env)?await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='economy'").bind(kingdomId).first():null;
-  // Economy previously had no direct production effect here; conservative 1% per level, capped at 30%.
-  const economyMultiplier=1+Math.max(0,Math.min(30,Number(economy?.level)||0))/100;
-  const prestigeBonus=(1+getCastleVipBonuses(row.prestige).productionPercent/100)*(1+equipmentProductionBonus)*economyMultiplier;
+  const resourceResearch=scienceEnabled(env)?await env.DB.prepare("SELECT research_key,level FROM research WHERE kingdom_id=? AND research_key IN ('economy','forestry','masonry','metallurgy')").bind(kingdomId).all():null;
+  const resourceMultipliers=resourceScienceMultipliers(resourceResearch?.results||[]);
+  const prestigeBonus=(1+getCastleVipBonuses(row.prestige).productionPercent/100)*(1+equipmentProductionBonus);
   const [valhallaMultipliers,valhallaBuffs,petBonuses]=await Promise.all([
     getValhallaMultipliers(env),getValhallaBuffMultipliers(env,kingdomId),getPetBonuses(env,kingdomId)
   ]);
@@ -506,7 +506,7 @@ async function applyProduction(env,kingdomId){
   let chainResult=null;
   const capacities={food:Number(row.food_capacity)||50000,wood:Number(row.wood_capacity)||50000,stone:Number(row.stone_capacity)||30000,iron:Number(row.iron_capacity)||25000,gold:Number(row.gold_capacity)||20000};
   for(const [key,rate] of Object.entries(perHour)){
-    const accumulated=rate*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*petBonuses.resourceProductionMultiplier*prestigeBonus*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
+    const accumulated=rate*valhallaMultipliers.resource*valhallaBuffs.resourceProduction*petBonuses.resourceProductionMultiplier*prestigeBonus*resourceMultipliers[key]*elapsed+Math.max(0,Math.min(3599,Number(previousRemainders[key])||0));
     const produced=Math.floor(accumulated/3600);
     const current=Math.max(0,Number(row[key])||0);
     gains[key]=Math.min(produced,Math.max(0,capacities[key]-current));
@@ -519,7 +519,7 @@ async function applyProduction(env,kingdomId){
       millMultiplier:millHeroMultiplier(await assigned4xHeroLevel(env,kingdomId,"industry:mill")),
       wheat:chainState.wheat,flour:chainState.flour,
       foodFreeSpace:Math.max(0,capacities.food-Math.max(0,Number(row.food)||0)),
-      multiplier:valhallaMultipliers.resource*valhallaBuffs.resourceProduction*petBonuses.resourceProductionMultiplier*prestigeBonus,
+      multiplier:valhallaMultipliers.resource*valhallaBuffs.resourceProduction*petBonuses.resourceProductionMultiplier*prestigeBonus*resourceMultipliers.food,
       remainders:previousRemainders
     });
     gains.food=chainResult.food;
@@ -2092,7 +2092,7 @@ async function processDueKingdomQueues(env,kingdomId=null){
     if(advanced4xEnabled(env))statements.push(...progressionQueueStatements(env,{...queue,completionToken},guard));
     try{
       await env.DB.batch(statements);
-      if(queue.queue_type==="construction")await recalculateKingdomStats(env,queue.kingdom_id);
+      if(queue.queue_type==="construction"||(scienceEnabled(env)&&queue.queue_type==="research"&&queue.target_key==="fortification"))await recalculateKingdomStats(env,queue.kingdom_id);
       await recalculateKingdomPower(env,queue.kingdom_id);
     }catch(error){
       console.error("kingdom_queue_completion_failed",queue.id,String(error?.message||error));
