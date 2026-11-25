@@ -6,7 +6,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
-import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
+import { readGraphicsChoice, getGraphicsStorage } from "./kingdom-visual-preferences.js";
 import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
 import { projectDragonVisual, makeDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
@@ -1215,7 +1215,7 @@ if (host && "WebGLRenderingContext" in window) {
   }
   try {
     const deviceMemory = Number(navigator.deviceMemory || 0);
-    const preferredTier = readGraphicsChoice(window.localStorage);
+    const preferredTier = readGraphicsChoice(getGraphicsStorage(window));
     automaticGraphics = preferredTier === "auto";
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const cores = Number(navigator.hardwareConcurrency || 0);

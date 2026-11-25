@@ -445,3 +445,19 @@ test("instanced forest and distant defenses release instance buffers through bot
  assert.match(renderer,/function disposeDetachedObject3D\(root\) \{[\s\S]*?disposeObject3D\(root, resources\);[\s\S]*?disposeResourceSet\(resources\)/);
  assert.match(renderer,/function disposeSceneResources\(\) \{[\s\S]*?disposeObject3D\(scene, resources\);[\s\S]*?disposeResourceSet\(resources\)/);
 });
+
+
+test("graphics settings survive storage property and method failures",async()=>{
+ const {getGraphicsStorage,readGraphicsChoice,persistGraphicsChoice}=await import("../scripts/kingdom-visual-preferences.js");
+ const restricted={get localStorage(){throw Error("SecurityError")}};
+ assert.equal(getGraphicsStorage(restricted),null);
+ assert.equal(readGraphicsChoice(getGraphicsStorage(restricted)),"auto");
+ assert.equal(persistGraphicsChoice(getGraphicsStorage(restricted),"high"),false);
+ const broken={localStorage:{getItem(){throw Error("denied")},setItem(){throw Error("denied")}}};
+ assert.equal(readGraphicsChoice(getGraphicsStorage(broken)),"auto");
+ assert.equal(persistGraphicsChoice(getGraphicsStorage(broken),"low"),false);
+ const boot=await readFile(new URL("../scripts/kingdom-visual-boot.js",import.meta.url),"utf8");
+ assert.match(boot,/readGraphicsChoice\(getGraphicsStorage\(window\)\)/);
+ assert.match(boot,/persistGraphicsChoice\(getGraphicsStorage\(window\), value\)/);
+ assert.match(renderer,/readGraphicsChoice\(getGraphicsStorage\(window\)\)/);
+});

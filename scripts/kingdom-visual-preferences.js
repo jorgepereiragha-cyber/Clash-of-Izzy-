@@ -34,3 +34,8 @@ export function graphicsChoiceLabel(choice) {
     "2d": "2D leve"
   })[normalizeGraphicsChoice(choice)];
 }
+
+// Accessing the browser's storage property can itself throw in restricted WebViews.
+export function getGraphicsStorage(host){
+  try { return host?.localStorage || null; } catch { return null; }
+}

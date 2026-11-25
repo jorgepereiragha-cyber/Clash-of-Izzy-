@@ -33,7 +33,7 @@ test("world map 3D is imported only by one lazy boot after load and visibility",
 test("FPS downgrade changes actual renderer cost, not just an indicator", async () => {
   const html = await read("world.html");
   const scene = await read("world-map-3d.js");
-  assert.match(scene,/let quality = lowMemory \|\| saveData/);
+  assert.match(scene,/let quality = mapProfile\(8192\)\.tier/);
   assert.match(scene,/function checkAndDowngradeQuality\(timestamp\)/);
   assert.ok(scene.includes("timestamp - lastFpsCheck < 3000 || fpsSamples.length < 20"));
   assert.match(scene,/avg >= 22/);
@@ -65,4 +65,23 @@ test("storage-denied WebViews retain graphics fallback without throwing during m
   assert.match(boot,/try \{ choice = readGraphicsChoice\(window\.localStorage\); \} catch/);
   assert.match(scene,/let preference = "auto"/);
   assert.match(scene,/try \{ preference = readGraphicsChoice\(window\.localStorage\); \} catch/);
+});
+
+
+test("map and city share hardware tier policy, including real texture limit",async()=>{
+ const scene=await read("world-map-3d.js");
+ assert.match(scene,/import \{ selectKingdomQualityProfile \} from "\.\/scripts\/kingdom-quality\.js"/);
+ assert.match(scene,/const mapProfile = maxTextureSize => selectKingdomQualityProfile/);
+ assert.match(scene,/quality = mapProfile\(renderer\.capabilities\.maxTextureSize\)\.tier/);
+ const {selectKingdomQualityProfile}=await import("../scripts/kingdom-quality.js");
+ assert.equal(selectKingdomQualityProfile({deviceMemory:8,hardwareConcurrency:8,maxTextureSize:2048,preferredTier:"high"}).tier,"balanced");
+ assert.equal(selectKingdomQualityProfile({deviceMemory:8,hardwareConcurrency:8,maxTextureSize:1024,preferredTier:"high"}).tier,"low");
+ assert.equal(selectKingdomQualityProfile({deviceMemory:12,hardwareConcurrency:12,maxTextureSize:16384,saveData:true,preferredTier:"high"}).tier,"low");
+});
+test("march animation never rewrites static territory label positions each frame",async()=>{
+ const scene=await read("world-map-3d.js");
+ const tick=scene.slice(scene.indexOf("const tick = timestamp =>"),scene.indexOf("function setWorldState"));
+ assert.match(tick,/updateMarchPositions\(now\)/);
+ assert.doesNotMatch(tick,/projectTerritories\(\)/);
+ assert.match(scene,/function draw\(\)[\s\S]*?projectTerritories\(\)/);
 });
