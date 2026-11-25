@@ -1927,6 +1927,21 @@ async function angelDeathEventState(env,playerId){
   return {event:{...event,boss_name:ANGEL_DEATH_EVENT.name,boss_epithet:ANGEL_DEATH_EVENT.epithet,boss_level:ANGEL_DEATH_EVENT.level,timezone:ANGEL_DEATH_EVENT.timezone,schedule:ANGEL_DEATH_EVENT.schedule},participant,leaderboard:rows.results||[]};
 }
 
+// Only an attack inserted by this batch may update boss HP or participant totals.
+export function appendAngelDeathAttackSettlement(db,statements,{eventId,kingdomId,requestId,instant,troopsLost,actionId}){
+  const guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
+  statements.push(
+    db.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(kingdomId,"__internal_action_guard",actionId),
+    db.prepare("UPDATE world_events SET boss_hp_remaining=MAX(0,boss_hp_remaining-(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)),boss_defeated_at=CASE WHEN boss_hp_remaining<=(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?) THEN COALESCE(boss_defeated_at,?) ELSE boss_defeated_at END WHERE id=? AND "+guard)
+      .bind(eventId,kingdomId,requestId,eventId,kingdomId,requestId,instant,eventId,kingdomId,actionId),
+    db.prepare("INSERT OR IGNORE INTO world_event_participants(event_id,kingdom_id,first_attack_at,last_attack_at) SELECT ?,?,?,? WHERE "+guard)
+      .bind(eventId,kingdomId,instant,instant,kingdomId,actionId),
+    db.prepare("UPDATE world_event_participants SET score=score+(SELECT score FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),damage=damage+(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),attacks=attacks+1,troops_lost=troops_lost+?,last_attack_at=? WHERE event_id=? AND kingdom_id=? AND "+guard)
+      .bind(eventId,kingdomId,requestId,eventId,kingdomId,requestId,troopsLost,instant,eventId,kingdomId,kingdomId,actionId),
+    db.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(kingdomId,actionId)
+  );
+}
+
 async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   const requestId=String(body.requestId||"").trim();
   if(!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(requestId))return json({error:"Identificador de ataque inválido. Atualize a página e tente novamente."},400);
@@ -1997,20 +2012,15 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   }
   const snapshotJson=JSON.stringify(snapshot),expectedRows=selected.length;
   const previousBattleToken=battleState?.battle_token??"",battleToken=crypto.randomUUID();
-  const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND EXISTS(SELECT 1 FROM json_each(?) AS selected WHERE selected.key=army_units.unit_type||'_'||army_units.tier) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) AND EXISTS(SELECT 1 FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>?)")
-    .bind(snapshotJson,kingdom.id,snapshotJson,snapshotJson,kingdom.id,expectedRows,kingdom.id,battleToken,event.id,instant,instant);
+  const troopUpdate=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST(json_extract((SELECT value FROM json_each(?) WHERE key=army_units.unit_type||'_'||army_units.tier),'$.loss') AS INTEGER) WHERE kingdom_id=? AND quantity>0 AND EXISTS(SELECT 1 FROM json_each(?) AS selected WHERE selected.key=army_units.unit_type||'_'||army_units.tier) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS current ON current.kingdom_id=? AND current.unit_type||'_'||current.tier=requested.key AND current.quantity=CAST(json_extract(requested.value,'$.quantity') AS INTEGER))=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?) AND EXISTS(SELECT 1 FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>?) AND NOT EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
+    .bind(snapshotJson,kingdom.id,snapshotJson,snapshotJson,kingdom.id,expectedRows,kingdom.id,battleToken,event.id,instant,instant,event.id,kingdom.id,requestId);
   const statements=[
     env.DB.prepare("UPDATE kingdoms SET battle_token=? WHERE id=? AND COALESCE(battle_token,'')=COALESCE(?, '')").bind(battleToken,kingdom.id,previousBattleToken),
     troopUpdate,
     env.DB.prepare("INSERT INTO world_event_attacks(event_id,kingdom_id,request_id,damage,score,troop_losses_json) SELECT ?,?,?,MIN(?,boss_hp_remaining),MIN(?,boss_hp_remaining),? FROM world_events WHERE id=? AND status='active' AND boss_hp_remaining>0 AND starts_at<=? AND ends_at>? AND changes()=? AND EXISTS(SELECT 1 FROM kingdoms WHERE id=? AND battle_token=?)")
-      .bind(event.id,kingdom.id,requestId,simulation.damage,simulation.damage,snapshotJson,event.id,instant,instant,expectedRows,kingdom.id,battleToken),
-    env.DB.prepare("UPDATE world_events SET boss_hp_remaining=MAX(0,boss_hp_remaining-(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)),boss_defeated_at=CASE WHEN boss_hp_remaining<=(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?) THEN COALESCE(boss_defeated_at,?) ELSE boss_defeated_at END WHERE id=? AND EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
-      .bind(event.id,kingdom.id,requestId,event.id,kingdom.id,requestId,instant,event.id,event.id,kingdom.id,requestId),
-    env.DB.prepare("INSERT OR IGNORE INTO world_event_participants(event_id,kingdom_id,first_attack_at,last_attack_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
-      .bind(event.id,kingdom.id,instant,instant,event.id,kingdom.id,requestId),
-    env.DB.prepare("UPDATE world_event_participants SET score=score+(SELECT score FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),damage=damage+(SELECT damage FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?),attacks=attacks+1,troops_lost=troops_lost+?,last_attack_at=? WHERE event_id=? AND kingdom_id=? AND EXISTS(SELECT 1 FROM world_event_attacks WHERE event_id=? AND kingdom_id=? AND request_id=?)")
-      .bind(event.id,kingdom.id,requestId,event.id,kingdom.id,requestId,simulation.troopsLost,instant,event.id,kingdom.id,event.id,kingdom.id,requestId)
+      .bind(event.id,kingdom.id,requestId,simulation.damage,simulation.damage,snapshotJson,event.id,instant,instant,expectedRows,kingdom.id,battleToken)
   ];
+  appendAngelDeathAttackSettlement(env.DB,statements,{eventId:event.id,kingdomId:kingdom.id,requestId,instant,troopsLost:simulation.troopsLost,actionId:crypto.randomUUID()});
   const result=await env.DB.batch(statements);
   if(!result[2]?.meta?.changes)return json({error:"O exército mudou, o chefe foi derrotado ou outro ataque foi processado. Atualize e tente novamente."},409);
   const [updated,attackRecord]=await Promise.all([

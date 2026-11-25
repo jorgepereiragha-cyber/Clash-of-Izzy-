@@ -226,3 +226,33 @@ test("Anjo da Morte distribui as baixas pelo exército inteiro, sem punir pilhas
   assert.ok(splitStacks.troopsLost < splitStacks.totalTroops);
   assert.ok(Object.values(splitStacks.losses).every(loss => loss === 0 || loss === 1));
 });
+
+test("Anjo da Morte: an existing attack cannot settle twice after a rejected insert",async()=>{
+  const {DatabaseSync}=await import("node:sqlite");
+  const {appendAngelDeathAttackSettlement}=await import("../worker.js");
+  const db=new DatabaseSync(":memory:");
+  try{
+    db.exec(`
+      CREATE TABLE kingdom_events(kingdom_id INTEGER,event_type TEXT,payload_json TEXT);
+      CREATE TABLE world_events(id INTEGER PRIMARY KEY,boss_hp_remaining INTEGER,boss_defeated_at TEXT);
+      CREATE TABLE world_event_attacks(event_id INTEGER,kingdom_id INTEGER,request_id TEXT,damage INTEGER,score INTEGER,UNIQUE(event_id,kingdom_id,request_id));
+      CREATE TABLE world_event_participants(event_id INTEGER,kingdom_id INTEGER,first_attack_at TEXT,last_attack_at TEXT,score INTEGER DEFAULT 0,damage INTEGER DEFAULT 0,attacks INTEGER DEFAULT 0,troops_lost INTEGER DEFAULT 0,UNIQUE(event_id,kingdom_id));
+      INSERT INTO world_events VALUES(1,1000,NULL);
+    `);
+    const adapter={prepare(sql){return {bind(...args){return {sql,args}}}}};
+    const instant="2026-11-27T22:00:00.000Z";
+    const execute=(requestId,actionId,damage,troopsLost)=>{
+      const statements=[adapter.prepare("INSERT OR IGNORE INTO world_event_attacks VALUES(1,2,?,?,?)").bind(requestId,damage,damage)];
+      appendAngelDeathAttackSettlement(adapter,statements,{eventId:1,kingdomId:2,requestId,instant,troopsLost,actionId});
+      db.exec("BEGIN");
+      try{for(const {sql,args} of statements)db.prepare(sql).run(...args);db.exec("COMMIT");}catch(error){db.exec("ROLLBACK");throw error;}
+    };
+    execute("first","guard1",100,4);
+    execute("first","guard2",100,4);
+    execute("second","guard3",50,2);
+    assert.equal(db.prepare("SELECT boss_hp_remaining FROM world_events").get().boss_hp_remaining,850);
+    assert.deepEqual({...db.prepare("SELECT score,damage,attacks,troops_lost FROM world_event_participants").get()},{score:150,damage:150,attacks:2,troops_lost:6});
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM world_event_attacks").get().n,2);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_events").get().n,0);
+  }finally{db.close();}
+});
