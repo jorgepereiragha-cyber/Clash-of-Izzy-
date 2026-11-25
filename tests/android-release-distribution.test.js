@@ -38,8 +38,11 @@ test('published APK URL contract matches portal and includes SHA-256 asset', () 
   assert.match(flow, /sha256sum -c/);
   assert.match(portal, /releases\/latest/);
   assert.match(portal, /clash-of-izzy-android\.apk/);
-  assert.match(portal, /validAsset\(asset, filename/);
-  assert.match(portal, /validAsset\(asset, filename \+ "\.sha256"/);
+  assert.match(portal, /validAsset\(asset, expected\)/);
+  assert.match(portal, /exactAsset\(filename\)/);
+  assert.match(portal, /exactAsset\(filename \+ "\.sha256"\)/);
+  assert.match(portal, /Number\.isSafeInteger\(asset\.size\) && asset\.size > 0/);
+  assert.match(portal, /matches\.length === 1/);
   assert.match(gradle, /ANDROID_VERSION_CODE/);
   assert.match(gradle, /ANDROID_VERSION_NAME/);
   assert.match(gradle, /versionCode androidVersionCode/);

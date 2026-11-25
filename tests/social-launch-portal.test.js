@@ -23,7 +23,7 @@ test("social actions share only the public marketing portal and never a payment 
   assert.match(portal,/utm_campaign=eldoria_pre_lancamento/);
   assert.match(portal,/id="download-apk" aria-disabled="true"/);
   assert.doesNotMatch(portal,/id="play-browser"|kingdom\.html/);
-  assert.match(portal,/id="download-apk-final" aria-disabled="true"/);
+  assert.match(portal,/id="download-invite" aria-disabled="true"/);
   assert.doesNotMatch(portal,/NUBANK_PIX_KEY|MP_ACCESS_TOKEN|paymentReference/);
   assert.doesNotMatch(portal,/href="\/(?:kingdom|world|arena|account|admin)\.html"/);
 });

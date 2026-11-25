@@ -20,211 +20,104 @@
 <link rel="stylesheet" href="/styles/coi-theme.css">
 <title>Clash of Izzy — O Reino no Seu Celular | APK Android</title>
 <style>
-:root{
-  color-scheme:dark;--gold:#f1c467;--gold-light:#ffe3a1;--ink:#f8f1df;--muted:#c5d2e7;
-  --royal:#0b2c61;--night:#050e20
-}
+:root{color-scheme:dark;--gold:#f1c467;--ink:#fff4dd}
 *{box-sizing:border-box}
-html{scroll-behavior:smooth}
-body{
-  margin:0;color:var(--ink);font:16px/1.55 system-ui,-apple-system,"Segoe UI",sans-serif;
-  background:
-    radial-gradient(ellipse at 23% 8%,#1a4a94aa,transparent 48%),
-    radial-gradient(ellipse at 92% 25%,#78522a45,transparent 36%),
-    linear-gradient(165deg,#071831,#08152b 46%,#040b19);
-  min-height:100vh
-}
-.wrap{width:min(1120px,calc(100% - 40px));margin-inline:auto}
-.royal-hero{display:grid;grid-template-columns:minmax(0,.95fr) minmax(0,1.05fr);align-items:center;gap:clamp(24px,5vw,64px);padding:clamp(35px,7vw,86px) 0 48px}
-.royal-art{
-  position:relative;isolation:isolate;min-height:450px;display:grid;place-items:center;
-  padding:34px;border:1px solid #e5b65c;border-radius:28px;overflow:hidden;
-  background:
-    radial-gradient(ellipse at 50% 34%,#3065a8 0%,#102d5e 35%,transparent 78%),
-    linear-gradient(145deg,#1d396a,#07142c 65%);
-  box-shadow:0 24px 65px #0009,inset 0 0 0 5px #071326,inset 0 0 0 7px #91652a
-}
-.royal-art::before{
-  content:"";position:absolute;inset:18px;border:2px solid #d9a348;
-  clip-path:polygon(0 0,15% 0,15% 2px,85% 2px,85% 0,100% 0,100% 100%,0 100%);
-  border-radius:19px;pointer-events:none
-}
-.royal-art::after{
-  content:"";position:absolute;inset:0;z-index:-1;
-  background:
-    linear-gradient(0deg,#040e24aa,transparent 52%),
-    repeating-linear-gradient(90deg,transparent 0 39px,#ffd88807 40px 41px,transparent 42px 85px);
-  pointer-events:none
-}
-.royal-sun{position:absolute;width:66%;aspect-ratio:1;top:12%;border:1px solid #ffdd905e;border-radius:50%;box-shadow:0 0 80px #ffc26439,inset 0 0 80px #f6be4c17;pointer-events:none}
-.crest{z-index:1;display:block;width:min(88%,405px);height:auto;filter:drop-shadow(0 22px 26px #000b)}
-.royal-caption{position:absolute;z-index:2;bottom:31px;left:30px;right:30px;text-align:center;font-size:12px;font-weight:850;letter-spacing:.24em;color:#ffde9e;text-shadow:0 2px 12px #000}
-.royal-titleline{display:flex;align-items:center;gap:10px;color:var(--gold-light);font-size:11px;letter-spacing:.2em;font-weight:800;text-transform:uppercase}
-.royal-titleline::before{content:"";width:25px;height:2px;background:linear-gradient(90deg,#f7d27b,transparent)}
-h1{margin:12px 0 18px;font-family:Georgia,"Times New Roman",serif;letter-spacing:.045em;font-size:clamp(44px,6.2vw,81px);font-weight:900;line-height:1.04;text-shadow:0 5px 18px #0008}
-h1 .golden{display:block;color:#f6c96c;text-shadow:0 1px 0 #ffe9b0,0 5px 18px #000a}
-.lead{max-width:640px;margin:0;color:#e2e9f5;font-size:clamp(17px,2.25vw,22px);line-height:1.5}
-.royal-features{display:flex;flex-wrap:wrap;gap:9px;margin:21px 0}
-.royal-features span{border:1px solid #b48b4e77;border-radius:30px;padding:6px 13px;background:#112a4c;color:#ebd7b1;font-size:12px;letter-spacing:.03em}
-.actions{margin:24px 0 0;display:flex;flex-direction:column;align-items:flex-start;gap:11px}
-.download{
-  display:inline-flex;align-items:center;justify-content:center;min-height:58px;
-  width:min(100%,395px);padding:12px 22px;border-radius:12px;
-  border:2px solid #ffdf95;background:linear-gradient(180deg,#ffe6ac,#d7a454 65%,#b97c28);
-  color:#16120c;font-size:16px;font-weight:900;text-decoration:none;text-align:center;
-  box-shadow:inset 0 1px 0 #fff9,0 15px 35px #0008;transition:transform .18s,filter .18s
-}
-.download[href]:hover{transform:translateY(-2px);filter:brightness(1.07)}
-.download:focus-visible,a:focus-visible{outline:3px solid white;outline-offset:4px}
-.download[aria-disabled="true"]{background:linear-gradient(#283d59,#19283e);color:#d2dfef;border-color:#6c819d;cursor:not-allowed;box-shadow:none}
-.status{min-height:48px;max-width:610px;margin:0;color:#e8d7b4;font-size:13px}
-.play-note{max-width:395px;margin:0;color:#e8d7b4;font-size:13px}
-.hash{color:#f6d590;font-size:14px}
-.share-row{display:flex;flex-wrap:wrap;gap:9px;align-items:center;margin-top:14px}
-.share-link{display:inline-flex;align-items:center;justify-content:center;min-height:48px;min-width:105px;padding:10px 14px;border:1px solid #cda45f;border-radius:10px;background:#1b365c;color:#fff4dc;text-decoration:none;font:700 13px/1.4 system-ui,sans-serif;cursor:pointer}
-.share-link:focus-visible{outline:3px solid white;outline-offset:3px}
-.share-link:hover{background:#284d7c}
-.grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:12px auto 28px}
-.tile{position:relative;padding:24px 22px;background:linear-gradient(145deg,#1e3e6c,#0b1c37);border:1px solid #a8824899;border-radius:16px;box-shadow:inset 0 1px #ffe6ab20,0 11px 25px #0004}
-.tile::before{content:"";position:absolute;top:0;left:22px;width:54px;height:3px;background:linear-gradient(90deg,#ffd47e,transparent)}
-.tile h2{font-family:Georgia,"Times New Roman",serif;font-size:23px;margin:0 0 8px;color:#f7d58f}
-.tile p{margin:0;color:var(--muted);font-size:15px}
-.instructions{max-width:960px;margin:0 auto 36px;padding:26px 30px;border:1px solid #a7834e99;border-radius:16px;background:linear-gradient(155deg,#0f2749,#09172c);box-shadow:0 12px 32px #0004}
-.instructions h2{margin:0 0 9px;color:var(--gold-light);font-family:Georgia,"Times New Roman",serif;font-size:25px}
-.instructions p{margin:10px 0;color:#d9e4f4}
-footer{text-align:center;padding:20px 0 38px;color:#bac9de;font-size:13px}
+body{margin:0;min-width:0;background:#070d18;color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+.royal-hero{position:relative;isolation:isolate;min-height:100vh;min-height:100svh;display:grid;grid-template-rows:1fr auto;align-items:center;padding:clamp(18px,5vw,64px);overflow:clip}
+.royal-art{position:absolute;inset:0;z-index:-2;overflow:hidden;background:radial-gradient(ellipse at 73% 25%,#c29a5770,transparent 35%),radial-gradient(ellipse at 14% 20%,#264d83,transparent 54%),linear-gradient(160deg,#101e36,#070d18 78%)}
+.royal-art svg{position:absolute;inset:0;width:100%;height:100%}
+.crest{position:absolute;width:clamp(180px,36vw,500px);height:auto;max-height:66%;object-fit:contain;right:8%;top:10%;filter:drop-shadow(0 24px 44px #000b)}
+.royal-art:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#050b16ed 0%,#050b16aa 38%,transparent 75%),linear-gradient(0deg,#050a13 0%,transparent 36%);pointer-events:none}
+.royal-copy{position:relative;width:min(100%,760px);padding-block:28px;align-self:center}
+h1{margin:0;font:900 clamp(42px,8.4vw,116px)/.91 Georgia,serif;letter-spacing:.015em;text-shadow:0 4px 24px #000;color:#fff1d6}
+h1 .golden{display:block;color:var(--gold);text-shadow:0 1px 0 #ffedb5,0 5px 20px #000}
+.tagline{margin:18px 0 24px;color:#e1dacd;font:400 clamp(16px,2.5vw,23px)/1.4 Georgia,serif;letter-spacing:.05em}
+.actions{display:flex;flex-direction:column;align-items:flex-start;gap:9px}
+.download{display:inline-flex;align-items:center;justify-content:center;text-align:center;width:min(100%,340px);min-height:56px;padding:12px 20px;color:#18130c;background:linear-gradient(#ffdf9c,#d4a04c);border:1px solid #ffe6ad;border-radius:4px;font-weight:850;font-size:16px;text-decoration:none;box-shadow:0 8px 32px #0008}
+.download[href]:hover{filter:brightness(1.12)}
+.download[aria-disabled="true"]{background:#162238;color:#e0e6ee;border-color:#8491a2;box-shadow:none;cursor:not-allowed}
+#download-invite[aria-disabled="true"]{display:none}
+.actions:has(#download-invite[href]) #download-apk[aria-disabled="true"],.actions:has(#download-invite[href]) #download-apk[aria-disabled="true"] + .status{display:none}
+.actions:has(#download-apk[href]) #download-invite[href]{min-height:44px;background:none;border:0;box-shadow:none;color:var(--gold);text-decoration:underline;font-size:14px}
+.status{font-size:13px;color:#e5d8c2;margin:0;max-width:340px;overflow-wrap:anywhere}
+.details{align-self:end;width:min(100%,680px);color:#cdd6e4;font-size:13px}
+.details summary{cursor:pointer;width:fit-content;max-width:100%;min-height:44px;display:flex;align-items:center;gap:8px;color:#eed9ad}
+.details summary::before{content:"+";font-size:18px}.details[open] summary::before{content:"−"}
+.details-content{padding:14px 16px;background:#091424ed;border:1px solid #bda56b55;border-radius:6px;display:grid;gap:10px}
+.details p{margin:0}.details a,.details button{color:#f6d28c}
+.share-row{display:flex;flex-wrap:wrap;gap:4px 16px}
+.share-row a,.share-row button{display:inline-flex;align-items:center;min-height:44px;background:none;border:0;padding:0;font:inherit;text-decoration:underline;cursor:pointer}
+[hidden]{display:none!important}
 @media(max-width:800px){
-  .royal-hero{grid-template-columns:1fr;gap:26px;padding-top:32px}
-  .royal-art{min-height:320px;max-width:520px;width:100%;margin:auto}
-  .crest{width:min(73%,300px)}
-  .royal-copy{text-align:center;order:-1} /* CTA do APK aparece antes da arte em telas estreitas */
-  .royal-titleline{justify-content:center}
-  .lead{margin-inline:auto}
-  .royal-features,.actions{justify-content:center;align-items:center}
-  .grid{grid-template-columns:1fr}
+.royal-hero{padding:clamp(18px,5vw,36px);grid-template-rows:minmax(0,1fr) auto}
+.crest{width:min(67vw,320px);max-height:42%;right:50%;transform:translateX(50%);top:5%}
+.royal-art:after{background:linear-gradient(0deg,#050a13 0%,#050a13ee 25%,#050a1350 64%,transparent 95%)}
+.royal-copy{text-align:center;align-self:end;padding-top:clamp(220px,43svh,370px);padding-bottom:16px;margin-inline:auto}
+.actions{align-items:center}.tagline{margin:14px 0 20px}.details{margin-inline:auto}.details summary{margin-inline:auto}
 }
-@media(max-width:420px){
-  .wrap{width:calc(100% - 26px)}
-  .royal-art{min-height:274px;padding:24px}
-  .royal-caption{font-size:10px;letter-spacing:.13em;bottom:22px}
-  h1{font-size:clamp(42px,12vw,55px)}
-  .tile{padding:19px}
-  .instructions{padding:20px}
-}
-@media(prefers-reduced-motion:reduce){.download{transition:none}}
-
-
-
-/* A página pública divulga o Android sem simular downloads, imagens ou público. */
-h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-ui,sans-serif;letter-spacing:0;margin:14px 0 0;text-shadow:none}
-.section{margin:0 auto 54px}.section h2{font:700 clamp(28px,4vw,40px)/1.2 Georgia,serif;color:#ffdea0;margin:0 0 11px}
-.section>p{color:#d6e2f1;max-width:790px;margin:0 0 22px}.eyebrow{color:#f1c467;font-weight:800;font-size:12px;letter-spacing:.16em;text-transform:uppercase}
-.download{min-height:64px;width:min(100%,440px);font-size:18px}
-.download[aria-disabled="true"]{opacity:.92}.fine-print{max-width:440px;color:#ccd9e9;font-size:13px;margin:0}
-.feature-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:15px}
-.feature-card{border:1px solid #a8824899;background:linear-gradient(145deg,#1e3e6c,#0b1c37);padding:23px;border-radius:16px}
-.feature-card h3{font:700 20px Georgia,serif;color:#ffe0a5;margin:8px 0}.feature-card p{margin:0;font-size:14px;color:#d6e2f1}
-.feature-icon{display:grid;place-items:center;border:1px solid #b68e54;border-radius:11px;background:#25446a;width:45px;height:45px;font-size:27px;color:#f5cb82}
-.gallery-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px}
-.gallery-grid figure{background:#0d1d35;border:1px solid #a88248;border-radius:16px;overflow:hidden;margin:0}
-.shot-placeholder{height:235px;display:flex;align-items:center;justify-content:center;text-align:center;padding:16px;background:radial-gradient(circle at center,#35598b,#0d1d35 76%);color:#f6d79b;font-weight:700}
-.shot-placeholder span{border:1px dashed #d4ad70;padding:28px 12px;max-width:190px;letter-spacing:.04em}
-.gallery-grid figcaption{padding:13px 16px;color:#f3dfb9;font-weight:700}
-.install-steps{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;list-style:none;margin:20px 0;padding:0}
-.install-steps li{border:1px solid #8a744f;border-radius:13px;background:#112b4d;padding:18px;color:#d6e2f1;font-size:14px}
-.install-steps strong{display:block;color:#ffdaa0;font-size:16px;margin:10px 0}
-.step-num{display:grid;place-items:center;border-radius:50%;width:36px;height:36px;background:#e8bd76;color:#121b29;font-weight:900}
-.safety-note{border-left:4px solid #ebc37d;background:#142e50;border-radius:0 10px 10px 0;padding:14px;color:#e2e9f5}
-.final-cta{text-align:center;padding:42px 18px;margin:20px auto 36px;border-radius:24px;border:1px solid #e4b76f;background:radial-gradient(circle at top,#2c4f82,#0a1a33 70%)}
-.final-cta h2{font:700 clamp(28px,4vw,42px) Georgia,serif;color:#ffe0a2;margin:12px 0}.final-cta p{color:#dbe5f2}
-.final-cta .download{margin:15px auto 8px}
-.support-mini{margin:0 auto 40px;display:flex;justify-content:space-between;gap:15px;align-items:center;flex-wrap:wrap;border:1px solid #6e7891;border-radius:13px;padding:19px;background:#132c4d;color:#dbe5f2;font-size:14px}
-.support-mini a{color:#ffdc9b;font-weight:800}
-@media(max-width:800px){.feature-grid,.gallery-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.install-steps{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:540px){.feature-grid,.gallery-grid,.install-steps{grid-template-columns:1fr}.shot-placeholder{height:175px}.support-mini{justify-content:center;text-align:center}.final-cta{padding:30px 15px}.download{width:100%}}
+@media(max-height:500px) and (orientation:landscape){.royal-copy{text-align:left;align-self:center;padding:12px 0;max-width:65%;margin:0}.actions{align-items:flex-start}.crest{right:3%;top:7%;transform:none;width:32vw;max-height:80%}.royal-art:after{background:linear-gradient(90deg,#050b16ef,transparent 90%)}.details summary{margin:0}h1{font-size:clamp(38px,8vw,74px)}.tagline{margin:8px 0 14px}}
 </style>
 </head>
 <body>
-
-<main class="wrap">
-<header class="royal-hero">
-  <div class="royal-art">
-    <div class="royal-sun" aria-hidden="true"></div>
-    <img class="crest" src="/assets/brand/royal-king.webp" width="224" height="224" loading="eager" decoding="async" fetchpriority="high" alt="Rei guerreiro de coroa dourada, espada real e brasão azul do Clash of Izzy">
-    <div class="royal-caption">HONRA · GLÓRIA · CONQUISTA</div>
+<main class="royal-hero">
+  <div class="royal-art" aria-hidden="true">
+    <svg viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" focusable="false">
+      <defs>
+        <linearGradient id="ridge" x2="0" y2="1"><stop stop-color="#223751"/><stop offset="1" stop-color="#0b1322"/></linearGradient>
+        <linearGradient id="stone" x2="1" y2=".5"><stop stop-color="#263347"/><stop offset="1" stop-color="#101a2b"/></linearGradient>
+        <radialGradient id="sun"><stop stop-color="#f7d898" stop-opacity=".75"/><stop offset="1" stop-color="#c69245" stop-opacity="0"/></radialGradient>
+        <g id="tower"><path fill="url(#stone)" stroke="#ad8d58" stroke-opacity=".38" d="M0 230V38H-8V0H8V16H25V0H43V16H60V0H76V38H68V230Z"/><path fill="#d9aa62" opacity=".55" d="M28 60h11v28H28zM28 120h11v28H28z"/></g>
+      </defs>
+      <circle cx="1100" cy="220" r="270" fill="url(#sun)"/>
+      <path fill="#1b2a43" d="M0 580 155 365 252 490 390 290 556 500 735 340 880 530 1050 355 1220 520 1440 330V900H0Z"/>
+      <path fill="url(#ridge)" d="M0 715 190 540 330 680 535 490 720 695 920 520 1130 660 1440 495V900H0Z"/>
+      <g transform="translate(810 475)" opacity=".94">
+        <path fill="url(#stone)" stroke="#bd9b62" stroke-opacity=".26" d="M-25 270V122H3V99H29V122H55V99H81V122H107V99H133V122H159V99H185V122H211V99H237V122H263V99H289V122H315V99H341V122H367V270Z"/>
+        <path fill="#26374c" d="M116 250V-18H108V-45H126V-31H143V-45H160V-31H177V-45H194V-18H187V250Z"/>
+        <path fill="#14243a" d="M110-45 151-122 192-45Z"/><path stroke="#bfa16b" d="M151-122v-31"/><path fill="#bf974c" d="M151-151l52 13-52 15Z"/>
+        <use href="#tower" x="-10" y="22"/><use href="#tower" x="260" y="22"/><path fill="#090f1a" d="M124 270v-60a42 42 0 0 1 84 0v60Z"/>
+        <path fill="#d1a85e" opacity=".62" d="M147 11h12v35h-12zM147 73h12v35h-12z"/>
+      </g>
+      <path fill="#111c2d" opacity=".86" d="M1070 166q-60-50-111-45 36 20 56 67-26-8-47 6 49 6 87 37l-37 17 52-8 30 24-17-30 32-19q65-48 104-40-20-25-69-19 21-45 46-62-66 10-100 72l-13-12 5-18-16 15-9-12-2 25Z"/>
+      <path fill="#080f1c" d="M0 830Q230 700 430 810T820 790Q1030 725 1440 815V900H0Z"/>
+    </svg>
+    <img class="crest" src="/assets/brand/royal-king.webp" width="224" height="224" decoding="async" fetchpriority="high" alt="">
   </div>
-  <div class="royal-copy">
-    <div class="royal-titleline">Estratégia medieval para Android</div>
-    <h1>CLASH OF <span class="golden">IZZY</span><small>O Reino no Seu Celular</small></h1>
-    <p class="lead">Baixe o app oficial Android quando lançado. Construa, lute e domine um mundo de castelos, heróis e alianças.</p>
-    <div class="royal-features" aria-label="Sobre o aplicativo"><span>App Android</span><span>Grátis para jogar</span><span>Em desenvolvimento</span></div>
+  <section class="royal-copy">
+    <h1>CLASH OF <span class="golden">IZZY</span></h1>
+    <p class="tagline">Construa. Lute. Reine.</p>
     <div class="actions">
       <a class="download" id="download-apk" aria-disabled="true" tabindex="-1">Baixar APK Android</a>
-      <p class="status" id="download-status" role="status" aria-live="polite">Verificando se uma versão Android oficial foi publicada…</p>
-      <p class="fine-print">O botão será liberado somente após a publicação oficial do APK e do arquivo SHA-256 no GitHub.</p>
-      <a class="hash" id="checksum-link" hidden>Consultar arquivo SHA-256</a>
-      <a class="hash" id="official-release-page" href="https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases" target="_blank" rel="noopener noreferrer">Conferir versões oficiais no GitHub</a>
-      <a class="download" id="download-invite" aria-disabled="true" tabindex="-1">Baixar Clash of Izzy — acesso por convite</a>
-      <p class="status" id="invite-download-status" role="status" aria-live="polite">Verificando disponibilidade do acesso por convite…</p>
-      <a class="hash" id="invite-checksum" hidden>Consultar SHA-256 do instalador por convite</a>
-      <div class="share-row" aria-label="Divulgar o app">
-        <button class="share-link" id="share-portal" type="button">Compartilhar</button>
-        <a class="share-link" id="share-whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp</a>
-        <a class="share-link" id="share-facebook" target="_blank" rel="noopener noreferrer">Facebook</a>
-        <button class="share-link" id="copy-portal" type="button">Copiar link</button>
-      </div>
-      <p class="status" id="share-status" role="status" aria-live="polite">Compartilhe esta página sem anunciar que o APK já está disponível.</p>
+      <p class="status" id="download-status" role="status" aria-live="polite">Verificando disponibilidade…</p>
+      <a class="download" id="download-invite" aria-disabled="true" tabindex="-1">Baixar para Android · por convite</a>
     </div>
-  </div>
-</header>
-<section class="section" aria-labelledby="benefits-title">
-  <div class="eyebrow">A aventura começa no reino</div>
-  <h2 id="benefits-title">Construa seu legado</h2>
-  <p>Conheça os sistemas e conteúdos planejados para o Android. Alguns recursos ainda podem ser habilitados por etapas.</p>
-  <div class="feature-grid"><article class="feature-card"><span class="feature-icon" aria-hidden="true">◇</span><h3>Mapa 3D isométrico</h3><p>Explore o mundo medieval com diferentes opções visuais de renderização.</p></article>
-<article class="feature-card"><span class="feature-icon" aria-hidden="true">♜</span><h3>Castelos e construções</h3><p>Administre recursos, fortaleça estruturas e evolua o reino.</p></article>
-<article class="feature-card"><span class="feature-icon" aria-hidden="true">✦</span><h3>Heróis e dragões</h3><p>Reúna personagens e prepare equipamentos e estratégias.</p></article>
-<article class="feature-card"><span class="feature-icon" aria-hidden="true">⚔</span><h3>Alianças e batalhas</h3><p>Forme alianças e participe dos confrontos quando habilitados.</p></article>
-<article class="feature-card"><span class="feature-icon" aria-hidden="true">☼</span><h3>Eventos diários</h3><p>Acompanhe recompensas e eventos disponíveis no servidor.</p></article>
-<article class="feature-card"><span class="feature-icon" aria-hidden="true">♛</span><h3>Skins e pacotes</h3><p>Personalizações e conteúdos opcionais sujeitos a disponibilidade.</p></article></div>
-</section>
-<section class="section" aria-labelledby="gallery-title">
-  <div class="eyebrow">Galeria do jogo</div>
-  <h2 id="gallery-title">Veja o reino em ação</h2>
-  <p>As capturas reais do Android serão adicionadas após a homologação visual. Os espaços abaixo não são imagens de jogabilidade.</p>
-  <div class="gallery-grid"><figure><div class="shot-placeholder"><span>Captura do jogo em preparação</span></div><figcaption>Castelo e construções</figcaption></figure>
-<figure><div class="shot-placeholder"><span>Captura do jogo em preparação</span></div><figcaption>Mapa e exploração</figcaption></figure>
-<figure><div class="shot-placeholder"><span>Captura do jogo em preparação</span></div><figcaption>Heróis e dragões</figcaption></figure></div>
-</section>
-<section class="section instructions" aria-labelledby="install-title">
-  <div class="eyebrow">Instalação segura</div>
-  <h2 id="install-title">Como instalar no Android</h2>
-  <p>Quando o APK oficial estiver disponível, siga os passos abaixo. Não baixe arquivos de fontes desconhecidas.</p>
-  <ol class="install-steps"><li><span class="step-num">1</span><strong>Baixe pelo portal</strong>Use o botão oficial quando a versão estiver liberada.</li>
-<li><span class="step-num">2</span><strong>Confira o arquivo</strong>Verifique origem, checksum SHA-256 e assinatura do APK.</li>
-<li><span class="step-num">3</span><strong>Instale no Android</strong>Abra o APK e autorize essa fonte se o Android solicitar.</li>
-<li><span class="step-num">4</span><strong>Entre no reino</strong>Inicie o app com conexão à internet para sincronizar.</li></ol>
-  <p class="safety-note"><strong>Baixe somente o APK oficial desta página.</strong> APK direto não significa publicação na Play Store. O instalador por convite é separado da versão comercial e exige um código para jogar; a versão para iPhone ainda não está disponível.</p>
-</section>
-<section class="final-cta" aria-labelledby="final-title">
-  <div class="eyebrow">Sua próxima conquista</div>
-  <h2 id="final-title">Seu reino está esperando. Baixe agora.</h2>
-  <p>Instale o Clash of Izzy assim que a versão Android oficial estiver liberada.</p>
-  <a class="download" id="download-apk-final" aria-disabled="true" tabindex="-1">Baixar APK Android</a>
-  <p class="fine-print">Download indisponível até a publicação da release oficial.</p>
-</section>
-<aside class="support-mini" aria-label="Apoio ao desenvolvimento">
-  <span><strong>Projeto independente.</strong> Apoiar é opcional e depende da habilitação dos pagamentos.</span>
-  <a href="/apoie.html">Conhecer o projeto de apoio</a>
-</aside>
+  </section>
+  <details class="details">
+    <summary>Informações e acesso por convite</summary>
+    <div class="details-content">
+      <p id="invite-download-status" role="status" aria-live="polite">Verificando acesso por convite…</p>
+      <a id="checksum-link" hidden>SHA-256 do APK oficial</a>
+      <a id="invite-checksum" hidden>SHA-256 do APK por convite</a>
+      <p>Baixe somente os instaladores oficiais. Confira a assinatura e o SHA-256; o acesso por convite exige código para jogar. Versão para iPhone indisponível.</p>
+      <a id="official-release-page" href="https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases" target="_blank" rel="noopener noreferrer">Versões oficiais</a>
+      <div class="share-row" aria-label="Compartilhar">
+        <button id="share-portal" type="button">Compartilhar</button>
+        <a id="share-whatsapp" target="_blank" rel="noopener noreferrer">WhatsApp</a>
+        <a id="share-facebook" target="_blank" rel="noopener noreferrer">Facebook</a>
+        <button id="copy-portal" type="button">Copiar link</button>
+      </div>
+      <p id="share-status" role="status" aria-live="polite"></p>
+      <a href="/apoie.html">Apoiar o projeto</a>
+      <p>© 2026 Clash of Izzy · Projeto independente.</p>
+    </div>
+  </details>
 </main>
-<footer class="wrap">© 2026 Clash of Izzy. Projeto independente, sem associação a outros jogos ou editoras.</footer>
 <script>
 (() => {
   "use strict";
   const repo = "jorgepereiragha-cyber/Clash-of-Izzy-";
   const filename = "clash-of-izzy-android.apk";
-  const buttons = [document.getElementById("download-apk"), document.getElementById("download-apk-final")];
+  const buttons = [document.getElementById("download-apk")];
   const status = document.getElementById("download-status");
   const checksum = document.getElementById("checksum-link");
   const prefix = "/" + repo + "/releases/download/";
@@ -240,7 +133,7 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
     const link = publicUrl + "?utm_source=compartilhamento&utm_medium=social&utm_campaign=eldoria_pre_lancamento";
     try {
       await navigator.clipboard.writeText(link);
-      shareStatus.textContent = "Link oficial copiado. Compartilhe nas redes sociais sem anunciar que o APK já está disponível.";
+      shareStatus.textContent = "Link oficial copiado. Compartilhe com seus aliados.";
     } catch {
       shareStatus.textContent = "Link para compartilhar: " + link;
     }
@@ -271,21 +164,29 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
         url.pathname.startsWith(prefix) && url.search === "" && url.hash === "";
     } catch { return false; }
   }
+  function uniqueReleaseAsset(release, expected) {
+    const matches = release.assets.filter(asset => asset && asset.name === expected);
+    if (!(matches.length === 1)) return null;
+    const asset = matches[0];
+    return validAsset(asset, expected) &&
+      Number.isSafeInteger(asset.size) && asset.size > 0 &&
+      new URL(asset.browser_download_url).pathname === prefix + encodeURIComponent(release.tag_name) + "/" + expected
+      ? asset : null;
+  }
   async function findOfficialApk() {
     try {
       const release = await fetchReleaseJson("/releases/latest");
-      if (release.draft || release.prerelease || !Array.isArray(release.assets)) throw new Error("release não oficial");
-      const apk = release.assets.find(asset => validAsset(asset, filename) && asset.size > 0);
-      const hash = release.assets.find(asset => validAsset(asset, filename + ".sha256"));
-      if (!apk || !hash || hash.size <= 0) throw new Error("APK e SHA-256 não publicados");
-      if (!release.tag_name || ![apk,hash].every(asset => new URL(asset.browser_download_url).pathname.startsWith(prefix + encodeURIComponent(release.tag_name) + "/"))) throw new Error("tag da release incompatível");
+      if (!release || release.draft !== false || release.prerelease !== false || !Array.isArray(release.assets) || typeof release.tag_name !== "string" || !release.tag_name) throw new Error("release não oficial");
+      const exactAsset = expected => uniqueReleaseAsset(release, expected);
+      const apk = exactAsset(filename), hash = exactAsset(filename + ".sha256");
+      if (!apk || !hash) throw new Error("APK e SHA-256 não publicados");
       for (const button of buttons) {
         button.href = apk.browser_download_url;
         button.setAttribute("download", filename);
         button.removeAttribute("aria-disabled");
         button.removeAttribute("tabindex");
       }
-      status.textContent = "Versão " + String(release.tag_name) + " disponível no GitHub. Confira o SHA-256 e a assinatura antes de instalar.";
+      status.textContent = "Versão " + String(release.tag_name) + " disponível.";
       checksum.href = hash.browser_download_url;
       checksum.rel = "noopener noreferrer";
       checksum.hidden = false;
@@ -297,7 +198,7 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
       }
       checksum.removeAttribute("href");
       checksum.hidden = true;
-      status.textContent = "O APK comercial ainda não está disponível ou não foi possível verificar a publicação oficial. Use somente um instalador autorizado nesta página.";
+      status.textContent = "O APK comercial ainda não está disponível.";
     }
   }
 
@@ -313,12 +214,7 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
         /^android-access-v[1-9][0-9]{0,8}$/.test(r.tag_name))
         .sort((a,b) => Number(b.tag_name.slice(16)) - Number(a.tag_name.slice(16)))[0];
       if (!release || !Array.isArray(release.assets)) throw new Error("sem instalador");
-      const asset = expected => {
-        const matches = release.assets.filter(a => validAsset(a, expected) &&
-          Number.isSafeInteger(a.size) && a.size > 0 &&
-          new URL(a.browser_download_url).pathname === prefix + release.tag_name + "/" + expected);
-        return matches.length === 1 ? matches[0] : null;
-      };
+      const asset = expected => uniqueReleaseAsset(release, expected);
       const apk = asset(name), hash = asset(name + ".sha256");
       if (!apk || !hash) throw new Error("arquivos ausentes");
       button.href = apk.browser_download_url;
@@ -328,7 +224,7 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
       checksum.href = hash.browser_download_url;
       checksum.rel = "noopener noreferrer";
       checksum.hidden = false;
-      status.textContent = "Instalador Android por convite disponível. Confira a assinatura e o SHA-256 antes de instalar. O código de convite continua obrigatório.";
+      status.textContent = "Instalador por convite disponível. Código obrigatório.";
     } catch {
       button.removeAttribute("href");
       button.setAttribute("aria-disabled", "true");

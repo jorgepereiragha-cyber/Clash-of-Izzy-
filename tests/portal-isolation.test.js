@@ -90,13 +90,13 @@ test("identidade rei guerreiro usa capa real responsiva sem ativar download inex
   assert.match(publicHtml,/class="royal-art"/);
   assert.match(publicHtml,/--gold:#f1c467/);
   assert.match(publicHtml,/@media\(max-width:800px\)/);
-  assert.match(publicHtml,/\.royal-copy\{text-align:center;order:-1\}/);
-  assert.match(publicHtml,/alt="Rei guerreiro de coroa dourada/);
+  assert.match(publicHtml,/\.royal-copy\{text-align:center/);
+  assert.match(publicHtml,/src="\/assets\/brand\/royal-king\.webp"/);
   assert.match(publicHtml,/id="download-apk" aria-disabled="true"/);
   assert.doesNotMatch(publicHtml,/id="play-browser"|kingdom\.html/);
-  assert.match(publicHtml,/id="download-apk-final" aria-disabled="true"/);
-  assert.match(publicHtml,/Captura do jogo em preparação/);
-  assert.match(publicHtml,/Veja o reino em ação/);
+  assert.match(publicHtml,/id="download-invite" aria-disabled="true"/);
+  assert.doesNotMatch(publicHtml,/shot-placeholder|feature-card|gallery-grid/);
+  assert.match(publicHtml,/<details class="details">/);
   assert.match(publicHtml,/id="checksum-link" hidden/);
   assert.match(publicHtml,/function validAsset\(asset, expectedName\)/);
   assert.doesNotMatch(publicHtml,/href="\/(?:kingdom|world|arena)\.html"/);
