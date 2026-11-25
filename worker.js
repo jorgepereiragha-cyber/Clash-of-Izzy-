@@ -2984,10 +2984,12 @@ export default {
       }else if(pending.product_kind==="vip_package"){
         result=await env.DB.batch([
           approvalStatement,
-          env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()=1 AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.gems_amount,pending.player_id,id),
-          ...(pending.product_name===MASTER_PACK_NAME?masterGrantStatements(env.DB,id):[])
+          ...(pending.product_name===MASTER_PACK_NAME?masterGrantStatements(env.DB,id):[
+            env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()=1 AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')").bind(pending.gems_amount,pending.player_id,id)
+          ])
         ]);
         if(!result[0]?.meta?.changes)return json({error:"Pedido já processado ou referência de pagamento duplicada."},409);
+        if(pending.product_name===MASTER_PACK_NAME&&!result[1]?.meta?.changes)return json({error:"Pagamento registrado; pacote Master não concedido novamente. Conciliação manual necessária.",manualReview:true},409);
       }else{
         result=await env.DB.batch([
           approvalStatement,
