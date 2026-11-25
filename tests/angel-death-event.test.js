@@ -256,3 +256,47 @@ test("Anjo da Morte: an existing attack cannot settle twice after a rejected ins
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_events").get().n,0);
   }finally{db.close();}
 });
+
+test("Anjo da Morte: pending rewards recover once and failed credits roll back",async()=>{
+  const {DatabaseSync}=await import("node:sqlite");
+  const {appendAngelDeathReward}=await import("../worker.js");
+  const db=new DatabaseSync(":memory:");
+  try{
+    db.exec(`
+      CREATE TABLE world_events(id INTEGER PRIMARY KEY,ends_at TEXT,status TEXT);
+      CREATE TABLE world_event_rewards(event_id INTEGER,kingdom_id INTEGER,rank INTEGER,score INTEGER,reward_json TEXT,paid_at TEXT,UNIQUE(event_id,kingdom_id));
+      CREATE TABLE players(id INTEGER PRIMARY KEY,gems INTEGER);
+      CREATE TABLE kingdoms(id INTEGER PRIMARY KEY,player_id INTEGER,food INTEGER,wood INTEGER,stone INTEGER,iron INTEGER,gold INTEGER,updated_at TEXT);
+      CREATE TABLE inventory_items(kingdom_id INTEGER,item_key TEXT,quantity INTEGER,UNIQUE(kingdom_id,item_key));
+      INSERT INTO world_events VALUES(1,'2026-11-30T03:00:00.000Z','active'),(2,'2026-12-07T03:00:00.000Z','active');
+      INSERT INTO players VALUES(1,0),(2,0);
+      INSERT INTO kingdoms VALUES(10,1,0,0,0,0,0,NULL),(20,2,0,0,0,0,0,NULL);
+      INSERT INTO world_event_rewards VALUES(1,10,1,200,'{}',NULL);
+    `);
+    const adapter={prepare(sql){return {bind(...args){return {sql,args}}}}};
+    const paidAt="2026-11-30T03:01:00.000Z";
+    const pay=(eventId,kingdom_id,player_id,rank,fault=false)=>{
+      const statements=[];
+      appendAngelDeathReward(adapter,statements,{eventId,participant:{kingdom_id,player_id,score:200},rank,paidAt});
+      db.exec("BEGIN");
+      try{
+        for(const {sql,args} of statements){
+          if(fault&&sql.startsWith("INSERT INTO inventory_items"))throw Error("delivery failure");
+          db.prepare(sql).run(...args);
+        }
+        db.exec("COMMIT");
+      }catch(error){db.exec("ROLLBACK");throw error;}
+    };
+    assert.throws(()=>pay(1,10,1,1,true),/delivery failure/);
+    assert.equal(db.prepare("SELECT paid_at FROM world_event_rewards").get().paid_at,null);
+    assert.equal(db.prepare("SELECT gems FROM players WHERE id=1").get().gems,0);
+    assert.equal(db.prepare("SELECT food FROM kingdoms WHERE id=10").get().food,0);
+    pay(1,10,1,1);pay(1,10,1,1);pay(1,20,2,2);pay(1,20,2,2);pay(2,10,1,1);
+    assert.equal(db.prepare("SELECT gems FROM players WHERE id=1").get().gems,12000);
+    assert.equal(db.prepare("SELECT gems FROM players WHERE id=2").get().gems,9000);
+    assert.equal(db.prepare("SELECT food FROM kingdoms WHERE id=10").get().food,5000000);
+    assert.equal(db.prepare("SELECT quantity FROM inventory_items WHERE kingdom_id=10").get().quantity,500);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM world_event_rewards WHERE paid_at IS NOT NULL").get().n,2);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM world_event_rewards WHERE event_id=2").get().n,0);
+  }finally{db.close();}
+});

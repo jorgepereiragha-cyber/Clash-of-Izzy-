@@ -2030,6 +2030,19 @@ async function angelDeathEventAttack(env,playerId,body,now=new Date()){
   return json({success:true,damage:Number(attackRecord?.damage||0),score:Number(attackRecord?.score||0),losses:simulation.losses,troopsLost:simulation.troopsLost,lossRatePercent:Math.round(simulation.lossRate*100),bossHpRemaining:Number(updated?.boss_hp_remaining||0),message:"Ataque registrado. As baixas foram aplicadas permanentemente ao exército deste evento."});
 }
 
+// Claim an unpaid reward and credit it in the same D1 transaction.
+export function appendAngelDeathReward(db,statements,{eventId,participant,rank,paidAt}){
+  const reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
+  const eligible="EXISTS(SELECT 1 FROM world_events WHERE id=? AND ends_at<=? AND status IN ('scheduled','active'))";
+  statements.push(
+    db.prepare("INSERT OR IGNORE INTO world_event_rewards(event_id,kingdom_id,rank,score,reward_json) SELECT ?,?,?,?,? WHERE "+eligible).bind(eventId,participant.kingdom_id,rank,participant.score,rewardJson,eventId,paidAt),
+    db.prepare("UPDATE world_event_rewards SET paid_at=?,rank=?,score=?,reward_json=? WHERE event_id=? AND kingdom_id=? AND paid_at IS NULL AND "+eligible+" AND EXISTS(SELECT 1 FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE k.id=? AND p.id=?)").bind(paidAt,rank,participant.score,rewardJson,eventId,participant.kingdom_id,eventId,paidAt,participant.kingdom_id,participant.player_id),
+    db.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()=1").bind(reward.food,reward.wood,reward.stone,reward.iron,reward.gold,participant.kingdom_id),
+    db.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()=1").bind(reward.gems,participant.player_id),
+    db.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?, 'death_essence', ? WHERE changes()=1 ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+excluded.quantity").bind(participant.kingdom_id,reward.deathEssence)
+  );
+}
+
 async function distributeAngelDeathRewards(env,eventId,now=new Date()){
   const participants=await env.DB.prepare(
     "SELECT ranked.kingdom_id,ranked.player_id,ranked.score,ranked.final_rank FROM ("+
@@ -2042,16 +2055,12 @@ async function distributeAngelDeathRewards(env,eventId,now=new Date()){
   if(rows.length){
     const statements=[];
     for(let index=0;index<rows.length;index++){
-      const participant=rows[index],rank=Number(participant.final_rank)||index+1,reward=angelDeathRewardForRank(rank),rewardJson=JSON.stringify(reward);
-      statements.push(env.DB.prepare("INSERT OR IGNORE INTO world_event_rewards(event_id,kingdom_id,rank,score,reward_json) VALUES(?,?,?,?,?)").bind(eventId,participant.kingdom_id,rank,participant.score,rewardJson));
-      statements.push(env.DB.prepare("UPDATE kingdoms SET food=food+?,wood=wood+?,stone=stone+?,iron=iron+?,gold=gold+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()>0").bind(reward.food,reward.wood,reward.stone,reward.iron,reward.gold,participant.kingdom_id));
-      statements.push(env.DB.prepare("UPDATE players SET gems=gems+? WHERE id=? AND changes()>0").bind(reward.gems,participant.player_id));
-      statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?, 'death_essence', ? WHERE changes()>0 ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+excluded.quantity").bind(participant.kingdom_id,reward.deathEssence));
-      statements.push(env.DB.prepare("UPDATE world_event_rewards SET paid_at=? WHERE event_id=? AND kingdom_id=? AND paid_at IS NULL AND changes()>0").bind(now.toISOString(),eventId,participant.kingdom_id));
+      const participant=rows[index],rank=Number(participant.final_rank)||index+1;
+      appendAngelDeathReward(env.DB,statements,{eventId,participant,rank,paidAt:now.toISOString()});
     }
     await env.DB.batch(statements);
   }
-  await env.DB.prepare("UPDATE world_events SET status='completed',rewards_distributed_at=? WHERE id=? AND ends_at<=? AND NOT EXISTS(SELECT 1 FROM world_event_participants ep LEFT JOIN world_event_rewards wr ON wr.event_id=ep.event_id AND wr.kingdom_id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0 AND (wr.id IS NULL OR wr.paid_at IS NULL))")
+  await env.DB.prepare("UPDATE world_events SET status='completed',rewards_distributed_at=COALESCE(rewards_distributed_at,?) WHERE id=? AND status IN ('scheduled','active') AND ends_at<=? AND NOT EXISTS(SELECT 1 FROM world_event_participants ep LEFT JOIN world_event_rewards wr ON wr.event_id=ep.event_id AND wr.kingdom_id=ep.kingdom_id WHERE ep.event_id=? AND ep.score>0 AND (wr.id IS NULL OR wr.paid_at IS NULL))")
     .bind(now.toISOString(),eventId,now.toISOString(),eventId).run();
 }
 
