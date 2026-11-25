@@ -798,6 +798,21 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal((await actionFor(cookie,start.data.token,{type:"hero_evolve",hero:"kael_sunwarden",expectedStars:maxStars})).status,409);
     assert.equal(heroStars(await getStateFor(cookie,start.data.token)).fragments,1000);
     console.log("Beta hero stars passed: exact cost, concurrent CAS, replay, stat increase and rarity cap.");
+    // Disposable D1 fixture: move five active militia to wounded, not new troops.
+    await localSql("UPDATE kingdoms SET food=10000 WHERE id="+queueRealm);
+    await localSql("UPDATE army_units SET quantity=quantity-5,wounded=wounded+5 WHERE kingdom_id="+queueRealm+" AND unit_type='militia' AND tier=1 AND quantity>=5");
+    const beforeHeal=await getStateFor(cookie,start.data.token);
+    const patient=beforeHeal.hospital.patients.find(x=>x.unit==="militia"&&x.tier===1);
+    assert.ok(patient&&patient.wounded>=5);
+    const heal={type:"hospital_heal",unit:"militia",tier:1,quantity:5,expectedWounded:patient.wounded};
+    const healRace=await Promise.all([actionFor(cookie,start.data.token,heal),actionFor(cookie,start.data.token,heal)]);
+    assert.deepEqual(healRace.map(x=>x.status).sort((a,b)=>a-b),[200,409]);
+    assert.equal((await actionFor(cookie,start.data.token,heal)).status,409);
+    const afterHeal=await getStateFor(cookie,start.data.token);
+    assert.equal(afterHeal.hospital.wounded,beforeHeal.hospital.wounded-5);
+    assert.equal(afterHeal.totalTroops,beforeHeal.totalTroops+5);
+    assert.equal(afterHeal.armyCount,beforeHeal.armyCount);
+    console.log("Beta hospital recovery passed: wounded to active, capacity conserved and replay rejected.");
 
     const methods = await http(base, "/api/store/payment-methods", {cookie});
     assert.equal(methods.status, 200);

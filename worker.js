@@ -1,6 +1,7 @@
 export { EldoriaRoom } from "./eldoria-room.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "./game-adapter.js";
+import { hospitalEnabled,HOSPITAL_PER_LEVEL,HOSPITAL_HEAL_MAX,recoverableLosses,hospitalHealCost,hospitalAdmission } from "./hospital-policy.js";
 import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, HERO_SUMMON_RARITY_ODDS, heroView, getHeroCombatBonuses, getHeroSummonOdds } from "./hero-catalog.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank, sameAngelDeathAttackUnits } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
@@ -625,6 +626,11 @@ async function processMarches(env,kingdomId,batchSize=50){
    for(const [unit,qty] of Object.entries(survivors)){
     if(qty>0)statements.push(env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT ?,?,?,? WHERE "+guard+" ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(kingdomId,unit,1,qty,m.id,kingdomId,resolutionToken));
    }
+   // PvE casualties remain absent from active troops; up to half may be admitted to hospital.
+   if(hospitalEnabled(env))for(const u of army){
+     const admitted=recoverableLosses(u.quantity,Number(survivors[u.unit_type]||0));
+     if(admitted>0)statements.push(hospitalAdmission(env.DB,kingdomId,u.unit_type,admitted,guard,[m.id,kingdomId,resolutionToken]));
+   }
    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,CASE WHEN json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured')=1 THEN 'territory_captured' ELSE 'territory_attack_resolved' END,json_object('territoryId',?,'won',json_extract((SELECT rewards_json FROM battle_reports WHERE attacker_kingdom_id=? AND territory_id=? ORDER BY id DESC LIMIT 1),'$.territoryCaptured'),'losses',json(?)) WHERE "+guard)
     .bind(kingdomId,kingdomId,m.target_territory_id,m.target_territory_id,kingdomId,m.target_territory_id,JSON.stringify(losses),m.id,kingdomId,resolutionToken));
   }else{
@@ -883,7 +889,9 @@ async function gameState(env,playerId){
     try{return total+Object.values(JSON.parse(row.units_json||"{}")).reduce((sum,value)=>sum+Math.max(0,Math.floor(Number(value)||0)),0)}catch{return total;}
   },0);
   const queuedTraining=(queues.results||[]).filter(row=>row.queue_type==="training"&&row.status==="running").reduce((sum,row)=>sum+Math.max(0,Number(row.quantity)||0),0);
-  const armyCount=totalTroops+fieldTroops+queuedTraining;
+  const woundedTroops=hospitalEnabled(env)?(troops.results||[]).reduce((n,u)=>n+Number(u.wounded||0),0):0;
+  const armyCount=totalTroops+fieldTroops+queuedTraining+woundedTroops;
+  const hospital=hospitalEnabled(env)?{capacity:Math.max(0,Number((buildings.results||[]).find(b=>b.building_type==="hospital")?.level||0))*HOSPITAL_PER_LEVEL,wounded:woundedTroops,maxTreatment:HOSPITAL_HEAL_MAX,patients:(troops.results||[]).filter(u=>u.wounded>0&&Object.hasOwn(UNITS,u.unit_type)).map(u=>({unit:u.unit_type,tier:u.tier,wounded:u.wounded,label:UNITS[u.unit_type].label,foodPerUnit:hospitalHealCost(1,UNITS[u.unit_type].food)}))}:null;
   const academyLevel=(buildings.results||[]).find(row=>row.building_type==="academy")?.level||0;
   const militaryLevel=(research.results||[]).find(row=>row.research_key==="military")?.level||0;
   const topMarchHero=[...(heroInventory.results||[])].sort((a,b)=>{
@@ -927,7 +935,7 @@ async function gameState(env,playerId){
     getKingdomProgression(env,kingdom.id)
   ]):null;
   const specialCityBuildings=specialCityEnabled(env)?(await env.DB.prepare("SELECT building_type,grid_x,grid_z,width,height FROM city_special_buildings WHERE kingdom_id=? ORDER BY building_type").bind(kingdom.id).all()).results||[]:[];
-  return {specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
+  return {hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
     defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
@@ -1602,6 +1610,19 @@ async function gameAction(env,playerId,body){
     statements.push(env.DB.prepare("DELETE FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?").bind(k.id,actionId));
     const result=await env.DB.batch(statements);
     if(!result[1]?.meta?.changes)return json({error:"Recursos ou materiais insuficientes, ou fila de construção ocupada. Atualize e tente novamente."},409);
+  }else if(type==="hospital_heal"){
+    if(!hospitalEnabled(env))return json({error:"Hospital indisponível."},503);
+    const unit=body.unit,tier=body.tier,quantity=body.quantity,expected=body.expectedWounded;
+    const spec=typeof unit==="string"&&Object.hasOwn(UNITS,unit)?UNITS[unit]:null;
+    const food=spec?hospitalHealCost(quantity,spec.food):null;
+    if(food===null||!Number.isSafeInteger(tier)||tier<1||tier>10||!Number.isSafeInteger(expected)||expected<quantity)return json({error:"Tratamento inválido."},400);
+    // Wounded troops already reserve army capacity; healing only moves them into active service.
+    const result=await env.DB.batch([
+      env.DB.prepare("UPDATE kingdoms SET food=food-? WHERE id=? AND food>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type='hospital' AND level>=1) AND EXISTS(SELECT 1 FROM army_units WHERE kingdom_id=? AND unit_type=? AND tier=? AND wounded=? AND wounded>=?)").bind(food,k.id,food,k.id,k.id,unit,tier,expected,quantity),
+      env.DB.prepare("UPDATE army_units SET wounded=wounded-?,quantity=quantity+? WHERE kingdom_id=? AND unit_type=? AND tier=? AND wounded=? AND wounded>=? AND changes()=1").bind(quantity,quantity,k.id,unit,tier,expected,quantity),
+      env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(k.id,"hospital_healed",JSON.stringify({unit,tier,quantity,food}))
+    ]);
+    if(result.some(row=>row?.meta?.changes!==1))return json({error:"Feridos, hospital ou recursos alterados. Sincronize o reino."},409);
   }else if(type==="train"){
     const unit=String(body.unit||"militia"),quantity=Math.max(1,Math.min(100,Math.floor(Number(body.quantity)||10)));
     const spec=Object.hasOwn(UNITS,unit)?UNITS[unit]:null;if(!spec)return json({error:"Tipo de tropa inválido."},400);
@@ -1612,7 +1633,7 @@ async function gameAction(env,playerId,body){
     if(!barracks)return json({error:"Construa o quartel antes de treinar tropas."},409);
     const troopCapacity=Math.max(1,Number(barracks.level)||1)*TROOP_CAPACITY_PER_BARRACKS_LEVEL;
     const [ownedArmy,fieldArmy,pendingArmy]=await Promise.all([
-      env.DB.prepare("SELECT COALESCE(SUM(quantity),0) AS total FROM army_units WHERE kingdom_id=?").bind(k.id).first(),
+      env.DB.prepare("SELECT COALESCE(SUM("+(hospitalEnabled(env)?"quantity+wounded":"quantity")+"),0) AS total FROM army_units WHERE kingdom_id=?").bind(k.id).first(),
       env.DB.prepare("SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) AS total FROM marches m,json_each(m.units_json) j WHERE m.kingdom_id=? AND m.status='marching'").bind(k.id).first(),
       env.DB.prepare("SELECT COALESCE(SUM(quantity),0) AS total FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running'").bind(k.id).first()
     ]);
@@ -1628,7 +1649,7 @@ async function gameAction(env,playerId,body){
     const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();
     const actionId=crypto.randomUUID(),guard="EXISTS(SELECT 1 FROM kingdom_events WHERE kingdom_id=? AND event_type='__internal_action_guard' AND payload_json=?)";
     const debit=env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND food>=? AND wood>=? AND iron>=? AND EXISTS(SELECT 1 FROM kingdom_buildings WHERE kingdom_id=? AND building_type=? AND level>=1) AND NOT EXISTS(SELECT 1 FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND queue_slot=? AND status='running')"+
-      " AND ((SELECT COALESCE(SUM(quantity),0) FROM army_units WHERE kingdom_id=?)"+
+      " AND ((SELECT COALESCE(SUM("+(hospitalEnabled(env)?"quantity+wounded":"quantity")+"),0) FROM army_units WHERE kingdom_id=?)"+
       "+(SELECT COALESCE(SUM(CAST(j.value AS INTEGER)),0) FROM marches m,json_each(m.units_json) j WHERE m.kingdom_id=? AND m.status='marching')"+
       "+(SELECT COALESCE(SUM(quantity),0) FROM kingdom_queues WHERE kingdom_id=? AND queue_type='training' AND status='running')+?)<= "+
       "(SELECT level*? FROM kingdom_buildings WHERE kingdom_id=? AND building_type='barracks')")

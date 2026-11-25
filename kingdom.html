@@ -290,6 +290,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <p class="muted">Uma pesquisa por vez. O nível só aumenta depois da conclusão confirmada pelo servidor.</p>
 </form>
 </section>
+<section class="panel" id="coiHospitalPanel" hidden><h2>Hospital militar</h2><div id="coiHospitalPatients" aria-live="polite"></div></section>
 <section class="panel"><h2>🛡️ Poder do reino</h2><div class="grid2" id="army"></div><div class="toolbar"><button class="secondary" id="goMap">🌍 Explorar territórios</button></div></section>
 <section class="panel"><h2>📜 Crônicas do reino</h2><div class="events" id="events"></div></section>
 <section class="panel" id="coiDragonPanel"><h2>🐉 Dragões de Eldoria · Azul, Roxo e Dourado</h2><p class="muted">Colecione nove dragões exclusivos; somente o equipado participa dos bônus do combate. Os três dourados pertencem ao pacote Master confirmado.</p><div id="dragonCollection" class="events" aria-live="polite"></div></section>
@@ -724,6 +725,21 @@ async function runKingdomPanelAction(payload,successMessage){
  }catch(error){setStatus(error.message||"Operação não concluída.",true);}
  finally{busy=false;render();}
 }
+function renderHospital(){
+ const panel=document.getElementById("coiHospitalPanel"),root=document.getElementById("coiHospitalPatients"),hospital=state?.hospital;
+ if(!panel||!root)return;
+ panel.hidden=!hospital;root.replaceChildren();if(!hospital)return;
+ const summary=document.createElement("p");summary.textContent="Feridos: "+fmt(hospital.wounded)+" / "+fmt(hospital.capacity)+" · Reservam capacidade do exército.";root.append(summary);
+ for(const patient of hospital.patients||[]){
+  const line=document.createElement("div");line.className="event";
+  const quantity=Math.min(patient.wounded,hospital.maxTreatment),food=quantity*patient.foodPerUnit;
+  const label=document.createElement("p");label.textContent=patient.label+" · Nível "+patient.tier+" · "+fmt(patient.wounded)+" feridos";
+  const button=document.createElement("button");button.type="button";button.textContent="Tratar "+fmt(quantity)+" · "+fmt(food)+" comida";
+  button.disabled=busy||quantity<1||Number(state.kingdom?.food||0)<food;
+  button.addEventListener("click",()=>runKingdomPanelAction({type:"hospital_heal",unit:patient.unit,tier:patient.tier,quantity,expectedWounded:patient.wounded},"Tropas tratadas e devolvidas ao exército."));
+  line.append(label,button);root.append(line);
+ }
+}
 function renderCastleVip(){
  const root=document.getElementById("castleVipProgress");if(!root)return;
  root.replaceChildren();
@@ -799,7 +815,7 @@ document.getElementById("coiCitySelectionDetails").addEventListener("click",()=>
  target.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
  target.focus({preventScroll:true});
 });
-function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderCastleVip();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();
+function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderCastleVip();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();renderHospital();
 const buildings=state.buildings||[];const city=document.getElementById("city");
 city.querySelectorAll(":scope > .building").forEach(button=>button.remove());
 city.insertAdjacentHTML("beforeend",buildings.slice(0,16).map((b,i)=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'"'+(i>=9?' hidden':'')+' data-building="'+esc(b.building_type)+'" aria-label="'+esc(name+", nível "+fmt(b.level)+". Ver melhorias")+'"><span class="emoji">'+esc(emoji)+'</span><strong data-compact="'+esc(compactBuildingNames[b.building_type]||name)+'">'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join(""));drawKingdomScene(buildings,Number(k.equipped_skin_id||0));watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomDragon=state.dragon?{dragon_key:state.dragon.dragon_key,level:state.dragon.level}:null;window.__coiKingdomDefenses=state.cityDefenses||[];window.__coiKingdomSpecialBuildings=state.specialCityBuildings||[];window.__coiKingdomHeroAssignments=state.advanced4xEnabled?(state.heroes||[]):[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.__coiKingdomCastleVipLevel=Number(state.castleVip?.level??k.prestige??0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],defenses:state.cityDefenses||[],heroes:window.__coiKingdomHeroAssignments,castleSkinId:Number(k.equipped_skin_id||0),castleVipLevel:window.__coiKingdomCastleVipLevel}}));
