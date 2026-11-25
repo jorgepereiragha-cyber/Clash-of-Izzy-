@@ -24,3 +24,18 @@ test("PvE rarity thresholds are bounded and deterministic",()=>{
  }
  for(const invalid of [null,0,31,1.5,undefined,"invalid"])assert.equal(pveFragmentReward(invalid),null);
 });
+
+
+test("reinforcement cost rejects invalid and maximum levels, preserving all ten prices",()=>{
+ for(const [level,cost] of ENHANCEMENT_COSTS.entries())assert.equal(enhancementCost(level),cost);
+ for(const level of [null,undefined,NaN,Infinity,-1,10,11,1.5,"1",false])assert.equal(enhancementCost(level),null);
+});
+test("reinforcement UI and debit fail closed when cost or fragment balance is unavailable",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const [worker,ui]=await Promise.all(["../worker.js","../equipment-system.js"].map(p=>readFile(new URL(p,import.meta.url),"utf8")));
+ assert.match(worker,/const cost=enhancementCost\(expected\)/);
+ assert.match(worker,/if\(cost===null\)return json/);
+ assert.match(ui,/Number\.isSafeInteger\(item\.enhancementCost\)/);
+ assert.match(ui,/Number\.isSafeInteger\(fragment\?\.balance\)/);
+ assert.match(ui,/enhancement>=10\|\|!validCost\|\|!validBalance/);
+});

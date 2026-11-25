@@ -1053,7 +1053,8 @@ async function gameAction(env,playerId,body){
     if(!Object.hasOwn(EQUIPMENT_CATALOG,itemKey))return json({error:"Equipamento inválido."},400);
     const def=EQUIPMENT_CATALOG[itemKey],expected=body.expectedEnhancement;
     if(!Number.isSafeInteger(expected)||expected<0||expected>=10)return json({error:"Reforço inválido ou máximo."},400);
-    const cost=ENHANCEMENT_COSTS[expected];
+    const cost=enhancementCost(expected);
+    if(cost===null)return json({error:"Custo de reforço indisponível."},409);
     // The debit checks ownership, lock and exact expected level in the same transaction.
     const result=await env.DB.batch([
       env.DB.prepare("UPDATE equipment_fragments SET quantity=quantity-? WHERE kingdom_id=? AND rarity=? AND quantity>=? AND EXISTS(SELECT 1 FROM kingdom_equipment WHERE kingdom_id=? AND item_key=? AND enhancement=? AND is_locked=0)").bind(cost,k.id,def.rarity,cost,k.id,itemKey,expected),
