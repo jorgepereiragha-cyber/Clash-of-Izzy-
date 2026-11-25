@@ -1,0 +1,7 @@
+# Ciências militares especializadas — experimento offline
+
+Referências de gênero: [Academia de Rise of Kingdoms](https://riseofkingdoms.fandom.com/wiki/Technology), [pesquisa sobre avaliação automatizada de balanceamento RTS](https://ieeexplore.ieee.org/abstract/document/9619032), [transações Cloudflare D1](https://developers.cloudflare.com/d1/worker-api/d1-database/).
+
+Quatro especializações originais: infantaria, arqueiros, cavalaria e cerco. Hipótese inicial de 0,3 ponto percentual de ataque por nível, máximo 10 níveis / 3 pontos percentuais. Somadas aos bônus universais existentes dentro do teto de 30%; não muda o bônus de mascote. Nenhum custo, requisito VIP, efeito de muralhas ou bônus de rally aprovado nesta etapa. Nenhum endpoint recebe os níveis experimentais, nenhum novo registro é gravado no D1 e o Worker não passa a opção ao simulador. A versão 1 é preservada; o experimento exige rulesVersion=2 e dados explícitos de teste. 
+
+Matriz de testes: quatro classes, três tiers, três tamanhos de exército e níveis 0/5/10 (108 simulações). Verificar isolamento de classe, conservação de tropas, determinismo, teto e ausência de efeitos na versão 1. Não representa PvP real nem comprova taxa de vitória equilibrada. Antes de disponibilizar: simulações de confrontos mistos, telemetria beta, definição de requisitos e custos, persistência autoritativa, validação atômica dos débitos, cobertura de marchas e demais modos e aprovação explícita dos limites.

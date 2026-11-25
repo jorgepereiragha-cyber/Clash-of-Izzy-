@@ -23,6 +23,15 @@ export function combatRulesVersion(env){
 }
 const CLASS=Object.freeze({militia:"infantry",swordsman:"infantry",spearman:"infantry",archer:"ranged",crossbowman:"ranged",mage:"ranged",cavalry:"cavalry",knight:"cavalry",catapult:"siege",ram:"siege",trebuchet:"siege"});
 const COUNTER=Object.freeze({infantry:"ranged",ranged:"cavalry",cavalry:"infantry"});
+// Experimental research profile, consumed only in offline tactical simulations
+// until Worker authority, research gates and live balance are homologated.
+export const SPECIALIZED_SCIENCE_KEYS=Object.freeze({infantry:"science_infantry",ranged:"science_archers",cavalry:"science_cavalry",siege:"science_siege"});
+export function specializedScienceAttackPercent(levels,unitType){
+  if(!Object.hasOwn(CLASS,unitType)||!levels||typeof levels!=="object"||Array.isArray(levels))return 0;
+  const key=SPECIALIZED_SCIENCE_KEYS[CLASS[unitType]];
+  const level=Object.hasOwn(levels,key)?levels[key]:0;
+  return Number.isSafeInteger(level)&&level>=0&&level<=10?level*0.3:0;
+}
 export function tacticalMultiplier(attacker,defender){
   const a=Object.hasOwn(CLASS,attacker)?CLASS[attacker]:null;
   const d=Object.hasOwn(CLASS,defender)?CLASS[defender]:null;
@@ -115,7 +124,7 @@ function attackPhase(acting, opposing, round, log, bonus = 0, critical = {}, met
   }
 }
 
-export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, skinAttackBonusPercent = 0, skinDefenseBonusPercent = 0, skinSetAttackBonusPercent = 0, skinSetDefenseBonusPercent = 0, skinSetHealthBonusPercent = 0, skinSetCriticalChancePercent = 0, heroAttackBonusPercent = 0, heroDefenseBonusPercent = 0, dragonAttackBonusPercent = 0, dragonDefenseBonusPercent = 0, castleVipAttackBonusPercent = 0, castleVipDefenseBonusPercent = 0, imperialAttackBonusPercent = 0, imperialDefenseBonusPercent = 0, imperialHealthBonusPercent = 0, heroHealthBonusPercent = 0, heroCriticalChancePercent = 0, infantryAttackBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1, rulesVersion=1 }) {
+export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLevel, heroLevel = 1, dragonLevel = 1, researchLevel = 0, defenseBonusPercent = 0, equipmentAttackBonusPercent = 0, equipmentHealthBonusPercent = 0, skinAttackBonusPercent = 0, skinDefenseBonusPercent = 0, skinSetAttackBonusPercent = 0, skinSetDefenseBonusPercent = 0, skinSetHealthBonusPercent = 0, skinSetCriticalChancePercent = 0, heroAttackBonusPercent = 0, heroDefenseBonusPercent = 0, dragonAttackBonusPercent = 0, dragonDefenseBonusPercent = 0, castleVipAttackBonusPercent = 0, castleVipDefenseBonusPercent = 0, imperialAttackBonusPercent = 0, imperialDefenseBonusPercent = 0, imperialHealthBonusPercent = 0, heroHealthBonusPercent = 0, heroCriticalChancePercent = 0, infantryAttackBonusPercent = 0, criticalChancePercent = 0, criticalDamageMultiplier = 1.5, criticalSeed = 1, castlePowerBonusPercent, roll = 1, rulesVersion=1, experimentalScienceLevels=null }) {
   const attackers = (rulesVersion===2?canonicalArmy(army):(army || []).filter(row => Number(row.quantity) > 0))
     .map((row, index) => makeStack(row, "attacker", index, rulesVersion));
   const defenseBonus = clamp((Number(defenseBonusPercent) || 0) + clamp(Number(skinDefenseBonusPercent) || 0, 0, 2.5) + clamp(Number(skinSetDefenseBonusPercent) || 0, 0, 2.5) + clamp(Number(heroDefenseBonusPercent) || 0, 0, 20) + clamp(Number(dragonDefenseBonusPercent) || 0, 0, 5.5) + clamp(Number(castleVipDefenseBonusPercent) || 0, 0, 7) + clamp(Number(imperialDefenseBonusPercent) || 0, 0, 6), 0, 30);
@@ -126,7 +135,11 @@ export function simulateBattle({ army, castleLevel = 1, defenderLevel = castleLe
   for (const stack of attackers) {
     stack.defenseBonusPercent = defenseBonus;
     const isInfantry = ["militia", "swordsman", "spearman"].includes(stack.key);
-    stack.power = stack.power * (1 + castlePowerBonus) * (1 + attackGearBonus) * (isInfantry ? (1 + infantryAttackBonus) : 1);
+    const scienceBonus=rulesVersion===2?specializedScienceAttackPercent(experimentalScienceLevels,stack.key)/100:0;
+    // Keep global gear/imperial/science attack within the existing 30% cap.
+    // The existing pet infantry modifier remains unchanged.
+    const effectiveAttackBonus=Math.min(0.30,attackGearBonus+scienceBonus);
+    stack.power = stack.power * (1 + castlePowerBonus) * (1 + effectiveAttackBonus) * (isInfantry ? (1 + infantryAttackBonus) : 1);
     stack.hpPerUnit = Math.floor(stack.hpPerUnit * (1 + castlePowerBonus) * (1 + healthGearBonus));
     stack.hp = stack.quantity * stack.hpPerUnit;
   }
