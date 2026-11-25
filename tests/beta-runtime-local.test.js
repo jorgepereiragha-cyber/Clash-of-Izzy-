@@ -632,6 +632,24 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.ok(Number.isSafeInteger(queueRealm) && queueRealm > 0);
     const localSql = async sql => command([...common,"execute","clash-of-izzy-beta-db","--local",
       "--persist-to",persist,"--command",sql]);
+    // Synthetic ownership only in the disposable D1: verify progress follows the individual dragon.
+    const dragonBeforeSwitch=await getStateFor(cookie,start.data.token);
+    const originalDragon=dragonBeforeSwitch.dragon;
+    await localSql("INSERT INTO kingdom_dragons(kingdom_id,dragon_key,source) VALUES("+queueRealm+",'mist_talon','game')");
+    const switchTo=key=>actionFor(cookie,start.data.token,{type:"dragon_equip",dragonKey:key});
+    const swapped=await switchTo("mist_talon");
+    assert.equal(swapped.status,200);
+    assert.equal(Number(swapped.data.state.dragon.level),1);
+    assert.equal(Number(swapped.data.state.dragon.bond),1);
+    assert.equal(Number(swapped.data.state.dragonCollection.find(x=>x.key===originalDragon.dragon_key).level),Number(originalDragon.level));
+    const staleDragon=await actionFor(cookie,start.data.token,{type:"dragon_upgrade",dragonKey:originalDragon.dragon_key,expectedLevel:Number(originalDragon.level)});
+    assert.equal(staleDragon.status,409);
+    const restored=await switchTo(originalDragon.dragon_key);
+    assert.equal(restored.status,200);
+    assert.equal(Number(restored.data.state.dragon.level),Number(originalDragon.level));
+    assert.equal(Number(restored.data.state.dragon.bond),Number(originalDragon.bond));
+    assert.equal(Number(restored.data.state.dragon.experience),Number(originalDragon.experience));
+    console.log("Beta individual dragon progression passed: switch and restore without transferring progress.");
     const countEvents = async type => {
       assert.ok(["research_started","research_upgraded","troop_training_started","troops_trained"].includes(type));
       const raw = await command([...common,"execute","clash-of-izzy-beta-db","--local",

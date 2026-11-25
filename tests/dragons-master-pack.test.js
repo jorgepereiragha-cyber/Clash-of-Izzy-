@@ -80,3 +80,15 @@ test("beta dragon progression binds key and level, and rejects replay",async()=>
  assert.match(action,/INSERT INTO kingdom_events.*WHERE changes\(\)=1/);
  assert.match(page,/type:"dragon_upgrade",dragonKey:dragon\.key,expectedLevel:level/);
 });
+
+test("individual dragon progress is not transferred to another creature",()=>{
+ const collection=getDragonCollectionView(["ember_wyrm","mist_talon"],"mist_talon",3,5,[
+  {dragon_key:"ember_wyrm",level:50,bond:70},{dragon_key:"mist_talon",level:3,bond:5}
+ ]);
+ assert.equal(collection.find(x=>x.key==="ember_wyrm").level,50);
+ assert.equal(collection.find(x=>x.key==="mist_talon").level,3);
+ assert.equal(collection.find(x=>x.key==="sun_ascendant").level,1);
+ assert.deepEqual(getDragonCombatBonuses({dragon_key:"ember_wyrm",level:50,bond:70}),
+  {attackPercent:collection[0].attackPercent,defensePercent:collection[0].defensePercent});
+ assert.equal(collection.filter(x=>x.equipped).length,1);
+});

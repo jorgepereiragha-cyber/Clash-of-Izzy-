@@ -916,10 +916,10 @@ async function gameState(env,playerId){
   const activeCastleSkin=castleSkinCombatView(activeCastleSkinRow);
   const petState=await getPetsState(env,kingdom.id);
   const [dragonOwnedRows,mailRows]=await env.DB.batch([
-    env.DB.prepare("SELECT dragon_key FROM kingdom_dragons WHERE kingdom_id=? ORDER BY dragon_key").bind(kingdom.id),
+    env.DB.prepare("SELECT dragon_key,level,experience,bond FROM kingdom_dragons WHERE kingdom_id=? ORDER BY dragon_key").bind(kingdom.id),
     env.DB.prepare("SELECT id,source_key,title,body,reward_key,read_at,claimed_at,created_at FROM kingdom_mailbox WHERE kingdom_id=? ORDER BY id DESC LIMIT 50").bind(kingdom.id)
   ]);
-  const dragonCollection=getDragonCollectionView((dragonOwnedRows.results||[]).map(row=>row.dragon_key),dragon?.dragon_key,dragon?.level,dragon?.bond);
+  const dragonCollection=getDragonCollectionView((dragonOwnedRows.results||[]).map(row=>row.dragon_key),dragon?.dragon_key,dragon?.level,dragon?.bond,dragonOwnedRows.results||[]);
   const advancedState=advanced4xEnabled(env)?await Promise.all([
     ensureIntermediateResources(env,kingdom.id),
     env.DB.prepare("SELECT id,defense_type,grid_x,grid_z,width,height,level FROM city_defenses WHERE kingdom_id=? ORDER BY id").bind(kingdom.id).all(),
@@ -1398,7 +1398,8 @@ async function gameAction(env,playerId,body){
   }else if(type==="dragon_equip"){
     const dragonKey=String(body.dragonKey||""),dragon=Object.hasOwn(DRAGON_BY_KEY,dragonKey)?DRAGON_BY_KEY[dragonKey]:null;
     if(!dragon)return json({error:"Dragão não encontrado."},404);
-    const result=await env.DB.prepare("UPDATE dragons SET dragon_key=?,dragon_name=? WHERE kingdom_id=? AND EXISTS(SELECT 1 FROM kingdom_dragons WHERE kingdom_id=? AND dragon_key=?)").bind(dragon.key,dragon.name,k.id,k.id,dragon.key).run();
+    // Read the target's saved progression in the same statement as the active switch.
+    const result=await env.DB.prepare("UPDATE dragons SET dragon_key=?,dragon_name=?,(level,experience,bond)=(SELECT level,experience,bond FROM kingdom_dragons WHERE kingdom_id=? AND dragon_key=?) WHERE kingdom_id=? AND EXISTS(SELECT 1 FROM kingdom_dragons WHERE kingdom_id=? AND dragon_key=?)").bind(dragon.key,dragon.name,k.id,dragon.key,k.id,k.id,dragon.key).run();
     if(!result.meta?.changes)return json({error:"Desbloqueie o dragão antes de equipar."},409);
   }else if(type==="mail_read"){
     const id=Number(body.mailId);
@@ -1428,11 +1429,12 @@ async function gameAction(env,playerId,body){
     const cost={food:250*level,wood:150*level,stone:100*level,iron:25*level};
     // Same D1 transaction: compare identity and level, debit, evolve and record.
     const result=await env.DB.batch([
-      env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,stone=stone-?,iron=iron-? WHERE id=? AND food>=? AND wood>=? AND stone>=? AND iron>=? AND EXISTS(SELECT 1 FROM dragons WHERE kingdom_id=? AND level=? AND dragon_key=?)").bind(cost.food,cost.wood,cost.stone,cost.iron,k.id,cost.food,cost.wood,cost.stone,cost.iron,k.id,level,dragonKey),
+      env.DB.prepare("UPDATE kingdoms SET food=food-?,wood=wood-?,stone=stone-?,iron=iron-? WHERE id=? AND food>=? AND wood>=? AND stone>=? AND iron>=? AND EXISTS(SELECT 1 FROM dragons d JOIN kingdom_dragons kd ON kd.kingdom_id=d.kingdom_id AND kd.dragon_key=d.dragon_key AND kd.level=d.level AND kd.experience=d.experience AND kd.bond=d.bond WHERE d.kingdom_id=? AND d.level=? AND d.dragon_key=?)").bind(cost.food,cost.wood,cost.stone,cost.iron,k.id,cost.food,cost.wood,cost.stone,cost.iron,k.id,level,dragonKey),
       env.DB.prepare("UPDATE dragons SET level=level+1,experience=experience+100,bond=MIN(100,bond+2) WHERE kingdom_id=? AND level=? AND dragon_key=? AND changes()=1").bind(k.id,level,dragonKey),
+      env.DB.prepare("UPDATE kingdom_dragons SET (level,experience,bond)=(SELECT level,experience,bond FROM dragons WHERE kingdom_id=? AND dragon_key=?) WHERE kingdom_id=? AND dragon_key=? AND changes()=1").bind(k.id,dragonKey,k.id,dragonKey),
       env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(k.id,"dragon_evolved",JSON.stringify({dragonKey,level:level+1,cost}))
     ]);
-    if(result[0]?.meta?.changes!==1||result[1]?.meta?.changes!==1||result[2]?.meta?.changes!==1)return json({error:"Recursos insuficientes ou dragão alterado."},409);
+    if(result.some(entry=>entry?.meta?.changes!==1))return json({error:"Recursos insuficientes ou dragão alterado."},409);
   }else if(type==="hero_summon"){
     const quantity=Number(body.quantity)===10?10:1,cost=quantity===10?900:100;
     const ownedRows=await env.DB.prepare("SELECT hero_key FROM hero_inventory WHERE kingdom_id=?").bind(k.id).all();
@@ -2151,6 +2153,8 @@ export default {
           const existingTriggers=new Set((triggerRows.results||[]).map(row=>row.name));
           missingTriggers=missingTriggers.filter(name=>!existingTriggers.has(name));
         }
+        // 0046 must be present before individual dragon queries are accepted.
+        await env.DB.prepare("SELECT level,experience,bond FROM kingdom_dragons LIMIT 0").all();
         checks.schema=missingTables.length===0&&missingTriggers.length===0;
       }catch(error){
         console.error("health_check_failed",String(error?.message||error));

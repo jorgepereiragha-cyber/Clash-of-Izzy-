@@ -1,5 +1,5 @@
 // Catálogo canônico de 9 dragões do Clash of Izzy: 3 azuis, 3 roxos e 3 dourados.
-// Apenas um dragão equipado aplica bônus. O nível pertence ao dragão ativo persistido.
+// Apenas um dragão equipado aplica bônus. A coleção mantém progresso individual.
 export const DRAGON_CATALOG=Object.freeze([
   {
     "key": "ember_wyrm",
@@ -130,13 +130,14 @@ export function getDragonCombatBonuses(row={}){
    defensePercent:Math.min(DRAGON_BONUS_CAP,Number((dragon.defense*factor).toFixed(2)))
  };
 }
-export function getDragonCollectionView(ownedKeys=[],activeKey="ember_wyrm",level=1,bond=1){
- const owned=new Set(ownedKeys.map(String));
- return DRAGON_CATALOG.map(dragon=>({
-   ...dragon,
-   owned:owned.has(dragon.key),
-   equipped:dragon.key===activeKey,
-   attackPercent:getDragonCombatBonuses({...dragon,dragon_key:dragon.key,level,bond}).attackPercent,
-   defensePercent:getDragonCombatBonuses({...dragon,dragon_key:dragon.key,level,bond}).defensePercent
- }));
+export function getDragonCollectionView(ownedKeys=[],activeKey="ember_wyrm",level=1,bond=1,progressRows=[]){
+ const owned=new Set(ownedKeys.map(String)),progress=new Map(progressRows.map(row=>[row.dragon_key,row]));
+ return DRAGON_CATALOG.map(dragon=>{
+   const equipped=owned.has(dragon.key)&&dragon.key===activeKey;
+   const saved=owned.has(dragon.key)?progress.get(dragon.key):null;
+   const individualLevel=Math.max(1,Math.min(100,Number(equipped?level:saved?.level)||1));
+   const individualBond=Math.max(1,Math.min(100,Number(equipped?bond:saved?.bond)||1));
+   return {...dragon,owned:owned.has(dragon.key),equipped,level:individualLevel,bond:individualBond,
+     ...getDragonCombatBonuses({dragon_key:dragon.key,level:individualLevel,bond:individualBond})};
+ });
 }
