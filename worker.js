@@ -2,7 +2,7 @@ export { EldoriaRoom } from "./eldoria-room.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses, combatRulesVersion } from "./game-adapter.js";
 import { hospitalEnabled,HOSPITAL_PER_LEVEL,HOSPITAL_HEAL_MAX,recoverableLosses,hospitalHealCost,hospitalAdmission } from "./hospital-policy.js";
-import { scienceEnabled,SCIENCE_CATALOG,sciencePercent,scienceRequirement,scienceDuration,scienceView,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses,resourceScienceMultipliers,structuralDefenseScience } from "./castle-science.js";
+import { scienceEnabled,SCIENCE_CATALOG,sciencePercent,scienceRequirement,scienceDuration,scienceView,scienceUpgradeCost,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses,resourceScienceMultipliers,structuralDefenseScience } from "./castle-science.js";
 import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, HERO_SUMMON_RARITY_ODDS, heroView, getHeroCombatBonuses, getHeroSummonOdds } from "./hero-catalog.js";
 import { ANGEL_DEATH_EVENT, getAngelDeathWeekendWindow, simulateAngelDeathAttack, angelDeathRewardForRank, sameAngelDeathAttackUnits } from "./angel-death-event.js";
 import { consumeRateLimit } from "./api-rate-limit.js";
@@ -42,6 +42,7 @@ import { handleOnboarding } from "./onboarding-bonus.js";
 import { createSupportCheckout } from "./support-orders.js";
 import { betaAccessGuard } from "./beta-access.js";
 import { productionWindow } from "./production-clock.js";
+import {activateCastleShield,castleShieldState} from "./castle-shield.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -227,7 +228,7 @@ async function getShopState(env,kingdomId){
   cycle,refreshAt:(cycle+1)*SHOP_CYCLE_MS,
   offers:offers.map(o=>({...SHOP_ITEMS[o.id],id:o.id,price:o.price,discount:o.discount,stock:stock[o.id]??o.stock,originalPrice:SHOP_ITEMS[o.id].price})),
   exchangeOffers:exchanges.map(o=>({...o,stock:stock[o.id]??o.stock,rewardName:SHOP_ITEMS[o.reward.item]?.name||o.reward.item})),
-  items:SHOP_ITEMS,inventory:inventory.results||[]
+  items:SHOP_ITEMS,inventory:inventory.results||[],castleShield:await castleShieldState(env,kingdomId)
  };
 }
 function rollHeroRarity(){
@@ -1162,6 +1163,9 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()>0").bind(k.id,"skin_fused",JSON.stringify({inputs,output:output.id,shards:50}))
     ]);
     if(!fusion[0]?.meta?.changes)return json({error:"Fragmentos insuficientes, skins alteradas ou fusão já realizada."},409);
+  }else if(type==="castle_shield_activate"){
+    const result=await activateCastleShield(env,Number(k.id),body);
+    if(!result.ok)return json({error:result.error},result.status);
   }else if(type==="shop_buy"){
     const itemId=String(body.item||""),source=String(body.source||"shop"),item=Object.hasOwn(SHOP_ITEMS,itemId)?SHOP_ITEMS[itemId]:null;
     if(!item||!["shop","merchant"].includes(source))return json({error:"Produto ou origem inválidos."},400);
@@ -1709,7 +1713,8 @@ async function gameAction(env,playerId,body){
     }
     const activeQueue=await env.DB.prepare("SELECT id FROM kingdom_queues WHERE kingdom_id=? AND queue_type='research' AND status='running'").bind(k.id).first();
     if(activeQueue)return json({error:"Sua fila de pesquisa já está ocupada. Aguarde a tecnologia atual."},409);
-    const c=science?.cost||allowed[key],factor=level+1,cost={wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
+    const c=allowed[key],factor=level+1,cost=science?scienceUpgradeCost(key,level):{wood:c.wood*factor,stone:c.stone*factor,iron:c.iron*factor};
+    if(!cost)return json({error:"Custo da ciência indisponível. Sincronize a Academia."},409);
     const valhallaMultipliers=await getValhallaMultipliers(env);
     const durationSeconds=await scaleKingdomQueueDurationSeconds(env,k.id,calculateQueueDurationSeconds("research",{level:level+1,facilityLevel:Math.max(1,centerLevel)}),"research",valhallaMultipliers);
     const startedAt=new Date().toISOString(),completesAt=new Date(Date.now()+durationSeconds*1000).toISOString();

@@ -26,6 +26,15 @@ export function imperialCombatBonuses(rows=[],kingdom={}){
  return {attackPercent:sciencePercent("imperial_attack",scienceLevel(levels.get("imperial_attack"),cap)),defensePercent:sciencePercent("imperial_defense",scienceLevel(levels.get("imperial_defense"),cap)),healthPercent:sciencePercent("imperial_health",scienceLevel(levels.get("imperial_health"),cap))};
 }
 export function scienceRequirement(key,level){const d=SCIENCE_CATALOG[key];return Object.hasOwn(SCIENCE_CATALOG,key)?d.academy+Math.floor(scienceLevel(level,d.maxLevel)/(d.imperial?3:2)):0;}
+// Single price policy for both research orders and Academy previews.
+export function scienceUpgradeCost(key,level){
+ if(!Object.hasOwn(SCIENCE_CATALOG,key)||!Number.isSafeInteger(level)||level<0||level>=SCIENCE_CATALOG[key].maxLevel)return null;
+ return Object.fromEntries(Object.entries(SCIENCE_CATALOG[key].cost).map(([resource,base])=>[resource,base*(level+1)]));
+}
+export function scienceResourceShortfall(cost,kingdom={}){
+ if(!cost||!kingdom||!Object.keys(cost).every(key=>Number.isFinite(kingdom[key])&&kingdom[key]>=0))return null;
+ return Object.fromEntries(Object.entries(cost).map(([key,amount])=>[key,Math.max(0,Math.ceil(amount-kingdom[key]))]));
+}
 export function scienceDuration(seconds,key,level){return Math.max(10,Math.ceil(seconds*(1-sciencePercent(key,level)/100)));}
 export function hospitalScienceCapacity(level,medicine){return Math.max(0,Math.floor(Number(level)||0))*(100+2*scienceLevel(medicine));}
 export function scienceView(rows=[],academy=0,kingdom={}){
@@ -34,11 +43,16 @@ export function scienceView(rows=[],academy=0,kingdom={}){
   const level=scienceLevel(levels.get(key),d.maxLevel),requiredAcademy=scienceRequirement(key,level),[requiredKey,requiredLevel]=d.prerequisite;
   const unlockedMax=d.imperial?imperialScienceCap(kingdom):d.maxLevel;
   const nextVip=d.imperial&&level<d.maxLevel?IMPERIAL_VIP_CAPS.findIndex(cap=>cap>level):null;
-  const prerequisiteMet=(levels.get(requiredKey)||0)>=requiredLevel;
-  const academyMet=academy>=requiredAcademy;
+  const prerequisiteLevel=scienceLevel(levels.get(requiredKey),30);
+  const academyLevel=scienceLevel(academy,30);
+  const prerequisiteMet=prerequisiteLevel>=requiredLevel;
+  const academyMet=academyLevel>=requiredAcademy;
   const lockedReason=level>=d.maxLevel?"max_level":level>=unlockedMax?"vip":!academyMet?"academy":!prerequisiteMet?"prerequisite":null;
   const nextBonusPercent=level<unlockedMax?sciencePercent(key,level+1):null;
-  return {key,...d,level,unlockedMax,nextVip,requiredAcademy,requiredKey,requiredLevel,prerequisiteMet,academyMet,lockedReason,available:lockedReason===null,bonusPercent:sciencePercent(key,Math.min(level,unlockedMax)),nextBonusPercent,nextCost:level<d.maxLevel?Object.fromEntries(Object.entries(d.cost).map(([k,v])=>[k,v*(level+1)])):null};
+  const nextCost=scienceUpgradeCost(key,level);
+  const resourceShortfall=scienceResourceShortfall(nextCost,kingdom);
+  const resourcesReady=resourceShortfall===null?null:Object.values(resourceShortfall).every(n=>n===0);
+  return {key,...d,level,unlockedMax,nextVip,requiredAcademy,academyLevel,requiredKey,requiredLevel,prerequisiteLevel,prerequisiteMet,academyMet,lockedReason,available:lockedReason===null,bonusPercent:sciencePercent(key,Math.min(level,unlockedMax)),nextBonusPercent,nextCost,resourceShortfall,resourcesReady};
  });
 }
 

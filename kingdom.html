@@ -746,13 +746,20 @@ function renderAcademyScience(){
    for(const row of imperialRows){const opt=document.createElement("option");opt.value=row.key;opt.textContent=row.name;group.append(opt);}select.append(group);
  }else if(!imperialRows.length&&imperialGroup)imperialGroup.remove();
  const row=rows.find(x=>x.key===select.value);
+ const activeResearch=(state?.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running");
  if(row){
   const names={economy:"Economia",military:"Doutrina militar",defense:"Defesa",...Object.fromEntries(rows.map(x=>[x.key,x.name]))};
   const lockText={max_level:"Nível máximo concluído.",vip:"Limite da progressão VIP atingido.",academy:"Melhore a Academia.",prerequisite:"Conclua a pesquisa anterior."}[row.lockedReason]||"";
   const nextBonus=Number.isFinite(row.nextBonusPercent)?" · Próximo nível: "+row.nextBonusPercent+"%":"";
-  details.textContent=row.category+" · Nv. "+row.level+"/"+row.maxLevel+" · "+row.effect+": "+row.bonusPercent+"%"+nextBonus+(row.imperial?" · Limite VIP atual: "+row.unlockedMax+(row.level>=row.unlockedMax&&row.nextVip?" · Exige Castelo 30 / VIP "+row.nextVip:""):"")+" · Academia "+row.requiredAcademy+" · "+(names[row.requiredKey]||row.requiredKey)+" "+row.requiredLevel+(row.nextCost?" · Custo: "+fmt(row.nextCost.wood)+" madeira, "+fmt(row.nextCost.stone)+" pedra, "+fmt(row.nextCost.iron)+" ferro":" · Máximo")+(lockText?" · "+lockText:"");
+  details.textContent=row.category+" · Nv. "+row.level+"/"+row.maxLevel+" · "+row.effect+": "+row.bonusPercent+"%"+nextBonus+(row.imperial?" · Limite VIP atual: "+row.unlockedMax+(row.level>=row.unlockedMax&&row.nextVip?" · Exige Castelo 30 / VIP "+row.nextVip:""):"")+" · Academia "+row.academyLevel+"/"+row.requiredAcademy+" · "+(names[row.requiredKey]||row.requiredKey)+" "+row.prerequisiteLevel+"/"+row.requiredLevel+(row.nextCost?" · Custo: "+fmt(row.nextCost.wood)+" madeira, "+fmt(row.nextCost.stone)+" pedra, "+fmt(row.nextCost.iron)+" ferro":" · Máximo")+(lockText?" · "+lockText:"");
+  if(row.nextCost){
+   const resourceNames={wood:"madeira",stone:"pedra",iron:"ferro"};
+   const missing=Object.entries(row.resourceShortfall||{}).filter(([,n])=>Number.isSafeInteger(n)&&n>0).map(([key,n])=>fmt(n)+" "+(resourceNames[key]||key));
+   details.textContent+=row.resourcesReady===true?" · Recursos suficientes.":row.resourcesReady===false?" · Faltam: "+missing.join(", ")+".":" · Saldo não sincronizado.";
+  }
  }else details.textContent=select.value==="economy"&&rows.length?"Produção de recursos +1% por nível (até 30%).":"";
- button.disabled=busy||(state?.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running")||Boolean(row&&!row.available);
+ button.disabled=busy||activeResearch||Boolean(row&&(!row.available||row.resourcesReady!==true));
+ button.textContent=busy?"Sincronizando…":activeResearch?"Pesquisa em andamento":row?.lockedReason==="max_level"?"Nível máximo":row&&!row.available?"Requisitos pendentes":row?.resourcesReady===false?"Recursos insuficientes":row&&row.resourcesReady!==true?"Sincronize os recursos":"Iniciar pesquisa";
 }
 document.getElementById("researchKey")?.addEventListener("change",renderAcademyScience);
 function renderHospital(){

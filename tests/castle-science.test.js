@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {SCIENCE_CATALOG,scienceEnabled,scienceView,sciencePercent,scienceDuration,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses,resourceScienceMultipliers,structuralDefenseScience} from "../castle-science.js";
+import {SCIENCE_CATALOG,scienceEnabled,scienceView,sciencePercent,scienceDuration,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses,scienceUpgradeCost,scienceResourceShortfall,resourceScienceMultipliers,structuralDefenseScience} from "../castle-science.js";
 test("science requires completed prerequisites and academy levels; effects bounded",()=>{
  assert.equal(scienceEnabled({ENVIRONMENT:"production",GAME_4X_SYSTEMS_ENABLED:"true"}),false);
  const empty=scienceView([],1);assert.ok(empty.every(x=>!x.available));
@@ -53,6 +53,40 @@ test("Academy explains each gate and previews next permitted bonus without chang
  assert.equal(capped.lockedReason,"vip");assert.equal(capped.nextBonusPercent,null);assert.equal(capped.bonusPercent,1);
  const max=get([...prereq,{research_key:"imperial_attack",level:30}],30,{castle_level:30,prestige:7},"imperial_attack");
  assert.equal(max.lockedReason,"max_level");assert.equal(max.nextCost,null);
+});
+
+
+test("Academy prices are canonical and resource shortfalls never authorize invalid balances",()=>{
+ for(const [key,def] of Object.entries(SCIENCE_CATALOG)){
+  for(let level=0;level<def.maxLevel;level++){
+   assert.deepEqual(scienceUpgradeCost(key,level),Object.fromEntries(Object.entries(def.cost).map(([resource,base])=>[resource,base*(level+1)])));
+  }
+  assert.equal(scienceUpgradeCost(key,def.maxLevel),null);
+ }
+ for(const invalid of [-1,1.5,Infinity,NaN,"1",null])assert.equal(scienceUpgradeCost("scholarship",invalid),null);
+ assert.equal(scienceUpgradeCost("__proto__",0),null);
+ const cost=scienceUpgradeCost("scholarship",0);
+ assert.deepEqual(scienceResourceShortfall(cost,{wood:319.2,stone:220,iron:4}),{wood:1,stone:0,iron:11});
+ assert.equal(scienceResourceShortfall(cost,{wood:320,stone:220}),null);
+ assert.equal(scienceResourceShortfall(cost,{wood:Infinity,stone:220,iron:15}),null);
+ const rows=[{research_key:"economy",level:1}];
+ const missing=scienceView(rows,1,{wood:319,stone:220,iron:15}).find(r=>r.key==="scholarship");
+ assert.equal(missing.available,true);
+ assert.equal(missing.resourcesReady,false);
+ assert.deepEqual(missing.resourceShortfall,{wood:1,stone:0,iron:0});
+ assert.equal(missing.academyLevel,1);
+ assert.equal(missing.prerequisiteLevel,1);
+ const ready=scienceView(rows,1,{wood:320,stone:220,iron:15}).find(r=>r.key==="scholarship");
+ assert.equal(ready.resourcesReady,true);
+ assert.equal(scienceView(rows,1,{}).find(r=>r.key==="scholarship").resourcesReady,null);
+});
+test("Worker debit and UI share the price and readiness contract",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const [worker,page]=await Promise.all(["../worker.js","../kingdom.html"].map(p=>readFile(new URL(p,import.meta.url),"utf8")));
+ assert.match(worker,/cost=science\?scienceUpgradeCost\(key,level\)/);
+ assert.match(page,/row\.resourcesReady!==true/);
+ assert.match(page,/row\.resourceShortfall/);
+ assert.match(page,/row\.academyLevel/);
 });
 
 test("specializations require academy and completed economy or defense research",()=>{
