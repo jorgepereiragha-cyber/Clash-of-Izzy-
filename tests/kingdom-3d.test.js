@@ -473,3 +473,12 @@ test("scenic city uses flat bounded paving and a subdued placement guide",()=>{
  assert.doesNotMatch(renderer,/new THREE\.TubeGeometry\(curve, 36/);
  assert.match(renderer,/ctx\.createRadialGradient\(x \+ dx, y \+ dy/);
 });
+
+test("rural buildings have separate models and bounded crop instances",()=>{
+ assert.match(renderer,/const ruralTypes=new Set\(\["farm","quarry","lumber_mill","iron_mine"\]\)/);
+ assert.match(renderer,/if\(ruralTypes\.has\(type\)\)\{\s*addRuralBuilding/);
+ assert.match(renderer,/eldoria-rural-v1/);
+ assert.match(renderer,/const rows=low\?2:high\?5:3/);
+ assert.match(renderer,/new THREE\.InstancedMesh\(new THREE\.CylinderGeometry\(\.014,\.022,\.15,5\),grain,rows\*3\)/);
+ assert.match(renderer,/if \(node\.isInstancedMesh\) node\.dispose\(\)/);
+});
