@@ -29,5 +29,7 @@ jobs:
         run: node --test tests/rally-troop-ownership.test.js
       - name: Collective rally capacity and concurrent joins
         run: node --test tests/rally-capacity.test.js
+      - name: Tactical combat versioning and deterministic simulations
+        run: node --test tests/tactical-combat-v2.test.js
       - name: Rally mobile formation and session fallback
         run: node --test tests/rally-formation-ui.test.js tests/rally-session-storage.test.js
