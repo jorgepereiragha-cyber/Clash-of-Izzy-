@@ -37,3 +37,20 @@ test("imperial attack actually affects existing battle simulation within the agg
  assert.ok(up.attackerPower>base.attackerPower);
  assert.deepEqual(simulateBattle({...input,imperialAttackBonusPercent:999}),up);
 });
+
+
+test("Academy explains each gate and previews next permitted bonus without changing prices",()=>{
+ const get=(rows,academy,kingdom,key)=>scienceView(rows,academy,kingdom).find(x=>x.key===key);
+ const prereq=[{research_key:"military",level:10}];
+ assert.equal(get([],1,{},"scholarship").lockedReason,"prerequisite");
+ assert.equal(get(prereq,0,{castle_level:30,prestige:1},"imperial_attack").lockedReason,"academy");
+ const gated=get(prereq,30,{castle_level:30,prestige:0},"imperial_attack");
+ assert.equal(gated.lockedReason,"vip");assert.equal(gated.nextBonusPercent,null);
+ const ready=get(prereq,10,{castle_level:30,prestige:1},"imperial_attack");
+ assert.equal(ready.lockedReason,null);assert.equal(ready.available,true);assert.equal(ready.nextBonusPercent,0.2);
+ assert.deepEqual(ready.nextCost,{wood:900,stone:600,iron:180});
+ const capped=get([...prereq,{research_key:"imperial_attack",level:5}],30,{castle_level:30,prestige:1},"imperial_attack");
+ assert.equal(capped.lockedReason,"vip");assert.equal(capped.nextBonusPercent,null);assert.equal(capped.bonusPercent,1);
+ const max=get([...prereq,{research_key:"imperial_attack",level:30}],30,{castle_level:30,prestige:7},"imperial_attack");
+ assert.equal(max.lockedReason,"max_level");assert.equal(max.nextCost,null);
+});
