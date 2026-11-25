@@ -1062,7 +1062,15 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       let stateB = (await api("/api/game/state", { token: tokenB })).data.state;
       const invite = stateB.pendingInvites?.[0];
       assert.ok(invite?.id, "convite chegou ao reino destinatário");
-      await action(tokenB, { type: "alliance_accept_invite", inviteId: invite.id }, 200);
+      executedActions.add("alliance_accept_invite");
+      const acceptResults = await Promise.all([1,2].map(() => api("/api/game/action", {
+        method: "POST", token: tokenB, body: { type: "alliance_accept_invite", inviteId: invite.id }
+      })));
+      assert.equal(acceptResults.filter(result => result.status === 200).length, 1);
+      assert.ok(acceptResults.every(result => [200,404,409].includes(result.status)));
+      const afterAccept = (await api("/api/game/state", { token: tokenB })).data.state;
+      assert.equal(afterAccept.alliance.tag, "ALFA");
+      assert.equal(afterAccept.alliance.members.filter(member => Number(member.kingdom_id) === Number(kingdomB)).length, 1);
       await action(tokenA, { type: "alliance_promote", targetKingdomId: kingdomB, rank: "oficial" }, 200);
       await action(tokenB, { type: "alliance_chat", message: "Teste de comunicação entre aliados" }, 200);
       const chatFeed = await api("/api/game/alliance/chat", { token: tokenB });
@@ -1104,7 +1112,13 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.equal(afterClaim.shared_wood, beforeClaim.shared_wood - 1000);
       assert.equal(afterClaim.territory_count, beforeClaim.territory_count + 1);
 
-      await action(tokenC, { type: "alliance_join", tag: "ALFA" }, 200);
+      executedActions.add("alliance_join");
+      const joins = await Promise.all([1,2].map(() => api("/api/game/action", {
+        method: "POST", token: tokenC, body: { type: "alliance_join", tag: "ALFA" }
+      })));
+      assert.deepEqual(joins.map(result => result.status).sort(), [200,409]);
+      const afterJoin = (await api("/api/game/state", { token: tokenC })).data.state.alliance;
+      assert.equal(afterJoin.members.filter(member => Number(member.kingdom_id) === Number(kingdomC)).length, 1);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomC }, 200);
       // Set the isolated fixture one below the daily cap; only one concurrent help may succeed.
       await runCli([

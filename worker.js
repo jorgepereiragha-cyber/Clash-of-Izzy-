@@ -1301,9 +1301,9 @@ async function gameAction(env,playerId,body){
     if(existing)return json({error:"Seu reino já pertence a uma aliança."},409);
     const alliance=await env.DB.prepare("SELECT id,max_members FROM alliances WHERE tag=?").bind(tag).first();
     if(!alliance)return json({error:"Aliança não encontrada."},404);
-    const joined=await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT ?,?,'member' WHERE (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=?) < ?")
-      .bind(alliance.id,k.id,alliance.id,alliance.max_members).run();
-    if(!joined.meta.changes)return json({error:"A aliança atingiu o limite de membros."},409);
+    const joined=await env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role) SELECT a.id,?,'member' FROM alliances a WHERE a.id=? AND NOT EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=?) AND (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=a.id)<a.max_members")
+      .bind(k.id,alliance.id,k.id).run();
+    if(joined.meta?.changes!==1)return json({error:"A aliança atingiu o limite de membros ou seu reino já pertence a uma aliança."},409);
   }else if(type==="alliance_invite"){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não permite convidar jogadores."},403);
@@ -1316,7 +1316,8 @@ async function gameAction(env,playerId,body){
     const count=await env.DB.prepare("SELECT COUNT(*) AS n FROM alliance_members WHERE alliance_id=?").bind(member.alliance_id).first();
     const cap=await env.DB.prepare("SELECT max_members FROM alliances WHERE id=?").bind(member.alliance_id).first();
     if(count.n>=cap.max_members)return json({error:"Aliança atingiu o limite de membros."},409);
-    await env.DB.prepare("INSERT OR IGNORE INTO alliance_invites(alliance_id,target_kingdom_id,invited_by_kingdom_id) VALUES(?,?,?)").bind(member.alliance_id,target.id,k.id).run();
+    const invited=await env.DB.prepare("INSERT OR IGNORE INTO alliance_invites(alliance_id,target_kingdom_id,invited_by_kingdom_id) SELECT a.id,?,? FROM alliances a WHERE a.id=? AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=a.id AND kingdom_id=? AND rank IN ('lider','co_lider','oficial')) AND NOT EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=?) AND (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=a.id)<a.max_members").bind(target.id,k.id,member.alliance_id,k.id,target.id).run();
+    if(invited.meta?.changes!==1)return json({error:"Convite já existente, aliança cheia ou permissão alterada."},409);
   }else if(type==="alliance_accept_invite"){
     const inviteId=Number(body.inviteId);
     const invite=await env.DB.prepare("SELECT i.alliance_id,a.max_members FROM alliance_invites i JOIN alliances a ON a.id=i.alliance_id WHERE i.id=? AND i.target_kingdom_id=?").bind(inviteId,k.id).first();
@@ -1325,10 +1326,12 @@ async function gameAction(env,playerId,body){
     if(current)return json({error:"Seu reino já pertence a uma aliança."},409);
     const count=await env.DB.prepare("SELECT COUNT(*) AS n FROM alliance_members WHERE alliance_id=?").bind(invite.alliance_id).first();
     if(count.n>=invite.max_members)return json({error:"A aliança está cheia."},409);
-    await env.DB.batch([
-      env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role,rank) VALUES(?,?,'member','membro')").bind(invite.alliance_id,k.id),
-      env.DB.prepare("DELETE FROM alliance_invites WHERE id=?").bind(inviteId)
+    // Recheck the invitation, membership and capacity inside the same D1 transaction.
+    const accepted=await env.DB.batch([
+      env.DB.prepare("INSERT INTO alliance_members(alliance_id,kingdom_id,role,rank) SELECT a.id,?,'member','membro' FROM alliances a JOIN alliance_invites i ON i.alliance_id=a.id WHERE i.id=? AND i.target_kingdom_id=? AND a.id=? AND NOT EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=?) AND (SELECT COUNT(*) FROM alliance_members WHERE alliance_id=a.id)<a.max_members").bind(k.id,inviteId,k.id,invite.alliance_id,k.id),
+      env.DB.prepare("DELETE FROM alliance_invites WHERE id=? AND target_kingdom_id=? AND changes()=1").bind(inviteId,k.id)
     ]);
+    if(accepted[0]?.meta?.changes!==1||accepted[1]?.meta?.changes!==1)return json({error:"Convite indisponível, aliança cheia ou reino já vinculado."},409);
   }else if(type==="alliance_promote"){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const targetId=Number(body.targetKingdomId),newRank=String(body.rank||"");
