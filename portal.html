@@ -30,7 +30,7 @@ body{margin:0;min-width:0;background:#070d18;color:var(--ink);font:15px/1.5 syst
 .royal-art:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#050b16ed 0%,#050b16aa 38%,transparent 75%),linear-gradient(0deg,#050a13 0%,transparent 36%);pointer-events:none}
 .royal-copy{position:relative;width:min(100%,760px);padding-block:28px;align-self:center}
 h1{margin:0;font:900 clamp(42px,8.4vw,116px)/.91 Georgia,serif;letter-spacing:.015em;text-shadow:0 4px 24px #000;color:#fff1d6}
-h1 span{display:block;color:var(--gold);text-shadow:0 1px 0 #ffedb5,0 5px 20px #000}
+h1 .golden{display:block;color:var(--gold);text-shadow:0 1px 0 #ffedb5,0 5px 20px #000}
 .tagline{margin:18px 0 24px;color:#e1dacd;font:400 clamp(16px,2.5vw,23px)/1.4 Georgia,serif;letter-spacing:.05em}
 .actions{display:flex;flex-direction:column;align-items:flex-start;gap:9px}
 .download{display:inline-flex;align-items:center;justify-content:center;text-align:center;width:min(100%,340px);min-height:56px;padding:12px 20px;color:#18130c;background:linear-gradient(#ffdf9c,#d4a04c);border:1px solid #ffe6ad;border-radius:4px;font-weight:850;font-size:16px;text-decoration:none;box-shadow:0 8px 32px #0008}
@@ -84,7 +84,7 @@ h1 span{display:block;color:var(--gold);text-shadow:0 1px 0 #ffedb5,0 5px 20px #
     <img class="crest" src="/assets/brand/royal-king.webp" width="224" height="224" decoding="async" fetchpriority="high" alt="">
   </div>
   <section class="royal-copy">
-    <h1>CLASH OF <span>IZZY</span></h1>
+    <h1>CLASH OF <span class="golden">IZZY</span></h1>
     <p class="tagline">Construa. Lute. Reine.</p>
     <div class="actions">
       <a class="download" id="download-apk" aria-disabled="true" tabindex="-1">Baixar APK Android</a>

@@ -20,7 +20,7 @@ test("Android: marketing homepage promotes gated APK, not browser gameplay", asy
   }
   await expect(page.locator("#play-browser,a[href*='kingdom.html']")).toHaveCount(0);
   await expect(page.locator(".feature-card,.gallery-grid,.shot-placeholder")).toHaveCount(0);
-  await expect(page.locator("details")).not.toHaveAttribute("open", /./);
+  await expect(page.locator("details")).toHaveJSProperty("open", false);
   await expect(page.getByText("O APK comercial ainda não está disponível")).toBeVisible();
 });
 
@@ -56,6 +56,7 @@ test("Android: reject download redirection to another domain even if release met
     })
   }));
   await page.goto("/portal.html");
+  await expect(page.locator("#download-status")).toContainText("O APK comercial ainda não está disponível");
   await expect(page.locator("#download-apk")).toHaveAttribute("aria-disabled", "true");
   await expect(page.locator("#download-apk")).not.toHaveAttribute("href", /./);
 });
@@ -86,4 +87,17 @@ test("Android: compact responsive hero and accessible secondary details",async({
     await page.locator("summary").click();
     await expect(page.locator("#official-release-page")).toBeVisible();
   }
+});
+
+test("Android: invite APK remains visible when commercial release is unavailable",async({page})=>{
+ await page.route(releases,route=>route.fulfill({status:404,headers:{"access-control-allow-origin":"*"},body:"{}"}));
+ const inviteName="clash-of-izzy-access.apk", tag="android-access-v11";
+ const base="https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases/download/"+tag+"/";
+ await page.route("https://api.github.com/repos/jorgepereiragha-cyber/Clash-of-Izzy-/releases?per_page=100",route=>route.fulfill({status:200,headers:{"access-control-allow-origin":"*"},contentType:"application/json",body:JSON.stringify([{draft:false,prerelease:true,tag_name:tag,assets:[inviteName,inviteName+".sha256"].map(name=>({name,state:"uploaded",size:100,browser_download_url:base+name}))}])}));
+ await page.goto("/portal.html");
+ await expect(page.locator("#download-invite")).toBeVisible();
+ await expect(page.locator("#download-invite")).toHaveAttribute("href",base+inviteName);
+ await expect(page.locator("#download-apk")).not.toBeVisible();
+ await page.locator("summary").click();
+ await expect(page.locator("#invite-checksum")).toHaveAttribute("href",base+inviteName+".sha256");
 });
