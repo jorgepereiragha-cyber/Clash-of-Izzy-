@@ -142,7 +142,7 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
   await expect(page.locator("#pantheon-skin-set-grid")).toContainText("Corte Solar do Egito");
   await expect(page.locator("#pantheon-skin-set-grid [data-set-id='egyptian_solar_court'] .pantheon-relic-card")).toHaveCount(5);
   await expect(page.locator("#pantheon-skin-set-grid [data-item-id='eg_ra_crown'] .pantheon-relic-art use")).toHaveAttribute("href", "/assets/art/skins/pantheon-relics.svg#eg_ra_crown");
-  await expect(page.locator("#pantheon-skin-set-grid [data-item-id='eg_ra_crown'] .pantheon-skin-action")).toHaveText("COMPRAR · 1.400 gemas");
+  await expect(page.locator("#pantheon-skin-set-grid [data-item-id='eg_ra_crown'] .pantheon-skin-action")).toHaveText("COMPRAR · 1.400 diamantes");
   await expect(page.locator(".hero-roster-card")).toHaveCount(1);
   await expect(page.locator(".hero-roster-name")).toHaveText("Kael");
   await expect(page.locator(".hero-roster-portrait use")).toHaveAttribute("href", /portraits\.svg#kael$/);
@@ -156,7 +156,7 @@ test("equipment page shows hero portraits, combat passives and exact summon rate
 
   await page.locator("#hero-summon-one").click();
   await expect(page.locator("#hero-summon-status")).toContainText("1 herói(s) novo(s)");
-  await expect(page.locator("#hero-gem-balance")).toHaveText("Gemas: 900");
+  await expect(page.locator("#hero-gem-balance")).toHaveText("Diamantes: 900");
   await expect(page.locator(".hero-roster-card")).toHaveCount(2);
   await expect(page.locator(".hero-summon-result")).toContainText("Merlin");
   await expect(page.locator(".hero-roster-card").nth(1).locator(".hero-roster-portrait use")).toHaveAttribute("href", "/assets/art/heroes/portraits.svg#mage");

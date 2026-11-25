@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {DRAGON_CATALOG,DRAGON_BY_KEY,MASTER_DRAGON_KEYS,getDragonCombatBonuses,getDragonCollectionView} from "../dragon-catalog.js";
+import {DRAGON_CATALOG,DRAGON_BY_KEY,MASTER_DRAGON_KEYS,getDragonCombatBonuses,getDragonCollectionView,getDragonElementalSkill,DRAGON_ELEMENTAL_SKILLS} from "../dragon-catalog.js";
 import {MASTER_PACK_NAME,MASTER_PACK_GEMS,MASTER_PACK_BONUSES,masterGrantStatements} from "../master-pack.js";
 import {readFile} from "node:fs/promises";
 test("9 dragões distintos: três de cada cor, somente dourados Master",()=>{
@@ -66,4 +66,55 @@ test("Worker valida propriedade dos dragões e bloqueia resgate duplicado de men
  assert.match(game,/heroAttackBonusPercent\) \|\| 0, 0, 20/);
  assert.match(game,/dragonAttackBonusPercent\) \|\| 0, 0, 5\.5/);
  for(const id of ["dragonCollection","kingdomMailbox","kingdomBackpack"])assert.ok(page.includes('id="'+id+'"'));
+});
+
+test("beta dragon progression binds key and level, and rejects replay",async()=>{
+ const worker=await readFile(new URL("../worker.js",import.meta.url),"utf8");
+ const page=await readFile(new URL("../kingdom.html",import.meta.url),"utf8");
+ const start=worker.indexOf('type==="dragon_upgrade"');
+ const end=worker.indexOf('type==="hero_summon"',start);
+ assert.ok(start>=0&&end>start);
+ const action=worker.slice(start,end);
+ assert.match(action,/body\.expectedLevel!==level\|\|body\.dragonKey!==dragonKey/);
+ assert.match(action,/level=\? AND dragon_key=\? AND changes\(\)=1/);
+ assert.match(action,/INSERT INTO kingdom_events.*WHERE changes\(\)=1/);
+ assert.match(page,/type:"dragon_upgrade",dragonKey:dragon\.key,expectedLevel:level/);
+});
+
+test("individual dragon progress is not transferred to another creature",()=>{
+ const collection=getDragonCollectionView(["ember_wyrm","mist_talon"],"mist_talon",3,5,[
+  {dragon_key:"ember_wyrm",level:50,bond:70},{dragon_key:"mist_talon",level:3,bond:5}
+ ]);
+ assert.equal(collection.find(x=>x.key==="ember_wyrm").level,50);
+ assert.equal(collection.find(x=>x.key==="mist_talon").level,3);
+ assert.equal(collection.find(x=>x.key==="sun_ascendant").level,1);
+ assert.deepEqual(getDragonCombatBonuses({dragon_key:"ember_wyrm",level:50,bond:70}),
+  {attackPercent:collection[0].attackPercent,defensePercent:collection[0].defensePercent});
+ assert.equal(collection.filter(x=>x.equipped).length,1);
+});
+
+test("nine elemental passives unlock by both individual level and bond, without increasing cap",()=>{
+ assert.equal(Object.keys(DRAGON_ELEMENTAL_SKILLS).length,9);
+ for(const dragon of DRAGON_CATALOG){
+  const get=(level,bond)=>getDragonElementalSkill({dragon_key:dragon.key,level,bond});
+  assert.equal(get(19,100).rank,0);
+  assert.equal(get(100,19).rank,0);
+  assert.equal(get(20,20).rank,1);
+  assert.equal(get(50,50).rank,2);
+  assert.equal(get(80,80).rank,3);
+  assert.equal(get(100,100).nextMilestone,null);
+  assert.ok(get(100,100).attackPercent+get(100,100).defensePercent<=0.300000001);
+  const total=getDragonCombatBonuses({dragon_key:dragon.key,level:100,bond:100});
+  assert.ok(total.attackPercent<=5.5&&total.defensePercent<=5.5);
+ }
+ for(const key of ["constructor","__proto__","missing"]){
+  assert.equal(getDragonElementalSkill({dragon_key:key}),null);
+  assert.deepEqual(getDragonCombatBonuses({dragon_key:key}),{attackPercent:0,defensePercent:0});
+ }
+ const base=0.65+0.25*19/99+0.1*19/99;
+ const skill=getDragonElementalSkill({dragon_key:"ember_wyrm",level:20,bond:20});
+ assert.equal(getDragonCombatBonuses({dragon_key:"ember_wyrm",level:20,bond:20}).attackPercent,Number((1.1*base+skill.attackPercent).toFixed(2)));
+ const view=getDragonCollectionView(["ember_wyrm","mist_talon"],"mist_talon",50,50,[{dragon_key:"ember_wyrm",level:1,bond:1}]);
+ assert.equal(view.find(x=>x.key==="ember_wyrm").elementalSkill.rank,0);
+ assert.equal(view.find(x=>x.key==="mist_talon").elementalSkill.rank,2);
 });

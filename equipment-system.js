@@ -128,7 +128,7 @@
     const summary=$("equipment-bonus-summary"),skinSummary=$("castle-skin-bonus-summary"),skin=state?.activeCastleSkin;
     if(summary){
       const setText=bonus.legendarySetActive===true?" · Conjunto completo: +1% Ataque / +1% Defesa / +0,5% Vida":"";
-      summary.textContent="Bônus do herói em combate: Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%"+setText;
+      summary.textContent="Equipamentos do comandante ativo ("+((state?.heroInventory||[]).find(h=>h.hero_key===state?.activeCommanderHeroKey)?.name||"não selecionado")+"): Ataque +"+Number(bonus.attackPercent||0).toFixed(1)+"% · Defesa +"+Number(bonus.defensePercent||0).toFixed(1)+"% · Vida +"+Number(bonus.healthPercent||0).toFixed(1)+"% · Crítico +"+Number(bonus.criticalChancePercent||0).toFixed(1)+"% · Marcha +"+Number(bonus.marchSpeedPercent||0).toFixed(1)+"% · Produção +"+Number(bonus.resourcePercent||0).toFixed(1)+"%"+setText+(bonus.reinforcementBonus?.stage?" · Conjunto reforçado +"+bonus.reinforcementBonus.stage:"");
     }
     if(skinSummary){
       skinSummary.textContent=skin?.id
@@ -148,18 +148,18 @@
       const description=document.createElement("p");description.textContent=skin.visual||"Visual cosmético exclusivo.";
       const button=document.createElement("button");button.type="button";button.className="skin-buy-btn";
       const hasSkin=owned.has(id);button.disabled=busy||hasSkin;
-      button.textContent=hasSkin?"ADQUIRIDA":"Comprar · "+fmt(skin.price)+" gemas";
+      button.textContent=hasSkin?"ADQUIRIDA":"Comprar · "+fmt(skin.price)+" diamantes";
       button.addEventListener("click",()=>perform({type:"cosmetic_buy",skin:id},"Skin "+skin.name+" adquirida."));
       card.append(title,rarity,description,button);return card;
     }));
-    $("skin-gems").textContent="Gemas: "+fmt(state?.player?.gems);
+    $("skin-gems").textContent="Diamantes: "+fmt(state?.player?.gems);
     $("skin-shards").textContent="Fragmentos: "+fmt(cosmetics.shards);
     const collection=cosmetics.collections?.find(item=>item.id==="col_norse");
     const complete=Boolean(collection?.skins?.every(id=>owned.has(id)));
     const claimed=(cosmetics.claimed||[]).includes("col_norse");
     const claim=$("claim-norse-collection");
     claim.disabled=busy||!complete||claimed;
-    claim.textContent=claimed?"RECOMPENSA RESGATADA":complete?"RESGATAR COLEÇÃO · +5.000 GEMAS / 200 FRAGMENTOS":"COLEÇÃO "+skins.filter(([id])=>owned.has(id)).length+"/6";
+    claim.textContent=claimed?"RECOMPENSA RESGATADA":complete?"RESGATAR COLEÇÃO · +5.000 DIAMANTES / 200 FRAGMENTOS":"COLEÇÃO "+skins.filter(([id])=>owned.has(id)).length+"/6";
   }
   function describeSkinBonuses(bonuses={}){
     const fields=[["attackPercent","ATQ"],["defensePercent","DEF"],["healthPercent","VIDA"],["criticalChancePercent","CRÍT"]];
@@ -284,7 +284,7 @@
           button.disabled=busy;
           button.textContent=item.equipped
             ?"DESEQUIPAR"
-            :item.owned?"EQUIPAR":"COMPRAR · "+fmt(item.price)+" gemas";
+            :item.owned?"EQUIPAR":"COMPRAR · "+fmt(item.price)+" diamantes";
           button.setAttribute("aria-label",button.textContent+" "+(item.name||"relíquia"));
           button.addEventListener("click",()=>{
             if(item.equipped){
@@ -403,8 +403,23 @@
       const fragments=document.createElement("p");
       fragments.className="hero-roster-fragments";
       fragments.textContent="Fragmentos: "+Number(hero.fragments||0).toLocaleString("pt-BR")+
-        (hero.fragments_to_next?" · Próxima estrela: "+hero.fragments_to_next:" · Estrelas máximas");
+        (hero.fragments_to_next?" · Próxima estrela: "+hero.fragments_to_next:Number(hero.stars)>=Number(hero.max_stars)?" · Estrelas máximas":" · Evolução indisponível");
       copy.append(name,title,origin,aura,meta,stats,combat,skill,fragments);
+      if(hero.talent){
+        const talent=hero.talent,line=document.createElement("p");line.className="hero-roster-skill";
+        const effects=[["Ataque",talent.attackPercent],["Defesa",talent.defensePercent],["Vida",talent.healthPercent],["Crítico",talent.criticalChancePercent]].filter(([,value])=>Number(value)>0).map(([label,value])=>label+" +"+Number(value).toFixed(2)+"%");
+        line.textContent=talent.name+" · Talento "+talent.rank+"/"+talent.maxRank+
+          (effects.length?" · "+effects.join(" · ")+" (incluído nos passivos, sujeito ao limite)":" · Bloqueado")+
+          (talent.nextMilestone?" · Próximo: Nv. "+talent.nextMilestone.level+" e "+talent.nextMilestone.stars+" estrelas":" · Talento máximo");
+        copy.append(line);
+      }
+      const evolve=document.createElement("button");
+      evolve.type="button";evolve.className="forge-action hero-star-evolve";
+      const cost=Number(hero.fragments_to_next||0),eligible=hero.can_evolve===true&&cost>0;
+      evolve.disabled=busy||!eligible||Number(hero.fragments||0)<cost;
+      evolve.textContent=eligible?"EVOLUIR ESTRELA · "+fmt(cost)+" FRAGMENTOS":Number(hero.stars)>=Number(hero.max_stars)?"ESTRELAS MÁXIMAS":"EVOLUÇÃO INDISPONÍVEL";
+      evolve.addEventListener("click",()=>perform({type:"hero_evolve",hero:hero.hero_key,expectedStars:Number(hero.stars)},"Estrela do herói evoluída."));
+      copy.append(evolve);
       if(hero.identity_lore){
         const story=document.createElement("details");story.className="hero-roster-story";
         const summary=document.createElement("summary");summary.textContent="História do herói";
@@ -468,7 +483,7 @@
   function renderSummonControls(){
     const gems=$("hero-gem-balance"),one=$("hero-summon-one"),ten=$("hero-summon-ten");
     const balance=Math.max(0,Number(state?.player?.gems)||0);
-    if(gems)gems.textContent="Gemas: "+fmt(balance);
+    if(gems)gems.textContent="Diamantes: "+fmt(balance);
     if(one)one.disabled=busy||balance<100;
     if(ten)ten.disabled=busy||balance<900;
   }
@@ -504,7 +519,7 @@
       picker.addEventListener("change",()=>{selected=picker.value;render()});
     }
     if(picker){
-      picker.replaceChildren(...equipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
+      picker.replaceChildren(...equipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" +"+(entry.enhancement||0)+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
     }
     const item=equipment.find(x=>x.id===selected)||equipment[0];
     if(!item){setStatus("Nenhum equipamento disponível neste reino.",true);return;}
@@ -530,7 +545,7 @@
     renderSummonOdds();
     renderSummonControls();
     renderSummonResults();
-    $("item-name").textContent=item.name;
+    $("item-name").textContent=item.name+" +"+(item.enhancement||0);
     $("current-level").textContent=item.level;
     $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";
     const current=item.stats||{},next=item.nextLevelStats||{};
@@ -546,6 +561,13 @@
     const lock=$("lock-btn");lock.textContent=item.isLocked?"🔒 Travado":"🔓 Destravado";lock.setAttribute("aria-pressed",String(item.isLocked));
     const upgrade=$("upgrade-btn");upgrade.disabled=busy||item.isLocked||item.level>=item.maxLevel;
     upgrade.textContent=item.level>=item.maxLevel?"NÍVEL MÁXIMO":item.isLocked?"DESTRAVE PARA EVOLUIR":"⚒️ EVOLUIR EQUIPAMENTO";
+    const enhancement=Number(item.enhancement||0),fragment=state.equipmentFragments?.[item.rarity];
+    $("enhancement-title").textContent="Reforço +"+enhancement+" / +10";
+    $("enhancement-preview").textContent=item.nextEnhancementStats?Object.entries(item.nextEnhancementStats).map(([key,value])=>(labels[key]||key)+": "+formatGearStat(key,value)).join(" · "):"Reforço máximo";
+    $("fragment-balance").textContent="Fragmentos "+(rarityLabels[item.rarity]||item.rarity)+": "+fmt(fragment?.balance)+" · Próximo custo: "+(item.enhancementCost??"—");
+    $("fragment-recipe").textContent=fragment?"Forja: "+fmt(fragment.gold)+" ouro · "+fmt(fragment.iron)+" ferro · Castelo Nv. "+fragment.castle:"";
+    $("enhance-btn").disabled=busy||item.isLocked||enhancement>=10||!fragment||Number(fragment.balance)<Number(item.enhancementCost);
+    $("fragment-forge-btn").disabled=busy||!fragment||Number(state.kingdom?.castle_level)<fragment.castle||Number(state.kingdom?.gold)<fragment.gold||Number(state.kingdom?.iron)<fragment.iron;
     const equip=$("equip-btn");equip.disabled=busy||!selectedHeroId||Number(item.equippedHeroId)===selectedHeroId;
     equip.textContent=Number(item.equippedHeroId)===selectedHeroId?"EQUIPADO NESTE HERÓI":"EQUIPAR NESTE HERÓI";
     $("unequip-btn").disabled=busy||!item.equippedHeroId;
@@ -584,7 +606,10 @@
     }
     finally{busy=false;render();}
   }
-  window.upgradeEquipment=()=>perform({type:"equipment_upgrade",itemId:selected},"Equipamento evoluído e salvo no servidor.");
+  window.upgradeEquipment=()=>{
+    const item=state?.equipment?.find(x=>x.id===selected);
+    if(item)return perform({type:"equipment_upgrade",itemId:item.id,expectedLevel:item.level},"Equipamento evoluído e salvo no servidor.");
+  };
   window.toggleLock=()=>perform({type:"equipment_lock",itemId:selected},"Bloqueio do equipamento atualizado no servidor.");
   window.equipEquipment=()=>selectedHeroId?perform({type:"equipment_equip",itemId:selected,heroId:selectedHeroId},"Equipamento atribuído ao herói."):setStatus("Selecione um herói válido.",true);
   window.unequipEquipment=()=>{
@@ -595,6 +620,8 @@
   document.addEventListener("DOMContentLoaded",()=>{
     $("hero-select").addEventListener("change",event=>{selectedHeroId=Number(event.target.value)||null;render();});
     $("upgrade-btn").addEventListener("click",()=>window.upgradeEquipment());
+    $("enhance-btn").addEventListener("click",()=>{const item=state?.equipment?.find(x=>x.id===selected);if(item)perform({type:"equipment_enhance",itemId:item.id,expectedEnhancement:item.enhancement},"Reforço aplicado e salvo.");});
+    $("fragment-forge-btn").addEventListener("click",()=>{const item=state?.equipment?.find(x=>x.id===selected);if(item)perform({type:"equipment_fragment_forge",rarity:item.rarity},"Fragmentos forjados.");});
     $("lock-btn").addEventListener("click",()=>window.toggleLock());
     $("equip-btn").addEventListener("click",()=>window.equipEquipment());
     $("unequip-btn").addEventListener("click",()=>window.unequipEquipment());

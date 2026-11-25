@@ -7,9 +7,12 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
 import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
+import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
+import { projectDragonVisual, makeDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
+import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -27,6 +30,8 @@ if (host && "WebGLRenderingContext" in window) {
   let activeHeroFigures = [];
   let activeProps = [];
   let activeTroops = [];
+  let activeDragon = null;
+  let dragonTime = 0;
   let armyMixers = [];
   let animationFrame = 0;
   let lastAnimationTime = 0;
@@ -38,10 +43,13 @@ if (host && "WebGLRenderingContext" in window) {
   const glbPropTemplates = new Map();
   const glbUnitTemplates = new Map();
   const glbLoadPromises = new Map();
+  const glbLoadLanes = Array.from({ length: 3 }, () => Promise.resolve());
+  let nextGlbLane = 0;
   let manifestAssets = [];
   let manifestProps = [];
   let manifestUnits = [];
   let manifestLoad = null;
+  let optionalSceneRefreshes = 0;
   const material = (color, roughness = 0.92) => new THREE.MeshStandardMaterial({ color, roughness, metalness: 0.02 });
   const mats = {
     grass: material("#577a49"), grassLight: material("#78945a"),
@@ -74,6 +82,8 @@ if (host && "WebGLRenderingContext" in window) {
   const surfaceMaterialCache = new Map();
   let disposed = false;
   let kingdomRenderHandler = null;
+  let kingdomZoomHandler = null;
+  let cameraZoomFactor = 1;
   let valhallaModeHandler = null;
   let developmentStatsBadge = null;
   let developmentStatsTimer = null;
@@ -194,6 +204,8 @@ if (host && "WebGLRenderingContext" in window) {
     defensePreviewMesh = null;
     activeProps = [];
     activeTroops = [];
+    activeDragon = null;
+    dragonTime = 0;
     armyMixers = [];
     manifestAssets = [];
     manifestProps = [];
@@ -642,25 +654,75 @@ if (host && "WebGLRenderingContext" in window) {
     const x = Number(building?.position_x), z = Number(building?.position_z);
     if (building?.position_x != null && building?.position_z != null &&
         Number.isFinite(x) && Number.isFinite(z)) return { x: x * .53, z: z * .53 };
-    return { x: (index % 3 - 1) * 4.15, z: (Math.floor(index / 3) - 1) * 3.15 };
+    // Only legacy buildings without stored coordinates use this preview grid.
+    // Keep the familiar 3x3 arrangement for compact cities, and arrange
+    // larger settlements in four columns without changing persisted layout.
+    const columns = latestBuildings.length > 9 ? 4 : 3;
+    const spacingX = columns === 4 ? 3.35 : 4.15;
+    const spacingZ = columns === 4 ? 3.0 : 3.15;
+    const rows = Math.ceil(Math.min(16, latestBuildings.length) / columns);
+    return {
+      x: (index % columns - (columns - 1) / 2) * spacingX,
+      z: (Math.floor(index / columns) - (rows - 1) / 2) * spacingZ
+    };
+  }
+  function currentSpecialLandmarks(){return planSpecialCityLandmarks(window.__coiKingdomSpecialBuildings);}
+  function createSpecialLandmark(type){
+    const group=new THREE.Group();
+    group.userData.coIType=type;group.userData.coIProcedural=true;group.userData.coISpecial=true;
+    // Two compact original silhouettes; use shared scene materials and disposable geometry.
+    box(group,1.5,.15,1.5,mats.darkStone,0,.075,0);
+    if(type==="dragon_nest"){
+      addCylinder(group,.65,.7,.32,mats.stone,0,.27,0,10);
+      for(let i=0;i<8;i++){
+        const a=i*Math.PI/4;
+        const twig=box(group,.42,.12,.11,mats.wood,.58*Math.cos(a),.46,.58*Math.sin(a));
+        if(twig)twig.rotation.y=-a+Math.PI/2;
+      }
+      for(const [x,z] of [[-.23,-.14],[.23,-.12],[0,.23]]){
+        const egg=new THREE.Mesh(new THREE.SphereGeometry(.18,8,6),mats.gold);
+        egg.scale.y=1.45;egg.position.set(x,.58,z);group.add(egg);
+      }
+    }else{
+      box(group,1.14,.14,1.14,mats.stone,0,.22,0);
+      for(const x of [-.48,.48])for(const z of [-.48,.48])addCylinder(group,.09,.12,.78,mats.stone,x,.68,z,6);
+      box(group,1.2,.12,1.2,mats.gold,0,1.12,0);
+      const crest=new THREE.Mesh(new THREE.OctahedronGeometry(.28),mats.window);
+      crest.position.y=1.43;group.add(crest);
+      box(group,.43,.28,.43,mats.roof,0,.42,0);
+    }
+    return group;
   }
   function frameCityBuildings(buildings) {
     if (!camera || !buildings.length) return;
-    const points = buildings.map(cityWorldPoint);
+    const points = [...buildings,...currentSpecialLandmarks()].map(cityWorldPoint);
     const xs = points.map(p => p.x), zs = points.map(p => p.z);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minZ = Math.min(...zs), maxZ = Math.max(...zs);
     const cx = (minX + maxX) / 2, cz = (minZ + maxZ) / 2;
-    const span = Math.max(maxX - minX + 4, maxZ - minZ + 4);
-    camera.zoom = Math.min(1, 13 / span);
     camera.position.set(cx + 10, 13, cz + 11);
     camera.lookAt(cx, .2, cz);
+    // On narrow Android screens world-space X/Z spans are insufficient: the
+    // diagonal isometric projection can crop buildings at the left and right.
+    // Fit the *camera-space* footprint to the actual orthographic viewport.
+    camera.updateMatrixWorld(true);
+    const projected = points.map(({ x, z }) =>
+      new THREE.Vector3(x, .18, z).applyMatrix4(camera.matrixWorldInverse));
+    const screenXs = projected.map(point => point.x);
+    const screenYs = projected.map(point => point.y);
+    const projectedWidth = Math.max(...screenXs) - Math.min(...screenXs) + 3.2;
+    const projectedHeight = Math.max(...screenYs) - Math.min(...screenYs) + 4.0;
+    const viewportWidth = Math.max(1, camera.right - camera.left);
+    const viewportHeight = Math.max(1, camera.top - camera.bottom);
+    // Player zoom remains view-only. A reset always restores the safe fit.
+    const fitZoom = Math.min(1, viewportWidth / projectedWidth, viewportHeight / projectedHeight);
+    camera.zoom = fitZoom * cameraZoomFactor;
     camera.updateProjectionMatrix();
   }
   function publishBuildingHitTargets(buildings = latestBuildings) {
     if (!host || !camera || !renderer || disposed) return;
     camera.updateMatrixWorld(true);
-    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
     const positions = list.map((building, index) => {
       const { x, z } = cityWorldPoint(building, index);
       const projected = new THREE.Vector3(x, .18, z).project(camera);
@@ -693,7 +755,7 @@ if (host && "WebGLRenderingContext" in window) {
     activeModels = [];
     // Keep deterministic world-space building anchors. HTML hit targets are
     // projected into screen coordinates from this same camera below.
-    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(9, qualityProfile?.maxBuildings || 9));
+    const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
     frameCityBuildings(list);
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
@@ -708,6 +770,13 @@ if (host && "WebGLRenderingContext" in window) {
       scene.add(group);
       activeModels.push(group);
     });
+    for(const landmark of currentSpecialLandmarks()){
+      const group=createSpecialLandmark(landmark.building_type);
+      const {x,z}=cityWorldPoint(landmark,0);
+      group.position.set(x,0,z);
+      // Small decorations have no extra animation or shadow draw calls.
+      scene.add(group);activeModels.push(group);
+    }
     renderer.render(scene, camera);
     publishBuildingHitTargets(list);
   }
@@ -874,6 +943,27 @@ if (host && "WebGLRenderingContext" in window) {
     scene.add(defensePreviewMesh);
     renderer.render(scene,camera);
   }
+  function renderEquippedDragon(row) {
+    const visual=projectDragonVisual(row);
+    if(activeDragon && (!visual || activeDragon.key!==visual.key || activeDragon.level!==visual.level)){
+      scene.remove(activeDragon.figure.root);
+      disposeDetachedObject3D(activeDragon.figure.root);
+      activeDragon=null;
+    }
+    if(!visual || !scene || disposed)return;
+    if(!activeDragon){
+      activeDragon={...visual,figure:makeDragonFigure(THREE,visual,qualityProfile?.tier)};
+      dragonTime=0;
+      scene.add(activeDragon.figure.root);
+      poseDragon(activeDragon.figure,0,false);
+    }
+    const castleIndex=latestBuildings.findIndex(b=>b.building_type==="castle");
+    const anchor=castleIndex>=0?cityWorldPoint(latestBuildings[castleIndex],castleIndex):{x:0,z:0};
+    activeDragon.figure.root.position.set(anchor.x+1.65,2.35,anchor.z-1.05);
+  }
+  function canAnimateDragon(){
+    return !!activeDragon && qualityProfile?.tier==="high" && !qualityProfile?.prefersReducedMotion;
+  }
   function canRunArmyAnimation() {
     return !disposed && !cinematicCaptureActive && !document.hidden && sceneInViewport;
   }
@@ -888,7 +978,7 @@ if (host && "WebGLRenderingContext" in window) {
     adaptivePixelScale.reset();
   }
   function renderArmyFrame(timestamp) {
-    if (!canRunArmyAnimation() || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders)) {
+    if (!canRunArmyAnimation() || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders && !canAnimateDragon())) {
       animationFrame = 0;
       lastAnimationTime = 0;
       return;
@@ -911,11 +1001,15 @@ if (host && "WebGLRenderingContext" in window) {
     lastAnimationTime = timestamp;
     for (const mixer of armyMixers) mixer.update(delta);
     advancedShaders?.update(delta);
+    if(canAnimateDragon()){
+      dragonTime+=delta;
+      poseDragon(activeDragon.figure,dragonTime,true);
+    }
     renderer.render(scene, camera);
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
   function startArmyAnimationLoop() {
-    if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
+    if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders && !canAnimateDragon()) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
     lastAnimationTime = 0;
     animationFrameTiming.reset();
     adaptivePixelScale.reset();
@@ -953,11 +1047,10 @@ if (host && "WebGLRenderingContext" in window) {
     return url.href;
   }
   async function loadManifestAsset(entry) {
-    const { asset, kind, key } = entry;
+    const { asset, kind } = entry;
     try {
       const assetUrl = safeAssetUrl(asset);
       const loadPromise = gltfLoader.loadAsync(assetUrl);
-      glbLoadPromises.set(key, loadPromise);
       const gltf = await loadPromise;
       if (disposed || !renderer) {
         disposeDetachedObject3D(gltf.scene);
@@ -974,9 +1067,17 @@ if (host && "WebGLRenderingContext" in window) {
       });
     } catch (assetError) {
       console.info(`Clash of Izzy: GLB ${asset.id || asset.type || asset.unit_type} indisponível; mantendo o fallback procedural.`, assetError);
-    } finally {
-      glbLoadPromises.delete(key);
     }
+  }
+  function scheduleManifestAsset(entry) {
+    if (glbLoadPromises.has(entry.key)) return null;
+    const lane = nextGlbLane++ % glbLoadLanes.length;
+    const pending = glbLoadLanes[lane].then(() => {
+      if (!disposed && renderer) return loadManifestAsset(entry);
+    }).finally(() => glbLoadPromises.delete(entry.key));
+    glbLoadPromises.set(entry.key, pending);
+    glbLoadLanes[lane] = pending.catch(() => {});
+    return pending;
   }
   function renderManifestProps() {
     for (const prop of activeProps) scene.remove(prop);
@@ -1004,37 +1105,35 @@ if (host && "WebGLRenderingContext" in window) {
   function renderKingdomTroops(troops = []) {
     stopArmyAnimationLoop();
     for (const instance of activeTroops) {
-      instance.mixer.stopAllAction();
-      instance.mixer.uncacheRoot(instance.root);
+      instance.mixer?.stopAllAction();
+      instance.mixer?.uncacheRoot(instance.root);
       scene.remove(instance.root);
+      if (instance.procedural) disposeDetachedObject3D(instance.root);
     }
     activeTroops = [];
     armyMixers = [];
-    const archerCount = (Array.isArray(troops) ? troops : [])
-      .filter(unit => unit?.unit_type === "archer")
-      .reduce((sum, unit) => sum + Math.max(0, Number(unit.quantity) || 0), 0);
-    const asset = glbUnitTemplates.get("archer");
-    if (!asset || archerCount <= 0) {
-      renderer?.render(scene, camera);
-      return;
-    }
-    const tierLimit = qualityProfile?.tier === "low" ? 2 : qualityProfile?.tier === "high" ? 5 : 3;
-    const count = Math.min(tierLimit, asset.maxInstances, Math.max(1, Math.ceil(Math.log2(archerCount + 1))));
-    const spacing = .72;
-    for (let index = 0; index < count; index += 1) {
-      const root = cloneSkinned(asset.template);
-      root.position.set((index - (count - 1) / 2) * spacing, 0, 4.25 + (index % 2) * .22);
+    const plan = planArmyFigures(troops, qualityProfile?.tier);
+    const glbCounts = new Map();
+    for (const entry of plan) {
+      const asset = glbUnitTemplates.get(entry.type);
+      const used = glbCounts.get(entry.type) || 0;
+      const procedural = !asset || used >= asset.maxInstances;
+      const root = procedural ? createProceduralUnit(THREE, entry.type, qualityProfile?.tier) : cloneSkinned(asset.template);
+      root.position.set(entry.x, 0, entry.z);
       root.rotation.y = Math.PI;
-      root.userData.coIUnitType = "archer";
+      root.userData.coIUnitType = entry.type;
       scene.add(root);
-      const mixer = new THREE.AnimationMixer(root);
-      const clip = asset.animations.find(animation => animation.name.toLowerCase() === asset.animation.toLowerCase())
-        || asset.animations.find(animation => animation.name.toLowerCase() === "static")
-        || asset.animations[0];
-      if (clip) mixer.clipAction(clip).play();
-      activeTroops.push({ root, mixer });
-      armyMixers.push(mixer);
-      if (qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) mixer.update(0);
+      let mixer = null;
+      if (!procedural) {
+        glbCounts.set(entry.type, used + 1);
+        mixer = new THREE.AnimationMixer(root);
+        const clip = asset.animations.find(animation => animation.name.toLowerCase() === asset.animation.toLowerCase())
+          || asset.animations.find(animation => animation.name.toLowerCase() === "static")
+          || asset.animations[0];
+        if (clip) { mixer.clipAction(clip).play(); armyMixers.push(mixer); }
+        if (qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) mixer.update(0);
+      }
+      activeTroops.push({ root, mixer, procedural });
     }
     startArmyAnimationLoop();
     if (!animationFrame) renderer?.render(scene, camera);
@@ -1089,14 +1188,14 @@ if (host && "WebGLRenderingContext" in window) {
           .filter(asset => asset?.enabled === true && presentUnits.has(asset.unit_type) && !glbUnitTemplates.has(asset.unit_type))
           .map(asset => ({ asset, kind: "unit", key: `unit:${asset.unit_type}` }))
       ].filter(entry => !glbLoadPromises.has(entry.key));
-      let cursor = 0;
-      const worker = async () => {
-        while (!disposed && cursor < queue.length) {
-          await loadManifestAsset(queue[cursor++]);
-        }
-      };
-      await Promise.all(Array.from({ length: Math.min(3, queue.length) }, () => worker()));
+      // Normal state refreshes already render the existing templates. Avoid a
+      // second scene rebuild when this call has no new assets to decode.
+      if (!queue.length) return;
+      const pending = queue.map(scheduleManifestAsset).filter(Boolean);
+      if (!pending.length) return;
+      await Promise.all(pending);
       if (!disposed && renderer) {
+        optionalSceneRefreshes += 1;
         renderBuildings(latestBuildings);
         renderManifestProps();
         renderKingdomTroops(latestTroops);
@@ -1202,6 +1301,12 @@ if (host && "WebGLRenderingContext" in window) {
         premiumWater: Boolean(waterFeature),
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
+        loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
+        pendingGlbLoads: glbLoadPromises.size,
+        optionalSceneRefreshes,
+        specialLandmarks:activeModels.filter(model=>model.userData.coISpecial).map(model=>({type:model.userData.coIType,x:model.position.x,z:model.position.z})),
+        troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
+        dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon()} : null,
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };
@@ -1225,6 +1330,7 @@ if (host && "WebGLRenderingContext" in window) {
       visibilityChangeHandler = null;
       if (resizeHandler) window.removeEventListener("resize", resizeHandler);
       if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+      if (kingdomZoomHandler) window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler);
       if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
       if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
       valhallaModeHandler = null;
@@ -1252,11 +1358,25 @@ if (host && "WebGLRenderingContext" in window) {
       renderBuildings(list,latestCastleSkinId);
       renderCityDefenses(latestDefenses);
       renderAssignedHeroFigures(latestHeroAssignments);
+      renderEquippedDragon(window.__coiKingdomDragon);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       if (!disposed) loadOptionalGlbAssets(list, latestTroops);
     };
     window.addEventListener("coi:kingdom-render", kingdomRenderHandler);
+    kingdomZoomHandler = event => {
+      if (disposed || cinematicCaptureActive || !renderer || !scene || !camera) return;
+      const action = event.detail?.action;
+      if (!["in", "out", "reset"].includes(action)) return;
+      cameraZoomFactor = action === "reset" ? 1
+        : Math.max(0.7, Math.min(1.6, Number((cameraZoomFactor + (action === "in" ? 0.2 : -0.2)).toFixed(2))));
+      const visible = latestBuildings.slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
+      if (!visible.length) return;
+      frameCityBuildings(visible);
+      renderer.render(scene, camera);
+      publishBuildingHitTargets(visible);
+    };
+    window.addEventListener("coi:kingdom-zoom", kingdomZoomHandler);
     defensePreviewHandler=event=>updateDefensePreview(event.detail||{});
     window.addEventListener("coi:defense-preview",defensePreviewHandler);
     if (Array.isArray(window.__coiKingdomBuildings)) {
@@ -1268,6 +1388,7 @@ if (host && "WebGLRenderingContext" in window) {
       renderBuildings(window.__coiKingdomBuildings,latestCastleSkinId);
       renderCityDefenses(latestDefenses);
       renderAssignedHeroFigures(latestHeroAssignments);
+      renderEquippedDragon(window.__coiKingdomDragon);
       renderManifestProps();
       renderKingdomTroops(latestTroops);
       loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops);
@@ -1278,6 +1399,10 @@ if (host && "WebGLRenderingContext" in window) {
       const viewHeight = 12.8, viewWidth = viewHeight * aspect;
       camera.left = -viewWidth / 2; camera.right = viewWidth / 2;
       camera.top = viewHeight / 2; camera.bottom = -viewHeight / 2;
+      // Refit after orientation/viewport changes; otherwise portrait mode can
+      // clip outer buildings even when the initial landscape frame was valid.
+      const visibleBuildings = latestBuildings.slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
+      if (visibleBuildings.length) frameCityBuildings(visibleBuildings);
       camera.updateProjectionMatrix();
       renderer.setPixelRatio(calculateKingdomPixelRatio({ width: host.clientWidth, height: host.clientHeight, devicePixelRatio: window.devicePixelRatio || 1, profile: qualityProfile }) * (automaticGraphics ? adaptivePixelScale.scale : 1));
       renderer.setSize(host.clientWidth, host.clientHeight, false);
@@ -1341,6 +1466,7 @@ if (host && "WebGLRenderingContext" in window) {
       sceneVisibilityObserver.observe(host);
     }
     resize();
+    window.dispatchEvent(new CustomEvent("coi:kingdom-3d-ready"));
     if (advancedShaders) startArmyAnimationLoop();
   } catch (error) {
     // Initialization can fail after GPU resources or listeners were already created.
@@ -1355,6 +1481,7 @@ if (host && "WebGLRenderingContext" in window) {
     visibilityChangeHandler = null;
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
     if (kingdomRenderHandler) window.removeEventListener("coi:kingdom-render", kingdomRenderHandler);
+    if (kingdomZoomHandler) window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler);
     if (defensePreviewHandler) window.removeEventListener("coi:defense-preview", defensePreviewHandler);
     if (valhallaModeHandler) window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
     valhallaModeHandler = null;

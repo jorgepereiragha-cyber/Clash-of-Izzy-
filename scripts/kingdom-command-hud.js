@@ -27,3 +27,4 @@ function updateCommandDeck(rawDetail) {
 }
 
 window.addEventListener("coi:command-state", event => updateCommandDeck(event.detail));
+if (window.__coiCommandSnapshot) updateCommandDeck(window.__coiCommandSnapshot);
