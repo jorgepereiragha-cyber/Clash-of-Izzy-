@@ -125,3 +125,6 @@ wrangler.beta.local-smoke.jsonc
 
 # Server-only production clock.
 production-clock.js
+
+# Server-only castle shield policy.
+castle-shield.js
