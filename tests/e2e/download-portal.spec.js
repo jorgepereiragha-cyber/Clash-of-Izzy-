@@ -43,6 +43,7 @@ test("Android: only signed release names on official GitHub download host are of
   await expect(page.locator("#download-apk-final")).not.toHaveAttribute("aria-disabled", "true");
   await expect(page.locator("#checksum-link")).toHaveAttribute("href", prefix + apk + ".sha256");
   await expect(page.getByText("Versão v1.2.3 disponível")).toBeVisible();
+  await expect(page.locator("#download-status-final")).toContainText("APK oficial disponível");
 });
 
 test("Android: reject download redirection to another domain even if release metadata contains an asset", async ({ page }) => {
@@ -60,4 +61,19 @@ test("Android: reject download redirection to another domain even if release met
   await expect(page.locator("#download-apk")).toHaveAttribute("aria-disabled", "true");
   await expect(page.locator("#download-apk")).not.toHaveAttribute("href", /./);
   await expect(page.locator("#download-apk-final")).toHaveAttribute("aria-disabled", "true");
+});
+
+test("Android: reject incorrect asset paths and duplicated release assets", async ({page})=>{
+  let assets = [
+    {name:apk,state:"uploaded",size:4000000,browser_download_url:prefix+apk+"/extra"},
+    {name:apk+".sha256",state:"uploaded",size:96,browser_download_url:prefix+apk+".sha256"}
+  ];
+  await page.route(releases,route=>route.fulfill({status:200,headers:{"access-control-allow-origin":"*"},contentType:"application/json",body:JSON.stringify({draft:false,prerelease:false,tag_name:"v1.2.3",assets})}));
+  await page.goto("/portal.html");
+  await expect(page.locator("#download-status-final")).toContainText("Download indisponível");
+  await expect(page.locator("#download-apk")).not.toHaveAttribute("href",/./);
+  assets=[{...assets[0],browser_download_url:prefix+apk},{...assets[0],browser_download_url:prefix+apk},assets[1]];
+  await page.reload();
+  await expect(page.locator("#download-status-final")).toContainText("Download indisponível");
+  await expect(page.locator("#download-apk-final")).not.toHaveAttribute("href",/./);
 });
