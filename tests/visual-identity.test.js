@@ -25,11 +25,19 @@ test("cidade 3D segue a bíblia visual com telhados azul-real e detalhes dourado
 test("edifícios 3D possuem silhuetas e marcos próprios por função", async () => {
   const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.url), "utf8");
   for (const feature of [
-    'type === "market"', 'type === "barracks"', 'type === "quarry"',
-    'type === "lumber_mill"', 'type === "academy"', 'type === "hospital"',
+    'type === "market"', 'type === "barracks"',
+    'type === "academy"', 'type === "hospital"',
     'type === "archery_range"', 'type === "siege_workshop"',
     'type === "embassy"', 'type === "warehouse"', 'type === "stable"'
   ]) assert.ok(renderer.includes(feature), "marco arquitetônico ausente: " + feature);
+  const rural=renderer.slice(renderer.indexOf("function addRuralBuilding"),renderer.indexOf("function createBuilding"));
+  assert.match(renderer,/const ruralTypes=new Set\(\["farm","quarry","lumber_mill","iron_mine"\]\)/);
+  assert.match(rural,/type==="farm"/);
+  assert.match(rural,/type==="lumber_mill"/);
+  assert.match(rural,/type==="iron_mine"/);
+  assert.match(rural,/box\(group,\.86,\.30\+\.05\*stage,\.44,wall/);
+  assert.match(rural,/new THREE\.DodecahedronGeometry/);
+  assert.match(rural,/new THREE\.TorusGeometry/);
   assert.match(renderer, /emissiveIntensity: 0\.28/);
   assert.match(renderer, /new THREE\.DodecahedronGeometry/);
   assert.match(renderer, /new THREE\.TorusGeometry/);
