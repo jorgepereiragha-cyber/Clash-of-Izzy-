@@ -1,4 +1,6 @@
 import { test, expect } from "@playwright/test";
+import { mkdir } from "node:fs/promises";
+import { join } from "node:path";
 
 const releases = "https://api.github.com/repos/jorgepereiragha-cyber/Clash-of-Izzy-/releases/latest";
 const prefix = "https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases/download/v1.2.3/";
@@ -77,15 +79,26 @@ test("Android: reject incorrect asset paths and duplicated release assets", asyn
 });
 
 test("Android: compact responsive hero and accessible secondary details",async({page})=>{
+  // Real portal markup, with mocked release metadata; evidence is not a production screenshot.
+  const evidenceDir = join(process.cwd(), "test-results", "visual-preview", "portal");
+  await mkdir(evidenceDir, {recursive:true});
   await page.route(releases,route=>route.fulfill({status:404,headers:{"access-control-allow-origin":"*"},body:"{}"}));
-  for(const [width,height] of [[360,800],[390,844],[844,390],[1440,900]]){
+  for(const [width,height] of [[360,800],[390,844],[412,915],[844,390],[1440,900]]){
     await page.setViewportSize({width,height});
     await page.goto("/portal.html");
-    await expect(page.locator("#download-apk")).toBeInViewport();
-    await expect(page.locator("h1")).toBeInViewport();
+    await expect(page.locator("#download-status")).toContainText("O APK comercial ainda não está disponível");
+    await expect(page.locator("#invite-download-status")).toContainText("Instalador por convite ainda indisponível");
+    await expect(page.locator("#download-apk")).toBeInViewport({ratio:0.9});
+    await expect(page.locator("h1")).toBeInViewport({ratio:0.9});
+    await expect.poll(()=>page.locator(".crest").evaluate(img=>img.complete && img.naturalWidth>0)).toBe(true);
     expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
-    await page.locator("summary").click();
+    await page.screenshot({path:join(evidenceDir,`portal-${width}x${height}-downloads-indisponiveis.png`),animations:"disabled"});
+    await page.locator("summary").focus();
+    await expect(page.locator("summary")).toBeFocused();
+    await page.keyboard.press("Enter");
     await expect(page.locator("#official-release-page")).toBeVisible();
+    await expect(page.locator("details")).toHaveJSProperty("open",true);
+    await page.screenshot({path:join(evidenceDir,`portal-${width}x${height}-detalhes.png`),fullPage:true,animations:"disabled"});
   }
 });
 
