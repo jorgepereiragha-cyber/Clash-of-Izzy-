@@ -7,6 +7,10 @@ const UNIT_POWER=Object.freeze({
 });
 const NODE_RESOURCE=Object.freeze({mine:"iron",forest:"wood",farm:"food",quarry:"stone"});
 const MAX_TOTAL_TROOPS=200000;
+// A rally has its own capacity, independent of each participant's march.
+// Only internal SQL expressions are passed to these builders.
+const rallyCapacitySql=leader=>`MIN(${MAX_TOTAL_TROOPS},10000+10000*MAX(1,MIN(30,COALESCE((SELECT level FROM kingdom_buildings WHERE kingdom_id=${leader} AND building_type='embassy'),1))))`;
+const rallyTroopsSql=rally=>`(SELECT COALESCE(SUM(CAST(t.value AS INTEGER)),0) FROM rally_reinforcements rr,json_each(rr.troop_data) t WHERE rr.rally_id=${rally})`;
 
 function reply(data,status=200){
  return Response.json(data,{status,headers:{"Cache-Control":"no-store","X-Content-Type-Options":"nosniff"}});
@@ -80,6 +84,8 @@ async function listRallies(env,kingdomId){
   SELECT r.id,r.leader_kingdom_id,r.target_id,r.status,r.total_power,r.departure_time,r.arrival_time,
    r.rally_duration,k.kingdom_name AS leader_name,n.node_type,n.level AS node_level,
    (SELECT COUNT(*) FROM rally_reinforcements rr WHERE rr.rally_id=r.id) AS member_count,
+   ${rallyTroopsSql("r.id")} AS total_troops,
+   ${rallyCapacitySql("r.leader_kingdom_id")} AS troop_capacity,
    EXISTS(SELECT 1 FROM rally_reinforcements mine WHERE mine.rally_id=r.id AND mine.kingdom_id=?) AS joined
   FROM rallies r
   JOIN kingdoms k ON k.id=r.leader_kingdom_id
@@ -109,8 +115,8 @@ async function createRally(env,kingdomId,body){
  const arrival=now+duration+travelSeconds;
  const withdrawal=withdrawalStatement(
   troopJson,kingdomId,
-  "EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=? AND alliance_id=?) AND EXISTS(SELECT 1 FROM resource_nodes WHERE id=? AND occupied_by IS NULL AND reserved_by_rally IS NULL)",
-  [kingdomId,membership.alliance_id,targetId]
+  `EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=? AND alliance_id=?) AND EXISTS(SELECT 1 FROM resource_nodes WHERE id=? AND occupied_by IS NULL AND reserved_by_rally IS NULL) AND ?<=${rallyCapacitySql("?")}`,
+  [kingdomId,membership.alliance_id,targetId,countTroops(troops),kingdomId]
  );
  const result=await env.DB.batch([
   env.DB.prepare(withdrawal.sql).bind(...withdrawal.bindings),
@@ -125,7 +131,7 @@ async function createRally(env,kingdomId,body){
    .bind(troopPower(troops),rallyId)
  ]);
  if(Number(result[1]?.meta?.changes||0)!==1){
-  return reply({error:"Tropas insuficientes, nó reservado ou rally não pôde ser criado."},409);
+  return reply({error:"Tropas insuficientes, capacidade do rally excedida ou nó reservado."},409);
  }
  return reply({success:true,rally_id:rallyId,departure_time:now+duration,arrival_time:arrival,power:troopPower(troops)},201);
 }
@@ -145,8 +151,8 @@ async function joinRally(env,kingdomId,body){
  const troopJson=JSON.stringify(troops),count=Object.keys(troops).length,power=troopPower(troops);
  const withdrawal=withdrawalStatement(
   troopJson,kingdomId,
-  "EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=? AND alliance_id=?) AND EXISTS(SELECT 1 FROM rallies WHERE id=? AND status='gathering' AND departure_time>?) AND NOT EXISTS(SELECT 1 FROM rally_reinforcements WHERE rally_id=? AND kingdom_id=?)",
-  [kingdomId,membership.alliance_id,rallyId,Math.floor(Date.now()/1000),rallyId,kingdomId]
+  `EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=? AND alliance_id=?) AND EXISTS(SELECT 1 FROM rallies r WHERE r.id=? AND r.alliance_id=? AND r.status='gathering' AND r.departure_time>? AND ${rallyTroopsSql("r.id")}+?<=${rallyCapacitySql("r.leader_kingdom_id")}) AND NOT EXISTS(SELECT 1 FROM rally_reinforcements WHERE rally_id=? AND kingdom_id=?)`,
+  [kingdomId,membership.alliance_id,rallyId,membership.alliance_id,Math.floor(Date.now()/1000),countTroops(troops),rallyId,kingdomId]
  );
  const result=await env.DB.batch([
   env.DB.prepare(withdrawal.sql).bind(...withdrawal.bindings),
@@ -156,7 +162,7 @@ async function joinRally(env,kingdomId,body){
    .bind(power,rallyId)
  ]);
  if(Number(result[1]?.meta?.changes||0)!==1)
-  return reply({error:"Tropas insuficientes ou você já participa deste rally."},409);
+  return reply({error:"Tropas insuficientes, rally lotado ou participação já registrada."},409);
  return reply({success:true,power_added:power});
 }
 async function occupyNode(env,kingdomId,body){
