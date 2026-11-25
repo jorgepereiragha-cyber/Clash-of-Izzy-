@@ -9,7 +9,7 @@ export const FRAGMENT_RECIPES = Object.freeze({
 export function enhancementLevel(value){
   return Number.isSafeInteger(value) && value>=0 && value<=10 ? value : 0;
 }
-export function enhancementCost(level){return ENHANCEMENT_COSTS[enhancementLevel(level)] ?? null;}
+export function enhancementCost(level){return Number.isSafeInteger(level)&&level>=0&&level<ENHANCEMENT_COSTS.length?ENHANCEMENT_COSTS[level]:null;}
 export function enhancedStats(def,level,enhancement){
   const factor=1+enhancementLevel(enhancement)*0.025;
   return Object.fromEntries(Object.entries(def.base).map(([key,value])=>
