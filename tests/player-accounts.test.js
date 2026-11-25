@@ -87,3 +87,38 @@ test("account storage errors cannot create anonymous realms without persistent s
   assert.ok(html.includes('try{sessionStorage.setItem("coi_game_token",token);persisted=true;}catch{}'));
   assert.ok(html.includes('if(!persisted)throw new Error('));
 });
+
+test("password registration carries forward Google session version and issues the returned version", async () => {
+  const { handlePlayerAccountRoute } = await import("../player-accounts.js");
+  for (const oldVersion of [0, 1, 5]) {
+    let insertedSql;
+    let insertedBindings;
+    const env = {
+      SESSION_SECRET: "synthetic-test-secret",
+      DB: { prepare(sql) { return { bind(...args) { return {
+        async first() {
+          if (sql.startsWith("SELECT id,player_id FROM players")) return { id: 7, player_id: "izzy_test" };
+          if (sql.startsWith("SELECT id FROM player_accounts")) return null;
+          if (sql.startsWith("INSERT INTO player_accounts")) {
+            insertedSql = sql; insertedBindings = args;
+            return { session_version: oldVersion + 1 };
+          }
+          throw new Error("Unexpected SQL: " + sql);
+        }
+      }; } }; } }
+    };
+    const response = await handlePlayerAccountRoute(new Request("https://test.example/api/account/register", {method:"POST"}), env, {
+      gameIdentity: async () => "izzy_test",
+      readBody: async () => ({ username:"tester", password:"syntheticPassword123!", email:"" }),
+      rateLimitDecision: async () => null,
+      json: (data, status = 200) => Response.json(data, {status})
+    });
+    assert.equal(response.status, 201);
+    assert.match(insertedSql, /COALESCE\(\(SELECT session_version FROM google_account_links WHERE player_id=\?\),0\)\+1/);
+    assert.match(insertedSql, /RETURNING session_version/);
+    assert.equal(insertedBindings.at(-1), 7);
+    const {token} = await response.json();
+    const payload = JSON.parse(Buffer.from(token.split(".")[0], "base64url").toString());
+    assert.equal(payload.av, oldVersion + 1);
+  }
+});

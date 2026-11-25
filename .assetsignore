@@ -122,3 +122,6 @@ scripts/*.mjs
 
 # Temporary local-only beta runtime smoke config, never a public asset.
 wrangler.beta.local-smoke.jsonc
+
+# Server-only production clock.
+production-clock.js
