@@ -20,6 +20,7 @@ battle-replay.js
 email-system.js
 kingdom-queue-rules.js
 mercadopago-orders.js
+payment-activation.js
 level-packs.js
 pets.js
 player-accounts.js

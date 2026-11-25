@@ -52,11 +52,11 @@ jobs:
           }
           const vars = config.vars || {};
           for (const name of ["GAME_4X_SYSTEMS_ENABLED","LEVEL_PACKS_ENABLED",
-             "LEVEL_PACKS_PUBLIC_ENABLED","LEVEL_PACKS_PROPOSED_PRICES_APPROVED"]) {
+             "LEVEL_PACKS_PUBLIC_ENABLED","LEVEL_PACKS_PROPOSED_PRICES_APPROVED", "MP_PAYMENTS_ENABLED"]) {
             if (vars[name] !== "false") throw Error("Unsafe feature flag in deployment: " + name);
           }
           if (vars.ENVIRONMENT !== "production") throw Error("Expected production environment.");
-          console.log("Production binding verified; 4X and commercial flags remain disabled.");
+          console.log("Production binding verified; 4X, new Mercado Pago checkout and commercial flags remain disabled.");
           JS
 
       - name: Testar regras de jogo e migracoes apenas no D1 local

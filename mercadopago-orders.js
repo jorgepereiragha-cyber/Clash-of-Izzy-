@@ -1,4 +1,5 @@
 import { finalizeSupportOrder } from "./support-orders.js";
+import { mercadoPagoNewCheckoutEnabled } from "./payment-activation.js";
 import {MASTER_PACK_NAME,masterGrantStatements} from "./master-pack.js";
 import {getLevelPackByName,levelPackMatchesOrder,levelPackGrantStatements,levelPacksEnabledForPlayer,levelPackPriceApproved} from "./level-packs.js";
 function toBase64Url(bytes) {
@@ -63,7 +64,7 @@ function isTrustedCheckoutUrl(value) {
 export const isTrustedMercadoPagoCheckoutUrl = isTrustedCheckoutUrl;
 
 async function createCheckout(request, env, ctx) {
-  if (!env.MP_ACCESS_TOKEN || !env.MP_WEBHOOK_SECRET) return ctx.json({ error: "Checkout automático ainda não configurado por completo; o link Mercado Pago atual continua disponível.", code: "MP_NOT_CONFIGURED" }, 503);
+  if (!mercadoPagoNewCheckoutEnabled(env)) return ctx.json({ error: "Checkout Mercado Pago ainda não homologado ou não configurado.", code: "MP_NOT_CONFIGURED" }, 503);
   const playerId = await ctx.gameIdentity(request, env);
   if (!playerId) return ctx.json({ error: "Sessão do jogador inválida." }, 401);
   const limited = await ctx.rateLimitDecision(env, "mercadopago-checkout-player", playerId, 5, 3600);

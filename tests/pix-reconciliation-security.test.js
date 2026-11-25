@@ -48,7 +48,7 @@ test("unconfigured Mercado Pago and Nubank can never create player payment order
   const server=readFileSync(new URL("../worker.js",import.meta.url),"utf8");
   const arena=readFileSync(new URL("../arena.html",import.meta.url),"utf8");
   assert.match(server,/MP_NOT_CONFIGURED/);
-  assert.match(server,/if\(requestedPaymentMethod==="mercadopago_link"&&\(!env\.MP_ACCESS_TOKEN\|\|!env\.MP_WEBHOOK_SECRET\)\)/);
+  assert.match(server,/if\(requestedPaymentMethod==="mercadopago_link"&&!mercadoPagoNewCheckoutEnabled\(env\)\)/);
   assert.match(server,/requestedPaymentMethod==="pix" && !nubankPixReady\(env\)/);
   assert.match(arena,/paymentMethodStatus=\{known:false,mercadoPago:false,nubankPix:false\}/);
   assert.match(arena,/methods\.mercadoPago===true/);
