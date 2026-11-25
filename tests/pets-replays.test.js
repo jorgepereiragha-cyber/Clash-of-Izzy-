@@ -113,5 +113,17 @@ test("mascote desativado não consome ouro nem substitui o mascote ativo, inclus
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_pet_feed_requests").get().n,0);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_pets").get().n,2);
     assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_events").get().n,0);
+    // Re-selecting the active pet is a successful no-op, including parallel requests.
+    const repeated=await Promise.all(Array.from({length:4},()=>call("activate",{pet_id:"pet_raven"})));
+    assert.ok(repeated.every(r=>r.status===200));
+    for(const response of repeated)assert.equal((await response.json()).replayed,true);
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_events").get().n,0);
+    db.exec("UPDATE pet_catalog SET active=1 WHERE id='pet_wolf'");
+    const switches=await Promise.all(Array.from({length:4},()=>call("activate",{pet_id:"pet_wolf"})));
+    assert.ok(switches.every(r=>r.status===200));
+    const bodies=await Promise.all(switches.map(r=>r.json()));
+    assert.equal(bodies.filter(r=>!r.replayed).length,1);
+    assert.equal(db.prepare("SELECT pet_id FROM kingdom_pets WHERE is_active=1").get().pet_id,"pet_wolf");
+    assert.equal(db.prepare("SELECT COUNT(*) AS n FROM kingdom_events WHERE event_type='pet_activated'").get().n,1);
   }finally{db.close();}
 });
