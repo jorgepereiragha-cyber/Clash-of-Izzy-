@@ -421,3 +421,19 @@ test("city camera touch zoom is view-only, bounded, and disabled after WebGL los
   assert.match(renderer, /publishBuildingHitTargets\(visible\)/);
   assert.equal(renderer.split('window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler)').length - 1, 2);
 });
+
+test("special landmarks render only persisted distinct bounded positions",async()=>{
+ const {planSpecialCityLandmarks}=await import("../scripts/kingdom-special-landmarks.js");
+ assert.deepEqual(planSpecialCityLandmarks([
+  {building_type:"dragon_nest",grid_x:22,grid_z:-25,width:3,height:3},
+  {building_type:"dragon_nest",grid_x:0,grid_z:0,width:3,height:3},
+  {building_type:"summon_altar",grid_x:23,grid_z:0,width:3,height:3},
+  {building_type:"summon_altar",grid_x:0,grid_z:0,width:3,height:3},
+  {building_type:"castle",grid_x:0,grid_z:0,width:3,height:3}
+ ]),[{building_type:"dragon_nest",position_x:23.5,position_z:-23.5,level:1},{building_type:"summon_altar",position_x:1.5,position_z:1.5,level:1}]);
+ assert.deepEqual(planSpecialCityLandmarks(null),[]);
+ assert.match(renderer,/function createSpecialLandmark/);
+ assert.match(renderer,/scene\.add\(group\);activeModels\.push\(group\)/);
+ assert.match(renderer,/specialLandmarks:activeModels\.filter/);
+ assert.match(kingdom,/window\.__coiKingdomSpecialBuildings=state\.specialCityBuildings/);
+});

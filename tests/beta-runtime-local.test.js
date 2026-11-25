@@ -873,6 +873,10 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           assert.equal(response.status(), 200, "browser kingdom state is readable");
           return (await response.json()).state;
         };
+        const nestResponse=await context.request.post(base+"/api/game/action",{headers:auth,data:{type:"city_special_position",building:"dragon_nest",gridX:22,gridZ:22,fromX:null,fromZ:null}});
+        assert.equal(nestResponse.status(),200,"browser realm nest persisted");
+        const altarResponse=await context.request.post(base+"/api/game/action",{headers:auth,data:{type:"city_special_position",building:"summon_altar",gridX:17,gridZ:22,fromX:null,fromZ:null}});
+        assert.equal(altarResponse.status(),200,"browser realm altar persisted");
         const beforeTraining = await readBrowserState();
         const realmId = Number(beforeTraining.kingdom.id);
         assert.ok(Number.isSafeInteger(realmId) && realmId > 0);
@@ -952,6 +956,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.ok(equippedDragon?.dragon_key,"server-backed equipped dragon");
         assert.equal(diagnostics.dragonVisual?.key,equippedDragon.dragon_key,"only equipped dragon is represented");
         assert.equal(diagnostics.dragonVisual.animated,false,"balanced profile keeps dragon static");
+        assert.deepEqual(diagnostics.specialLandmarks.map(x=>x.type).sort(),["dragon_nest","summon_altar"]);
+        for(const model of diagnostics.specialLandmarks)assert.ok(Number.isFinite(model.x)&&Number.isFinite(model.z));
         const evidence = path.join(root, "test-results", "beta-visual");
         await mkdir(evidence, {recursive:true});
         await page.locator("#city").screenshot({path:path.join(evidence,"kingdom-3d.png")});

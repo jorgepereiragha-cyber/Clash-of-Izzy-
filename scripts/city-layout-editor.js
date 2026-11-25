@@ -50,6 +50,7 @@ if (root) {
       ctx.fillRect(px,py,fp.width*unit,fp.height*unit);
       ctx.strokeStyle = "#e8e0c5";
       ctx.strokeRect(px,py,fp.width*unit,fp.height*unit);
+      if(b.special){ctx.fillStyle="#fff";ctx.font="bold 10px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(b.building_type==="dragon_nest"?"N":"A",px+fp.width*unit/2,py+fp.height*unit/2);}
     });
     if (size && Number.isFinite(x) && Number.isFinite(z)) {
       ctx.fillStyle = valid ? "rgba(85,225,135,.42)" : "rgba(244,88,88,.53)";
@@ -93,6 +94,11 @@ if (root) {
         option.textContent = row.special?row.name+(row.position_x===null?" · Posicionar":" · Estrutura especial"):(window.__coiCityBuildingNames?.[row.building_type] || row.building_type) + " · Nv. " + row.level;
         selector.appendChild(option);
       });
+    }
+    // Refresh labels after first placement without replacing focus or options.
+    for(const option of selector.options){
+      const row=rows.find(b=>b.building_type===option.value);
+      if(row?.special)option.textContent=row.name+(row.position_x===null?" · Posicionar":" · Estrutura especial");
     }
     if (rows.some(b => b.building_type === previous)) selector.value = previous;
     const chosen = selected();

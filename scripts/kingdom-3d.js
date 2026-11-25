@@ -12,6 +12,7 @@ import { projectDragonVisual, makeDragonFigure, poseDragon } from "./kingdom-dra
 import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
+import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -665,9 +666,36 @@ if (host && "WebGLRenderingContext" in window) {
       z: (Math.floor(index / columns) - (rows - 1) / 2) * spacingZ
     };
   }
+  function currentSpecialLandmarks(){return planSpecialCityLandmarks(window.__coiKingdomSpecialBuildings);}
+  function createSpecialLandmark(type){
+    const group=new THREE.Group();
+    group.userData.coIType=type;group.userData.coIProcedural=true;group.userData.coISpecial=true;
+    // Two compact original silhouettes; use shared scene materials and disposable geometry.
+    box(group,1.5,.15,1.5,mats.darkStone,0,.075,0);
+    if(type==="dragon_nest"){
+      addCylinder(group,.65,.7,.32,mats.stone,0,.27,0,10);
+      for(let i=0;i<8;i++){
+        const a=i*Math.PI/4;
+        const twig=box(group,.42,.12,.11,mats.wood,.58*Math.cos(a),.46,.58*Math.sin(a));
+        if(twig)twig.rotation.y=-a+Math.PI/2;
+      }
+      for(const [x,z] of [[-.23,-.14],[.23,-.12],[0,.23]]){
+        const egg=new THREE.Mesh(new THREE.SphereGeometry(.18,8,6),mats.gold);
+        egg.scale.y=1.45;egg.position.set(x,.58,z);group.add(egg);
+      }
+    }else{
+      box(group,1.14,.14,1.14,mats.stone,0,.22,0);
+      for(const x of [-.48,.48])for(const z of [-.48,.48])addCylinder(group,.09,.12,.78,mats.stone,x,.68,z,6);
+      box(group,1.2,.12,1.2,mats.gold,0,1.12,0);
+      const crest=new THREE.Mesh(new THREE.OctahedronGeometry(.28),mats.window);
+      crest.position.y=1.43;group.add(crest);
+      box(group,.43,.28,.43,mats.roof,0,.42,0);
+    }
+    return group;
+  }
   function frameCityBuildings(buildings) {
     if (!camera || !buildings.length) return;
-    const points = buildings.map(cityWorldPoint);
+    const points = [...buildings,...currentSpecialLandmarks()].map(cityWorldPoint);
     const xs = points.map(p => p.x), zs = points.map(p => p.z);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minZ = Math.min(...zs), maxZ = Math.max(...zs);
@@ -742,6 +770,13 @@ if (host && "WebGLRenderingContext" in window) {
       scene.add(group);
       activeModels.push(group);
     });
+    for(const landmark of currentSpecialLandmarks()){
+      const group=createSpecialLandmark(landmark.building_type);
+      const {x,z}=cityWorldPoint(landmark,0);
+      group.position.set(x,0,z);
+      // Small decorations have no extra animation or shadow draw calls.
+      scene.add(group);activeModels.push(group);
+    }
     renderer.render(scene, camera);
     publishBuildingHitTargets(list);
   }
@@ -1269,6 +1304,7 @@ if (host && "WebGLRenderingContext" in window) {
         loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
         pendingGlbLoads: glbLoadPromises.size,
         optionalSceneRefreshes,
+        specialLandmarks:activeModels.filter(model=>model.userData.coISpecial).map(model=>({type:model.userData.coIType,x:model.position.x,z:model.position.z})),
         troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
         dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon()} : null,
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
