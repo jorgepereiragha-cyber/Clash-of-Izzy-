@@ -3,6 +3,9 @@ import { test, expect } from "@playwright/test";
 const releases = "https://api.github.com/repos/jorgepereiragha-cyber/Clash-of-Izzy-/releases/latest";
 const prefix = "https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/releases/download/v1.2.3/";
 const apk = "clash-of-izzy-android.apk";
+test.beforeEach(async ({page})=>{
+  await page.route("https://api.github.com/repos/jorgepereiragha-cyber/Clash-of-Izzy-/releases?per_page=100",route=>route.fulfill({status:200,headers:{"access-control-allow-origin":"*"},contentType:"application/json",body:"[]"}));
+});
 
 test("Android: marketing homepage promotes gated APK, not browser gameplay", async ({ page }) => {
   await page.route(releases, route => route.fulfill({ status: 404, headers: { "access-control-allow-origin": "*" }, contentType: "application/json", body: "{}" }));

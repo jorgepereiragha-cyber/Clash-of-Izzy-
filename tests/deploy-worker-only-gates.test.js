@@ -37,3 +37,10 @@ test("Worker-only publication never migrates production D1 and checks live Worke
   assert.match(workflow,/node scripts\/check-android-release-server\.mjs/);
   assert.match(workflow,/node scripts\/production-smoke\.js/);
 });
+
+test("Worker-only publication verifies the candidate D1 migration set before remote deploy",()=>{
+  const guard=workflow.indexOf("run: node scripts/check-worker-only-schema.mjs");
+  const deploy=workflow.indexOf("run: npx wrangler --config wrangler.jsonc deploy");
+  assert.ok(guard>0&&deploy>guard);
+  assert.ok(workflow.indexOf("run: node scripts/cloudflare-remote-audit.mjs")<guard);
+});

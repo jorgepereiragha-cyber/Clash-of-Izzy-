@@ -159,10 +159,11 @@ export async function assaultThrone(env,kingdom,body,now=new Date()){
     "AND EXISTS(SELECT 1 FROM realm_thrones t WHERE t.realm_id=? AND t.revision=? "+
       "AND (t.crowned_cycle IS NULL OR t.crowned_cycle<>?) "+
       "AND datetime('now')>=datetime(?) AND datetime('now')<datetime(?)) "+
+    "AND EXISTS(SELECT 1 FROM alliance_members WHERE kingdom_id=? AND alliance_id=?) "+
     "AND NOT EXISTS(SELECT 1 FROM throne_assaults WHERE kingdom_id=? "+
       "AND (request_id=? OR created_at>datetime('now','-5 minutes')))"
   ).bind(lossesJson,kingdomId,unitsJson,unitsJson,kingdomId,types,realmId,Number(row.revision),
-    timeline.cycle,timeline.contestStartsAt,timeline.contestEndsAt,kingdomId,requestId);
+    timeline.cycle,timeline.contestStartsAt,timeline.contestEndsAt,kingdomId,Number(membership.alliance_id),kingdomId,requestId);
   const attempt=env.DB.prepare(
     "INSERT INTO throne_assaults(realm_id,cycle,kingdom_id,alliance_id,request_id,units_json,"+
     "casualties_json,attacker_power,defender_power,won) "+
@@ -172,18 +173,20 @@ export async function assaultThrone(env,kingdom,body,now=new Date()){
   const capture=env.DB.prepare(
     "UPDATE realm_thrones SET occupying_alliance_id=?,occupying_kingdom_id=?, "+
     "occupied_since=?,occupation_cycle=?,occupying_power=?,revision=revision+1 "+
-    "WHERE realm_id=? AND revision=? AND ?=1 "+
+    "WHERE realm_id=? AND revision=? AND ?=1 AND changes()=1 "+
     "AND EXISTS(SELECT 1 FROM throne_assaults WHERE kingdom_id=? AND request_id=?)"
   ).bind(Number(membership.alliance_id),kingdomId,timestamp,timeline.cycle,
     combat.attackPower,realmId,Number(row.revision),combat.won?1:0,kingdomId,requestId);
   const record=env.DB.prepare(
     "INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) "+
-    "SELECT ?,'throne_assault',? WHERE EXISTS "+
+    "SELECT ?,'throne_assault',? WHERE changes()=1 AND EXISTS "+
     "(SELECT 1 FROM throne_assaults WHERE kingdom_id=? AND request_id=?)"
   ).bind(kingdomId,JSON.stringify({realmId,won:combat.won,cycle:timeline.cycle,
     losses,attackerPower:combat.attackPower,defenderPower:combat.defenderPower}),kingdomId,requestId);
   try{
-    const results=await env.DB.batch([debit,attempt,capture,record]);
+    // Chain the fresh INSERT through its event record into capture. A historical
+    // request_id must never authorize any new side effect on replay.
+    const results=await env.DB.batch([debit,attempt,record,capture]);
     if(Number(results[1]?.meta?.changes)!==1)
       return {ok:false,status:409,error:"Exército insuficiente, cerco repetido ou evento encerrado"};
     return {ok:true,combat:{...combat,realmId,cycle:timeline.cycle,losses,

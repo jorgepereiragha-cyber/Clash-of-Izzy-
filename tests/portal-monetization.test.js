@@ -16,7 +16,7 @@ test('isolated portal markets Android only without game routes or PWA', async ()
   assert.match(portal, /\.sha256/);
   assert.match(portal, /aria-disabled="true"/);
   assert.match(portal, /asset\.state !== "uploaded"/);
-  assert.match(portal, /url\.hostname === "github\.com"/);
+  assert.match(portal, /url\.origin === "https:\/\/github\.com" && !url\.username && !url\.password/);
   assert.doesNotMatch(portal, /href="\/(?:kingdom|world|arena|events|alliance)\.html"/);
   assert.doesNotMatch(portal, /beforeinstallprompt|install-pwa|href="\/manifest\.json"/);
   assert.match(index, /http-equiv="refresh" content="0;url=\/portal\.html"/);

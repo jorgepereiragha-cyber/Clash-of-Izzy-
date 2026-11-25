@@ -45,7 +45,7 @@ jobs:
         if: steps.available.outputs.ready == 'true'
         run: |
           node --check portal-worker.js
-          node --test tests/portal-isolation.test.js
+          node --test tests/portal-isolation.test.js tests/portal-access-runtime.test.mjs
           python3 - <<'PY'
           from pathlib import Path
           root = Path("public-portal")

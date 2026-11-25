@@ -117,3 +117,6 @@ live-payment-gate.js
 
 # Backend-only administrative diamond credit ledger.
 admin-gem-grants.js
+
+# Server-only production clock.
+production-clock.js

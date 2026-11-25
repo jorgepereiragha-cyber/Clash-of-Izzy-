@@ -122,6 +122,9 @@ jobs:
       - name: Auditar Cloudflare e Time Travel antes de publicar (somente leitura)
         run: node scripts/cloudflare-remote-audit.mjs
 
+      - name: Exigir histórico D1 compatível com o SHA a publicar (somente leitura)
+        run: node scripts/check-worker-only-schema.mjs
+
       - name: Publicar exclusivamente Worker e assets, sem migrar D1
         run: npx wrangler --config wrangler.jsonc deploy
 
