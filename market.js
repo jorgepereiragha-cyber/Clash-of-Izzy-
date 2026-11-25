@@ -106,12 +106,18 @@
       {quantity:1,cost:100,label:"Convocação individual",description:"Uma chance de recrutar um novo comandante ou receber fragmentos de um repetido."},
       {quantity:10,cost:900,label:"Convocação em lote",description:"Dez convocações com desconto sobre o preço individual."}
     ];
+    const rarityLabels={white:"Branco · Comum",blue:"Azul · Raro",purple:"Roxo · Épico",gold:"Dourado · Lendário"};
+    const odds=state?.heroSummonOdds;
+    const validOdds=Array.isArray(odds)&&odds.length===4&&new Set(odds.map(row=>row?.rarity)).size===4&&
+      odds.every(row=>Object.hasOwn(rarityLabels,row?.rarity)&&Number.isFinite(row.chancePercent)&&row.chancePercent>=0&&row.chancePercent<=100)&&
+      Math.abs(odds.reduce((sum,row)=>sum+row.chancePercent,0)-100)<1e-8;
+    const oddsText=validOdds?odds.map(row=>fmt(row.chancePercent)+"% "+rarityLabels[row.rarity]).join(" · "):"Probabilidades indisponíveis. Atualize o mercado antes de convocar.";
     for(const option of options){
       const card=node("article","market-card");
       card.append(node("div","market-icon","📜"),node("h3","",option.label),node("p","",option.description));
       card.append(node("p","market-price","💎 "+fmt(option.cost)+" diamantes"));
-      card.append(node("p","market-meta","Probabilidades por convocação: 70% Comum · 25% Raro · 5% Lendário"));
-      card.append(button(option.quantity===1?"CONVOCAR 1 HERÓI":"CONVOCAR 10 HERÓIS","hero-summon",{quantity:option.quantity},Number(state.player?.gems||0)<option.cost));
+      card.append(node("p","market-meta",validOdds?"Probabilidades por convocação: "+oddsText:oddsText));
+      card.append(button(option.quantity===1?"CONVOCAR 1 HERÓI":"CONVOCAR 10 HERÓIS","hero-summon",{quantity:option.quantity},!validOdds||Number(state.player?.gems||0)<option.cost));
       root.append(card);
     }
   }

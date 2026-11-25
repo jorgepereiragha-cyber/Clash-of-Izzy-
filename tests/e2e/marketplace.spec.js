@@ -1,4 +1,5 @@
 import { test, expect } from "@playwright/test";
+import { getHeroSummonOdds } from "../../hero-catalog.js";
 
 test("mercado usa sessão preservada no sessionStorage quando localStorage falha", async ({page}) => {
   const headers=[];
@@ -27,6 +28,7 @@ test("Mercador, Loja de Heróis e aceleradores funcionam no viewport Android", a
   const completesAt = new Date(now.getTime() + 60 * 60 * 1000).toISOString();
   const state = {
     player: { gems: 1200 },
+    heroSummonOdds: getHeroSummonOdds(),
     kingdom: { food: 50000, wood: 50000, stone: 50000, iron: 50000, gold: 50000 },
     shop: {
       cycle: 100,
@@ -88,6 +90,8 @@ test("Mercador, Loja de Heróis e aceleradores funcionam no viewport Android", a
   await expect(page.locator("#market-status")).toContainText("Troca concluída");
   expect(actions[0]).toEqual({ type: "merchant_exchange", offerId: "wood_acc_5min" });
 
+  await expect(page.getByText(/55% Branco.*30% Azul.*13% Roxo.*2% Dourado/).first()).toBeVisible();
+  await expect(page.getByRole("button", { name: "CONVOCAR 1 HERÓI" })).toBeEnabled();
   await page.getByRole("button", { name: "CONVOCAR 1 HERÓI" }).click();
   await expect(page.locator("#market-status")).toContainText("Convocação concluída");
   expect(actions[1]).toEqual({ type: "hero_summon", quantity: 1 });
