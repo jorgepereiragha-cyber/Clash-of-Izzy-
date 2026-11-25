@@ -346,7 +346,7 @@ async function gameIdentity(request,env){
   }else if(p.av!==undefined)return null;
   return String(p.sub);
 }
-async function ensureKingdom(env,playerId){
+export async function ensureKingdom(env,playerId){
   // The entire foundation is one transaction. A random guard identifies
   // only the kingdom inserted by this invocation, never a legacy kingdom.
   const actionId=crypto.randomUUID();
@@ -366,7 +366,7 @@ async function ensureKingdom(env,playerId){
     ).bind("Reino de Eldoria",5000,5000,3000,1000,1000,new Date().toISOString(),playerId),
     env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT k.id,'__internal_action_guard',? FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=? AND changes()=1").bind(actionId,playerId),
     ...Object.keys(BUILDINGS).map((key,i)=>seed("INSERT INTO kingdom_buildings(kingdom_id,building_type,level,position_x,position_z) SELECT k.id,?,1,?,?",key,((i%4)-1.5)*7,Math.floor(i/4)*7-7)),
-    ...Object.keys(UNITS).filter(key=>key!=="mage").map(key=>seed("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT k.id,?,1,?",key,key==="militia"?30:0)),
+    ...Object.keys(UNITS).map(key=>seed("INSERT OR IGNORE INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT k.id,?,1,?",key,key==="militia"?30:0)),
     seed("INSERT INTO heroes(kingdom_id,hero_key,hero_name,rarity) SELECT k.id,'kael_sunwarden','Kael, Guardião do Sol','rare'"),
     seed("INSERT INTO dragons(kingdom_id,dragon_key,dragon_name) SELECT k.id,'ember_wyrm','Brasa'"),
     seed("INSERT INTO kingdom_dragons(kingdom_id,dragon_key,source) SELECT k.id,'ember_wyrm','starter'"),
