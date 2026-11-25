@@ -1,6 +1,6 @@
 export { EldoriaRoom } from "./eldoria-room.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
-import { simulateBattle, calculateMarchDuration, applyUnitLosses } from "./game-adapter.js";
+import { simulateBattle, calculateMarchDuration, applyUnitLosses, combatRulesVersion } from "./game-adapter.js";
 import { hospitalEnabled,HOSPITAL_PER_LEVEL,HOSPITAL_HEAL_MAX,recoverableLosses,hospitalHealCost,hospitalAdmission } from "./hospital-policy.js";
 import { scienceEnabled,SCIENCE_CATALOG,sciencePercent,scienceRequirement,scienceDuration,scienceView,hospitalScienceCapacity,imperialScienceCap,imperialCombatBonuses } from "./castle-science.js";
 import { HERO_TEMPLATES, HERO_RARITY, HERO_STAR_COST, HERO_SUMMON_RARITY_ODDS, heroView, getHeroCombatBonuses, getHeroSummonOdds } from "./hero-catalog.js";
@@ -595,7 +595,7 @@ async function processMarches(env,kingdomId,batchSize=50){
     const criticalSeed=crypto.getRandomValues(new Uint32Array(1))[0];
     const battleRoll=.85+crypto.getRandomValues(new Uint32Array(1))[0]/4294967295*.30;
     const simulation=simulateBattle({
-     army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),
+     army,castleLevel,defenderLevel:Math.max(1,Math.min(30,Number(target.level)||1)),rulesVersion:combatRulesVersion(env),
      heroLevel:Number(hero?.level||1),dragonLevel:Number(dragon?.level||1),
      dragonAttackBonusPercent:getDragonCombatBonuses(dragon).attackPercent,dragonDefenseBonusPercent:getDragonCombatBonuses(dragon).defensePercent,
      castleVipAttackBonusPercent:getCastleVipBonuses(kingdom?.prestige).attackPercent,castleVipDefenseBonusPercent:getCastleVipBonuses(kingdom?.prestige).defensePercent,
@@ -618,7 +618,7 @@ async function processMarches(env,kingdomId,batchSize=50){
     simulatedWin=simulation.won;attackerPower=simulation.attackerPower;defenderPower=simulation.defenderPower;
     criticalHits=simulation.criticalHits||0;
     losses=simulation.losses||{};
-    replayData={version:1,mode:"territory_pve",seed:{criticalSeed,roll:battleRoll},participants:{attacker:{kingdom_id:kingdomId,army:army.map(unit=>({...unit}))},defender:{territory_id:target.id,level:Math.max(1,Math.min(30,Number(target.level)||1))}},modifiers:{hero:heroCombat,imperialScience:imperial,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,skin_sets:cosmeticState.skinSetBonuses,pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses:simulation.losses||{}},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
+    replayData={version:1,mode:"territory_pve",combat_rules_version:simulation.rulesVersion||1,seed:{criticalSeed,roll:battleRoll},participants:{attacker:{kingdom_id:kingdomId,army:army.map(unit=>({...unit}))},defender:{territory_id:target.id,level:Math.max(1,Math.min(30,Number(target.level)||1))}},modifiers:{hero:heroCombat,imperialScience:imperial,equipment:{attack:gear.attackPercent,health:gear.healthPercent,defense:gear.defensePercent,critical:gear.criticalChancePercent,legendary_set:gear.legendarySetActive},castle_skin:skinBonus,skin_sets:cosmeticState.skinSetBonuses,pet:{active_pet_id:petBonuses.activePetId,infantry_attack:petBonuses.infantryAttackPercent}},outcome:{won:simulation.won,rounds:simulation.rounds,attacker_power:simulation.attackerPower,defender_power:simulation.defenderPower,losses:simulation.losses||{},...(simulation.defenderLosses?{defender_losses:simulation.defenderLosses}:{})},frames:(simulation.log||[]).map((frame,index)=>({sequence:index+1,...frame}))};
     battleLog=[{event:"combat_metadata",criticalSeed,criticalChancePercent:gear.criticalChancePercent,hero:heroCombat,equipment:gear,castleSkin:skinBonus,skinSets:cosmeticState.skinSetBonuses,pet:petBonuses,criticalHits:simulation.criticalHits||0},...(simulation.log||[])];
     Object.assign(survivors, applyUnitLosses(army, losses));
    }else{
