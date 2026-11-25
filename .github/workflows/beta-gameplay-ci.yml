@@ -25,3 +25,5 @@ jobs:
         run: node --test tests/castle-science.test.js tests/hospital-policy.test.js tests/city-layout-rules.test.js tests/recruitment-sites.test.js tests/kingdom-queues.test.js tests/march-capacity.test.js tests/march-slots.test.js tests/eldoria-realtime-client.test.js tests/eldoria-realtime-routing.test.js tests/eldoria-room.test.js
       - name: Synthetic load harness checks (mock transport only)
         run: node --test tests/staging-load-smoke.test.js
+      - name: Rally ownership, settlement rollback and resource regeneration
+        run: node --test tests/rally-troop-ownership.test.js
