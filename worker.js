@@ -2671,6 +2671,7 @@ export default {
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"game-state-player",playerId,120,60);
         if(limited)return limited;
+        const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);
       }
       if(url.pathname==="/api/game/event"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"angel-death-state-player",playerId,30,60);
@@ -2878,6 +2879,9 @@ export default {
         const ip=request.headers.get("CF-Connecting-IP")||"unknown";
         const networkLimit=await rateLimitDecision(env,"game-action-network",ip,600,60);
         if(networkLimit)return networkLimit;
+        const body=await readBody(request);
+        if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);
+        return await gameAction(env,playerId,body);
       }
       if(url.pathname==="/api/game/alliance/chat"){
         if(request.method!=="GET")return json({error:"Método não permitido."},405);
@@ -2911,10 +2915,6 @@ export default {
         if(rallyBody.__bodyError)return json({error:"Solicitação de guerra inválida."},rallyBody.__bodyError==="payload_too_large"?413:400);
         return await handleRally(request,env,playerId,rallyPath,rallyBody);
       }
-      if(url.pathname==="/api/game/state"&&request.method==="GET"){
-        const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);
-      }
-      if(url.pathname==="/api/game/action"&&request.method==="POST"){const body=await readBody(request);if(body.__bodyError)return json({error:body.__bodyError==="payload_too_large"?"Requisição muito grande.":"JSON inválido."},body.__bodyError==="payload_too_large"?413:400);return await gameAction(env,playerId,body);}
       return json({error:"Rota de jogo não encontrada."},404);
     }catch(e){console.error("game_request_failed",String(e?.message||e));return json({error:"Falha ao processar o jogo. Tente novamente."},500)}
   }
