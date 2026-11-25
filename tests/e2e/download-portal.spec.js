@@ -12,15 +12,15 @@ test("Android: marketing homepage promotes gated APK, not browser gameplay", asy
   await page.goto("/");
   await expect(page).toHaveURL(/\/portal(?:\.html)?$/);
   await expect(page.locator("h1")).toContainText("CLASH OF IZZY");
-  await expect(page.locator("h1")).toContainText("O Reino no Seu Celular");
-  for(const id of ["download-apk","download-apk-final"]) {
+  await expect(page.locator(".tagline")).toHaveText("Construa. Lute. Reine.");
+  for(const id of ["download-apk","download-invite"]) {
     const button = page.locator("#" + id);
     await expect(button).toHaveAttribute("aria-disabled", "true");
     await expect(button).not.toHaveAttribute("href", /./);
   }
   await expect(page.locator("#play-browser,a[href*='kingdom.html']")).toHaveCount(0);
-  await expect(page.locator(".feature-card")).toHaveCount(6);
-  await expect(page.locator(".gallery-grid figure")).toHaveCount(3);
+  await expect(page.locator(".feature-card,.gallery-grid,.shot-placeholder")).toHaveCount(0);
+  await expect(page.locator("details")).not.toHaveAttribute("open", /./);
   await expect(page.getByText("O APK comercial ainda não está disponível")).toBeVisible();
 });
 
@@ -39,11 +39,9 @@ test("Android: only signed release names on official GitHub download host are of
   const download = page.locator("#download-apk");
   await expect(download).toHaveAttribute("href", prefix + apk);
   await expect(download).not.toHaveAttribute("aria-disabled", "true");
-  await expect(page.locator("#download-apk-final")).toHaveAttribute("href", prefix + apk);
-  await expect(page.locator("#download-apk-final")).not.toHaveAttribute("aria-disabled", "true");
   await expect(page.locator("#checksum-link")).toHaveAttribute("href", prefix + apk + ".sha256");
   await expect(page.getByText("Versão v1.2.3 disponível")).toBeVisible();
-  await expect(page.locator("#download-status-final")).toContainText("APK oficial disponível");
+  await expect(page.locator("#download-status")).toContainText("Versão v1.2.3 disponível");
 });
 
 test("Android: reject download redirection to another domain even if release metadata contains an asset", async ({ page }) => {
@@ -60,7 +58,6 @@ test("Android: reject download redirection to another domain even if release met
   await page.goto("/portal.html");
   await expect(page.locator("#download-apk")).toHaveAttribute("aria-disabled", "true");
   await expect(page.locator("#download-apk")).not.toHaveAttribute("href", /./);
-  await expect(page.locator("#download-apk-final")).toHaveAttribute("aria-disabled", "true");
 });
 
 test("Android: reject incorrect asset paths and duplicated release assets", async ({page})=>{
@@ -70,10 +67,23 @@ test("Android: reject incorrect asset paths and duplicated release assets", asyn
   ];
   await page.route(releases,route=>route.fulfill({status:200,headers:{"access-control-allow-origin":"*"},contentType:"application/json",body:JSON.stringify({draft:false,prerelease:false,tag_name:"v1.2.3",assets})}));
   await page.goto("/portal.html");
-  await expect(page.locator("#download-status-final")).toContainText("Download indisponível");
+  await expect(page.locator("#download-status")).toContainText("O APK comercial ainda não está disponível");
   await expect(page.locator("#download-apk")).not.toHaveAttribute("href",/./);
   assets=[{...assets[0],browser_download_url:prefix+apk},{...assets[0],browser_download_url:prefix+apk},assets[1]];
   await page.reload();
-  await expect(page.locator("#download-status-final")).toContainText("Download indisponível");
-  await expect(page.locator("#download-apk-final")).not.toHaveAttribute("href",/./);
+  await expect(page.locator("#download-status")).toContainText("O APK comercial ainda não está disponível");
+  await expect(page.locator("#download-apk")).not.toHaveAttribute("href",/./);
+});
+
+test("Android: compact responsive hero and accessible secondary details",async({page})=>{
+  await page.route(releases,route=>route.fulfill({status:404,headers:{"access-control-allow-origin":"*"},body:"{}"}));
+  for(const [width,height] of [[360,800],[390,844],[844,390],[1440,900]]){
+    await page.setViewportSize({width,height});
+    await page.goto("/portal.html");
+    await expect(page.locator("#download-apk")).toBeInViewport();
+    await expect(page.locator("h1")).toBeInViewport();
+    expect(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth)).toBe(true);
+    await page.locator("summary").click();
+    await expect(page.locator("#official-release-page")).toBeVisible();
+  }
 });

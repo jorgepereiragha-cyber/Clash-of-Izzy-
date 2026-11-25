@@ -10,7 +10,7 @@ test('isolated portal markets Android only without game routes or PWA', async ()
   ]);
   assert.match(portal, /id="download-apk"/);
   assert.doesNotMatch(portal, /id="play-browser"|kingdom\.html/);
-  assert.match(portal, /id="download-apk-final" aria-disabled="true"/);
+  assert.match(portal, /id="download-invite" aria-disabled="true"/);
   assert.match(portal, /releases\/latest/);
   assert.match(portal, /clash-of-izzy-android\.apk/);
   assert.match(portal, /\.sha256/);
