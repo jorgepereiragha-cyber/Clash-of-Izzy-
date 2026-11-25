@@ -19,23 +19,28 @@ export function nextRewardDay(lastDate, lastDay, todayUtc){
 const getLatestSql="SELECT claim_date,cycle_day FROM daily_reward_claims WHERE player_id=(SELECT id FROM players WHERE player_id=?) ORDER BY claim_date DESC LIMIT 1";
 async function state(db,playerId) {
   const [today,last]=await db.batch([
-    db.prepare("SELECT date('now') AS today").bind(),
+    db.prepare("SELECT date('now') AS today FROM players p JOIN kingdoms k ON k.player_id=p.id WHERE p.player_id=?").bind(playerId),
     db.prepare(getLatestSql).bind(playerId)
   ]);
   const date=String(today.results?.[0]?.today||"");
+  if(!date)return null;
   const previous=last.results?.[0]||null;
   const claimed=previous?.claim_date===date;
   const day=claimed ? Number(previous.cycle_day) : nextRewardDay(previous?.claim_date,Number(previous?.cycle_day),date);
   return {date,claimed,day,reward:DAILY_REWARDS[day-1],rewards:DAILY_REWARDS};
 }
 export async function handleDailyReward(request,env,playerId,json){
-  if(request.method==="GET")return json(await state(env.DB,playerId));
+  if(request.method==="GET"){
+    const current=await state(env.DB,playerId);
+    return current?json(current):json({error:"Reino não encontrado."},404);
+  }
   if(request.method!=="POST")return json({error:"Método não permitido."},405);
   // INSERT e créditos participam da mesma transação D1. changes() impede dupla concessão.
   const statements=[
     env.DB.prepare(`INSERT OR IGNORE INTO daily_reward_claims(player_id,claim_date,cycle_day)
       SELECT p.id,date('now'),CASE WHEN prev.claim_date=date('now','-1 day') THEN (prev.cycle_day%7)+1 ELSE 1 END
-      FROM players p LEFT JOIN daily_reward_claims prev ON prev.player_id=p.id
+      FROM players p JOIN kingdoms k ON k.player_id=p.id
+      LEFT JOIN daily_reward_claims prev ON prev.player_id=p.id
       AND prev.claim_date=(SELECT MAX(claim_date) FROM daily_reward_claims WHERE player_id=p.id)
       WHERE p.player_id=?`).bind(playerId),
     env.DB.prepare(`UPDATE players SET gems=gems+CASE
@@ -56,7 +61,9 @@ export async function handleDailyReward(request,env,playerId,json){
   ];
   const results=await env.DB.batch(statements);
   if(results[0]?.meta?.changes!==1||results[1]?.meta?.changes!==1||results[2]?.meta?.changes!==1){
-    return json({error:"Recompensa de hoje já resgatada ou reino indisponível.",...await state(env.DB,playerId)},409);
+    const current=await state(env.DB,playerId);
+    if(!current)return json({error:"Reino não encontrado."},404);
+    return json({error:"Recompensa de hoje já resgatada ou reino indisponível.",...current},409);
   }
   const current=await state(env.DB,playerId);
   return json({success:true,...current,message:"Recompensa diária adicionada ao seu reino."},201);

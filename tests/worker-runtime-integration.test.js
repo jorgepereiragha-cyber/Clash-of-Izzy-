@@ -248,6 +248,29 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       method:"POST",token:unknownRealmBody+"."+unknownRealmSig,body:{}
     }),404,"signed session of player without kingdom must not create another realm");
 
+    await t.test("recompensa diária exige reino existente e bloqueia resgates simultâneos", async () => {
+      const orphanToken=unknownRealmBody+"."+unknownRealmSig;
+      expectStatus(await api("/api/game/daily-reward",{token:orphanToken}),404,"conta sem reino não tem recompensa");
+      expectStatus(await api("/api/game/daily-reward",{method:"POST",token:orphanToken,body:{}}),404,"conta sem reino não pode registrar nem creditar recompensa");
+      const orphanRows=rowsFromD1Json(await runCli([
+        "--config","wrangler.jsonc","d1","execute","clash-of-izzy-db","--local","--persist-to",persistDir,"--json",
+        "--command","SELECT p.gems,(SELECT COUNT(*) FROM daily_reward_claims d WHERE d.player_id=p.id) AS claims FROM players p WHERE p.player_id='izzy_"+"f".repeat(32)+"';"
+      ]));
+      assert.equal(orphanRows.length,1);
+      assert.equal(Number(orphanRows[0].gems),0);
+      assert.equal(Number(orphanRows[0].claims),0);
+      // Use the existing third synthetic realm, and restore no data or balance by hand.
+      const before=expectStatus(await api("/api/game/state",{token:tokenC}),200,"saldo antes do resgate").state.player.gems;
+      const info=expectStatus(await api("/api/game/daily-reward",{token:tokenC}),200,"recompensa inicial");
+      assert.equal(info.day,1);assert.equal(info.claimed,false);
+      const attempts=await Promise.all(Array.from({length:4},()=>api("/api/game/daily-reward",{method:"POST",token:tokenC,body:{}})));
+      assert.deepEqual(attempts.map(r=>r.status).sort((x,y)=>x-y),[201,409,409,409]);
+      const after=expectStatus(await api("/api/game/state",{token:tokenC}),200,"saldo após resgates concorrentes").state.player.gems;
+      assert.equal(Number(after),Number(before)+50);
+      const claimed=expectStatus(await api("/api/game/daily-reward",{token:tokenC}),200,"recompensa após concorrência");
+      assert.equal(claimed.claimed,true);
+    });
+
     // Signed tokens with suffixes used to be accepted because verify()
     // destructured the first two dot-separated components and ignored the rest.
     expectStatus(await api("/api/game/state", { token: startA.token + ".unsigned-extension" }), 401,
