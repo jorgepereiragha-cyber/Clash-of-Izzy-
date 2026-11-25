@@ -1,13 +1,13 @@
 // Lightweight bootstrap: the 2D preference avoids downloading the Three.js engine.
 import {
   GRAPHICS_STORAGE_KEY, normalizeGraphicsChoice, readGraphicsChoice,
-  persistGraphicsChoice, graphicsChoiceLabel
+  persistGraphicsChoice, graphicsChoiceLabel, getGraphicsStorage
 } from "./kingdom-visual-preferences.js";
 
 const select = document.getElementById("coiGraphicsPreset");
 const applyButton = document.getElementById("coiGraphicsApply");
 const status = document.getElementById("coiGraphicsStatus");
-const saved = readGraphicsChoice(window.localStorage);
+const saved = readGraphicsChoice(getGraphicsStorage(window));
 const announce = message => { if (status) status.textContent = message; };
 let retryAvailable = false;
 const updateApply = () => {
@@ -32,7 +32,7 @@ select?.addEventListener("change", () => {
 applyButton?.addEventListener("click", () => {
   const value = normalizeGraphicsChoice(select?.value);
   if (value === saved && !retryAvailable) return;
-  if (value !== saved && !persistGraphicsChoice(window.localStorage, value)) {
+  if (value !== saved && !persistGraphicsChoice(getGraphicsStorage(window), value)) {
     announce("Não foi possível salvar sua preferência neste dispositivo.");
     return;
   }

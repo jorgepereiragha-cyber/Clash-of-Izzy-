@@ -6,7 +6,7 @@ import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
 import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
-import { readGraphicsChoice } from "./kingdom-visual-preferences.js";
+import { readGraphicsChoice, getGraphicsStorage } from "./kingdom-visual-preferences.js";
 import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
 import { projectDragonVisual, makeDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
 import { derivePbrTextureData } from "./kingdom-materials.js";
@@ -244,7 +244,11 @@ if (host && "WebGLRenderingContext" in window) {
       for (let y = 0; y < 128; y += 22) {
         const offset = (Math.floor(y / 22) % 2) * 16;
         for (let x = -16; x < 144; x += 32) {
-          ctx.strokeStyle = "rgba(35,39,37,.22)";
+          ctx.fillStyle = rand() > .5 ? "rgba(242,226,194,.11)" : "rgba(34,38,34,.10)";
+          ctx.fillRect(x + offset + 2, y + 2, 28, 18);
+          ctx.fillStyle = "rgba(255,244,215,.18)";
+          ctx.fillRect(x + offset + 2, y + 2, 28, 1);
+          ctx.strokeStyle = "rgba(35,39,37,.28)";
           ctx.lineWidth = 1.5;
           ctx.strokeRect(x + offset + 1, y + 1, 30, 20);
         }
@@ -255,6 +259,17 @@ if (host && "WebGLRenderingContext" in window) {
         ctx.fillRect(x + ((y / 12) % 2) * 8, y, 14, 9);
       }
     } else if (kind === "grass") {
+      // Seamless deterministic turf variation within the existing texture budget.
+      for (let i = 0; i < 24; i++) {
+        const x = rand() * 128, y = rand() * 128, radius = 9 + rand() * 19;
+        for (const dx of [-128, 0, 128]) for (const dy of [-128, 0, 128]) {
+          const gradient = ctx.createRadialGradient(x + dx, y + dy, 0, x + dx, y + dy, radius);
+          gradient.addColorStop(0, i % 2 ? "rgba(184,164,92,.16)" : "rgba(30,52,27,.20)");
+          gradient.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = gradient;
+          ctx.fillRect(x + dx - radius, y + dy - radius, radius * 2, radius * 2);
+        }
+      }
       for (let i = 0; i < 700; i++) {
         ctx.strokeStyle = rand() > .5 ? "rgba(25,65,28,.20)" : "rgba(210,220,135,.16)";
         ctx.lineWidth = 1;
@@ -262,6 +277,18 @@ if (host && "WebGLRenderingContext" in window) {
         ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x + rand() * 3, y - 2 - rand() * 5); ctx.stroke();
       }
     } else if (kind === "road") {
+      // Individual paving stones with alternating joints and weathered faces.
+      for (let y = 0; y < 128; y += 16) {
+        const offset = (y / 16 % 2) * 16;
+        for (let x = -32; x < 144; x += 32) {
+          ctx.fillStyle = "rgba(48,40,29,.22)";
+          ctx.fillRect(x + offset, y, 32, 16);
+          ctx.fillStyle = rand() > .5 ? "rgba(238,222,184,.28)" : "rgba(103,91,68,.16)";
+          ctx.fillRect(x + offset + 1, y + 1, 30, 14);
+          ctx.fillStyle = "rgba(255,245,214,.16)";
+          ctx.fillRect(x + offset + 2, y + 2, 28, 1);
+        }
+      }
       for (let i = 0; i < 90; i++) {
         const x = rand() * 128, y = rand() * 128;
         ctx.fillStyle = rand() > .5 ? "rgba(45,39,29,.15)" : "rgba(255,245,215,.18)";
@@ -415,6 +442,137 @@ if (host && "WebGLRenderingContext" in window) {
     parent.add(wheel);
     addCylinder(parent, .055, .055, .18, mats.darkStone, x, y, z, 8).rotation.z = Math.PI / 2;
   }
+  // Original Eldoria architecture. All dimensions remain inside the existing
+  // visual footprint. These are owned procedural meshes, not shared GLB clones.
+  const buildingProfiles = Object.freeze({
+    barracks:[1.42,1.05,.99,.48],farm:[1.4,.78,1.0,.54],
+    quarry:[1.18,.67,1.0,.25],lumber_mill:[1.46,.83,1.0,.48],
+    iron_mine:[1.24,.74,1.02,.31],market:[1.44,.82,1.08,.35],
+    academy:[1.38,1.24,1.02,.57],wall:[1.52,.68,.55,.05],
+    hospital:[1.40,.93,1.04,.48],watchtower:[.72,1.67,.72,.48],
+    stable:[1.48,.75,1.0,.47],archery_range:[1.32,.76,1.0,.42],
+    siege_workshop:[1.48,.96,1.12,.55],embassy:[1.40,1.16,1.03,.54],
+    warehouse:[1.46,.9,1.1,.52]
+  });
+  function addEldoriaCastle(group,level,skin,wall,roof,stone,accent){
+    const tier=level>=30?4:level>=20?3:level>=10?2:1;
+    const high=qualityProfile?.tier==="high",low=qualityProfile?.tier==="low";
+    const keepHeight=1.42+(tier-1)*.19;
+    const towerHeight=1.28+(tier-1)*.16;
+    group.userData.coIArchitecture="eldoria-imperial-v1";
+    group.userData.coIArchitectureTier=tier;
+    box(group,1.75,.15,1.52,mats.darkStone,0,.075,0);
+    box(group,1.60,.12,1.38,stone,0,.19,0);
+    // The central inhabited keep remains visible even in balanced mode.
+    box(group,.94,keepHeight, .85,wall,0,.25+keepHeight/2,-.12);
+    box(group,1.04,.14,.95,stone,0,.25+keepHeight,-.12);
+    const mainRoof=new THREE.Mesh(new THREE.ConeGeometry(.73,.68+(tier-1)*.07,4),roof);
+    mainRoof.rotation.y=Math.PI/4;mainRoof.position.set(0,.32+keepHeight+(.68+(tier-1)*.07)/2,-.12);group.add(mainRoof);
+    // Front gateway, recessed entry, stone lintel, and stepped approach.
+    box(group,.66,.72,.27,stone,0,.58,.54);
+    box(group,.36,.49,.035,mats.darkStone,0,.50,.695);
+    box(group,.30,.45,.045,mats.wood,0,.48,.72);
+    box(group,.44,.075,.08,accent,0,.74,.725);
+    box(group,.66,.09,.24,stone,0,.09,.77);
+    const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
+    for(const [x,z] of towers){
+      addCylinder(group,.22,.26,towerHeight,stone,x,.25+towerHeight/2,z,low?6:10);
+      addCylinder(group,.29,.25,.13,stone,x,.25+towerHeight,z,low?6:10);
+      addCylinder(group,0,.30,.47+(tier-1)*.035,roof,x,.25+towerHeight+.30,z,low?6:10);
+      box(group,.09,.25,.04,mats.darkStone,x,.25+towerHeight*.65,z+.255);
+      if(!low)box(group,.11,.04,.06,accent,x,.25+towerHeight*.65-.14,z+.26);
+    }
+    for(const x of [-.47,.47])box(group,.32,.56,.18,wall,x,.48,.55);
+    for(const z of [-.38,.23]){
+      box(group,.14,.58,.54,wall,-.65,.45,z);
+      box(group,.14,.58,.54,wall,.65,.45,z);
+    }
+    for(const x of [-.24,.24]){
+      box(group,.12,.30,.045,mats.darkStone,x,.25+keepHeight*.65,.32);
+      box(group,.075,.22,.055,mats.window,x,.25+keepHeight*.65,.35);
+    }
+    // Tier-dependent buttresses and royal ornaments; no effect on gameplay.
+    if(tier>=2&&!low)for(const x of [-.43,.43])box(group,.12,.76,.14,stone,x,.63,.42);
+    if(tier>=3){
+      addCylinder(group,.028,.028,.42,accent,0,.90+keepHeight,-.12,6);
+      const finial=new THREE.Mesh(new THREE.OctahedronGeometry(.10),accent);
+      finial.position.set(0,1.13+keepHeight,-.12);group.add(finial);
+    }
+    if(high)for(const x of [-.48,-.24,0,.24,.48])box(group,.14,.16,.14,stone,x,.90,.51);
+    if(!low){
+      const bannerMaterial=material(skin?.banner||"#E7BD68",.82);
+      // The heraldic seal keeps the original royal palette and respects owned skins.
+      const seal=new THREE.Mesh(new THREE.CircleGeometry(.105,10),accent);
+      seal.position.set(0,.25+keepHeight*.84,.323);group.add(seal);
+      const sealCore=new THREE.Mesh(new THREE.CircleGeometry(.064,10),material(skin?.seal||"#24476B",.58));
+      sealCore.position.set(0,.25+keepHeight*.84,.328);group.add(sealCore);
+      for(const x of [-.40,.40])box(group,.13,.34,.035,bannerMaterial,x,.99,.65);
+    }
+  }
+  // Resource plots have their own silhouette instead of the common civic house.
+  // Local decor stays inside the 2x2 plot (1.06 scene units), never changing D1.
+  const ruralTypes=new Set(["farm","quarry","lumber_mill","iron_mine"]);
+  function addRuralBuilding(group,type,level,wall,roof){
+    const high=qualityProfile?.tier==="high";
+    const low=qualityProfile?.tier==="low";
+    const stage=level>=20?3:level>=10?2:1;
+    group.userData.coIArchitecture="eldoria-rural-v1";
+    group.userData.coIArchitectureTier=stage;
+    box(group,1.02,.08,1.02,mats.darkStone,0,.04,0);
+    if(type==="farm"){
+      const earth=material("#725033"),grain=material("#d4ad52");
+      box(group,.98,.05,.98,earth,0,.10,0);
+      // Barn and foreground crop field are separate readable volumes.
+      box(group,.78,.46+.06*stage,.38,wall,0,.35+.03*stage,-.27);
+      const barnRoof=new THREE.Mesh(new THREE.ConeGeometry(1,.3,4),roof);
+      barnRoof.rotation.y=Math.PI/4;barnRoof.scale.set(.86/Math.SQRT2,1,.48/Math.SQRT2);
+      barnRoof.position.set(0,.76+.06*stage,-.27);group.add(barnRoof);
+      box(group,.21,.32,.035,mats.wood,0,.28,-.06);
+      for(const x of [-.32,0,.32])box(group,.20,.035,.49,earth,x,.145,.23);
+      const rows=low?2:high?5:3;
+      const stems=new THREE.InstancedMesh(new THREE.CylinderGeometry(.014,.022,.15,5),grain,rows*3);
+      const dummy=new THREE.Object3D();
+      let i=0;
+      for(const x of [-.32,0,.32])for(let j=0;j<rows;j++){
+        dummy.position.set(x,.23,.02+j*.42/(rows-1));
+        dummy.scale.setScalar(1);dummy.updateMatrix();stems.setMatrixAt(i++,dummy.matrix);
+      }
+      stems.instanceMatrix.needsUpdate=true;stems.computeBoundingSphere();group.add(stems);
+    }else if(type==="lumber_mill"){
+      // Open timber shed with stacked logs, not a closed stone house.
+      for(const x of [-.42,.42])for(const z of [-.42,-.02])
+        box(group,.075,.62,.075,mats.wood,x,.39,z);
+      box(group,.98,.10,.54,roof,0,.76,-.22);
+      box(group,.80,.09,.40,mats.wood,0,.36,-.22);
+      for(let i=0;i<3+stage;i++){
+        const log=addCylinder(group,.055,.055,.72,mats.wood,0,.16+Math.floor(i/3)*.12,.07+(i%3)*.14,7);
+        log.rotation.z=Math.PI/2;
+      }
+      const saw=new THREE.Mesh(new THREE.TorusGeometry(.14,.025,5,12),mats.gold);
+      saw.position.set(.22,.51,-.02);group.add(saw);
+    }else{
+      // Excavated working area, distinct ore colors and a mine entrance.
+      const oreMat=type==="iron_mine"?material("#788c9d",.38):mats.stone;
+      box(group,.96,.09,.96,mats.roadEdge,0,.11,0);
+      if(type==="iron_mine"){
+        box(group,.80,.64+.06*stage,.48,mats.darkStone,0,.43,-.24);
+        box(group,.37,.46,.035,mats.wood,0,.36,.012);
+        box(group,.26,.37,.04,material("#242823"),0,.32,.035);
+        for(const x of [-.21,.21])box(group,.07,.51,.08,mats.wood,x,.36,.045);
+        box(group,.51,.08,.09,mats.wood,0,.64,.045);
+        for(const x of [-.12,.12])box(group,.032,.03,.39,mats.gold,x,.18,.30);
+      }else{
+        box(group,.86,.30+.05*stage,.44,wall,0,.28,-.26);
+        box(group,.65,.17,.32,mats.stone,0,.51+.05*stage,-.28);
+      }
+      for(let i=0;i<(low?3:5);i++){
+        const size=.105+(i%3)*.025;
+        const rock=new THREE.Mesh(new THREE.DodecahedronGeometry(size,0),oreMat);
+        rock.position.set(-.32+(i%3)*.32,.16+size*.55,.22+Math.floor(i/3)*.22);
+        rock.rotation.set(.2,i*.7,.3);group.add(rock);
+      }
+    }
+  }
   function createBuilding(type, level, x, z, castleSkinId = 0) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
@@ -428,76 +586,52 @@ if (host && "WebGLRenderingContext" in window) {
     const castleStone=castleSkin?surfaceMaterial(castleSkin.stone,"stone",seed+207):mats.stone;
     const castleRoof=castleSkin?surfaceMaterial(castleSkin.roof,"roof",seed+309):mats.roof;
     const castleAccent=castleSkin?material(castleSkin.accent,.52):mats.gold;
-    const height = 1.0 + Math.min(30, Math.max(1, Number(level) || 1)) * .035;
+    const safeLevel=Math.min(30,Math.max(1,Math.floor(Number(level)||1)));
+    if(type==="castle"){
+      addEldoriaCastle(group,safeLevel,castleSkin,wall,roof,castleStone,castleAccent);
+      return group;
+    }
+    if(ruralTypes.has(type)){
+      addRuralBuilding(group,type,safeLevel,wall,roof);
+      return group;
+    }
+    const [bodyWidth,baseHeight,bodyDepth,roofHeight]=buildingProfiles[type]||buildingProfiles.warehouse;
+    const height = baseHeight + safeLevel * .024;
+    group.userData.coIArchitecture="eldoria-civic-v1";
 
     // Shared architectural language: visible stone footing, timber eaves and a
     // readable roof silhouette, while each building keeps its own landmark.
     box(group, 1.56, .14, 1.32, mats.darkStone, 0, .05, 0);
-    box(group, 1.48, height, 1.22, wall, 0, height / 2, 0);
-    box(group, 1.55, .09, 1.29, mats.wood, 0, height + .035, 0);
-    const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(1.02, .88, 4), roof);
-    roofMesh.rotation.y = Math.PI / 4;
-    roofMesh.position.y = height + .48;
-    roofMesh.castShadow = true;
-    group.add(roofMesh);
+    box(group, bodyWidth, height, bodyDepth, wall, 0, height / 2, 0);
+    box(group, bodyWidth+.08, .09, bodyDepth+.08, mats.wood, 0, height + .035, 0);
+    if(type==="wall"||type==="quarry"||type==="iron_mine"){
+      box(group,bodyWidth+.09,.12,bodyDepth+.09,mats.darkStone,0,height+.10,0);
+    }else{
+      const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(1, roofHeight, 4), roof);
+      roofMesh.rotation.y = Math.PI / 4;
+      roofMesh.scale.set((bodyWidth+.14)/Math.SQRT2,1,(bodyDepth+.14)/Math.SQRT2);
+      roofMesh.position.y = height + .08 + roofHeight/2;
+      roofMesh.castShadow = true;
+      group.add(roofMesh);
+    }
 
     // Warm emissive windows stay legible in the isometric view without adding
     // real-time point lights to every building.
-    box(group, .23, .48, .04, mats.wood, 0, .24, .635);
-    for (const wx of [-.45, .45]) {
-      box(group, .18, .22, .045, mats.window, wx, height * .63, .635);
-      box(group, .035, .25, .055, mats.wood, wx, height * .63, .66);
-      box(group, .2, .035, .055, mats.wood, wx, height * .63, .66);
+    const facade=bodyDepth/2+.025;
+    box(group, .23, Math.min(.48,height*.70), .04, mats.wood, 0, Math.min(.24,height*.35), facade);
+    for (const wx of [-bodyWidth*.30, bodyWidth*.30]) {
+      box(group, .18, .22, .045, mats.window, wx, height * .63, facade);
+      box(group, .035, .25, .055, mats.wood, wx, height * .63, facade+.025);
+      box(group, .2, .035, .055, mats.wood, wx, height * .63, facade+.025);
     }
 
-    if (type === "castle") {
-      // Four corner keeps, crenellated parapet, royal standards and a heraldic seal.
-      for (const tx of [-.56, .56]) for (const tz of [-.43, .43]) {
-        box(group, .36, 1.5, .36, castleStone, tx, .75, tz);
-        const turret = new THREE.Mesh(new THREE.ConeGeometry(.27, .54, 4), castleRoof);
-        turret.position.set(tx, 1.78, tz);
-        turret.rotation.y = Math.PI / 4;
-        turret.castShadow = true;
-        group.add(turret);
-        box(group, .4, .09, .4, castleAccent, tx, 1.51, tz);
-      }
-      for (let i = -2; i <= 2; i++) {
-        box(group, .18, .22, .18, castleStone, i * .24, height + .16, -.58);
-        box(group, .18, .22, .18, castleStone, i * .24, height + .16, .58);
-      }
-      for (const tx of [-.56, .56]) {
-        box(group, .045, .52, .045, castleAccent, tx, 1.92, .49);
-        const banner = new THREE.Mesh(new THREE.PlaneGeometry(.34, .42), new THREE.MeshStandardMaterial({
-          color: castleSkin ? castleSkin.banner : "#E7BD68", roughness: .82, side: THREE.DoubleSide
-        }));
-        banner.position.set(tx + .18, 1.86, .515);
-        banner.castShadow = true;
-        group.add(banner);
-      }
-      const seal = new THREE.Mesh(new THREE.CircleGeometry(.2, 8), castleAccent);
-      seal.position.set(0, 1.02, .66);
-      seal.castShadow = true;
-      group.add(seal);
-      const sealCore = new THREE.Mesh(new THREE.CircleGeometry(.12, 8), material(castleSkin ? castleSkin.seal : "#24476B", .58));
-      sealCore.position.set(0, 1.02, .668);
-      group.add(sealCore);
-      box(group, .62, .24, .24, castleAccent, 0, height + .08, .76);
-    } else if (type === "watchtower") {
+    if (type === "watchtower") {
       box(group, .16, .95, .16, mats.wood, 0, height + .42, 0);
       const flag = new THREE.Mesh(new THREE.PlaneGeometry(.48, .28), material("#A9433B"));
       flag.position.set(.25, height + .78, 0);
       flag.rotation.y = Math.PI / 2;
       group.add(flag);
       box(group, .48, .12, .48, mats.gold, 0, height + .82, 0);
-    } else if (type === "farm") {
-      // Crop beds with raised furrows and golden grain heads.
-      for (let i = -1; i <= 1; i++) {
-        const row = box(group, .17, .045, .96, material("#9A682D"), i * .42, .06, -.82);
-        row.rotation.y = .08;
-        for (let j = 0; j < 3; j++) {
-          addCylinder(group, .018, .025, .22, material("#D6BD65"), i * .42, .2, -.48 - j * .22, 5);
-        }
-      }
     } else if (type === "barracks") {
       // Weapon rack and practice dummies make the military function obvious.
       box(group, .9, .08, .12, mats.wood, 0, .48, -.7);
@@ -523,32 +657,6 @@ if (host && "WebGLRenderingContext" in window) {
         stripe.rotation.x = -.12;
         group.add(stripe);
       }
-    } else if (type === "quarry") {
-      for (const [sx, sz, scale] of [[-.48, -.72, .22], [0, -.78, .3], [.48, -.7, .2]]) {
-        const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(scale, 0), mats.darkStone);
-        rock.position.set(sx, scale * .72, sz);
-        rock.rotation.set(.2, sx * 2, .35);
-        rock.castShadow = true;
-        group.add(rock);
-      }
-      addCylinder(group, .035, .035, .7, mats.gold, .55, .48, .72, 6);
-    } else if (type === "lumber_mill") {
-      for (let i = 0; i < 4; i++) {
-        const log = addCylinder(group, .11, .11, .82, mats.wood, -.52 + i * .28, .2, -.76, 7);
-        log.rotation.z = Math.PI / 2;
-      }
-      box(group, .12, .82, .12, mats.darkStone, .58, .48, .65);
-      const saw = new THREE.Mesh(new THREE.TorusGeometry(.22, .045, 6, 12), mats.gold);
-      saw.position.set(.58, .76, .73);
-      group.add(saw);
-    } else if (type === "iron_mine") {
-      for (const [sx, sz, scale] of [[-.4, -.72, .2], [0, -.8, .27], [.42, -.72, .18]]) {
-        const ore = new THREE.Mesh(new THREE.IcosahedronGeometry(scale, 0), material("#8798A5", .32));
-        ore.position.set(sx, scale * .72, sz);
-        ore.castShadow = true;
-        group.add(ore);
-      }
-      box(group, .62, .08, .12, mats.wood, 0, .32, .75);
     } else if (type === "academy") {
       addCylinder(group, .26, .32, 1.05, mats.stone, .52, height + .48, -.25, 8);
       const spire = new THREE.Mesh(new THREE.ConeGeometry(.34, .68, 6), mats.roof);
@@ -603,42 +711,12 @@ if (host && "WebGLRenderingContext" in window) {
     }
     return group;
   }
-  // Reuse licensed, textured Kenney tower + wall GLBs for the default main castle.
-  // Never mutate or dispose template geometries/materials: clone(true) shares them.
-  // Owned castle skins continue through the established procedural palette path.
-  function createCastleGlbGroup() {
-    const towerTemplate = glbTemplates.get("watchtower");
-    const wallTemplate = glbTemplates.get("wall");
-    if (!towerTemplate || !wallTemplate || qualityProfile?.tier === "low") return null;
-    const castle = new THREE.Group();
-    castle.userData.coIAssetId = "kenney-castle-kit-composite";
-    const high = qualityProfile?.tier === "high";
-    const towerPositions = high
-      ? [[-.87, -.73], [.87, -.73], [-.87, .73], [.87, .73]]
-      : [[-.87, -.73], [.87, .73]];
-    for (const [x, z] of towerPositions) {
-      const tower = towerTemplate.clone(true);
-      tower.scale.setScalar(.76);
-      tower.position.set(x, 0, z);
-      castle.add(tower);
-    }
-    const wallPositions = high
-      ? [[0, -.73, 0], [0, .73, Math.PI], [-.87, 0, Math.PI / 2], [.87, 0, -Math.PI / 2]]
-      : [[0, -.73, 0], [0, .73, Math.PI]];
-    for (const [x, z, angle] of wallPositions) {
-      const wall = wallTemplate.clone(true);
-      wall.position.set(x, 0, z);
-      wall.rotation.y = angle;
-      wall.scale.setScalar(.88);
-      castle.add(wall);
-    }
-    return castle;
-  }
   function buildGround() {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(32, 32), mats.grass);
     ground.rotation.x = -Math.PI / 2; ground.position.y = -.08; ground.receiveShadow = true; scene.add(ground);
     const grid = new THREE.GridHelper(32, 50, "#91a36d", "#91a36d");
-    grid.position.y = -.055; grid.material.transparent = true; grid.material.opacity = .12; scene.add(grid);
+    grid.position.y = -.055; grid.material.transparent = true; grid.material.opacity = .025;
+    grid.material.depthWrite = false; scene.add(grid);
     // A winding stone road crosses the settlement.
     const points = [
       new THREE.Vector3(-6.4, .015, 4.2), new THREE.Vector3(-3.8, .015, 3.3),
@@ -646,10 +724,34 @@ if (host && "WebGLRenderingContext" in window) {
       new THREE.Vector3(2.8, .015, -.8), new THREE.Vector3(5.8, .015, -3.7)
     ];
     const curve = new THREE.CatmullRomCurve3(points);
-    const road = new THREE.Mesh(new THREE.TubeGeometry(curve, 36, .32, 6, false), mats.road);
-    road.receiveShadow = true; scene.add(road);
-    const verge = new THREE.Mesh(new THREE.TubeGeometry(curve, 36, .38, 6, false), mats.roadEdge);
-    verge.position.y = -.025; scene.add(verge);
+    // Ground-conforming paved ribbon instead of a raised tube.
+    // Two bounded static meshes, shared materials and no per-frame work.
+    const pathRibbon = (width, height, mat) => {
+      const positions = [], uvs = [], indices = [];
+      const segments = 36, arcLength = curve.getLength();
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments, p = curve.getPointAt(t), tangent = curve.getTangentAt(t);
+        const length = Math.hypot(tangent.x, tangent.z) || 1;
+        const nx = -tangent.z / length, nz = tangent.x / length;
+        for (const side of [-1, 1]) {
+          positions.push(p.x + nx * width * side, height, p.z + nz * width * side);
+          uvs.push((side + 1) / 2, t * arcLength / 2);
+        }
+        if (i < segments) {
+          const a = i * 2;
+          indices.push(a, a + 1, a + 2, a + 1, a + 3, a + 2);
+        }
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+      geometry.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+      geometry.setIndex(indices);
+      geometry.computeVertexNormals();
+      const mesh = new THREE.Mesh(geometry, mat);
+      mesh.receiveShadow = true; scene.add(mesh);
+    };
+    pathRibbon(.46, -.06, mats.roadEdge);
+    pathRibbon(.36, -.045, mats.road);
     // Forest is batched into three instanced draw calls instead of one per tree part.
     addForestInstances();
   }
@@ -714,7 +816,7 @@ if (host && "WebGLRenderingContext" in window) {
     const screenXs = projected.map(point => point.x);
     const screenYs = projected.map(point => point.y);
     const projectedWidth = Math.max(...screenXs) - Math.min(...screenXs) + 3.2;
-    const projectedHeight = Math.max(...screenYs) - Math.min(...screenYs) + 4.0;
+    const projectedHeight = Math.max(...screenYs) - Math.min(...screenYs) + 4.6;
     const viewportWidth = Math.max(1, camera.right - camera.left);
     const viewportHeight = Math.max(1, camera.top - camera.bottom);
     // Player zoom remains view-only. A reset always restores the safe fit.
@@ -750,6 +852,7 @@ if (host && "WebGLRenderingContext" in window) {
       scene.remove(item);
       if (item.userData.coIProcedural) item.traverse(node => {
         if (!node.isMesh) return;
+        if (node.isInstancedMesh) node.dispose();
         node.geometry?.dispose();
         const materials = Array.isArray(node.material) ? node.material : [node.material];
         materials.forEach(mat => { if (mat && !sharedMaterials.has(mat)) mat.dispose(); });
@@ -763,9 +866,8 @@ if (host && "WebGLRenderingContext" in window) {
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
       const template = glbTemplates.get(b.building_type);
-      const castleKit = b.building_type === "castle" && latestCastleSkinId === 0
-        ? createCastleGlbGroup() : null;
-      const group = castleKit || (template ? template.clone(true) : createBuilding(b.building_type, b.level, x, z, latestCastleSkinId));
+      const group = b.building_type==="castle"||!template
+        ? createBuilding(b.building_type, b.level, x, z, latestCastleSkinId) : template.clone(true);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       // Adicionar acessórios depois das sombras: ornamentos mobile não projetam sombras.
@@ -1168,12 +1270,7 @@ if (host && "WebGLRenderingContext" in window) {
           .map(item => item?.building_type)
           .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
       );
-      // The textured main castle is assembled from already licensed watchtower/wall GLBs.
-      // When those assets cannot load, the original castle still renders unmodified.
-      if (neededTypes.has("castle") && latestCastleSkinId === 0) {
-        neededTypes.add("watchtower");
-        neededTypes.add("wall");
-      }
+      // Optional GLBs replace only their own building type, never the original keep.
       const presentUnits = new Set(
         (Array.isArray(troops) ? troops : [])
           .filter(unit => Number(unit?.quantity) > 0)
@@ -1209,7 +1306,7 @@ if (host && "WebGLRenderingContext" in window) {
   }
   try {
     const deviceMemory = Number(navigator.deviceMemory || 0);
-    const preferredTier = readGraphicsChoice(window.localStorage);
+    const preferredTier = readGraphicsChoice(getGraphicsStorage(window));
     automaticGraphics = preferredTier === "auto";
     const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
     const cores = Number(navigator.hardwareConcurrency || 0);
@@ -1307,6 +1404,7 @@ if (host && "WebGLRenderingContext" in window) {
         loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
         pendingGlbLoads: glbLoadPromises.size,
         optionalSceneRefreshes,
+        architecture:activeModels.filter(model=>model.userData.coIArchitecture).map(model=>({type:model.userData.coIType,design:model.userData.coIArchitecture,tier:model.userData.coIArchitectureTier||null})),
         specialLandmarks:activeModels.filter(model=>model.userData.coISpecial).map(model=>({type:model.userData.coIType,x:model.position.x,z:model.position.z})),
         troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
         dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon()} : null,

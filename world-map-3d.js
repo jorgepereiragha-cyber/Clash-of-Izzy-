@@ -1,5 +1,6 @@
 import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
+import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -19,18 +20,17 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
   const connection = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
   const memory = Number(navigator.deviceMemory || 0);
   const cores = Number(navigator.hardwareConcurrency || 0);
-  const lowMemory = memory > 0 && memory <= 2;
   const saveData = connection?.saveData === true;
   // Reading the storage property itself may throw in restricted WebViews.
   let preference = "auto";
   try { preference = readGraphicsChoice(window.localStorage); } catch { /* Use automatic quality safely. */ }
-  const automatic = lowMemory ? "low" : memory >= 8 ? "high" : "balanced";
-  const highUnsafe = (memory > 0 && memory < 6) || (cores > 0 && cores < 6);
-  let quality = lowMemory || saveData ? "low"
-    : preference === "low" ? "low"
-    : preference === "balanced" ? "balanced"
-    : preference === "high" ? (highUnsafe ? "balanced" : "high")
-    : automatic;
+  // Same device policy as the city. Re-evaluate with the actual GPU capability
+  // after creating the context; the map retains its smaller pixel budget.
+  const mapProfile = maxTextureSize => selectKingdomQualityProfile({
+    deviceMemory:memory,hardwareConcurrency:cores,viewportWidth:host.clientWidth||window.innerWidth,
+    maxTextureSize,saveData,prefersReducedMotion:reduceMotion,preferredTier:preference
+  });
+  let quality = mapProfile(8192).tier;
   window.__coiWorldGraphicsQuality = quality;
 
   let renderer = null;
@@ -554,7 +554,8 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
       const now = Date.now();
       updateMarchPositions(now);
       renderer.render(scene, camera);
-      projectTerritories();
+      // Territory anchors are static during march animation. draw(), resize()
+      // and camera/state updates already project them when their positions change.
       if (activeMarches.some(march => now < march.endAt) && canAnimateMarches()) {
         frame = requestAnimationFrame(tick);
       }
@@ -632,6 +633,8 @@ import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
         stencil: false,
         depth: true
       });
+      quality = mapProfile(renderer.capabilities.maxTextureSize).tier;
+      window.__coiWorldGraphicsQuality = quality;
       renderer.outputColorSpace = THREE.SRGBColorSpace;
       renderer.toneMapping = THREE.ACESFilmicToneMapping;
       renderer.toneMappingExposure = 1.05;

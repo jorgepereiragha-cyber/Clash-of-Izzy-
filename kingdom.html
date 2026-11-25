@@ -55,7 +55,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 /* In WebGL mode the buttons are transparent hit targets, not opaque cards:
    the actual Three.js architecture remains visible beneath its own label. */
 .city.has-3d{display:block;padding:0}
-.city.has-3d .building{position:absolute;left:50%;top:50%;width:clamp(76px,22%,112px);height:56px;min-height:44px;transform:translate(-50%,-18%);background:linear-gradient(180deg,#0c172500 38%,#0c1725bd 100%);backdrop-filter:none;border-color:#e7bd6866;box-shadow:0 3px 10px #07150e55;justify-content:end;padding:5px 4px 8px;z-index:2}
+.city.has-3d .building{position:absolute;left:50%;top:50%;width:clamp(76px,22%,112px);height:56px;min-height:44px;transform:translate(-50%,-18%);background:linear-gradient(180deg,#0c172500 65%,#0c17259c 100%);backdrop-filter:none;border-color:transparent;box-shadow:none;justify-content:end;padding:5px 4px 8px;z-index:2}
 .city.has-3d .building:hover{transform:translate(-50%,-18%) translateY(-2px) scale(1.02)}
 .city .building[hidden]{display:none!important}
 .coi-city-camera-controls[hidden]{display:none!important}
@@ -76,7 +76,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .city.has-3d .building .emoji{display:none}
 .city.has-3d .building strong{font-size:12px;text-shadow:0 2px 4px #000}
 .city.has-3d .building small{font-size:10px;text-shadow:0 2px 4px #000}
-.city.has-3d .building.castle{background:linear-gradient(180deg,#0c172500 34%,#142b44d9 100%);border:1px solid #ffe09a;box-shadow:inset 0 0 0 1px #f4d78e55,0 4px 12px #0007}
+.city.has-3d .building.castle{background:linear-gradient(180deg,#0c172500 60%,#142b44b0 100%);border:1px solid #ffe09a55;box-shadow:none}
 .city .building[aria-pressed="true"]{outline:3px solid #ffe39a;outline-offset:2px;z-index:4}
 #coiCitySelection[hidden]{display:none!important}
 #coiCitySelection{position:fixed;z-index:25;bottom:20px;left:50%;transform:translateX(-50%);display:flex;gap:10px;align-items:center;width:min(94vw,470px);padding:10px 12px;border:1px solid #e3bc72;border-radius:12px;background:#132739f5;box-shadow:0 12px 32px #000b;color:#fff2d7}
@@ -85,6 +85,10 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 #coiCitySelection small{font-size:11px;line-height:1.25;color:#d6e3ee}
 #coiCitySelection button{min-height:48px;touch-action:manipulation}
 #coiCitySelectionDetails{min-width:112px}
+#coiCitySelection{flex-wrap:wrap}
+#coiCitySelection .coi-selection-copy{flex-basis:100%}
+#coiCitySelectionAction{flex:1;min-height:48px}
+#coiCitySelectionAction[hidden]{display:none!important}
 #coiCitySelectionClose{min-width:48px;font-size:21px}
 @media(max-width:760px){#coiCitySelection{bottom:calc(86px + env(safe-area-inset-bottom));gap:7px;padding:9px}#coiCitySelectionDetails{min-width:106px;font-size:12px}}
 @media(prefers-reduced-motion:no-preference){.city .building{transition:transform .18s ease,border-color .18s ease}.city .building:hover{transform:translateY(-3px) scale(1.025)}}
@@ -194,7 +198,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
  <details id="coiCityLayout" class="coi-layout-panel">
   <summary>Organizar edifícios · Grid 50×50</summary>
   <div class="layout-content">
-   <small>Selecione o edifício, toque no mapa para escolher o local e confirme. A posição é validada e salva no servidor. Esta função reorganiza construções e posiciona o ninho e o altar no beta, sem alterar níveis ou custos.</small>
+   <small>Selecione o edifício, toque no mapa para escolher o local e confirme. A posição é validada e salva no servidor. Esta função reorganiza construções e posiciona o ninho e o altar no reino, sem alterar níveis ou custos.</small>
    <canvas id="coiCityGrid" width="500" height="500" aria-label="Mapa de ocupação da cidade; selecione também as coordenadas nos campos abaixo"></canvas>
    <div class="layout-controls">
     <label for="coiCityBuilding">Edifício<select id="coiCityBuilding"></select></label>
@@ -336,7 +340,8 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div class="notice" style="margin-top:14px">O tempo e os recursos são processados pelo servidor. Fechar o jogo não interrompe a evolução do reino; ao retornar, o estado é sincronizado novamente.</div>
 </div></main>
 <div id="coiCitySelection" aria-label="Edifício selecionado" hidden>
- <div class="coi-selection-copy" aria-live="polite"><strong id="coiCitySelectionName"></strong><small id="coiCitySelectionLevel"></small></div>
+ <div class="coi-selection-copy" aria-live="polite"><strong id="coiCitySelectionName"></strong><small id="coiCitySelectionLevel"></small><small id="coiCitySelectionRole"></small></div>
+ <button type="button" id="coiCitySelectionAction" class="secondary" hidden></button>
  <button type="button" id="coiCitySelectionDetails" class="secondary">Ver melhorias</button>
  <button type="button" id="coiCitySelectionClose" class="secondary" aria-label="Fechar seleção do edifício">×</button>
 </div>
@@ -810,6 +815,42 @@ async function upgradeCastleVip(expectedVipLevel){
  }catch(error){setStatus(error.message||"Não foi possível evoluir o VIP.",true);}
  finally{busy=false;render();}
 }
+// Contextual navigation only: server rules, resource costs and queues remain unchanged.
+const buildingFunctions=Object.freeze({
+ castle:{role:"Progressão do reino e ascensão VIP",target:"castleVipProgress",action:"Ver VIP"},
+ barracks:{role:"Infantaria e capacidade total do exército",units:["militia","swordsman","spearman"]},
+ farm:{role:"Produção alimentar",resource:"food",target:"coiFourXPanel",action:"Indústrias"},
+ quarry:{role:"Produção de pedra",resource:"stone"},
+ lumber_mill:{role:"Produção de madeira",resource:"wood"},
+ iron_mine:{role:"Produção de ferro",resource:"iron"},
+ market:{role:"Produção de ouro",resource:"gold"},
+ academy:{role:"Ciência militar e treinamento de magos",target:"researchForm",action:"Pesquisar"},
+ wall:{role:"Resistência da muralha e defesa",target:"coiDefenseGrid",action:"Defesas"},
+ hospital:{role:"Tratamento de tropas feridas",target:"coiHospitalPanel",action:"Hospital"},
+ watchtower:{role:"Contribui para a defesa do reino",target:"coiDefenseGrid",action:"Defesas"},
+ stable:{role:"Cavalaria e cavaleiros",units:["cavalry","knight"]},
+ archery_range:{role:"Arqueiros e besteiros",units:["archer","crossbowman"]},
+ siege_workshop:{role:"Máquinas de cerco",units:["catapult","ram","trebuchet"]},
+ embassy:{role:"Capacidade coletiva de rally",href:"/alliance.html",action:"Aliança"},
+ warehouse:{role:"Capacidade de armazenamento dos recursos"}
+});
+function buildingRoleText(type,definition){
+ const k=state?.kingdom||{};
+ const number=value=>value!=null&&Number.isFinite(Number(value))?fmt(value):"—";
+ if(type==="barracks")return definition.role+" · "+number(state.armyCount)+" / "+number(state.troopCapacity);
+ if(type==="hospital")return state.hospital?definition.role+" · "+number(state.hospital.wounded)+" / "+number(state.hospital.capacity):"Tratamento indisponível neste servidor";
+ if(type==="wall")return definition.role+" · "+number(k.wall_hp)+" / "+number(k.wall_max_hp)+" PV";
+ if(type==="castle")return definition.role+" · VIP "+number(state.castleVip?.level??k.prestige);
+ if(definition.resource)return definition.role+" · Estoque: "+number(k[definition.resource])+" / "+number(k[definition.resource+"_capacity"]);
+ return definition.role;
+}
+function buildingActionAvailable(definition){
+ if(!definition)return false;
+ if(definition.units||definition.href)return true;
+ if(!definition.target)return false;
+ const target=document.getElementById(definition.target);
+ return Boolean(target&&!target.closest("[hidden]"));
+}
 let selectedCityBuildingType = null;
 function selectCityBuilding(type){
  const panel=document.getElementById("coiCitySelection");
@@ -824,6 +865,11 @@ function selectCityBuilding(type){
  const upgradeButton=[...document.querySelectorAll("#buildings [data-upgrade]")].find(button=>button.dataset.upgrade===type);
  const [name]=names[type];
  document.getElementById("coiCitySelectionName").textContent=name;
+ const definition=buildingFunctions[type];
+ document.getElementById("coiCitySelectionRole").textContent=definition?buildingRoleText(type,definition):"";
+ const action=document.getElementById("coiCitySelectionAction");
+ action.hidden=!buildingActionAvailable(definition);
+ action.textContent=definition?.units?"Treinar":definition?.action||"";
  document.getElementById("coiCitySelectionLevel").textContent="Nível "+fmt(entry.level)+(upgradeButton?.disabled?" · Melhoria indisponível no momento":" · Ver progresso e melhorias");
  panel.hidden=false;
  document.querySelectorAll("#city [data-building]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.building===type)));
@@ -840,6 +886,23 @@ document.getElementById("coiCitySelection").addEventListener("keydown",event=>{
  if(event.key!=="Escape")return;
  event.preventDefault();
  document.getElementById("coiCitySelectionClose").click();
+});
+document.getElementById("coiCitySelectionAction").addEventListener("click",()=>{
+ const definition=buildingFunctions[selectedCityBuildingType];
+ if(!buildingActionAvailable(definition))return;
+ if(definition.href){window.location.assign(definition.href);return;}
+ const target=document.getElementById(definition.units?"trainingForm":definition.target);
+ if(!target)return;
+ let focusTarget=target.querySelector("select:not(:disabled),button:not(:disabled),input:not(:disabled)")||target;
+ if(definition.units){
+  const unit=document.getElementById("unitType");
+  if(!definition.units.includes(unit.value))unit.value=definition.units[0];
+  focusTarget=unit;
+ }
+ selectCityBuilding(null);
+ target.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
+ if(!focusTarget.matches("select,button,input,a,[tabindex]"))focusTarget.tabIndex=-1;
+ focusTarget.focus({preventScroll:true});
 });
 document.getElementById("coiCitySelectionDetails").addEventListener("click",()=>{
  if(!selectedCityBuildingType)return;

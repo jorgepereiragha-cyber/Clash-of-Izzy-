@@ -7,18 +7,17 @@ const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 
-test("Kenney castle kit progressively replaces the default castle without leaking shared GLB geometry", () => {
-  assert.match(renderer, /function createCastleGlbGroup\(\)/);
-  assert.match(renderer, /glbTemplates\.get\("watchtower"\)/);
-  assert.match(renderer, /glbTemplates\.get\("wall"\)/);
-  assert.match(renderer, /towerTemplate\.clone\(true\)/);
-  assert.match(renderer, /wallTemplate\.clone\(true\)/);
-  assert.match(renderer, /latestCastleSkinId === 0/);
-  assert.match(renderer, /const group = castleKit \|\| \(template \? template\.clone\(true\) : createBuilding/);
-  assert.match(renderer, /neededTypes\.add\("watchtower"\)/);
-  assert.match(renderer, /neededTypes\.add\("wall"\)/);
-  assert.match(renderer, /if \(!towerTemplate \|\| !wallTemplate \|\| qualityProfile\?\.tier === "low"\) return null/);
-  assert.match(renderer, /PCFSoftShadowMap/);
+test("original imperial keep is rendered at every skin and quality without substituting standalone wall GLBs", () => {
+  assert.match(renderer,/function addEldoriaCastle/);
+  assert.match(renderer,/eldoria-imperial-v1/);
+  assert.match(renderer,/level>=30\?4:level>=20\?3:level>=10\?2:1/);
+  assert.match(renderer,/if\(type==="castle"\)\{\s*addEldoriaCastle/);
+  assert.match(renderer,/b\.building_type==="castle"\|\|!template/);
+  assert.doesNotMatch(renderer,/createCastleGlbGroup|kenney-castle-kit-composite/);
+  assert.match(renderer,/PCFSoftShadowMap/);
+  for(const type of ["barracks","farm","quarry","lumber_mill","iron_mine","market","academy","wall","hospital","watchtower","stable","archery_range","siege_workshop","embassy","warehouse"]){
+    assert.ok(renderer.slice(renderer.indexOf("const buildingProfiles"),renderer.indexOf("function addEldoriaCastle")).includes(type+":["));
+  }
 });
 
 test("mobile GLB trees scale to device tier without discarding instanced procedural forest", () => {
@@ -445,4 +444,41 @@ test("instanced forest and distant defenses release instance buffers through bot
  assert.equal((renderer.match(/instances: new Set\(\)/g)||[]).length,2);
  assert.match(renderer,/function disposeDetachedObject3D\(root\) \{[\s\S]*?disposeObject3D\(root, resources\);[\s\S]*?disposeResourceSet\(resources\)/);
  assert.match(renderer,/function disposeSceneResources\(\) \{[\s\S]*?disposeObject3D\(scene, resources\);[\s\S]*?disposeResourceSet\(resources\)/);
+});
+
+
+test("graphics settings survive storage property and method failures",async()=>{
+ const {getGraphicsStorage,readGraphicsChoice,persistGraphicsChoice}=await import("../scripts/kingdom-visual-preferences.js");
+ const restricted={get localStorage(){throw Error("SecurityError")}};
+ assert.equal(getGraphicsStorage(restricted),null);
+ assert.equal(readGraphicsChoice(getGraphicsStorage(restricted)),"auto");
+ assert.equal(persistGraphicsChoice(getGraphicsStorage(restricted),"high"),false);
+ const broken={localStorage:{getItem(){throw Error("denied")},setItem(){throw Error("denied")}}};
+ assert.equal(readGraphicsChoice(getGraphicsStorage(broken)),"auto");
+ assert.equal(persistGraphicsChoice(getGraphicsStorage(broken),"low"),false);
+ const boot=await readFile(new URL("../scripts/kingdom-visual-boot.js",import.meta.url),"utf8");
+ assert.match(boot,/readGraphicsChoice\(getGraphicsStorage\(window\)\)/);
+ assert.match(boot,/persistGraphicsChoice\(getGraphicsStorage\(window\), value\)/);
+ assert.match(renderer,/readGraphicsChoice\(getGraphicsStorage\(window\)\)/);
+});
+
+test("scenic city uses flat bounded paving and a subdued placement guide",()=>{
+ assert.match(renderer,/grid\.material\.opacity = \.025/);
+ assert.match(renderer,/grid\.material\.depthWrite = false/);
+ assert.match(renderer,/const segments = 36, arcLength = curve\.getLength\(\)/);
+ assert.match(renderer,/indices\.push\(a, a \+ 1, a \+ 2, a \+ 1, a \+ 3, a \+ 2\)/);
+ assert.match(renderer,/geometry\.computeVertexNormals\(\)/);
+ assert.match(renderer,/pathRibbon\(\.46, -\.06, mats\.roadEdge\)/);
+ assert.match(renderer,/pathRibbon\(\.36, -\.045, mats\.road\)/);
+ assert.doesNotMatch(renderer,/new THREE\.TubeGeometry\(curve, 36/);
+ assert.match(renderer,/ctx\.createRadialGradient\(x \+ dx, y \+ dy/);
+});
+
+test("rural buildings have separate models and bounded crop instances",()=>{
+ assert.match(renderer,/const ruralTypes=new Set\(\["farm","quarry","lumber_mill","iron_mine"\]\)/);
+ assert.match(renderer,/if\(ruralTypes\.has\(type\)\)\{\s*addRuralBuilding/);
+ assert.match(renderer,/eldoria-rural-v1/);
+ assert.match(renderer,/const rows=low\?2:high\?5:3/);
+ assert.match(renderer,/new THREE\.InstancedMesh\(new THREE\.CylinderGeometry\(\.014,\.022,\.15,5\),grain,rows\*3\)/);
+ assert.match(renderer,/if \(node\.isInstancedMesh\) node\.dispose\(\)/);
 });

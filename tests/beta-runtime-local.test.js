@@ -902,6 +902,24 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         const firstToken = await page.evaluate(() => localStorage.getItem("coi_game_token"));
         assert.ok(firstToken, "browser persists the realm session");
         assert.ok(await page.locator("#city .building").count() > 0, "city controls render in lightweight mode");
+        // Every real building resolves its contextual information even if the
+        // low-end scene only displays the first nine touch targets.
+        const roles=await page.evaluate(()=>{
+          const result=[];
+          for(const button of document.querySelectorAll("#city [data-building]")){
+            button.click();
+            result.push({type:button.dataset.building,role:document.getElementById("coiCitySelectionRole").textContent});
+          }
+          document.querySelector('#city [data-building="barracks"]').click();
+          return result;
+        });
+        assert.equal(roles.length,16);
+        assert.ok(roles.every(x=>x.role.length>5));
+        await page.locator("#coiCitySelectionAction").click();
+        assert.equal(await page.locator("#unitType").inputValue(),"militia");
+        assert.equal(await page.locator("#coiCitySelection").isVisible(),false);
+        assert.equal(await page.evaluate(()=>document.activeElement.id),"unitType");
+
         await page.waitForFunction(() => ["castle", "castle-running", "army", "army-running", "world", "alliance"].includes(document.querySelector("#coiJourneyAction")?.dataset.phase));
         assert.ok(await page.locator("#coiRoyalJourney").isVisible(), "server-backed journey is visible in the beta");
         await page.reload();
@@ -994,6 +1012,10 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.equal(refreshCounts.after,refreshCounts.before,
           "unchanged kingdom state must not trigger an extra optional model rebuild");
         const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
+        assert.ok(diagnostics.architecture.some(x=>x.type==="castle"&&x.design==="eldoria-imperial-v1"&&x.tier===1),"new realm uses original tier-one keep");
+        for(const type of ["farm","quarry","lumber_mill","iron_mine"]){
+          assert.ok(diagnostics.architecture.some(x=>x.type===type&&x.design==="eldoria-rural-v1"),type+" uses its own rural architecture");
+        }
         assert.ok(diagnostics.troopFigures.some(x=>x.type==="archer"&&!x.procedural),"trained archers use the decoded GLB");
         assert.ok(diagnostics.troopFigures.length<=8,"balanced figure budget");
         const equippedDragon=await page.evaluate(()=>window.__coiKingdomDragon);
