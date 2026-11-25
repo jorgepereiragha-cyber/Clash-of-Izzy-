@@ -37,6 +37,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
+          ref: ${{ github.sha }}
           persist-credentials: false
 
       - name: Set up Node.js
@@ -49,6 +50,9 @@ jobs:
           test -f worker.js || (echo "worker.js not found" && exit 1)
           test -f wrangler.jsonc || (echo "wrangler.jsonc not found" && exit 1)
           test -d migrations || (echo "migrations directory not found" && exit 1)
+
+      - name: Exigir destino e flags de produção seguros antes de qualquer operação remota
+        run: node scripts/check-production-deploy-config.mjs
 
       - name: Install dependencies
         run: npm install --ignore-scripts --no-audit --no-fund
