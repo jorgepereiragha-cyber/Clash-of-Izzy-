@@ -2121,8 +2121,11 @@ export default {
   catch(error){console.error("scheduled_rate_limit_cleanup_failed",String(error?.message||error));}
   try{await env.DB.prepare("UPDATE battle_reports SET replay_json='{}',battle_log='[]' WHERE id IN (SELECT id FROM battle_reports WHERE replay_expires_at>0 AND replay_expires_at<=? AND (replay_json<>'{}' OR battle_log<>'[]') ORDER BY replay_expires_at,id LIMIT 25)").bind(Math.floor(Date.now()/1000)).run();}
   catch(error){console.error("scheduled_battle_replay_expiry_failed",String(error?.message||error));}
-  try{await processEmailQueue(env,1);}
-  catch(error){console.error("scheduled_email_queue_failed",String(error?.message||error));}
+  // Beta cron must not send real queued mail unless independently approved.
+  if(env.ENVIRONMENT!=="beta" || env.BETA_EMAIL_DELIVERY_APPROVED==="true"){
+    try{await processEmailQueue(env,1);}
+    catch(error){console.error("scheduled_email_queue_failed",String(error?.message||error));}
+  }
  },
  async fetch(request,env){
   if(request.method==="OPTIONS")return new Response(null,{status:204});
