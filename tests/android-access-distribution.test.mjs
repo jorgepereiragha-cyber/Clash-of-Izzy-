@@ -4,7 +4,14 @@ import {readFileSync} from "node:fs";
 import {checkAccessServer,HEALTH_URL} from "../scripts/check-android-access-server.mjs";
 const read=p=>readFileSync(new URL("../"+p,import.meta.url),"utf8");
 const health={ok:true,status:"ready",androidApiContract:"eldoria-android-v1",checks:{database:true,session:true,schema:true},missingTables:[],missingTriggers:[]};
-function mock(body=health,location="/beta-access.html",status=200){return async url=>url===HEALTH_URL?Response.json(body,{status}):new Response(null,{status:302,headers:{location}});}
+function mock(body=health,location="/beta-access.html",status=200,gateStatus=403,pageStatus=200){
+ return async url=>{
+  if(url===HEALTH_URL)return Response.json(body,{status});
+  if(url.endsWith("/api/game/state"))return Response.json({code:"BETA_INVITE_REQUIRED"},{status:gateStatus});
+  if(url.endsWith("/beta-access.html"))return new Response('<input id="code"><script>"/api/beta/invite/redeem"</script>',{status:pageStatus,headers:{"content-type":"text/html"}});
+  return new Response(null,{status:302,headers:{location}});
+ };
+}
 test("access distribution requires real readiness and closed invitation gate",async()=>{
  await checkAccessServer(mock());
  await assert.rejects(checkAccessServer(mock({...health,missingTriggers:["trigger"]})));
@@ -12,6 +19,8 @@ test("access distribution requires real readiness and closed invitation gate",as
  await assert.rejects(checkAccessServer(mock(health,"/kingdom.html")));
  await assert.rejects(checkAccessServer(mock(health,"https://other.example/beta-access.html")));
  await assert.rejects(checkAccessServer(mock(health,"/beta-access.html",503)));
+ await assert.rejects(checkAccessServer(mock(health,"/beta-access.html",200,200)));
+ await assert.rejects(checkAccessServer(mock(health,"/beta-access.html",200,403,404)));
 });
 test("public name is clean; technical identity remains distinct",()=>{
  const gradle=read("android-sideload/app/build.gradle");

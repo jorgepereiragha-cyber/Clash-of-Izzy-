@@ -13,6 +13,15 @@ export async function checkAccessServer(fetchImpl = fetch) {
   if (![302,303,307,308].includes(access.status) ||
       new URL(access.headers.get("location") || "/",HEALTH_URL).href !== new URL("/beta-access.html",HEALTH_URL).href)
     throw new Error("Proteção de acesso por convite não confirmada.");
+  const gate = await fetchImpl(new URL("/api/game/state",HEALTH_URL).href,{redirect:"error",cache:"no-store",signal:AbortSignal.timeout(15000)});
+  const denied = await gate.json().catch(() => null);
+  if (gate.status !== 403 || denied?.code !== "BETA_INVITE_REQUIRED")
+    throw new Error("API de jogo acessível sem convite ou contrato de isolamento ausente.");
+  const page = await fetchImpl(new URL("/beta-access.html",HEALTH_URL).href,{redirect:"error",cache:"no-store",signal:AbortSignal.timeout(15000)});
+  const html = await page.text();
+  if (page.status !== 200 || !page.headers.get("content-type")?.includes("text/html") ||
+      !html.includes('id="code"') || !html.includes("/api/beta/invite/redeem"))
+    throw new Error("Página de convite ausente ou inválida.");
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   try { await checkAccessServer(); console.log("Servidor e convite validados."); }

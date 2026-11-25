@@ -251,22 +251,29 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
     try { await navigator.share({ title: "Clash of Izzy", text: shareText, url: publicUrl }); }
     catch { shareStatus.textContent = "Compartilhamento não concluído. Você pode copiar o link."; }
   });
+  async function fetchReleaseJson(path) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 10000);
+    try {
+      const response = await fetch("https://api.github.com/repos/" + repo + path, {
+        headers: { Accept: "application/vnd.github+json" }, cache: "no-store",
+        redirect: "error", signal: controller.signal
+      });
+      if (!response.ok) throw new Error("release indisponível");
+      return await response.json();
+    } finally { clearTimeout(timer); }
+  }
   function validAsset(asset, expectedName) {
     if (!asset || asset.name !== expectedName || asset.state !== "uploaded") return false;
     try {
       const url = new URL(asset.browser_download_url);
-      return url.protocol === "https:" && url.hostname === "github.com" &&
+      return url.origin === "https://github.com" && !url.username && !url.password &&
         url.pathname.startsWith(prefix) && url.search === "" && url.hash === "";
     } catch { return false; }
   }
   async function findOfficialApk() {
     try {
-      const response = await fetch("https://api.github.com/repos/" + repo + "/releases/latest", {
-        headers: { Accept: "application/vnd.github+json" },
-        cache: "no-store"
-      });
-      if (!response.ok) throw new Error("release indisponível");
-      const release = await response.json();
+      const release = await fetchReleaseJson("/releases/latest");
       if (release.draft || release.prerelease || !Array.isArray(release.assets)) throw new Error("release não oficial");
       const apk = release.assets.find(asset => validAsset(asset, filename) && asset.size > 0);
       const hash = release.assets.find(asset => validAsset(asset, filename + ".sha256"));
@@ -300,19 +307,18 @@ h1 small{display:block;color:#eee1c8;font:700 clamp(18px,2.5vw,29px)/1.3 system-
     const checksum = document.getElementById("invite-checksum");
     const name = "clash-of-izzy-access.apk";
     try {
-      const response = await fetch("https://api.github.com/repos/" + repo + "/releases?per_page=100", {
-        headers: { Accept: "application/vnd.github+json" }, cache: "no-store"
-      });
-      if (!response.ok) throw new Error("release indisponível");
-      const releases = await response.json();
+      const releases = await fetchReleaseJson("/releases?per_page=100");
       if (!Array.isArray(releases)) throw new Error("resposta inválida");
-      const release = releases.filter(r => r.draft === false && r.prerelease === true &&
+      const release = releases.filter(r => r && r.draft === false && r.prerelease === true &&
         /^android-access-v[1-9][0-9]{0,8}$/.test(r.tag_name))
         .sort((a,b) => Number(b.tag_name.slice(16)) - Number(a.tag_name.slice(16)))[0];
       if (!release || !Array.isArray(release.assets)) throw new Error("sem instalador");
-      const asset = expected => release.assets.find(a => validAsset(a, expected) &&
-        Number.isSafeInteger(a.size) && a.size > 0 &&
-        new URL(a.browser_download_url).pathname === prefix + release.tag_name + "/" + expected);
+      const asset = expected => {
+        const matches = release.assets.filter(a => validAsset(a, expected) &&
+          Number.isSafeInteger(a.size) && a.size > 0 &&
+          new URL(a.browser_download_url).pathname === prefix + release.tag_name + "/" + expected);
+        return matches.length === 1 ? matches[0] : null;
+      };
       const apk = asset(name), hash = asset(name + ".sha256");
       if (!apk || !hash) throw new Error("arquivos ausentes");
       button.href = apk.browser_download_url;
