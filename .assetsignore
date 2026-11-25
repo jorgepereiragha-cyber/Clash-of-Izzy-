@@ -102,3 +102,6 @@ support-orders.js
 
 # All D1 audits and local build CLIs are server-side tooling.
 scripts/*.mjs
+
+# Server-only production clock.
+production-clock.js
