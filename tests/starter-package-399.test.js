@@ -25,5 +25,5 @@ test("the store uses D1 catalog price and grants its gems only after verified se
   assert.match(provider, /actualCents === expectedCents/);
   assert.match(provider, /paidCents === expectedCents/);
   assert.match(arena, /price\.textContent='R\$ '\+Number\(item\.price_brl\)\.toFixed\(2\)\.replace\('\.',','\)/);
-  assert.match(arena, /Number\(item\.gems\|\|0\)\.toLocaleString\('pt-BR'\)\+' gemas após confirmação'/);
+  assert.match(arena, /Number\(item\.gems\|\|0\)\.toLocaleString\('pt-BR'\)\+' diamantes após confirmação'/);
 });

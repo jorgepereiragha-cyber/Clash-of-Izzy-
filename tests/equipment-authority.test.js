@@ -44,3 +44,11 @@ test("equipamentos usam estado persistente e validação no servidor", async () 
   assert.doesNotMatch(ui, /playerState\.gold\s*[-+]=/);
   assert.doesNotMatch(ui, /item\.level\s*\+=/);
 });
+
+test("beta normal upgrade requires expected level; equipment binds canonical level inside transaction", async () => {
+  const worker=await readFile(new URL("../worker.js",import.meta.url),"utf8");
+  const ui=await readFile(new URL("../equipment-system.js",import.meta.url),"utf8");
+  assert.match(worker,/body\.expectedLevel!==level/);
+  assert.match(ui,/expectedLevel:item\.level/);
+  assert.match(worker,/SELECT \?,\?,ke\.item_key,ke\.level FROM kingdom_equipment ke JOIN heroes/);
+});

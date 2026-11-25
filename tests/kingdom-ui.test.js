@@ -37,7 +37,7 @@ test("central do reino mostra filas persistentes, treinamento e pesquisas", asyn
 test("HUD shows server-owned gems and highlights only changed resource counters", async () => {
   const html = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
   assert.match(html, /renderResourceHud\(k\)/);
-  assert.match(html, /"💎","Gemas","gems",state\?\.player\?\.gems/);
+  assert.match(html, /"💎","Diamantes","gems",state\?\.player\?\.gems/);
   assert.match(html, /lastResourceSnapshot/);
   assert.match(html, /resource-bump/);
   assert.match(html, /grid-template-columns:repeat\(6,minmax\(0,1fr\)\)/);

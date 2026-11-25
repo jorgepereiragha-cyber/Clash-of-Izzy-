@@ -103,5 +103,20 @@ support-orders.js
 # All D1 audits and local build CLIs are server-side tooling.
 scripts/*.mjs
 
+# Server modules from promoted gameplay; never serve beta internals or private config.
+beta-access.js
+beta/**
+wrangler.beta.jsonc
+wrangler.beta.local-smoke.jsonc
+castle-science.js
+city-special-buildings.js
+hospital-policy.js
+equipment-enhancement.js
+march-scheduler-policy.js
+live-payment-gate.js
+
+# Backend-only administrative diamond credit ledger.
+admin-gem-grants.js
+
 # Server-only production clock.
 production-clock.js

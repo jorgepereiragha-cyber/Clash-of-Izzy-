@@ -150,6 +150,9 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       "SESSION_SECRET:" + SESSION_SECRET,
       "ADMIN_EMAIL:" + ADMIN_EMAIL,
       "ADMIN_PASSWORD:" + ADMIN_PASSWORD,
+      // Only this loopback Wrangler fixture may exercise approved manual orders.
+      // Production defaults and deploy confirmations stay unchanged.
+      "LIVE_PAYMENTS_APPROVED:true",
       "--log-level", "error",
     ], {
       cwd: root,
@@ -164,6 +167,8 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
     await waitForWorker(baseUrl, workerProcess, () => workerOutput);
     const api = makeApi(baseUrl);
+    const fixtureMethods = expectStatus(await api("/api/store/payment-methods"), 200, "provedores externos indisponíveis no D1 local");
+    assert.deepEqual(fixtureMethods, {mercadoPago:false,nubankPix:false});
 
     const health = await api("/api/health");
     const healthData = expectStatus(health, 200, "health da API");
@@ -242,6 +247,29 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
     expectStatus(await api("/api/game/start", {
       method:"POST",token:unknownRealmBody+"."+unknownRealmSig,body:{}
     }),404,"signed session of player without kingdom must not create another realm");
+
+    await t.test("recompensa diária exige reino existente e bloqueia resgates simultâneos", async () => {
+      const orphanToken=unknownRealmBody+"."+unknownRealmSig;
+      expectStatus(await api("/api/game/daily-reward",{token:orphanToken}),404,"conta sem reino não tem recompensa");
+      expectStatus(await api("/api/game/daily-reward",{method:"POST",token:orphanToken,body:{}}),404,"conta sem reino não pode registrar nem creditar recompensa");
+      const orphanRows=rowsFromD1Json(await runCli([
+        "--config","wrangler.jsonc","d1","execute","clash-of-izzy-db","--local","--persist-to",persistDir,"--json",
+        "--command","SELECT p.gems,(SELECT COUNT(*) FROM daily_reward_claims d WHERE d.player_id=p.id) AS claims FROM players p WHERE p.player_id='izzy_"+"f".repeat(32)+"';"
+      ]));
+      assert.equal(orphanRows.length,1);
+      assert.equal(Number(orphanRows[0].gems),0);
+      assert.equal(Number(orphanRows[0].claims),0);
+      // Use the existing third synthetic realm, and restore no data or balance by hand.
+      const before=expectStatus(await api("/api/game/state",{token:tokenC}),200,"saldo antes do resgate").state.player.gems;
+      const info=expectStatus(await api("/api/game/daily-reward",{token:tokenC}),200,"recompensa inicial");
+      assert.equal(info.day,1);assert.equal(info.claimed,false);
+      const attempts=await Promise.all(Array.from({length:4},()=>api("/api/game/daily-reward",{method:"POST",token:tokenC,body:{}})));
+      assert.deepEqual(attempts.map(r=>r.status).sort((x,y)=>x-y),[201,409,409,409]);
+      const after=expectStatus(await api("/api/game/state",{token:tokenC}),200,"saldo após resgates concorrentes").state.player.gems;
+      assert.equal(Number(after),Number(before)+50);
+      const claimed=expectStatus(await api("/api/game/daily-reward",{token:tokenC}),200,"recompensa após concorrência");
+      assert.equal(claimed.claimed,true);
+    });
 
     // Signed tokens with suffixes used to be accepted because verify()
     // destructured the first two dot-separated components and ignored the rest.
@@ -660,7 +688,16 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
 
     await t.test("painel Master, catálogo e pedidos de compra", async () => {
       expectStatus(await admin("/api/admin/player-search", { query: playerA }), 200, "busca administrativa de jogador");
-      expectStatus(await admin("/api/admin/gems", { playerId: playerA, amount: 10 }), 200, "crédito administrativo de gemas");
+      const credit={playerId:playerA,amount:10,reason:"Crédito de integração auditado",request_key:"admin-grant-integration-0001"};
+      const beforeCredit=await admin("/api/admin/player-search",{query:playerA});
+      const credits=await Promise.all([admin("/api/admin/gems",credit),admin("/api/admin/gems",credit)]);
+      for(const result of credits)expectStatus(result,200,"crédito administrativo idempotente");
+      assert.equal(credits.filter(result=>result.data.reused===false).length,1);
+      assert.equal(credits.filter(result=>result.data.reused===true).length,1);
+      const afterCredit=await admin("/api/admin/player-search",{query:playerA});
+      assert.equal(Number(afterCredit.data.player.gems),Number(beforeCredit.data.player.gems)+10);
+      expectStatus(await admin("/api/admin/gems",{...credit,amount:11}),409,"chave de crédito não pode mudar quantidade");
+      expectStatus(await admin("/api/admin/gems",{playerId:playerA,amount:10}),400,"crédito sem chave e motivo bloqueado");
       expectStatus(await admin("/api/admin/gems", { playerId: playerA, amount: 0 }), 400, "bloqueio de crédito inválido");
 
       expectStatus(await admin("/api/admin/vip-packages", {
@@ -996,6 +1033,12 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(stateA.queues.filter(item => item.status === "running" && item.queue_type === "training").length === 2,
         "dois treinamentos simultâneos permanecem persistidos");
       assert.ok(stateA.queues.some(item => item.status === "running" && item.queue_type === "research"));
+      // Reject inherited Object.prototype keys, not just unknown/incorrect item IDs.
+      const activeConstruction = stateA.queues.find(item => item.status === "running" && item.queue_type === "construction");
+      assert.ok(activeConstruction?.id);
+      for (const itemId of ["constructor", "__proto__", "toString", "res_1h"]) {
+        await action(tokenA, { type: "queue_speedup", queueId: activeConstruction.id, itemId, quantity: 1 }, 400);
+      }
 
       const resourcesAfterDebit = Object.fromEntries(coreResourceKeys.map(key => [key, Number(stateA.kingdom[key])]));
       assert.ok(coreResourceKeys.some(key => resourcesAfterDebit[key] < resourcesBeforeQueues[key]),
@@ -1028,28 +1071,74 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       let stateB = (await api("/api/game/state", { token: tokenB })).data.state;
       const invite = stateB.pendingInvites?.[0];
       assert.ok(invite?.id, "convite chegou ao reino destinatário");
-      await action(tokenB, { type: "alliance_accept_invite", inviteId: invite.id }, 200);
+      executedActions.add("alliance_accept_invite");
+      const acceptResults = await Promise.all([1,2].map(() => api("/api/game/action", {
+        method: "POST", token: tokenB, body: { type: "alliance_accept_invite", inviteId: invite.id }
+      })));
+      assert.equal(acceptResults.filter(result => result.status === 200).length, 1);
+      assert.ok(acceptResults.every(result => [200,404,409].includes(result.status)));
+      const afterAccept = (await api("/api/game/state", { token: tokenB })).data.state;
+      assert.equal(afterAccept.alliance.tag, "ALFA");
+      assert.equal(afterAccept.alliance.members.filter(member => Number(member.kingdom_id) === Number(kingdomB)).length, 1);
       await action(tokenA, { type: "alliance_promote", targetKingdomId: kingdomB, rank: "oficial" }, 200);
       await action(tokenB, { type: "alliance_chat", message: "Teste de comunicação entre aliados" }, 200);
       const chatFeed = await api("/api/game/alliance/chat", { token: tokenB });
       expectStatus(chatFeed, 200, "feed compacto do chat da aliança");
       assert.equal(chatFeed.data.alliance?.name, "Guardioes Alfa");
       assert.ok(chatFeed.data.chat?.some(message => message.message === "Teste de comunicação entre aliados"));
+      const beforeDonation = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
       await action(tokenA, { type: "alliance_donate", resource: "food", amount: 1000 }, 200);
       await action(tokenA, { type: "alliance_donate", resource: "wood", amount: 1000 }, 200);
+      const afterDonation = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
+      assert.equal(afterDonation.shared_food, beforeDonation.shared_food + 1000);
+      assert.equal(afterDonation.shared_wood, beforeDonation.shared_wood + 1000);
+      assert.equal(afterDonation.contribution, beforeDonation.contribution + 20);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomB }, 200);
       await action(tokenA, { type: "alliance_kick", targetKingdomId: kingdomB }, 200);
 
       await action(tokenB, { type: "alliance_create", name: "Guardioes Beta", tag: "BETA" }, 200);
-      await action(tokenA, { type: "alliance_war_declare", targetTag: "BETA" }, 200);
+      executedActions.add("alliance_war_declare");
+      const wars = await Promise.all([
+        api("/api/game/action", { method: "POST", token: tokenA, body: { type: "alliance_war_declare", targetTag: "BETA" } }),
+        api("/api/game/action", { method: "POST", token: tokenB, body: { type: "alliance_war_declare", targetTag: "ALFA" } })
+      ]);
+      assert.deepEqual(wars.map(result => result.status).sort(), [200, 409]);
+      const warState = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
+      assert.equal(warState.wars.filter(war => war.status === "active").length, 1);
 
       stateA = (await api("/api/game/state", { token: tokenA })).data.state;
       const claimable = stateA.territories.find(item => item.territory_kind==="resource" && item.resource_type && !item.alliance_id && !item.owner_kingdom_id);
       assert.ok(claimable?.id, "há território disponível para reivindicação");
+      // Leave enough in the treasury for a second debit, so the repeat really tests ownership.
+      await action(tokenA, { type: "alliance_donate", resource: "food", amount: 1000 }, 200);
+      await action(tokenA, { type: "alliance_donate", resource: "wood", amount: 1000 }, 200);
+      const beforeClaim = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
+      assert.ok(beforeClaim.shared_food >= 2000 && beforeClaim.shared_wood >= 2000);
       await action(tokenA, { type: "alliance_claim_territory", territoryId: claimable.id }, 200);
+      await action(tokenA, { type: "alliance_claim_territory", territoryId: claimable.id }, 409, "repetição não cobra território já controlado");
+      const afterClaim = (await api("/api/game/state", { token: tokenA })).data.state.alliance;
+      assert.equal(afterClaim.shared_food, beforeClaim.shared_food - 1000);
+      assert.equal(afterClaim.shared_wood, beforeClaim.shared_wood - 1000);
+      assert.equal(afterClaim.territory_count, beforeClaim.territory_count + 1);
 
-      await action(tokenC, { type: "alliance_join", tag: "ALFA" }, 200);
+      executedActions.add("alliance_join");
+      const joins = await Promise.all([1,2].map(() => api("/api/game/action", {
+        method: "POST", token: tokenC, body: { type: "alliance_join", tag: "ALFA" }
+      })));
+      assert.deepEqual(joins.map(result => result.status).sort(), [200,409]);
+      const afterJoin = (await api("/api/game/state", { token: tokenC })).data.state.alliance;
+      assert.equal(afterJoin.members.filter(member => Number(member.kingdom_id) === Number(kingdomC)).length, 1);
       await action(tokenA, { type: "alliance_help", targetKingdomId: kingdomC }, 200);
+      // Set the isolated fixture one below the daily cap; only one concurrent help may succeed.
+      await runCli([
+        "--config", "wrangler.jsonc", "d1", "execute", "clash-of-izzy-db",
+        "--local", "--persist-to", persistDir,
+        "--command", "UPDATE alliance_members SET help_count=(SELECT 4+2*level FROM alliances WHERE id=alliance_members.alliance_id),help_reset_at=date('now') WHERE kingdom_id="+Number(kingdomA)+";"
+      ]);
+      const helps = await Promise.all([1,2].map(() => api("/api/game/action", {
+        method: "POST", token: tokenA, body: { type: "alliance_help", targetKingdomId: kingdomC }
+      })));
+      assert.deepEqual(helps.map(result => result.status).sort(), [200, 409]);
       await action(tokenC, { type: "alliance_leave" }, 200);
     });
 

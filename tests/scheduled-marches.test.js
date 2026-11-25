@@ -5,14 +5,16 @@ import { readFile } from "node:fs/promises";
 test("Worker processa marchas vencidas sem depender do login do jogador", async () => {
   const worker = await readFile(new URL("../worker.js", import.meta.url), "utf8");
   assert.ok(worker.includes("async function processDueMarches(env)"));
-  assert.ok(worker.includes("SELECT DISTINCT kingdom_id FROM marches WHERE status='marching' AND arrives_at<=? ORDER BY kingdom_id LIMIT 1"));
+  const policy=await readFile(new URL("../march-scheduler-policy.js",import.meta.url),"utf8");
+  assert.match(policy,/GROUP BY kingdom_id ORDER BY MIN\(arrives_at\), kingdom_id LIMIT \?/);
+  assert.match(worker,/realmLimit:env\.ENVIRONMENT==="production"\?1:4/);
   const schedulerStart = worker.indexOf("async scheduled(controller,env){");
   const schedulerEnd = worker.indexOf("async fetch(request,env)", schedulerStart);
   const scheduler = worker.slice(schedulerStart, schedulerEnd);
   assert.ok(scheduler.includes("await processDueKingdomQueues(env)"));
   assert.ok(scheduler.includes("await processDueMarches(env)"));
   assert.ok(scheduler.indexOf("await processDueKingdomQueues(env)") < scheduler.indexOf("await processDueMarches(env)"));
-  assert.ok(worker.includes('console.error("scheduled_march_resolution_failed"'));
+  assert.match(worker,/onFailure:\(kingdomId,error\)=>console\.error\(\s*"scheduled_march_resolution_failed",kingdomId,String\(error\?\.message\|\|error\)/);
 });
 
 test("Cloudflare agenda a resolução automática de marchas a cada minuto", async () => {

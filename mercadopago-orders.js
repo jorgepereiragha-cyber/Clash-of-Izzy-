@@ -224,29 +224,41 @@ async function handleWebhook(request, env, ctx) {
   if (purchase.product_kind === "vip_package") {
     if (levelPack) {
       common.push(...levelPackGrantStatements(env.DB, purchase.id, purchase.product_id, levelPack));
+    } else if(purchase.product_name===MASTER_PACK_NAME){
+      common.push(...masterGrantStatements(env.DB,purchase.id));
     } else {
       common.push(env.DB.prepare(
         "UPDATE players SET gems=gems+(SELECT gems_amount FROM purchase_requests WHERE id=?) WHERE id=? AND changes()=1"
       ).bind(purchase.id, purchase.player_id));
-      if(purchase.product_name===MASTER_PACK_NAME)common.push(...masterGrantStatements(env.DB,purchase.id));
     }
   } else if (purchase.product_kind === "skin") {
     common.push(env.DB.prepare(
       "INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT ?,? WHERE changes()=1"
     ).bind(purchase.player_id, purchase.product_id));
   }
+  const isMaster=purchase.product_kind==="vip_package"&&purchase.product_name===MASTER_PACK_NAME;
   common.push(env.DB.prepare(
     "UPDATE mercadopago_orders SET fulfilled_at=CURRENT_TIMESTAMP WHERE order_id=? AND fulfilled_at IS NULL " +
     "AND EXISTS(SELECT 1 FROM purchase_requests WHERE id=? AND status='approved')" +
-    (levelPack ? " AND EXISTS(SELECT 1 FROM level_pack_claims WHERE request_id=?)" : "")
-  ).bind(...(levelPack ? [orderId,purchase.id,purchase.id] : [orderId,purchase.id])));
+    (levelPack ? " AND EXISTS(SELECT 1 FROM level_pack_claims WHERE request_id=?)" : isMaster ? " AND EXISTS(SELECT 1 FROM master_bonus_claims WHERE request_id=?)" : "")
+  ).bind(...(levelPack||isMaster ? [orderId,purchase.id,purchase.id] : [orderId,purchase.id])));
   try {
-    const results = await env.DB.batch(common);
-    // Quando dois pedidos distintos foram pagos para um pacote de compra unica,
-    // nao conceder duas vezes nem marcar a segunda order como entregue.
-    if (levelPack && purchase.status === "pending" && !results[2]?.meta?.changes) {
-      console.error("level_pack_duplicate_payment_requires_reconciliation", orderId, purchase.id);
-      return ctx.json({received:true,processed:true,manualReview:true});
+    await env.DB.batch(common);
+    // Use the committed claim, not a stale pending snapshot or the current batch's
+    // insertion count: concurrent notifications of the same paid order are replays.
+    if(isMaster){
+      const claim=await env.DB.prepare("SELECT 1 AS granted FROM master_bonus_claims WHERE request_id=?").bind(purchase.id).first();
+      if(!claim){
+        console.error("master_payment_requires_reconciliation",orderId,purchase.id);
+        return ctx.json({received:true,processed:true,manualReview:true});
+      }
+    }
+    if(levelPack){
+      const claim=await env.DB.prepare("SELECT 1 AS granted FROM level_pack_claims WHERE request_id=?").bind(purchase.id).first();
+      if(!claim){
+        console.error("level_pack_duplicate_payment_requires_reconciliation", orderId, purchase.id);
+        return ctx.json({received:true,processed:true,manualReview:true});
+      }
     }
   } catch (error) {
     console.error("mercadopago_fulfillment_failed", orderId, String(error?.message || error));

@@ -38,11 +38,14 @@
     "GAME_4X_SYSTEMS_ENABLED": "false",
     "LEVEL_PACKS_ENABLED": "false",
     "LEVEL_PACKS_PUBLIC_ENABLED": "false",
-    "LEVEL_PACKS_PROPOSED_PRICES_APPROVED": "false"
+    "LEVEL_PACKS_PROPOSED_PRICES_APPROVED": "false",
+    "MASTER_PACK_ENABLED": "false",
+    "LIVE_PAYMENTS_APPROVED": "false"
   },
   "previews": {
     "vars": {
-      "ENVIRONMENT": "preview"
+      "ENVIRONMENT": "preview",
+      "LIVE_PAYMENTS_APPROVED": "false"
     },
     "d1_databases": [
       {

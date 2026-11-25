@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
-import { heroView, HERO_TEMPLATES, HERO_RARITY, HERO_SUMMON_RARITY_ODDS, getHeroCombatBonuses, getHeroSummonOdds } from "../hero-catalog.js";
+import { heroView, HERO_TEMPLATES, HERO_RARITY, HERO_SUMMON_RARITY_ODDS, getHeroCombatBonuses, getHeroSummonOdds, getHeroTalent } from "../hero-catalog.js";
 
 test("Kael tem ficha canônica, retrato e progressão consistente", () => {
   const base = heroView({ hero_key: "kael_sunwarden", rarity: "blue", level: 1, stars: 1 });
@@ -192,4 +192,66 @@ test("ficha dourada mantém raridade canônica mesmo se D1 legada gravou legenda
   const seasonal=heroView({hero_key:"odin_awakened",rarity:"purple",seasonal_rarity:"mythic"});
   assert.equal(seasonal.rarity_key,"purple");
   assert.equal(seasonal.rarity_label,"Mítico");
+});
+
+test("star progression reports only valid next-star costs for canonical rarity",()=>{
+  const before=heroView({hero_key:"kael_sunwarden",rarity:"gold",stars:1,fragments:100});
+  assert.equal(before.can_evolve,true);
+  assert.equal(before.fragments_to_next,10);
+  const max=heroView({hero_key:"kael_sunwarden",rarity:"gold",stars:6,fragments:1000});
+  assert.equal(max.max_stars,6);
+  assert.equal(max.can_evolve,false);
+  assert.equal(max.fragments_to_next,null);
+});
+
+test("70 heróis têm talentos limitados, com marcos de nível e estrelas",()=>{
+ const seasonal=["odin_awakened","thor_ragnarok","freya_vanir","loki_chaos","valhalla_king"];
+ const rows=[...Object.entries(HERO_TEMPLATES).map(([hero_key,def])=>({hero_key,rarity:def.rarity})),...seasonal.map(hero_key=>({hero_key,rarity:"purple"}))];
+ assert.equal(rows.length,70);
+ for(const row of rows){
+  const rarity=HERO_RARITY[row.rarity];
+  const start=getHeroTalent({...row,level:1,stars:1});
+  assert.ok(start,row.hero_key);
+  assert.equal(start.rank,0);
+  const m=start.nextMilestone;
+  assert.equal(getHeroTalent({...row,level:m.level,stars:1}).rank,0);
+  assert.equal(getHeroTalent({...row,level:m.level,stars:m.stars}).rank,1);
+  const end=getHeroTalent({...row,level:rarity.maxLevel,stars:rarity.maxStars});
+  assert.equal(end.rank,3);
+  assert.equal(end.nextMilestone,null);
+  assert.ok(end.attackPercent+end.defensePercent+end.healthPercent+end.criticalChancePercent<=0.300000001);
+  const card=heroView({...row,level:rarity.maxLevel,stars:rarity.maxStars});
+  assert.deepEqual(card.talent,end);
+  assert.ok(card.combat_bonuses.attackPercent<=20&&card.combat_bonuses.defensePercent<=20);
+  assert.ok(card.combat_bonuses.healthPercent<=3&&card.combat_bonuses.criticalChancePercent<=2);
+ }
+ for(const key of ["__proto__","constructor","unknown"]){
+  assert.equal(getHeroTalent({hero_key:key}),null);
+  assert.deepEqual(getHeroCombatBonuses({hero_key:key}),{attackPercent:0,defensePercent:0,healthPercent:0,criticalChancePercent:0});
+ }
+});
+
+test("expanded heroes have role-specific vitality and critical, all progress monotonically",()=>{
+ const rows=Object.entries(HERO_TEMPLATES);
+ for(const [hero_key,def] of rows){
+  const rarity=HERO_RARITY[def.rarity];let prev=null;
+  for(let level=1;level<=rarity.maxLevel;level++){
+   const next=getHeroCombatBonuses({hero_key,level,stars:rarity.maxStars});
+   assert.ok(Object.values(next).every(Number.isFinite));
+   if(prev)for(const key of Object.keys(next))assert.ok(next[key]>=prev[key],hero_key+" "+key);
+   prev=next;
+  }
+ }
+ const expanded=rows.filter(([key])=>key.startsWith("eldoria_"));
+ assert.equal(expanded.length,47);
+ for(const [hero_key,def] of expanded){
+  const rarity=HERO_RARITY[def.rarity],bonus=getHeroCombatBonuses({hero_key,level:rarity.maxLevel,stars:rarity.maxStars});
+  if(def.type==="suporte")assert.ok(bonus.healthPercent>=2);
+  if(def.type==="arqueiro")assert.ok(bonus.criticalChancePercent>=1);
+ }
+});
+test("commander selection uses consistent deterministic tie break",async()=>{
+ const worker=await readFile(new URL("../worker.js",import.meta.url),"utf8");
+ assert.doesNotMatch(worker,/ORDER BY hi\.level DESC,hi\.stars DESC,h\.id LIMIT 1/);
+ assert.match(worker,/activeCommanderHeroId:activeHeroId/);
 });

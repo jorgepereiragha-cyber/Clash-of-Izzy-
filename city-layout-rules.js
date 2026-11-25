@@ -58,6 +58,8 @@ function sizeCase(column) {
     " ELSE 5 END";
 }
 
+export const specialCityEnabled=env=>env.GAME_4X_SYSTEMS_ENABLED==="true"&&(["beta","production","preview"].includes(env.ENVIRONMENT));
+export const SPECIAL_CITY_CLEAR="NOT EXISTS(SELECT 1 FROM city_special_buildings s WHERE s.kingdom_id=? AND s.grid_x<? AND s.grid_x+s.width>? AND s.grid_z<? AND s.grid_z+s.height>?)";
 const ATOMIC_MOVE_SQL =
   "UPDATE kingdom_buildings SET position_x=?,position_z=? " +
   "WHERE kingdom_id=? AND building_type=? AND position_x=? AND position_z=? " +
@@ -94,7 +96,9 @@ export async function moveCityBuilding(env, kingdomId, body) {
   const binds=[x,z,kingdomId,type,fromX,fromZ,kingdomId,type,
     x+footprint.width,x,z+footprint.height,z];
   if(advanced)binds.push(kingdomId,x+footprint.width,x,z+footprint.height,z);
-  const update=await env.DB.prepare(ATOMIC_MOVE_SQL+defenseGuard).bind(...binds).run();
+  const specialGuard=specialCityEnabled(env)?" AND "+SPECIAL_CITY_CLEAR:"";
+  if(specialGuard)binds.push(kingdomId,x+footprint.width,x,z+footprint.height,z);
+  const update=await env.DB.prepare(ATOMIC_MOVE_SQL+defenseGuard+specialGuard).bind(...binds).run();
   if (Number(update?.meta?.changes) !== 1) {
     return { ok: false, status: 409, error: "Posição ocupada ou cidade desatualizada. Sincronize e tente novamente." };
   }

@@ -35,7 +35,7 @@ test("kingdom progressively loads Three.js with a safe 2D fallback", () => {
   assert.match(renderer, /new THREE\.WebGLRenderer/);
   assert.match(renderer, /WebGL indisponível; mantendo arte procedural 2D/);
   assert.match(renderer, /coi:kingdom-render/);
-  assert.match(renderer, /Math\.min\(9, qualityProfile\?\.maxBuildings \|\| 9\)/);
+  assert.match(renderer, /Math\.min\(16, qualityProfile\?\.maxBuildings \|\| 9\)/);
   assert.match(renderer, /const \{ x, z \} = cityWorldPoint\(b, i\)/);
   assert.match(renderer, /frameCityBuildings\(list\)/);
   assert.match(renderer, /Number\(building\?\.position_x\)/);
@@ -50,7 +50,7 @@ test("bundled CC0 models can render props and only display units present in the 
   assert.match(renderer, /manifestUnits = Array\.isArray\(manifest\.units\)/);
   assert.match(renderer, /function renderManifestProps\(\)/);
   assert.match(renderer, /function renderKingdomTroops\(troops = \[\]\)/);
-  assert.match(renderer, /unit\?\.unit_type === "archer"/);
+  assert.match(renderer, /planArmyFigures\(troops, qualityProfile\?\.tier\)/);
   assert.match(renderer, /cloneSkinned\(asset\.template\)/);
   assert.match(renderer, /new THREE\.AnimationMixer\(root\)/);
   assert.match(kingdom, /window\.__coiKingdomTroops=state\.troops\|\|\[\]/);
@@ -291,7 +291,7 @@ test("GLB assets are normalized to a mobile building footprint and grounded at y
 test("optional GLB assets load only for present building types with bounded concurrency", () => {
   assert.ok(renderer.includes("const neededTypes = new Set"));
   assert.ok(renderer.includes("glbLoadPromises.has(entry.key)"));
-  assert.ok(renderer.includes("Math.min(3, queue.length)"));
+  assert.ok(renderer.includes("const glbLoadLanes = Array.from({ length: 3 }"));
   assert.ok(renderer.includes("loadOptionalGlbAssets(list, latestTroops)"));
   assert.ok(renderer.includes("loadOptionalGlbAssets(window.__coiKingdomBuildings, latestTroops)"));
   assert.ok(renderer.includes("manifestLoad = null"));
@@ -299,7 +299,7 @@ test("optional GLB assets load only for present building types with bounded conc
 
 test("failed optional GLB downloads preserve procedural models and allow later retries", () => {
   assert.ok(renderer.includes("GLB assets not ready; procedural models remain active"));
-  assert.ok(renderer.includes("glbLoadPromises.delete(key)"));
+  assert.ok(renderer.includes("glbLoadPromises.delete(entry.key)"));
   assert.ok(renderer.includes("manifestLoad = null"));
 });
 
@@ -379,4 +379,61 @@ test("the city ambient layer is loaded and respects Android power and lifecycle 
   assert.doesNotMatch(ambient, /new THREE\.WebGLRenderer/);
   assert.match(ambient, /FRAME_INTERVAL_MS = 1000 \/ 30/);
   assert.match(ambient, /timestamp - lastFrame < FRAME_INTERVAL_MS/);
+});
+
+
+test("WebGL shows 8/12/16 buildings by tier and Canvas keeps nine accessible slots", () => {
+  // Assert the cap semantically rather than counting text occurrences: resize
+  // also needs the same limit, and refactors may add legitimate call sites.
+  assert.match(renderer, /Math\.min\(16, qualityProfile\?\.maxBuildings \|\| 9\)/);
+  assert.match(renderer, /const visibleBuildings = latestBuildings\.slice\(0, Math\.min\(16,/);
+  assert.match(renderer, /publishBuildingHitTargets\(list\)/);
+  assert.match(renderer, /const columns = latestBuildings\.length > 9 \? 4 : 3/);
+  assert.match(kingdom, /buildings\.slice\(0,16\)\.map\(\(b,i\)=>/);
+  assert.ok(kingdom.includes("i>=9?' hidden':''"));
+  assert.match(kingdom, /button\.hidden=index>=9/);
+  assert.match(kingdom, /const order=buildings\.slice\(0,9\)/);
+  assert.ok(kingdom.includes('city.classList.toggle("dense-3d",positions.length>9)'));
+  assert.ok(kingdom.includes('.city .building[hidden]{display:none!important}'));
+});
+
+
+test("WebGL loss returns focus from hidden camera tools to a visible Canvas building", () => {
+  assert.match(kingdom, /const cameraHadFocus=!!cityCameraControls\?\.contains\(document\.activeElement\)/);
+  assert.match(kingdom, /if\(cameraHadFocus\)city\.querySelector\("\[data-building\]:not\(\[hidden\]\)"\)\?\.focus\(\{preventScroll:true\}\)/);
+  assert.match(kingdom, /button\.hidden=index>=9/);
+});
+
+test("city camera touch zoom is view-only, bounded, and disabled after WebGL loss", () => {
+  assert.match(kingdom, /id="coiCityCameraControls"/);
+  assert.match(kingdom, /data-city-zoom="in"/);
+  assert.match(kingdom, /data-city-zoom="out"/);
+  assert.match(kingdom, /data-city-zoom="reset"/);
+  assert.match(kingdom, /aria-label="Aproximar câmera da cidade"/);
+  assert.match(kingdom, /coi:kingdom-3d-ready/);
+  assert.match(kingdom, /if\(cityCameraControls\)cityCameraControls\.hidden=true/);
+  assert.match(renderer, /camera\.zoom = fitZoom \* cameraZoomFactor/);
+  assert.match(renderer, /new THREE\.Vector3\(x, \.18, z\)\.applyMatrix4\(camera\.matrixWorldInverse\)/);
+  assert.match(renderer, /viewportWidth \/ projectedWidth, viewportHeight \/ projectedHeight/);
+  assert.match(renderer, /if \(visibleBuildings\.length\) frameCityBuildings\(visibleBuildings\)/);
+  assert.match(renderer, /Math\.max\(0\.7, Math\.min\(1\.6/);
+  assert.match(renderer, /if \(disposed \|\| cinematicCaptureActive \|\| !renderer \|\| !scene \|\| !camera\) return/);
+  assert.match(renderer, /publishBuildingHitTargets\(visible\)/);
+  assert.equal(renderer.split('window.removeEventListener("coi:kingdom-zoom", kingdomZoomHandler)').length - 1, 2);
+});
+
+test("special landmarks render only persisted distinct bounded positions",async()=>{
+ const {planSpecialCityLandmarks}=await import("../scripts/kingdom-special-landmarks.js");
+ assert.deepEqual(planSpecialCityLandmarks([
+  {building_type:"dragon_nest",grid_x:22,grid_z:-25,width:3,height:3},
+  {building_type:"dragon_nest",grid_x:0,grid_z:0,width:3,height:3},
+  {building_type:"summon_altar",grid_x:23,grid_z:0,width:3,height:3},
+  {building_type:"summon_altar",grid_x:0,grid_z:0,width:3,height:3},
+  {building_type:"castle",grid_x:0,grid_z:0,width:3,height:3}
+ ]),[{building_type:"dragon_nest",position_x:23.5,position_z:-23.5,level:1},{building_type:"summon_altar",position_x:1.5,position_z:1.5,level:1}]);
+ assert.deepEqual(planSpecialCityLandmarks(null),[]);
+ assert.match(renderer,/function createSpecialLandmark/);
+ assert.match(renderer,/scene\.add\(group\);activeModels\.push\(group\)/);
+ assert.match(renderer,/specialLandmarks:activeModels\.filter/);
+ assert.match(kingdom,/window\.__coiKingdomSpecialBuildings=state\.specialCityBuildings/);
 });

@@ -1,5 +1,5 @@
 // Defesas persistidas no D1; a autoridade de custo, grid e limite pertence ao Worker.
-import { CITY_FOOTPRINTS,CITY_GRID_MIN,CITY_GRID_MAX } from "./city-layout-rules.js";
+import { CITY_FOOTPRINTS,CITY_GRID_MIN,CITY_GRID_MAX,specialCityEnabled,SPECIAL_CITY_CLEAR } from "./city-layout-rules.js";
 
 export const DEFENSE_CATALOG=Object.freeze({
   tower:Object.freeze({name:"Torre de vigia",width:2,height:2,minCastleLevel:5,wood:150,stone:240,iron:60,power:85}),
@@ -49,13 +49,14 @@ export async function placeCityDefense(env,kingdomId,body){
   const sql="UPDATE kingdoms SET wood=wood-?,stone=stone-?,iron=iron-?,updated_at=CURRENT_TIMESTAMP "+
     "WHERE id=? AND wood>=? AND stone>=? AND iron>=? AND castle_level>=? "+
     "AND (SELECT COUNT(*) FROM city_defenses WHERE kingdom_id=? AND defense_type=?)<? AND "+
-    occupiedBuilding+" AND "+occupiedDefense();
+    occupiedBuilding+" AND "+occupiedDefense()+(specialCityEnabled(env)?" AND "+SPECIAL_CITY_CLEAR:"");
   const debit=env.DB.prepare(sql).bind(
     spec.wood,spec.stone,spec.iron,kingdomId,
     spec.wood,spec.stone,spec.iron,spec.minCastleLevel,
     kingdomId,type,countLimit,
     kingdomId,x+spec.width,x,z+spec.height,z,
-    kingdomId,x+spec.width,x,z+spec.height,z
+    kingdomId,x+spec.width,x,z+spec.height,z,
+    ...(specialCityEnabled(env)?[kingdomId,x+spec.width,x,z+spec.height,z]:[])
   );
   const place=env.DB.prepare("INSERT INTO city_defenses(kingdom_id,defense_type,grid_x,grid_z,width,height) "+
     "SELECT ?,?,?,?,?,? WHERE changes()=1")
@@ -79,10 +80,10 @@ export async function movePlacedDefense(env,kingdomId,body){
   const spec=DEFENSE_CATALOG[defense.defense_type];
   if(!spec||!locationBounds(x,z,spec))return {ok:false,status:400,error:"Posição inválida."};
   const sql="UPDATE city_defenses SET grid_x=?,grid_z=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND kingdom_id=? AND grid_x=? AND grid_z=? "+
-    "AND "+occupiedBuilding+" AND "+occupiedDefense(true);
+    "AND "+occupiedBuilding+" AND "+occupiedDefense(true)+(specialCityEnabled(env)?" AND "+SPECIAL_CITY_CLEAR:"");
   const moved=await env.DB.prepare(sql).bind(x,z,id,kingdomId,defense.grid_x,defense.grid_z,
     kingdomId,x+spec.width,x,z+spec.height,z,
-    kingdomId,id,x+spec.width,x,z+spec.height,z).run();
+    kingdomId,id,x+spec.width,x,z+spec.height,z,...(specialCityEnabled(env)?[kingdomId,x+spec.width,x,z+spec.height,z]:[])).run();
   if(Number(moved?.meta?.changes)!==1)return {ok:false,status:409,error:"Defesa alterada ou posição ocupada."};
   return {ok:true,id,gridX:x,gridZ:z};
 }
