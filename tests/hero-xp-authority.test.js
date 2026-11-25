@@ -22,7 +22,9 @@ test("level-up XP remainder is authoritative, never restored from old equipment 
  const {sql,env}=fixture();
  try{
   await syncHeroSystems(env,1);
+  const before=sql.prepare("SELECT total_changes() AS n").get().n;
   await syncHeroSystems(env,1);
+  assert.equal(sql.prepare("SELECT total_changes() AS n").get().n,before);
   const inventory=sql.prepare("SELECT level,experience FROM hero_inventory WHERE kingdom_id=1 AND hero_key='kael_sunwarden'").get();
   const mirror=sql.prepare("SELECT level,experience,hero_name FROM heroes WHERE kingdom_id=1 AND hero_key='kael_sunwarden'").get();
   assert.deepEqual([inventory.level,inventory.experience],[4,10]);
