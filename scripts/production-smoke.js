@@ -287,8 +287,13 @@ export async function runProductionSmokeTests({
   assert(serviceWorker.includes("/admin.html"), "PWA não inclui o painel Master.");
   assert(serviceWorker.includes("/valhalla-admin-ui.js"), "PWA não inclui o controlador administrativo de Valhalla.");
   assert(serviceWorker.includes("/styles/valhalla-admin.css"), "PWA não inclui os estilos administrativos de Valhalla.");
-  assert(serviceWorker.includes("/styles/landing.css"), "PWA não inclui os estilos da landing page.");
-  assert(serviceWorker.includes("/landing.js"), "PWA não inclui o controlador da landing page.");
+  if(androidPortalUi){
+    assert(serviceWorker.includes("/portal.html"), "PWA não inclui a entrada do portal Android.");
+  }else{
+    // Diagnostic compatibility with previously published landing releases.
+    assert(serviceWorker.includes("/styles/landing.css"), "PWA não inclui os estilos da landing page.");
+    assert(serviceWorker.includes("/landing.js"), "PWA não inclui o controlador da landing page.");
+  }
   assert(serviceWorker.includes("/valhalla-shop-ui.js"), "PWA não inclui a interface da Loja de Valhalla.");
   assert(serviceWorker.includes("/styles/valhalla-shop.css"), "PWA não inclui os estilos da Loja de Valhalla.");
   assert(!serviceWorker.includes("/scripts/cinematic/recorder-ui.js"),

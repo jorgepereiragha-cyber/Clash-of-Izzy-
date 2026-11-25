@@ -187,6 +187,11 @@ test("production smoke aceita entrada exclusivamente promocional com APK oficial
     if (path === "/index.html") return makeResponse(
       '<html><meta http-equiv="refresh" content="0;url=/portal.html"><a href="/portal.html">Baixar aplicativo</a></html>',
       200, "text/html; charset=utf-8");
+    if (path === "/sw.js") {
+      const old = await legacy(url);
+      return makeResponse((await old.text()).replace('"/styles/landing.css","/landing.js"', '"/portal.html"'), 200, "text/javascript");
+    }
+    if (path === "/landing.js" || path === "/styles/landing.css") throw Error("Modern smoke must not fetch removed landing assets");
     if (path === "/portal.html") return makeResponse(
       '<html><h1>CLASH OF IZZY</h1><a id="download-apk">Baixar aplicativo Android</a><script>fetch("releases/latest");const ext=".sha256";</script></html>',
       200, "text/html; charset=utf-8");

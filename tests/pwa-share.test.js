@@ -11,13 +11,17 @@ test("public landing exposes promotional Android APK download only", async () =>
   assert.doesNotMatch(page, /id="play-now"|href="\/kingdom\.html"|beforeinstallprompt/);
 });
 
-test("PWA sharing uses the OS share sheet with safe fallbacks and preserves referral codes", async () => {
-  const script = await read("landing.js");
-  assert.ok(script.includes('typeof navigator.share === "function"'));
-  assert.ok(script.includes("navigator.share(payload)"));
-  assert.ok(script.includes("navigator.clipboard.writeText(shareUrl)"));
-  assert.ok(script.includes("https://wa.me/?text="));
-  assert.ok(script.includes("/^izzy_[a-f0-9]{32}$/"));
+test("obsolete landing assets are absent and no current HTML depends on them", async () => {
+  for (const path of ["landing.js","styles/landing.css"]) {
+    await assert.rejects(read(path), {code:"ENOENT"});
+  }
+  const {readdir}=await import("node:fs/promises");
+  for(const dir of ["","public-portal/"]){
+    const files=await readdir(new URL("../"+dir,import.meta.url));
+    for(const file of files.filter(name=>name.endsWith(".html"))){
+      assert.doesNotMatch(await read(dir+file),/landing\.js|styles\/landing\.css/,dir+file);
+    }
+  }
 });
 
 test("new landing assets invalidate the previous offline shell cache", async () => {
@@ -26,7 +30,8 @@ test("new landing assets invalidate the previous offline shell cache", async () 
   assert.ok(cacheVersion > 41, `expected a new shell cache above v41, got v${cacheVersion || "missing"}`);
   assert.ok(serviceWorker.includes('"/assets/art/skins/pantheon-relics.svg"'));
   assert.ok(serviceWorker.includes('"/index.html"'));
-  assert.ok(serviceWorker.includes('"/landing.js"'));
+  assert.ok(serviceWorker.includes('"/portal.html"'));
+  assert.doesNotMatch(serviceWorker,/landing\.js|styles\/landing\.css/);
   assert.ok(serviceWorker.includes('"/assets/art/heroes/portraits.svg"'));
   assert.ok(serviceWorker.includes('"/styles/heroes.css"'));
 });
