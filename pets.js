@@ -160,15 +160,16 @@ async function activatePet(env, kingdomId, body) {
   if (!owned) return reply({ error: "Desbloqueie este mascote antes de ativá-lo." }, 404);
 
   const result = await env.DB.batch([
-    env.DB.prepare("UPDATE kingdom_pets SET is_active=0,updated_at=unixepoch() WHERE kingdom_id=? AND is_active=1 AND EXISTS(SELECT 1 FROM kingdom_pets kp JOIN pet_catalog pc ON pc.id=kp.pet_id WHERE kp.kingdom_id=? AND kp.pet_id=? AND pc.active=1)").bind(kingdomId, kingdomId, petId),
-    env.DB.prepare("UPDATE kingdom_pets SET is_active=1,updated_at=unixepoch() WHERE kingdom_id=? AND pet_id=? AND EXISTS(SELECT 1 FROM pet_catalog WHERE id=? AND active=1)").bind(kingdomId, petId, petId),
+    env.DB.prepare("UPDATE kingdom_pets SET is_active=0,updated_at=unixepoch() WHERE kingdom_id=? AND is_active=1 AND pet_id<>? AND EXISTS(SELECT 1 FROM kingdom_pets kp JOIN pet_catalog pc ON pc.id=kp.pet_id WHERE kp.kingdom_id=? AND kp.pet_id=? AND pc.active=1)").bind(kingdomId, petId, kingdomId, petId),
+    env.DB.prepare("UPDATE kingdom_pets SET is_active=1,updated_at=unixepoch() WHERE kingdom_id=? AND pet_id=? AND is_active=0 AND EXISTS(SELECT 1 FROM pet_catalog WHERE id=? AND active=1)").bind(kingdomId, petId, petId),
     env.DB.prepare(
       "INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) " +
       "SELECT ?,'pet_activated',? WHERE changes()>0"
     ).bind(kingdomId, JSON.stringify({ pet_id: petId }))
   ]);
-  if (!result[1]?.meta?.changes) return reply({ error: "Não foi possível ativar o mascote." }, 409);
-  return reply({ success: true, pet_id: petId, bonuses: await getPetBonuses(env, kingdomId) });
+  const bonuses = await getPetBonuses(env, kingdomId);
+  if (!result[1]?.meta?.changes && bonuses.activePetId !== petId) return reply({ error: "Não foi possível ativar o mascote." }, 409);
+  return reply({ success: true, replayed: !result[1]?.meta?.changes, pet_id: petId, bonuses });
 }
 
 async function existingFeed(env, kingdomId, requestKey) {
