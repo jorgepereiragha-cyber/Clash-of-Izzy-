@@ -1,7 +1,7 @@
 # Isolated Millennium A.D. art conversion. No mod scripts are executed.
 import bpy, pathlib, sys
 root=pathlib.Path(sys.argv[sys.argv.index("--")+1]).resolve()
-for name in ("caro_fortress_struct",):
+for name in ("caro_fortress_struct", "caro_farmstead", "caro_market", "caro_blacksmith", "caro_wall_long", "caro_wall_gate", "caro_defense_tower", "caro_storehouse"):
     bpy.ops.wm.read_factory_settings(use_empty=True)
     source=root/(name+".dae")
     bpy.ops.wm.collada_import(filepath=str(source))
