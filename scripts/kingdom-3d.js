@@ -1167,6 +1167,26 @@ if (host && "WebGLRenderingContext" in window) {
     const fitZoom = Math.min(1, viewportWidth / projectedWidth, viewportHeight / projectedHeight);
     camera.zoom = fitZoom * cameraZoomFactor;
     camera.updateProjectionMatrix();
+    const castle = activeModels.find(model => model.userData.coIType === "castle");
+    if (castle) {
+      // Fit the actual castle and its ornaments before applying manual zoom.
+      const bounds = new THREE.Box3().setFromObject(castle);
+      const corner = new THREE.Vector3();
+      let extent = 0;
+      for (const x of [bounds.min.x, bounds.max.x]) {
+        for (const y of [bounds.min.y, bounds.max.y]) {
+          for (const z of [bounds.min.z, bounds.max.z]) {
+            corner.set(x,y,z).project(camera);
+            extent = Math.max(extent, Math.abs(corner.x), Math.abs(corner.y));
+          }
+        }
+      }
+      const safeExtent = .94 * cameraZoomFactor;
+      if (extent > safeExtent && Number.isFinite(extent)) {
+        camera.zoom *= safeExtent / extent;
+        camera.updateProjectionMatrix();
+      }
+    }
   }
   function publishBuildingHitTargets(buildings = latestBuildings) {
     if (!host || !camera || !renderer || disposed) return;
@@ -1206,7 +1226,6 @@ if (host && "WebGLRenderingContext" in window) {
     // Keep deterministic world-space building anchors. HTML hit targets are
     // projected into screen coordinates from this same camera below.
     const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
-    frameCityBuildings(list);
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
       const template = glbTemplates.get(b.building_type);
@@ -1234,6 +1253,7 @@ if (host && "WebGLRenderingContext" in window) {
       // Small decorations have no extra animation or shadow draw calls.
       scene.add(group);activeModels.push(group);
     }
+    frameCityBuildings(list);
     updateCityStreets();
     updateCityContactShadows();
     renderer.render(scene, camera);
