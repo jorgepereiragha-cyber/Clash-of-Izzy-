@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
-import { marchVisualProgress, marchVisualPoint, planMarchFormation } from "./scripts/march-visual-path.js";
+import { marchVisualProgress, marchVisualPoint, planMarchFormation, planMarchRepresentatives } from "./scripts/march-visual-path.js";
 import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-state.js";
 
 /*
@@ -423,17 +423,47 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     }
   }
 
-  function createSoldier(parent, material, x, z, variant = 0) {
+  function createSoldier(parent, material, x, z, variant = 0, type = "spearman") {
     const soldier = new THREE.Group();
     soldier.position.set(x, .1, z);
+    soldier.userData.marchLegs=[];
+    const siege=["catapult","ram","trebuchet"].includes(type);
+    if(siege){
+      box(soldier,.62,.23,.78,shared.wood,0,.22,0);
+      for(const sx of [-.35,.35])for(const sz of [-.25,.25]){
+        const wheel=makeMesh(new THREE.CylinderGeometry(.15,.15,.09,6),shared.leather,soldier,sx,.15,sz);
+        wheel.rotation.z=Math.PI/2;
+      }
+      if(type==="ram")box(soldier,.24,.24,1.0,shared.spear,0,.48,.12);
+      else {const arm=box(soldier,.12,.86,.12,shared.wood,0,.65,0);arm.rotation.x=-.6;box(soldier,.29,.17,.22,shared.spear,0,1,.28);}
+      parent.add(soldier);return soldier;
+    }
+    const mounted=type==="cavalry"||type==="knight";
+    if(mounted){
+      box(soldier,.4,.36,.72,shared.leather,0,.31,0);
+      box(soldier,.22,.3,.24,shared.leather,0,.55,.34);
+      for(const sx of [-.13,.13])for(const sz of [-.24,.24])box(soldier,.09,.25,.09,shared.leather,sx,.13,sz);
+    }
     const body = makeMesh(new THREE.CylinderGeometry(.22, .27, .78, 6), material, soldier, 0, .57, 0);
     body.castShadow = quality !== "low";
     makeMesh(new THREE.SphereGeometry(.19, 7, 6), shared.skin, soldier, 0, 1.12, 0);
     cone(soldier, .25, .32, shared.gold, 0, 1.34, 0, 5);
     box(soldier, .38, .43, .12, shared.leather, variant % 2 ? -.28 : .28, .6, .04);
-    const spear = makeMesh(new THREE.CylinderGeometry(.025, .035, 1.35, 5), shared.wood, soldier, .3, 1.14, -.08);
-    spear.rotation.z = -.16;
-    cone(soldier, .085, .24, shared.spear, .3, 1.85, -.08, 4);
+    if(type==="archer"||type==="crossbowman"){
+      const bow=makeMesh(new THREE.TorusGeometry(.22,.025,4,10,Math.PI),shared.wood,soldier,.31,.73,.12);
+      bow.rotation.z=-Math.PI/2;
+      if(type==="crossbowman")box(soldier,.1,.08,.38,shared.wood,.31,.73,.12);
+    }else if(type==="mage"){
+      box(soldier,.045,.98,.045,shared.wood,.31,.8,0);
+      makeMesh(new THREE.OctahedronGeometry(.11),shared.gold,soldier,.31,1.33,0);
+    }else if(type==="swordsman"||type==="militia"||type==="knight"){
+      box(soldier,.08,.58,.035,shared.spear,.31,.91,0);
+      box(soldier,.19,.045,.065,shared.gold,.31,.65,0);
+    }else{
+      const spear = makeMesh(new THREE.CylinderGeometry(.025,.035,1.35,5),shared.wood,soldier,.3,1.14,-.08);
+      spear.rotation.z=-.16;
+      cone(soldier,.085,.24,shared.spear,.3,1.85,-.08,4);
+    }
     // Each soldier has a real parent; previous code allocated invisible meshes.
     const legs=[];
     for(const side of [-1,1]){
@@ -452,7 +482,9 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     const formation = planMarchFormation(march.march_type, quality);
     const material = formation.color === "red" ? shared.redTroop :
       formation.color === "green" ? shared.forest : formation.color === "gold" ? shared.neutral : shared.blueTroop;
-    const soldiers = formation.positions.map(([x,z],index)=>createSoldier(group,material,x,z,index));
+    const representatives=planMarchRepresentatives(march.units_json,formation.positions.length);
+    const positions=representatives.length?formation.positions.slice(0,representatives.length):formation.positions;
+    const soldiers=positions.map(([x,z],index)=>createSoldier(group,material,x,z,index,representatives[index]||"spearman"));
     const flagPole = box(group, .07, 1.45, .07, shared.gold, 0, 1.25, -.72);
     flagPole.castShadow = false;
     box(group, .67, .35, .06, material, .3, 1.73, -.72);
@@ -491,8 +523,8 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
       const moving=!reduceMotion && quality!=="low" && progress>0 && progress<1;
       for(const [index,soldier] of march.soldiers.entries()){
         const phase=moving?Math.sin(now*.008+index*1.3):0;
-        soldier.userData.marchLegs[0].rotation.x=phase*.38;
-        soldier.userData.marchLegs[1].rotation.x=-phase*.38;
+        const legs=soldier.userData.marchLegs;
+        if(legs.length===2){legs[0].rotation.x=phase*.38;legs[1].rotation.x=-phase*.38;}
       }
     }
   }

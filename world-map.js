@@ -1,4 +1,5 @@
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
+import { readMarchComposition } from "./scripts/march-visual-path.js";
 
 const API = "/api";
 const $ = id => document.getElementById(id);
@@ -339,6 +340,8 @@ function renderMarches() {
     const title = make("strong", "", (march.march_type || "Marcha").toUpperCase() + " · " + (territories.get(Number(march.target_territory_id)) || "Território"));
     const date = march.arrives_at ? new Date(march.arrives_at).toLocaleString("pt-BR") : "—";
     card.append(title, make("div", "muted", "Estado: " + march.status), make("div", "muted", "Chegada prevista: " + date));
+    const composition=readMarchComposition(march.units_json);
+    if(composition.length)card.append(make("div","muted","Formação: "+composition.map(u=>UNIT_NAMES[u.type]+" × "+fmt(u.count)).join(" · ")));
     root.append(card);
   }
 }
