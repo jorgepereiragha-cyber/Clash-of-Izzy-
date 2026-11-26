@@ -7,3 +7,6 @@
 
 .coi-equipment-art{display:block;width:100%;height:82px;box-sizing:border-box;padding:10px;margin:0 0 8px;color:var(--gear-ink,#cbd3dc);background:radial-gradient(ellipse at 50% 36%,#33465b,#111b2c 76%);border:1px solid currentColor;border-radius:9px}
 #selected-equipment-art .coi-equipment-art{width:84px;height:84px;margin:0 auto 10px}
+
+.coi-equipment-art.is-painted{object-fit:contain;padding:5px;width:74px;height:74px;margin:0 auto 8px;image-rendering:auto}
+#selected-equipment-art .coi-equipment-art.is-painted{width:74px;height:74px;padding:5px}
