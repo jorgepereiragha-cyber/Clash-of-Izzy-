@@ -577,3 +577,18 @@ test("forest uses broadleaf crowns and bounded instanced tonal variation",()=>{
  assert.match(forest,/setColorAt/);
  assert.match(forest,/instanceColor\.needsUpdate=true/);
 });
+
+
+test("imported dragon animates on balanced graphics while low and reduced motion remain static",()=>{
+ const match=renderer.match(/function canAnimateDragon\(\)\s*\{([\s\S]*?)\n  \}/);
+ assert.ok(match);
+ const canAnimate=new Function("activeDragon","qualityProfile",match[1]);
+ for(const tier of ["low","balanced","high"]){
+   for(const imported of [false,true]){
+     const dragon={figure:{imported}};
+     assert.equal(Boolean(canAnimate(dragon,{tier,prefersReducedMotion:false})),tier==="high"||(tier==="balanced"&&imported));
+     assert.equal(Boolean(canAnimate(dragon,{tier,prefersReducedMotion:true})),false);
+   }
+ }
+ assert.equal(Boolean(canAnimate(null,{tier:"high"})),false);
+});
