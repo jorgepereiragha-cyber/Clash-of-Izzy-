@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 const toUrl = path => new URL("../" + path.replace(/^\/+/, ""), import.meta.url);
 
-test("bundled Kenney assets keep CC0 provenance and a bounded local footprint", () => {
+test("bundled Kenney and KayKit assets keep CC0 provenance and a bounded local footprint", () => {
   assert.equal(manifest.version, 2);
   assert.ok(manifest.models.length >= 2);
   assert.ok(manifest.props.length >= 2);
@@ -13,7 +13,7 @@ test("bundled Kenney assets keep CC0 provenance and a bounded local footprint", 
   for (const asset of [...manifest.models, ...manifest.props, ...manifest.units]) {
     assert.equal(asset.enabled, true);
     assert.equal(asset.license, "CC0-1.0");
-    assert.match(asset.sourceUrl, /^https:\/\/kenney\.nl\/assets\//);
+    assert.match(asset.sourceUrl, /^https:\/\/(?:kenney\.nl\/assets\/|github\.com\/KayKit-Game-Assets\/KayKit-Medieval-Hexagon-Pack-1\.0\/tree\/[a-f0-9]{40}$)/);
     assert.ok(asset.src.startsWith("/assets/3d/"));
     assert.ok(asset.src.endsWith(".glb"));
   }
@@ -55,4 +55,20 @@ test("archer asset includes the idle clip and both original CC0 license files ar
   const forestLicense = await readFile(new URL("../assets/3d/licenses/Kenney-Mini-Forest.txt", import.meta.url), "utf8");
   assert.match(castleLicense, /Creative Commons Zero, CC0/i);
   assert.match(forestLicense, /Creative Commons Zero, CC0/i);
+});
+
+test("KayKit civic models share the local atlas and preserve the original license", async () => {
+  const assets = manifest.models.filter(asset => asset.id.startsWith("kaykit-blue-"));
+  assert.deepEqual(assets.map(asset => asset.type).sort(), ["barracks", "iron_mine", "market"]);
+  assert.match(await readFile(toUrl("/assets/3d/licenses/KayKit-Medieval-Hexagon.txt"), "utf8"), /Creative Commons Zero, CC0/);
+  for (const asset of assets) {
+    const data = await readFile(toUrl(asset.src));
+    const length = data.readUInt32LE(12);
+    const gltf = JSON.parse(data.subarray(20,20+length).toString("utf8").trim());
+    assert.equal(gltf.buffers[0].uri, undefined);
+    assert.ok(gltf.images.length > 0);
+    assert.ok(gltf.images.every(image => image.uri === "hexagons_medieval.png"));
+    assert.equal(data.readUInt32LE(24+length), 0x004e4942);
+    assert.ok(gltf.buffers[0].byteLength <= data.readUInt32LE(20+length));
+  }
 });
