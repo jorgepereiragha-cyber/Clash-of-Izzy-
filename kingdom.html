@@ -106,6 +106,22 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   #feedbackForm textarea{resize:vertical;min-height:84px}
   #feedbackForm button{justify-self:start}
 
+
+/* Scene art, not opaque UI cards, is the focus of the settlement. */
+.city:not(.has-3d) .building{background:linear-gradient(180deg,#142f2822,#0e211cc2);border-color:#e0c28275;box-shadow:0 2px 6px #07150e44;backdrop-filter:none;gap:2px}
+.city:not(.has-3d) .building.castle{background:linear-gradient(180deg,#735b2d55,#292719c9);border-color:#f4d78e}
+.city .building-art{display:block;width:clamp(38px,12vw,76px);height:clamp(36px,11vw,68px);filter:drop-shadow(0 3px 2px #0007);flex:none}
+.city.has-3d .building-art{display:none}
+.city.has-3d .building{background:none;border:0;box-shadow:none;gap:0;justify-content:flex-end;padding:1px 2px 3px}
+.city.has-3d .building.castle{background:none;border:0}
+.city.has-3d .building strong,.city.has-3d .building small{background:#10202ccc;padding:1px 4px;border-radius:3px;line-height:1.12;max-width:100%}
+.city.has-3d .building strong{font-size:10px}
+.city.has-3d.dense-3d .building strong{font-size:0}
+.city.has-3d .building small{font-size:9px}
+.city.has-3d .building[aria-pressed="true"]{outline:2px solid #ffe39a;outline-offset:1px}
+.city.has-3d .building:hover{transform:translate(-50%,-18%)}
+@media(max-width:760px){.coi-city-stage-label{padding:4px 8px!important;pointer-events:none}.coi-city-stage-label small{display:none}.coi-city-stage-corner{display:none}.city:not(.has-3d) .building{padding:3px 2px}}
+
 </style>  <link rel="stylesheet" href="/styles/navigation.css">
   <link rel="stylesheet" href="/styles/android-experience.css">
 <link rel="stylesheet" href="/styles/kingdom-4x-command.css">
@@ -960,10 +976,15 @@ document.getElementById("coiCitySelectionDetails").addEventListener("click",()=>
  target.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
  target.focus({preventScroll:true});
 });
+function cityBuildingArt(type,emoji){
+ const allowed=["castle","barracks","farm","quarry","lumber_mill","iron_mine","market","academy","wall","hospital","watchtower","stable","archery_range","siege_workshop","embassy","warehouse"];
+ if(!allowed.includes(type))return '<span class="emoji">'+esc(emoji)+'</span>';
+ return '<svg class="building-art" viewBox="0 0 100 90" aria-hidden="true" focusable="false"><use href="/assets/art/buildings/icons.svg#'+type+'"></use></svg>';
+}
 function render(){const k=state.kingdom;document.getElementById("kingdomName").textContent=k.kingdom_name||"Reino de Eldoria";document.getElementById("playerName").textContent=(state.player?.nickname||state.player?.name||"Comandante")+" · Castelo nível "+(k.castle_level||1);document.getElementById("nicknameInput").value=state.player?.nickname||"";renderResourceHud(k);renderCastleSkins();renderCastleVip();renderDragonCollection();renderKingdomMailbox();renderKingdomBackpack();renderHospital();
 const buildings=state.buildings||[];const city=document.getElementById("city");
 city.querySelectorAll(":scope > .building").forEach(button=>button.remove());
-city.insertAdjacentHTML("beforeend",buildings.slice(0,16).map((b,i)=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'"'+(i>=9?' hidden':'')+' data-building="'+esc(b.building_type)+'" aria-label="'+esc(name+", nível "+fmt(b.level)+". Ver melhorias")+'"><span class="emoji">'+esc(emoji)+'</span><strong data-compact="'+esc(compactBuildingNames[b.building_type]||name)+'">'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join(""));drawKingdomScene(buildings,Number(k.equipped_skin_id||0));watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomDragon=state.dragon?{dragon_key:state.dragon.dragon_key,level:state.dragon.level}:null;window.__coiKingdomDefenses=state.cityDefenses||[];window.__coiKingdomSpecialBuildings=state.specialCityBuildings||[];window.__coiKingdomHeroAssignments=state.advanced4xEnabled?(state.heroes||[]):[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.__coiKingdomCastleVipLevel=Number(state.castleVip?.level??k.prestige??0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],defenses:state.cityDefenses||[],heroes:window.__coiKingdomHeroAssignments,castleSkinId:Number(k.equipped_skin_id||0),castleVipLevel:window.__coiKingdomCastleVipLevel}}));
+city.insertAdjacentHTML("beforeend",buildings.slice(0,16).map((b,i)=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];return '<button class="building '+(b.building_type==="castle"?"castle":"")+'"'+(i>=9?' hidden':'')+' data-building="'+esc(b.building_type)+'" aria-label="'+esc(name+", nível "+fmt(b.level)+". Ver melhorias")+'">'+cityBuildingArt(b.building_type,emoji)+'<strong data-compact="'+esc(compactBuildingNames[b.building_type]||name)+'">'+esc(name)+'</strong><small>Nível '+fmt(b.level)+'</small></button>'}).join(""));drawKingdomScene(buildings,Number(k.equipped_skin_id||0));watchKingdomScene();window.__coiKingdomBuildings=buildings;window.__coiKingdomTroops=state.troops||[];window.__coiKingdomDragon=state.dragon?{dragon_key:state.dragon.dragon_key,level:state.dragon.level}:null;window.__coiKingdomDefenses=state.cityDefenses||[];window.__coiKingdomSpecialBuildings=state.specialCityBuildings||[];window.__coiKingdomHeroAssignments=state.advanced4xEnabled?(state.heroes||[]):[];window.__coiKingdomCastleSkin=Number(k.equipped_skin_id||0);window.__coiKingdomCastleVipLevel=Number(state.castleVip?.level??k.prestige??0);window.dispatchEvent(new CustomEvent("coi:kingdom-render",{detail:{buildings,troops:state.troops||[],defenses:state.cityDefenses||[],heroes:window.__coiKingdomHeroAssignments,castleSkinId:Number(k.equipped_skin_id||0),castleVipLevel:window.__coiKingdomCastleVipLevel}}));
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Diamantes",fmt(state.player?.gems)],["👑 VIP do Castelo",fmt(state.castleVip?.level??k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const blocked=maxed||activeConstructionCount>=2||alreadyQueued||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");

@@ -1016,6 +1016,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         for(const type of ["farm","quarry","lumber_mill","iron_mine"]){
           assert.ok(diagnostics.architecture.some(x=>x.type===type&&x.design==="eldoria-rural-v1"),type+" uses its own rural architecture");
         }
+        for(const type of ["wall","watchtower"])assert.ok(diagnostics.architecture.some(x=>x.type===type&&x.design==="eldoria-defenses-v1"),type+" has original stone defense silhouette");
         assert.ok(diagnostics.troopFigures.some(x=>x.type==="archer"&&!x.procedural),"trained archers use the decoded GLB");
         assert.ok(diagnostics.troopFigures.length<=8,"balanced figure budget");
         const equippedDragon=await page.evaluate(()=>window.__coiKingdomDragon);

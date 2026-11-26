@@ -603,6 +603,33 @@ if (host && "WebGLRenderingContext" in window) {
       addRuralBuilding(group,type,safeLevel,wall,roof);
       return group;
     }
+    if(type==="wall"||type==="watchtower"){
+      // Original stone defenses: actual silhouettes, not isolated placeholder cubes.
+      const height=(type==="watchtower"?1.24:.66)+safeLevel*.018;
+      group.userData.coIArchitecture="eldoria-defenses-v1";
+      if(type==="wall"){
+        box(group,1.68,.13,.74,mats.darkStone,0,.065,0);
+        box(group,1.52,height,.47,wall,0,.13+height/2,0);
+        box(group,1.62,.12,.59,mats.stone,0,.13+height,0);
+        for(const x of [-.62,-.31,0,.31,.62])box(group,.19,.21,.52,mats.stone,x,.29+height,0);
+        for(const x of [-.68,.68])box(group,.23,height+.05,.64,mats.stone,x,.14+height/2,0);
+        for(const x of [-.35,.35])box(group,.055,.20,.035,mats.darkStone,x,.16+height*.64,.25);
+      }else{
+        box(group,1.12,.14,1.12,mats.darkStone,0,.07,0);
+        addCylinder(group,.36,.44,height,wall,0,.14+height/2,0,8);
+        addCylinder(group,.49,.38,.16,mats.stone,0,.14+height,0,8);
+        for(let i=0;i<8;i++){
+          const a=i*Math.PI/4;
+          const merlon=box(group,.20,.24,.19,mats.stone,.43*Math.cos(a),height+.31,.43*Math.sin(a));
+          merlon.rotation.y=-a;
+        }
+        box(group,.09,.33,.055,mats.darkStone,0,.14+height*.65,.39);
+        box(group,.21,.31,.06,mats.wood,0,.31,.44);
+        addCylinder(group,.024,.024,.52,mats.wood,0,height+.48,0,6);
+        box(group,.34,.19,.025,mats.gold,.17,height+.66,0);
+      }
+      return group;
+    }
     const [bodyWidth,baseHeight,bodyDepth,roofHeight]=buildingProfiles[type]||buildingProfiles.warehouse;
     const height = baseHeight + safeLevel * .024;
     group.userData.coIArchitecture="eldoria-civic-v1";

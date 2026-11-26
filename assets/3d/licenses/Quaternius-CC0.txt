@@ -1,0 +1,5 @@
+Quaternius — CC0 1.0 Universal
+Author's published licenses: https://quaternius.com/packs/ultimatefantasyrts.html and https://quaternius.com/packs/knightcharacter.html
+License: https://creativecommons.org/publicdomain/zero/1.0/
+GLB mirror pinned: https://github.com/trebeljahr/quaternius-showcase/tree/0128ca510d653bb04d6d1e4885bd8890b5050b4f
+Mirror license registry: https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/LICENSES.md

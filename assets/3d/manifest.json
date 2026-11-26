@@ -5,7 +5,7 @@
       "id": "kenney-castle-watchtower",
       "type": "watchtower",
       "src": "/assets/3d/kenney/castle-kit/Models/GLB format/tower-square.glb",
-      "enabled": true,
+      "enabled": false,
       "targetFootprint": 1.55,
       "targetHeight": 2.35,
       "source": "Kenney Castle Kit",
@@ -16,7 +16,7 @@
       "id": "kenney-castle-wall",
       "type": "wall",
       "src": "/assets/3d/kenney/castle-kit/Models/GLB format/wall.glb",
-      "enabled": true,
+      "enabled": false,
       "targetFootprint": 1.75,
       "targetHeight": 1.8,
       "source": "Kenney Castle Kit",
@@ -54,6 +54,50 @@
       "targetHeight": 1.5,
       "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
       "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/tree/84fa4e91af6a88989be7c99e0891cede11f2ca38",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-archery-range",
+      "type": "archery_range",
+      "src": "/assets/3d/quaternius/archery_range.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.85,
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-academy",
+      "type": "academy",
+      "src": "/assets/3d/quaternius/academy.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 2.25,
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-warehouse",
+      "type": "warehouse",
+      "src": "/assets/3d/quaternius/warehouse.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.8,
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-embassy",
+      "type": "embassy",
+      "src": "/assets/3d/quaternius/embassy.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 2.2,
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
       "license": "CC0-1.0"
     }
   ],
@@ -130,6 +174,19 @@
       "source": "Kenney Mini Forest",
       "sourceUrl": "https://kenney.nl/assets/mini-forest",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-swordsman",
+      "unit_type": "swordsman",
+      "src": "/assets/3d/quaternius/swordsman.glb",
+      "enabled": true,
+      "targetFootprint": 0.85,
+      "targetHeight": 1.6,
+      "source": "Quaternius Animated Knight Pack",
+      "sourceUrl": "https://quaternius.com/packs/knightcharacter.html",
+      "license": "CC0-1.0",
+      "animation": "HumanArmature|Idle",
+      "maxInstances": 3
     }
   ],
   "files": {
@@ -231,6 +288,56 @@
       "sha256": "c86332ac085c2a7f0f926ea9f51907bbd9354561f5717cf95dc2cfcaaff873b1",
       "bytes": 31176,
       "licenseFile": "licenses/Kenney-Mini-Forest.txt"
+    },
+    "/assets/3d/quaternius/archery_range.glb": {
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Ultimate Fantasy RTS — Quaternius",
+      "sha256": "19c16547d4918a3a38e70ef2712db1c44878ea45334c9b1489eee539e84c6ff0",
+      "bytes": 251348,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/real_time_strategy_pack/Archery_FirstAge_Level1.glb"
+    },
+    "/assets/3d/quaternius/academy.glb": {
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Ultimate Fantasy RTS — Quaternius",
+      "sha256": "8939e4c47c2b37f0d1bed2df7025b66a4cf71057ae01ecaafa04b234ebeaa560",
+      "bytes": 26700,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/real_time_strategy_pack/Temple_SecondAge_Level1.glb"
+    },
+    "/assets/3d/quaternius/warehouse.glb": {
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Ultimate Fantasy RTS — Quaternius",
+      "sha256": "7d9530a17dbafb82a3a5e485f75ed056eb26e71da7bee0de8d52dab3f99aee8d",
+      "bytes": 200212,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/real_time_strategy_pack/Storage_FirstAge_Level1.glb"
+    },
+    "/assets/3d/quaternius/embassy.glb": {
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Ultimate Fantasy RTS — Quaternius",
+      "sha256": "3b2320b491dae5a25c65bf63dd269758a08bbd0a5e02c894af53d089ca654f5b",
+      "bytes": 175228,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/real_time_strategy_pack/TownCenter_SecondAge_Level1.glb"
+    },
+    "/assets/3d/quaternius/swordsman.glb": {
+      "source": "Quaternius Animated Knight Pack",
+      "sourceUrl": "https://quaternius.com/packs/knightcharacter.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Animated Knight Pack — Quaternius",
+      "sha256": "b5da53738f593def15014a1c070d05b517e2145b494147c1d5b10eabcb9ad9c9",
+      "bytes": 393060,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/single_knight_pack/KnightCharacter.glb"
     }
   }
 }
