@@ -6,6 +6,27 @@ export const DRAGON_PALETTES=Object.freeze({
  sun_ascendant:[0xbd7937,0xffc367,0xffeab2],astral_aegis:[0xb49763,0x6874ba,0xf4dfaa],
  imperial_drake:[0xb38b41,0x9d483c,0xffdd80]
 });
+
+// Width, height and length of the equipped dragon in city space.
+const DRAGON_PROPORTIONS = Object.freeze({
+  ember_wyrm: [1.02, 1.02, 1.10],
+  mist_talon: [1.15, 0.87, 0.96],
+  frost_glimmer: [0.97, 1.14, 0.92],
+  storm_rune: [1.12, 1.08, 0.96],
+  jade_guardian: [0.93, 0.91, 1.18],
+  abyss_wing: [1.19, 0.91, 1.03],
+  sun_ascendant: [1.13, 1.03, 1.08],
+  astral_aegis: [1.05, 1.17, 0.94],
+  imperial_drake: [0.99, 1.12, 1.14]
+});
+
+function configureDragonRoot(root, visual) {
+  const [width, height, length] = DRAGON_PROPORTIONS[visual.key];
+  root.scale.set(visual.scale * width, visual.scale * height, visual.scale * length);
+  root.rotation.y = -.40;
+  root.userData.coIDragonKey = visual.key;
+}
+
 export function projectDragonVisual(row) {
  const key=row?.dragon_key;
  if(typeof key!=="string"||!Object.hasOwn(DRAGON_PALETTES,key))return null;
@@ -45,9 +66,7 @@ export function makeDragonFigure(THREE, visual, tier) {
  for(let i=0;i<(tier==="high"?5:3);i++){
   mesh(root,new THREE.ConeGeometry(.055,.17,5),crestMat,0,.34-i*.025,.25-i*.22);
  }
- root.scale.setScalar(visual.scale);
- root.rotation.y=-.40;
- root.userData.coIDragonKey=visual.key;
+ configureDragonRoot(root, visual);
  return {root,wings};
 }
 // The normalized template owns geometry and textures; each equipped clone owns
@@ -71,9 +90,7 @@ export function makeImportedDragonFigure(THREE,cloneSkinned,asset,visual) {
   node.material=Array.isArray(node.material)?node.material.map(cloneMaterial):cloneMaterial(node.material);
   node.castShadow=false;node.receiveShadow=false;
  });
- root.scale.setScalar(visual.scale);
- root.rotation.y=-.40;
- root.userData.coIDragonKey=visual.key;
+ configureDragonRoot(root, visual);
  const mixer=new THREE.AnimationMixer(root);
  mixer.clipAction(clip).play();
  return {root,imported:true,mixer,materials:[...materials.values()],skeletons:[...skeletons],wings:[]};
