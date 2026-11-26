@@ -976,16 +976,22 @@ async function gameAction(env,playerId,body){
   }else if(type==="castle_skin_equip"){
     const rawSkinId=body.skinId;
     if(rawSkinId===null||rawSkinId===undefined||rawSkinId===""){
-      if(k.equipped_skin_id!==null&&k.equipped_skin_id!==undefined){
-        await env.DB.prepare("UPDATE kingdoms SET equipped_skin_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=?").bind(k.id).run();
-        await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"castle_skin_unequipped","{}").run();
-      }
+      // Use current persisted state, not the potentially stale request snapshot.
+      // The event is committed in the same D1 transaction as the selection.
+      await env.DB.batch([
+        env.DB.prepare("UPDATE kingdoms SET equipped_skin_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE id=? AND equipped_skin_id IS NOT NULL").bind(k.id),
+        env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(k.id,"castle_skin_unequipped","{}")
+      ]);
     }else{
       const skinId=Number(rawSkinId);
       if(!Number.isSafeInteger(skinId)||skinId<1)return json({error:"Skin de castelo inválida."},400);
-      const result=await env.DB.prepare("UPDATE kingdoms SET equipped_skin_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND EXISTS(SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?)").bind(skinId,k.id,p.id,skinId).run();
-      if(!result.meta?.changes)return json({error:"Você não possui esta skin."},404);
-      await env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) VALUES(?,?,?)").bind(k.id,"castle_skin_equipped",JSON.stringify({skinId})).run();
+      const result=await env.DB.batch([
+        env.DB.prepare("UPDATE kingdoms SET equipped_skin_id=?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND equipped_skin_id IS NOT ? AND EXISTS(SELECT 1 FROM player_skins WHERE player_id=? AND skin_id=?)").bind(skinId,k.id,skinId,p.id,skinId),
+        env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,?,? WHERE changes()=1").bind(k.id,"castle_skin_equipped",JSON.stringify({skinId})),
+        env.DB.prepare("SELECT 1 AS owned FROM player_skins WHERE player_id=? AND skin_id=?").bind(p.id,skinId)
+      ]);
+      // An already equipped owned skin is an idempotent success, not an error.
+      if(!result[2]?.results?.length)return json({error:"Você não possui esta skin."},404);
     }
   }else if(type==="equipment_craft"){
     const itemKey=String(body.itemId||""),def=EQUIPMENT_CATALOG[itemKey];
