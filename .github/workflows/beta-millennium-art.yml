@@ -83,6 +83,9 @@ jobs:
           BETA_BROWSER_SMOKE: "1"
           BETA_MILLENNIUM_SMOKE: "1"
         run: node --test tests/beta-runtime-local.test.js
+      - name: Enforce complete visual asset regression suite
+        if: always() && github.head_ref == 'improve/beta-millennium-integrate'
+        run: node --test tests/kingdom-assets.test.js tests/art-license-policy.test.js
       - uses: actions/upload-artifact@v4
         if: always() && github.head_ref == 'improve/beta-millennium-integrate'
         with:
