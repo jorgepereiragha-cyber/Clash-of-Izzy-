@@ -2,6 +2,7 @@ import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
 import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-path.js";
+import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -46,6 +47,9 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
   let contextLost = false;
   let sceneInViewport = true;
   let worldState = null;
+  let visualKeys = null;
+  let territoryLookup = new Map();
+  const visualRebuilds = { home:0, features:0, routes:0, marches:0 };
   let activeMarches = [];
   let homeCastleGroup = null;
   let projectionButtons = new Map();
@@ -465,9 +469,8 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
   }
 
   function updateMarchPositions(now) {
-    const territories = new Map((worldState?.territories || []).map(item => [Number(item.id), item]));
     for (const march of activeMarches) {
-      const target = territories.get(march.targetId);
+      const target = territoryLookup.get(march.targetId);
       if (!target) continue;
       const progress=marchVisualProgress(now,march.startAt,march.endAt);
       const origin=visualHome();
@@ -577,22 +580,26 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
   }
 
   function setWorldState(nextState) {
-    if (!nextState || !Array.isArray(nextState.territories)) return;
+    if (disposed || contextLost || !nextState || !Array.isArray(nextState.territories)) return;
+    const keys = worldVisualKeys(nextState);
+    const previous = visualKeys;
     worldState = nextState;
-    if(homeCastleGroup){
-      terrainRoot.remove(homeCastleGroup);
-      homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
+    territoryLookup = new Map(nextState.territories.map(item=>[Number(item.id),item]));
+    if (keys.home !== previous?.home) {
+      if(homeCastleGroup){
+        terrainRoot.remove(homeCastleGroup);
+        homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
+      }
+      // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
+      const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
+      homeCastleGroup=createCastle(terrainRoot,hasThrone?13:0,hasThrone?-11:0,1.4,"home",Number(worldState.castleSkinId)||0);
+      visualRebuilds.home++;
     }
-    // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
-    const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
-    if(hasThrone){
-      homeCastleGroup=createCastle(terrainRoot,13,-11,1.4,"home",Number(worldState.castleSkinId)||0);
-    }else{
-      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(worldState.castleSkinId)||0);
-    }
-    rebuildTerritories();
-    rebuildRoads();
-    rebuildMarches();
+    if(keys.features!==previous?.features){rebuildTerritories();visualRebuilds.features++;}
+    if(keys.routes!==previous?.routes){rebuildRoads();visualRebuilds.routes++;}
+    if(keys.marches!==previous?.marches){rebuildMarches();visualRebuilds.marches++;}
+    else {updateMarchPositions(Date.now());syncMarchAnimation();}
+    visualKeys=keys;
     draw();
   }
 
@@ -702,7 +709,8 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
           projectionButtons = buttons instanceof Map ? buttons : new Map();
           projectTerritories();
         },
-        project: projectTerritories
+        project: projectTerritories,
+        diagnostics: () => ({ rebuilds: {...visualRebuilds} })
       };
       window.dispatchEvent(new CustomEvent("coi:world-map-3d-ready"));
       if (window.__coiWorldMapState) setWorldState(window.__coiWorldMapState);
