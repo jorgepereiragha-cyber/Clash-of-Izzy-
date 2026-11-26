@@ -34,6 +34,19 @@
     if(!response.ok)throw new Error(data.error||"Falha ao sincronizar equipamentos.");
     return data;
   }
+  const paintedHeroKeys=new Set(["soldado_basico","capitao_espada","mestre_arco","arqueiro_comum","joana_darc"]);
+  const publicDomainHeroKeys=new Set(["curandeiro_aldeia","sacerdotisa_luar","freya_vanir"]);
+  function paintedHeroPortrait(hero, fallback){
+    const group=paintedHeroKeys.has(hero.hero_key)?"flare":publicDomainHeroKeys.has(hero.hero_key)?"painted":null;
+    if(!group)return fallback;
+    const frame=document.createElement("div");frame.className="coi-painted-portrait";
+    const img=document.createElement("img");img.className="hero-roster-portrait coi-painted-hero";img.alt=hero.portrait_alt||hero.name||"Retrato de herói";img.loading="lazy";img.decoding="async";img.setAttribute("aria-hidden","true");
+    img.addEventListener("load",()=>{frame.classList.add("is-loaded");fallback.setAttribute("aria-hidden","true");img.removeAttribute("aria-hidden");},{once:true});
+    img.addEventListener("error",()=>img.remove(),{once:true});
+    frame.append(fallback,img);
+    img.src="/assets/art/heroes/"+group+"/"+hero.hero_key+".png";
+    return frame;
+  }
   function renderForge(){
     const research=state?.equipmentResearch||[],levels=new Map(research.map(item=>[item.id,Number(item.level)||0]));
     const academy=Number((state?.buildings||[]).find(item=>item.building_type==="academy")?.level||0);
@@ -448,7 +461,7 @@
       });
       const details=document.createElement("div");
       details.append(copy,button);
-      card.append(portrait,details);
+      card.append(paintedHeroPortrait(hero,portrait),details);
       root.append(card);
     }
   }

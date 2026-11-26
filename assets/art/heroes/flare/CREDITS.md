@@ -1,0 +1,3 @@
+# Imported painted portraits
+
+Justin Nichol and Flare Project, CC BY-SA 3.0 (https://creativecommons.org/licenses/by-sa/3.0/). Source https://github.com/flareteam/flare-game/tree/c641d2ac2801617f6be3e327454de39250d489b9/mods/fantasycore/images/portraits; attribution https://github.com/flareteam/flare-game/wiki/Credits. Unmodified PNGs renamed for existing Eldoria hero keys. Reusable art, not exclusive to Clash of Izzy; no Flare code, characters, lore or branding imported. Imported images remain CC BY-SA 3.0. Mapping: soldado_basico=male02, capitao_espada=male01, mestre_arco=male03, arqueiro_comum=female02, joana_darc=female01. Original SVG remains fallback. Other hero IDs unchanged.
