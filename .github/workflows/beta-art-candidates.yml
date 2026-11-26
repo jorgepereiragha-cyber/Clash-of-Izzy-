@@ -1,0 +1,29 @@
+name: Beta photoreal art candidates (no deploy)
+on:
+  pull_request:
+    branches: [beta]
+    paths:
+      - scripts/acquire-photoreal-city-assets.mjs
+      - .github/workflows/beta-art-candidates.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  acquire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check scripts/acquire-photoreal-city-assets.mjs
+      - run: node scripts/acquire-photoreal-city-assets.mjs art-candidates
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eldoria-photoreal-candidates
+          path: art-candidates/
+          if-no-files-found: error
+          retention-days: 7
