@@ -1,0 +1,57 @@
+name: Beta Millennium fortress candidate (no deploy)
+on:
+  pull_request:
+    branches: [beta]
+    paths:
+      - scripts/convert-millennium-fortress.py
+      - .github/workflows/beta-millennium-art.yml
+permissions:
+  contents: read
+jobs:
+  convert:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Download pinned art only and verify Git blob hashes
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p art-candidates
+          base=https://raw.githubusercontent.com/0ADMods/millenniumad/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3
+          acquire() {
+            curl --fail --silent --show-error --max-time 90 --max-filesize 20000000 "$base/$1" -o "art-candidates/$2"
+            test "$(git hash-object "art-candidates/$2")" = "$3"
+          }
+          acquire art/meshes/structural/caro_fortress_struct.dae caro_fortress_struct.dae 815d2fa82a16599bd676c6246e19a6aa47ca9424
+          acquire art/meshes/structural/caro_farmstead.dae caro_farmstead.dae c5b8331289b1669f412468c76c9876c16d7bcfd5
+          acquire art/meshes/structural/caro_market.dae caro_market.dae 2cf431688d3960fd1e892b41c25a3e13d5f91e3b
+          acquire art/meshes/structural/caro_blacksmith.dae caro_blacksmith.dae 8237af2fe5305ee2c844ce2f7d168feb90590981
+          acquire art/meshes/structural/caro_wall_long.dae caro_wall_long.dae 57c8f10ec8a87d506dad6121962e5f225e5db17a
+          acquire art/meshes/structural/caro_wall_gate.dae caro_wall_gate.dae 6edef4c94b6b25e4ba6bbc52dcef8463d455c9a9
+          acquire art/meshes/structural/caro_defense_tower.dae caro_defense_tower.dae c18c459e9f425546a87efb90f032e03faecd5099
+          acquire art/meshes/structural/caro_storehouse.dae caro_storehouse.dae af7174d950859abd150c46d36dd09a39e0824deb
+          acquire art/textures/skins/structural/caro_struct.png caro_struct.png 099fc80f1d3d628e82fd1dbdbaf279bbe8c1d4c7
+          acquire art/textures/skins/structural/caro_struct_norm.png caro_struct_norm.png b28d12d3007b7c9f288c11b9213dee23a72f02ed
+          curl --fail --silent --show-error --max-time 30 "$base/art/license.txt" -o art-candidates/UPSTREAM-ART-LICENSE.txt
+          printf '%s\n' 'Source: https://github.com/0ADMods/millenniumad/tree/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3' 'Credits: Millennium A.D. contributors; see upstream README.' 'Candidate only; asset-specific licensing and visual review required before redistribution in the game.' > art-candidates/PROVENANCE.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: millennium-verified-source-art
+          path: art-candidates/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Convert pinned static art using Python standard library
+        timeout-minutes: 3
+        run: |
+          python3 scripts/convert-millennium-fortress.py art-candidates
+          cd art-candidates
+          sha256sum *.dae *.png *.glb > SHA256SUMS.txt
+      - uses: actions/upload-artifact@v4
+        with:
+          name: millennium-fortress-candidate
+          path: art-candidates/
+          retention-days: 7
+          if-no-files-found: error
