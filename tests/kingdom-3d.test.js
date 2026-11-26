@@ -513,3 +513,12 @@ test("server grid plots determine art centers and constrain asymmetrical models"
  assert.match(renderer,/cityModelAnchor\(x,z,serverCityFootprint\(building\.building_type\)\)/);
  assert.match(renderer,/group\.scale\.multiplyScalar\(artScale\)/);
 });
+
+test("city scenery extends beyond camera framing and supports separate center and overview",()=>{
+ assert.match(renderer,/PlaneGeometry\(96, 96\), mats\.grass/);
+ assert.match(renderer,/kind === "grass" \? 27 : 3/);
+ assert.match(renderer,/cameraFocusCenter \? buildings : \[\.\.\.buildings,\.\.\.currentSpecialLandmarks\(\)\]/);
+ assert.match(renderer,/cameraFocusCenter=action==="center"/);
+ assert.match(kingdom,/data-city-zoom="center"/);
+ assert.match(kingdom,/data-city-zoom="reset"/);
+});
