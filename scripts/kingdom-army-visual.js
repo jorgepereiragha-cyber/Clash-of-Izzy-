@@ -90,3 +90,9 @@ export function createProceduralUnit(THREE, type, tier) {
   root.userData.coIUnitType=type;
   return root;
 }
+
+// Stable phase per visible representative; no random state or gameplay timing.
+export function troopAnimationPhase(index,duration,reducedMotion=false){
+  if(reducedMotion||!Number.isSafeInteger(index)||index<0||!Number.isFinite(duration)||duration<=0)return 0;
+  return ((index*0.6180339887498949)%1)*duration;
+}

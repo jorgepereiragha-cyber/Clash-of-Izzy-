@@ -28,3 +28,15 @@ test("procedural resources are disposed without disposing shared GLB templates",
  assert.match(renderer,/instance.mixer\?\.uncacheRoot/);
  assert.match(renderer,/createProceduralUnit\(THREE, entry.type/);
 });
+
+
+test("troop animation phases are stable, distinct and disabled for reduced motion",async()=>{
+  const {troopAnimationPhase}=await import("../scripts/kingdom-army-visual.js");
+  const phases=Array.from({length:12},(_,i)=>troopAnimationPhase(i,2));
+  assert.equal(new Set(phases).size,12);
+  assert.ok(phases.every(x=>x>=0&&x<2));
+  assert.deepEqual(phases,Array.from({length:12},(_,i)=>troopAnimationPhase(i,2)));
+  assert.equal(troopAnimationPhase(4,2,true),0);
+  assert.equal(troopAnimationPhase(4,0),0);
+  assert.equal(troopAnimationPhase(-1,2),0);
+});
