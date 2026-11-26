@@ -15,7 +15,7 @@ export function projectDragonVisual(row) {
 }
 export function makeDragonFigure(THREE, visual, tier) {
  const [bodyColor,wingColor,crestColor]=DRAGON_PALETTES[visual.key];
- const root=new THREE.Group(), wings=[];
+ const root=new THREE.Group(), wings=[], tail=[];
  const bodyMat=new THREE.MeshStandardMaterial({color:bodyColor,roughness:.72,metalness:.12,flatShading:true});
  const wingMat=new THREE.MeshStandardMaterial({color:wingColor,roughness:.79,side:THREE.DoubleSide,flatShading:true});
  const crestMat=new THREE.MeshStandardMaterial({color:crestColor,roughness:.48,metalness:.22});
@@ -26,7 +26,7 @@ export function makeDragonFigure(THREE, visual, tier) {
  const body=(x,y,z,sx,sy,sz)=>mesh(root,new THREE.IcosahedronGeometry(1,1),bodyMat,x,y,z,sx,sy,sz);
  body(0,0,0,.32,.35,.68);body(0,.19,.47,.19,.27,.38);body(0,.38,.72,.23,.19,.26);
  body(0,.29,.92,.15,.11,.17);
- for(let i=0;i<4;i++)body(0,-.10-i*.045,-.60-i*.20,.17-i*.027,.16-i*.023,.25);
+ for(let i=0;i<4;i++){const segment=body(0,-.10-i*.045,-.60-i*.20,.17-i*.027,.16-i*.023,.25);tail.push({mesh:segment,index:i});}
  for(const s of [-1,1]){
   for(const z of [-.36,.24])body(s*.23,-.25,z,.10,.20,.14);
   const horn=mesh(root,new THREE.ConeGeometry(.065,.23,5),crestMat,s*.12,.58,.68);
@@ -48,9 +48,19 @@ export function makeDragonFigure(THREE, visual, tier) {
  root.scale.setScalar(visual.scale);
  root.rotation.y=-.40;
  root.userData.coIDragonKey=visual.key;
- return {root,wings};
+ return {root,wings,tail};
 }
 export function poseDragon(figure,time,animated) {
- const phase=animated?Math.sin(time*2.6):0;
+ const t=animated&&Number.isFinite(time)?time:0;
+ const phase=animated?Math.sin(t*2.6):0;
  for(const {wing,sign} of figure.wings)wing.rotation.z=sign*(.18+phase*.36);
+ for(const {mesh,index} of figure.tail||[]){
+  const wave=animated?Math.sin(t*2.6-index*.48):0;
+  mesh.position.x=wave*(index+1)*.035;
+  mesh.rotation.y=wave*.12*(index+1);
+ }
+ if(figure.root){figure.root.rotation.x=animated?Math.sin(t*2.6+.6)*.035:0;figure.root.rotation.z=animated?Math.sin(t*1.3)*.04:0;}
+}
+export function dragonHoverOffset(time,animated){
+ return animated&&Number.isFinite(time)?Math.sin(time*2.6-.6)*.09:0;
 }
