@@ -376,3 +376,37 @@ test.describe("Mobile kingdom rendering", () => {
   });
 
 });
+
+test("2D city paints local atlas art and troop preview follows selection",async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem("coi_graphics_preference","2d"));
+ await installApiFixtures(page);
+ await page.goto("/kingdom.html");
+ await expect(page.locator("#status")).toContainText("Reino sincronizado");
+ await expect(page.locator("#city .building.canvas-art-ready")).toHaveCount(9);
+ await expect(page.locator("#city canvas#kingdom3d")).toHaveCount(0);
+ await expect(page.locator("#resources .coi-entity-art")).toHaveCount(6);
+ await page.locator("#unitType").selectOption("archer");
+ await expect(page.locator("#coiTroopArtPreview use")).toHaveAttribute("href","/assets/art/eldoria/hud.svg#troop-archer");
+ await expect(page.locator('#city [data-building="castle"]')).toBeVisible();
+ await mkdir("test-results/beta-visual",{recursive:true});
+ await page.locator("#city").screenshot({path:"test-results/beta-visual/eldoria-canvas-atlas.png",animations:"disabled"});
+});
+
+ test("2D city paints local atlas art for saved dragon nest and summon altar",async({page})=>{
+ const {CITY_FOOTPRINTS}=await import("../../city-layout-rules.js");
+ await page.addInitScript(()=>localStorage.setItem("coi_graphics_preference","2d"));
+ await installApiFixtures(page,{
+   cityLayout:{min:-25,max:25,footprints:CITY_FOOTPRINTS},
+   specialCityCatalog:{dragon_nest:{name:"Ninho de Dragões",width:3,height:3},summon_altar:{name:"Altar de Convocação",width:3,height:3}},
+   specialCityBuildings:[{building_type:"dragon_nest",grid_x:8,grid_z:8,width:3,height:3},{building_type:"summon_altar",grid_x:14,grid_z:8,width:3,height:3}],
+   buildings:makeKingdomState().buildings.map((b,i)=>({...b,position_x:-20+i*5,position_z:-18}))
+ });
+ await page.goto("/kingdom.html");
+ await expect(page.locator("#status")).toContainText("Reino sincronizado");
+ await page.locator("#coiCityLayout summary").click();
+ await expect(page.locator("#coiCityGrid")).toHaveAttribute("data-special-art-count","2");
+ await page.locator("#coiCityBuilding").selectOption("dragon_nest");
+ await expect(page.locator("#coiCityX")).toHaveValue("8");
+ await mkdir("test-results/beta-visual",{recursive:true});
+ await page.locator("#coiCityGrid").screenshot({path:"test-results/beta-visual/special-landmarks-layout.png"});
+ });

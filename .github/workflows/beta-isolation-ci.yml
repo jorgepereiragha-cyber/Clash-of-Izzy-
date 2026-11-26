@@ -61,6 +61,8 @@ jobs:
         run: node --test tests/beta-runtime-local.test.js
         env:
           BETA_BROWSER_SMOKE: '1'
+      - name: Validate actual Canvas atlas and troop preview in Chromium (local only)
+        run: npx playwright test tests/e2e/mobile-kingdom-render.spec.js -g "2D city paints local atlas art" --output=test-results/playwright-atlas
       - name: Archive synthetic kingdom rendering evidence
         if: always()
         uses: actions/upload-artifact@v4

@@ -124,10 +124,13 @@ test("siege workshop uses distinct local CC0 art without external dependencies",
   const provenance = manifest.files[asset.src];
   assert.equal(provenance.license, "CC0-1.0");
   const b = await readFile(toUrl(asset.src));
-  assert.equal(b.length, 670832);
+  assert.equal(b.length, 463796);
+  assert.equal(b.length, provenance.bytes);
   const g = JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());
   assert.ok(g.meshes.length > 0);
   assert.ok(g.materials.some(m => m.name === "RoofTiles_Red"));
+  assert.ok(g.meshes.every(mesh => mesh.primitives.every(primitive =>
+    primitive.attributes.COLOR_0 === undefined)));
   assert.ok([...(g.images || []), ...(g.buffers || [])].every(x => x.uri === undefined));
   assert.equal(Object.values(manifest.files).filter(x => x.sha256 === provenance.sha256).length, 1);
 });

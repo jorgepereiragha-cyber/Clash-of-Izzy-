@@ -1,3 +1,4 @@
+import {worldTerrainHeight,worldTerrainBlend,worldRiverDistance,worldRiverRibbon} from "./scripts/world-map-terrain.js";
 import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
@@ -91,6 +92,8 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
   const territoryRoot = new THREE.Group();
   const armyRoot = new THREE.Group();
   const shared = {
+    terrainGround: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }),
+    riverBank: new THREE.MeshStandardMaterial({ color: 0x9a9370, roughness: 1 }),
     grass: new THREE.MeshStandardMaterial({ color: 0x668b4f, roughness: 1 }),
     grassLight: new THREE.MeshStandardMaterial({ color: 0x8eaa62, roughness: 1 }),
     forest: new THREE.MeshStandardMaterial({ color: 0x315f43, roughness: 1 }),
@@ -136,8 +139,7 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
   }
 
   function terrainHeight(x, z) {
-    return Math.sin(x * .095) * .48 + Math.cos(z * .13) * .34
-      + Math.sin((x + z) * .055) * .28 + Math.cos((x - z) * .035) * .22;
+    return worldTerrainHeight(x,z);
   }
 
   function makeMesh(geometry, material, parent, x, y, z) {
@@ -214,48 +216,50 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     const greenA = new THREE.Color(0x658950);
     const greenB = new THREE.Color(0x8ca75e);
     const marsh = new THREE.Color(0x526f50);
+    const bank = new THREE.Color(0x9a9370),color=new THREE.Color();
     for (let i = 0; i < positions.count; i++) {
       const x = positions.getX(i);
       const z = -positions.getY(i);
       const h = terrainHeight(x, z);
       positions.setZ(i, h);
-      const edge = Math.pow(x / 56, 2) + Math.pow(z / 46, 2);
-      const noise = (Math.sin(x * .31) + Math.cos(z * .27)) * .035;
-      const color = edge > .9 ? marsh.clone() : (noise > 0 ? greenB.clone() : greenA.clone());
-      color.multiplyScalar(1 - Math.max(0, edge - .58) * .23);
+      const blend=worldTerrainBlend(x,z);
+      color.copy(greenA).lerp(greenB,blend.meadow).lerp(marsh,blend.edge*.78).lerp(bank,blend.bank*.65);
+      color.multiplyScalar(1-blend.edge*.12);
       colors.push(color.r, color.g, color.b);
     }
     geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
     geometry.rotateX(-Math.PI / 2);
     geometry.computeVertexNormals();
-    const material = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
-    const ground = makeMesh(geometry, material, terrainRoot, 0, -.25, 0);
+    const ground = makeMesh(geometry, shared.terrainGround, terrainRoot, 0, -.25, 0);
     ground.receiveShadow = true;
 
     const water = makeMesh(new THREE.PlaneGeometry(132, 112), shared.water, terrainRoot, 0, -1.2, 0);
     water.rotation.x = -Math.PI / 2;
     water.receiveShadow = false;
 
-    // River and old trade roads establish a readable strategic landscape.
-    const river = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(-50, -.86, -22),
-      new THREE.Vector3(-30, -.82, -10),
-      new THREE.Vector3(-10, -.82, -14),
-      new THREE.Vector3(12, -.82, -5),
-      new THREE.Vector3(34, -.84, -13),
-      new THREE.Vector3(52, -.86, -7)
-    ]);
-    makeMesh(new THREE.TubeGeometry(river, 48, .72, 7, false), shared.water, terrainRoot, 0, 0, 0);
+    // Two terrain-conforming ribbons instead of a buried fixed-height tube.
+    // Road surfaces stay above the water; all march coordinates are unchanged.
+    const segments=quality==="low"?48:96;
+    for(const [width,offset,material] of [[1.45,-.13,shared.riverBank],[.82,-.045,shared.water]]){
+      const ribbon=worldRiverRibbon({segments,halfWidth:width,offset});
+      const meshGeometry=new THREE.BufferGeometry();
+      meshGeometry.setAttribute("position",new THREE.Float32BufferAttribute(ribbon.positions,3));
+      meshGeometry.setIndex(ribbon.indices);meshGeometry.computeVertexNormals();
+      const surface=makeMesh(meshGeometry,material,terrainRoot,0,0,0);
+      surface.castShadow=false;surface.receiveShadow=true;
+    }
 
     const random = seeded(27011);
     const treeCount = quality === "low" ? 38 : quality === "high" ? 105 : 68;
     const forestPositions = [];
     for (let i = 0; i < treeCount; i++) {
-      const x = (random() - .5) * 96;
-      const z = (random() - .5) * 72;
-      // Keep the main roads and central settlement readable.
+      // Alternate scattered trees and compact woodland clusters at fixed locations.
+      const clusters=[[-36,-26],[-29,20],[28,25],[36,-25],[-12,31]];
+      const center=clusters[i%clusters.length],clustered=i%3!==0;
+      const x=clustered?center[0]+(random()-.5)*15:(random()-.5)*96;
+      const z=clustered?center[1]+(random()-.5)*12:(random()-.5)*72;
       if (Math.abs(x) < 9 && Math.abs(z) < 9) continue;
-      if (Math.abs(z + 10) < 3 && x > -52 && x < 52) continue;
+      if (worldRiverDistance(x,z)<3) continue;
       forestPositions.push({ x, z, scale: .62 + random() * .58, variant: i });
     }
     addInstancedForest(terrainRoot, forestPositions);

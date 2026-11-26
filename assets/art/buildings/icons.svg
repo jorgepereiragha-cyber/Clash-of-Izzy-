@@ -13,4 +13,31 @@
 <symbol id="archery_range" viewBox="0 0 100 90"><path d="M7 64 50 43 94 64 50 86Z" fill="#607849" stroke="#324f35" stroke-width="2"/><path d="M16 65 50 49 85 65 50 82Z" fill="#9d9167"/><path d="M15 36h35v29H15Z" fill="#ad9977" stroke="#594c3a" stroke-width="2"/><path d="M50 36l12 -8v29l-12 8Z" fill="#6e6958"/><path d="M11 36l21.5 -22 21.5 22Z" fill="#586e4d" stroke="#283946" stroke-width="2"/><path d="M54 36l12 -8 -21.5 -22 -12 8Z" fill="#233d54"/><path d="M27.5 65v-16q5 -8 10 0v16" fill="#443326"/><path d="M22 44h8v10h-8Z M35 44h8v10h-8Z" fill="#e4bc72"/><circle cx="71" cy="52" r="16" fill="#d9c083" stroke="#624831" stroke-width="3"/><circle cx="71" cy="52" r="10" fill="#9b493d"/><circle cx="71" cy="52" r="4" fill="#e0c565"/><path d="M71 68v8" stroke="#60452f" stroke-width="4"/></symbol>
 <symbol id="siege_workshop" viewBox="0 0 100 90"><path d="M7 64 50 43 94 64 50 86Z" fill="#607849" stroke="#324f35" stroke-width="2"/><path d="M16 65 50 49 85 65 50 82Z" fill="#9d9167"/><path d="M17 34h43v33H17Z" fill="#ad9977" stroke="#594c3a" stroke-width="2"/><path d="M60 34l12 -8v33l-12 8Z" fill="#6e6958"/><path d="M13 34l25.5 -22 25.5 22Z" fill="#69513c" stroke="#283946" stroke-width="2"/><path d="M64 34l12 -8 -25.5 -22 -12 8Z" fill="#233d54"/><path d="M33.5 67v-16q5 -8 10 0v16" fill="#443326"/><path d="M24 42h8v10h-8Z M45 42h8v10h-8Z" fill="#e4bc72"/><circle cx="70" cy="65" r="11" fill="#875d35" stroke="#d3b580" stroke-width="3"/><path d="M70 54v22m-11-11h22M57 55l18-22 7 4" stroke="#573c28" stroke-width="3"/></symbol>
 <symbol id="embassy" viewBox="0 0 100 90"><path d="M7 64 50 43 94 64 50 86Z" fill="#607849" stroke="#324f35" stroke-width="2"/><path d="M16 65 50 49 85 65 50 82Z" fill="#9d9167"/><path d="M22 33h51v34H22Z" fill="#ad9977" stroke="#594c3a" stroke-width="2"/><path d="M73 33l12 -8v34l-12 8Z" fill="#6e6958"/><path d="M18 33l29.5 -22 29.5 22Z" fill="#355f80" stroke="#283946" stroke-width="2"/><path d="M77 33l12 -8 -29.5 -22 -12 8Z" fill="#233d54"/><path d="M42.5 67v-16q5 -8 10 0v16" fill="#443326"/><path d="M29 41h8v10h-8Z M58 41h8v10h-8Z" fill="#e4bc72"/><path d="M35 33v-13l15 4-15 4m22 5v-13l15 4-15 4" fill="#cba75a" stroke="#e3c37a" stroke-width="2"/></symbol>
-<symbol id="warehouse" viewBox="0 0 100 90"><path d="M7 64 50 43 94 64 50 86Z" fill="#607849" stroke="#324f35" stroke-width="2"/><path d="M16 65 50 49 85 65 50 82Z" fill="#9d9167"/><path d="M22 35h50v33H22Z" fill="#ad9977" stroke="#594c3a" stroke-width="2"/><path d="M72 35l12 -8v33l-12 8Z" fill="#6e6958"/><path d="M18 35l29 -22 29 22Z" fill="#68523e" stroke="#283946" stroke-width="2"/><path d="M76 35l12 -8 -29 -22 -12 8Z" fill="#233d54"/><path d="M42 68v-16q5 -8 10 0v16" fill="#443326"/><path d="M29 43h8v10h-8Z M57 43h8v10h-8Z" fill="#e4bc72"/><path d="M13 60h17v13H13Zm56 1h18v13H69Z" fill="#a37c49" stroke="#5c3e2b" stroke-width="2"/><path d="m13 60 17 13m39-12 18 13" stroke="#d4a86b"/></symbol></svg>
+<symbol id="warehouse" viewBox="0 0 100 90"><path d="M7 64 50 43 94 64 50 86Z" fill="#607849" stroke="#324f35" stroke-width="2"/><path d="M16 65 50 49 85 65 50 82Z" fill="#9d9167"/><path d="M22 35h50v33H22Z" fill="#ad9977" stroke="#594c3a" stroke-width="2"/><path d="M72 35l12 -8v33l-12 8Z" fill="#6e6958"/><path d="M18 35l29 -22 29 22Z" fill="#68523e" stroke="#283946" stroke-width="2"/><path d="M76 35l12 -8 -29 -22 -12 8Z" fill="#233d54"/><path d="M42 68v-16q5 -8 10 0v16" fill="#443326"/><path d="M29 43h8v10h-8Z M57 43h8v10h-8Z" fill="#e4bc72"/><path d="M13 60h17v13H13Zm56 1h18v13H69Z" fill="#a37c49" stroke="#5c3e2b" stroke-width="2"/><path d="m13 60 17 13m39-12 18 13" stroke="#d4a86b"/></symbol><symbol id="dragon_nest" viewBox="0 0 100 90">
+<path d="M6 64 50 42 94 64 50 87Z" fill="#536f4d" stroke="#2e4937" stroke-width="2"/>
+<path d="M13 61 50 42 87 61 87 69 50 83 13 69Z" fill="#6d7370" stroke="#343c39" stroke-width="2"/>
+<path d="M13 61 50 42 87 61 50 76Z" fill="#b7aa91" stroke="#615d50" stroke-width="2"/>
+<ellipse cx="50" cy="55" rx="34" ry="19" fill="#59412e" stroke="#3d3026" stroke-width="2"/>
+<ellipse cx="50" cy="53" rx="25" ry="12" fill="#8c6b42" stroke="#d0ab6d" stroke-width="2"/>
+<path d="M17 51 30 41 42 37M20 62 38 69 59 71M78 42 87 53 79 63M27 43 45 38M62 40 78 44M32 66 55 73M67 67 83 59" fill="none" stroke="#b18a57" stroke-width="4" stroke-linecap="round"/>
+<path d="M33 52C24 48 29 30 36 27 44 31 48 47 41 52Z" fill="#d5b575" stroke="#7e5e36" stroke-width="2"/>
+<path d="M50 60C41 54 45 33 53 28 64 32 68 52 60 60Z" fill="#c98953" stroke="#754735" stroke-width="2"/>
+<path d="M64 48C58 43 62 29 69 24 78 30 80 44 73 48Z" fill="#8fb9bf" stroke="#4d7581" stroke-width="2"/>
+<path d="m33 37 4-4 3 8-5 5m16-7 5-4 3 8-6 6m14-18 4-3 3 6-4 4" fill="none" stroke="#f4dfa6" stroke-width="1.5"/>
+<path d="M20 58 38 67 55 69 74 62 84 53" fill="none" stroke="#d5ad71" stroke-width="2"/>
+</symbol>
+<symbol id="summon_altar" viewBox="0 0 100 90">
+<path d="M6 64 50 43 94 64 50 87Z" fill="#536f4d" stroke="#2e4937" stroke-width="2"/>
+<path d="M12 63 50 45 88 63 88 70 50 85 12 70Z" fill="#666a79" stroke="#34394c" stroke-width="2"/>
+<path d="M12 63 50 45 88 63 50 78Z" fill="#a2a4ad" stroke="#626473" stroke-width="2"/>
+<path d="M24 61 50 48 76 61 50 73Z" fill="#44536e" stroke="#c6a66c" stroke-width="2"/>
+<path d="M30 54 50 45 70 54 70 62 50 70 30 62Z" fill="#4e4866" stroke="#d5b875" stroke-width="2"/>
+<path d="M21 33h10v26H21Zm48 0h10v26H69ZM45 15h10v26H45Z" fill="#9a9daa" stroke="#514f64" stroke-width="2"/>
+<path d="M18 30h16v6H18Zm48 0h16v6H66ZM42 12h16v6H42Z" fill="#e4bd72" stroke="#866339" stroke-width="2"/>
+<path d="M26 28 50 13 74 28 74 33 50 20 26 33Z" fill="#77708b" stroke="#e5c580" stroke-width="2"/>
+<path d="M50 28 63 43 50 58 37 43Z" fill="#629dd3" stroke="#bcecf5" stroke-width="2"/>
+<path d="M50 28 50 58 37 43 50 38 63 43Z" fill="#93c5e1" stroke="#d1eaf2" stroke-width="1.4"/>
+<path d="M50 23v-5m19 25h6m-44 0h-6m25 20v5" stroke="#f4d58a" stroke-width="2"/>
+<path d="M38 63 50 68 62 63" fill="none" stroke="#edd18a" stroke-width="2"/>
+</symbol>
+</svg>

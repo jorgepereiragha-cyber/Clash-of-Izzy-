@@ -592,8 +592,8 @@
       "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
       "license": "CC0-1.0",
       "attribution": "Quaternius Medieval Village Pack — Quaternius",
-      "sha256": "264fc6abe5be8c091a1c6f293dce9e8ae79b96b50ccec45f0a7fb12201db1d7c",
-      "bytes": 670832,
+      "sha256": "f469580f07c0a907694869dccfea9f2416081be895f5d3aa07783de82ecfe74d",
+      "bytes": 463796,
       "licenseFile": "licenses/Quaternius-CC0.txt",
       "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/medieval_village_pack/Blacksmith.glb"
     }
@@ -606,6 +606,1097 @@
     "wood": {
       "color": "/assets/3d/materials/wood-color.jpg",
       "normal": "/assets/3d/materials/wood-normal.jpg"
+    }
+  },
+  "entityArt": {
+    "schema": 1,
+    "world": "eldoria",
+    "qualityTiers": [
+      "low",
+      "balanced",
+      "high"
+    ],
+    "qualityAliases": {
+      "medium": "balanced"
+    },
+    "buildings": {
+      "castle": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "castle",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "barracks": {
+        "webgl": {
+          "modelIds": [
+            "kaykit-blue-barracks"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "barracks",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "farm": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-farm"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "farm",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "quarry": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "quarry",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "lumber_mill": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-lumber-mill"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "lumber_mill",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "iron_mine": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "iron_mine",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "market": {
+        "webgl": {
+          "modelIds": [
+            "kaykit-blue-market"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "market",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "academy": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-academy"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "academy",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "wall": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "wall",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "hospital": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "hospital",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "watchtower": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "watchtower",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "stable": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-stable"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "stable",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "archery_range": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-archery-range"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "archery_range",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "siege_workshop": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-siege-workshop"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "siege_workshop",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "embassy": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-embassy"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "embassy",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "warehouse": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-warehouse"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "warehouse",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "castle_gate": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-castle-gate"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": null
+      },
+      "dragon_nest": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "dragon_nest",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "summon_altar": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "summon_altar",
+          "viewBox": "0 0 100 90"
+        }
+      }
+    },
+    "dragons": {
+      "ember_wyrm": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-equipped-dragon"
+          ],
+          "sharedModel": true,
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "dragon-ember_wyrm",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "mist_talon": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-equipped-dragon"
+          ],
+          "sharedModel": true,
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "dragon-mist_talon",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "frost_glimmer": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-equipped-dragon"
+          ],
+          "sharedModel": true,
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "dragon-frost_glimmer",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "storm_rune": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-equipped-dragon"
+          ],
+          "sharedModel": true,
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "dragon-storm_rune",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "jade_guardian": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-equipped-dragon"
+          ],
+          "sharedModel": true,
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "dragon-jade_guardian",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "abyss_wing": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-equipped-dragon"
+          ],
+          "sharedModel": true,
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "dragon-abyss_wing",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "sun_ascendant": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-equipped-dragon"
+          ],
+          "sharedModel": true,
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "dragon-sun_ascendant",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "astral_aegis": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-equipped-dragon"
+          ],
+          "sharedModel": true,
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "dragon-astral_aegis",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "imperial_drake": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-equipped-dragon"
+          ],
+          "sharedModel": true,
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "dragon-imperial_drake",
+          "viewBox": "0 0 100 100"
+        }
+      }
+    },
+    "troops": {
+      "militia": {
+        "webgl": {
+          "modelIds": [
+            "kaykit-adventurers-militia"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-militia",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "swordsman": {
+        "webgl": {
+          "modelIds": [
+            "quaternius-swordsman"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-swordsman",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "spearman": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-spearman",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "archer": {
+        "webgl": {
+          "modelIds": [
+            "kenney-archer"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-archer",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "crossbowman": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-crossbowman",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "cavalry": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-cavalry",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "knight": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-knight",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "mage": {
+        "webgl": {
+          "modelIds": [
+            "kaykit-adventurers-mage"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-mage",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "catapult": {
+        "webgl": {
+          "modelIds": [
+            "kenney-siege-catapult"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-catapult",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "ram": {
+        "webgl": {
+          "modelIds": [
+            "kenney-siege-ram"
+          ],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-ram",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "trebuchet": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "troop-trebuchet",
+          "viewBox": "0 0 100 100"
+        }
+      }
+    },
+    "heroes": {
+      "soldado_basico": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "guard",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "arqueiro_comum": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "archer",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "cavaleiro_iniciante": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "knight",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "curandeiro_aldeia": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "healer",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "capitao_espada": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "commander",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "mestre_arco": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "master-archer",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "cavaleiro_dragao": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "dragon-knight",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "sacerdotisa_luar": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "moon-priestess",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "rei_artur": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "arthur",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "merlin_arquimago": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "mage",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "joana_darc": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "valkyrie",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "genghis_khan": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "raider",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "kael_sunwarden": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "kael",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "amun_ra_solar": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "amun-ra",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "anubis_duat": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "anubis",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "isis_eternal_wings": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "isis",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "horus_eternal_eye": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "horus",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "sekhmet_crimson_lioness": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "sekhmet",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_01": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-01",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_02": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-02",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_03": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-03",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_04": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-04",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_05": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-05",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_06": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-06",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_07": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-07",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_08": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-08",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_09": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-09",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_10": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-10",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_11": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-11",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_12": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-12",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_13": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-13",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_white_14": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-white-14",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_15": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-15",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_16": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-16",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_17": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-17",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_18": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-18",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_19": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-19",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_20": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-20",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_21": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-21",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_22": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-22",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_23": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-23",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_24": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-24",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_25": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-25",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_26": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-26",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_blue_27": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-blue-27",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_purple_28": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-purple-28",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_purple_29": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-purple-29",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_purple_30": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-purple-30",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_purple_31": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-purple-31",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_purple_32": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-purple-32",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_purple_33": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-purple-33",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_purple_34": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-purple-34",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_purple_35": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-purple-35",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_purple_36": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-purple-36",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_37": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-37",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_38": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-38",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_39": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-39",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_40": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-40",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_41": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-41",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_42": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-42",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_43": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-43",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_44": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-44",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_45": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-45",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_46": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-46",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "eldoria_gold_47": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "eldoria-gold-47",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "odin_awakened": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "odin",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "thor_ragnarok": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "thor",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "freya_vanir": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "freya",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "loki_chaos": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "loki",
+          "viewBox": "0 0 320 480"
+        }
+      },
+      "valhalla_king": {
+        "canvas2d": {
+          "atlas": "art/heroes/portraits.svg",
+          "symbol": "valhalla-king",
+          "viewBox": "0 0 320 480"
+        }
+      }
+    },
+    "resources": {
+      "food": {
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "resource-food",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "wood": {
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "resource-wood",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "stone": {
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "resource-stone",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "iron": {
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "resource-iron",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "gold": {
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "resource-gold",
+          "viewBox": "0 0 100 100"
+        }
+      },
+      "gems": {
+        "canvas2d": {
+          "atlas": "art/eldoria/hud.svg",
+          "symbol": "resource-gems",
+          "viewBox": "0 0 100 100"
+        }
+      }
+    },
+    "science": {
+      "scholarship": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "scholarship",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "conscription": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "conscription",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "field_logistics": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "field_logistics",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "military_medicine": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "military_medicine",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "imperial_attack": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "imperial_attack",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "imperial_defense": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "imperial_defense",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "imperial_health": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "imperial_health",
+          "viewBox": "0 0 512 512"
+        }
+      }
     }
   }
 }
