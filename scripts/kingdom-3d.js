@@ -1186,26 +1186,36 @@ if (host && "WebGLRenderingContext" in window) {
     const fitZoom = Math.min(1, viewportWidth / projectedWidth, viewportHeight / projectedHeight);
     camera.zoom = fitZoom * cameraZoomFactor;
     camera.updateProjectionMatrix();
-    const castle = activeModels.find(model => model.userData.coIType === "castle");
-    if (castle) {
-      // Fit the actual castle and its ornaments before applying manual zoom.
-      const bounds = new THREE.Box3().setFromObject(castle);
-      const corner = new THREE.Vector3();
-      let extent = 0;
+    // Fit every visible static structure, not only the castle. Taller
+    // landmarks and newly decoded building models must remain inside the
+    // overview after a tier change, asset refresh or orientation change.
+    const extent = cityStructureFrameExtent();
+    const safeExtent = .94 * cameraZoomFactor;
+    if (extent > safeExtent && Number.isFinite(extent)) {
+      camera.zoom *= safeExtent / extent;
+      camera.updateProjectionMatrix();
+    }
+  }
+  function cityStructureFrameExtent() {
+    if (!camera) return 0;
+    const bounds = new THREE.Box3();
+    const corner = new THREE.Vector3();
+    let extent = 0;
+    for (const model of activeModels) {
+      if (cameraFocusCenter && model.userData.coISpecial) continue;
+      bounds.setFromObject(model);
+      if (bounds.isEmpty()) continue;
       for (const x of [bounds.min.x, bounds.max.x]) {
         for (const y of [bounds.min.y, bounds.max.y]) {
           for (const z of [bounds.min.z, bounds.max.z]) {
             corner.set(x,y,z).project(camera);
-            extent = Math.max(extent, Math.abs(corner.x), Math.abs(corner.y));
+            const projected = Math.max(Math.abs(corner.x), Math.abs(corner.y));
+            if (Number.isFinite(projected)) extent = Math.max(extent, projected);
           }
         }
       }
-      const safeExtent = .94 * cameraZoomFactor;
-      if (extent > safeExtent && Number.isFinite(extent)) {
-        camera.zoom *= safeExtent / extent;
-        camera.updateProjectionMatrix();
-      }
     }
+    return extent;
   }
   function publishBuildingHitTargets(buildings = latestBuildings) {
     if (!host || !camera || !renderer || disposed) return;
@@ -1821,6 +1831,7 @@ if (host && "WebGLRenderingContext" in window) {
         scannedMaterials:[...scannedSurfaceMaps.keys()].sort(),
         scannedMaterialsPending,
         cameraFocus:cameraFocusCenter?"center":"overview",
+        cityStructureFrameExtent: cityStructureFrameExtent(),
         cityArtLayout:activeModels.filter(m=>!m.userData.coISpecial).map(m=>({type:m.userData.coIType,x:m.position.x,z:m.position.z,scale:m.userData.coIArtScale})),
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
