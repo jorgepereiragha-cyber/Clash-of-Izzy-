@@ -11,7 +11,7 @@ test("bundled Kenney and KayKit assets keep CC0 provenance and a bounded local f
   assert.ok(manifest.props.length >= 2);
   assert.ok(manifest.units.some(item => item.unit_type === "archer"));
   for (const asset of [...manifest.models, ...manifest.props, ...manifest.units]) {
-    assert.equal(asset.enabled, asset.id !== "kaykit-blue-iron-mine", asset.id);
+    assert.equal(asset.enabled, !["kaykit-blue-iron-mine", "kenney-castle-watchtower", "kenney-castle-wall"].includes(asset.id), asset.id);
     assert.equal(asset.license, "CC0-1.0");
     assert.match(asset.sourceUrl, /^https:\/\/(?:kenney\.nl\/assets\/|github\.com\/KayKit-Game-Assets\/KayKit-Medieval-Hexagon-Pack-1\.0\/tree\/[a-f0-9]{40}$)/);
     assert.ok(asset.src.startsWith("/assets/3d/"));
