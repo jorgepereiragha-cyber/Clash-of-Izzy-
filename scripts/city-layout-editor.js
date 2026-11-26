@@ -1,3 +1,4 @@
+import {loadEntityManifest,resolveBuilding2DAsset,loadEntityCanvasImage,peekEntityCanvasImage} from "./kingdom-2d-art-atlas.js";
 /* Editor de layout 2D: prévia local; apenas o Worker decide e persiste a posição. */
 const root = document.getElementById("coiCityLayout");
 if (root) {
@@ -16,11 +17,28 @@ if (root) {
   })];
   const defenses = () => window.__coiCityLayoutState?.()?.cityDefenses || [];
   const selected = () => buildings().find(item => item.building_type === selector.value);
-  let moving = false;
+  let moving = false, artManifest=null, artSignature=null, artPending=false;
+  function prepareArt(rows){
+    if(!artManifest||artPending||!root.open)return;
+    const ids=[...new Set(rows.map(b=>b.building_type))];
+    const signature=ids.join('|');
+    if(signature===artSignature)return;
+    artPending=true;
+    Promise.all(ids.map(id=>{const asset=resolveBuilding2DAsset(artManifest,id);return asset?loadEntityCanvasImage(asset).catch(()=>null):null;})).then(()=>{artSignature=signature;}).finally(()=>{artPending=false;draw();});
+  }
+  function paintBuildingArt(id,x,y,w,h){
+    const asset=artManifest&&resolveBuilding2DAsset(artManifest,id),image=asset&&peekEntityCanvasImage(asset);
+    if(!image)return false;
+    const size=Math.min(w,h)*.86;
+    if(size<=0)return false;
+    try{ctx.drawImage(image,x+(w-size)/2,y+(h-size)/2,size,size);return true;}catch{return false;}
+  }
 
   function draw() {
     const layout = config(), rows = buildings();
     if (!layout || !ctx) return;
+    prepareArt(rows);
+    let specialArtCount=0;
     const min = layout.min, tiles = layout.max - layout.min;
     const unit = canvas.width / tiles;
     const current = selected();
@@ -50,14 +68,18 @@ if (root) {
       ctx.fillRect(px,py,fp.width*unit,fp.height*unit);
       ctx.strokeStyle = "#e8e0c5";
       ctx.strokeRect(px,py,fp.width*unit,fp.height*unit);
-      if(b.special){ctx.fillStyle="#fff";ctx.font="bold 10px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(b.building_type==="dragon_nest"?"N":"A",px+fp.width*unit/2,py+fp.height*unit/2);}
+      const painted=paintBuildingArt(b.building_type,px,py,fp.width*unit,fp.height*unit);
+      if(b.special&&painted)specialArtCount++;
+      if(b.special&&!painted){ctx.fillStyle="#fff";ctx.font="bold 10px sans-serif";ctx.textAlign="center";ctx.textBaseline="middle";ctx.fillText(b.building_type==="dragon_nest"?"N":"A",px+fp.width*unit/2,py+fp.height*unit/2);}
     });
+    canvas.dataset.specialArtCount=String(specialArtCount);
     if (size && Number.isFinite(x) && Number.isFinite(z)) {
       ctx.fillStyle = valid ? "rgba(85,225,135,.42)" : "rgba(244,88,88,.53)";
       ctx.fillRect((x-min)*unit,(z-min)*unit,size.width*unit,size.height*unit);
       ctx.strokeStyle = valid ? "#8ef0af" : "#ff8585";
       ctx.lineWidth = 2;
       ctx.strokeRect((x-min)*unit,(z-min)*unit,size.width*unit,size.height*unit);
+      if(current?.special)paintBuildingArt(current.building_type,(x-min)*unit,(z-min)*unit,size.width*unit,size.height*unit);
     }
     submit.disabled = moving || !valid || !current ||
       (current.position_x!==null && Number(current.position_x) === x && Number(current.position_z) === z);
@@ -162,5 +184,6 @@ if (root) {
   });
   window.addEventListener("coi:kingdom-render",refresh);
   root.addEventListener("toggle",() => { if(root.open) refresh(); });
+  loadEntityManifest().then(manifest=>{artManifest=manifest;if(root.open)draw();}).catch(()=>{/* occupancy grid stays functional */});
   refresh();
 }
