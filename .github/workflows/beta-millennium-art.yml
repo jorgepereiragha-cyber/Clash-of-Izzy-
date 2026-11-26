@@ -33,8 +33,9 @@ jobs:
       - name: Convert static art
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y blender
-          blender --background --disable-autoexec --python-exit-code 1 --python scripts/convert-millennium-fortress.py -- art-candidates
+          sudo apt-get install -y blender python3-numpy
+          /usr/bin/blender --background --disable-autoexec --python-exit-code 1 --python-expr 'import numpy; print(numpy.__version__)'
+          /usr/bin/blender --background --disable-autoexec --python-exit-code 1 --python scripts/convert-millennium-fortress.py -- art-candidates
           cd art-candidates
           sha256sum *.dae *.png *.glb > SHA256SUMS.txt
       - uses: actions/upload-artifact@v4
