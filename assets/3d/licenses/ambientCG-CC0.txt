@@ -1,0 +1,6 @@
+ambientCG — Bricks 100
+Source: https://ambientcg.com/view?id=Bricks100
+License: Creative Commons CC0 1.0 Universal
+https://docs.ambientcg.com/license/
+https://creativecommons.org/publicdomain/zero/1.0/
+Imported unchanged from pinned public mirror as recorded in manifest.json.

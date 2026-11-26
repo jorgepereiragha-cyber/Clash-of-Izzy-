@@ -989,7 +989,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           return info?.available && info.loadedGlbTemplates?.buildings >= 2 &&
             info.loadedGlbTemplates?.props >= 2 && info.loadedGlbTemplates?.units >= 1 &&
             info.pendingGlbLoads === 0 &&
-            info.drawCalls > 0 && info.triangles > 0;
+            info.drawCalls > 0 && info.triangles > 0 && !info.scannedMaterialsPending && info.scannedMaterials?.length===2;
         }, null, {timeout:45_000});
         const refreshCounts = await page.evaluate(async () => {
           const before = window.__coiKingdomDiagnostics().optionalSceneRefreshes;

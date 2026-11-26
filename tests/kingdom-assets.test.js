@@ -104,3 +104,14 @@ test("fortified castle gate uses embedded stone, wood and heraldry materials",as
 test("catapult and ram use existing licensed castle kit texture without duplicate files",async()=>{
  for(const type of ["catapult","ram"]){const a=manifest.units.find(x=>x.unit_type===type);assert.ok(a?.enabled);assert.equal(a.maxInstances,2);const b=await readFile(toUrl(a.src));const g=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());assert.ok(g.meshes.length>=6);assert.deepEqual(g.images.map(x=>x.uri),["Textures/colormap.png"]);assert.equal(manifest.files[a.src].license,"CC0-1.0");}
 });
+
+test("photo-scanned stone and timber are audited local CC0 maps with a mobile budget",async()=>{
+ const {CITY_SCANNED_MATERIALS,scannedMaterialResolution,neutralizeScanColor}=await import("../scripts/city-scanned-materials.js");
+ assert.deepEqual(CITY_SCANNED_MATERIALS,manifest.scannedMaterials);
+ let total=0;for(const paths of Object.values(CITY_SCANNED_MATERIALS))for(const src of Object.values(paths)){const b=await readFile(toUrl(src));assert.equal(b.readUInt16BE(0),0xffd8);assert.equal(b.readUInt16BE(b.length-2),0xffd9);assert.equal(manifest.files[src].bytes,b.length);assert.equal(manifest.files[src].license,"CC0-1.0");total+=b.length;}
+ assert.ok(total<=2100000);
+ assert.equal(scannedMaterialResolution({tier:"low",loadOptionalAssets:false,pbrMaps:false}),0);
+ assert.equal(scannedMaterialResolution({tier:"balanced",loadOptionalAssets:true,pbrMaps:true}),256);
+ assert.equal(scannedMaterialResolution({tier:"high",loadOptionalAssets:true,pbrMaps:true}),512);
+ const p=neutralizeScanColor(Uint8ClampedArray.from([10,20,30,255,90,100,110,255]));assert.ok(p[0]===p[1]&&p[1]===p[2]&&p[0]<p[4]&&p[3]===255);
+});

@@ -14,6 +14,7 @@ import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
 import { approvedManifestEntry } from "./art-license-policy.js";
+import { CITY_SCANNED_MATERIALS, scannedMaterialResolution, neutralizeScanColor } from "./city-scanned-materials.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -81,6 +82,8 @@ if (host && "WebGLRenderingContext" in window) {
   const sharedMaterials = new Set(Object.values(mats));
   const surfaceTextureCache = new Map();
   const surfaceMaterialCache = new Map();
+  const scannedSurfaceMaps = new Map();
+  let scannedMaterialsPending=false;
   let disposed = false;
   let kingdomRenderHandler = null;
   let kingdomZoomHandler = null;
@@ -200,10 +203,12 @@ if (host && "WebGLRenderingContext" in window) {
       if (mat.map) resources.textures.add(mat.map);
     }
     for(const mat of surfaceMaterialCache.values())resources.materials.add(mat);
+    for(const maps of scannedSurfaceMaps.values())for(const texture of Object.values(maps))resources.textures.add(texture);
     disposeResourceSet(resources);
     scene?.clear();
     surfaceTextureCache.clear();
     surfaceMaterialCache.clear();
+    scannedSurfaceMaps.clear();
     glbTemplates.clear();
     glbPropTemplates.clear();
     glbUnitTemplates.clear();
@@ -382,9 +387,49 @@ if (host && "WebGLRenderingContext" in window) {
       metalness: 0.01
     });
     // Evita recompilar materiais iguais após cada atualização de estado.
+    applyScannedSurface(mat,kind,base);
     surfaceMaterialCache.set(key,mat);
     sharedMaterials.add(mat);
     return mat;
+  }
+  function applyScannedSurface(mat,kind,base,disposePrevious=false){
+    const maps=scannedSurfaceMaps.get(kind);if(!maps)return;
+    if(disposePrevious)for(const name of ["map","normalMap","roughnessMap"])if(mat[name]&&!Object.values(maps).includes(mat[name]))mat[name].dispose();
+    mat.map=maps.map;mat.normalMap=maps.normalMap;mat.roughnessMap=null;
+    mat.color.set(base);mat.roughness=.9;mat.normalScale.set(.72,.72);mat.needsUpdate=true;
+  }
+  async function loadScannedCityMaterials(){
+    const resolution=scannedMaterialResolution(qualityProfile);
+    if(!resolution)return;
+    scannedMaterialsPending=true;
+    const loader=new THREE.ImageLoader();
+    await Promise.allSettled(Object.entries(CITY_SCANNED_MATERIALS).map(async ([kind,paths])=>{
+      const [color,normal]=await Promise.all([loader.loadAsync(paths.color),loader.loadAsync(paths.normal)]);
+      if(disposed||!renderer||!scene)return;
+      const createMap=(image,isColor)=>{
+        const canvas=document.createElement("canvas");canvas.width=resolution;
+        canvas.height=Math.max(1,Math.round(resolution*image.height/image.width));
+        const ctx=canvas.getContext("2d");if(!ctx)throw Error("Canvas indisponível");
+        ctx.drawImage(image,0,0,canvas.width,canvas.height);
+        if(isColor){const data=ctx.getImageData(0,0,canvas.width,canvas.height);neutralizeScanColor(data.data);ctx.putImageData(data,0,0);}
+        const map=new THREE.CanvasTexture(canvas);
+        map.colorSpace=isColor?THREE.SRGBColorSpace:THREE.NoColorSpace;
+        map.wrapS=map.wrapT=THREE.RepeatWrapping;map.repeat.set(1.5,1.5);
+        map.anisotropy=Math.min(qualityProfile.anisotropy,renderer.capabilities.getMaxAnisotropy());
+        return map;
+      };
+      let map,normalMap;
+      try{map=createMap(color,true);normalMap=createMap(normal,false);}
+      catch(error){map?.dispose();normalMap?.dispose();throw error;}
+      scannedSurfaceMaps.set(kind,{map,normalMap});
+      if(kind==="stone"){
+        applyScannedSurface(mats.stone,kind,"#9c9b8b",true);
+        applyScannedSurface(mats.darkStone,kind,"#555d5c",true);
+      }else if(kind==="wood")applyScannedSurface(mats.wood,kind,"#a78a6b",true);
+      for(const [key,mat] of surfaceMaterialCache){const [base,materialKind]=key.split(":");if(materialKind===kind)applyScannedSurface(mat,kind,base);}
+    }));
+    scannedMaterialsPending=false;
+    if(!disposed&&renderer&&scene&&camera)renderer.render(scene,camera);
   }
   function applyProceduralSurfaceMaps() {
     const maps = [
@@ -1489,6 +1534,7 @@ if (host && "WebGLRenderingContext" in window) {
     setKingdomValhallaMode(valhallaModeActive);
     applyProceduralSurfaceMaps();
     buildGround();
+    void loadScannedCityMaterials();
     if (qualityProfile.tier === "high" && !qualityProfile.prefersReducedMotion) {
       try {
         advancedShaders = new AdvancedShaders(scene, renderer, camera, THREE);
@@ -1530,6 +1576,8 @@ if (host && "WebGLRenderingContext" in window) {
         shadows: renderer.shadowMap.enabled,
         premiumWater: Boolean(waterFeature),
         contactShadowInstances:contactShadowBatch?.count||0,
+        scannedMaterials:[...scannedSurfaceMaps.keys()].sort(),
+        scannedMaterialsPending,
         cameraFocus:cameraFocusCenter?"center":"overview",
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
