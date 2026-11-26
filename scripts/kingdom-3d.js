@@ -531,8 +531,9 @@ if (host && "WebGLRenderingContext" in window) {
   function addEldoriaCastle(group,level,skin,wall,roof,stone,accent){
     const tier=level>=30?4:level>=20?3:level>=10?2:1;
     const high=qualityProfile?.tier==="high",low=qualityProfile?.tier==="low";
-    const keepHeight=1.66+(tier-1)*.23;
-    const towerHeight=1.37+(tier-1)*.17;
+    // Broad, squat fortress at the start; taller royal palace only at late tiers.
+    const keepHeight=[1.32,1.55,1.91,2.35][tier-1];
+    const towerHeight=[.83,1.02,1.20,1.43][tier-1];
     group.userData.coIArchitecture="eldoria-imperial-v1";
     group.userData.coIArchitectureTier=tier;
     box(group,1.75,.15,1.52,mats.darkStone,0,.075,0);
@@ -607,32 +608,82 @@ if (host && "WebGLRenderingContext" in window) {
       box(group,.44,.075,.08,accent,0,.74,.725);
     }
     box(group,.66,.09,.24,stone,0,.09,.77);
+    // A broad front gatehouse and low stone curtain make the keep read as a
+    // fortress rather than a single tall tower at the mobile overview scale.
+    const frontHeight=.52+(tier-1)*.07;
+    for(const side of [-1,1]){
+      box(group,.39,frontHeight,.29,wall,side*.49,.19+frontHeight/2,.49);
+      box(group,.43,.085,.33,stone,side*.49,.19+frontHeight,.49);
+      for(const offset of [-.13,.13]){
+        box(group,.10,.13,.12,stone,side*.49+offset,.19+frontHeight+.10,.61);
+      }
+    }
     const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
     for(const [x,z] of towers){
-      addCylinder(group,.22,.26,towerHeight,stone,x,.25+towerHeight/2,z,low?6:10);
-      addCylinder(group,.29,.25,.13,stone,x,.25+towerHeight,z,low?6:10);
-      addCylinder(group,0,.30,.47+(tier-1)*.035,roof,x,.25+towerHeight+.30,z,low?6:10);
-      if(low)box(group,.09,.25,.04,mats.darkStone,x,.25+towerHeight*.65,z+.255);
-      else{
-        archWindow(x,.25+towerHeight*.52,z+.255,0,.14,.29);
-        archWindow(x+.255,.25+towerHeight*.52,z,Math.PI/2,.14,.29);
-        addCylinder(group,.245,.255,.045,wall,x,.25+towerHeight*.35,z,10);
-        addCylinder(group,.26,.25,.045,stone,x,.25+towerHeight*.79,z,10);
+      // Distinct late-game skyline: rear royal towers rise above the front defenses.
+      const royalRearTower=z<0&&tier>=3;
+      const cornerHeight=towerHeight+(royalRearTower?(tier===4?.46:.25):0);
+      const spireHeight=.47+(tier-1)*.035+(royalRearTower&&tier===4?.16:0);
+      addCylinder(group,.22,.26,cornerHeight,stone,x,.25+cornerHeight/2,z,low?6:10);
+      const capHeight=.13;
+      const capCenter=.25+cornerHeight;
+      const roofBase=capCenter+capHeight/2;
+      const roofPeak=roofBase+spireHeight;
+      addCylinder(group,.29,.25,capHeight,stone,x,capCenter,z,low?6:10);
+      // Front towers are military battlements; royal rear towers gain spires.
+      if(z>0){
+        addCylinder(group,.25,.27,.075,stone,x,roofBase+.025,z,low?6:10);
+        const merlons=low?4:6;
+        for(let i=0;i<merlons;i++){
+          const a=i*Math.PI*2/merlons;
+          const merlon=box(group,.11,.15,.10,stone,x+.21*Math.cos(a),roofBase+.13,z+.21*Math.sin(a));
+          merlon.rotation.y=-a;
+        }
+      }else{
+        addCylinder(group,0,.30,spireHeight,roof,x,roofBase+spireHeight/2,z,low?6:10);
       }
-      if(!low)box(group,.11,.04,.06,accent,x,.25+towerHeight*.65-.14,z+.26);
+      if(royalRearTower&&tier===4){
+        addCylinder(group,.025,.035,.16,accent,x,roofPeak+.08,z,6);
+        const crown=new THREE.Mesh(new THREE.OctahedronGeometry(.065),accent);
+        crown.position.set(x,roofPeak+.18,z);group.add(crown);
+      }
+      if(low)box(group,.09,.25,.04,mats.darkStone,x,.25+cornerHeight*.65,z+.255);
+      else{
+        archWindow(x,.25+cornerHeight*.52,z+.255,0,.14,.29);
+        archWindow(x+.255,.25+cornerHeight*.52,z,Math.PI/2,.14,.29);
+        addCylinder(group,.245,.255,.045,wall,x,.25+cornerHeight*.35,z,10);
+        addCylinder(group,.26,.25,.045,stone,x,.25+cornerHeight*.79,z,10);
+      }
+      if(!low)box(group,.11,.04,.06,accent,x,.25+cornerHeight*.65-.14,z+.26);
     }
     for(const x of [-.47,.47])box(group,.32,.56,.18,wall,x,.48,.55);
-    // Repeated crenellations add a recognizable fortified silhouette in one draw call.
+    // Continuous curtain walls support every merlon. Use one instanced
+    // batch for crenellations and preserve the gate opening and plot footprint.
+    const curtainHeight=.58+(tier-1)*.055;
+    const curtainTop=.16+curtainHeight;
+    box(group,1.30,curtainHeight,.14,wall,0,.16+curtainHeight/2,-.64);
+    box(group,1.38,.085,.22,stone,0,curtainTop+.035,-.64);
+    for(const x of [-.65,.65]){
+      box(group,.14,curtainHeight,1.04,wall,x,.16+curtainHeight/2,-.05);
+      box(group,.22,.085,1.08,stone,x,curtainTop+.035,-.05);
+    }
     const battlementPositions=[];
-    for(const x of [-.48,-.24,0,.24,.48])battlementPositions.push([x,.84,-.64]);
-    if(!low)for(const z of [-.38,-.12,.14])for(const x of [-.72,.72])battlementPositions.push([x,.84,z]);
+    for(const x of [-.48,-.24,0,.24,.48])battlementPositions.push([x,curtainTop+.16,-.64]);
+    if(!low)for(const z of [-.35,-.11,.13])for(const x of [-.65,.65])battlementPositions.push([x,curtainTop+.16,z]);
     const battlements=new THREE.InstancedMesh(new THREE.BoxGeometry(.13,.17,.13),stone,battlementPositions.length);
     const transform=new THREE.Object3D();
     battlementPositions.forEach(([x,y,z],i)=>{transform.position.set(x,y,z);transform.updateMatrix();battlements.setMatrixAt(i,transform.matrix);});
-    battlements.instanceMatrix.needsUpdate=true;battlements.computeBoundingSphere();group.add(battlements);
-    for(const z of [-.38,.23]){
-      box(group,.14,.58,.54,wall,-.65,.45,z);
-      box(group,.14,.58,.54,wall,.65,.45,z);
+    battlements.instanceMatrix.needsUpdate=true;battlements.computeBoundingSphere();
+    battlements.castShadow=true;battlements.receiveShadow=true;group.add(battlements);
+    if(!low){
+      // Stone stair approach and raised gate plinth, all within existing base.
+      for(let i=0;i<3;i++){
+        const w=.60-i*.065,h=.045*(i+1);
+        box(group,w,h,.12,stone,0,.025+h/2,.80-i*.07);
+      }
+      // Buttresses emphasize masonry on the visible outer walls.
+      for(const x of [-.65,.65])for(const z of [-.22,.12])
+        box(group,.23,curtainHeight*.73,.115,stone,x,.16+curtainHeight*.365,z);
     }
     if(low)for(const x of [-.24,.24]){
       box(group,.12,.30,.045,mats.darkStone,x,.25+keepHeight*.65,.32);
@@ -646,6 +697,24 @@ if (host && "WebGLRenderingContext" in window) {
       finial.position.set(0,1.13+keepHeight,-.12);group.add(finial);
     }
     if(high)for(const x of [-.48,-.24,0,.24,.48])box(group,.14,.16,.14,stone,x,.90,.51);
+    // Original stepped royal wings distinguish the late keep silhouettes.
+    // Geometry remains inside the curtain walls; no extra asset downloads.
+    if(tier>=3&&!low){
+      const wingHeight=keepHeight*(tier===4?.76:.57);
+      for(const side of [-1,1]){
+        const x=side*.48,z=-.29;
+        box(group,.28,wingHeight,.48,wall,x,.25+wingHeight/2,z);
+        box(group,.34,.085,.54,stone,x,.25+wingHeight,z);
+        const wingRoof=new THREE.Mesh(new THREE.ConeGeometry(.31,.36,4),roof);
+        wingRoof.rotation.y=Math.PI/4;
+        wingRoof.scale.set(.78,1,1.22);
+        wingRoof.position.set(x,.25+wingHeight+.18,z);
+        group.add(wingRoof);
+        archWindow(x,.25+wingHeight*.48,z+.247,0,.105,.22);
+        // The exposed outer facade remains readable from the isometric camera.
+        archWindow(x+side*.147,.25+wingHeight*.48,z,side*Math.PI/2,.105,.22);
+      }
+    }
     if(!low){
       const bannerMaterial=material(skin?.banner||"#E7BD68",.82);
       // The heraldic seal keeps the original royal palette and respects owned skins.
@@ -846,8 +915,27 @@ if (host && "WebGLRenderingContext" in window) {
         box(group, .2, .24, .2, mats.stone, i * .24, height + .14, .56);
       }
     } else if (type === "hospital") {
-      box(group, .16, .56, .08, material("#A9433B"), 0, .82, .67);
-      box(group, .48, .16, .08, material("#A9433B"), 0, .82, .67);
+      // Stone infirmary with a covered entrance and a readable medical crest.
+      const porchZ=bodyDepth/2+.14;
+      const red=material("#A9433B",.82);
+      box(group,.70,.09,.35,mats.stone,0,.09,porchZ);
+      for(const x of [-.28,.28]){
+        addCylinder(group,.065,.085,.61,mats.stone,x,.44,porchZ+.09,6);
+        box(group,.16,.06,.16,mats.stone,x,.75,porchZ+.09);
+      }
+      box(group,.78,.08,.39,mats.wood,0,.81,porchZ);
+      const porchRoof=new THREE.Mesh(new THREE.ConeGeometry(.51,.26,4),roof);
+      porchRoof.rotation.y=Math.PI/4;porchRoof.scale.z=.60;
+      porchRoof.position.set(0,.98,porchZ);porchRoof.castShadow=true;group.add(porchRoof);
+      box(group,.36,.37,.045,mats.stone,0,height+.09,facade+.035);
+      box(group,.085,.29,.035,red,0,height+.09,facade+.075);
+      box(group,.27,.085,.035,red,0,height+.09,facade+.075);
+      if(qualityProfile?.tier!=="low"){
+        for(const x of [-bodyWidth*.30,bodyWidth*.30]){
+          box(group,.24,.065,.11,mats.stone,x,height*.63-.14,facade+.025);
+          box(group,.24,.055,.095,mats.stone,x,height*.63+.14,facade+.025);
+        }
+      }
     } else if (type === "stable") {
       for (const sx of [-.52, .52]) box(group, .08, .55, .08, mats.wood, sx, .32, .76);
       for (const sy of [.2, .48]) box(group, 1.05, .07, .08, mats.wood, 0, sy, .76);
@@ -976,7 +1064,16 @@ if (host && "WebGLRenderingContext" in window) {
       const bounds=new THREE.Box3().setFromObject(model);
       return {minX:bounds.min.x,maxX:bounds.max.x,minZ:bounds.min.z,maxZ:bounds.max.z};
     });
-    const signature=JSON.stringify(plots.map(p=>Object.values(p).map(v=>Math.round(v*1000))));
+    // Paved civic forecourts fill otherwise bare grass inside reserved
+    // building plots. Rural production stays unpaved. The road and plaza
+    // geometry shares two draw calls and the existing scanned materials.
+    const plazas=plots.filter((plot,i)=>{
+      const model=activeModels[i],type=model.userData.coIType;
+      return !ruralTypes.has(type)&&type!=="wall"&&type!=="watchtower"&&
+        !model.userData.coISpecial&&Boolean(serverCityFootprint(type));
+    });
+    const signature=JSON.stringify({plots:plots.map(p=>Object.values(p).map(v=>Math.round(v*1000))),plazas});
+    
     if(signature===cityStreetSignature)return;
     cityStreetSignature=signature;
     for(const mesh of cityStreetMeshes){scene.remove(mesh);mesh.geometry.dispose();}
@@ -984,7 +1081,7 @@ if (host && "WebGLRenderingContext" in window) {
     const cells=planCityStreetCells(plots);
     // Never show the old arbitrary road on a populated layout.
     for(const mesh of legacyRoadMeshes)mesh.visible=plots.length<2;
-    if(!cells.length)return;
+    if(!cells.length&&!plazas.length)return;
     const keys=new Set(cells.map(({x,z})=>x+","+z));
     const tile=CITY_TILE_WORLD;
     function streetMesh(mat,y,inset){
@@ -1005,11 +1102,20 @@ if (host && "WebGLRenderingContext" in window) {
         if(keys.has(x+","+(z-1)))quad(x0+inset,z0,x1-inset,z0+inset);
         if(keys.has(x+","+(z+1)))quad(x0+inset,z1-inset,x1-inset,z1);
       }
+      for(const p of plazas){
+        // Keep a slim verge inside the authoritative footprint; the
+        // adjacent route cells remain outside the plot.
+        const pad=.025+inset;
+        if(p.maxX-p.minX>2*pad&&p.maxZ-p.minZ>2*pad)
+          quad(p.minX+pad,p.minZ+pad,p.maxX-pad,p.maxZ-pad);
+      }
+      if(!pos.length)return;
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
       geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uv,2));
       geometry.setIndex(indices);geometry.computeVertexNormals();
       const mesh=new THREE.Mesh(geometry,mat);mesh.receiveShadow=true;
+      mesh.userData.coIPlazaCount=plazas.length;
       scene.add(mesh);cityStreetMeshes.push(mesh);
     }
     streetMesh(mats.roadEdge,-.06,0);
@@ -1038,26 +1144,59 @@ if (host && "WebGLRenderingContext" in window) {
   function createSpecialLandmark(type){
     const group=new THREE.Group();
     group.userData.coIType=type;group.userData.coIProcedural=true;group.userData.coISpecial=true;
-    // Two compact original silhouettes; use shared scene materials and disposable geometry.
+    const low=qualityProfile?.tier==="low";
+    const segments=low?6:10;
     box(group,1.5,.15,1.5,mats.darkStone,0,.075,0);
     if(type==="dragon_nest"){
-      addCylinder(group,.65,.7,.32,mats.stone,0,.27,0,10);
+      // A fortified hatchery: stone retaining walls, a recessed nest, eggs
+      // and an open entrance, all within the existing 3x3 landmark footprint.
+      addCylinder(group,.70,.73,.15,mats.stone,0,.20,0,segments);
+      addCylinder(group,.49,.56,.09,mats.wood,0,.29,0,segments);
       for(let i=0;i<8;i++){
         const a=i*Math.PI/4;
-        const twig=box(group,.42,.12,.11,mats.wood,.58*Math.cos(a),.46,.58*Math.sin(a));
-        if(twig)twig.rotation.y=-a+Math.PI/2;
+        if(i!==2){
+          const rock=box(group,.43,.34+(i%3)*.045,.19,mats.stone,.59*Math.cos(a),.40,.59*Math.sin(a));
+          rock.rotation.y=-a+Math.PI/2;
+          const rim=box(group,.43,.07,.23,mats.darkStone,.59*Math.cos(a),.61+(i%3)*.02,.59*Math.sin(a));
+          rim.rotation.y=rock.rotation.y;
+        }
+        const twig=box(group,.40,.065,.085,mats.wood,.40*Math.cos(a),.35,.40*Math.sin(a));
+        twig.rotation.y=-a+Math.PI/2;
       }
-      for(const [x,z] of [[-.23,-.14],[.23,-.12],[0,.23]]){
-        const egg=new THREE.Mesh(new THREE.SphereGeometry(.18,8,6),mats.gold);
-        egg.scale.y=1.45;egg.position.set(x,.58,z);group.add(egg);
+      for(const x of [-.29,.29]){
+        addCylinder(group,.12,.15,.68,mats.stone,x,.48,.50,segments);
+        addCylinder(group,0,.15,.26,mats.roof,x,.95,.50,segments);
+      }
+      box(group,.34,.065,.22,mats.stone,0,.18,.61);
+      for(const [x,z,scale] of [[-.23,-.14,1],[.23,-.12,.87],[0,.23,1.08]]){
+        const egg=new THREE.Mesh(new THREE.SphereGeometry(.18,segments,low?6:10),mats.gold);
+        egg.scale.set(scale,scale*1.45,scale);
+        egg.position.set(x,.34+.18*scale*1.45,z);egg.castShadow=true;egg.receiveShadow=true;group.add(egg);
       }
     }else{
-      box(group,1.14,.14,1.14,mats.stone,0,.22,0);
-      for(const x of [-.48,.48])for(const z of [-.48,.48])addCylinder(group,.09,.12,.78,mats.stone,x,.68,z,6);
-      box(group,1.2,.12,1.2,mats.gold,0,1.12,0);
-      const crest=new THREE.Mesh(new THREE.OctahedronGeometry(.28),mats.window);
-      crest.position.y=1.43;group.add(crest);
-      box(group,.43,.28,.43,mats.roof,0,.42,0);
+      // Open royal summoning sanctuary: raised steps, colonnade, canopy and
+      // a suspended crystal focal point. No extra textures or dynamic lights.
+      box(group,1.30,.13,1.30,mats.stone,0,.21,0);
+      box(group,1.15,.11,1.15,mats.stone,0,.32,0);
+      box(group,.68,.08,.18,mats.stone,0,.20,.64);
+      for(const x of [-.48,.48])for(const z of [-.48,.48]){
+        addCylinder(group,.13,.15,.10,mats.stone,x,.40,z,segments);
+        addCylinder(group,.075,.105,.83,mats.stone,x,.86,z,segments);
+        addCylinder(group,.14,.11,.09,mats.gold,x,1.31,z,segments);
+      }
+      box(group,1.23,.12,1.23,mats.stone,0,1.40,0);
+      box(group,1.29,.055,1.29,mats.gold,0,1.48,0);
+      const canopy=new THREE.Mesh(new THREE.ConeGeometry(.89,.44,4),mats.roof);
+      canopy.rotation.y=Math.PI/4;canopy.position.y=1.71;canopy.castShadow=true;group.add(canopy);
+      addCylinder(group,.025,.055,.19,mats.gold,0,2.02,0,segments);
+      addCylinder(group,.24,.33,.22,mats.stone,0,.49,0,segments);
+      addCylinder(group,.32,.24,.075,mats.gold,0,.63,0,segments);
+      const crest=new THREE.Mesh(new THREE.OctahedronGeometry(.24),mats.window);
+      crest.position.y=.94;group.add(crest);
+      if(!low)for(const x of [-.48,.48]){
+        box(group,.14,.29,.035,mats.roof,x,1.12,.56);
+        box(group,.14,.035,.04,mats.gold,x,.99,.56);
+      }
     }
     return group;
   }
@@ -1087,6 +1226,36 @@ if (host && "WebGLRenderingContext" in window) {
     const fitZoom = Math.min(1, viewportWidth / projectedWidth, viewportHeight / projectedHeight);
     camera.zoom = fitZoom * cameraZoomFactor;
     camera.updateProjectionMatrix();
+    // Fit every visible static structure, not only the castle. Taller
+    // landmarks and newly decoded building models must remain inside the
+    // overview after a tier change, asset refresh or orientation change.
+    const extent = cityStructureFrameExtent();
+    const safeExtent = .94 * cameraZoomFactor;
+    if (extent > safeExtent && Number.isFinite(extent)) {
+      camera.zoom *= safeExtent / extent;
+      camera.updateProjectionMatrix();
+    }
+  }
+  function cityStructureFrameExtent() {
+    if (!camera) return 0;
+    const bounds = new THREE.Box3();
+    const corner = new THREE.Vector3();
+    let extent = 0;
+    for (const model of activeModels) {
+      if (cameraFocusCenter && model.userData.coISpecial) continue;
+      bounds.setFromObject(model);
+      if (bounds.isEmpty()) continue;
+      for (const x of [bounds.min.x, bounds.max.x]) {
+        for (const y of [bounds.min.y, bounds.max.y]) {
+          for (const z of [bounds.min.z, bounds.max.z]) {
+            corner.set(x,y,z).project(camera);
+            const projected = Math.max(Math.abs(corner.x), Math.abs(corner.y));
+            if (Number.isFinite(projected)) extent = Math.max(extent, projected);
+          }
+        }
+      }
+    }
+    return extent;
   }
   function publishBuildingHitTargets(buildings = latestBuildings) {
     if (!host || !camera || !renderer || disposed) return;
@@ -1126,7 +1295,6 @@ if (host && "WebGLRenderingContext" in window) {
     // Keep deterministic world-space building anchors. HTML hit targets are
     // projected into screen coordinates from this same camera below.
     const list = (Array.isArray(buildings) ? buildings : []).slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
-    frameCityBuildings(list);
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
       const template = glbTemplates.get(b.building_type);
@@ -1154,6 +1322,7 @@ if (host && "WebGLRenderingContext" in window) {
       // Small decorations have no extra animation or shadow draw calls.
       scene.add(group);activeModels.push(group);
     }
+    frameCityBuildings(list);
     updateCityStreets();
     updateCityContactShadows();
     renderer.render(scene, camera);
@@ -1702,6 +1871,8 @@ if (host && "WebGLRenderingContext" in window) {
         scannedMaterials:[...scannedSurfaceMaps.keys()].sort(),
         scannedMaterialsPending,
         cameraFocus:cameraFocusCenter?"center":"overview",
+        cityStructureFrameExtent: cityStructureFrameExtent(),
+        cityPavedPlots:cityStreetMeshes[0]?.userData.coIPlazaCount||0,
         cityArtLayout:activeModels.filter(m=>!m.userData.coISpecial).map(m=>({type:m.userData.coIType,x:m.position.x,z:m.position.z,scale:m.userData.coIArtScale})),
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
