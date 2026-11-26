@@ -1,0 +1,45 @@
+name: Persist reviewed Millennium art on integration branch
+on:
+  push:
+    branches: [improve/beta-millennium-integrate]
+    paths: ['.github/workflows/beta-commit-reviewed-art.yml']
+permissions:
+  contents: read
+jobs:
+  persist:
+    if: github.ref == 'refs/heads/improve/beta-millennium-integrate'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: improve/beta-millennium-integrate
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: actions/download-artifact@v4
+        with:
+          name: millennium-integration-evidence
+          run-id: '45745700755'
+          github-token: ${{ github.token }}
+          repository: ${{ github.repository }}
+          path: reviewed-artifact
+      - name: Verify exact reviewed art and rebuild manifest
+        run: |
+          set -euo pipefail
+          node scripts/stage-millennium-buildings.mjs reviewed-artifact/assets/3d/millennium
+          npm run assets:validate
+          node --test tests/art-license-policy.test.js
+      - name: Commit only five verified assets and manifest to integration branch
+        run: |
+          set -euo pipefail
+          test "$(git branch --show-current)" = improve/beta-millennium-integrate
+          git add -- assets/3d/millennium/caro_farmstead.glb assets/3d/millennium/caro_market.glb assets/3d/millennium/caro_storehouse.glb assets/3d/millennium/caro_struct.png assets/3d/millennium/caro_struct_norm.png assets/3d/manifest.json
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'feat(beta): persist reviewed Millennium farm market and warehouse'
+          git push origin HEAD:refs/heads/improve/beta-millennium-integrate
