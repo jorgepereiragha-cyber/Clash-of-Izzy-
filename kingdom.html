@@ -1057,27 +1057,56 @@ function renderBattleReports(){
  if(!reports.length){root.innerHTML='<div class="muted">As batalhas concluídas aparecerão aqui.</div>';return;}
  root.innerHTML=reports.map(report=>{
   const date=report.created_at?new Date(report.created_at).toLocaleString("pt-BR"):"";
+  const replayId=Number(report.id);
   const power="Força "+fmt(report.attacker_power)+" × "+fmt(report.defender_power);
-  return '<div class="event" style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span><strong>#'+fmt(report.id)+' · '+esc(report.battle_type||"Batalha")+'</strong><small class="muted" style="display:block">'+esc(date)+' · '+esc(power)+'</small></span>'+(Number(report.has_replay)===1?'<button class="secondary" data-battle-replay="'+fmt(report.id)+'">Assistir replay</button>':'<small class="muted">Replay indisponível/expirado</small>')+'</div>';
+  return '<div class="event" style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap"><span><strong>#'+fmt(report.id)+' · '+esc(report.battle_type||"Batalha")+'</strong><small class="muted" style="display:block">'+esc(date)+' · '+esc(power)+'</small></span>'+(Number(report.has_replay)===1&&Number.isSafeInteger(replayId)&&replayId>0?'<button class="secondary" data-battle-replay="'+String(replayId)+'">Assistir replay</button>':'<small class="muted">Replay indisponível/expirado</small>')+'</div>';
  }).join("");
  root.querySelectorAll("[data-battle-replay]").forEach(button=>button.addEventListener("click",()=>showBattleReplay(button.dataset.battleReplay)));
 }
+// Presentation only: do not recompute battle outcomes or invent absent modifiers.
+function battleReportSummary(data){
+ const outcome=data?.replay?.outcome||{},result=data?.result||{},modifiers=data?.replay?.modifiers||{};
+ const numeric=value=>typeof value==="number"&&Number.isFinite(value)&&value>=0?value:null;
+ const metric=(label,value,suffix="")=>numeric(value)===null?"":'<div><small class="muted">'+label+'</small><strong style="display:block">'+fmt(value)+suffix+'</strong></div>';
+ const lossTotal=value=>{
+  if(!value||typeof value!=="object"||Array.isArray(value))return null;
+  const amounts=Object.values(value);
+  if(!amounts.length||amounts.some(n=>!Number.isSafeInteger(n)||n<0))return null;
+  const total=amounts.reduce((sum,n)=>sum+n,0);return Number.isSafeInteger(total)?total:null;
+ };
+ const group=(label,items)=>'<div class="event"><strong>'+label+'</strong><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:8px">'+(items.filter(Boolean).join("")||'<small class="muted">Não registrado neste replay.</small>')+'</div></div>';
+ const bonus=(label,values,keys)=>group(label,keys.map(([name,key])=>metric(name,values?.[key],"%")));
+ const heroKeys=[["Ataque","attackPercent"],["Defesa","defensePercent"],["Vida","healthPercent"],["Chance crítica","criticalChancePercent"]];
+ const equipmentKeys=[["Ataque","attack"],["Defesa","defense"],["Vida","health"],["Chance crítica","critical"]];
+ return group("Visão geral",[
+  metric("Poder atacante",numeric(outcome.attacker_power)??result.attacker_power),
+  metric("Poder defensor",numeric(outcome.defender_power)??result.defender_power),
+  metric("Rodadas",outcome.rounds),
+  metric("Baixas do atacante",lossTotal(outcome.losses??result.losses)),
+  metric("Baixas do defensor",lossTotal(outcome.defender_losses))
+ ])+bonus("Herói · bônus registrados",modifiers.hero,heroKeys)
+ +bonus("Equipamentos · bônus registrados",modifiers.equipment,equipmentKeys)
+ +bonus("Dragão · bônus registrados",modifiers.dragon,heroKeys);
+}
+let battleReplayRequest=0;
 async function showBattleReplay(battleId){
+ const requestId=++battleReplayRequest;
  const view=document.getElementById("battleReplayView");
  view.innerHTML='<div class="muted">Carregando replay…</div>';
  try{
   const data=await request("/game/battle/replay?battle_id="+encodeURIComponent(battleId));
-  const frames=data.replay?.frames||[];
+  if(requestId!==battleReplayRequest)return;
+  const frames=Array.isArray(data.replay?.frames)?data.replay.frames:[];
   const result=data.replay?.outcome||data.result||{};
-  const header='<div class="event"><strong>Replay #'+fmt(data.battle_id)+' · '+esc(data.participants?.attacker||"Atacante")+' × '+esc(data.participants?.defender||"Defensor")+'</strong><div>'+((result.won===true)?"Vitória":(result.won===false)?"Derrota":"Resultado registrado")+' · '+fmt(frames.length)+' eventos de combate</div><small class="muted">Disponível até '+esc(new Date(Number(data.expires_at)*1000).toLocaleString("pt-BR"))+'</small></div>';
+  const header='<div class="event"><strong>Replay #'+fmt(data.battle_id)+' · '+esc(data.participants?.attacker||"Atacante")+' × '+esc(data.participants?.defender||"Defensor")+'</strong><div>'+((result.won===true)?"Vitória do atacante":(result.won===false)?"Derrota do atacante":"Resultado registrado")+' · '+fmt(frames.length)+' eventos de combate</div><small class="muted">Disponível até '+esc(new Date(Number(data.expires_at)*1000).toLocaleString("pt-BR"))+'</small></div>';
   const rows=frames.map(frame=>{
    const side=frame.side==="attacker"?"Atacante":"Defensor";
    const action=frame.unit?esc(frame.unit)+" → "+esc(frame.target||"alvo")+" · "+fmt(frame.damage||0)+" dano":esc(frame.event||"Evento");
    return '<div class="event"><small>Rodada '+fmt(frame.round||0)+' · '+side+'</small><div>'+action+(frame.critical?' · CRÍTICO':'')+'</div></div>';
   }).join("");
-  view.innerHTML=header+(rows||'<div class="muted">Este replay não contém quadros detalhados.</div>');
+  view.innerHTML=header+battleReportSummary(data)+'<details class="event"><summary>Eventos de combate ('+fmt(frames.length)+')</summary>'+(rows||'<div class="muted">Este replay não contém quadros detalhados.</div>')+'</details>';
   view.scrollIntoView({behavior:"smooth",block:"nearest"});
- }catch(error){view.innerHTML='<div class="event">'+esc(error.message||"Replay indisponível.")+'</div>';}
+ }catch(error){if(requestId===battleReplayRequest)view.innerHTML='<div class="event">'+esc(error.message||"Replay indisponível.")+'</div>';}
 }
 
 function formatDuration(seconds){
