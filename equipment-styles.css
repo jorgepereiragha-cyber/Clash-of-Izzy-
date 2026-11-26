@@ -214,3 +214,7 @@
 .pantheon-set-bonus-summary{padding:10px;border:1px solid #4e7898;border-radius:9px;background:linear-gradient(130deg,#1c344c,#152237);color:#d8ebff;font-weight:700;font-size:12px;line-height:1.5}
 .pantheon-empty-state{padding:12px;color:#c8d3df;font-size:13px}
 @media(max-width:390px){.pantheon-skin-sets{padding:10px}.pantheon-set-card{padding:9px}.pantheon-relic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pantheon-relic-art{width:60px;height:60px}}
+
+/* One local atlas for selected equipment. Native 60px cells avoid upscaled blur. */
+.coi-equipment-art{display:block;width:60px;height:60px;flex:none;margin:4px auto 8px;background-image:url("/assets/art/equipment/flare-variations.png");background-size:895px 515px;background-repeat:no-repeat;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+#coi-equipped-art[hidden]{display:none}

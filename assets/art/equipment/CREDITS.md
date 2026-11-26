@@ -1,0 +1,3 @@
+# Equipment artwork
+
+Source: Mumu, Flare Item Variation (60x60 Only), https://opengameart.org/content/flare-item-variation-60x60-only . CC0 1.0, https://creativecommons.org/publicdomain/zero/1.0/ . The author identifies the pack as edits of the original icon collection; see source page for credits. Retrieved from Tiddybub/2d-assets, fantasy/oga-flare-item-variation-60x60-only/New%20Icons%281.0%29_1.png; original Git blob 5db5bc829484b3fbeed37ac7dd0eaaa4522c888c. One PNG retained unchanged, 895 x 515 px, 651824 bytes. Local CSS positions select eleven distinct illustrated slots; no new inventory or combat rules. No claim of exclusive art. Remaining ten catalog items retain fallback until matching art is sourced. Preview and exact crop in Android still require review.
