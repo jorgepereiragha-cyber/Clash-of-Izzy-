@@ -35,14 +35,16 @@
     return data;
   }
   const paintedHeroKeys=new Set(["soldado_basico","capitao_espada","mestre_arco","arqueiro_comum","joana_darc"]);
+  const publicDomainHeroKeys=new Set(["curandeiro_aldeia","sacerdotisa_luar","freya_vanir"]);
   function paintedHeroPortrait(hero, fallback){
-    if(!paintedHeroKeys.has(hero.hero_key))return fallback;
+    const group=paintedHeroKeys.has(hero.hero_key)?"flare":publicDomainHeroKeys.has(hero.hero_key)?"painted":null;
+    if(!group)return fallback;
     const frame=document.createElement("div");frame.className="coi-painted-portrait";
     const img=document.createElement("img");img.className="hero-roster-portrait coi-painted-hero";img.alt=hero.portrait_alt||hero.name||"Retrato de herói";img.loading="lazy";img.decoding="async";img.setAttribute("aria-hidden","true");
     img.addEventListener("load",()=>{frame.classList.add("is-loaded");fallback.setAttribute("aria-hidden","true");img.removeAttribute("aria-hidden");},{once:true});
     img.addEventListener("error",()=>img.remove(),{once:true});
     frame.append(fallback,img);
-    img.src="/assets/art/heroes/flare/"+hero.hero_key+".png";
+    img.src="/assets/art/heroes/"+group+"/"+hero.hero_key+".png";
     return frame;
   }
   function renderForge(){
