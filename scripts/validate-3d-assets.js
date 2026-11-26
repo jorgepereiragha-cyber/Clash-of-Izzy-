@@ -1,6 +1,7 @@
 import { readFile, realpath } from "node:fs/promises";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
+import { isApprovedArtLicense } from "./art-license-policy.js";
 
 const MAX_ASSETS = 64;
 const MAX_FILE_BYTES = 12 * 1024 * 1024;
@@ -73,7 +74,7 @@ function validateManifestEntry(asset, category, index) {
   }
   if (typeof asset.source !== "string" || !asset.source.trim()) fail(label + ".source deve identificar a origem.");
   if (typeof asset.sourceUrl !== "string" || !/^https:\/\//i.test(asset.sourceUrl)) fail(label + ".sourceUrl deve usar HTTPS.");
-  if (typeof asset.license !== "string" || !asset.license.trim()) fail(label + ".license deve informar a licença.");
+  if (!isApprovedArtLicense(asset.license)) fail(label + ".license deve informar uma licença comercial aprovada.");
   if (category === "models" && (typeof asset.type !== "string" || !asset.type.trim())) fail(label + ".type é obrigatório.");
   if (category === "units" && (typeof asset.unit_type !== "string" || !asset.unit_type.trim())) fail(label + ".unit_type é obrigatório.");
   if (category === "props" && (!Array.isArray(asset.positions) || asset.positions.some(position =>

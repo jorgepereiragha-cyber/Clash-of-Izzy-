@@ -12,12 +12,13 @@
     "db:migrate:preview:remote": "wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --remote",
     "check": "wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist",
     "test": "node --test",
-    "assets:validate": "node scripts/validate-3d-assets.js",
+    "assets:validate": "node scripts/validate-3d-assets.js && node scripts/audit-art-licenses.mjs",
     "test:e2e": "playwright test",
     "test:e2e:headed": "playwright test --headed",
     "vendor:three": "node scripts/vendor-three.mjs",
     "pretest": "npm run vendor:three",
-    "pretest:e2e": "npm run vendor:three"
+    "pretest:e2e": "npm run vendor:three",
+    "assets:audit": "node scripts/audit-art-licenses.mjs"
   },
   "devDependencies": {
     "wrangler": "4.161.0",
