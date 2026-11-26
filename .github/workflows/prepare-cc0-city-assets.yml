@@ -1,0 +1,31 @@
+name: Prepare CC0 medieval city assets (no deploy)
+on:
+  pull_request:
+    paths:
+      - scripts/prepare-cc0-city-assets.mjs
+      - .github/workflows/prepare-cc0-city-assets.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Download pinned GLBs and validate provenance, size and dependencies
+        run: node scripts/prepare-cc0-city-assets.mjs
+      - name: Package reviewed candidate files without publishing
+        uses: actions/upload-artifact@v4
+        with:
+          name: cc0-medieval-city-candidate
+          path: |
+            assets/3d/quaternius/medieval-village/
+            assets/3d/manifest.json
+          if-no-files-found: error
+          retention-days: 14
