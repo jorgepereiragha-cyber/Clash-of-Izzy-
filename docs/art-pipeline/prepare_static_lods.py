@@ -8,7 +8,7 @@ import sys
 from pathlib import Path
 
 import bpy
-from mathutils import Vector
+from mathutils import Vector, Matrix
 
 
 def triangles(obj):
@@ -27,11 +27,12 @@ def prepare(source, budget, output):
         raise ValueError("Resolve shape keys and modifiers in source before static reduction.")
     bpy.context.view_layer.update()
     # Bake transforms with independent mesh data before removing parent hierarchy.
+    transforms = {obj.name: obj.matrix_world.copy() for obj in meshes}
     for obj in meshes:
-        world = obj.matrix_world.copy()
+        world = transforms[obj.name]
         obj.data = obj.data.copy()
         obj.parent = None
-        obj.matrix_world.identity()
+        obj.matrix_world = Matrix.Identity(4)
         obj.data.transform(world)
         obj.data.update()
     for obj in objects:

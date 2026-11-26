@@ -17,3 +17,10 @@ https://developer.android.com/games/optimize/gameperformance
 
 ## Staging Blender
 Utilize docs/art-pipeline/prepare_static_lods.py em Blender headless com arquivo GLB estático licenciado e três budgets. Exporta três GLBs separados sem sobrescrever, centraliza no chão, verifica triângulos e recusa rig/animação. Exemplo: `blender -b --python-exit-code 1 --python docs/art-pipeline/prepare_static_lods.py -- source.glb /tmp/eldoria/farm_L1 --budgets 8000 2500 800`. Validação de sintaxe no CI; execução real Blender, retopologia, UV, Draco e KTX2 ainda exigem homologação. Nunca usar o decimador estático para dragões ou tropas animadas.
+
+## Pacote final de automação (adaptado ao projeto)
+- `python3 docs/art-pipeline/plan_generation.py all` lista os 76 modelos previstos sem rede ou cobrança. Use grupos castle/economy/military/special/dragons/troops e --limit 1 para piloto. Ainda não envia jobs. Meshy exige preview e refine para textura; validar shape antes do refine. Tripo exige contrato e credenciais próprios. Revisar preços/licença antes de autorização de gastos; jamais salvar tokens no Git.
+- `python3 docs/art-pipeline/validate_staging_glb.py file.glb --max-triangles 8000` verifica cabeçalho, geometria e tamanho; --require-ktx2 verifica declaração de extensão, não substitui validador glTF completo nem inspeção visual.
+- Receitas PBR: docs/art-pipeline/MATERIAL_RECIPES.md.
+- Projeto real: JavaScript ES modules, Three.js, Node test, Worker/D1; sem Vite/TypeScript/Vitest. Não importar CityState/UpgradeFlow paralelos ou criar placeholders binários fictícios. O fallback procedural existente é mantido.
+- Pipeline operacional requer modelos reais, Blender e aprovação de arte; não chamar staging de release. Não registrar arte sem licença. Referência Meshy: https://docs.meshy.ai/en/api/text-to-3d .
