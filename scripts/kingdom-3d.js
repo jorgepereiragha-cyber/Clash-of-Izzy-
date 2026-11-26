@@ -674,6 +674,22 @@ if (host && "WebGLRenderingContext" in window) {
       finial.position.set(0,1.13+keepHeight,-.12);group.add(finial);
     }
     if(high)for(const x of [-.48,-.24,0,.24,.48])box(group,.14,.16,.14,stone,x,.90,.51);
+    // Original stepped royal wings distinguish the late keep silhouettes.
+    // Geometry remains inside the curtain walls; no extra asset downloads.
+    if(tier>=3&&!low){
+      const wingHeight=keepHeight*(tier===4?.76:.57);
+      for(const side of [-1,1]){
+        const x=side*.48,z=-.29;
+        box(group,.28,wingHeight,.48,wall,x,.25+wingHeight/2,z);
+        box(group,.34,.085,.54,stone,x,.25+wingHeight,z);
+        const wingRoof=new THREE.Mesh(new THREE.ConeGeometry(.31,.36,4),roof);
+        wingRoof.rotation.y=Math.PI/4;
+        wingRoof.scale.set(.78,1,1.22);
+        wingRoof.position.set(x,.25+wingHeight+.18,z);
+        group.add(wingRoof);
+        archWindow(x,.25+wingHeight*.48,z+.247,0,.105,.22);
+      }
+    }
     if(!low){
       const bannerMaterial=material(skin?.banner||"#E7BD68",.82);
       // The heraldic seal keeps the original royal palette and respects owned skins.
