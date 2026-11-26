@@ -50,7 +50,42 @@ export function makeDragonFigure(THREE, visual, tier) {
  root.userData.coIDragonKey=visual.key;
  return {root,wings};
 }
+// The normalized template owns geometry and textures; each equipped clone owns
+// only its tinted materials, skeletons and animation mixer.
+export function makeImportedDragonFigure(THREE,cloneSkinned,asset,visual) {
+ const clip=asset.animations.find(a=>a.name===asset.animation);
+ if(!clip)throw new Error("Dragon flight clip missing");
+ const root=cloneSkinned(asset.template),materials=new Map(),skeletons=new Set();
+ const tint=new THREE.Color(DRAGON_PALETTES[visual.key][0]).lerp(new THREE.Color(0xffffff),.35);
+ root.traverse(node=>{
+  if(node.isSkinnedMesh)skeletons.add(node.skeleton);
+  if(!node.isMesh)return;
+  const cloneMaterial=original=>{
+   if(!materials.has(original)){
+    const copy=original.clone();
+    copy.color?.multiply(tint);
+    materials.set(original,copy);
+   }
+   return materials.get(original);
+  };
+  node.material=Array.isArray(node.material)?node.material.map(cloneMaterial):cloneMaterial(node.material);
+  node.castShadow=false;node.receiveShadow=false;
+ });
+ root.scale.setScalar(visual.scale);
+ root.rotation.y=-.40;
+ root.userData.coIDragonKey=visual.key;
+ const mixer=new THREE.AnimationMixer(root);
+ mixer.clipAction(clip).play();
+ return {root,imported:true,mixer,materials:[...materials.values()],skeletons:[...skeletons],wings:[]};
+}
+export function disposeImportedDragonFigure(figure){
+ figure.mixer.stopAllAction();
+ figure.mixer.uncacheRoot(figure.root);
+ for(const skeleton of figure.skeletons)skeleton.dispose();
+ for(const material of figure.materials)material.dispose();
+}
 export function poseDragon(figure,time,animated) {
+ if(figure.imported){figure.mixer.setTime(animated?time:0);return;}
  const phase=animated?Math.sin(time*2.6):0;
  for(const {wing,sign} of figure.wings)wing.rotation.z=sign*(.18+phase*.36);
 }

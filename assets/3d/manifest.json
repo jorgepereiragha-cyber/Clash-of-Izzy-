@@ -99,6 +99,50 @@
       "source": "Quaternius Ultimate Fantasy RTS",
       "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-farm",
+      "type": "farm",
+      "src": "/assets/3d/quaternius/farm.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 0.8,
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-lumber-mill",
+      "type": "lumber_mill",
+      "src": "/assets/3d/quaternius/lumber_mill.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.35,
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-stable",
+      "type": "stable",
+      "src": "/assets/3d/quaternius/stable.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.65,
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-castle-gate",
+      "type": "castle_gate",
+      "src": "/assets/3d/quaternius/castle-gate.glb",
+      "enabled": true,
+      "targetFootprint": 1.45,
+      "targetHeight": 0.62,
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0"
     }
   ],
   "props": [
@@ -187,6 +231,69 @@
       "license": "CC0-1.0",
       "animation": "HumanArmature|Idle",
       "maxInstances": 3
+    },
+    {
+      "id": "quaternius-equipped-dragon",
+      "unit_type": "equipped_dragon",
+      "src": "/assets/3d/quaternius/dragon-evolved.glb",
+      "enabled": true,
+      "targetFootprint": 3.15,
+      "targetHeight": 1.65,
+      "animation": "Flying_Idle",
+      "maxInstances": 1,
+      "source": "Quaternius Ultimate Monsters — Dragon Evolved",
+      "sourceUrl": "https://poly.pizza/m/LlwD0QNUPj",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "kaykit-adventurers-mage",
+      "unit_type": "mage",
+      "src": "/assets/3d/kaykit/adventurers/mage.glb",
+      "enabled": true,
+      "targetFootprint": 0.85,
+      "targetHeight": 1.6,
+      "source": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/tree/672074b73ba276876a19e8816ecdc5241817ab47",
+      "license": "CC0-1.0",
+      "animation": "Idle",
+      "maxInstances": 2
+    },
+    {
+      "id": "kaykit-adventurers-militia",
+      "unit_type": "militia",
+      "src": "/assets/3d/kaykit/adventurers/militia.glb",
+      "enabled": true,
+      "targetFootprint": 0.85,
+      "targetHeight": 1.6,
+      "source": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/tree/672074b73ba276876a19e8816ecdc5241817ab47",
+      "license": "CC0-1.0",
+      "animation": "Idle",
+      "maxInstances": 2
+    },
+    {
+      "id": "kenney-siege-catapult",
+      "unit_type": "catapult",
+      "src": "/assets/3d/kenney/castle-kit/Models/GLB format/siege-catapult.glb",
+      "enabled": true,
+      "targetFootprint": 0.8,
+      "targetHeight": 1.35,
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "maxInstances": 2
+    },
+    {
+      "id": "kenney-siege-ram",
+      "unit_type": "ram",
+      "src": "/assets/3d/kenney/castle-kit/Models/GLB format/siege-ram.glb",
+      "enabled": true,
+      "targetFootprint": 0.8,
+      "targetHeight": 1.35,
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "maxInstances": 2
     }
   ],
   "files": {
@@ -338,6 +445,96 @@
       "bytes": 393060,
       "licenseFile": "licenses/Quaternius-CC0.txt",
       "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/single_knight_pack/KnightCharacter.glb"
+    },
+    "/assets/3d/quaternius/farm.glb": {
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Ultimate Fantasy RTS — Quaternius",
+      "sha256": "2bbcb19a1077ef7fab5bf70c521e83d0052cf543d03abf1efef6575df29d6511",
+      "bytes": 274124,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/real_time_strategy_pack/Farm_SecondAge_Level1_Wheat.glb"
+    },
+    "/assets/3d/quaternius/lumber_mill.glb": {
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Medieval Village Pack — Quaternius",
+      "sha256": "45b86787f29746003eb6b3eb889555b5d4cd99983f77011cb7d0d461cd6e547e",
+      "bytes": 309568,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/medieval_village_pack/Sawmill.glb"
+    },
+    "/assets/3d/quaternius/stable.glb": {
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Medieval Village Pack — Quaternius",
+      "sha256": "c5ed9626d931c52b5a2b48d805bccd4232239da5ba677ca169730c036eb5b8c8",
+      "bytes": 444596,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/medieval_village_pack/Stable.glb"
+    },
+    "/assets/3d/quaternius/dragon-evolved.glb": {
+      "source": "Quaternius Ultimate Monsters — Dragon Evolved",
+      "sourceUrl": "https://poly.pizza/m/LlwD0QNUPj",
+      "license": "CC0-1.0",
+      "attribution": "Dragon Evolved — Quaternius",
+      "sha256": "31b1bf500739adc996e095b5db4f9bf26581803b1b23a8aa75e92a2509253fbe",
+      "bytes": 86432,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/crisleyhguimaraes/space-ship/blob/c53b865c698d201fae129640f0a14f98f37e081b/public/models/creatures/dragon-evolved.glb"
+    },
+    "/assets/3d/kaykit/adventurers/mage.glb": {
+      "source": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/tree/672074b73ba276876a19e8816ecdc5241817ab47",
+      "license": "CC0-1.0",
+      "attribution": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sha256": "a123c287f8519853e03c36259309a0fadf1b8197a9bf775db7687d70a601acbb",
+      "bytes": 199176,
+      "licenseFile": "licenses/KayKit-Adventurers.txt",
+      "mirror": "https://github.com/crisleyhguimaraes/space-ship/blob/c53b865c698d201fae129640f0a14f98f37e081b/public/models/adventurers/mage.glb"
+    },
+    "/assets/3d/kaykit/adventurers/militia.glb": {
+      "source": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/tree/672074b73ba276876a19e8816ecdc5241817ab47",
+      "license": "CC0-1.0",
+      "attribution": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sha256": "bcdb12755bc20b169ad28ea7b0623907dcdd0e7db1d21541b9c4adb8c05ab2c0",
+      "bytes": 208748,
+      "licenseFile": "licenses/KayKit-Adventurers.txt",
+      "mirror": "https://github.com/crisleyhguimaraes/space-ship/blob/c53b865c698d201fae129640f0a14f98f37e081b/public/models/adventurers/barbarian.glb"
+    },
+    "/assets/3d/quaternius/castle-gate.glb": {
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Ultimate Fantasy RTS — Quaternius",
+      "sha256": "c73f5cb19153b70d5e6491678529e871934858b37cf87e94ec7d9ba17da52a8e",
+      "bytes": 147652,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/real_time_strategy_pack/WallTowers_DoorClosed_SecondAge.glb"
+    },
+    "/assets/3d/kenney/castle-kit/Models/GLB format/siege-catapult.glb": {
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney Castle Kit",
+      "sha256": "35a7484ff74630228e474fae885bdc9176c30e0af0d94def80307bdbc87b7583",
+      "bytes": 86164,
+      "licenseFile": "licenses/Kenney-Castle-Kit.txt",
+      "mirror": "https://github.com/GeorgeQLe/assets-3d-medieval/blob/ce28cabc1229b4c0a9ac24a6d2e7704c70fc486a/assets/kenney/castle-kit/Models/GLB format/siege-catapult.glb"
+    },
+    "/assets/3d/kenney/castle-kit/Models/GLB format/siege-ram.glb": {
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney Castle Kit",
+      "sha256": "6473c77747b1d0a2c273d5a013454a0c85e5fc33b831150dced46d89b8ff9a5e",
+      "bytes": 103620,
+      "licenseFile": "licenses/Kenney-Castle-Kit.txt",
+      "mirror": "https://github.com/GeorgeQLe/assets-3d-medieval/blob/ce28cabc1229b4c0a9ac24a6d2e7704c70fc486a/assets/kenney/castle-kit/Models/GLB format/siege-ram.glb"
     }
   }
 }

@@ -8,7 +8,7 @@ import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
 import { readGraphicsChoice, getGraphicsStorage } from "./kingdom-visual-preferences.js";
 import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
-import { projectDragonVisual, makeDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
+import { projectDragonVisual, makeDragonFigure, makeImportedDragonFigure, disposeImportedDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
 import { derivePbrTextureData, forEachPeriodicSurfaceCell } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
@@ -180,6 +180,10 @@ if (host && "WebGLRenderingContext" in window) {
     disposeResourceSet(resources);
   }
   function disposeSceneResources() {
+    if (activeDragon?.figure.imported) {
+      scene?.remove(activeDragon.figure.root);
+      disposeImportedDragonFigure(activeDragon.figure);
+    }
     const resources = { geometries: new Set(), materials: new Set(), textures: new Set(), imageBitmaps: new Set(), instances: new Set() };
     disposeObject3D(scene, resources);
     for (const template of glbTemplates.values()) disposeObject3D(template, resources);
@@ -476,11 +480,34 @@ if (host && "WebGLRenderingContext" in window) {
     box(group,1.04,.14,.95,stone,0,.25+keepHeight,-.12);
     const mainRoof=new THREE.Mesh(new THREE.ConeGeometry(.73,.68+(tier-1)*.07,4),roof);
     mainRoof.rotation.y=Math.PI/4;mainRoof.position.set(0,.32+keepHeight+(.68+(tier-1)*.07)/2,-.12);group.add(mainRoof);
-    // Front gateway, recessed entry, stone lintel, and stepped approach.
-    box(group,.66,.72,.27,stone,0,.58,.54);
-    box(group,.36,.49,.035,mats.darkStone,0,.50,.695);
-    box(group,.30,.45,.045,mats.wood,0,.48,.72);
-    box(group,.44,.075,.08,accent,0,.74,.725);
+    // Optional CC0 fortification facade. Clone owned geometries/materials so
+    // normal castle teardown never disposes a cached GLB template.
+    const gateTemplate=glbTemplates.get("castle_gate");
+    if(gateTemplate&&!low){
+      const gate=gateTemplate.clone(true);
+      gate.traverse(node=>{
+        if(!node.isMesh)return;
+        node.geometry=node.geometry.clone();
+        const recolor=original=>{
+          const mat=original.clone();
+          const name=original.name.toLowerCase();
+          if(name==="stone_light")mat.color.copy(stone.color);
+          else if(name==="stone")mat.color.copy(wall.color);
+          else if(name==="main")mat.color.set(skin?.banner||"#24476B");
+          return mat;
+        };
+        node.material=Array.isArray(node.material)?node.material.map(recolor):recolor(node.material);
+      });
+      gate.position.set(0,.22,.71);
+      group.add(gate);
+      group.userData.coICastleGateAsset=gateTemplate.userData.coIAssetId;
+    }else{
+      // Full original entry survives missing downloads and low-end devices.
+      box(group,.66,.72,.27,stone,0,.58,.54);
+      box(group,.36,.49,.035,mats.darkStone,0,.50,.695);
+      box(group,.30,.45,.045,mats.wood,0,.48,.72);
+      box(group,.44,.075,.08,accent,0,.74,.725);
+    }
     box(group,.66,.09,.24,stone,0,.09,.77);
     const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
     for(const [x,z] of towers){
@@ -1084,15 +1111,24 @@ if (host && "WebGLRenderingContext" in window) {
     renderer.render(scene,camera);
   }
   function renderEquippedDragon(row) {
+    if(!scene || disposed)return;
     const visual=projectDragonVisual(row);
-    if(activeDragon && (!visual || activeDragon.key!==visual.key || activeDragon.level!==visual.level)){
+    const template=glbUnitTemplates.get("equipped_dragon");
+    if(activeDragon && (!visual || activeDragon.key!==visual.key || activeDragon.level!==visual.level ||
+       (template && !activeDragon.figure.imported))){
       scene.remove(activeDragon.figure.root);
-      disposeDetachedObject3D(activeDragon.figure.root);
+      if(activeDragon.figure.imported)disposeImportedDragonFigure(activeDragon.figure);
+      else disposeDetachedObject3D(activeDragon.figure.root);
       activeDragon=null;
     }
-    if(!visual || !scene || disposed)return;
+    if(!visual)return;
     if(!activeDragon){
-      activeDragon={...visual,figure:makeDragonFigure(THREE,visual,qualityProfile?.tier)};
+      let figure;
+      if(template){
+        try { figure=makeImportedDragonFigure(THREE,cloneSkinned,template,visual); }
+        catch(error){ console.info("Clash of Izzy: dragão GLB indisponível.",error); }
+      }
+      activeDragon={...visual,figure:figure || makeDragonFigure(THREE,visual,qualityProfile?.tier)};
       dragonTime=0;
       scene.add(activeDragon.figure.root);
       poseDragon(activeDragon.figure,0,false);
@@ -1197,7 +1233,10 @@ if (host && "WebGLRenderingContext" in window) {
         return;
       }
       const template = normalizeGlbTemplate(gltf, asset);
-      if (kind === "building") glbTemplates.set(asset.type, template);
+      if (kind === "building") {
+        template.userData.coIAssetId = asset.id;
+        glbTemplates.set(asset.type, template);
+      }
       else if (kind === "prop") glbPropTemplates.set(asset.id, template);
       else if (kind === "unit") glbUnitTemplates.set(asset.unit_type, {
         template,
@@ -1305,6 +1344,8 @@ if (host && "WebGLRenderingContext" in window) {
           .map(item => item?.building_type)
           .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
       );
+      // The gate is an optional facade, never a replacement for the original keep.
+      if (neededTypes.has("castle") && qualityProfile?.tier !== "low") neededTypes.add("castle_gate");
       // Optional GLBs replace only their own building type, never the original keep.
       const presentUnits = new Set(
         (Array.isArray(troops) ? troops : [])
@@ -1320,7 +1361,8 @@ if (host && "WebGLRenderingContext" in window) {
           .filter(asset => asset?.enabled === true && typeof asset.id === "string" && !glbPropTemplates.has(asset.id))
           .map(asset => ({ asset, kind: "prop", key: `prop:${asset.id}` })),
         ...manifestUnits
-          .filter(asset => asset?.enabled === true && presentUnits.has(asset.unit_type) && !glbUnitTemplates.has(asset.unit_type))
+          .filter(asset => asset?.enabled === true && !glbUnitTemplates.has(asset.unit_type) &&
+            (asset.unit_type === "equipped_dragon" ? !!projectDragonVisual(window.__coiKingdomDragon) : presentUnits.has(asset.unit_type)))
           .map(asset => ({ asset, kind: "unit", key: `unit:${asset.unit_type}` }))
       ].filter(entry => !glbLoadPromises.has(entry.key));
       // Normal state refreshes already render the existing templates. Avoid a
@@ -1333,6 +1375,7 @@ if (host && "WebGLRenderingContext" in window) {
         optionalSceneRefreshes += 1;
         renderBuildings(latestBuildings);
         renderManifestProps();
+        renderEquippedDragon(window.__coiKingdomDragon);
         renderKingdomTroops(latestTroops);
       }
     } catch (error) {
@@ -1440,9 +1483,11 @@ if (host && "WebGLRenderingContext" in window) {
         pendingGlbLoads: glbLoadPromises.size,
         optionalSceneRefreshes,
         architecture:activeModels.filter(model=>model.userData.coIArchitecture).map(model=>({type:model.userData.coIType,design:model.userData.coIArchitecture,tier:model.userData.coIArchitectureTier||null})),
+        castleGateAsset:activeModels.find(model=>model.userData.coIType==="castle")?.userData.coICastleGateAsset||null,
+        importedBuildings:activeModels.filter(model=>model.userData.coIAssetId).map(model=>({type:model.userData.coIType,assetId:model.userData.coIAssetId})),
         specialLandmarks:activeModels.filter(model=>model.userData.coISpecial).map(model=>({type:model.userData.coIType,x:model.position.x,z:model.position.z})),
         troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
-        dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon()} : null,
+        dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon(),imported:Boolean(activeDragon.figure.imported)} : null,
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };
