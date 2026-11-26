@@ -1064,7 +1064,16 @@ if (host && "WebGLRenderingContext" in window) {
       const bounds=new THREE.Box3().setFromObject(model);
       return {minX:bounds.min.x,maxX:bounds.max.x,minZ:bounds.min.z,maxZ:bounds.max.z};
     });
-    const signature=JSON.stringify(plots.map(p=>Object.values(p).map(v=>Math.round(v*1000))));
+    // Paved civic forecourts fill otherwise bare grass inside reserved
+    // building plots. Rural production stays unpaved. The road and plaza
+    // geometry shares two draw calls and the existing scanned materials.
+    const plazas=plots.filter((plot,i)=>{
+      const model=activeModels[i],type=model.userData.coIType;
+      return !ruralTypes.has(type)&&type!=="wall"&&type!=="watchtower"&&
+        !model.userData.coISpecial&&Boolean(serverCityFootprint(type));
+    });
+    const signature=JSON.stringify({plots:plots.map(p=>Object.values(p).map(v=>Math.round(v*1000))),plazas});
+    
     if(signature===cityStreetSignature)return;
     cityStreetSignature=signature;
     for(const mesh of cityStreetMeshes){scene.remove(mesh);mesh.geometry.dispose();}
@@ -1072,7 +1081,7 @@ if (host && "WebGLRenderingContext" in window) {
     const cells=planCityStreetCells(plots);
     // Never show the old arbitrary road on a populated layout.
     for(const mesh of legacyRoadMeshes)mesh.visible=plots.length<2;
-    if(!cells.length)return;
+    if(!cells.length&&!plazas.length)return;
     const keys=new Set(cells.map(({x,z})=>x+","+z));
     const tile=CITY_TILE_WORLD;
     function streetMesh(mat,y,inset){
@@ -1093,11 +1102,20 @@ if (host && "WebGLRenderingContext" in window) {
         if(keys.has(x+","+(z-1)))quad(x0+inset,z0,x1-inset,z0+inset);
         if(keys.has(x+","+(z+1)))quad(x0+inset,z1-inset,x1-inset,z1);
       }
+      for(const p of plazas){
+        // Keep a slim verge inside the authoritative footprint; the
+        // adjacent route cells remain outside the plot.
+        const pad=.025+inset;
+        if(p.maxX-p.minX>2*pad&&p.maxZ-p.minZ>2*pad)
+          quad(p.minX+pad,p.minZ+pad,p.maxX-pad,p.maxZ-pad);
+      }
+      if(!pos.length)return;
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
       geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uv,2));
       geometry.setIndex(indices);geometry.computeVertexNormals();
       const mesh=new THREE.Mesh(geometry,mat);mesh.receiveShadow=true;
+      mesh.userData.coIPlazaCount=plazas.length;
       scene.add(mesh);cityStreetMeshes.push(mesh);
     }
     streetMesh(mats.roadEdge,-.06,0);
@@ -1854,6 +1872,7 @@ if (host && "WebGLRenderingContext" in window) {
         scannedMaterialsPending,
         cameraFocus:cameraFocusCenter?"center":"overview",
         cityStructureFrameExtent: cityStructureFrameExtent(),
+        cityPavedPlots:cityStreetMeshes[0]?.userData.coIPlazaCount||0,
         cityArtLayout:activeModels.filter(m=>!m.userData.coISpecial).map(m=>({type:m.userData.coIType,x:m.position.x,z:m.position.z,scale:m.userData.coIArtScale})),
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
