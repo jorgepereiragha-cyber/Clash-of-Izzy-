@@ -1028,7 +1028,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         const equippedDragon=await page.evaluate(()=>window.__coiKingdomDragon);
         assert.ok(equippedDragon?.dragon_key,"server-backed equipped dragon");
         assert.equal(diagnostics.dragonVisual?.key,equippedDragon.dragon_key,"only equipped dragon is represented");
-        assert.equal(diagnostics.dragonVisual.animated,false,"balanced profile keeps dragon static");
+        assert.equal(diagnostics.dragonVisual.animated,true,"balanced profile enables the imported flight clip");
         assert.equal(diagnostics.dragonVisual.imported,true,"equipped dragon must decode rigged GLB");
         assert.deepEqual(diagnostics.specialLandmarks.map(x=>x.type).sort(),["dragon_nest","summon_altar"]);
         for(const model of diagnostics.specialLandmarks)assert.ok(Number.isFinite(model.x)&&Number.isFinite(model.z));
