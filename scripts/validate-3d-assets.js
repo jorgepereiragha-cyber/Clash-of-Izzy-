@@ -72,8 +72,12 @@ function validateManifestEntry(asset, category, index) {
     fail(label + ".src deve apontar para um GLB em /assets/3d/.");
   }
   if (typeof asset.source !== "string" || !asset.source.trim()) fail(label + ".source deve identificar a origem.");
-  if (typeof asset.sourceUrl !== "string" || !/^https:\/\//i.test(asset.sourceUrl)) fail(label + ".sourceUrl deve usar HTTPS.");
-  if (typeof asset.license !== "string" || !asset.license.trim()) fail(label + ".license deve informar a licença.");
+  let origin;
+  try { origin = new URL(asset.sourceUrl); } catch { fail(label + ".sourceUrl inválida."); }
+  if (origin.protocol !== "https:" || origin.username || origin.password || origin.hash)
+    fail(label + ".sourceUrl deve usar HTTPS sem credenciais ou fragmento.");
+  // Commercial release policy: only explicitly CC0 third-party models enter this manifest.
+  if (asset.license !== "CC0-1.0") fail(label + ".license deve ser CC0-1.0; licença ausente ou não aprovada.");
   if (category === "models" && (typeof asset.type !== "string" || !asset.type.trim())) fail(label + ".type é obrigatório.");
   if (category === "units" && (typeof asset.unit_type !== "string" || !asset.unit_type.trim())) fail(label + ".unit_type é obrigatório.");
   if (category === "props" && (!Array.isArray(asset.positions) || asset.positions.some(position =>

@@ -14,3 +14,6 @@ Fontes oficiais:
 As cópias dos arquivos de licença fornecidos com os pacotes estão em `licenses/`. A atribuição a Kenney é opcional, mas a origem permanece registrada no manifesto.
 
 O carregamento é local e opcional. O perfil de qualidade e Data Saver continuam controlando o download; a geometria procedural continua como fallback. Todos os modelos são servidos do próprio jogo em `/assets/3d/`.
+
+## Política de entrada de modelos externos
+O validador exige a identificação explícita CC0-1.0 e URL HTTPS válida para cada entrada, inclusive as desativadas. A declaração no manifesto não substitui a verificação humana da origem, licença e arquivo original. Antes de importar, registrar autor, pacote, URL oficial, versão, licença fornecida, hash SHA-256 dos bytes e correspondência com o modelo. Não importar previews, marcas, artes extraídas de jogos ou conteúdo apenas gratuito sem autorização de redistribuição. As fontes candidatas e etapas de validação estão em docs/ASSETS_CC0_SELECTION.md.
