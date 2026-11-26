@@ -5,7 +5,7 @@ import { readFile } from "node:fs/promises";
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 const toUrl = path => new URL("../" + path.replace(/^\/+/, ""), import.meta.url);
 
-test("bundled Kenney and KayKit assets keep CC0 provenance and a bounded local footprint", () => {
+test("bundled Kenney, KayKit and Quaternius assets keep CC0 provenance and a bounded local footprint", () => {
   assert.equal(manifest.version, 2);
   assert.ok(manifest.models.length >= 2);
   assert.ok(manifest.props.length >= 2);
@@ -13,7 +13,7 @@ test("bundled Kenney and KayKit assets keep CC0 provenance and a bounded local f
   for (const asset of [...manifest.models, ...manifest.props, ...manifest.units]) {
     assert.equal(asset.enabled, !["kaykit-blue-iron-mine", "kenney-castle-watchtower", "kenney-castle-wall"].includes(asset.id), asset.id);
     assert.equal(asset.license, "CC0-1.0");
-    assert.match(asset.sourceUrl, /^https:\/\/(?:kenney\.nl\/assets\/|github\.com\/KayKit-Game-Assets\/KayKit-Medieval-Hexagon-Pack-1\.0\/tree\/[a-f0-9]{40}$)/);
+    assert.match(asset.sourceUrl, /^https:\/\/(?:kenney\.nl\/assets\/|quaternius\.com\/packs\/|github\.com\/KayKit-Game-Assets\/KayKit-Medieval-Hexagon-Pack-1\.0\/tree\/[a-f0-9]{40}$)/);
     assert.ok(asset.src.startsWith("/assets/3d/"));
     assert.ok(asset.src.endsWith(".glb"));
   }
@@ -33,6 +33,7 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
     const document = JSON.parse(data.subarray(20, 20 + jsonLength).toString("utf8").trim());
     assert.equal(document.asset?.version, "2.0", asset.id);
     for (const image of document.images || []) {
+      if(image.uri===undefined){assert.ok(Number.isInteger(image.bufferView),asset.id+" embedded image");continue;}
       assert.ok(image.uri, asset.id + " should use a readable local texture URI");
       assert.ok(!/^https?:/i.test(image.uri), asset.id + " must not request a third-party texture");
       const texturePath = relativePath.slice(0, relativePath.lastIndexOf("/") + 1) + image.uri;
@@ -40,7 +41,7 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
       assert.ok(texture.byteLength > 0, texturePath);
     }
   }
-  assert.ok(totalBytes < 1_000_000, "optional 3D downloads must remain under 1 MB");
+  assert.ok(totalBytes < 2_500_000, "bundled GLBs must remain under 2.5 MB");
 });
 
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {
@@ -72,4 +73,10 @@ test("KayKit civic models share the local atlas and preserve the original licens
     assert.equal(data.readUInt32LE(24+length), 0x004e4942);
     assert.ok(gltf.buffers[0].byteLength <= data.readUInt32LE(20+length));
   }
+});
+
+test("Quaternius imports preserve local provenance and real GLB models",()=>{
+ for(const type of ["archery_range","academy","warehouse","embassy","swordsman"]){
+ const a=[...manifest.models,...manifest.units].find(x=>x.id==="quaternius-"+type.replace("_","-"));assert.ok(a?.enabled);assert.equal(manifest.files[a.src].license,"CC0-1.0");assert.match(manifest.files[a.src].sha256,/^[a-f0-9]{64}$/);
+ }
 });
