@@ -870,8 +870,27 @@ if (host && "WebGLRenderingContext" in window) {
         box(group, .2, .24, .2, mats.stone, i * .24, height + .14, .56);
       }
     } else if (type === "hospital") {
-      box(group, .16, .56, .08, material("#A9433B"), 0, .82, .67);
-      box(group, .48, .16, .08, material("#A9433B"), 0, .82, .67);
+      // Stone infirmary with a covered entrance and a readable medical crest.
+      const porchZ=bodyDepth/2+.14;
+      const red=material("#A9433B",.82);
+      box(group,.70,.09,.35,mats.stone,0,.09,porchZ);
+      for(const x of [-.28,.28]){
+        addCylinder(group,.065,.085,.61,mats.stone,x,.44,porchZ+.09,6);
+        box(group,.16,.06,.16,mats.stone,x,.75,porchZ+.09);
+      }
+      box(group,.78,.08,.39,mats.wood,0,.81,porchZ);
+      const porchRoof=new THREE.Mesh(new THREE.ConeGeometry(.51,.26,4),roof);
+      porchRoof.rotation.y=Math.PI/4;porchRoof.scale.z=.60;
+      porchRoof.position.set(0,.98,porchZ);porchRoof.castShadow=true;group.add(porchRoof);
+      box(group,.36,.37,.045,mats.stone,0,height+.09,facade+.035);
+      box(group,.085,.29,.035,red,0,height+.09,facade+.075);
+      box(group,.27,.085,.035,red,0,height+.09,facade+.075);
+      if(qualityProfile?.tier!=="low"){
+        for(const x of [-bodyWidth*.30,bodyWidth*.30]){
+          box(group,.24,.065,.11,mats.stone,x,height*.63-.14,facade+.025);
+          box(group,.24,.055,.095,mats.stone,x,height*.63+.14,facade+.025);
+        }
+      }
     } else if (type === "stable") {
       for (const sx of [-.52, .52]) box(group, .08, .55, .08, mats.wood, sx, .32, .76);
       for (const sy of [.2, .48]) box(group, 1.05, .07, .08, mats.wood, 0, sy, .76);
