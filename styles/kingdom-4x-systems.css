@@ -26,3 +26,20 @@
 @media (prefers-reduced-motion: reduce) {
   .coi-4x-panel { animation: none !important; transition: none !important; }
 }
+
+/* Academia: presentation only, using the canonical server-provided research rows. */
+#coiScienceGallery{margin:16px 0}
+#coiScienceGallery[hidden]{display:none}
+#coiScienceGallery h3{margin:0 0 6px;color:#f3d49a;font-size:16px}
+.coi-science-cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,210px),1fr));gap:9px}
+.coi-science-card{display:grid;grid-template-columns:42px minmax(0,1fr);align-items:center;gap:10px;min-width:0;min-height:82px;padding:10px;text-align:left;border:1px solid #627e99;border-radius:10px;background:linear-gradient(145deg,#213b55,#142338);color:#e7edf7;cursor:pointer;white-space:normal}
+.coi-science-card svg{display:block;width:42px;height:42px;color:#bcdcf8;pointer-events:none}
+.coi-science-card.is-imperial{border-color:#aa874b;background:linear-gradient(145deg,#42341f,#192437)}
+.coi-science-card.is-imperial svg{color:#f2cf82}
+.coi-science-card[aria-pressed="true"]{outline:2px solid #ffdc92;outline-offset:-3px}
+.coi-science-card:focus-visible{outline:3px solid #fff0c2;outline-offset:2px}
+.coi-science-copy{display:grid;gap:4px;min-width:0;overflow-wrap:anywhere}
+.coi-science-copy strong{font-size:13px;color:#fff1cc}
+.coi-science-level,.coi-science-status{font-size:11px;color:#e1e9f2;line-height:1.35}
+.coi-science-credit{font-size:11px;color:#c4d1df;margin:9px 0 0}
+.coi-science-credit a{color:#e9c77e}

@@ -282,6 +282,12 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 </section>
 <section class="panel"><h2>🔬 Academia e pesquisas</h2>
 <div id="researchLevels" class="events"></div>
+<div id="coiScienceGallery" hidden>
+  <h3>Especializações da Academia</h3>
+  <p class="muted">Escolha uma tecnologia para consultar os requisitos e iniciar a pesquisa.</p>
+  <div id="coiScienceCards" class="coi-science-cards"></div>
+  <p class="coi-science-credit">Ícones de <a href="https://game-icons.net/" rel="noopener noreferrer" target="_blank">Lorc / Game-icons.net</a>, <a href="https://creativecommons.org/licenses/by/3.0/" rel="noopener noreferrer" target="_blank">CC BY 3.0</a>. Adaptados para fundo transparente e cor temática.</p>
+</div>
 <form id="researchForm" class="queue-form">
 <label for="researchKey">Tecnologia</label>
 <select id="researchKey" required>
@@ -732,6 +738,45 @@ async function runKingdomPanelAction(payload,successMessage){
  }catch(error){setStatus(error.message||"Operação não concluída.",true);}
  finally{busy=false;render();}
 }
+const scienceIconKeys=new Set(["scholarship","conscription","field_logistics","military_medicine","imperial_attack","imperial_defense","imperial_health"]);
+let scienceCardSignature="";
+function renderScienceCards(rows,selectedKey){
+ const gallery=document.getElementById("coiScienceGallery"),root=document.getElementById("coiScienceCards");
+ if(!gallery||!root)return;
+ const visible=rows.filter(row=>scienceIconKeys.has(row.key));
+ gallery.hidden=!visible.length;
+ const signature=JSON.stringify([selectedKey,visible.map(row=>[row.key,row.name,row.category,row.level,row.maxLevel,row.unlockedMax,row.lockedReason,row.resourcesReady,row.bonusPercent,row.imperial])]);
+ if(signature===scienceCardSignature)return;
+ scienceCardSignature=signature;
+ const focusKey=root.contains(document.activeElement)?document.activeElement.dataset.scienceKey:null;
+ const fragment=document.createDocumentFragment();
+ const statusLabels={max_level:"Concluída",vip:"Bloqueada por VIP",academy:"Exige Academia",prerequisite:"Exige pesquisa anterior"};
+ for(const row of visible){
+  const card=document.createElement("button");card.type="button";card.className="coi-science-card";
+  card.dataset.scienceKey=row.key;
+  if(row.imperial)card.classList.add("is-imperial");
+  card.setAttribute("aria-pressed",String(row.key===selectedKey));
+  const icon=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  icon.setAttribute("viewBox","0 0 512 512");icon.setAttribute("aria-hidden","true");icon.setAttribute("focusable","false");
+  const use=document.createElementNS("http://www.w3.org/2000/svg","use");use.setAttribute("href","/assets/art/science/icons.svg#"+row.key);icon.append(use);
+  const content=document.createElement("span");content.className="coi-science-copy";
+  const title=document.createElement("strong");title.textContent=row.name;
+  const level=document.createElement("span");level.className="coi-science-level";level.textContent="Nv. "+fmt(row.level)+"/"+fmt(row.maxLevel)+" · "+fmt(row.bonusPercent)+"%";
+  const status=document.createElement("span");status.className="coi-science-status";
+  status.textContent=statusLabels[row.lockedReason]||(row.resourcesReady===true?"Disponível":row.resourcesReady===false?"Faltam recursos":"Saldo a sincronizar");
+  content.append(title,level,status);card.append(icon,content);fragment.append(card);
+ }
+ root.replaceChildren(fragment);
+ if(focusKey){[...root.querySelectorAll("button")].find(card=>card.dataset.scienceKey===focusKey)?.focus({preventScroll:true});}
+}
+document.getElementById("coiScienceCards")?.addEventListener("click",event=>{
+ const card=event.target.closest?.("button[data-science-key]");
+ const select=document.getElementById("researchKey");
+ if(!card||!select||!scienceIconKeys.has(card.dataset.scienceKey))return;
+ if(![...select.options].some(option=>option.value===card.dataset.scienceKey))return;
+ select.value=card.dataset.scienceKey;
+ renderAcademyScience();
+});
 function renderAcademyScience(){
  const select=document.getElementById("researchKey"),details=document.getElementById("coiScienceDetails"),button=document.getElementById("researchButton");
  if(!select||!details||!button)return;
@@ -746,6 +791,7 @@ function renderAcademyScience(){
    const group=document.createElement("optgroup");group.label="Ciências imperiais · Castelo 30 / VIP 1+";group.dataset.imperial="true";
    for(const row of imperialRows){const opt=document.createElement("option");opt.value=row.key;opt.textContent=row.name;group.append(opt);}select.append(group);
  }else if(!imperialRows.length&&imperialGroup)imperialGroup.remove();
+ renderScienceCards(rows,select.value);
  const row=rows.find(x=>x.key===select.value);
  const activeResearch=(state?.queues||[]).some(q=>q.queue_type==="research"&&q.status==="running");
  if(row){
