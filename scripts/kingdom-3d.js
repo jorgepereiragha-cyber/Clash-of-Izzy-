@@ -13,6 +13,7 @@ import { derivePbrTextureData, forEachPeriodicSurfaceCell } from "./kingdom-mate
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
+import { approvedManifestEntry } from "./art-license-policy.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -1261,9 +1262,9 @@ if (host && "WebGLRenderingContext" in window) {
           if (!response.ok) throw new Error("Manifesto 3D indisponível.");
           const manifest = await response.json();
           if (disposed || !renderer) return;
-          manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [];
-          manifestProps = Array.isArray(manifest.props) ? manifest.props.slice(0, 16) : [];
-          manifestUnits = Array.isArray(manifest.units) ? manifest.units.slice(0, 8) : [];
+          manifestAssets = Array.isArray(manifest.models) ? manifest.models.filter(asset => approvedManifestEntry(asset, manifest.files)).slice(0, 32) : [];
+          manifestProps = Array.isArray(manifest.props) ? manifest.props.filter(asset => approvedManifestEntry(asset, manifest.files)).slice(0, 16) : [];
+          manifestUnits = Array.isArray(manifest.units) ? manifest.units.filter(asset => approvedManifestEntry(asset, manifest.files)).slice(0, 16) : [];
         })().catch(error => {
           manifestLoad = null;
           throw error;

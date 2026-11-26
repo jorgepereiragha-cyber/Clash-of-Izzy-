@@ -131,5 +131,106 @@
       "sourceUrl": "https://kenney.nl/assets/mini-forest",
       "license": "CC0-1.0"
     }
-  ]
+  ],
+  "files": {
+    "/assets/3d/kaykit/medieval-blue/barracks.glb": {
+      "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/tree/84fa4e91af6a88989be7c99e0891cede11f2ca38",
+      "license": "CC0-1.0",
+      "attribution": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sha256": "1d6a698c1d8e04bc5fb5a511fbc21fb9207ad99101a439eaa83e953e5964cf00",
+      "bytes": 231048,
+      "licenseFile": "licenses/KayKit-Medieval-Hexagon.txt"
+    },
+    "/assets/3d/kaykit/medieval-blue/hexagons_medieval.png": {
+      "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/tree/84fa4e91af6a88989be7c99e0891cede11f2ca38",
+      "license": "CC0-1.0",
+      "attribution": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sha256": "5301a06866ba3be68dcc14cc429bd6d0f69004b72884283715d7e233f2e9782e",
+      "bytes": 15783,
+      "licenseFile": "licenses/KayKit-Medieval-Hexagon.txt"
+    },
+    "/assets/3d/kaykit/medieval-blue/iron_mine.glb": {
+      "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/tree/84fa4e91af6a88989be7c99e0891cede11f2ca38",
+      "license": "CC0-1.0",
+      "attribution": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sha256": "b6281eb2a508066618482cacd6829671b66cb38c21f50b1fc40196b6430dbac4",
+      "bytes": 67400,
+      "licenseFile": "licenses/KayKit-Medieval-Hexagon.txt"
+    },
+    "/assets/3d/kaykit/medieval-blue/market.glb": {
+      "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/tree/84fa4e91af6a88989be7c99e0891cede11f2ca38",
+      "license": "CC0-1.0",
+      "attribution": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sha256": "4c0c1c3214809ef2d325e2785fabfaa777293e041f974e9a5ae2d89b6e2fbafb",
+      "bytes": 153544,
+      "licenseFile": "licenses/KayKit-Medieval-Hexagon.txt"
+    },
+    "/assets/3d/kenney/castle-kit/Models/GLB format/Textures/colormap.png": {
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney Castle Kit",
+      "sha256": "66fd49be148f32e88f6c8cace67120250d1943a7856601158ad0ff24651db0b0",
+      "bytes": 7529,
+      "licenseFile": "licenses/Kenney-Castle-Kit.txt"
+    },
+    "/assets/3d/kenney/castle-kit/Models/GLB format/siege-trebuchet.glb": {
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney Castle Kit",
+      "sha256": "123711fd475e35d061738f648d9bf46c7f463d57681325c369977cee8954679a",
+      "bytes": 139848,
+      "licenseFile": "licenses/Kenney-Castle-Kit.txt"
+    },
+    "/assets/3d/kenney/castle-kit/Models/GLB format/tower-square.glb": {
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney Castle Kit",
+      "sha256": "ae2e4f11247fef4e8e550011c20bc1862839cd4cfd21590aec9781ae0fbbbc7f",
+      "bytes": 16564,
+      "licenseFile": "licenses/Kenney-Castle-Kit.txt"
+    },
+    "/assets/3d/kenney/castle-kit/Models/GLB format/wall.glb": {
+      "source": "Kenney Castle Kit",
+      "sourceUrl": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney Castle Kit",
+      "sha256": "b2ea00acbf4ba91ff0d4b8b942edf9fa12d821abd0b2c945c57a2b9b3153cfe3",
+      "bytes": 16552,
+      "licenseFile": "licenses/Kenney-Castle-Kit.txt"
+    },
+    "/assets/3d/kenney/mini-forest/Models/GLB format/Textures/colormap.png": {
+      "source": "Kenney Mini Forest",
+      "sourceUrl": "https://kenney.nl/assets/mini-forest",
+      "license": "CC0-1.0",
+      "attribution": "Kenney Mini Forest",
+      "sha256": "319f1087d8ed50a8794f9a8179f64671d5595f2365fdf3e47ec2d4eb74dba20f",
+      "bytes": 10659,
+      "licenseFile": "licenses/Kenney-Mini-Forest.txt"
+    },
+    "/assets/3d/kenney/mini-forest/Models/GLB format/character-archer.glb": {
+      "source": "Kenney Mini Forest",
+      "sourceUrl": "https://kenney.nl/assets/mini-forest",
+      "license": "CC0-1.0",
+      "attribution": "Kenney Mini Forest",
+      "sha256": "0fd0f92e452ffab13529e51037cc804edf6ff3134f6bdd614b7aaea9ae6feb3b",
+      "bytes": 239124,
+      "licenseFile": "licenses/Kenney-Mini-Forest.txt"
+    },
+    "/assets/3d/kenney/mini-forest/Models/GLB format/tree-high.glb": {
+      "source": "Kenney Mini Forest",
+      "sourceUrl": "https://kenney.nl/assets/mini-forest",
+      "license": "CC0-1.0",
+      "attribution": "Kenney Mini Forest",
+      "sha256": "c86332ac085c2a7f0f926ea9f51907bbd9354561f5717cf95dc2cfcaaff873b1",
+      "bytes": 31176,
+      "licenseFile": "licenses/Kenney-Mini-Forest.txt"
+    }
+  }
 }
