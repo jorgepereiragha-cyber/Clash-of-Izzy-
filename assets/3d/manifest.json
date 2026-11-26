@@ -49,7 +49,7 @@
       "id": "kaykit-blue-iron-mine",
       "type": "iron_mine",
       "src": "/assets/3d/kaykit/medieval-blue/iron_mine.glb",
-      "enabled": true,
+      "enabled": false,
       "targetFootprint": 1.45,
       "targetHeight": 1.5,
       "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",

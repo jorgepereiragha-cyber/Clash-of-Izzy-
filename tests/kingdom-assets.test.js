@@ -11,7 +11,7 @@ test("bundled Kenney and KayKit assets keep CC0 provenance and a bounded local f
   assert.ok(manifest.props.length >= 2);
   assert.ok(manifest.units.some(item => item.unit_type === "archer"));
   for (const asset of [...manifest.models, ...manifest.props, ...manifest.units]) {
-    assert.equal(asset.enabled, true);
+    assert.equal(asset.enabled, asset.id !== "kaykit-blue-iron-mine", asset.id);
     assert.equal(asset.license, "CC0-1.0");
     assert.match(asset.sourceUrl, /^https:\/\/(?:kenney\.nl\/assets\/|github\.com\/KayKit-Game-Assets\/KayKit-Medieval-Hexagon-Pack-1\.0\/tree\/[a-f0-9]{40}$)/);
     assert.ok(asset.src.startsWith("/assets/3d/"));
@@ -60,6 +60,7 @@ test("archer asset includes the idle clip and both original CC0 license files ar
 test("KayKit civic models share the local atlas and preserve the original license", async () => {
   const assets = manifest.models.filter(asset => asset.id.startsWith("kaykit-blue-"));
   assert.deepEqual(assets.map(asset => asset.type).sort(), ["barracks", "iron_mine", "market"]);
+  assert.deepEqual(assets.filter(asset => asset.enabled).map(asset=>asset.type).sort(), ["barracks", "market"]);
   assert.match(await readFile(toUrl("/assets/3d/licenses/KayKit-Medieval-Hexagon.txt"), "utf8"), /Creative Commons Zero, CC0/);
   for (const asset of assets) {
     const data = await readFile(toUrl(asset.src));
