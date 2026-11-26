@@ -8,7 +8,7 @@ import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
 import { readGraphicsChoice, getGraphicsStorage } from "./kingdom-visual-preferences.js";
 import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
-import { projectDragonVisual, makeDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
+import { projectDragonVisual, makeDragonFigure, makeImportedDragonFigure, disposeImportedDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
 import { derivePbrTextureData, forEachPeriodicSurfaceCell } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
@@ -180,6 +180,10 @@ if (host && "WebGLRenderingContext" in window) {
     disposeResourceSet(resources);
   }
   function disposeSceneResources() {
+    if (activeDragon?.figure.imported) {
+      scene?.remove(activeDragon.figure.root);
+      disposeImportedDragonFigure(activeDragon.figure);
+    }
     const resources = { geometries: new Set(), materials: new Set(), textures: new Set(), imageBitmaps: new Set(), instances: new Set() };
     disposeObject3D(scene, resources);
     for (const template of glbTemplates.values()) disposeObject3D(template, resources);
@@ -1084,15 +1088,24 @@ if (host && "WebGLRenderingContext" in window) {
     renderer.render(scene,camera);
   }
   function renderEquippedDragon(row) {
+    if(!scene || disposed)return;
     const visual=projectDragonVisual(row);
-    if(activeDragon && (!visual || activeDragon.key!==visual.key || activeDragon.level!==visual.level)){
+    const template=glbUnitTemplates.get("equipped_dragon");
+    if(activeDragon && (!visual || activeDragon.key!==visual.key || activeDragon.level!==visual.level ||
+       (template && !activeDragon.figure.imported))){
       scene.remove(activeDragon.figure.root);
-      disposeDetachedObject3D(activeDragon.figure.root);
+      if(activeDragon.figure.imported)disposeImportedDragonFigure(activeDragon.figure);
+      else disposeDetachedObject3D(activeDragon.figure.root);
       activeDragon=null;
     }
-    if(!visual || !scene || disposed)return;
+    if(!visual)return;
     if(!activeDragon){
-      activeDragon={...visual,figure:makeDragonFigure(THREE,visual,qualityProfile?.tier)};
+      let figure;
+      if(template){
+        try { figure=makeImportedDragonFigure(THREE,cloneSkinned,template,visual); }
+        catch(error){ console.info("Clash of Izzy: dragão GLB indisponível.",error); }
+      }
+      activeDragon={...visual,figure:figure || makeDragonFigure(THREE,visual,qualityProfile?.tier)};
       dragonTime=0;
       scene.add(activeDragon.figure.root);
       poseDragon(activeDragon.figure,0,false);
@@ -1320,7 +1333,8 @@ if (host && "WebGLRenderingContext" in window) {
           .filter(asset => asset?.enabled === true && typeof asset.id === "string" && !glbPropTemplates.has(asset.id))
           .map(asset => ({ asset, kind: "prop", key: `prop:${asset.id}` })),
         ...manifestUnits
-          .filter(asset => asset?.enabled === true && presentUnits.has(asset.unit_type) && !glbUnitTemplates.has(asset.unit_type))
+          .filter(asset => asset?.enabled === true && !glbUnitTemplates.has(asset.unit_type) &&
+            (asset.unit_type === "equipped_dragon" ? !!projectDragonVisual(window.__coiKingdomDragon) : presentUnits.has(asset.unit_type)))
           .map(asset => ({ asset, kind: "unit", key: `unit:${asset.unit_type}` }))
       ].filter(entry => !glbLoadPromises.has(entry.key));
       // Normal state refreshes already render the existing templates. Avoid a
@@ -1333,6 +1347,7 @@ if (host && "WebGLRenderingContext" in window) {
         optionalSceneRefreshes += 1;
         renderBuildings(latestBuildings);
         renderManifestProps();
+        renderEquippedDragon(window.__coiKingdomDragon);
         renderKingdomTroops(latestTroops);
       }
     } catch (error) {

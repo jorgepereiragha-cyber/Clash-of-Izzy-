@@ -19,3 +19,9 @@ test("wings are mirrored and reduced motion gives a fixed pose",()=>{
  poseDragon(figure,500,false);
  assert.equal(figure.wings[1].wing.rotation.z,.18);
 });
+
+test("imported dragon uses the flight mixer and honors reduced motion",()=>{
+ const times=[]; const figure={imported:true,mixer:{setTime(t){times.push(t);}}};
+ poseDragon(figure,2.5,true);poseDragon(figure,100,false);
+ assert.deepEqual(times,[2.5,0]);
+});

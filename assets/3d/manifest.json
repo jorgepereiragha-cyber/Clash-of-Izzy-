@@ -220,6 +220,19 @@
       "license": "CC0-1.0",
       "animation": "HumanArmature|Idle",
       "maxInstances": 3
+    },
+    {
+      "id": "quaternius-equipped-dragon",
+      "unit_type": "equipped_dragon",
+      "src": "/assets/3d/quaternius/dragon-evolved.glb",
+      "enabled": true,
+      "targetFootprint": 3.15,
+      "targetHeight": 1.65,
+      "animation": "Flying_Idle",
+      "maxInstances": 1,
+      "source": "Quaternius Ultimate Monsters — Dragon Evolved",
+      "sourceUrl": "https://poly.pizza/m/LlwD0QNUPj",
+      "license": "CC0-1.0"
     }
   ],
   "files": {
@@ -401,6 +414,16 @@
       "bytes": 444596,
       "licenseFile": "licenses/Quaternius-CC0.txt",
       "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/medieval_village_pack/Stable.glb"
+    },
+    "/assets/3d/quaternius/dragon-evolved.glb": {
+      "source": "Quaternius Ultimate Monsters — Dragon Evolved",
+      "sourceUrl": "https://poly.pizza/m/LlwD0QNUPj",
+      "license": "CC0-1.0",
+      "attribution": "Dragon Evolved — Quaternius",
+      "sha256": "31b1bf500739adc996e095b5db4f9bf26581803b1b23a8aa75e92a2509253fbe",
+      "bytes": 86432,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/crisleyhguimaraes/space-ship/blob/c53b865c698d201fae129640f0a14f98f37e081b/public/models/creatures/dragon-evolved.glb"
     }
   }
 }
