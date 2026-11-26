@@ -1708,6 +1708,7 @@ if (host && "WebGLRenderingContext" in window) {
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
         loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
+        loadedBuildingAssets: [...glbTemplates].map(([type,model])=>({type,assetId:model.userData.coIAssetId})),
         pendingGlbLoads: glbLoadPromises.size,
         optionalSceneRefreshes,
         architecture:activeModels.filter(model=>model.userData.coIArchitecture).map(model=>({type:model.userData.coIType,design:model.userData.coIArchitecture,tier:model.userData.coIArchitectureTier||null})),
