@@ -1011,8 +1011,12 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.ok(refreshCounts.before >= 1, "initial optional models refresh the scene");
         assert.equal(refreshCounts.after,refreshCounts.before,
           "unchanged kingdom state must not trigger an extra optional model rebuild");
+        await page.waitForFunction(()=>window.__coiKingdomDiagnostics?.()?.photoStoneLoaded===true,null,{timeout:45_000});
         const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
         assert.ok(diagnostics.architecture.some(x=>x.type==="castle"&&x.design==="eldoria-imperial-v1"&&x.tier===1),"new realm uses original tier-one keep");
+        const artLayout=diagnostics.cityArtLayout;
+        assert.ok(artLayout.some(x=>x.type==="castle"&&x.scale>1),"main castle occupies its reserved plot");
+        assert.ok(artLayout.every(x=>Number.isFinite(x.x)&&Number.isFinite(x.z)&&x.scale>0&&x.scale<=1.4),"finite model positions and bounded scale");
         assert.equal(diagnostics.castleGateAsset,"quaternius-castle-gate","original castle uses decoded modular fortification");
         for(const type of ["quarry","iron_mine"]){
           assert.ok(diagnostics.architecture.some(x=>x.type===type&&x.design==="eldoria-rural-v1"),type+" uses its own rural architecture");

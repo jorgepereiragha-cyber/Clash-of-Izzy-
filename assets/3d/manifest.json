@@ -535,6 +535,16 @@
       "bytes": 103620,
       "licenseFile": "licenses/Kenney-Castle-Kit.txt",
       "mirror": "https://github.com/GeorgeQLe/assets-3d-medieval/blob/ce28cabc1229b4c0a9ac24a6d2e7704c70fc486a/assets/kenney/castle-kit/Models/GLB format/siege-ram.glb"
+    },
+    "/assets/3d/polyhaven/stone_wall_diff_1k.jpg": {
+      "source": "Poly Haven Stone Wall",
+      "sourceUrl": "https://polyhaven.com/a/stone_wall",
+      "license": "CC0-1.0",
+      "attribution": "Charlotte Baglioni (photography), Dario Barresi (processing), Poly Haven",
+      "sha256": "390969aead48d9a10ac731a5e0af8761cc4ed89faa02ba775b913930b4398d87",
+      "bytes": 836975,
+      "licenseFile": "licenses/Poly-Haven-Stone-Wall.txt",
+      "mirror": "https://github.com/we1jia/emberfall/blob/5d199ab4888e428b0dab80528a37ab8ac0107360/public/assets/vendor/polyhaven/stone_wall/stone_wall_diff_1k.jpg"
     }
   }
 }

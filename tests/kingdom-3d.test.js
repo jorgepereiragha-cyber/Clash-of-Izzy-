@@ -500,6 +500,20 @@ test("city contact shadows stay bounded and use one reusable instanced batch",as
  assert.match(renderer,/mat\.color\.set\(skin\?\.stone/);
 });
 
+test("server grid plots determine art centers and constrain asymmetrical models",async()=>{
+ const {readCityFootprint,cityModelAnchor,cityModelFit}=await import("../scripts/city-art-layout.js");
+ const fp=readCityFootprint({castle:{width:5,height:5}},"castle");
+ assert.deepEqual(cityModelAnchor(-2.5,-2.5,fp),{x:0,z:0});
+ assert.deepEqual(cityModelAnchor(0,0,null),{x:0,z:0});
+ assert.equal(readCityFootprint({castle:{width:999,height:5}},"castle"),null);
+ assert.ok(cityModelFit("castle",fp,.9,.9)>1.3);
+ assert.ok(cityModelFit("farm",{width:2,height:2},.8,.6)<.7);
+ assert.equal(cityModelFit("farm",null,.8,.6),1);
+ assert.equal(cityModelFit("castle",fp,Infinity,.9),1);
+ assert.match(renderer,/cityModelAnchor\(x,z,serverCityFootprint\(building\.building_type\)\)/);
+ assert.match(renderer,/group\.scale\.multiplyScalar\(artScale\)/);
+});
+
 test("city scenery extends beyond camera framing and supports separate center and overview",()=>{
  assert.match(renderer,/PlaneGeometry\(96, 96\), mats\.grass/);
  assert.match(renderer,/kind === "grass" \? 27 : 3/);
