@@ -1,7 +1,8 @@
 import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
-import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-path.js";
+import { marchVisualProgress, marchVisualPoint, planMarchFormation } from "./scripts/march-visual-path.js";
+import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-state.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -46,6 +47,9 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
   let contextLost = false;
   let sceneInViewport = true;
   let worldState = null;
+  let visualKeys = null;
+  let territoryLookup = new Map();
+  const visualRebuilds = { home:0, features:0, routes:0, marches:0 };
   let activeMarches = [];
   let homeCastleGroup = null;
   let projectionButtons = new Map();
@@ -275,7 +279,7 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
     box(parent, .8, .42, .06, shared.banner, x + .61, y + height + 1.82, z);
   }
 
-  function createCastle(parent, x, z, scale = 1, color = "home", skinId = 0) {
+  function createCastle(parent, x, z, scale = 1, color = "home", skinId = 0, level = 1) {
     const group = new THREE.Group();
     group.position.set(x, terrainHeight(x, z), z);
     group.scale.setScalar(scale);
@@ -285,8 +289,11 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
     const roof=theme?.roof||shared.roof;
     const banner=theme?.banner||(color==="enemy"?shared.enemy:shared.banner);
     const accent=theme?.accent||shared.gold;
+    const tier=worldCastleTier(level);
+    group.userData.coICastleTier=tier;
+    const rise=(tier-1)*.32;
     box(group,5.6,1.35,4.5,wall,0,.76,0);
-    box(group,3.2,2.8,3.1,wallLight,0,2.55,0);
+    box(group,3.2,2.8+rise,3.1,wallLight,0,2.55+rise/2,0);
     box(group,1.15,1.9,.18,shared.wood,0,1.1,1.64);
     for(const [tx,tz] of [[-2.5,-1.9],[2.5,-1.9],[-2.5,1.9],[2.5,1.9]]){
       const tower=new THREE.Group();tower.position.set(tx,0,tz);group.add(tower);
@@ -294,9 +301,19 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
       box(tower,1.42,.2,1.42,wallLight,0,2.65,0);
       cone(tower,1.05,1.45,roof,0,3.45,0,4);
     }
-    cone(group,1.8,1.25,roof,0,4.55,0,4);
-    box(group,.08,1.85,.08,accent,.55,5.45,0);
-    box(group,1.0,.48,.07,banner,1.02,5.83,0);
+    cone(group,1.8,1.25,roof,0,4.55+rise,0,4);
+    if(tier>=2){
+      for(const tx of [-1.3,1.3])box(group,.44,.56,.50,accent,tx,3.5+rise,1.57);
+    }
+    if(tier>=3){
+      box(group,1.1,.23,.18,accent,0,3.75+rise,1.57);
+      for(const tx of [-1.15,1.15])cone(group,.39,.8,roof,tx,4.25+rise,1.12,4);
+    }
+    if(tier>=4)cone(group,.38,.72,accent,0,5.38+rise,0,6);
+    box(group,.08,1.85,.08,accent,.55,5.45+rise,0);
+    box(group,1.0,.48,.07,banner,1.02,5.83+rise,0);
+    // Keep an independent faction pennant: cosmetic colors never disguise ownership.
+    box(group,.56,.24,.08,color==="enemy"?shared.enemy:shared.banner,.82,5.27+rise,0);
     parent.add(group);
     return group;
   }
@@ -354,7 +371,7 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
       return;
     }
     if (territory.territory_kind === "castle") {
-      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home", territory.castle_skin_id);
+      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home", territory.castle_skin_id, territory.castle_level ?? territory.level);
       return;
     }
 
@@ -432,12 +449,10 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
 
   function createMarchFormation(march) {
     const group = new THREE.Group();
-    const material = march.march_type === "attack" ? shared.redTroop : shared.blueTroop;
-    const soldiers=[
-      createSoldier(group, material, -.42, -.28, 0),
-      createSoldier(group, material, .42, -.28, 1),
-      createSoldier(group, material, 0, .48, 2)
-    ];
+    const formation = planMarchFormation(march.march_type, quality);
+    const material = formation.color === "red" ? shared.redTroop :
+      formation.color === "green" ? shared.forest : formation.color === "gold" ? shared.neutral : shared.blueTroop;
+    const soldiers = formation.positions.map(([x,z],index)=>createSoldier(group,material,x,z,index));
     const flagPole = box(group, .07, 1.45, .07, shared.gold, 0, 1.25, -.72);
     flagPole.castShadow = false;
     box(group, .67, .35, .06, material, .3, 1.73, -.72);
@@ -465,9 +480,8 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
   }
 
   function updateMarchPositions(now) {
-    const territories = new Map((worldState?.territories || []).map(item => [Number(item.id), item]));
     for (const march of activeMarches) {
-      const target = territories.get(march.targetId);
+      const target = territoryLookup.get(march.targetId);
       if (!target) continue;
       const progress=marchVisualProgress(now,march.startAt,march.endAt);
       const origin=visualHome();
@@ -577,22 +591,26 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
   }
 
   function setWorldState(nextState) {
-    if (!nextState || !Array.isArray(nextState.territories)) return;
+    if (disposed || contextLost || !nextState || !Array.isArray(nextState.territories)) return;
+    const keys = worldVisualKeys(nextState);
+    const previous = visualKeys;
     worldState = nextState;
-    if(homeCastleGroup){
-      terrainRoot.remove(homeCastleGroup);
-      homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
+    territoryLookup = new Map(nextState.territories.map(item=>[Number(item.id),item]));
+    if (keys.home !== previous?.home) {
+      if(homeCastleGroup){
+        terrainRoot.remove(homeCastleGroup);
+        homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
+      }
+      // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
+      const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
+      homeCastleGroup=createCastle(terrainRoot,hasThrone?13:0,hasThrone?-11:0,1.4,"home",Number(worldState.castleSkinId)||0,worldState.castleLevel);
+      visualRebuilds.home++;
     }
-    // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
-    const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
-    if(hasThrone){
-      homeCastleGroup=createCastle(terrainRoot,13,-11,1.4,"home",Number(worldState.castleSkinId)||0);
-    }else{
-      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(worldState.castleSkinId)||0);
-    }
-    rebuildTerritories();
-    rebuildRoads();
-    rebuildMarches();
+    if(keys.features!==previous?.features){rebuildTerritories();visualRebuilds.features++;}
+    if(keys.routes!==previous?.routes){rebuildRoads();visualRebuilds.routes++;}
+    if(keys.marches!==previous?.marches){rebuildMarches();visualRebuilds.marches++;}
+    else {updateMarchPositions(Date.now());syncMarchAnimation();}
+    visualKeys=keys;
     draw();
   }
 
@@ -671,7 +689,7 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
       scene.add(worldRoot);
       worldRoot.add(terrainRoot, routeRoot, territoryRoot, armyRoot);
       createGround();
-      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(window.__coiWorldMapState?.castleSkinId)||0);
+      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(window.__coiWorldMapState?.castleSkinId)||0,window.__coiWorldMapState?.castleLevel);
       resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
       resizeObserver?.observe(host);
       resizeHandler = resize;
@@ -702,7 +720,8 @@ import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-pa
           projectionButtons = buttons instanceof Map ? buttons : new Map();
           projectTerritories();
         },
-        project: projectTerritories
+        project: projectTerritories,
+        diagnostics: () => ({ rebuilds: {...visualRebuilds} })
       };
       window.dispatchEvent(new CustomEvent("coi:world-map-3d-ready"));
       if (window.__coiWorldMapState) setWorldState(window.__coiWorldMapState);

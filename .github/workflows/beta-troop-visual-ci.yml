@@ -15,4 +15,4 @@ jobs:
         with:
           node-version: '22'
       - run: npm run assets:validate
-      - run: node --test tests/march-visual-path.test.js tests/city-building-art.test.js tests/art-license-policy.test.js tests/asset-manifest-validation.test.js tests/kingdom-army-visual.test.js tests/kingdom-3d.test.js tests/kingdom-assets.test.js tests/periodic-surface-grid.test.js tests/skin-art.test.js tests/castle-science.test.js tests/cosmetic-fairness.test.js
+      - run: node --test tests/march-visual-path.test.js tests/world-map-mobile-performance.test.js tests/city-building-art.test.js tests/art-license-policy.test.js tests/asset-manifest-validation.test.js tests/kingdom-army-visual.test.js tests/kingdom-3d.test.js tests/kingdom-assets.test.js tests/periodic-surface-grid.test.js tests/skin-art.test.js tests/castle-science.test.js tests/cosmetic-fairness.test.js
