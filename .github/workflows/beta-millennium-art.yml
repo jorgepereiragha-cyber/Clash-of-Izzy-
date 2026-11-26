@@ -4,13 +4,14 @@ on:
     branches: [beta]
     paths:
       - scripts/convert-millennium-fortress.py
+      - scripts/stage-millennium-buildings.mjs
       - .github/workflows/beta-millennium-art.yml
 permissions:
   contents: read
 jobs:
   convert:
     runs-on: ubuntu-22.04
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
@@ -55,3 +56,31 @@ jobs:
           path: art-candidates/
           retention-days: 7
           if-no-files-found: error
+      - name: Stage reviewed buildings in disposable checkout
+        if: github.head_ref == 'improve/beta-millennium-integrate'
+        run: |
+          node scripts/stage-millennium-buildings.mjs art-candidates
+          npm run assets:validate
+          node --test tests/art-license-policy.test.js
+      - name: Install browser smoke dependencies
+        if: github.head_ref == 'improve/beta-millennium-integrate'
+        run: |
+          npm ci
+          npx playwright install chromium
+          npm run vendor:three
+      - name: Render staged models in local beta Worker and D1
+        if: github.head_ref == 'improve/beta-millennium-integrate'
+        env:
+          BETA_BROWSER_SMOKE: "1"
+          BETA_MILLENNIUM_SMOKE: "1"
+        run: node --test tests/beta-runtime-local.test.js
+      - uses: actions/upload-artifact@v4
+        if: always() && github.head_ref == 'improve/beta-millennium-integrate'
+        with:
+          name: millennium-integration-evidence
+          path: |
+            test-results/beta-visual/
+            assets/3d/millennium/
+            assets/3d/manifest.json
+          if-no-files-found: error
+          retention-days: 7
