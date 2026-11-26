@@ -8,3 +8,5 @@ Seven painted PNGs by pauliuw, *Modified And Cliped Magic, Skill & Item Icons*, 
 - scout_boots: Boots 1 Original.png
 - asgardian_greaves: Boots 2 Original.png
 - valkyrie_charm: Necklet Mod 5.png
+
+- leather_armor: OSARE leather_armor.png, 60x60, by Blarumyrran (CC0). Source: https://opengameart.org/content/osare-weapon-icons; mirror pinned to https://github.com/Tiddybub/2d-assets/tree/e0cbe0d995554a490d4c182fe9beb8769ffbb606/ui/oga-osare-weapon-icons. Original preview explicitly credits Blarumyrran and confirms public domain. Unmodified local PNG; existing SVG remains the fallback. Three overlapping OSARE sword/plate candidates were not added to avoid duplicate art for already illustrated items.

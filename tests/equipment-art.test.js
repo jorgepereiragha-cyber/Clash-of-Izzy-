@@ -14,9 +14,9 @@ test("all canonical equipment has unique local art and rejects unknown keys",asy
  assert.match(client,/createEquipment\(stage\)/);assert.match(client,/createEquipment\(item\)/);assert.match(ui,/id="selected-equipment-art"/);
 });
 
-test("seven inspected painted CC0 gear illustrations use unique valid local PNGs and a vector fallback",async()=>{
- const {createHash}=await import("node:crypto");const helper=await read("scripts/skin-art.js");const ids=JSON.parse(helper.match(/const paintedEquipmentIds=new Set\((\[[^\n]+\])\)/)[1]);assert.equal(ids.length,7);const hashes=new Set();const credits=await read("assets/art/equipment/CREDITS.md");
+test("eight inspected painted CC0 gear illustrations use unique valid local PNGs and a vector fallback",async()=>{
+ const {createHash}=await import("node:crypto");const helper=await read("scripts/skin-art.js");const ids=JSON.parse(helper.match(/const paintedEquipmentIds=new Set\((\[[^\n]+\])\)/)[1]);assert.equal(ids.length,8);const hashes=new Set();const credits=await read("assets/art/equipment/CREDITS.md");
  const window={};const node=()=>({style:{setProperty(){}},setAttribute(){},append(){},addEventListener(){}});vm.runInNewContext(helper,{window,document:{createElement:node,createElementNS:node}});
- for(const id of ids){const data=await readFile(new URL("../assets/art/equipment/"+id+".png",import.meta.url));assert.equal(data.subarray(0,8).toString("hex"),"89504e470d0a1a0a");assert.equal(data.readUInt32BE(16),64);assert.equal(data.readUInt32BE(20),64);const hash=createHash("sha256").update(data).digest("hex");assert.ok(!hashes.has(hash));hashes.add(hash);assert.ok(credits.includes(id));const img=window.COI_SKIN_ART.createEquipment({id,name:id});assert.equal(img.src,"/assets/art/equipment/"+id+".png");}
+ for(const id of ids){const data=await readFile(new URL("../assets/art/equipment/"+id+".png",import.meta.url));assert.equal(data.subarray(0,8).toString("hex"),"89504e470d0a1a0a");const size=id==="leather_armor"?60:64;assert.equal(data.readUInt32BE(16),size);assert.equal(data.readUInt32BE(20),size);const hash=createHash("sha256").update(data).digest("hex");assert.ok(!hashes.has(hash));hashes.add(hash);assert.ok(credits.includes(id));const img=window.COI_SKIN_ART.createEquipment({id,name:id});assert.equal(img.src,"/assets/art/equipment/"+id+".png");}
  assert.match(helper,/createEquipment\(item,false\)/);assert.match(credits,/CC0/);
 });

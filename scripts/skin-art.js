@@ -21,11 +21,11 @@
  }
  const equipmentGroups={"weapons-helms":["iron_sword","espada_guerreiro","rune_spear","mjolnir_fragment","iron_helm","raven_helm","runic_helm"],"armor-boots":["coroa_izzy","leather_armor","warden_plate","manto_real","aegis_asgard","scout_boots","wolf_boots"],"accessories-boots":["storm_boots","asgardian_greaves","copper_ring","frost_ring","moon_charm","valkyrie_charm","anel_poder"]};
  const equipmentLookup=new Map(Object.entries(equipmentGroups).flatMap(([group,ids])=>ids.map(id=>[id,group])));
- const paintedEquipmentIds=new Set(["iron_sword","espada_guerreiro","warden_plate","aegis_asgard","scout_boots","asgardian_greaves","valkyrie_charm"]);
+ const paintedEquipmentIds=new Set(["iron_sword","espada_guerreiro","warden_plate","aegis_asgard","scout_boots","asgardian_greaves","valkyrie_charm","leather_armor"]);
  function createEquipment(item,preferPainted=true){
   const id=item?.id;if(!equipmentLookup.has(id))return null;
   if(preferPainted&&paintedEquipmentIds.has(id)){
-   const img=document.createElement("img");img.className="coi-equipment-art is-painted";img.src="/assets/art/equipment/"+id+".png";img.alt=String(item.name||"Equipamento");img.width=64;img.height=64;img.loading="lazy";img.decoding="async";
+   const img=document.createElement("img");img.className="coi-equipment-art is-painted";img.src="/assets/art/equipment/"+id+".png";img.alt=String(item.name||"Equipamento");img.width=id==="leather_armor"?60:64;img.height=img.width;img.loading="lazy";img.decoding="async";
    img.addEventListener("error",()=>{const fallback=createEquipment(item,false);if(fallback)img.replaceWith(fallback);},{once:true});return img;
   }
   const ns="http://www.w3.org/2000/svg",art=document.createElementNS(ns,"svg");
