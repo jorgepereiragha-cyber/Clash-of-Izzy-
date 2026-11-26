@@ -6,6 +6,7 @@ const root=path.resolve(process.argv[2]||"art-candidates");
 const dest="assets/3d/millennium";
 const manifestPath="assets/3d/manifest.json";
 const manifest=JSON.parse(await readFile(manifestPath,"utf8"));
+if(manifest.version>=2&&!manifest.entityArt)throw Error("Missing v2 entityArt index");
 const base="https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/";
 const source="Millennium A.D. (Carolingian structures)";
 const attribution="The Council of Modders, Fallen Empire Studio, Scion Development — https://www.wildfiregames.com/ — CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/";
@@ -48,7 +49,21 @@ for(const [type,name,hash,targetFootprint,targetHeight] of choices){
   indexed.webgl.modelIds=[id];
  }
 }
+// Preflight the whole batch before writing anything. Never mask a different
+// versioned asset by replacing it with a newly converted candidate.
+for(const v of validated){
+ const target=path.join(dest,v.name);
+ let existing;
+ try{existing=await readFile(target);}catch(error){if(error.code!=="ENOENT")throw error;}
+ if(existing&&createHash("sha256").update(existing).digest("hex")!==v.file.sha256){
+  throw Error("Versioned asset differs from reviewed candidate: "+v.name+"; review hashes before replacing");
+ }
+}
 await mkdir(dest,{recursive:true});
 for(const v of validated){await writeFile(path.join(dest,v.name),v.bytes);manifest.files[v.src]=v.file;}
+// Report all bundled GLBs, including inactive alternatives. The existing
+// regression suite remains the authoritative strict budget gate.
+const glbBytes=Object.entries(manifest.files).filter(([src])=>src.toLowerCase().endsWith(".glb")).reduce((sum,[,file])=>sum+file.bytes,0);
+console.log("Manifest GLB budget: "+glbBytes+" / <4600000 bytes; excess="+Math.max(0,glbBytes-4599999));
 await writeFile(manifestPath,JSON.stringify(manifest,null,2)+"\n");
 console.log("Staged three reviewed building roles with shared textures.");
