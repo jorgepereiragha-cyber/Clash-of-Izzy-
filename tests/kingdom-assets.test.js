@@ -13,7 +13,7 @@ test("bundled Kenney, KayKit and Quaternius assets keep CC0 provenance and a bou
   for (const asset of [...manifest.models, ...manifest.props, ...manifest.units]) {
     assert.equal(asset.enabled, !["kaykit-blue-iron-mine", "kenney-castle-watchtower", "kenney-castle-wall"].includes(asset.id), asset.id);
     assert.equal(asset.license, "CC0-1.0");
-    assert.match(asset.sourceUrl, /^https:\/\/(?:kenney\.nl\/assets\/|quaternius\.com\/packs\/|poly\.pizza\/m\/|github\.com\/KayKit-Game-Assets\/KayKit-Medieval-Hexagon-Pack-1\.0\/tree\/[a-f0-9]{40}$)/);
+    assert.match(asset.sourceUrl, /^https:\/\/(?:kenney\.nl\/assets\/|quaternius\.com\/packs\/|poly\.pizza\/m\/|github\.com\/KayKit-Game-Assets\/(?:KayKit-Medieval-Hexagon-Pack-1\.0|KayKit-Character-Pack-Adventures-1\.0)\/tree\/[a-f0-9]{40}$)/);
     assert.ok(asset.src.startsWith("/assets/3d/"));
     assert.ok(asset.src.endsWith(".glb"));
   }
@@ -41,7 +41,7 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
       assert.ok(texture.byteLength > 0, texturePath);
     }
   }
-  assert.ok(totalBytes < 3_200_000, "bundled GLBs must remain under 3.2 MB");
+  assert.ok(totalBytes < 3_600_000, "bundled GLBs must remain under 3.6 MB");
 });
 
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {
@@ -88,4 +88,9 @@ test("equipped dragon GLB is local, rigged and has a flight clip", async()=>{
  assert.ok(g.skins.length); assert.ok(g.animations.some(x=>x.name===a.animation));
  assert.ok([...(g.images||[]),...(g.buffers||[])].every(x=>x.uri===undefined));
  assert.equal(manifest.files[a.src].license,"CC0-1.0");
+});
+
+test("KayKit militia and mage contain local rigged idle and locomotion animations",async()=>{
+ for(const type of ["militia","mage"]){const a=manifest.units.find(x=>x.unit_type===type);assert.ok(a?.enabled);assert.equal(a.animation,"Idle");assert.equal(a.maxInstances,2);const b=await readFile(toUrl(a.src));const g=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());assert.ok(g.skins.length);for(const clip of ["Idle","Running_A","Walking_A"])assert.ok(g.animations.some(x=>x.name===clip));assert.ok([...(g.images||[]),...(g.buffers||[])].every(x=>x.uri===undefined));}
+ assert.match(await readFile(toUrl("/assets/3d/licenses/KayKit-Adventurers.txt"),"utf8"),/Creative Commons Zero, CC0/);
 });

@@ -233,6 +233,32 @@
       "source": "Quaternius Ultimate Monsters — Dragon Evolved",
       "sourceUrl": "https://poly.pizza/m/LlwD0QNUPj",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "kaykit-adventurers-mage",
+      "unit_type": "mage",
+      "src": "/assets/3d/kaykit/adventurers/mage.glb",
+      "enabled": true,
+      "targetFootprint": 0.85,
+      "targetHeight": 1.6,
+      "source": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/tree/672074b73ba276876a19e8816ecdc5241817ab47",
+      "license": "CC0-1.0",
+      "animation": "Idle",
+      "maxInstances": 2
+    },
+    {
+      "id": "kaykit-adventurers-militia",
+      "unit_type": "militia",
+      "src": "/assets/3d/kaykit/adventurers/militia.glb",
+      "enabled": true,
+      "targetFootprint": 0.85,
+      "targetHeight": 1.6,
+      "source": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/tree/672074b73ba276876a19e8816ecdc5241817ab47",
+      "license": "CC0-1.0",
+      "animation": "Idle",
+      "maxInstances": 2
     }
   ],
   "files": {
@@ -424,6 +450,26 @@
       "bytes": 86432,
       "licenseFile": "licenses/Quaternius-CC0.txt",
       "mirror": "https://github.com/crisleyhguimaraes/space-ship/blob/c53b865c698d201fae129640f0a14f98f37e081b/public/models/creatures/dragon-evolved.glb"
+    },
+    "/assets/3d/kaykit/adventurers/mage.glb": {
+      "source": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/tree/672074b73ba276876a19e8816ecdc5241817ab47",
+      "license": "CC0-1.0",
+      "attribution": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sha256": "a123c287f8519853e03c36259309a0fadf1b8197a9bf775db7687d70a601acbb",
+      "bytes": 199176,
+      "licenseFile": "licenses/KayKit-Adventurers.txt",
+      "mirror": "https://github.com/crisleyhguimaraes/space-ship/blob/c53b865c698d201fae129640f0a14f98f37e081b/public/models/adventurers/mage.glb"
+    },
+    "/assets/3d/kaykit/adventurers/militia.glb": {
+      "source": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Character-Pack-Adventures-1.0/tree/672074b73ba276876a19e8816ecdc5241817ab47",
+      "license": "CC0-1.0",
+      "attribution": "KayKit Character Pack: Adventurers (Kay Lousberg)",
+      "sha256": "bcdb12755bc20b169ad28ea7b0623907dcdd0e7db1d21541b9c4adb8c05ab2c0",
+      "bytes": 208748,
+      "licenseFile": "licenses/KayKit-Adventurers.txt",
+      "mirror": "https://github.com/crisleyhguimaraes/space-ship/blob/c53b865c698d201fae129640f0a14f98f37e081b/public/models/adventurers/barbarian.glb"
     }
   }
 }
