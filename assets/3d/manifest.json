@@ -1624,6 +1624,57 @@
           "viewBox": "0 0 100 100"
         }
       }
+    },
+    "science": {
+      "scholarship": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "scholarship",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "conscription": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "conscription",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "field_logistics": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "field_logistics",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "military_medicine": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "military_medicine",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "imperial_attack": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "imperial_attack",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "imperial_defense": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "imperial_defense",
+          "viewBox": "0 0 512 512"
+        }
+      },
+      "imperial_health": {
+        "canvas2d": {
+          "atlas": "art/science/icons.svg",
+          "symbol": "imperial_health",
+          "viewBox": "0 0 512 512"
+        }
+      }
     }
   }
 }

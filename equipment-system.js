@@ -347,6 +347,7 @@
       if(hero.rarity_key)card.dataset.heroRarity=String(hero.rarity_key);
       const portrait=document.createElementNS("http://www.w3.org/2000/svg","svg");
       portrait.setAttribute("class","hero-roster-portrait");
+      portrait.dataset.entityArtCategory="heroes";portrait.dataset.entityArtId=hero.hero_key;portrait.setAttribute("data-entity-art-existing","");
       portrait.setAttribute("viewBox","0 0 320 480");
       portrait.setAttribute("role","img");
       portrait.setAttribute("aria-label",hero.portrait_alt||hero.name||"Retrato de herói");
@@ -449,6 +450,7 @@
       card.append(portrait,details);
       root.append(card);
     }
+    window.dispatchEvent(new Event("coi:entity-art-targets"));
   }
   function renderSummonOdds(){
     const root=$("hero-summon-rates");

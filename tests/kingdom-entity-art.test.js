@@ -4,6 +4,7 @@ import {readFile} from "node:fs/promises";
 import {HERO_TEMPLATES} from "../hero-catalog.js";
 import {DRAGON_CATALOG} from "../dragon-catalog.js";
 import {UNIT_STYLES} from "../scripts/kingdom-army-visual.js";
+import {KingdomEntityArtController,normalizeQualityProfile} from "../scripts/kingdom-entity-art-boot.js";
 import {resolveEntity2DAsset,resolveQualityFolder,loadCachedImage,loadEntityManifest} from "../scripts/kingdom-2d-art-atlas.js";
 const manifest=JSON.parse(await readFile(new URL("../assets/3d/manifest.json",import.meta.url),"utf8"));
 const art=manifest.entityArt;
@@ -15,7 +16,7 @@ test("canonical 2D art index references real symbols and approved enabled GLB en
  assert.equal(Object.keys(art.heroes).length,70);
  const available=[...manifest.models,...manifest.units].filter(x=>x.enabled===true);
  for(const [category,entries] of Object.entries(art)){
-   if(!["buildings","dragons","troops","heroes","resources"].includes(category))continue;
+   if(!["buildings","dragons","troops","heroes","resources","science"].includes(category))continue;
    for(const [key,entry] of Object.entries(entries)){
      for(const id of entry.webgl?.modelIds||[])assert.ok(available.some(a=>a.id===id&&manifest.files[a.src]),id);
      if(!entry.canvas2d)continue;
@@ -49,4 +50,39 @@ test("failed asset request is retriable and concurrent manifest fetch is shared"
  await assert.rejects(loadCachedImage("/assets/art/test.webp",FakeImage));
  await loadCachedImage("/assets/art/test.webp",FakeImage);
  assert.equal(calls,2);
+});
+
+test("controller normalizes quality and keeps a single 48-entry decoded cache",async()=>{
+ for(const value of ["medium","MEDIUM","Balanced","unknown"])assert.equal(normalizeQualityProfile(value),"balanced");
+ for(const value of ["low","high"])assert.equal(normalizeQualityProfile(value),value);
+ const controller=new KingdomEntityArtController({manifest,quality:"MEDIUM"});
+ assert.equal(controller.quality,"balanced");
+ controller.setQuality("high");assert.equal(controller.quality,"high");
+ let calls=0;
+ class FakeImage{set src(_){calls++;queueMicrotask(()=>this.onload());}}
+ const urls=Array.from({length:65},(_,i)=>"/assets/art/cache-test-"+i+".webp");
+ for(const url of urls)await controller.acquireImage(url,FakeImage);
+ const cache=controller.cacheInfo();
+ assert.equal(cache.size,48);assert.equal(cache.limit,48);
+ assert.ok(!cache.keys.includes(urls[0]));assert.ok(cache.keys.includes(urls[64]));
+ await controller.acquireImage(urls[64],FakeImage);assert.equal(calls,65);
+});
+test("controller uses official keys and real local atlas symbols, never synthetic hero IDs",()=>{
+ const controller=new KingdomEntityArtController({manifest});
+ for(const {key} of DRAGON_CATALOG)assert.equal(controller.getDragonPortrait(key).src,"/assets/art/eldoria/hud.svg#dragon-"+key);
+ for(const key of Object.keys(UNIT_STYLES))assert.equal(controller.getTroopIcon(key).src,"/assets/art/eldoria/hud.svg#troop-"+key);
+ const keys=Object.keys(art.heroes),portraits=keys.map(key=>controller.getHeroPortrait(key).src);
+ assert.equal(new Set(portraits).size,70);
+ assert.equal(controller.getHeroPortrait("hero_01"),null);
+ assert.equal(controller.drawCanvas2DEntity(null,{category:"buildings",id:"castle"}),false);
+ assert.equal(controller.drawCanvas2DEntity({drawImage(){throw Error("should not draw");}},{category:"buildings",id:"castle",x:0,y:0,w:20,h:20}),false);
+});
+test("science symbols and pure 2D integration stay tied to real UI",async()=>{
+ assert.equal(Object.keys(art.science).length,7);
+ const boot=await readFile(new URL("../scripts/kingdom-entity-art-boot.js",import.meta.url),"utf8");
+ assert.doesNotMatch(boot,/from\s+["']three(?:\/|["'])/);
+ const html=await readFile(new URL("../kingdom.html",import.meta.url),"utf8");
+ assert.match(html,/__coiDrawCityEntityArt\(ctx/);
+ assert.match(html,/coiTroopArtPreview/);assert.match(html,/coiHeroArtPreview/);
+ assert.match(html,/data-entity-art-existing/);
 });

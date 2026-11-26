@@ -88,6 +88,7 @@ if(root){
    :"Posto livre"+(ready?".":" (construa primeiro o edifício necessário).");
   heroAssign.disabled=pending||!ready||Boolean(assigned)||!selected;
   heroUnassign.disabled=pending||!assigned;
+  window.dispatchEvent(new Event("coi:entity-art-targets"));
  }
  function render(){
   const s=state();

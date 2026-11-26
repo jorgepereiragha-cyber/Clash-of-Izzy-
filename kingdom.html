@@ -114,6 +114,11 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .city.has-3d .building-art{display:none}
 .resource-icon .coi-entity-art{display:inline-block;width:22px;height:22px;vertical-align:middle}
 .coi-dragon-art-card>.coi-entity-art{display:block;width:88px;height:88px;max-width:100%;margin:0 auto 8px;filter:drop-shadow(0 3px 3px #0007)}
+.city:not(.has-3d) .building.canvas-art-ready{background:linear-gradient(180deg,transparent 0 68%,#102820c2 100%);backdrop-filter:none}
+.city:not(.has-3d) .building.canvas-art-ready .building-art{visibility:hidden}
+.coi-art-preview:empty{display:none}
+.coi-art-preview .coi-entity-art{display:block;width:76px;height:76px;margin:4px auto;filter:drop-shadow(0 3px 3px #0007)}
+#coiHeroArtPreview .coi-entity-art{width:60px;height:90px}
 .city.has-3d .building{background:none;border:0;box-shadow:none;gap:0;justify-content:flex-end;padding:1px 2px 3px}
 .city.has-3d .building.castle{background:none;border:0}
 .city.has-3d .building strong,.city.has-3d .building small{background:#10202c88;padding:0 3px;border-radius:2px;line-height:1.12;max-width:100%;text-shadow:0 1px 3px #000}
@@ -243,6 +248,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
    <button id="coiHeroAssign" type="button" disabled>Alocar herói</button>
    <button id="coiHeroUnassign" type="button" disabled>Liberar posto</button>
   </div>
+  <span id="coiHeroArtPreview" class="coi-art-preview" data-entity-art-category="heroes" data-entity-art-id="" aria-hidden="true"></span>
   <p id="coiHeroSummary">Nenhum herói alocado.</p>
   <p id="coiHeroFeedback" role="status" aria-live="polite"></p>
   <h3>Defesas posicionáveis · 50×50</h3>
@@ -289,6 +295,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <section class="panel"><h2>⚔️ Recrutamento de tropas</h2>
 <form id="trainingForm" class="queue-form">
 <label for="unitType">Unidade militar</label>
+<span id="coiTroopArtPreview" class="coi-art-preview" data-entity-art-category="troops" data-entity-art-id="militia" aria-hidden="true"></span>
 <select id="unitType" required>
 <option value="militia">Milícia</option><option value="swordsman">Espadachim</option><option value="spearman">Lanceiro</option>
 <option value="archer">Arqueiro</option><option value="crossbowman">Besteiro</option><option value="cavalry">Cavalaria</option>
@@ -568,7 +575,17 @@ function drawKingdomScene(buildings,castleSkinId=0){
  };
  const castleSkin=castleSkinPalettes[Number(castleSkinId)]||null;
  const order=buildings.slice(0,9);
+ const buttons=Array.from(host.querySelectorAll(":scope > .building"));
+ const canvasRect=canvas.getBoundingClientRect();
+ buttons.forEach(button=>button.classList.remove("canvas-art-ready"));
  order.forEach((b,i)=>{const col=i%3,row=Math.floor(i/3),cx=col*cw+cw*.5,base=row*ch+ch*.73,scale=Math.min(cw,ch)/100,colors=b.building_type==="castle"&&castleSkin?[castleSkin[0],castleSkin[1],castleSkin[2]]:(palette[b.building_type]||palette.warehouse),level=Math.max(1,Number(b.level)||1),height=(22+Math.min(level,20)*1.35)*scale;
+  const button=buttons[i],icon=button?.querySelector(".building-art");
+  if(!host.classList.contains("has-3d")&&icon&&!button.hidden&&!(b.building_type==="castle"&&castleSkin)&&window.__coiDrawCityEntityArt){
+   const r=icon.getBoundingClientRect();
+   if(window.__coiDrawCityEntityArt(ctx,{category:"buildings",id:b.building_type,tier:level,x:r.left-canvasRect.left,y:r.top-canvasRect.top,w:r.width,h:r.height})){
+    button.classList.add("canvas-art-ready");return;
+   }
+  }
   ctx.fillStyle="#07170f88";ctx.beginPath();ctx.ellipse(cx,base+3,Math.min(cw,ch)*.31,7*scale,0,0,Math.PI*2);ctx.fill();
   const bw=Math.min(cw*.52,66*scale),wallH=height*.62,roofH=height*.48,left=cx-bw/2,right=cx+bw/2,top=base-wallH;
   poly([[left,top],[right,top],[right,base],[left,base]],colors[0],"#342b25");
@@ -580,6 +597,7 @@ function drawKingdomScene(buildings,castleSkinId=0){
   else if(i%3===0){ctx.fillStyle="#d8bb70";ctx.fillRect(cx-1,top-roofH-8*scale,2,8*scale);}
  });
 }
+window.addEventListener("coi:entity-art-ready",()=>{if(state&&!document.getElementById("city")?.classList.contains("has-3d"))drawKingdomScene(state.buildings||[],Number(state.kingdom?.equipped_skin_id||0));});
 let kingdomResizeObserver=null,kingdomResizeHandler=null;
 function watchKingdomScene(){
  const host=document.getElementById("city");if(!host)return;
@@ -621,6 +639,7 @@ window.addEventListener("coi:kingdom-2d-fallback",()=>{
   button.style.left="";
   button.style.top="";
  });
+ drawKingdomScene(state?.buildings||[],Number(state?.kingdom?.equipped_skin_id||0));
  if(cameraHadFocus)city.querySelector("[data-building]:not([hidden])")?.focus({preventScroll:true});
 });
 function renderCastleSkins(){
@@ -780,6 +799,7 @@ function renderScienceCards(rows,selectedKey){
   if(row.imperial)card.classList.add("is-imperial");
   card.setAttribute("aria-pressed",String(row.key===selectedKey));
   const icon=document.createElementNS("http://www.w3.org/2000/svg","svg");
+  icon.dataset.entityArtCategory="science";icon.dataset.entityArtId=row.key;icon.setAttribute("data-entity-art-existing","");
   icon.setAttribute("viewBox","0 0 512 512");icon.setAttribute("aria-hidden","true");icon.setAttribute("focusable","false");
   const use=document.createElementNS("http://www.w3.org/2000/svg","use");use.setAttribute("href","/assets/art/science/icons.svg#"+row.key);icon.append(use);
   const content=document.createElement("span");content.className="coi-science-copy";
@@ -790,6 +810,7 @@ function renderScienceCards(rows,selectedKey){
   content.append(title,level,status);card.append(icon,content);fragment.append(card);
  }
  root.replaceChildren(fragment);
+ window.dispatchEvent(new Event("coi:entity-art-targets"));
  if(focusKey){[...root.querySelectorAll("button")].find(card=>card.dataset.scienceKey===focusKey)?.focus({preventScroll:true});}
 }
 document.getElementById("coiScienceCards")?.addEventListener("click",event=>{

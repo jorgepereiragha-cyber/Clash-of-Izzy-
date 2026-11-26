@@ -8,10 +8,11 @@ export function loadEntityManifest(fetcher=globalThis.fetch) {
 }
 const own=(obj,key)=>obj&&typeof key==="string"&&Object.hasOwn(obj,key)?obj[key]:null;
 export function resolveQualityFolder(value) {
-  return value==="low"||value==="high"?value:"balanced";
+  const key=String(value??"").trim().toLowerCase();
+  return key==="low"||key==="high"?key:"balanced";
 }
 function localPath(path) {
-  if(typeof path!=="string"||!path||path.includes("..")||!/^[-a-zA-Z0-9_ /%.]+$/.test(path))return null;
+  if(typeof path!=="string"||!path||path.includes("..")||!/^[-a-zA-Z0-9_ /.]+$/.test(path))return null;
   const relative=path.replace(/^\/?assets\//,"");
   if(relative.startsWith("/")||!relative.includes("/"))return null;
   return "/assets/"+relative;
@@ -34,14 +35,63 @@ export const resolveDragon2DAsset=(m,id)=>resolveEntity2DAsset(m,"dragons",id);
 export const resolveTroop2DAsset=(m,id)=>resolveEntity2DAsset(m,"troops",id);
 export const resolveHero2DPortrait=(m,id)=>resolveEntity2DAsset(m,"heroes",id);
 const images=new Map(),LIMIT=48;
+function rememberImage(key,load){
+  if(images.has(key)){const entry=images.get(key);images.delete(key);images.set(key,entry);return entry.promise;}
+  const entry={image:null,promise:null};
+  entry.promise=Promise.resolve().then(load).then(image=>{entry.image=image;return image;})
+    .catch(error=>{if(images.get(key)===entry)images.delete(key);throw error;});
+  images.set(key,entry);
+  while(images.size>LIMIT)images.delete(images.keys().next().value);
+  return entry.promise;
+}
+function decodeImage(url,ImageClass=globalThis.Image){
+  return new Promise((resolve,reject)=>{
+    const img=new ImageClass();img.decoding="async";
+    img.onload=()=>resolve(img);img.onerror=()=>reject(new Error("Imagem indisponível: "+url));img.src=url;
+  });
+}
 export function loadCachedImage(url,ImageClass=globalThis.Image) {
   if(typeof url!=="string"||!url.startsWith("/assets/")||localPath(url)!==url)return Promise.reject(new Error("URL de arte inválida"));
-  if(images.has(url)){const p=images.get(url);images.delete(url);images.set(url,p);return p;}
-  const p=Promise.resolve().then(()=>new Promise((resolve,reject)=>{
-    const img=new ImageClass();img.decoding="async";img.onload=()=>resolve(img);img.onerror=()=>reject(new Error("Imagem indisponível: "+url));img.src=url;
-  })).catch(error=>{if(images.get(url)===p)images.delete(url);throw error;});
-  images.set(url,p);while(images.size>LIMIT)images.delete(images.keys().next().value);
-  return p;
+  return rememberImage(url,()=>decodeImage(url,ImageClass));
+}
+export function imageCacheInfo(){return {size:images.size,limit:LIMIT,keys:[...images.keys()]};}
+// Small separate cache of source XML, not decoded images. No remote URLs.
+const atlasDocuments=new Map(),ATLAS_LIMIT=4;
+function loadSvgAtlas(path){
+  if(atlasDocuments.has(path))return atlasDocuments.get(path);
+  const request=fetch(path,{credentials:"same-origin"}).then(r=>{if(!r.ok)throw new Error("Atlas indisponível");return r.text();})
+    .then(xml=>{const doc=new DOMParser().parseFromString(xml,"image/svg+xml");if(doc.querySelector("parsererror")||doc.documentElement.localName!=="svg")throw new Error("Atlas inválido");return doc;})
+    .catch(error=>{if(atlasDocuments.get(path)===request)atlasDocuments.delete(path);throw error;});
+  atlasDocuments.set(path,request);while(atlasDocuments.size>ATLAS_LIMIT)atlasDocuments.delete(atlasDocuments.keys().next().value);
+  return request;
+}
+export function loadEntityCanvasImage(asset){
+  if(asset?.kind==="image")return loadCachedImage(asset.src);
+  const parts=typeof asset?.src==="string"?asset.src.split("#"):[];
+  const [path,symbol]=parts;
+  if(asset?.kind!=="symbol"||parts.length!==2||!path?.startsWith("/assets/")||localPath(path)!==path||!path.endsWith(".svg")||!/^[-a-zA-Z0-9_]+$/.test(symbol||""))return Promise.reject(new Error("Símbolo inválido"));
+  return rememberImage(asset.src,async()=>{
+    const doc=await loadSvgAtlas(path),ns="http://www.w3.org/2000/svg";
+    const node=Array.from(doc.querySelectorAll("symbol")).find(s=>s.getAttribute("id")===symbol);
+    if(!node)throw new Error("Símbolo ausente: "+symbol);
+    const svg=doc.createElementNS(ns,"svg");
+    const viewBox=node.getAttribute("viewBox")||asset.viewBox||"0 0 100 100";
+    svg.setAttribute("viewBox",viewBox);
+    const dimensions=viewBox.trim().split(/\s+/).map(Number);
+    if(dimensions.length!==4||!dimensions.every(Number.isFinite)||dimensions[2]<=0||dimensions[3]<=0)throw new Error("Dimensões inválidas");
+    svg.setAttribute("width",String(dimensions[2]));svg.setAttribute("height",String(dimensions[3]));
+    for(const child of Array.from(doc.documentElement.children))if(child.localName==="defs")svg.append(child.cloneNode(true));
+    svg.append(node.cloneNode(true));
+    const use=doc.createElementNS(ns,"use");use.setAttribute("href","#"+symbol);use.setAttribute("width",String(dimensions[2]));use.setAttribute("height",String(dimensions[3]));svg.append(use);
+    const url=URL.createObjectURL(new Blob([new XMLSerializer().serializeToString(svg)],{type:"image/svg+xml;charset=utf-8"}));
+    try{return await decodeImage(url);}finally{URL.revokeObjectURL(url);}
+  });
+}
+export function peekEntityCanvasImage(asset){
+  const entry=images.get(asset?.src);
+  if(!entry?.image)return null;
+  images.delete(asset.src);images.set(asset.src,entry);
+  return entry.image;
 }
 export function createEntityArtElement(asset,doc=globalThis.document) {
   if(!asset||!doc)return null;
