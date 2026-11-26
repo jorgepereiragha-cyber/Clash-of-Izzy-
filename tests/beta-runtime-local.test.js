@@ -1083,7 +1083,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           return window.__coiKingdomDiagnostics().architecture.find(entry => entry.type === "castle");
         }, level);
         try {
-          for (const [level, tier] of [[10,2], [20,3], [25,3], [30,4]]) {
+          for (const [level, tier] of [[1,1], [9,1], [10,2], [19,2], [20,3], [25,3], [29,3], [30,4]]) {
             const castle = await renderCastlePreview(level);
             assert.equal(castle.tier, tier, "city renders the correct castle tier at level " + level);
             await page.locator("#city").screenshot({path:path.join(evidence,"castle-level-"+level+".png")});
