@@ -613,12 +613,16 @@ if (host && "WebGLRenderingContext" in window) {
       const cornerHeight=towerHeight+(royalRearTower?(tier===4?.46:.25):0);
       const spireHeight=.47+(tier-1)*.035+(royalRearTower&&tier===4?.16:0);
       addCylinder(group,.22,.26,cornerHeight,stone,x,.25+cornerHeight/2,z,low?6:10);
-      addCylinder(group,.29,.25,.13,stone,x,.25+cornerHeight,z,low?6:10);
-      addCylinder(group,0,.30,spireHeight,roof,x,.25+cornerHeight+.13+spireHeight/2,z,low?6:10);
+      const capHeight=.13;
+      const capCenter=.25+cornerHeight;
+      const roofBase=capCenter+capHeight/2;
+      const roofPeak=roofBase+spireHeight;
+      addCylinder(group,.29,.25,capHeight,stone,x,capCenter,z,low?6:10);
+      addCylinder(group,0,.30,spireHeight,roof,x,roofBase+spireHeight/2,z,low?6:10);
       if(royalRearTower&&tier===4){
-        addCylinder(group,.025,.035,.16,accent,x,.25+cornerHeight+.13+spireHeight+.08,z,6);
+        addCylinder(group,.025,.035,.16,accent,x,roofPeak+.08,z,6);
         const crown=new THREE.Mesh(new THREE.OctahedronGeometry(.065),accent);
-        crown.position.set(x,.25+cornerHeight+.13+spireHeight+.18,z);group.add(crown);
+        crown.position.set(x,roofPeak+.18,z);group.add(crown);
       }
       if(low)box(group,.09,.25,.04,mats.darkStone,x,.25+cornerHeight*.65,z+.255);
       else{
