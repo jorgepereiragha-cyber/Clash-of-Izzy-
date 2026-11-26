@@ -608,30 +608,55 @@ if (host && "WebGLRenderingContext" in window) {
     box(group,.66,.09,.24,stone,0,.09,.77);
     const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
     for(const [x,z] of towers){
-      addCylinder(group,.22,.26,towerHeight,stone,x,.25+towerHeight/2,z,low?6:10);
-      addCylinder(group,.29,.25,.13,stone,x,.25+towerHeight,z,low?6:10);
-      addCylinder(group,0,.30,.47+(tier-1)*.035,roof,x,.25+towerHeight+.30,z,low?6:10);
-      if(low)box(group,.09,.25,.04,mats.darkStone,x,.25+towerHeight*.65,z+.255);
-      else{
-        archWindow(x,.25+towerHeight*.52,z+.255,0,.14,.29);
-        archWindow(x+.255,.25+towerHeight*.52,z,Math.PI/2,.14,.29);
-        addCylinder(group,.245,.255,.045,wall,x,.25+towerHeight*.35,z,10);
-        addCylinder(group,.26,.25,.045,stone,x,.25+towerHeight*.79,z,10);
+      // Distinct late-game skyline: rear royal towers rise above the front defenses.
+      const royalRearTower=z<0&&tier>=3;
+      const cornerHeight=towerHeight+(royalRearTower?(tier===4?.46:.25):0);
+      const spireHeight=.47+(tier-1)*.035+(royalRearTower&&tier===4?.16:0);
+      addCylinder(group,.22,.26,cornerHeight,stone,x,.25+cornerHeight/2,z,low?6:10);
+      addCylinder(group,.29,.25,.13,stone,x,.25+cornerHeight,z,low?6:10);
+      addCylinder(group,0,.30,spireHeight,roof,x,.25+cornerHeight+.13+spireHeight/2,z,low?6:10);
+      if(royalRearTower&&tier===4){
+        addCylinder(group,.025,.035,.16,accent,x,.25+cornerHeight+.13+spireHeight+.08,z,6);
+        const crown=new THREE.Mesh(new THREE.OctahedronGeometry(.065),accent);
+        crown.position.set(x,.25+cornerHeight+.13+spireHeight+.18,z);group.add(crown);
       }
-      if(!low)box(group,.11,.04,.06,accent,x,.25+towerHeight*.65-.14,z+.26);
+      if(low)box(group,.09,.25,.04,mats.darkStone,x,.25+cornerHeight*.65,z+.255);
+      else{
+        archWindow(x,.25+cornerHeight*.52,z+.255,0,.14,.29);
+        archWindow(x+.255,.25+cornerHeight*.52,z,Math.PI/2,.14,.29);
+        addCylinder(group,.245,.255,.045,wall,x,.25+cornerHeight*.35,z,10);
+        addCylinder(group,.26,.25,.045,stone,x,.25+cornerHeight*.79,z,10);
+      }
+      if(!low)box(group,.11,.04,.06,accent,x,.25+cornerHeight*.65-.14,z+.26);
     }
     for(const x of [-.47,.47])box(group,.32,.56,.18,wall,x,.48,.55);
-    // Repeated crenellations add a recognizable fortified silhouette in one draw call.
+    // Continuous curtain walls support every merlon. Use one instanced
+    // batch for crenellations and preserve the gate opening and plot footprint.
+    const curtainHeight=.58+(tier-1)*.055;
+    const curtainTop=.16+curtainHeight;
+    box(group,1.30,curtainHeight,.14,wall,0,.16+curtainHeight/2,-.64);
+    box(group,1.38,.085,.22,stone,0,curtainTop+.035,-.64);
+    for(const x of [-.65,.65]){
+      box(group,.14,curtainHeight,1.04,wall,x,.16+curtainHeight/2,-.05);
+      box(group,.22,.085,1.08,stone,x,curtainTop+.035,-.05);
+    }
     const battlementPositions=[];
-    for(const x of [-.48,-.24,0,.24,.48])battlementPositions.push([x,.84,-.64]);
-    if(!low)for(const z of [-.38,-.12,.14])for(const x of [-.72,.72])battlementPositions.push([x,.84,z]);
+    for(const x of [-.48,-.24,0,.24,.48])battlementPositions.push([x,curtainTop+.16,-.64]);
+    if(!low)for(const z of [-.35,-.11,.13])for(const x of [-.65,.65])battlementPositions.push([x,curtainTop+.16,z]);
     const battlements=new THREE.InstancedMesh(new THREE.BoxGeometry(.13,.17,.13),stone,battlementPositions.length);
     const transform=new THREE.Object3D();
     battlementPositions.forEach(([x,y,z],i)=>{transform.position.set(x,y,z);transform.updateMatrix();battlements.setMatrixAt(i,transform.matrix);});
-    battlements.instanceMatrix.needsUpdate=true;battlements.computeBoundingSphere();group.add(battlements);
-    for(const z of [-.38,.23]){
-      box(group,.14,.58,.54,wall,-.65,.45,z);
-      box(group,.14,.58,.54,wall,.65,.45,z);
+    battlements.instanceMatrix.needsUpdate=true;battlements.computeBoundingSphere();
+    battlements.castShadow=true;battlements.receiveShadow=true;group.add(battlements);
+    if(!low){
+      // Stone stair approach and raised gate plinth, all within existing base.
+      for(let i=0;i<3;i++){
+        const w=.60-i*.065,h=.045*(i+1);
+        box(group,w,h,.12,stone,0,.025+h/2,.80-i*.07);
+      }
+      // Buttresses emphasize masonry on the visible outer walls.
+      for(const x of [-.65,.65])for(const z of [-.22,.12])
+        box(group,.23,curtainHeight*.73,.115,stone,x,.16+curtainHeight*.365,z);
     }
     if(low)for(const x of [-.24,.24]){
       box(group,.12,.30,.045,mats.darkStone,x,.25+keepHeight*.65,.32);
@@ -845,8 +870,27 @@ if (host && "WebGLRenderingContext" in window) {
         box(group, .2, .24, .2, mats.stone, i * .24, height + .14, .56);
       }
     } else if (type === "hospital") {
-      box(group, .16, .56, .08, material("#A9433B"), 0, .82, .67);
-      box(group, .48, .16, .08, material("#A9433B"), 0, .82, .67);
+      // Stone infirmary with a covered entrance and a readable medical crest.
+      const porchZ=bodyDepth/2+.14;
+      const red=material("#A9433B",.82);
+      box(group,.70,.09,.35,mats.stone,0,.09,porchZ);
+      for(const x of [-.28,.28]){
+        addCylinder(group,.065,.085,.61,mats.stone,x,.44,porchZ+.09,6);
+        box(group,.16,.06,.16,mats.stone,x,.75,porchZ+.09);
+      }
+      box(group,.78,.08,.39,mats.wood,0,.81,porchZ);
+      const porchRoof=new THREE.Mesh(new THREE.ConeGeometry(.51,.26,4),roof);
+      porchRoof.rotation.y=Math.PI/4;porchRoof.scale.z=.60;
+      porchRoof.position.set(0,.98,porchZ);porchRoof.castShadow=true;group.add(porchRoof);
+      box(group,.36,.37,.045,mats.stone,0,height+.09,facade+.035);
+      box(group,.085,.29,.035,red,0,height+.09,facade+.075);
+      box(group,.27,.085,.035,red,0,height+.09,facade+.075);
+      if(qualityProfile?.tier!=="low"){
+        for(const x of [-bodyWidth*.30,bodyWidth*.30]){
+          box(group,.24,.065,.11,mats.stone,x,height*.63-.14,facade+.025);
+          box(group,.24,.055,.095,mats.stone,x,height*.63+.14,facade+.025);
+        }
+      }
     } else if (type === "stable") {
       for (const sx of [-.52, .52]) box(group, .08, .55, .08, mats.wood, sx, .32, .76);
       for (const sy of [.2, .48]) box(group, 1.05, .07, .08, mats.wood, 0, sy, .76);
@@ -1037,26 +1081,59 @@ if (host && "WebGLRenderingContext" in window) {
   function createSpecialLandmark(type){
     const group=new THREE.Group();
     group.userData.coIType=type;group.userData.coIProcedural=true;group.userData.coISpecial=true;
-    // Two compact original silhouettes; use shared scene materials and disposable geometry.
+    const low=qualityProfile?.tier==="low";
+    const segments=low?6:10;
     box(group,1.5,.15,1.5,mats.darkStone,0,.075,0);
     if(type==="dragon_nest"){
-      addCylinder(group,.65,.7,.32,mats.stone,0,.27,0,10);
+      // A fortified hatchery: stone retaining walls, a recessed nest, eggs
+      // and an open entrance, all within the existing 3x3 landmark footprint.
+      addCylinder(group,.70,.73,.15,mats.stone,0,.20,0,segments);
+      addCylinder(group,.49,.56,.09,mats.wood,0,.29,0,segments);
       for(let i=0;i<8;i++){
         const a=i*Math.PI/4;
-        const twig=box(group,.42,.12,.11,mats.wood,.58*Math.cos(a),.46,.58*Math.sin(a));
-        if(twig)twig.rotation.y=-a+Math.PI/2;
+        if(i!==2){
+          const rock=box(group,.43,.34+(i%3)*.045,.19,mats.stone,.59*Math.cos(a),.40,.59*Math.sin(a));
+          rock.rotation.y=-a+Math.PI/2;
+          const rim=box(group,.43,.07,.23,mats.darkStone,.59*Math.cos(a),.61+(i%3)*.02,.59*Math.sin(a));
+          rim.rotation.y=rock.rotation.y;
+        }
+        const twig=box(group,.40,.065,.085,mats.wood,.40*Math.cos(a),.35,.40*Math.sin(a));
+        twig.rotation.y=-a+Math.PI/2;
       }
-      for(const [x,z] of [[-.23,-.14],[.23,-.12],[0,.23]]){
-        const egg=new THREE.Mesh(new THREE.SphereGeometry(.18,8,6),mats.gold);
-        egg.scale.y=1.45;egg.position.set(x,.58,z);group.add(egg);
+      for(const x of [-.29,.29]){
+        addCylinder(group,.12,.15,.68,mats.stone,x,.48,.50,segments);
+        addCylinder(group,0,.15,.26,mats.roof,x,.95,.50,segments);
+      }
+      box(group,.34,.065,.22,mats.stone,0,.18,.61);
+      for(const [x,z,scale] of [[-.23,-.14,1],[.23,-.12,.87],[0,.23,1.08]]){
+        const egg=new THREE.Mesh(new THREE.SphereGeometry(.18,segments,low?6:10),mats.gold);
+        egg.scale.set(scale,scale*1.45,scale);
+        egg.position.set(x,.34+.18*scale*1.45,z);egg.castShadow=true;egg.receiveShadow=true;group.add(egg);
       }
     }else{
-      box(group,1.14,.14,1.14,mats.stone,0,.22,0);
-      for(const x of [-.48,.48])for(const z of [-.48,.48])addCylinder(group,.09,.12,.78,mats.stone,x,.68,z,6);
-      box(group,1.2,.12,1.2,mats.gold,0,1.12,0);
-      const crest=new THREE.Mesh(new THREE.OctahedronGeometry(.28),mats.window);
-      crest.position.y=1.43;group.add(crest);
-      box(group,.43,.28,.43,mats.roof,0,.42,0);
+      // Open royal summoning sanctuary: raised steps, colonnade, canopy and
+      // a suspended crystal focal point. No extra textures or dynamic lights.
+      box(group,1.30,.13,1.30,mats.stone,0,.21,0);
+      box(group,1.15,.11,1.15,mats.stone,0,.32,0);
+      box(group,.68,.08,.18,mats.stone,0,.20,.64);
+      for(const x of [-.48,.48])for(const z of [-.48,.48]){
+        addCylinder(group,.13,.15,.10,mats.stone,x,.40,z,segments);
+        addCylinder(group,.075,.105,.83,mats.stone,x,.86,z,segments);
+        addCylinder(group,.14,.11,.09,mats.gold,x,1.31,z,segments);
+      }
+      box(group,1.23,.12,1.23,mats.stone,0,1.40,0);
+      box(group,1.29,.055,1.29,mats.gold,0,1.48,0);
+      const canopy=new THREE.Mesh(new THREE.ConeGeometry(.89,.44,4),mats.roof);
+      canopy.rotation.y=Math.PI/4;canopy.position.y=1.71;canopy.castShadow=true;group.add(canopy);
+      addCylinder(group,.025,.055,.19,mats.gold,0,2.02,0,segments);
+      addCylinder(group,.24,.33,.22,mats.stone,0,.49,0,segments);
+      addCylinder(group,.32,.24,.075,mats.gold,0,.63,0,segments);
+      const crest=new THREE.Mesh(new THREE.OctahedronGeometry(.24),mats.window);
+      crest.position.y=.94;group.add(crest);
+      if(!low)for(const x of [-.48,.48]){
+        box(group,.14,.29,.035,mats.roof,x,1.12,.56);
+        box(group,.14,.035,.04,mats.gold,x,.99,.56);
+      }
     }
     return group;
   }
