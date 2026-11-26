@@ -1036,6 +1036,29 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await mkdir(evidence, {recursive:true});
         await page.locator("#city").screenshot({path:path.join(evidence,"kingdom-3d.png")});
         await writeFile(path.join(evidence,"renderer.json"), JSON.stringify(diagnostics,null,2));
+        const renderCastlePreview = level => page.evaluate(castleLevel => {
+          const buildings = window.__coiKingdomBuildings.map(building =>
+            building.building_type === "castle" && castleLevel !== null
+              ? {...building, level:castleLevel} : building);
+          window.dispatchEvent(new CustomEvent("coi:kingdom-render", {detail:{
+            buildings,
+            troops:window.__coiKingdomTroops,
+            defenses:window.__coiKingdomDefenses,
+            heroes:window.__coiKingdomHeroAssignments,
+            castleSkinId:window.__coiKingdomCastleSkin,
+            castleVipLevel:window.__coiKingdomCastleVipLevel
+          }}));
+          return window.__coiKingdomDiagnostics().architecture.find(entry => entry.type === "castle");
+        }, level);
+        try {
+          for (const [level, tier] of [[10,2], [20,3], [25,3], [30,4]]) {
+            const castle = await renderCastlePreview(level);
+            assert.equal(castle.tier, tier, "city renders the correct castle tier at level " + level);
+            await page.locator("#city").screenshot({path:path.join(evidence,"castle-level-"+level+".png")});
+          }
+        } finally {
+          await renderCastlePreview(null);
+        }
         console.log("Decoded beta GLB templates: " + JSON.stringify(diagnostics.loadedGlbTemplates));
         assert.deepEqual(localAssetErrors, [], "browser must not encounter missing graphics/script/style assets");
         // Trigger a real GPU context loss (not a synthetic DOM event).
