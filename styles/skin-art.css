@@ -4,3 +4,6 @@
 .pantheon-piece .coi-skin-art{width:46px;height:46px;padding:3px;margin:0}
 .coi-skin-credit{color:#c3d1df;font-size:11px;line-height:1.5;margin:10px 0}
 .coi-skin-credit a{color:#f2d08a;text-decoration:underline}
+
+.coi-equipment-art{display:block;width:100%;height:82px;box-sizing:border-box;padding:10px;margin:0 0 8px;color:var(--gear-ink,#cbd3dc);background:radial-gradient(ellipse at 50% 36%,#33465b,#111b2c 76%);border:1px solid currentColor;border-radius:9px}
+#selected-equipment-art .coi-equipment-art{width:84px;height:84px;margin:0 auto 10px}

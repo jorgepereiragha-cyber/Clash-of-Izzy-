@@ -70,6 +70,7 @@
           const stats=document.createElement("p");
           const base=stage.base||{};
           stats.textContent="Ataque "+formatGearStat("attack",base.attack||0)+" · Defesa "+formatGearStat("defense",base.defense||0)+" · Vida "+formatGearStat("health",base.health||0);
+          const art=window.COI_SKIN_ART?.createEquipment(stage);if(art)card.append(art);
           card.append(rarity,title,status,stats);
           if(!stage.owned&&stage.available&&stage.craft){
             const requirements=Object.entries(stage.requiredResearch||{});
@@ -121,6 +122,7 @@
         button.disabled=busy||missing.length>0||!enough||missingPredecessor;
         button.textContent=missingPredecessor?"FORJE A PEÇA ANTERIOR":!enough?"RECURSOS INSUFICIENTES":missing.length?"PESQUISE PRIMEIRO":"⚒️ FORJAR";
         button.addEventListener("click",()=>perform({type:"equipment_craft",itemId:item.id},"Equipamento "+item.name+" forjado."));
+        const art=window.COI_SKIN_ART?.createEquipment(item);if(art)card.append(art);
         card.append(title,rarity,description,stats,requirementText,cost,button);return card;
       }):[(()=>{const empty=document.createElement("p");empty.textContent="Nenhum projeto alternativo disponível.";return empty;})()]));
     }
@@ -524,6 +526,7 @@
       picker.replaceChildren(...equipment.map(entry=>{const option=document.createElement("option");option.value=entry.id;option.textContent=entry.name+" +"+(entry.enhancement||0)+" · Nv. "+entry.level;option.selected=entry.id===selected;return option;}));
     }
     const item=equipment.find(x=>x.id===selected)||equipment[0];
+    const artRoot=$("selected-equipment-art");if(artRoot)artRoot.replaceChildren();
     if(!item){setStatus("Nenhum equipamento disponível neste reino.",true);return;}
     selected=item.id;
     if(!selectedHeroId||!heroes.some(hero=>Number(hero.id)===selectedHeroId)){
@@ -547,6 +550,7 @@
     renderSummonOdds();
     renderSummonControls();
     renderSummonResults();
+    const art=window.COI_SKIN_ART?.createEquipment(item);if(artRoot&&art)artRoot.append(art);
     $("item-name").textContent=item.name+" +"+(item.enhancement||0);
     $("current-level").textContent=item.level;
     $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";

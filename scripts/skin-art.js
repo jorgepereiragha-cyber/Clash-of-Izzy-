@@ -19,10 +19,19 @@
   if(colors[id])art.style.setProperty("--skin-ink",colors[id]);
   const use=document.createElementNS(ns,"use");use.setAttribute("href","/assets/art/skins/"+group+".svg#"+id);art.append(use);return art;
  }
+ const equipmentGroups={"weapons-helms":["iron_sword","espada_guerreiro","rune_spear","mjolnir_fragment","iron_helm","raven_helm","runic_helm"],"armor-boots":["coroa_izzy","leather_armor","warden_plate","manto_real","aegis_asgard","scout_boots","wolf_boots"],"accessories-boots":["storm_boots","asgardian_greaves","copper_ring","frost_ring","moon_charm","valkyrie_charm","anel_poder"]};
+ const equipmentLookup=new Map(Object.entries(equipmentGroups).flatMap(([group,ids])=>ids.map(id=>[id,group])));
+ function createEquipment(item){
+  const id=item?.id;if(!equipmentLookup.has(id))return null;
+  const ns="http://www.w3.org/2000/svg",art=document.createElementNS(ns,"svg");
+  art.setAttribute("class","coi-equipment-art");art.setAttribute("viewBox","0 0 512 512");art.setAttribute("role","img");art.setAttribute("aria-label",String(item.name||"Equipamento"));art.setAttribute("focusable","false");
+  const palette={comum:"#cbd3dc",raro:"#8ac8ff",epico:"#c8a3ff",lendario:"#ffe09b"};art.style.setProperty("--gear-ink",Object.hasOwn(palette,item.rarity)?palette[item.rarity]:palette.comum);
+  const use=document.createElementNS(ns,"use");use.setAttribute("href","/assets/art/equipment/"+equipmentLookup.get(id)+".svg#"+id);art.append(use);return art;
+ }
  function credit(){
   const p=document.createElement("p");p.className="coi-skin-credit";p.append("Ícones de ");
   const a=document.createElement("a");a.href="https://game-icons.net/";a.target="_blank";a.rel="noopener noreferrer";a.textContent="Lorc / Game-icons.net";p.append(a," · ");
   const b=document.createElement("a");b.href="https://creativecommons.org/licenses/by/3.0/";b.target="_blank";b.rel="noopener noreferrer";b.textContent="CC BY 3.0";p.append(b," · adaptados para cor temática e fundo transparente.");return p;
  }
- window.COI_SKIN_ART=Object.freeze({create,credit});
+ window.COI_SKIN_ART=Object.freeze({create,createEquipment,credit});
 })();

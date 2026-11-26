@@ -1,0 +1,1 @@
+21 icons by Lorc / Game-icons.net, CC BY 3.0 (https://creativecommons.org/licenses/by/3.0/). Source: https://github.com/game-icons/icons/tree/82d948812bfe3f269ef8f731dcdb07b08160edc4/lorc. Adapted to transparent backgrounds, thematic color and local SVG symbols. Attribution shown in inventory. These are interface illustrations, not 3D gear models.
