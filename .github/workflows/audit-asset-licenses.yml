@@ -1,0 +1,20 @@
+name: Auditoria trimestral de assets (somente leitura)
+on:
+  schedule:
+    - cron: '0 7 1 1,4,7,10 *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: npm run assets:licenses
+      - run: npm run assets:validate
+      - run: echo "Revisão humana trimestral das fontes e termos de licença continua necessária; o hash não comprova autoria."

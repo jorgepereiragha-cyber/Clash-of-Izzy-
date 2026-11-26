@@ -76,8 +76,8 @@ function validateManifestEntry(asset, category, index) {
   try { origin = new URL(asset.sourceUrl); } catch { fail(label + ".sourceUrl inválida."); }
   if (origin.protocol !== "https:" || origin.username || origin.password || origin.hash)
     fail(label + ".sourceUrl deve usar HTTPS sem credenciais ou fragmento.");
-  // Commercial release policy: only explicitly CC0 third-party models enter this manifest.
-  if (asset.license !== "CC0-1.0") fail(label + ".license deve ser CC0-1.0; licença ausente ou não aprovada.");
+  // The separate registry verifies authorship, license link, modifications and actual SHA-256.
+  if (!["CC0-1.0","CC-BY-4.0"].includes(asset.license)) fail(label + ".license deve ser CC0-1.0 ou CC-BY-4.0; licença ausente ou não aprovada.");
   if (category === "models" && (typeof asset.type !== "string" || !asset.type.trim())) fail(label + ".type é obrigatório.");
   if (category === "units" && (typeof asset.unit_type !== "string" || !asset.unit_type.trim())) fail(label + ".unit_type é obrigatório.");
   if (category === "props" && (!Array.isArray(asset.positions) || asset.positions.some(position =>

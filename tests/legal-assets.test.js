@@ -6,7 +6,7 @@ import {verifyLicenses} from "../scripts/generate-licenses.mjs";
 const registry=JSON.parse(await readFile(new URL("../assets/3d/licenses.json",import.meta.url),"utf8"));
 test("all 3D assets and companion textures are registered, hash-verified and credited",async()=>{
  const result=await verifyLicenses();
- assert.equal(result.issues,0);assert.equal(result.verified,10);
+ assert.equal(result.issues,0);assert.equal(result.verified,Object.keys(registry.assets).length);assert.ok(result.verified>=10);
 });
 test("rejects restricted licenses, missing attribution, traversal, and duplicate basenames",()=>{
  const path=Object.keys(registry.assets)[0],entry=registry.assets[path];

@@ -1,0 +1,29 @@
+name: Preparar texturas PBR CC0 (sem deploy)
+on:
+  pull_request:
+    paths:
+      - scripts/fetch-polyhaven.mjs
+      - scripts/fetch_polyhaven.sh
+      - .github/workflows/prepare-pbr-textures.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: bash scripts/fetch_polyhaven.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: polyhaven-pbr-review-only
+          path: raw_textures/
+          if-no-files-found: ignore
+          retention-days: 14

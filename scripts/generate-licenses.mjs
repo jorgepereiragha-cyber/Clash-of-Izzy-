@@ -21,8 +21,11 @@ export async function verifyLicenses(root=process.cwd(),{write=false}={}){
  const manifest=JSON.parse(await readFile(join(root,"assets/3d/manifest.json"),"utf8"));
  for(const entry of [...manifest.models,...manifest.props,...manifest.units])if(entry.enabled)assertLicensedAsset(registry,entry.src,"https://local.invalid",entry);
  const scanned=new Set();
- for(const dir of ["assets/3d","assets/models"]){
-  for(const p of await walk(join(root,dir))){
+ for(const dir of ["assets/3d","assets/models","assets/textures"]){
+  const folder=join(root,dir);
+  if(dir==="assets/textures"){try{await lstat(folder)}catch(e){if(e.code==="ENOENT")continue;throw e}}
+  if((await lstat(folder)).isSymbolicLink())throw Error("Diretório de assets não pode ser symlink: "+dir);
+  for(const p of await walk(folder)){
    if(!/\.(glb|png|jpe?g|webp|ktx2)$/i.test(p))continue;
    const key="/"+p.slice(root.length+1).split(sep).join("/");
    const item=assertLicensedAsset(registry,key);
