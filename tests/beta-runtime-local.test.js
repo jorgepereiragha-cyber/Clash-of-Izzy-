@@ -1019,9 +1019,14 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         for(const type of ["quarry","iron_mine"]){
           assert.ok(diagnostics.architecture.some(x=>x.type===type&&x.design==="eldoria-rural-v1"),type+" uses its own rural architecture");
         }
-        const millenniumFarm=process.env.BETA_MILLENNIUM_SMOKE==="1"||(await readFile(path.join(root,"assets/3d/manifest.json"),"utf8")).includes('"id": "millennium-farm"');
-        for(const [type,assetId] of [["farm",millenniumFarm?"millennium-farm":"quaternius-farm"],["lumber_mill","quaternius-lumber-mill"],["stable","quaternius-stable"]]){
-
+        const activeManifest=JSON.parse(await readFile(path.join(root,"assets/3d/manifest.json"),"utf8"));
+        const activeBuilding=(type)=>activeManifest.models.find(a=>a.enabled&&a.type===type)?.id;
+        if(process.env.BETA_MILLENNIUM_SMOKE==="1"){
+          for(const type of ["farm","market","warehouse"])assert.equal(activeBuilding(type),"millennium-"+type);
+        }
+        for(const type of ["farm","market","warehouse","lumber_mill","stable"]){
+          const assetId=activeBuilding(type);
+          assert.ok(assetId,type+" has an active model in the manifest");
           assert.ok(diagnostics.importedBuildings.some(x=>x.type===type&&x.assetId===assetId),type+" uses its verified decoded GLB");
         }
         for(const type of ["wall","watchtower"])assert.ok(diagnostics.architecture.some(x=>x.type===type&&x.design==="eldoria-defenses-v1"),type+" has original stone defense silhouette");
