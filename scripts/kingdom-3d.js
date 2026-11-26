@@ -1210,7 +1210,10 @@ if (host && "WebGLRenderingContext" in window) {
         return;
       }
       const template = normalizeGlbTemplate(gltf, asset);
-      if (kind === "building") glbTemplates.set(asset.type, template);
+      if (kind === "building") {
+        template.userData.coIAssetId = asset.id;
+        glbTemplates.set(asset.type, template);
+      }
       else if (kind === "prop") glbPropTemplates.set(asset.id, template);
       else if (kind === "unit") glbUnitTemplates.set(asset.unit_type, {
         template,
@@ -1455,9 +1458,10 @@ if (host && "WebGLRenderingContext" in window) {
         pendingGlbLoads: glbLoadPromises.size,
         optionalSceneRefreshes,
         architecture:activeModels.filter(model=>model.userData.coIArchitecture).map(model=>({type:model.userData.coIType,design:model.userData.coIArchitecture,tier:model.userData.coIArchitectureTier||null})),
+        importedBuildings:activeModels.filter(model=>model.userData.coIAssetId).map(model=>({type:model.userData.coIType,assetId:model.userData.coIAssetId})),
         specialLandmarks:activeModels.filter(model=>model.userData.coISpecial).map(model=>({type:model.userData.coIType,x:model.position.x,z:model.position.z})),
         troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
-        dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon()} : null,
+        dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon(),imported:Boolean(activeDragon.figure.imported)} : null,
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };

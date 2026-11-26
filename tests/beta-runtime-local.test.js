@@ -1013,8 +1013,11 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           "unchanged kingdom state must not trigger an extra optional model rebuild");
         const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
         assert.ok(diagnostics.architecture.some(x=>x.type==="castle"&&x.design==="eldoria-imperial-v1"&&x.tier===1),"new realm uses original tier-one keep");
-        for(const type of ["farm","quarry","lumber_mill","iron_mine"]){
+        for(const type of ["quarry","iron_mine"]){
           assert.ok(diagnostics.architecture.some(x=>x.type===type&&x.design==="eldoria-rural-v1"),type+" uses its own rural architecture");
+        }
+        for(const [type,assetId] of [["farm","quaternius-farm"],["lumber_mill","quaternius-lumber-mill"],["stable","quaternius-stable"]]){
+          assert.ok(diagnostics.importedBuildings.some(x=>x.type===type&&x.assetId===assetId),type+" uses its verified decoded GLB");
         }
         for(const type of ["wall","watchtower"])assert.ok(diagnostics.architecture.some(x=>x.type===type&&x.design==="eldoria-defenses-v1"),type+" has original stone defense silhouette");
         assert.ok(diagnostics.troopFigures.some(x=>x.type==="archer"&&!x.procedural),"trained archers use the decoded GLB");
@@ -1023,6 +1026,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.ok(equippedDragon?.dragon_key,"server-backed equipped dragon");
         assert.equal(diagnostics.dragonVisual?.key,equippedDragon.dragon_key,"only equipped dragon is represented");
         assert.equal(diagnostics.dragonVisual.animated,false,"balanced profile keeps dragon static");
+        assert.equal(diagnostics.dragonVisual.imported,true,"equipped dragon must decode rigged GLB");
         assert.deepEqual(diagnostics.specialLandmarks.map(x=>x.type).sort(),["dragon_nest","summon_altar"]);
         for(const model of diagnostics.specialLandmarks)assert.ok(Number.isFinite(model.x)&&Number.isFinite(model.z));
         const evidence = path.join(root, "test-results", "beta-visual");
