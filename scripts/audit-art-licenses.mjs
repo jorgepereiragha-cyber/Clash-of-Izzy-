@@ -2,7 +2,7 @@ import { readFile, readdir, lstat } from "node:fs/promises";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
-import { approvedManifestEntry, isApprovedArtLicense } from "../scripts/art-license-policy.js";
+import { approvedManifestEntry, isApprovedArtLicense, hasShareAlikeProvenance } from "../scripts/art-license-policy.js";
 
 const media = /\.(?:glb|gltf|bin|png|jpe?g|webp|ktx2|exr|hdr|ogg|mp3|wav)$/i;
 function requireCondition(condition, message) { if (!condition) throw new Error(message); }
@@ -27,6 +27,7 @@ export async function auditArt(root = process.cwd()) {
   for (const p of actual) {
     const f = files[p];
     requireCondition(isApprovedArtLicense(f?.license) && typeof f.source === "string" && f.source.trim() && typeof f.attribution === "string" && f.attribution.trim(), "Licença ou autoria inválida: " + p);
+    requireCondition(hasShareAlikeProvenance(f), "Proveniência share-alike incompleta: " + p);
     requireCondition(new URL(f.sourceUrl).protocol === "https:", "Fonte inválida: " + p);
     requireCondition(typeof f.licenseFile === "string" && /^licenses\/[a-zA-Z0-9._-]+\.txt$/.test(f.licenseFile), "Evidência de licença inválida: " + p);
     const evidence = path.join(root,"assets/3d",f.licenseFile);
