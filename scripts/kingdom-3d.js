@@ -1349,7 +1349,11 @@ if (host && "WebGLRenderingContext" in window) {
     activeDragon.figure.root.position.set(anchor.x+1.65,2.35,anchor.z-1.05);
   }
   function canAnimateDragon(){
-    return !!activeDragon && qualityProfile?.tier==="high" && !qualityProfile?.prefersReducedMotion;
+    // Imported flight clips use a single existing mixer; keep procedural animation
+    // high-only, and preserve low-tier and reduced-motion behavior.
+    return !!activeDragon && !qualityProfile?.prefersReducedMotion &&
+      (qualityProfile?.tier==="high" ||
+       (qualityProfile?.tier==="balanced" && activeDragon.figure.imported));
   }
   function canRunArmyAnimation() {
     return !disposed && !cinematicCaptureActive && !document.hidden && sceneInViewport;
