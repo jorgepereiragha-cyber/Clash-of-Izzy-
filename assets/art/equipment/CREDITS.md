@@ -1,0 +1,3 @@
+# Equipment art provenance
+
+Flare Item Variation (60x60 Only), by Mumu, declared CC0 by the creator: https://opengameart.org/content/flare-item-variation-60x60-only. Original underlying Flare/OSARE icon artwork is credited to its original artists. Exact source PNG mirrored at https://github.com/Tiddybub/2d-assets/tree/main/fantasy/oga-flare-item-variation-60x60-only (blob 5db5bc829484b3fbeed37ac7dd0eaaa4522c888c). Original atlas unchanged, displayed by approved 64px regions. Twelve catalog entries have distinct illustrative tiles; remaining entries deliberately retain the existing text/icon until suitable art is verified. Art only; no new equipment IDs, statistics or purchases.
