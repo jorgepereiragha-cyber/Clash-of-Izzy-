@@ -63,3 +63,25 @@ export function derivePbrTextureData({ luminance, width, height, kind = "stone" 
 
   return Object.freeze({ normalData, roughnessData });
 }
+
+// Grade de alvenaria e telhas em um domínio periódico de 128 unidades.
+// Cada célula lógica é visitada uma vez; suas cópias de borda reutilizam
+// a mesma aparência em vez de consumir outra amostra aleatória.
+export function forEachPeriodicSurfaceCell(kind, visit) {
+  const width = kind === "roof" ? 16 : 32;
+  const height = 16;
+  const size = 128;
+  if (!["stone", "roof", "road"].includes(kind) || typeof visit !== "function") {
+    throw new TypeError("Grade de superfície inválida.");
+  }
+  for (let row = 0; row < size / height; row++) {
+    const y = row * height;
+    const offset = row % 2 * width / 2;
+    for (let col = 0; col < size / width; col++) {
+      const x = col * width + offset;
+      const positions = [x];
+      if (x + width > size) positions.push(x - size);
+      visit({ positions, y, width, height });
+    }
+  }
+}

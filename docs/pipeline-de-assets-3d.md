@@ -56,3 +56,17 @@ Nenhum pacote de arte entra na branch principal sem:
 ## Validação automatizada do manifesto v2
 
 O comando `npm run assets:validate` valida as listas `models`, `props` e `units`, IDs e caminhos duplicados, arquivos locais sem traversal nem fuga por link simbólico, assinatura e estrutura GLB 2.0, dependências de imagem/buffer locais e os limites de 12 MiB por GLB e 48 MiB no conjunto habilitado. A verificação não baixa URLs, não executa modelos e não substitui o Khronos glTF Validator nem a inspeção visual em Android.
+
+## Materiais periódicos e expansão visual
+
+A grade de pedra, telhado e estrada usa células periódicas e reaproveita as cores das peças que atravessam a borda. Isso corrige a descontinuidade geométrica das juntas sem aumentar a resolução ou criar novas texturas por edifício. O grão e os demais materiais ainda exigem inspeção visual de emendas. Os testes verificam cobertura e repetição das células; não substituem a comparação de capturas no Android.
+
+Fontes candidatas, não importadas nem aprovadas automaticamente:
+
+- Quaternius Medieval Village MegaKit (CC0): https://quaternius.com/packs/medievalvillagemegakit.html — módulos de fachadas, portas, telhados, forjas e mercados. Conferir os arquivos efetivamente disponíveis na edição gratuita.
+- Kenney Medieval RTS (CC0): https://kenney.nl/assets/medieval-rts — referência de leitura isométrica e fallback 2D; não tratar sprites como modelos GLB.
+- Poly Haven (CC0): https://polyhaven.com/a/cobblestone_01 e https://polyhaven.com/a/rock_01 — candidatos a calçamento e pedra; reduzir resolução antes de inclusão.
+- ambientCG (CC0): https://docs.ambientcg.com/license/ — materiais PBR; confirmar arquivo, licença e orçamento antes da inclusão.
+- Three.js: https://threejs.org/manual/pages/color-management.html — albedo em sRGB, normal e roughness em NoColorSpace.
+
+Importar somente modelos/arquivos autorizados e versionados localmente, com procedência e sem dependência de CDN. Usar o manifesto v2 existente; não criar outro carregador. Manter a identidade artística do Clash of Izzy, sem extrair recursos de outros jogos.

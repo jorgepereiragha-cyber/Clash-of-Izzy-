@@ -354,7 +354,8 @@ test("army and optional shader animation pause when hidden or outside the viewpo
 
 
 test("procedural PBR material maps are attached and disposed as owned GPU resources", () => {
-  assert.match(renderer, /import \{ derivePbrTextureData \} from "\.\/kingdom-materials\.js"/);
+  assert.match(renderer, /import \{[^}]*\bderivePbrTextureData\b[^}]*\} from "\.\/kingdom-materials\.js"/);
+  assert.match(renderer, /forEachPeriodicSurfaceCell\(kind,/);
   assert.match(renderer, /textureSet\.normalMap = createLinearMap\(derived\.normalData\)/);
   assert.match(renderer, /textureSet\.roughnessMap = createLinearMap\(derived\.roughnessData\)/);
   assert.match(renderer, /mat\.normalMap = textureSet\.normalMap/);
