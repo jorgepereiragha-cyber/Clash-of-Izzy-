@@ -31,7 +31,7 @@ test("share-alike art requires explicit adaptation license and provenance",()=>{
 
 
 test("manifest rejects duplicate enabled model roles without rejecting disabled alternatives",async()=>{
- const {mkdtemp,mkdir,writeFile,rm,readFile}=await import("node:fs/promises");
+ const {mkdtemp,mkdir,writeFile,rm,readFile,cp}=await import("node:fs/promises");
  const {tmpdir}=await import("node:os");
  const path=await import("node:path");
  const {validateAssetManifest}=await import("../scripts/validate-3d-assets.js");
@@ -41,11 +41,13 @@ test("manifest rejects duplicate enabled model roles without rejecting disabled 
   await mkdir(dir,{recursive:true});
   const manifest=JSON.parse(await readFile(new URL("../assets/3d/manifest.json",import.meta.url),"utf8"));
   const first=manifest.models.find(a=>a.enabled);
-  const bytes=await readFile(new URL(".."+first.src,import.meta.url));
-  const base={...first,src:"/assets/3d/first.glb"};
-  const alt={...base,id:base.id+"-alternate",src:"/assets/3d/second.glb"};
-  await writeFile(path.join(dir,"first.glb"),bytes);
-  await writeFile(path.join(dir,"second.glb"),bytes);
+  // Preserve the source GLB and its relative texture dependencies in each fixture.
+  const sourceDir=new URL(".",new URL(".."+first.src,import.meta.url));
+  await cp(sourceDir,path.join(dir,"first"),{recursive:true});
+  await cp(sourceDir,path.join(dir,"second"),{recursive:true});
+  const filename=first.src.split("/").at(-1);
+  const base={...first,src:"/assets/3d/first/"+filename};
+  const alt={...base,id:base.id+"-alternate",src:"/assets/3d/second/"+filename};
   const save=async enabled=>writeFile(path.join(dir,"manifest.json"),JSON.stringify({version:2,models:[base,{...alt,enabled}],props:[],units:[]}));
   await save(false);assert.equal((await validateAssetManifest(root)).enabled,1);
   await save(true);await assert.rejects(validateAssetManifest(root),/modelo ativo duplicado/);
