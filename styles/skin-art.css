@@ -10,3 +10,9 @@
 
 .coi-equipment-art.is-painted{object-fit:contain;padding:5px;width:74px;height:74px;margin:0 auto 8px;image-rendering:auto}
 #selected-equipment-art .coi-equipment-art.is-painted{width:74px;height:74px;padding:5px}
+
+/* Painted hero portraits preserve the existing vector if the raster cannot load. */
+.coi-painted-portrait{position:relative;align-self:start;min-width:0}
+.coi-painted-hero{position:absolute;inset:0;height:100%;object-fit:contain;object-position:center bottom;opacity:0;background:radial-gradient(ellipse at 50% 35%,#4a6279,#0b1726 78%);pointer-events:none}
+.coi-painted-portrait.is-loaded .coi-painted-hero{opacity:1}
+.coi-painted-portrait.is-loaded>svg{visibility:hidden}

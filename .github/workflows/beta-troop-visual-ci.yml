@@ -14,4 +14,4 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/kingdom-army-visual.test.js tests/kingdom-3d.test.js tests/kingdom-assets.test.js tests/periodic-surface-grid.test.js tests/skin-art.test.js tests/castle-science.test.js tests/cosmetic-fairness.test.js tests/equipment-art.test.js
+      - run: node --test tests/kingdom-army-visual.test.js tests/kingdom-3d.test.js tests/kingdom-assets.test.js tests/periodic-surface-grid.test.js tests/skin-art.test.js tests/castle-science.test.js tests/cosmetic-fairness.test.js tests/equipment-art.test.js tests/painted-hero-art.test.js
