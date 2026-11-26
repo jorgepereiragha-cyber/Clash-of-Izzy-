@@ -531,8 +531,9 @@ if (host && "WebGLRenderingContext" in window) {
   function addEldoriaCastle(group,level,skin,wall,roof,stone,accent){
     const tier=level>=30?4:level>=20?3:level>=10?2:1;
     const high=qualityProfile?.tier==="high",low=qualityProfile?.tier==="low";
-    const keepHeight=1.66+(tier-1)*.23;
-    const towerHeight=1.37+(tier-1)*.17;
+    // Broad, squat fortress at the start; taller royal palace only at late tiers.
+    const keepHeight=[1.32,1.55,1.91,2.35][tier-1];
+    const towerHeight=[.83,1.02,1.20,1.43][tier-1];
     group.userData.coIArchitecture="eldoria-imperial-v1";
     group.userData.coIArchitectureTier=tier;
     box(group,1.75,.15,1.52,mats.darkStone,0,.075,0);
@@ -607,6 +608,16 @@ if (host && "WebGLRenderingContext" in window) {
       box(group,.44,.075,.08,accent,0,.74,.725);
     }
     box(group,.66,.09,.24,stone,0,.09,.77);
+    // A broad front gatehouse and low stone curtain make the keep read as a
+    // fortress rather than a single tall tower at the mobile overview scale.
+    const frontHeight=.52+(tier-1)*.07;
+    for(const side of [-1,1]){
+      box(group,.39,frontHeight,.29,wall,side*.49,.19+frontHeight/2,.49);
+      box(group,.43,.085,.33,stone,side*.49,.19+frontHeight,.49);
+      for(const offset of [-.13,.13]){
+        box(group,.10,.13,.12,stone,side*.49+offset,.19+frontHeight+.10,.61);
+      }
+    }
     const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
     for(const [x,z] of towers){
       // Distinct late-game skyline: rear royal towers rise above the front defenses.
@@ -619,7 +630,18 @@ if (host && "WebGLRenderingContext" in window) {
       const roofBase=capCenter+capHeight/2;
       const roofPeak=roofBase+spireHeight;
       addCylinder(group,.29,.25,capHeight,stone,x,capCenter,z,low?6:10);
-      addCylinder(group,0,.30,spireHeight,roof,x,roofBase+spireHeight/2,z,low?6:10);
+      // Front towers are military battlements; royal rear towers gain spires.
+      if(z>0){
+        addCylinder(group,.25,.27,.075,stone,x,roofBase+.025,z,low?6:10);
+        const merlons=low?4:6;
+        for(let i=0;i<merlons;i++){
+          const a=i*Math.PI*2/merlons;
+          const merlon=box(group,.11,.15,.10,stone,x+.21*Math.cos(a),roofBase+.13,z+.21*Math.sin(a));
+          merlon.rotation.y=-a;
+        }
+      }else{
+        addCylinder(group,0,.30,spireHeight,roof,x,roofBase+spireHeight/2,z,low?6:10);
+      }
       if(royalRearTower&&tier===4){
         addCylinder(group,.025,.035,.16,accent,x,roofPeak+.08,z,6);
         const crown=new THREE.Mesh(new THREE.OctahedronGeometry(.065),accent);
