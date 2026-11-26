@@ -1,7 +1,7 @@
 import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
-import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-path.js";
+import { marchVisualProgress, marchVisualPoint, planMarchFormation } from "./scripts/march-visual-path.js";
 import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
 
 /*
@@ -301,6 +301,8 @@ import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
     cone(group,1.8,1.25,roof,0,4.55,0,4);
     box(group,.08,1.85,.08,accent,.55,5.45,0);
     box(group,1.0,.48,.07,banner,1.02,5.83,0);
+    // Keep an independent faction pennant: cosmetic colors never disguise ownership.
+    box(group,.56,.24,.08,color==="enemy"?shared.enemy:shared.banner,.82,5.27,0);
     parent.add(group);
     return group;
   }
@@ -436,12 +438,10 @@ import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
 
   function createMarchFormation(march) {
     const group = new THREE.Group();
-    const material = march.march_type === "attack" ? shared.redTroop : shared.blueTroop;
-    const soldiers=[
-      createSoldier(group, material, -.42, -.28, 0),
-      createSoldier(group, material, .42, -.28, 1),
-      createSoldier(group, material, 0, .48, 2)
-    ];
+    const formation = planMarchFormation(march.march_type, quality);
+    const material = formation.color === "red" ? shared.redTroop :
+      formation.color === "green" ? shared.forest : formation.color === "gold" ? shared.neutral : shared.blueTroop;
+    const soldiers = formation.positions.map(([x,z],index)=>createSoldier(group,material,x,z,index));
     const flagPole = box(group, .07, 1.45, .07, shared.gold, 0, 1.25, -.72);
     flagPole.castShadow = false;
     box(group, .67, .35, .06, material, .3, 1.73, -.72);
