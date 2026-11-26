@@ -523,3 +523,14 @@ test("server grid plots determine art centers and constrain asymmetrical models"
  assert.match(renderer,/cityModelAnchor\(x,z,serverCityFootprint\(building\.building_type\)\)/);
  assert.match(renderer,/group\.scale\.multiplyScalar\(artScale\)/);
 });
+
+
+test("royal citadel includes a layered silhouette and focused initial view",()=>{
+ assert.match(renderer,/let cameraFocusCenter = true/);
+ assert.match(renderer,/function addEldoriaCastle/);
+ assert.match(renderer,/new THREE\.ShapeGeometry\(archShape/);
+ assert.match(renderer,/const lanternY=/);
+ assert.match(renderer,/archWindow\(\.479,y,z,Math\.PI\/2/);
+ assert.match(renderer,/if\(!low\)\{/);
+ assert.match(renderer,/cameraFocusCenter=action==="center"/);
+});
