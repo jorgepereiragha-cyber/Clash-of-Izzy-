@@ -128,3 +128,15 @@ test("city preloads the exact level and quality art of visible plots without dup
 
 
 test("castle progression uses four actual atlas symbols for levels 1 through 30",async()=>{const atlas=await readFile(new URL("../assets/art/buildings/icons.svg",import.meta.url),"utf8");for(let level=1;level<=30;level++){const stage=level===30?4:level>=20?3:level>=10?2:1;const symbol=stage===1?"castle":"castle-stage-"+stage;assert.equal(resolveEntity2DAsset(manifest,"buildings","castle",{tier:level}).src,"/assets/art/buildings/icons.svg#"+symbol);assert.ok(atlas.includes('id="'+symbol+'"'));}});
+
+
+test("city DOM fallback uses the same manifest tier as the Canvas artwork",async()=>{
+ const html=await readFile(new URL("../kingdom.html",import.meta.url),"utf8");
+ assert.ok(html.includes('data-entity-art-existing data-entity-art-category="buildings"'));
+ assert.ok(html.includes('data-entity-art-tier="\x27+esc(String(b.level||1))'));
+ const controller=new KingdomEntityArtController({manifest});
+ let href;
+ const target={dataset:{entityArtCategory:"buildings",entityArtId:"castle",entityArtTier:"30"},hasAttribute:key=>key==="data-entity-art-existing",querySelector:selector=>selector==="use"?{setAttribute:(key,value)=>{if(key==="href")href=value;}}:null};
+ controller.bindDomArtTargets({querySelectorAll:()=>[target]});
+ assert.equal(href,"/assets/art/buildings/icons.svg#castle-stage-4");
+});
