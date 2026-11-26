@@ -1,5 +1,5 @@
 // Strict build-time GLB budget; includes disabled alternatives and measures actual bytes.
-import {readFile} from "node:fs/promises";
+import {readFile,readdir} from "node:fs/promises";
 import path from "node:path";
 export const GLB_BUDGET_BYTES=4_600_000;
 export function registeredGlbPaths(manifest){
@@ -16,8 +16,18 @@ export function registeredGlbPaths(manifest){
  return [...paths];
 }
 export async function measureBundledGlbs(manifest,root=process.cwd()){
+ const registered=new Set(registeredGlbPaths(manifest));
+ async function scan(dir,prefix){
+  for(const entry of await readdir(dir,{withFileTypes:true})){
+   const src=prefix+"/"+entry.name;
+   if(entry.isSymbolicLink())throw Error("Unexpected symlink in asset directory "+src);
+   if(entry.isDirectory())await scan(path.join(dir,entry.name),src);
+   else if(/\.glb$/i.test(entry.name)&&!registered.has(src))throw Error("Unregistered bundled GLB "+src);
+  }
+ }
+ await scan(path.join(root,"assets","3d"),"/assets/3d");
  let total=0;
- for(const src of registeredGlbPaths(manifest)){
+ for(const src of registered){
   const declared=manifest.files?.[src]?.bytes;
   const bytes=(await readFile(path.join(root,src.slice(1)))).length;
   if(!Number.isSafeInteger(declared)||declared!==bytes||bytes<=0)throw Error("Invalid byte provenance "+src);
