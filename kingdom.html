@@ -112,6 +112,8 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .city:not(.has-3d) .building.castle{background:linear-gradient(180deg,#735b2d55,#292719c9);border-color:#f4d78e}
 .city .building-art{display:block;width:clamp(38px,12vw,76px);height:clamp(36px,11vw,68px);filter:drop-shadow(0 3px 2px #0007);flex:none}
 .city.has-3d .building-art{display:none}
+.resource-icon .coi-entity-art{display:inline-block;width:22px;height:22px;vertical-align:middle}
+.coi-dragon-art-card>.coi-entity-art{display:block;width:88px;height:88px;max-width:100%;margin:0 auto 8px;filter:drop-shadow(0 3px 3px #0007)}
 .city.has-3d .building{background:none;border:0;box-shadow:none;gap:0;justify-content:flex-end;padding:1px 2px 3px}
 .city.has-3d .building.castle{background:none;border:0}
 .city.has-3d .building strong,.city.has-3d .building small{background:#10202c88;padding:0 3px;border-radius:2px;line-height:1.12;max-width:100%;text-shadow:0 1px 3px #000}
@@ -379,7 +381,7 @@ function renderResourceHud(kingdom){
  document.getElementById("resources").innerHTML=entries.map(([icon,label,key])=>{
   const value=fmt(snapshot[key]);
   const changed=lastResourceSnapshot!==null&&lastResourceSnapshot[key]!==snapshot[key];
-  return '<div class="resource'+(changed?' bump':'')+'" aria-label="'+esc(label+": "+value)+'"><span class="resource-icon" aria-hidden="true">'+icon+'</span><b>'+value+'</b>'+label+'</div>';
+  return '<div class="resource'+(changed?' bump':'')+'" aria-label="'+esc(label+": "+value)+'"><span class="resource-icon" data-entity-art-category="resources" data-entity-art-id="'+esc(key)+'" aria-hidden="true">'+icon+'</span><b>'+value+'</b>'+label+'</div>';
  }).join("");
  lastResourceSnapshot=snapshot;
 }
@@ -659,6 +661,7 @@ function renderDragonCollection(){
  const colors={blue:"Azul · Raro",purple:"Roxo · Épico",gold:"Dourado · Master"};
  for(const dragon of dragons){
   const card=document.createElement("div");card.className="event";
+  card.dataset.entityArtCategory="dragons";card.dataset.entityArtId=dragon.key;card.classList.add("coi-dragon-art-card");
   card.style.borderLeft=dragon.rarity==="gold"?"4px solid #eac571":dragon.rarity==="purple"?"4px solid #b386ed":"4px solid #68a9e2";
   const name=document.createElement("strong");name.textContent=dragon.name+" · "+colors[dragon.rarity];
   const stats=document.createElement("p");stats.className="muted";
@@ -1267,7 +1270,7 @@ document.getElementById("playerSearchForm").addEventListener("submit",searchPlay
 document.getElementById("refresh").addEventListener("click",connect);document.getElementById("goMap").addEventListener("click",()=>location.href="/world.html");
 const initialPlayerSearch=new URLSearchParams(location.search).get("playerSearch");
 connect().then(()=>{if(initialPlayerSearch){document.getElementById("playerSearchInput").value=initialPlayerSearch;document.getElementById("playerSearchForm").requestSubmit();}});
-</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/royal-journey.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script type="module" src="/scripts/kingdom-4x-systems.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
+</script><script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script><script type="module" src="/scripts/kingdom-command-hud.js"></script><script type="module" src="/scripts/royal-journey.js"></script><script type="module" src="/scripts/kingdom-visual-boot.js"></script><script type="module" src="/scripts/kingdom-entity-art-boot.js"></script><script type="module" src="/scripts/city-layout-editor.js"></script><script type="module" src="/scripts/kingdom-4x-systems.js"></script><script src="/scripts/ambient-particles.js" defer></script><script src="/valhalla-shop-ui.js" defer></script><script src="/player-engagement.js" defer></script><script src="/navigation.js" defer></script>
   <script src="/scripts/pwa-runtime.js" defer></script>
 <script type="module">import { startRealtimePresence } from "/scripts/eldoria-realtime-client.js"; startRealtimePresence();</script>
 </body></html>
