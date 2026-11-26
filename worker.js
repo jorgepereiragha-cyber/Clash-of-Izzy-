@@ -26,6 +26,7 @@ import { getPetBonuses, getPetsState, handlePetsRoute } from "./pets.js";
 import { getBattleReplay } from "./battle-replay.js";
 import { handlePlayerAccountRoute } from "./player-accounts.js";
 import { handleMercadoPagoRoute } from "./mercadopago-orders.js";
+import { paymentsEnabled, mercadoPagoCheckoutEnabled, nubankCheckoutEnabled } from "./payment-activation.js";
 import { normalizePixEndToEndId, preparePixApproval } from "./pix-reconciliation.js";
 import { PANTHEON_SKIN_ITEMS, buildSkinSetGallery } from "./skin-sets.js";
 import { DRAGON_BY_KEY, getDragonCombatBonuses, getDragonCollectionView } from "./dragon-catalog.js";
@@ -2238,8 +2239,9 @@ export default {
       return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
-  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:Boolean(env.MP_ACCESS_TOKEN&&env.MP_WEBHOOK_SECRET),nubankPix:nubankPixReady(env)});
+  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:mercadoPagoCheckoutEnabled(env),nubankPix:nubankCheckoutEnabled(env,nubankPixReady(env))});
   if(url.pathname==="/api/store/pix-instructions"&&request.method==="POST"){
+    if(!paymentsEnabled(env))return json({error:"Pagamentos ainda não homologados.",code:"PAYMENTS_DISABLED"},503);
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
@@ -2256,6 +2258,7 @@ export default {
     return json({requestId:pending.id,product:pending.product_name,amountBRL:Number(pending.price_brl),currency:"BRL",bank:"Nubank",pixKey:nubankPixKey(env),message:"Confira o nome do recebedor apresentado por seu banco antes de confirmar. O pedido só será entregue após conciliação manual."});
   }
   if(url.pathname==="/api/store/purchase-request"&&request.method==="POST"){
+    if(!paymentsEnabled(env))return json({error:"Pagamentos ainda não homologados.",code:"PAYMENTS_DISABLED"},503);
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);

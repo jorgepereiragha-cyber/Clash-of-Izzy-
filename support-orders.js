@@ -1,3 +1,4 @@
+import { mercadoPagoCheckoutEnabled } from "./payment-activation.js";
 // Apoio voluntário ao desenvolvimento. Sem gemas/itens: pacotes pagos permanecem na loja oficial.
 export const SUPPORT_TIERS=Object.freeze({
   escudeiro:{label:"Escudeiro",amountCents:1000},
@@ -18,7 +19,7 @@ const getSupportOrderSql=`SELECT s.*,p.player_id AS public_player_id FROM suppor
 
 export async function createSupportCheckout(request,env,ctx){
   if(request.method!=="POST")return ctx.json({error:"Método não permitido."},405);
-  if(!env.MP_ACCESS_TOKEN||!env.MP_WEBHOOK_SECRET)return ctx.json({error:"Mercado Pago ainda não está configurado para contribuições."},503);
+  if(!mercadoPagoCheckoutEnabled(env))return ctx.json({error:"Contribuições indisponíveis até homologação comercial."},503);
   const playerId=await ctx.gameIdentity(request,env);
   if(!playerId)return ctx.json({error:"Abra o jogo e entre no seu reino antes de apoiar."},401);
   const limited=await ctx.rateLimitDecision(env,"support-checkout-player",playerId,5,3600);
