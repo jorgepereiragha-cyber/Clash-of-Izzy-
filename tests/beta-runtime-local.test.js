@@ -1022,9 +1022,12 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         const activeManifest=JSON.parse(await readFile(path.join(root,"assets/3d/manifest.json"),"utf8"));
         const activeBuilding=(type)=>activeManifest.models.find(a=>a.enabled&&a.type===type)?.id;
         if(process.env.BETA_MILLENNIUM_SMOKE==="1"){
-          for(const type of ["farm","market","warehouse"])assert.equal(activeBuilding(type),"millennium-"+type);
+          for(const type of ["farm","market","warehouse"]){
+            assert.equal(activeBuilding(type),"millennium-"+type);
+            assert.ok(diagnostics.loadedBuildingAssets.some(x=>x.type===type&&x.assetId===activeBuilding(type)),type+" GLB decoded successfully");
+          }
         }
-        for(const type of ["farm","market","warehouse","lumber_mill","stable"]){
+        for(const type of ["farm","market","lumber_mill","stable"]){
           const assetId=activeBuilding(type);
           assert.ok(assetId,type+" has an active model in the manifest");
           assert.ok(diagnostics.importedBuildings.some(x=>x.type===type&&x.assetId===assetId),type+" uses its verified decoded GLB");
