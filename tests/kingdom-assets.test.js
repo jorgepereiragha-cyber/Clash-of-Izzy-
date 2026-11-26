@@ -41,7 +41,7 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
       assert.ok(texture.byteLength > 0, texturePath);
     }
   }
-  assert.ok(totalBytes < 4_000_000, "bundled GLBs must remain under 4 MB");
+  assert.ok(totalBytes < 4_600_000, "bundled GLBs must remain under 4.6 MB (including siege workshop)");
 });
 
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {
@@ -103,4 +103,20 @@ test("fortified castle gate uses embedded stone, wood and heraldry materials",as
 
 test("catapult and ram use existing licensed castle kit texture without duplicate files",async()=>{
  for(const type of ["catapult","ram"]){const a=manifest.units.find(x=>x.unit_type===type);assert.ok(a?.enabled);assert.equal(a.maxInstances,2);const b=await readFile(toUrl(a.src));const g=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());assert.ok(g.meshes.length>=6);assert.deepEqual(g.images.map(x=>x.uri),["Textures/colormap.png"]);assert.equal(manifest.files[a.src].license,"CC0-1.0");}
+});
+
+
+test("siege workshop uses distinct local CC0 art without external dependencies", async () => {
+  const asset = manifest.models.find(a => a.type === "siege_workshop");
+  assert.equal(asset?.id, "quaternius-siege-workshop");
+  assert.equal(asset.enabled, true);
+  const provenance = manifest.files[asset.src];
+  assert.equal(provenance.license, "CC0-1.0");
+  const b = await readFile(toUrl(asset.src));
+  assert.equal(b.length, 670832);
+  const g = JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());
+  assert.ok(g.meshes.length > 0);
+  assert.ok(g.materials.some(m => m.name === "RoofTiles_Red"));
+  assert.ok([...(g.images || []), ...(g.buffers || [])].every(x => x.uri === undefined));
+  assert.equal(Object.values(manifest.files).filter(x => x.sha256 === provenance.sha256).length, 1);
 });

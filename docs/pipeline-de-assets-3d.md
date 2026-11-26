@@ -83,3 +83,21 @@ Correção após CI: a mina KayKit permanece armazenada, mas desabilitada no man
 O manifesto v2 existente é a fonte única: a seção `files` registra cada arquivo de arte local (incluindo texturas e modelos desabilitados), origem, licença, crédito, evidência local, tamanho e SHA-256. Os hashes iniciais foram calculados sobre os blobs da beta 81caf85c83fd5a7a2e4fffe74454f79f576fae8a. O histórico original de download não foi inferido. A verificação `npm run assets:validate` inclui auditoria de arquivos não registrados, hashes e licenças, além da validação GLB. O reino ignora entradas não aprovadas e mantém o fallback. A auditoria de hashes é de build, não uma garantia criptográfica do cliente.
  
 Fontes candidatas (não importadas): Quaternius Medieval Village MegaKit e Ultimate Fantasy RTS (CC0), Poly Haven e ambientCG (CC0). Usar somente os arquivos realmente gratuitos; verificar termos da API Poly Haven, incluindo User-Agent identificável. Mixamo fica fora de aprovação automática até revisão da distribuição web dos arquivos e licença; CC-BY-SA, NC, GPL, AGPL, arquivos sem origem e rips também ficam bloqueados. A aprovação de novos arquivos exige revisão de autoria e licença, não apenas hash. Antes de aprovar CC-BY, publicar crédito individual com autor, título, link da obra, licença e alterações. O limite de modelos de tropas do renderer passa de 8 para 16, sem elevar os limites de instâncias. Não habilitar modelos novos sem inspeção Android, orçamento por cena e validação glTF. Os modelos atuais Kenney permanecem fallback/provisórios.
+
+
+## Kit CC0 de expansão — 25/11/2026
+
+A ferraria do Medieval Village Pack representa a oficina de cerco existente; não altera regras. Modelo convertido no espelho fixado, 670832 bytes, oito materiais, sem dependências externas. Total GLB 4472716 bytes; teto de regressão 4,6 MB decimal. Escala inicial e adequação visual dependem de revisão em navegador e Android. Fallback preservado.
+
+Candidatos pesquisados, não importados:
+- https://quaternius.com/packs/ultimatefantasyrts.html — evolução de edifícios; preservar torreão e skins próprias.
+- https://quaternius.com/packs/ultimatemonsters.html — monstros e dragões animados.
+- https://www.summerengine.com/asset-store/pack/isometric-medieval-town — fallback 2D, não GLB.
+- https://gdevelop.io/asset-store/free/3d-medieval-village-3d-medieval-village — 44 objetos, verificar formatos.
+- https://3dtexel.com/pt/texturas-pbr-gratis/ — somente biblioteca CC0; evitar duplicar materiais fotográficos em revisão.
+- https://kalponic-studio.itch.io/painterly-textures-vol-1 — verificar origem de cada textura.
+- https://kenney.nl/assets/fantasy-ui-borders — UI, preservar HUD funcional.
+- https://opengameart.org/content/cc0-fantasy-music-sounds — conferir licença individual das faixas.
+- https://vuena.itch.io/blocky-winter-free-sampler e https://vuena.itch.io/blocky-halloween-free — somente amostras CC0; Halloween gratuito tem três monstros, não treze.
+
+Não importar pacotes de licença ambígua. Manifesto v2 único; preço zero não equivale a CC0.
