@@ -111,3 +111,17 @@ test("special buildings use canonical D1 keys and real local art",async()=>{
  assert.match(source,/paintBuildingArt\(b\.building_type/);
  assert.doesNotMatch(source,/from\s+["']three(?:\/|["'])/);
 });
+
+
+test("city preloads the exact level and quality art of visible plots without duplicates",()=>{
+ const controller=new KingdomEntityArtController({manifest:{entityArt:{buildings:{
+   castle:{canvas2d:{src:"art/castle.webp"},tiers:{"20":{canvas2d:{src:"art/castle-20.webp",quality:{low:{src:"art/castle-20-low.webp"}}}}}},
+   farm:{canvas2d:{src:"art/farm.webp"}},warehouse:{canvas2d:{src:"art/warehouse.webp"}}
+ }}}});
+ const buildings=[{building_type:"castle",level:20},...Array.from({length:8},()=>({building_type:"farm",level:1})),{building_type:"warehouse",level:1}];
+ assert.deepEqual(controller.getCityPreloadAssets(buildings).map(a=>a.src),["/assets/art/castle-20.webp","/assets/art/farm.webp"]);
+ controller.setQuality("low");
+ assert.deepEqual(controller.getCityPreloadAssets(buildings).map(a=>a.src),["/assets/art/castle-20-low.webp","/assets/art/farm.webp"]);
+ assert.deepEqual(controller.getCityPreloadAssets([{building_type:"castle",level:1}]).map(a=>a.src),["/assets/art/castle.webp"]);
+ assert.deepEqual(controller.getCityPreloadAssets([{building_type:"unknown"},null]),[]);
+});
