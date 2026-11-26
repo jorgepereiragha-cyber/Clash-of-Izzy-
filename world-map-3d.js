@@ -2,7 +2,7 @@ import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
 import { marchVisualProgress, marchVisualPoint, planMarchFormation } from "./scripts/march-visual-path.js";
-import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
+import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-state.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -279,7 +279,7 @@ import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
     box(parent, .8, .42, .06, shared.banner, x + .61, y + height + 1.82, z);
   }
 
-  function createCastle(parent, x, z, scale = 1, color = "home", skinId = 0) {
+  function createCastle(parent, x, z, scale = 1, color = "home", skinId = 0, level = 1) {
     const group = new THREE.Group();
     group.position.set(x, terrainHeight(x, z), z);
     group.scale.setScalar(scale);
@@ -289,8 +289,11 @@ import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
     const roof=theme?.roof||shared.roof;
     const banner=theme?.banner||(color==="enemy"?shared.enemy:shared.banner);
     const accent=theme?.accent||shared.gold;
+    const tier=worldCastleTier(level);
+    group.userData.coICastleTier=tier;
+    const rise=(tier-1)*.32;
     box(group,5.6,1.35,4.5,wall,0,.76,0);
-    box(group,3.2,2.8,3.1,wallLight,0,2.55,0);
+    box(group,3.2,2.8+rise,3.1,wallLight,0,2.55+rise/2,0);
     box(group,1.15,1.9,.18,shared.wood,0,1.1,1.64);
     for(const [tx,tz] of [[-2.5,-1.9],[2.5,-1.9],[-2.5,1.9],[2.5,1.9]]){
       const tower=new THREE.Group();tower.position.set(tx,0,tz);group.add(tower);
@@ -298,11 +301,19 @@ import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
       box(tower,1.42,.2,1.42,wallLight,0,2.65,0);
       cone(tower,1.05,1.45,roof,0,3.45,0,4);
     }
-    cone(group,1.8,1.25,roof,0,4.55,0,4);
-    box(group,.08,1.85,.08,accent,.55,5.45,0);
-    box(group,1.0,.48,.07,banner,1.02,5.83,0);
+    cone(group,1.8,1.25,roof,0,4.55+rise,0,4);
+    if(tier>=2){
+      for(const tx of [-1.3,1.3])box(group,.44,.56,.50,accent,tx,3.5+rise,1.57);
+    }
+    if(tier>=3){
+      box(group,1.1,.23,.18,accent,0,3.75+rise,1.57);
+      for(const tx of [-1.15,1.15])cone(group,.39,.8,roof,tx,4.25+rise,1.12,4);
+    }
+    if(tier>=4)cone(group,.38,.72,accent,0,5.38+rise,0,6);
+    box(group,.08,1.85,.08,accent,.55,5.45+rise,0);
+    box(group,1.0,.48,.07,banner,1.02,5.83+rise,0);
     // Keep an independent faction pennant: cosmetic colors never disguise ownership.
-    box(group,.56,.24,.08,color==="enemy"?shared.enemy:shared.banner,.82,5.27,0);
+    box(group,.56,.24,.08,color==="enemy"?shared.enemy:shared.banner,.82,5.27+rise,0);
     parent.add(group);
     return group;
   }
@@ -360,7 +371,7 @@ import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
       return;
     }
     if (territory.territory_kind === "castle") {
-      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home", territory.castle_skin_id);
+      createCastle(parent, x, z, ownership === "enemy" ? .92 : 1.1, ownership === "enemy" ? "enemy" : "home", territory.castle_skin_id, territory.castle_level ?? territory.level);
       return;
     }
 
@@ -592,7 +603,7 @@ import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
       }
       // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
       const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
-      homeCastleGroup=createCastle(terrainRoot,hasThrone?13:0,hasThrone?-11:0,1.4,"home",Number(worldState.castleSkinId)||0);
+      homeCastleGroup=createCastle(terrainRoot,hasThrone?13:0,hasThrone?-11:0,1.4,"home",Number(worldState.castleSkinId)||0,worldState.castleLevel);
       visualRebuilds.home++;
     }
     if(keys.features!==previous?.features){rebuildTerritories();visualRebuilds.features++;}
@@ -678,7 +689,7 @@ import { worldVisualKeys } from "./scripts/world-map-visual-state.js";
       scene.add(worldRoot);
       worldRoot.add(terrainRoot, routeRoot, territoryRoot, armyRoot);
       createGround();
-      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(window.__coiWorldMapState?.castleSkinId)||0);
+      homeCastleGroup=createCastle(terrainRoot,0,0,1.4,"home",Number(window.__coiWorldMapState?.castleSkinId)||0,window.__coiWorldMapState?.castleLevel);
       resizeObserver = typeof ResizeObserver === "function" ? new ResizeObserver(resize) : null;
       resizeObserver?.observe(host);
       resizeHandler = resize;

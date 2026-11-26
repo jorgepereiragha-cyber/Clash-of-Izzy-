@@ -38,6 +38,6 @@ test("march formations identify orders and keep the existing GPU representative 
 });
 test("castle faction pennant stays independent of equipped cosmetic skin",async()=>{
  const src=await readFile(new URL("../world-map-3d.js",import.meta.url),"utf8");
- assert.match(src,/color==="enemy"\?shared\.enemy:shared\.banner,\.82,5\.27,0/);
+ assert.match(src,/color==="enemy"\?shared\.enemy:shared\.banner,\.82,5\.27\+rise,0/);
  assert.match(src,/planMarchFormation\(march\.march_type, quality\)/);
 });

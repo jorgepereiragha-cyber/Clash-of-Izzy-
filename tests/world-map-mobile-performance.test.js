@@ -104,3 +104,14 @@ test("renderer skips unchanged mesh layers and reuses territory lookup during fr
  assert.ok(scene.includes("territoryLookup.get(march.targetId)"));
  assert.ok(scene.includes("diagnostics: () => ({ rebuilds: {...visualRebuilds} })"));
 });
+
+test("world castle silhouettes follow the same 1/10/20/30 tier thresholds as city",async()=>{
+ const {worldCastleTier,worldVisualKeys}=await import("../scripts/world-map-visual-state.js");
+ assert.deepEqual([NaN,1,9,10,19,20,29,30,80].map(worldCastleTier),[1,1,1,2,2,3,3,4,4]);
+ const s={castleLevel:1,territories:[{id:1,territory_kind:"castle",castle_level:9}]};const a=worldVisualKeys(s);
+ assert.notEqual(a.home,worldVisualKeys({...s,castleLevel:10}).home);
+ assert.notEqual(a.features,worldVisualKeys({...s,territories:[{...s.territories[0],castle_level:10}]}).features);
+ assert.equal(a.routes,worldVisualKeys({...s,territories:[{...s.territories[0],castle_level:10}]}).routes);
+ const scene=await read("world-map-3d.js");assert.match(scene,/territory\.castle_level \?\? territory\.level/);
+ assert.match(scene,/const tier=worldCastleTier\(level\)/);
+});

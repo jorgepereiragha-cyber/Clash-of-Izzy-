@@ -155,6 +155,7 @@ function renderMap() {
     marches: state.marches || [],
     kingdomId: state.kingdom?.id || 0,
     castleSkinId: Number(state.kingdom?.equipped_skin_id || 0),
+    castleLevel: Number(state.kingdom?.castle_level || 1),
     throneShielded:state.throne?.shielded===true
   };
   window.__coiWorldMapButtons = buttonRefs;
