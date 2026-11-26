@@ -86,3 +86,22 @@ test("reino oferece recuperação de conta após 401/403 sem apagar a sessão", 
   assert.match(html, /loading\.append\(accountLink\)/);
   assert.doesNotMatch(html, /localStorage\.removeItem\("coi_game_token"\)/);
 });
+
+
+test("all six economy counters have local artwork with a visible fallback", async () => {
+ const html=await readFile(new URL("../kingdom.html",import.meta.url),"utf8");
+ const paths=JSON.parse(html.match(/const iconPaths=(\{[^\n]+\});/)[1].replace(/([a-z]+):/g,'"$1":'));
+ assert.deepEqual(Object.keys(paths),["food","wood","stone","iron","gold","gems"]);
+ const distinct=new Set();
+ for(const filename of Object.values(paths)){
+  const asset=await readFile(new URL("../assets/art/resources/"+filename,import.meta.url));
+  assert.ok(asset.length<20000);
+  if(filename.endsWith(".png"))assert.equal(asset.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
+  else assert.match(asset.toString(),/<svg xmlns=/);
+  assert.ok(!distinct.has(asset.toString("base64")));
+  distinct.add(asset.toString("base64"));
+ }
+ assert.match(html,/img\.addEventListener\("load",\(\)=>\{fallback\.hidden=true;img\.hidden=false;/);
+ assert.match(html,/img\.addEventListener\("error",\(\)=>img\.remove\(\)/);
+ assert.match(html,/img\.src="\/assets\/art\/resources\/"\+iconPaths\[key\]/);
+});
