@@ -10,7 +10,7 @@ const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json",
 test("original imperial keep remains the fallback and preserves equipped skins without substituting standalone wall GLBs", () => {
   assert.match(renderer,/function addEldoriaCastle/);
   assert.match(renderer,/eldoria-imperial-v1/);
-  assert.match(renderer,/level>=30\?4:level>=20\?3:level>=10\?2:1/);
+  assert.match(renderer,/const tier=castleArchitectureTier\(level\)/);
   assert.match(renderer,/if\(type==="castle"\)\{\s*addEldoriaCastle/);
   assert.match(renderer,/b\.building_type === "castle" && latestCastleSkinId\) \? null : glbTemplates\.get\(selected\?\.id\)/);
   assert.match(renderer,/const group = !template/);

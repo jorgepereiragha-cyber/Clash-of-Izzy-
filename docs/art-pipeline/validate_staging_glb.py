@@ -24,6 +24,12 @@ def inspect(path):
         for p in mesh["primitives"]:
             if p.get("mode",4)!=4:
                 raise ValueError("only triangle primitives accepted")
+            position=accessors[p["attributes"]["POSITION"]]
+            if position.get("type")!="VEC3" or not isinstance(position.get("count"),int) or position["count"]<3:
+                raise ValueError("invalid POSITION accessor")
+            for attribute,index in p["attributes"].items():
+                if accessors[index].get("count")!=position["count"]:
+                    raise ValueError(f"attribute count mismatch: {attribute}")
             a=accessors[p["indices"] if "indices" in p else p["attributes"]["POSITION"]]
             count=a["count"]
             if not isinstance(count,int) or count<3 or count%3:
@@ -31,7 +37,7 @@ def inspect(path):
             triangles+=count//3
     if not triangles:
         raise ValueError("empty geometry")
-    return {"triangles":triangles,"bytes":len(data),"ktx2":"KHR_texture_basisu" in g.get("extensionsUsed",[]),"skinned":bool(g.get("skins")),"animations":len(g.get("animations",[]))}
+    return {"triangles":triangles,"bytes":len(data),"ktx2":"KHR_texture_basisu" in g.get("extensionsUsed",[]),"skinned":bool(g.get("skins")),"animations":len(g.get("animations",[])),"embeddedImages":len(g.get("images",[])),"materialCount":len(g.get("materials",[]))}
 def main():
     p=argparse.ArgumentParser()
     p.add_argument("file",type=Path)

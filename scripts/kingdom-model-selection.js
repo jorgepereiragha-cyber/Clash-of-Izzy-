@@ -12,3 +12,10 @@ export function selectBuildingAsset(assets, type, level, tier = "balanced") {
       || Math.abs((a.lod ?? 1)-preferred)-Math.abs((b.lod ?? 1)-preferred)
       || (b.lod ?? 1)-(a.lod ?? 1))[0] ?? null;
 }
+
+// Architectural stages are visual only; never modify the authoritative level.
+export function castleArchitectureTier(level) {
+  const n = Number(level);
+  if (!Number.isFinite(n)) return 1;
+  return n >= 30 ? 5 : n >= 25 ? 4 : n >= 20 ? 3 : n >= 10 ? 2 : 1;
+}

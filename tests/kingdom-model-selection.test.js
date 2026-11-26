@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import {selectBuildingAsset, MODEL_LIMITS} from "../scripts/kingdom-model-selection.js";
+import {selectBuildingAsset, MODEL_LIMITS, castleArchitectureTier} from "../scripts/kingdom-model-selection.js";
 const a=(id,minLevel,lod,enabled=true,type="castle")=>({id,type,minLevel,lod,enabled});
 const models=[a("base",1,1),a("ten",10,1),a("twenty",20,1),a("high",20,0),a("low",20,2),a("disabled",25,0,false),a("other",30,0,true,"farm")];
 test("visual selection respects server level, type, enabled and LOD",()=>{
@@ -19,4 +19,8 @@ test("legacy manifest and invalid data are safe",()=>{
  assert.equal(selectBuildingAsset(null,"castle",1),null);
  assert.ok(MODEL_LIMITS.models>=56);
  assert.ok(MODEL_LIMITS.units>=11);
+});
+
+test("castle architecture has five level stages without changing progression",()=>{
+ assert.deepEqual([1,9,10,19,20,24,25,29,30,80,NaN].map(castleArchitectureTier),[1,1,2,2,3,3,4,4,5,5,1]);
 });

@@ -13,7 +13,7 @@ import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
-import { MODEL_LIMITS, selectBuildingAsset } from "./kingdom-model-selection.js";
+import { MODEL_LIMITS, selectBuildingAsset, castleArchitectureTier } from "./kingdom-model-selection.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -242,22 +242,30 @@ if (host && "WebGLRenderingContext" in window) {
         ctx.stroke();
       }
     } else if (kind === "stone") {
-      for (let y = 0; y < 128; y += 22) {
-        const offset = (Math.floor(y / 22) % 2) * 16;
+      // Exact tile divisors keep masonry seams consistent across repeated UVs.
+      for (let y = 0; y < 128; y += 16) {
+        const offset = (Math.floor(y / 16) % 2) * 16;
         for (let x = -16; x < 144; x += 32) {
           ctx.fillStyle = rand() > .5 ? "rgba(242,226,194,.11)" : "rgba(34,38,34,.10)";
-          ctx.fillRect(x + offset + 2, y + 2, 28, 18);
+          ctx.fillRect(x + offset + 2, y + 2, 28, 12);
           ctx.fillStyle = "rgba(255,244,215,.18)";
           ctx.fillRect(x + offset + 2, y + 2, 28, 1);
           ctx.strokeStyle = "rgba(35,39,37,.28)";
           ctx.lineWidth = 1.5;
-          ctx.strokeRect(x + offset + 1, y + 1, 30, 20);
+          ctx.strokeRect(x + offset + 1, y + 1, 30, 14);
+          ctx.fillStyle = "rgba(35,39,37,.12)";
+          ctx.fillRect(x + offset + 3, y + 12, 26, 2);
         }
       }
     } else if (kind === "roof") {
-      for (let y = 0; y < 128; y += 12) for (let x = 0; x < 128; x += 16) {
+      for (let y = 0; y < 128; y += 8) for (let x = -16; x < 128; x += 16) {
+        const start = x + ((y / 8) % 2) * 8;
         ctx.fillStyle = rand() > .5 ? "rgba(210,225,245,.20)" : "rgba(8,18,34,.22)";
-        ctx.fillRect(x + ((y / 12) % 2) * 8, y, 14, 9);
+        ctx.fillRect(start, y, 15, 7);
+        ctx.fillStyle = "rgba(230,235,240,.13)";
+        ctx.fillRect(start, y, 15, 1);
+        ctx.fillStyle = "rgba(8,18,34,.25)";
+        ctx.fillRect(start, y + 6, 15, 1);
       }
     } else if (kind === "grass") {
       // Seamless deterministic turf variation within the existing texture budget.
@@ -456,10 +464,10 @@ if (host && "WebGLRenderingContext" in window) {
     warehouse:[1.46,.9,1.1,.52]
   });
   function addEldoriaCastle(group,level,skin,wall,roof,stone,accent){
-    const tier=level>=30?4:level>=20?3:level>=10?2:1;
+    const tier=castleArchitectureTier(level);
     const high=qualityProfile?.tier==="high",low=qualityProfile?.tier==="low";
-    const keepHeight=1.42+(tier-1)*.19;
-    const towerHeight=1.28+(tier-1)*.16;
+    const keepHeight=1.42+(tier-1)*.15;
+    const towerHeight=1.28+(tier-1)*.12;
     group.userData.coIArchitecture="eldoria-imperial-v1";
     group.userData.coIArchitectureTier=tier;
     box(group,1.75,.15,1.52,mats.darkStone,0,.075,0);
@@ -475,7 +483,7 @@ if (host && "WebGLRenderingContext" in window) {
     box(group,.30,.45,.045,mats.wood,0,.48,.72);
     box(group,.44,.075,.08,accent,0,.74,.725);
     box(group,.66,.09,.24,stone,0,.09,.77);
-    const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
+    const towers=low||tier===1?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
     for(const [x,z] of towers){
       addCylinder(group,.22,.26,towerHeight,stone,x,.25+towerHeight/2,z,low?6:10);
       addCylinder(group,.29,.25,.13,stone,x,.25+towerHeight,z,low?6:10);
@@ -491,6 +499,17 @@ if (host && "WebGLRenderingContext" in window) {
     for(const x of [-.24,.24]){
       box(group,.12,.30,.045,mats.darkStone,x,.25+keepHeight*.65,.32);
       box(group,.075,.22,.055,mats.window,x,.25+keepHeight*.65,.35);
+    }
+    // Gate reinforcement and royal facade evolve without new assets or state.
+    if(tier>=2&&!low){
+      for(const x of [-.105,0,.105])box(group,.025,.45,.025,mats.darkStone,x,.49,.75);
+      box(group,.29,.025,.035,mats.darkStone,0,.58,.75);
+    }
+    if(tier>=4&&!low){
+      for(const x of [-.24,.24]){
+        box(group,.17,.045,.065,accent,x,.25+keepHeight*.65+.14,.35);
+        box(group,.17,.045,.065,accent,x,.25+keepHeight*.65-.14,.35);
+      }
     }
     // Tier-dependent buttresses and royal ornaments; no effect on gameplay.
     if(tier>=2&&!low)for(const x of [-.43,.43])box(group,.12,.76,.14,stone,x,.63,.42);
