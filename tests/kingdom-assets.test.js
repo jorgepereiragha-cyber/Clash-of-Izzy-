@@ -5,15 +5,48 @@ import { readFile } from "node:fs/promises";
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 const toUrl = path => new URL("../" + path.replace(/^\/+/, ""), import.meta.url);
 
-test("bundled Kenney, KayKit and Quaternius assets keep CC0 provenance and a bounded local footprint", () => {
+const replacements = Object.freeze({
+  farm: { old: "quaternius-farm", name: "caro_farmstead" },
+  market: { old: "kaykit-blue-market", name: "caro_market" },
+  warehouse: { old: "quaternius-warehouse", name: "caro_storehouse" }
+});
+const millenniumSource = "https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/art/meshes/structural/";
+const hasReplacement = type => Object.hasOwn(replacements,type) &&
+  manifest.models.some(a => a.id === "millennium-"+type && a.enabled);
+const originalDisabled = asset => ["kaykit-blue-iron-mine","kenney-castle-watchtower","kenney-castle-wall"].includes(asset.id) ||
+  Object.values(replacements).some(r => r.old === asset.id && hasReplacement(asset.type));
+
+
+test("bundled assets preserve CC0 provenance or explicitly reviewed share-alike substitutions", () => {
   assert.equal(manifest.version, 2);
   assert.ok(manifest.models.length >= 2);
   assert.ok(manifest.props.length >= 2);
   assert.ok(manifest.units.some(item => item.unit_type === "archer"));
   for (const asset of [...manifest.models, ...manifest.props, ...manifest.units]) {
-    assert.equal(asset.enabled, !["kaykit-blue-iron-mine", "kenney-castle-watchtower", "kenney-castle-wall"].includes(asset.id), asset.id);
-    assert.equal(asset.license, "CC0-1.0");
+    if(asset.id.startsWith("millennium-")){
+      const r = Object.hasOwn(replacements,asset.type) ? replacements[asset.type] : null;
+      assert.ok(r,asset.id+" unreviewed role");
+      assert.equal(asset.id,"millennium-"+asset.type);
+      assert.equal(asset.enabled,true);
+      assert.equal(asset.src,"/assets/3d/millennium/"+r.name+".glb");
+      assert.equal(asset.sourceUrl,millenniumSource+r.name+".dae");
+      assert.equal(asset.license,"CC-BY-SA-3.0");
+      const provenance=manifest.files[asset.src];
+      assert.equal(provenance.license,asset.license);
+      assert.equal(provenance.sourceUrl,asset.sourceUrl);
+      assert.equal(provenance.adaptedArtLicense,asset.license);
+      assert.equal(provenance.licenseUrl,"https://creativecommons.org/licenses/by-sa/3.0/");
+      assert.equal(provenance.licenseFile,"licenses/Millennium-AD.txt");
+      assert.match(provenance.sha256,/^[a-f0-9]{64}$/);
+      assert.ok(provenance.attribution.trim() && provenance.modifications.trim());
+      assert.deepEqual(manifest.entityArt.buildings[asset.type].webgl.modelIds,[asset.id]);
+      assert.equal(manifest.models.filter(a=>a.type===asset.type&&a.enabled).length,1);
+      assert.equal(manifest.models.find(a=>a.id===r.old)?.enabled,false);
+    }else{
+      assert.equal(asset.enabled,!originalDisabled(asset),asset.id);
+      assert.equal(asset.license,"CC0-1.0");
     assert.match(asset.sourceUrl, /^https:\/\/(?:kenney\.nl\/assets\/|quaternius\.com\/packs\/|poly\.pizza\/m\/|github\.com\/KayKit-Game-Assets\/(?:KayKit-Medieval-Hexagon-Pack-1\.0|KayKit-Character-Pack-Adventures-1\.0)\/tree\/[a-f0-9]{40}$)/);
+    }
     assert.ok(asset.src.startsWith("/assets/3d/"));
     assert.ok(asset.src.endsWith(".glb"));
   }
@@ -61,7 +94,7 @@ test("archer asset includes the idle clip and both original CC0 license files ar
 test("KayKit civic models share the local atlas and preserve the original license", async () => {
   const assets = manifest.models.filter(asset => asset.id.startsWith("kaykit-blue-"));
   assert.deepEqual(assets.map(asset => asset.type).sort(), ["barracks", "iron_mine", "market"]);
-  assert.deepEqual(assets.filter(asset => asset.enabled).map(asset=>asset.type).sort(), ["barracks", "market"]);
+  assert.deepEqual(assets.filter(asset => asset.enabled).map(asset=>asset.type).sort(), hasReplacement("market")?["barracks"]:["barracks","market"]);
   assert.match(await readFile(toUrl("/assets/3d/licenses/KayKit-Medieval-Hexagon.txt"), "utf8"), /Creative Commons Zero, CC0/);
   for (const asset of assets) {
     const data = await readFile(toUrl(asset.src));
@@ -77,7 +110,7 @@ test("KayKit civic models share the local atlas and preserve the original licens
 
 test("Quaternius imports preserve local provenance and real GLB models",()=>{
  for(const type of ["archery_range","academy","warehouse","embassy","swordsman","farm","lumber_mill","stable"]){
- const a=[...manifest.models,...manifest.units].find(x=>x.id==="quaternius-"+type.replace("_","-"));assert.ok(a?.enabled);assert.equal(manifest.files[a.src].license,"CC0-1.0");assert.match(manifest.files[a.src].sha256,/^[a-f0-9]{64}$/);
+ const a=[...manifest.models,...manifest.units].find(x=>x.id==="quaternius-"+type.replace("_","-"));assert.ok(a);assert.equal(a.enabled,!hasReplacement(type));assert.equal(manifest.files[a.src].license,"CC0-1.0");assert.match(manifest.files[a.src].sha256,/^[a-f0-9]{64}$/);
  }
 });
 
