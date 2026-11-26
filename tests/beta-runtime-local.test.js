@@ -641,6 +641,26 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.ok(Number.isSafeInteger(queueRealm) && queueRealm > 0);
     const localSql = async sql => command([...common,"execute","clash-of-izzy-beta-db","--local",
       "--persist-to",persist,"--command",sql]);
+    // Real D1/API skin ownership, replay and concurrent selection. No purchase.
+    await localSql("INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT k.player_id,s.id FROM kingdoms k CROSS JOIN skins s WHERE k.id="+queueRealm+" ORDER BY s.id LIMIT 1");
+    const skinBefore=await getStateFor(cookie,start.data.token);
+    const ownedSkin=Number(skinBefore.castleSkins[0]?.id);
+    assert.ok(Number.isSafeInteger(ownedSkin)&&ownedSkin>0);
+    const chooseSkin=skinId=>actionFor(cookie,start.data.token,{type:"castle_skin_equip",skinId});
+    const badSkin=await chooseSkin(9007199254740991);
+    assert.equal(badSkin.status,404);
+    const equippedRace=await Promise.all([chooseSkin(ownedSkin),chooseSkin(ownedSkin)]);
+    assert.ok(equippedRace.every(r=>r.status===200),"duplicate equip is idempotent");
+    const skinEquipped=await getStateFor(cookie,start.data.token);
+    assert.equal(Number(skinEquipped.kingdom.equipped_skin_id),ownedSkin);
+    const eventCount=(snapshot,type)=>snapshot.recentEvents.filter(e=>e.event_type===type).length;
+    assert.equal(eventCount(skinEquipped,"castle_skin_equipped"),eventCount(skinBefore,"castle_skin_equipped")+1);
+    const removeRace=await Promise.all([chooseSkin(null),chooseSkin(null)]);
+    assert.ok(removeRace.every(r=>r.status===200));
+    const skinRemoved=await getStateFor(cookie,start.data.token);
+    assert.equal(skinRemoved.kingdom.equipped_skin_id,null);
+    assert.equal(eventCount(skinRemoved,"castle_skin_unequipped"),eventCount(skinEquipped,"castle_skin_unequipped")+1);
+    assert.ok(skinRemoved.castleSkins.some(s=>Number(s.id)===ownedSkin),"unequip preserves ownership");
     // Synthetic ownership only in the disposable D1: verify progress follows the individual dragon.
     const dragonBeforeSwitch=await getStateFor(cookie,start.data.token);
     const originalDragon=dragonBeforeSwitch.dragon;
