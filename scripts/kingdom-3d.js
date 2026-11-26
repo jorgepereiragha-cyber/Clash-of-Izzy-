@@ -458,33 +458,43 @@ if (host && "WebGLRenderingContext" in window) {
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
   function addForestInstances() {
+    const low=qualityProfile?.tier==="low";
     const count = 18;
-    const trunkGeometry = new THREE.CylinderGeometry(.09, .13, .65, 5);
-    const crownGeometry = new THREE.ConeGeometry(.62, 1.45, 6);
-    const crownTopGeometry = new THREE.ConeGeometry(.43, 1.05, 6);
+    const trunkGeometry = new THREE.CylinderGeometry(.075, .14, .88, low?5:8);
+    // Broadleaf crowns replace the toy-like cone silhouette on every profile.
+    // Two shared foliage geometries and three draw calls, independent of tree count.
+    const crownGeometry = new THREE.IcosahedronGeometry(.69, low?0:1);
+    const crownTopGeometry = new THREE.IcosahedronGeometry(.48, low?0:1);
     const trunks = new THREE.InstancedMesh(trunkGeometry, mats.wood, count);
     const crowns = new THREE.InstancedMesh(crownGeometry, mats.leaf, count);
     const crownTops = new THREE.InstancedMesh(crownTopGeometry, mats.leafLight, count);
     trunks.castShadow = crowns.castShadow = crownTops.castShadow = true;
     trunks.receiveShadow = true;
-    const dummy = new THREE.Object3D();
+    const dummy = new THREE.Object3D(), tint=new THREE.Color();
     let added = 0;
     for (let i = 0; i < count; i++) {
       const x = ((i * 37) % 125) / 10 - 6.2;
       const z = ((i * 23) % 95) / 10 - 4.7;
       if (Math.abs(x) < 5 && Math.abs(z) < 4) continue;
       const scale = .72 + (i % 4) * .12;
-      dummy.position.set(x, .32 * scale, z);
+      const angle=i*2.399963;
+      dummy.rotation.set(0,angle,0);
+      dummy.position.set(x, .44 * scale, z);
       dummy.scale.setScalar(scale); dummy.updateMatrix(); trunks.setMatrixAt(added, dummy.matrix);
       dummy.position.set(x, 1.22 * scale, z);
-      dummy.scale.setScalar(scale); dummy.updateMatrix(); crowns.setMatrixAt(added, dummy.matrix);
-      dummy.position.set(x, 1.72 * scale, z);
-      dummy.scale.setScalar(scale); dummy.updateMatrix(); crownTops.setMatrixAt(added, dummy.matrix);
+      dummy.scale.set(scale*(.94+(i%3)*.1),scale*1.12,scale*.89);
+      dummy.updateMatrix(); crowns.setMatrixAt(added, dummy.matrix);
+      tint.setScalar(.77+(i%5)*.055);crowns.setColorAt(added,tint);
+      dummy.position.set(x+Math.cos(angle)*.22*scale, 1.64 * scale, z+Math.sin(angle)*.22*scale);
+      dummy.scale.set(scale*.90,scale*1.14,scale*.87);
+      dummy.updateMatrix(); crownTops.setMatrixAt(added, dummy.matrix);
+      tint.setScalar(.72+(i%4)*.075);crownTops.setColorAt(added,tint);
       added++;
     }
     for (const mesh of [trunks, crowns, crownTops]) {
       mesh.count = added;
       mesh.instanceMatrix.needsUpdate = true;
+      if(mesh.instanceColor)mesh.instanceColor.needsUpdate=true;
       mesh.computeBoundingSphere();
       scene.add(mesh);
     }
