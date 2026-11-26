@@ -1033,6 +1033,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.deepEqual(diagnostics.specialLandmarks.map(x=>x.type).sort(),["dragon_nest","summon_altar"]);
         for(const model of diagnostics.specialLandmarks)assert.ok(Number.isFinite(model.x)&&Number.isFinite(model.z));
         assert.ok(diagnostics.cityStructureFrameExtent > 0 && diagnostics.cityStructureFrameExtent <= .940001, "overview fits actual city structures including both special landmarks");
+        assert.ok(diagnostics.cityPavedPlots>=1&&diagnostics.cityPavedPlots<=diagnostics.cityArtLayout.length,"civic plaza paving shares the actual plot layout");
         const evidence = path.join(root, "test-results", "beta-visual");
         await mkdir(evidence, {recursive:true});
         await page.locator("#city").screenshot({path:path.join(evidence,"kingdom-3d.png")});
