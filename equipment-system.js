@@ -34,6 +34,16 @@
     if(!response.ok)throw new Error(data.error||"Falha ao sincronizar equipamentos.");
     return data;
   }
+  // Local CC0 illustrated atlas; exact catalog identifiers only. Unmapped items retain existing text/emoji.
+  const equipmentArtCells=Object.freeze({"iron_sword":[712,4],"espada_guerreiro":[584,132],"leather_armor":[776,324],"warden_plate":[835,260],"aegis_asgard":[835,324],"scout_boots":[456,260],"wolf_boots":[456,324],"storm_boots":[456,68],"copper_ring":[392,324],"frost_ring":[0,4],"anel_poder":[392,388]});
+  function equipmentArt(item){
+    if(!item||typeof item.id!=="string"||!Object.hasOwn(equipmentArtCells,item.id))return null;
+    const [x,y]=equipmentArtCells[item.id];
+    const art=document.createElement("span");art.className="coi-equipment-art";
+    art.setAttribute("role","img");art.setAttribute("aria-label","Ilustração de "+String(item.name||"equipamento"));
+    art.style.backgroundPosition=(-x)+"px "+(-y)+"px";
+    return art;
+  }
   function renderForge(){
     const research=state?.equipmentResearch||[],levels=new Map(research.map(item=>[item.id,Number(item.level)||0]));
     const academy=Number((state?.buildings||[]).find(item=>item.building_type==="academy")?.level||0);
@@ -70,6 +80,7 @@
           const stats=document.createElement("p");
           const base=stage.base||{};
           stats.textContent="Ataque "+formatGearStat("attack",base.attack||0)+" · Defesa "+formatGearStat("defense",base.defense||0)+" · Vida "+formatGearStat("health",base.health||0);
+          const art=equipmentArt(stage);if(art)card.append(art);
           card.append(rarity,title,status,stats);
           if(!stage.owned&&stage.available&&stage.craft){
             const requirements=Object.entries(stage.requiredResearch||{});
@@ -121,6 +132,7 @@
         button.disabled=busy||missing.length>0||!enough||missingPredecessor;
         button.textContent=missingPredecessor?"FORJE A PEÇA ANTERIOR":!enough?"RECURSOS INSUFICIENTES":missing.length?"PESQUISE PRIMEIRO":"⚒️ FORJAR";
         button.addEventListener("click",()=>perform({type:"equipment_craft",itemId:item.id},"Equipamento "+item.name+" forjado."));
+        const art=equipmentArt(item);if(art)card.append(art);
         card.append(title,rarity,description,stats,requirementText,cost,button);return card;
       }):[(()=>{const empty=document.createElement("p");empty.textContent="Nenhum projeto alternativo disponível.";return empty;})()]));
     }
@@ -548,6 +560,7 @@
     renderSummonControls();
     renderSummonResults();
     $("item-name").textContent=item.name+" +"+(item.enhancement||0);
+    const artRoot=$("coi-equipped-art");if(artRoot){const art=equipmentArt(item);artRoot.replaceChildren(...(art?[art]:[]));artRoot.hidden=!art;}
     $("current-level").textContent=item.level;
     $("next-level").textContent=item.level<item.maxLevel?item.level+1:"MÁX.";
     const current=item.stats||{},next=item.nextLevelStats||{};
