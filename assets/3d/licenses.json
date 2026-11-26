@@ -1,0 +1,115 @@
+{
+  "version": 1,
+  "assets": {
+    "/assets/3d/kenney/castle-kit/Models/GLB format/tower-square.glb": {
+      "source": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney",
+      "title": "Kenney Castle Kit",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "models",
+      "sha256": "ae2e4f11247fef4e8e550011c20bc1862839cd4cfd21590aec9781ae0fbbbc7f"
+    },
+    "/assets/3d/kenney/castle-kit/Models/GLB format/wall.glb": {
+      "source": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney",
+      "title": "Kenney Castle Kit",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "models",
+      "sha256": "b2ea00acbf4ba91ff0d4b8b942edf9fa12d821abd0b2c945c57a2b9b3153cfe3"
+    },
+    "/assets/3d/quaternius/medieval-village/Sawmill.glb": {
+      "source": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius",
+      "title": "Quaternius Medieval Village Pack",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "models",
+      "sha256": "45b86787f29746003eb6b3eb889555b5d4cd99983f77011cb7d0d461cd6e547e"
+    },
+    "/assets/3d/quaternius/medieval-village/Stable.glb": {
+      "source": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius",
+      "title": "Quaternius Medieval Village Pack",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "models",
+      "sha256": "c5ed9626d931c52b5a2b48d805bccd4232239da5ba677ca169730c036eb5b8c8"
+    },
+    "/assets/3d/quaternius/medieval-village/MarketStand_1.glb": {
+      "source": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius",
+      "title": "Quaternius Medieval Village Pack",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "models",
+      "sha256": "19b9b99c84d41c0b1124fe286ac3b99668d2f2d489d44affa559188881448d75"
+    },
+    "/assets/3d/kenney/castle-kit/Models/GLB format/siege-trebuchet.glb": {
+      "source": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney",
+      "title": "Kenney Castle Kit",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "props",
+      "sha256": "123711fd475e35d061738f648d9bf46c7f463d57681325c369977cee8954679a"
+    },
+    "/assets/3d/kenney/mini-forest/Models/GLB format/tree-high.glb": {
+      "source": "https://kenney.nl/assets/mini-forest",
+      "license": "CC0-1.0",
+      "attribution": "Kenney",
+      "title": "Kenney Mini Forest",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "props",
+      "sha256": "c86332ac085c2a7f0f926ea9f51907bbd9354561f5717cf95dc2cfcaaff873b1"
+    },
+    "/assets/3d/kenney/mini-forest/Models/GLB format/character-archer.glb": {
+      "source": "https://kenney.nl/assets/mini-forest",
+      "license": "CC0-1.0",
+      "attribution": "Kenney",
+      "title": "Kenney Mini Forest",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "units",
+      "sha256": "0fd0f92e452ffab13529e51037cc804edf6ff3134f6bdd614b7aaea9ae6feb3b"
+    },
+    "/assets/3d/kenney/castle-kit/Models/GLB format/Textures/colormap.png": {
+      "source": "https://kenney.nl/assets/castle-kit",
+      "license": "CC0-1.0",
+      "attribution": "Kenney",
+      "title": "Kenney Castle Kit",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "textures",
+      "sha256": "66fd49be148f32e88f6c8cace67120250d1943a7856601158ad0ff24651db0b0"
+    },
+    "/assets/3d/kenney/mini-forest/Models/GLB format/Textures/colormap.png": {
+      "source": "https://kenney.nl/assets/mini-forest",
+      "license": "CC0-1.0",
+      "attribution": "Kenney",
+      "title": "Kenney Mini Forest",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "modified": false,
+      "reviewedAt": "2026-11-25",
+      "category": "textures",
+      "sha256": "319f1087d8ed50a8794f9a8179f64671d5595f2365fdf3e47ec2d4eb74dba20f"
+    }
+  }
+}

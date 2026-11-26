@@ -5,6 +5,7 @@ import { KTX2Loader } from 'three/addons/loaders/KTX2Loader.js';
 import { MeshoptDecoder } from 'three/addons/libs/meshopt_decoder.module.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { disposeGLTFResources } from './resource-disposal.js';
+import { loadLicenseRegistry, assertLicensedAsset } from './license-registry.js';
 
 const modelPromises = new Map();
 const mixers = new Set();
@@ -57,7 +58,11 @@ export function loadModel(name, url) {
   const loader = gltfLoader;
   const generation = loaderGeneration;
   let promise;
-  promise = loader.loadAsync(safeUrl).then(gltf => {
+  promise = loadLicenseRegistry().then(registry => {
+    assertLicensedAsset(registry, safeUrl, window.location.origin);
+    if (disposed || generation !== loaderGeneration) throw new Error('Carregamento cancelado.');
+    return loader.loadAsync(safeUrl);
+  }).then(gltf => {
     // A resposta pode chegar depois de uma troca de cena/contexto. Nunca manter
     // recursos GPU pertencentes a uma geração de loader já encerrada.
     if (disposed || generation !== loaderGeneration) {
