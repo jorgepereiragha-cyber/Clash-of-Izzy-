@@ -1036,6 +1036,38 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await mkdir(evidence, {recursive:true});
         await page.locator("#city").screenshot({path:path.join(evidence,"kingdom-3d.png")});
         await writeFile(path.join(evidence,"renderer.json"), JSON.stringify(diagnostics,null,2));
+        const dragonVariants = await page.evaluate(async () => {
+          const { DRAGON_PALETTES } = await import("/scripts/kingdom-dragon-visual.js");
+          const original = window.__coiKingdomDragon;
+          const detail = {
+            buildings: window.__coiKingdomBuildings,
+            troops: window.__coiKingdomTroops,
+            defenses: window.__coiKingdomDefenses,
+            heroes: window.__coiKingdomHeroAssignments,
+            castleSkinId: window.__coiKingdomCastleSkin,
+            castleVipLevel: window.__coiKingdomCastleVipLevel
+          };
+          const render = () => window.dispatchEvent(new CustomEvent("coi:kingdom-render", {detail}));
+          try {
+            return Object.keys(DRAGON_PALETTES).map(key => {
+              window.__coiKingdomDragon = {...original, dragon_key:key, level:1};
+              render();
+              return window.__coiKingdomDiagnostics().dragonVisual;
+            });
+          } finally {
+            window.__coiKingdomDragon = original;
+            render();
+          }
+        });
+        assert.equal(dragonVariants.length, 9);
+        assert.equal(new Set(dragonVariants.map(variant => variant.key)).size, 9);
+        assert.equal(new Set(dragonVariants.map(variant => variant.scale.join(","))).size, 9);
+        for (const variant of dragonVariants) {
+          assert.equal(variant.imported, true);
+          assert.equal(variant.animated, true);
+          assert.ok(variant.scale.every(axis => Number.isFinite(axis) && axis > 0));
+        }
+        await writeFile(path.join(evidence,"dragon-variants.json"), JSON.stringify(dragonVariants,null,2));
         console.log("Decoded beta GLB templates: " + JSON.stringify(diagnostics.loadedGlbTemplates));
         assert.deepEqual(localAssetErrors, [], "browser must not encounter missing graphics/script/style assets");
         // Trigger a real GPU context loss (not a synthetic DOM event).
