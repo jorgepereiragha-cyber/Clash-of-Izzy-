@@ -1,0 +1,28 @@
+name: Beta complementary GLB candidates (no deploy)
+on:
+  pull_request:
+    branches: [beta]
+    paths:
+      - scripts/acquire-complementary-glb.mjs
+      - .github/workflows/beta-complementary-glb.yml
+permissions:
+  contents: read
+jobs:
+  candidates:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: node --check scripts/acquire-complementary-glb.mjs
+      - run: node scripts/acquire-complementary-glb.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eldoria-complementary-glb
+          path: art-candidates/
+          if-no-files-found: error
+          retention-days: 7
