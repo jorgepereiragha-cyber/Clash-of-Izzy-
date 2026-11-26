@@ -1013,6 +1013,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           "unchanged kingdom state must not trigger an extra optional model rebuild");
         const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
         assert.ok(diagnostics.architecture.some(x=>x.type==="castle"&&x.design==="eldoria-imperial-v1"&&x.tier===1),"new realm uses original tier-one keep");
+        assert.equal(diagnostics.castleGateAsset,"quaternius-castle-gate","original castle uses decoded modular fortification");
         for(const type of ["quarry","iron_mine"]){
           assert.ok(diagnostics.architecture.some(x=>x.type===type&&x.design==="eldoria-rural-v1"),type+" uses its own rural architecture");
         }

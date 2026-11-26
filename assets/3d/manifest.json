@@ -132,6 +132,17 @@
       "source": "Quaternius Medieval Village Pack",
       "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-castle-gate",
+      "type": "castle_gate",
+      "src": "/assets/3d/quaternius/castle-gate.glb",
+      "enabled": true,
+      "targetFootprint": 1.45,
+      "targetHeight": 0.62,
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0"
     }
   ],
   "props": [
@@ -470,6 +481,16 @@
       "bytes": 208748,
       "licenseFile": "licenses/KayKit-Adventurers.txt",
       "mirror": "https://github.com/crisleyhguimaraes/space-ship/blob/c53b865c698d201fae129640f0a14f98f37e081b/public/models/adventurers/barbarian.glb"
+    },
+    "/assets/3d/quaternius/castle-gate.glb": {
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Ultimate Fantasy RTS — Quaternius",
+      "sha256": "c73f5cb19153b70d5e6491678529e871934858b37cf87e94ec7d9ba17da52a8e",
+      "bytes": 147652,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/real_time_strategy_pack/WallTowers_DoorClosed_SecondAge.glb"
     }
   }
 }

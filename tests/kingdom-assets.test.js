@@ -41,7 +41,7 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
       assert.ok(texture.byteLength > 0, texturePath);
     }
   }
-  assert.ok(totalBytes < 3_600_000, "bundled GLBs must remain under 3.6 MB");
+  assert.ok(totalBytes < 3_750_000, "bundled GLBs must remain under 3.75 MB");
 });
 
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {
@@ -93,4 +93,10 @@ test("equipped dragon GLB is local, rigged and has a flight clip", async()=>{
 test("KayKit militia and mage contain local rigged idle and locomotion animations",async()=>{
  for(const type of ["militia","mage"]){const a=manifest.units.find(x=>x.unit_type===type);assert.ok(a?.enabled);assert.equal(a.animation,"Idle");assert.equal(a.maxInstances,2);const b=await readFile(toUrl(a.src));const g=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());assert.ok(g.skins.length);for(const clip of ["Idle","Running_A","Walking_A"])assert.ok(g.animations.some(x=>x.name===clip));assert.ok([...(g.images||[]),...(g.buffers||[])].every(x=>x.uri===undefined));}
  assert.match(await readFile(toUrl("/assets/3d/licenses/KayKit-Adventurers.txt"),"utf8"),/Creative Commons Zero, CC0/);
+});
+
+test("fortified castle gate uses embedded stone, wood and heraldry materials",async()=>{
+ const a=manifest.models.find(x=>x.type==="castle_gate");assert.ok(a?.enabled);assert.equal(a.id,"quaternius-castle-gate");assert.ok(a.targetFootprint<=1.45);
+ const b=await readFile(toUrl(a.src));const g=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());
+ for(const name of ["Stone","Stone_Light","Wood","Main"])assert.ok(g.materials.some(x=>x.name===name));assert.ok(!g.images?.length);assert.equal(manifest.files[a.src].license,"CC0-1.0");
 });

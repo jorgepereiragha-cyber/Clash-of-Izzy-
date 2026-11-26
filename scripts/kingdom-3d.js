@@ -480,11 +480,34 @@ if (host && "WebGLRenderingContext" in window) {
     box(group,1.04,.14,.95,stone,0,.25+keepHeight,-.12);
     const mainRoof=new THREE.Mesh(new THREE.ConeGeometry(.73,.68+(tier-1)*.07,4),roof);
     mainRoof.rotation.y=Math.PI/4;mainRoof.position.set(0,.32+keepHeight+(.68+(tier-1)*.07)/2,-.12);group.add(mainRoof);
-    // Front gateway, recessed entry, stone lintel, and stepped approach.
-    box(group,.66,.72,.27,stone,0,.58,.54);
-    box(group,.36,.49,.035,mats.darkStone,0,.50,.695);
-    box(group,.30,.45,.045,mats.wood,0,.48,.72);
-    box(group,.44,.075,.08,accent,0,.74,.725);
+    // Optional CC0 fortification facade. Clone owned geometries/materials so
+    // normal castle teardown never disposes a cached GLB template.
+    const gateTemplate=glbTemplates.get("castle_gate");
+    if(gateTemplate&&!low){
+      const gate=gateTemplate.clone(true);
+      gate.traverse(node=>{
+        if(!node.isMesh)return;
+        node.geometry=node.geometry.clone();
+        const recolor=original=>{
+          const mat=original.clone();
+          const name=original.name.toLowerCase();
+          if(name==="stone_light")mat.color.copy(stone.color);
+          else if(name==="stone")mat.color.copy(wall.color);
+          else if(name==="main")mat.color.set(skin?.banner||"#24476B");
+          return mat;
+        };
+        node.material=Array.isArray(node.material)?node.material.map(recolor):recolor(node.material);
+      });
+      gate.position.set(0,.22,.71);
+      group.add(gate);
+      group.userData.coICastleGateAsset=gateTemplate.userData.coIAssetId;
+    }else{
+      // Full original entry survives missing downloads and low-end devices.
+      box(group,.66,.72,.27,stone,0,.58,.54);
+      box(group,.36,.49,.035,mats.darkStone,0,.50,.695);
+      box(group,.30,.45,.045,mats.wood,0,.48,.72);
+      box(group,.44,.075,.08,accent,0,.74,.725);
+    }
     box(group,.66,.09,.24,stone,0,.09,.77);
     const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
     for(const [x,z] of towers){
@@ -1321,6 +1344,8 @@ if (host && "WebGLRenderingContext" in window) {
           .map(item => item?.building_type)
           .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
       );
+      // The gate is an optional facade, never a replacement for the original keep.
+      if (neededTypes.has("castle") && qualityProfile?.tier !== "low") neededTypes.add("castle_gate");
       // Optional GLBs replace only their own building type, never the original keep.
       const presentUnits = new Set(
         (Array.isArray(troops) ? troops : [])
@@ -1458,6 +1483,7 @@ if (host && "WebGLRenderingContext" in window) {
         pendingGlbLoads: glbLoadPromises.size,
         optionalSceneRefreshes,
         architecture:activeModels.filter(model=>model.userData.coIArchitecture).map(model=>({type:model.userData.coIType,design:model.userData.coIArchitecture,tier:model.userData.coIArchitectureTier||null})),
+        castleGateAsset:activeModels.find(model=>model.userData.coIType==="castle")?.userData.coICastleGateAsset||null,
         importedBuildings:activeModels.filter(model=>model.userData.coIAssetId).map(model=>({type:model.userData.coIType,assetId:model.userData.coIAssetId})),
         specialLandmarks:activeModels.filter(model=>model.userData.coISpecial).map(model=>({type:model.userData.coIType,x:model.position.x,z:model.position.z})),
         troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
