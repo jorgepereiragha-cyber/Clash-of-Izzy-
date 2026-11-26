@@ -608,17 +608,26 @@ if (host && "WebGLRenderingContext" in window) {
     box(group,.66,.09,.24,stone,0,.09,.77);
     const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
     for(const [x,z] of towers){
-      addCylinder(group,.22,.26,towerHeight,stone,x,.25+towerHeight/2,z,low?6:10);
-      addCylinder(group,.29,.25,.13,stone,x,.25+towerHeight,z,low?6:10);
-      addCylinder(group,0,.30,.47+(tier-1)*.035,roof,x,.25+towerHeight+.30,z,low?6:10);
-      if(low)box(group,.09,.25,.04,mats.darkStone,x,.25+towerHeight*.65,z+.255);
-      else{
-        archWindow(x,.25+towerHeight*.52,z+.255,0,.14,.29);
-        archWindow(x+.255,.25+towerHeight*.52,z,Math.PI/2,.14,.29);
-        addCylinder(group,.245,.255,.045,wall,x,.25+towerHeight*.35,z,10);
-        addCylinder(group,.26,.25,.045,stone,x,.25+towerHeight*.79,z,10);
+      // Distinct late-game skyline: rear royal towers rise above the front defenses.
+      const royalRearTower=z<0&&tier>=3;
+      const cornerHeight=towerHeight+(royalRearTower?(tier===4?.46:.25):0);
+      const spireHeight=.47+(tier-1)*.035+(royalRearTower&&tier===4?.16:0);
+      addCylinder(group,.22,.26,cornerHeight,stone,x,.25+cornerHeight/2,z,low?6:10);
+      addCylinder(group,.29,.25,.13,stone,x,.25+cornerHeight,z,low?6:10);
+      addCylinder(group,0,.30,spireHeight,roof,x,.25+cornerHeight+.13+spireHeight/2,z,low?6:10);
+      if(royalRearTower&&tier===4){
+        addCylinder(group,.025,.035,.16,accent,x,.25+cornerHeight+.13+spireHeight+.08,z,6);
+        const crown=new THREE.Mesh(new THREE.OctahedronGeometry(.065),accent);
+        crown.position.set(x,.25+cornerHeight+.13+spireHeight+.18,z);group.add(crown);
       }
-      if(!low)box(group,.11,.04,.06,accent,x,.25+towerHeight*.65-.14,z+.26);
+      if(low)box(group,.09,.25,.04,mats.darkStone,x,.25+cornerHeight*.65,z+.255);
+      else{
+        archWindow(x,.25+cornerHeight*.52,z+.255,0,.14,.29);
+        archWindow(x+.255,.25+cornerHeight*.52,z,Math.PI/2,.14,.29);
+        addCylinder(group,.245,.255,.045,wall,x,.25+cornerHeight*.35,z,10);
+        addCylinder(group,.26,.25,.045,stone,x,.25+cornerHeight*.79,z,10);
+      }
+      if(!low)box(group,.11,.04,.06,accent,x,.25+cornerHeight*.65-.14,z+.26);
     }
     for(const x of [-.47,.47])box(group,.32,.56,.18,wall,x,.48,.55);
     // Repeated crenellations add a recognizable fortified silhouette in one draw call.
