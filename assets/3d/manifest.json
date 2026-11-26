@@ -38,7 +38,7 @@
       "id": "kaykit-blue-market",
       "type": "market",
       "src": "/assets/3d/kaykit/medieval-blue/market.glb",
-      "enabled": true,
+      "enabled": false,
       "targetFootprint": 1.55,
       "targetHeight": 1.65,
       "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
@@ -82,7 +82,7 @@
       "id": "quaternius-warehouse",
       "type": "warehouse",
       "src": "/assets/3d/quaternius/warehouse.glb",
-      "enabled": true,
+      "enabled": false,
       "targetFootprint": 1.55,
       "targetHeight": 1.8,
       "source": "Quaternius Ultimate Fantasy RTS",
@@ -104,7 +104,7 @@
       "id": "quaternius-farm",
       "type": "farm",
       "src": "/assets/3d/quaternius/farm.glb",
-      "enabled": true,
+      "enabled": false,
       "targetFootprint": 1.55,
       "targetHeight": 0.8,
       "source": "Quaternius Ultimate Fantasy RTS",
@@ -154,6 +154,39 @@
       "source": "Quaternius Medieval Village Pack",
       "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "millennium-farm",
+      "type": "farm",
+      "src": "/assets/3d/millennium/caro_farmstead.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.2,
+      "source": "Millennium A.D. (Carolingian structures)",
+      "sourceUrl": "https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/art/meshes/structural/caro_farmstead.dae",
+      "license": "CC-BY-SA-3.0"
+    },
+    {
+      "id": "millennium-market",
+      "type": "market",
+      "src": "/assets/3d/millennium/caro_market.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.65,
+      "source": "Millennium A.D. (Carolingian structures)",
+      "sourceUrl": "https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/art/meshes/structural/caro_market.dae",
+      "license": "CC-BY-SA-3.0"
+    },
+    {
+      "id": "millennium-warehouse",
+      "type": "warehouse",
+      "src": "/assets/3d/millennium/caro_storehouse.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.8,
+      "source": "Millennium A.D. (Carolingian structures)",
+      "sourceUrl": "https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/art/meshes/structural/caro_storehouse.dae",
+      "license": "CC-BY-SA-3.0"
     }
   ],
   "props": [
@@ -596,6 +629,66 @@
       "bytes": 670832,
       "licenseFile": "licenses/Quaternius-CC0.txt",
       "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/medieval_village_pack/Blacksmith.glb"
+    },
+    "/assets/3d/millennium/caro_struct.png": {
+      "source": "Millennium A.D. (Carolingian structures)",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "The Council of Modders, Fallen Empire Studio, Scion Development — https://www.wildfiregames.com/ — CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/",
+      "licenseFile": "licenses/Millennium-AD.txt",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "adaptedArtLicense": "CC-BY-SA-3.0",
+      "sourceUrl": "https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/art/textures/skins/structural/caro_struct.png",
+      "modifications": "Unmodified upstream atlas; shared by the converted GLBs.",
+      "sha256": "514267124bf056a32df72cc5cce3086d2ac7675eabb10379caa7fb8f39b654f1",
+      "bytes": 1991502
+    },
+    "/assets/3d/millennium/caro_struct_norm.png": {
+      "source": "Millennium A.D. (Carolingian structures)",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "The Council of Modders, Fallen Empire Studio, Scion Development — https://www.wildfiregames.com/ — CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/",
+      "licenseFile": "licenses/Millennium-AD.txt",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "adaptedArtLicense": "CC-BY-SA-3.0",
+      "sourceUrl": "https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/art/textures/skins/structural/caro_struct_norm.png",
+      "modifications": "Unmodified upstream atlas; shared by the converted GLBs.",
+      "sha256": "d9bc3e3a9fc35e3c8165fe36f8dec682980efb418733c30b6b3dd3bd2685a3a7",
+      "bytes": 1988203
+    },
+    "/assets/3d/millennium/caro_farmstead.glb": {
+      "source": "Millennium A.D. (Carolingian structures)",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "The Council of Modders, Fallen Empire Studio, Scion Development — https://www.wildfiregames.com/ — CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/",
+      "licenseFile": "licenses/Millennium-AD.txt",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "adaptedArtLicense": "CC-BY-SA-3.0",
+      "sourceUrl": "https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/art/meshes/structural/caro_farmstead.dae",
+      "modifications": "Static COLLADA converted to glTF 2.0; transforms, normals and UV0 converted; shared local texture atlas. Actor attachments and animations not included.",
+      "sha256": "1e67f55f3dd1d0c6c7ba62d04d4d2e3a57d2a6420040400cb09163e2d9751d6f",
+      "bytes": 516208
+    },
+    "/assets/3d/millennium/caro_market.glb": {
+      "source": "Millennium A.D. (Carolingian structures)",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "The Council of Modders, Fallen Empire Studio, Scion Development — https://www.wildfiregames.com/ — CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/",
+      "licenseFile": "licenses/Millennium-AD.txt",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "adaptedArtLicense": "CC-BY-SA-3.0",
+      "sourceUrl": "https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/art/meshes/structural/caro_market.dae",
+      "modifications": "Static COLLADA converted to glTF 2.0; transforms, normals and UV0 converted; shared local texture atlas. Actor attachments and animations not included.",
+      "sha256": "a63f85f20a9a735ac3c3a27d71b8915a0a938b8f6015e523e627bff280eb6451",
+      "bytes": 739560
+    },
+    "/assets/3d/millennium/caro_storehouse.glb": {
+      "source": "Millennium A.D. (Carolingian structures)",
+      "license": "CC-BY-SA-3.0",
+      "attribution": "The Council of Modders, Fallen Empire Studio, Scion Development — https://www.wildfiregames.com/ — CC BY-SA 3.0: https://creativecommons.org/licenses/by-sa/3.0/",
+      "licenseFile": "licenses/Millennium-AD.txt",
+      "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0/",
+      "adaptedArtLicense": "CC-BY-SA-3.0",
+      "sourceUrl": "https://github.com/0ADMods/millenniumad/blob/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3/art/meshes/structural/caro_storehouse.dae",
+      "modifications": "Static COLLADA converted to glTF 2.0; transforms, normals and UV0 converted; shared local texture atlas. Actor attachments and animations not included.",
+      "sha256": "11703efa00b33b4faf04619ff843595ff863fd5e9fa150f016f48340bfbc2a2e",
+      "bytes": 295692
     }
   },
   "scannedMaterials": {
