@@ -1,6 +1,7 @@
 import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
+import { marchVisualProgress, marchVisualPoint } from "./scripts/march-visual-path.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -386,17 +387,20 @@ import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
     for (const territory of rows) createTerritoryFeature(territoryRoot, territory);
   }
 
+  function visualHome(){return {x:homeCastleGroup?.position.x??0,z:homeCastleGroup?.position.z??0};}
+
   function rebuildRoads() {
     clearGroup(routeRoot);
     const territories = Array.isArray(worldState?.territories) ? worldState.territories : [];
     for (const territory of territories) {
       const x = Number(territory.x) || 0;
       const z = Number(territory.z) || 0;
-      const curve = new THREE.QuadraticBezierCurve3(
-        new THREE.Vector3(0, terrainHeight(0, 0) + .1, 0),
-        new THREE.Vector3(x * .44, Math.max(1.15, terrainHeight(x * .44, z * .44) + .85), z * .44),
-        new THREE.Vector3(x, terrainHeight(x, z) + .12, z)
-      );
+      const origin=visualHome();
+      const points=Array.from({length:19},(_,i)=>{
+        const p=marchVisualPoint(origin,{x,z},i/18);
+        return new THREE.Vector3(p.x,terrainHeight(p.x,p.z)+.10,p.z);
+      });
+      const curve=new THREE.CatmullRomCurve3(points);
       makeMesh(new THREE.TubeGeometry(curve, 18, .14, 5, false), shared.roadEdge, routeRoot, 0, 0, 0);
       makeMesh(new THREE.TubeGeometry(curve, 18, .075, 5, false), shared.road, routeRoot, 0, .06, 0);
     }
@@ -413,15 +417,27 @@ import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
     const spear = makeMesh(new THREE.CylinderGeometry(.025, .035, 1.35, 5), shared.wood, soldier, .3, 1.14, -.08);
     spear.rotation.z = -.16;
     cone(soldier, .085, .24, shared.spear, .3, 1.85, -.08, 4);
+    // Each soldier has a real parent; previous code allocated invisible meshes.
+    const legs=[];
+    for(const side of [-1,1]){
+      const leg=new THREE.Group();leg.position.set(side*.115,.33,0);soldier.add(leg);
+      box(leg,.13,.27,.14,shared.leather,0,-.12,0);
+      box(leg,.16,.10,.24,shared.leather,0,-.27,.035);
+      legs.push(leg);
+    }
+    soldier.userData.marchLegs=legs;
+    parent.add(soldier);
     return soldier;
   }
 
   function createMarchFormation(march) {
     const group = new THREE.Group();
     const material = march.march_type === "attack" ? shared.redTroop : shared.blueTroop;
-    createSoldier(group, material, -.42, -.28, 0);
-    createSoldier(group, material, .42, -.28, 1);
-    createSoldier(group, material, 0, .48, 2);
+    const soldiers=[
+      createSoldier(group, material, -.42, -.28, 0),
+      createSoldier(group, material, .42, -.28, 1),
+      createSoldier(group, material, 0, .48, 2)
+    ];
     const flagPole = box(group, .07, 1.45, .07, shared.gold, 0, 1.25, -.72);
     flagPole.castShadow = false;
     box(group, .67, .35, .06, material, .3, 1.73, -.72);
@@ -430,6 +446,7 @@ import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
     return {
       id: Number(march.id),
       group,
+      soldiers,
       startAt: Date.parse(march.started_at || ""),
       endAt: Date.parse(march.arrives_at || ""),
       targetId: Number(march.target_territory_id),
@@ -452,21 +469,17 @@ import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
     for (const march of activeMarches) {
       const target = territories.get(march.targetId);
       if (!target) continue;
-      const start = Number.isFinite(march.startAt) ? march.startAt : now;
-      const end = Number.isFinite(march.endAt) ? march.endAt : now + 1000;
-      const progress = THREE.MathUtils.clamp((now - start) / Math.max(1000, end - start), 0, 1);
-      const x = Number(target.x) || 0;
-      const z = Number(target.z) || 0;
-      const curve = new THREE.QuadraticBezierCurve3(
-        new THREE.Vector3(0, terrainHeight(0, 0) + .15, 0),
-        new THREE.Vector3(x * .44, 1.55, z * .44),
-        new THREE.Vector3(x, terrainHeight(x, z) + .35, z)
-      );
-      const point = curve.getPoint(progress);
-      march.group.position.copy(point);
-      march.group.rotation.y = Math.atan2(x, z);
-      const bob = reduceMotion ? 0 : Math.sin(now * .009 + march.id) * .045;
-      march.group.position.y += bob;
+      const progress=marchVisualProgress(now,march.startAt,march.endAt);
+      const origin=visualHome();
+      const point=marchVisualPoint(origin,{x:Number(target.x)||0,z:Number(target.z)||0},progress);
+      march.group.position.set(point.x,terrainHeight(point.x,point.z)+.15,point.z);
+      march.group.rotation.y=point.heading;
+      const moving=!reduceMotion && quality!=="low" && progress>0 && progress<1;
+      for(const [index,soldier] of march.soldiers.entries()){
+        const phase=moving?Math.sin(now*.008+index*1.3):0;
+        soldier.userData.marchLegs[0].rotation.x=phase*.38;
+        soldier.userData.marchLegs[1].rotation.x=-phase*.38;
+      }
     }
   }
 
