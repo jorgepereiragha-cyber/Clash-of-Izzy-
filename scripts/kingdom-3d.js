@@ -8,7 +8,7 @@ import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
 import { readGraphicsChoice, getGraphicsStorage } from "./kingdom-visual-preferences.js";
 import { planArmyFigures, createProceduralUnit, troopAnimationPhase } from "./kingdom-army-visual.js";
-import { readCityFootprint, cityModelAnchor, cityModelFit } from "./city-art-layout.js";
+import { readCityFootprint, cityModelAnchor, cityModelFit, CITY_TILE_WORLD, planCityStreetCells } from "./city-art-layout.js";
 import { projectDragonVisual, makeDragonFigure, makeImportedDragonFigure, disposeImportedDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
 import { derivePbrTextureData, forEachPeriodicSurfaceCell, cityContactShadowSize, CITY_DAYLIGHT } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
@@ -25,6 +25,7 @@ if (host && "WebGLRenderingContext" in window) {
   let latestCastleSkinId = 0;
   let latestCastleVipLevel = 0;
   let activeModels = [];
+  let cityStreetMeshes = [], legacyRoadMeshes = [], cityStreetSignature = null;
   let activeDefenseModels = [];
   let defensePreviewMesh = null;
   let defensePreviewHandler = null;
@@ -231,6 +232,7 @@ if (host && "WebGLRenderingContext" in window) {
     advancedShaders = null;
     waterFeature = null;
     contactShadowBatch = null;
+    cityStreetMeshes=[];legacyRoadMeshes=[];cityStreetSignature=null;
   }
   // Small, deterministic, tileable procedural albedo maps add material identity
   // without shipping large image files or creating per-building texture copies.
@@ -902,13 +904,64 @@ if (host && "WebGLRenderingContext" in window) {
       geometry.setIndex(indices);
       geometry.computeVertexNormals();
       const mesh = new THREE.Mesh(geometry, mat);
-      mesh.receiveShadow = true; scene.add(mesh);
+      mesh.receiveShadow = true; scene.add(mesh); legacyRoadMeshes.push(mesh);
     };
     pathRibbon(.46, -.06, mats.roadEdge);
     pathRibbon(.36, -.045, mats.road);
     // Forest is batched into three instanced draw calls instead of one per tree part.
     addForestInstances();
     createCityContactShadows();
+  }
+  // Rebuild only when the actual plot layout changes. Two batched draw calls,
+  // shared terrain materials, no extra textures or animation work.
+  function updateCityStreets(){
+    const plots=activeModels.map(model=>{
+      const fp=serverCityFootprint(model.userData.coIType);
+      if(fp&&!model.userData.coISpecial){
+        const w=fp.width*CITY_TILE_WORLD/2,h=fp.height*CITY_TILE_WORLD/2;
+        return {minX:model.position.x-w,maxX:model.position.x+w,minZ:model.position.z-h,maxZ:model.position.z+h};
+      }
+      const bounds=new THREE.Box3().setFromObject(model);
+      return {minX:bounds.min.x,maxX:bounds.max.x,minZ:bounds.min.z,maxZ:bounds.max.z};
+    });
+    const signature=JSON.stringify(plots.map(p=>Object.values(p).map(v=>Math.round(v*1000))));
+    if(signature===cityStreetSignature)return;
+    cityStreetSignature=signature;
+    for(const mesh of cityStreetMeshes){scene.remove(mesh);mesh.geometry.dispose();}
+    cityStreetMeshes=[];
+    const cells=planCityStreetCells(plots);
+    // Never show the old arbitrary road on a populated layout.
+    for(const mesh of legacyRoadMeshes)mesh.visible=plots.length<2;
+    if(!cells.length)return;
+    const keys=new Set(cells.map(({x,z})=>x+","+z));
+    const tile=CITY_TILE_WORLD;
+    function streetMesh(mat,y,inset){
+      const pos=[],uv=[],indices=[];
+      const quad=(x0,z0,x1,z1)=>{
+        const i=pos.length/3;
+        for(const [x,z] of [[x0,z0],[x0,z1],[x1,z1],[x1,z0]]){
+          pos.push(x,y,z);uv.push(x/1.2,z/1.2);
+        }
+        indices.push(i,i+1,i+2,i,i+2,i+3);
+      };
+      for(const {x,z} of cells){
+        const x0=x*tile,z0=z*tile,x1=x0+tile,z1=z0+tile;
+        quad(x0+inset,z0+inset,x1-inset,z1-inset);
+        if(!inset)continue;
+        if(keys.has((x-1)+","+z))quad(x0,z0+inset,x0+inset,z1-inset);
+        if(keys.has((x+1)+","+z))quad(x1-inset,z0+inset,x1,z1-inset);
+        if(keys.has(x+","+(z-1)))quad(x0+inset,z0,x1-inset,z0+inset);
+        if(keys.has(x+","+(z+1)))quad(x0+inset,z1-inset,x1-inset,z1);
+      }
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute("position",new THREE.Float32BufferAttribute(pos,3));
+      geometry.setAttribute("uv",new THREE.Float32BufferAttribute(uv,2));
+      geometry.setIndex(indices);geometry.computeVertexNormals();
+      const mesh=new THREE.Mesh(geometry,mat);mesh.receiveShadow=true;
+      scene.add(mesh);cityStreetMeshes.push(mesh);
+    }
+    streetMesh(mats.roadEdge,-.06,0);
+    streetMesh(mats.road,-.045,.075);
   }
   function serverCityFootprint(type){
     return readCityFootprint(window.__coiCityLayoutState?.()?.cityLayout?.footprints,type);
@@ -1049,6 +1102,7 @@ if (host && "WebGLRenderingContext" in window) {
       // Small decorations have no extra animation or shadow draw calls.
       scene.add(group);activeModels.push(group);
     }
+    updateCityStreets();
     updateCityContactShadows();
     renderer.render(scene, camera);
     publishBuildingHitTargets(list);
