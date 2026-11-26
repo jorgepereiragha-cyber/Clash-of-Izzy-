@@ -214,3 +214,7 @@
 .pantheon-set-bonus-summary{padding:10px;border:1px solid #4e7898;border-radius:9px;background:linear-gradient(130deg,#1c344c,#152237);color:#d8ebff;font-weight:700;font-size:12px;line-height:1.5}
 .pantheon-empty-state{padding:12px;color:#c8d3df;font-size:13px}
 @media(max-width:390px){.pantheon-skin-sets{padding:10px}.pantheon-set-card{padding:9px}.pantheon-relic-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pantheon-relic-art{width:60px;height:60px}}
+
+/* CC0 Flare item variations: fixed 64px region, no scaling or extra downloads. */
+.equipment-art-tile{display:block;width:64px;height:64px;flex:0 0 64px;margin:0 auto 8px;border-radius:8px;background-image:url("/assets/art/equipment/flare-variants.png");background-repeat:no-repeat;background-size:895px 515px;background-color:#0d1a2a;box-shadow:0 0 0 1px #766343,0 4px 12px #0005}
+#equipment-art-preview[hidden]{display:none}
