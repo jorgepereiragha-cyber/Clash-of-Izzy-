@@ -85,6 +85,7 @@ if (host && "WebGLRenderingContext" in window) {
   let kingdomRenderHandler = null;
   let kingdomZoomHandler = null;
   let cameraZoomFactor = 1;
+  let cameraFocusCenter = false;
   let valhallaModeHandler = null;
   let developmentStatsBadge = null;
   let developmentStatsTimer = null;
@@ -317,8 +318,8 @@ if (host && "WebGLRenderingContext" in window) {
       ctx.fillStyle = rand() > .5 ? `rgba(255,255,255,${alpha})` : `rgba(0,0,0,${alpha})`;
       ctx.fillRect(rand() * textureSize, rand() * textureSize, 1 + rand() * 2, 1 + rand() * 2);
     }
-    const repeat = kind === "grass" ? 9 : 3;
-    const repeatY = kind === "grass" ? 7 : 3;
+    const repeat = kind === "grass" ? 27 : 3;
+    const repeatY = kind === "grass" ? 21 : 3;
     const anisotropy = Math.min(qualityProfile?.anisotropy || 2, renderer?.capabilities?.getMaxAnisotropy?.() || 1);
     const configureTexture = (texture, colorSpace = THREE.NoColorSpace) => {
       texture.colorSpace = colorSpace;
@@ -819,7 +820,7 @@ if (host && "WebGLRenderingContext" in window) {
     if(count)contactShadowBatch.computeBoundingSphere();
   }
   function buildGround() {
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(32, 32), mats.grass);
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(96, 96), mats.grass);
     ground.rotation.x = -Math.PI / 2; ground.position.y = -.08; ground.receiveShadow = true; scene.add(ground);
     const grid = new THREE.GridHelper(32, 50, "#91a36d", "#91a36d");
     grid.position.y = -.055; grid.material.transparent = true; grid.material.opacity = .025;
@@ -908,7 +909,8 @@ if (host && "WebGLRenderingContext" in window) {
   }
   function frameCityBuildings(buildings) {
     if (!camera || !buildings.length) return;
-    const points = [...buildings,...currentSpecialLandmarks()].map(cityWorldPoint);
+    // Overview includes all special sites; center mode focuses regular buildings.
+    const points = (cameraFocusCenter ? buildings : [...buildings,...currentSpecialLandmarks()]).map(cityWorldPoint);
     const xs = points.map(p => p.x), zs = points.map(p => p.z);
     const minX = Math.min(...xs), maxX = Math.max(...xs);
     const minZ = Math.min(...zs), maxZ = Math.max(...zs);
@@ -1528,6 +1530,7 @@ if (host && "WebGLRenderingContext" in window) {
         shadows: renderer.shadowMap.enabled,
         premiumWater: Boolean(waterFeature),
         contactShadowInstances:contactShadowBatch?.count||0,
+        cameraFocus:cameraFocusCenter?"center":"overview",
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
         loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
@@ -1599,8 +1602,9 @@ if (host && "WebGLRenderingContext" in window) {
     kingdomZoomHandler = event => {
       if (disposed || cinematicCaptureActive || !renderer || !scene || !camera) return;
       const action = event.detail?.action;
-      if (!["in", "out", "reset"].includes(action)) return;
-      cameraZoomFactor = action === "reset" ? 1
+      if (!["in", "out", "reset", "center"].includes(action)) return;
+      if(action==="center"||action==="reset")cameraFocusCenter=action==="center";
+      cameraZoomFactor = action === "reset" || action === "center" ? 1
         : Math.max(0.7, Math.min(1.6, Number((cameraZoomFactor + (action === "in" ? 0.2 : -0.2)).toFixed(2))));
       const visible = latestBuildings.slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
       if (!visible.length) return;
