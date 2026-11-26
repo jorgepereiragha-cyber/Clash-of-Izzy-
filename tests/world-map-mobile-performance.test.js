@@ -115,3 +115,19 @@ test("world castle silhouettes follow the same 1/10/20/30 tier thresholds as cit
  const scene=await read("world-map-3d.js");assert.match(scene,/territory\.castle_level \?\? territory\.level/);
  assert.match(scene,/const tier=worldCastleTier\(level\)/);
 });
+
+test("world terrain blends and river ribbons are deterministic, bounded, above ground and below route surfaces",async()=>{
+ const {worldTerrainHeight,worldTerrainBlend,worldRiverZ,worldRiverDistance,worldRiverRibbon}=await import("../scripts/world-map-terrain.js");
+ assert.equal(worldRiverZ(-50),-22);assert.equal(worldRiverZ(12),-5);
+ assert.equal(worldRiverDistance(12,-5),0);assert.equal(worldRiverDistance(53,-5),Infinity);
+ for(const [x,z] of [[0,0],[-50,-22],[56,46],[12,-5]]){
+  const blend=worldTerrainBlend(x,z);assert.ok(Object.values(blend).every(v=>Number.isFinite(v)&&v>=0&&v<=1));
+ }
+ const ribbon=worldRiverRibbon({segments:48,halfWidth:.82,offset:-.045});
+ assert.deepEqual(ribbon,worldRiverRibbon({segments:48,halfWidth:.82,offset:-.045}));
+ assert.equal(ribbon.positions.length,49*2*3);assert.equal(ribbon.indices.length,48*6);
+ for(let i=0;i<ribbon.positions.length;i+=3){const [x,y,z]=ribbon.positions.slice(i,i+3);assert.ok(y>worldTerrainHeight(x,z)-.25&&y<worldTerrainHeight(x,z)+.1);}
+ assert.ok(ribbon.indices.every(i=>Number.isInteger(i)&&i>=0&&i<98));
+ const source=await read("world-map-3d.js");assert.match(source,/worldRiverRibbon\(/);assert.match(source,/worldRiverDistance\(x,z\)<3/);assert.match(source,/shared\.terrainGround/);
+ assert.doesNotMatch(source,/TubeGeometry\(river,/);
+});
