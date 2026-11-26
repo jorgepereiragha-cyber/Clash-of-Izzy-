@@ -24,6 +24,7 @@ test("the store uses D1 catalog price and grants its gems only after verified se
   assert.match(worker, /changes\(\)=1 AND EXISTS\(SELECT 1 FROM purchase_requests/);
   assert.match(provider, /actualCents === expectedCents/);
   assert.match(provider, /paidCents === expectedCents/);
-  assert.match(arena, /price\.textContent='R\$ '\+Number\(item\.price_brl\)\.toFixed\(2\)\.replace\('\.',','\)/);
+  assert.match(arena, /price\.textContent=validPrice\?'R\$ '\+priceValue\.toFixed\(2\)\.replace\('\.',','\):'Preço indisponível'/);
+  assert.match(arena, /b\.disabled=Boolean\(item\.levelPack\?\.priceProvisional\)\|\|!validPrice\|\|!validGems/);
   assert.match(arena, /Number\(item\.gems\|\|0\)\.toLocaleString\('pt-BR'\)\+' gemas após confirmação'/);
 });
