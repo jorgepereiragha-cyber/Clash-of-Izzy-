@@ -85,3 +85,7 @@ Os atributos de apresentação vêm do catálogo canônico `hero-catalog.js` e, 
 O mesmo catálogo define passivos de combate específicos por herói. Eles progridem de 45% do valor máximo na primeira estrela/nível até 100% no nível e estrelas máximos. Os perfis têm limites por atributo: ataque até 2,8%, defesa até 2,2%, vida até 1,6% e acerto crítico até 1,2%. O Worker calcula esses valores e os aplica ao PvE e ao Anjo da Morte; o cliente só os apresenta. Os limites globais do simulador (30% para ataque, defesa e vida) continuam em vigor. PvP não é declarado como beneficiado por esta camada.
 
 A convocação padrão usa 70% comum, 25% raro e 5% lendário. O pool atual possui quatro comuns, cinco raros e quatro lendários, correspondendo a 17,5%, 5% e 1,25% por herói, respectivamente. Uma convocação custa 100 gemas; dez custam 900. Repetições entregam 5, 15 ou 40 fragmentos conforme a raridade. Não há garantia de lendário em um número fixo de tentativas; heróis sazonais de Valhalla não fazem parte do sorteio padrão.
+
+## Ilustrações raster opcionais
+
+Duas imagens CC0 de SpriteCook integradas à galeria por chave de herói; veja `heroes/illustrations/CREDITS.md`. O SVG canônico permanece como fallback. Carregamento lazy e erro de imagem recuperável.

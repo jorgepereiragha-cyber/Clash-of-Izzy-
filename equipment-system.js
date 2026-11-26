@@ -322,6 +322,21 @@
     }
     searchFocusApplied=true;
   }
+  // Curated CC0 character illustrations; missing art retains the original unique SVG.
+  const heroIllustrations=Object.freeze({
+    joana_darc:"serah-valen.png",
+    eldoria_white_03:"taren-bosquedouro.png"
+  });
+  function heroIllustration(hero,fallback){
+    if(!Object.hasOwn(heroIllustrations,hero.hero_key))return fallback;
+    const img=document.createElement("img");
+    img.className="hero-roster-portrait hero-roster-illustration";
+    img.alt=hero.name||"Retrato de herói";img.width=320;img.height=480;
+    img.loading="lazy";img.decoding="async";
+    img.addEventListener("error",()=>img.replaceWith(fallback),{once:true});
+    img.src="/assets/art/heroes/illustrations/"+heroIllustrations[hero.hero_key];
+    return img;
+  }
   function renderHeroGallery(){
     const root=$("hero-roster-grid"),count=$("hero-roster-count");
     if(!root)return;
@@ -446,7 +461,7 @@
       });
       const details=document.createElement("div");
       details.append(copy,button);
-      card.append(portrait,details);
+      card.append(heroIllustration(hero,portrait),details);
       root.append(card);
     }
   }

@@ -139,3 +139,6 @@
 .hero-roster-card[data-hero-aura="aura-eldoria-45"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
 .hero-roster-card[data-hero-aura="aura-eldoria-46"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
 .hero-roster-card[data-hero-aura="aura-eldoria-47"] .hero-roster-portrait{box-shadow:0 0 0 1px #f4cb69,0 0 20px #f4cb6955}
+
+/* Licensed character illustrations use the same portrait frame and rarity aura. */
+.hero-roster-illustration{object-fit:cover;object-position:center 20%;height:auto;align-self:start}
