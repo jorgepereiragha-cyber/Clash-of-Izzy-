@@ -237,7 +237,7 @@ test("late GLB loads are disposed when WebGL context is lost during async loadin
   assert.match(renderer, /if \(disposed \|\| !renderer\) return/);
   assert.match(renderer, /if \(disposed \|\| !renderer\) \{/);
   assert.match(renderer, /disposeDetachedObject3D\(gltf\.scene\)/);
-  assert.match(renderer, /renderBuildings\(latestBuildings\);\s*renderManifestProps\(\);\s*renderKingdomTroops\(latestTroops\)/);
+  assert.match(renderer, /renderBuildings\(latestBuildings\);\s*renderManifestProps\(\);\s*renderEquippedDragon\(window\.__coiKingdomDragon\);\s*renderKingdomTroops\(latestTroops\)/);
   assert.match(renderer, /function disposeDetachedObject3D\(root\)/);
 });
 
@@ -482,4 +482,9 @@ test("rural buildings have separate models and bounded crop instances",()=>{
  assert.match(renderer,/const rows=low\?2:high\?5:3/);
  assert.match(renderer,/new THREE\.InstancedMesh\(new THREE\.CylinderGeometry\(\.014,\.022,\.15,5\),grain,rows\*3\)/);
  assert.match(renderer,/if \(node\.isInstancedMesh\) node\.dispose\(\)/);
+});
+
+test("optional equipped dragon refreshes only after loading and retains shared model resources",()=>{
+ assert.match(renderer,/asset\.unit_type === "equipped_dragon" \? !!projectDragonVisual\(window\.__coiKingdomDragon\)/);
+ assert.match(renderer,/if\(activeDragon\.figure\.imported\)disposeImportedDragonFigure\(activeDragon\.figure\);\s*else disposeDetachedObject3D/);
 });
