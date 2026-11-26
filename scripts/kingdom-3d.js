@@ -1,5 +1,6 @@
 /* Progressive Three.js kingdom renderer. Canvas art remains as offline/WebGL fallback. */
 import * as THREE from "three";
+import { loadEntityManifest } from "./kingdom-2d-art-atlas.js";
 import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 import { KTX2Loader } from "three/addons/loaders/KTX2Loader.js";
 import { DRACOLoader } from "three/addons/loaders/DRACOLoader.js";
@@ -1659,10 +1660,7 @@ if (host && "WebGLRenderingContext" in window) {
     try {
       if (!manifestLoad) {
         manifestLoad = (async () => {
-          const response = await fetch("/assets/3d/manifest.json", { cache: "no-cache" });
-          if (disposed || !renderer) return;
-          if (!response.ok) throw new Error("Manifesto 3D indisponível.");
-          const manifest = await response.json();
+          const manifest = await loadEntityManifest();
           if (disposed || !renderer) return;
           manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, 32).filter(asset => approvedManifestEntry(asset, manifest.files)) : [];
           manifestProps = Array.isArray(manifest.props) ? manifest.props.slice(0, 16).filter(asset => approvedManifestEntry(asset, manifest.files)) : [];
