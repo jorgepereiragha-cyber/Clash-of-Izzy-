@@ -523,3 +523,34 @@ test("server grid plots determine art centers and constrain asymmetrical models"
  assert.match(renderer,/cityModelAnchor\(x,z,serverCityFootprint\(building\.building_type\)\)/);
  assert.match(renderer,/group\.scale\.multiplyScalar\(artScale\)/);
 });
+
+
+test("connected decorative streets do not occupy building plots",async()=>{
+ const {CITY_TILE_WORLD:t,planCityStreetCells:plan}=await import("../scripts/city-art-layout.js");
+ const rect=(x,z,w,h)=>({minX:x*t,maxX:(x+w)*t,minZ:z*t,maxZ:(z+h)*t});
+ const plots=[rect(-2,-2,4,4),rect(5,-1,2,2),rect(-7,3,2,2),rect(1,5,3,2)];
+ const cells=plan(plots),keys=new Set(cells.map(c=>c.x+","+c.z));
+ assert.ok(cells.length>4);
+ assert.equal(keys.size,cells.length);
+ assert.deepEqual(plan(plots),cells);
+ for(const c of cells){
+  assert.ok(c.x>=-25&&c.x<=24&&c.z>=-25&&c.z<=24);
+  assert.ok(!plots.some(p=>(c.x+.5)*t>p.minX&&(c.x+.5)*t<p.maxX&&(c.z+.5)*t>p.minZ&&(c.z+.5)*t<p.maxZ));
+ }
+ for(const p of plots)assert.ok(cells.some(c=>{
+  const x=(c.x+.5)*t,z=(c.z+.5)*t;
+  return ((x>=p.minX&&x<=p.maxX)&&(Math.abs(z-p.minZ)<t||Math.abs(z-p.maxZ)<t))||
+   ((z>=p.minZ&&z<=p.maxZ)&&(Math.abs(x-p.minX)<t||Math.abs(x-p.maxX)<t));
+ }));
+ const visited=new Set(),queue=[cells[0]];
+ for(let i=0;i<queue.length;i++){
+  const {x,z}=queue[i],k=x+","+z;
+  if(visited.has(k))continue;visited.add(k);
+  for(const [a,b] of [[x-1,z],[x+1,z],[x,z-1],[x,z+1]])if(keys.has(a+","+b)&&!visited.has(a+","+b))queue.push({x:a,z:b});
+ }
+ assert.equal(visited.size,cells.length);
+ assert.deepEqual(plan([]),[]);
+ assert.deepEqual(plan([plots[0]]),[]);
+ assert.match(renderer,/updateCityStreets\(\);/);
+ assert.match(renderer,/mesh\.geometry\.dispose\(\)/);
+});
