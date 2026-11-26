@@ -17,7 +17,12 @@ for name in ("caro_fortress_struct",):
     material.node_tree.links.new(color.outputs["Color"],shader.inputs["Base Color"])
     normal=nodes.new("ShaderNodeTexImage")
     normal.image=bpy.data.images.load(str(root/"caro_struct_norm.png"))
-    normal.image.colorspace_settings.name="Non-Color"
+    # Ubuntu Blender's OCIO config may expose only Linear/sRGB.
+    # Normal maps must not receive the sRGB transfer function.
+    try:
+        normal.image.colorspace_settings.name="Non-Color"
+    except (TypeError, ValueError):
+        normal.image.colorspace_settings.name="Linear"
     bump=nodes.new("ShaderNodeNormalMap")
     material.node_tree.links.new(normal.outputs["Color"],bump.inputs["Color"])
     material.node_tree.links.new(bump.outputs["Normal"],shader.inputs["Normal"])
