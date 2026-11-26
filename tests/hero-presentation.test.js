@@ -255,3 +255,21 @@ test("commander selection uses consistent deterministic tie break",async()=>{
  assert.doesNotMatch(worker,/ORDER BY hi\.level DESC,hi\.stars DESC,h\.id LIMIT 1/);
  assert.match(worker,/activeCommanderHeroId:activeHeroId/);
 });
+
+ test("curated raster illustrations are unique, local, licensed and preserve SVG fallback",async()=>{
+ const [client,credits]=await Promise.all([readFile(new URL("../equipment-system.js",import.meta.url),"utf8"),readFile(new URL("../assets/art/heroes/illustrations/CREDITS.md",import.meta.url),"utf8")]);
+ const map=Object.fromEntries([...client.match(/const heroIllustrations=Object.freeze\(\{([\s\S]*?)\}\);/)[1].matchAll(/([a-z_0-9]+):"([^"]+\.png)"/g)].map(m=>[m[1],m[2]]));
+ assert.deepEqual(Object.keys(map).sort(),["eldoria_white_03","joana_darc"]);
+ assert.equal(new Set(Object.values(map)).size,Object.keys(map).length);
+ for(const [key,name] of Object.entries(map)){
+  assert.ok(Object.hasOwn(HERO_TEMPLATES,key),key);
+  const bytes=await readFile(new URL("../assets/art/heroes/illustrations/"+name,import.meta.url));
+  assert.equal(bytes.subarray(0,8).toString("hex"),"89504e470d0a1a0a");
+  assert.ok(bytes.length<800000);
+  assert.ok(credits.includes(name));
+ }
+ assert.match(client,/img\.loading="lazy"/);
+ assert.match(client,/img\.replaceWith\(fallback\)/);
+ assert.match(client,/card\.append\(heroIllustration\(hero,portrait\),details\)/);
+ assert.match(credits,/CC0 1.0 Universal/);
+});
