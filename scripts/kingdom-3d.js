@@ -98,6 +98,8 @@ if (host && "WebGLRenderingContext" in window) {
   let advancedShaders = null;
   let waterFeature = null;
   let contactShadowBatch = null;
+  let castleStonePhoto = null;
+  const castlePhotoMaterials = new Map();
 
   function setKingdomValhallaMode(active) {
     valhallaModeActive = Boolean(active);
@@ -225,6 +227,7 @@ if (host && "WebGLRenderingContext" in window) {
     advancedShaders = null;
     waterFeature = null;
     contactShadowBatch = null;
+    castleStonePhoto?.dispose();castleStonePhoto=null;castlePhotoMaterials.clear();
   }
   // Small, deterministic, tileable procedural albedo maps add material identity
   // without shipping large image files or creating per-building texture copies.
@@ -385,6 +388,41 @@ if (host && "WebGLRenderingContext" in window) {
     surfaceMaterialCache.set(key,mat);
     sharedMaterials.add(mat);
     return mat;
+  }
+  // One shared photographic albedo. Downsample and neutralize the color so
+  // ownership-backed skin colors still determine the wall appearance.
+  function loadCastleStonePhoto(){
+    if(!qualityProfile?.loadOptionalAssets)return;
+    new THREE.ImageLoader().load("/assets/3d/polyhaven/stone_wall_diff_1k.jpg",image=>{
+      if(disposed||!renderer||!scene)return;
+      const size=Math.min(512,qualityProfile.surfaceTextureSize);
+      const canvas=document.createElement("canvas");canvas.width=canvas.height=size;
+      const ctx=canvas.getContext("2d");if(!ctx)return;
+      ctx.drawImage(image,0,0,size,size);
+      const pixels=ctx.getImageData(0,0,size,size);
+      for(let i=0;i<pixels.data.length;i+=4){
+        const gray=Math.min(255,Math.round(42+.213*pixels.data[i]+.715*pixels.data[i+1]+.072*pixels.data[i+2]));
+        pixels.data[i]=pixels.data[i+1]=pixels.data[i+2]=gray;
+      }
+      ctx.putImageData(pixels,0,0);
+      castleStonePhoto=new THREE.CanvasTexture(canvas);
+      castleStonePhoto.colorSpace=THREE.SRGBColorSpace;
+      castleStonePhoto.wrapS=castleStonePhoto.wrapT=THREE.RepeatWrapping;
+      castleStonePhoto.repeat.set(1,1);
+      castleStonePhoto.anisotropy=Math.min(qualityProfile.anisotropy,renderer.capabilities.getMaxAnisotropy());
+      for(const [mat,color] of castlePhotoMaterials)applyCastlePhotoMaterial(mat,color);
+      renderer.render(scene,camera);
+    },undefined,()=>{/* Retain procedural stone on any download error. */});
+  }
+  function applyCastlePhotoMaterial(mat,color){
+    if(!castleStonePhoto)return;
+    mat.map=castleStonePhoto;
+    // Do not combine mismatched procedural normal/roughness with photographic albedo.
+    mat.normalMap=null;mat.roughnessMap=null;mat.color.set(color);mat.needsUpdate=true;
+  }
+  function rememberCastlePhotoMaterial(mat,color){
+    castlePhotoMaterials.set(mat,color);
+    applyCastlePhotoMaterial(mat,color);
   }
   function applyProceduralSurfaceMaps() {
     const maps = [
@@ -635,6 +673,8 @@ if (host && "WebGLRenderingContext" in window) {
     const castleAccent=castleSkin?material(castleSkin.accent,.52):mats.gold;
     const safeLevel=Math.min(30,Math.max(1,Math.floor(Number(level)||1)));
     if(type==="castle"){
+      rememberCastlePhotoMaterial(wall,colors[0]);
+      if(castleSkin)rememberCastlePhotoMaterial(castleStone,castleSkin.stone);
       addEldoriaCastle(group,safeLevel,castleSkin,wall,roof,castleStone,castleAccent);
       return group;
     }
@@ -1489,6 +1529,7 @@ if (host && "WebGLRenderingContext" in window) {
     setKingdomValhallaMode(valhallaModeActive);
     applyProceduralSurfaceMaps();
     buildGround();
+    loadCastleStonePhoto();
     if (qualityProfile.tier === "high" && !qualityProfile.prefersReducedMotion) {
       try {
         advancedShaders = new AdvancedShaders(scene, renderer, camera, THREE);
@@ -1530,6 +1571,7 @@ if (host && "WebGLRenderingContext" in window) {
         shadows: renderer.shadowMap.enabled,
         premiumWater: Boolean(waterFeature),
         contactShadowInstances:contactShadowBatch?.count||0,
+        photographicCastleStone:!!castleStonePhoto,
         cameraFocus:cameraFocusCenter?"center":"overview",
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
