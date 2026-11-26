@@ -41,7 +41,7 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
       assert.ok(texture.byteLength > 0, texturePath);
     }
   }
-  assert.ok(totalBytes < 4_000_000, "bundled GLBs must remain under 4 MB");
+  assert.ok(totalBytes < 4_600_000, "bundled GLBs must remain under 4.6 MB (including siege workshop)");
 });
 
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {
@@ -114,4 +114,20 @@ test("photo-scanned stone and timber are audited local CC0 maps with a mobile bu
  assert.equal(scannedMaterialResolution({tier:"balanced",loadOptionalAssets:true,pbrMaps:true}),256);
  assert.equal(scannedMaterialResolution({tier:"high",loadOptionalAssets:true,pbrMaps:true}),512);
  const p=neutralizeScanColor(Uint8ClampedArray.from([10,20,30,255,90,100,110,255]));assert.ok(p[0]===p[1]&&p[1]===p[2]&&p[0]<p[4]&&p[3]===255);
+});
+
+
+test("siege workshop uses distinct local CC0 art without external dependencies", async () => {
+  const asset = manifest.models.find(a => a.type === "siege_workshop");
+  assert.equal(asset?.id, "quaternius-siege-workshop");
+  assert.equal(asset.enabled, true);
+  const provenance = manifest.files[asset.src];
+  assert.equal(provenance.license, "CC0-1.0");
+  const b = await readFile(toUrl(asset.src));
+  assert.equal(b.length, 670832);
+  const g = JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());
+  assert.ok(g.meshes.length > 0);
+  assert.ok(g.materials.some(m => m.name === "RoofTiles_Red"));
+  assert.ok([...(g.images || []), ...(g.buffers || [])].every(x => x.uri === undefined));
+  assert.equal(Object.values(manifest.files).filter(x => x.sha256 === provenance.sha256).length, 1);
 });

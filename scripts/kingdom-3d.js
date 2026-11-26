@@ -7,7 +7,8 @@ import { MeshoptDecoder } from "three/addons/libs/meshopt_decoder.module.js";
 import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
 import { readGraphicsChoice, getGraphicsStorage } from "./kingdom-visual-preferences.js";
-import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
+import { planArmyFigures, createProceduralUnit, troopAnimationPhase } from "./kingdom-army-visual.js";
+import { readCityFootprint, cityModelAnchor, cityModelFit } from "./city-art-layout.js";
 import { projectDragonVisual, makeDragonFigure, makeImportedDragonFigure, disposeImportedDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
 import { derivePbrTextureData, forEachPeriodicSurfaceCell, cityContactShadowSize, CITY_DAYLIGHT } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
@@ -909,10 +910,13 @@ if (host && "WebGLRenderingContext" in window) {
     addForestInstances();
     createCityContactShadows();
   }
+  function serverCityFootprint(type){
+    return readCityFootprint(window.__coiCityLayoutState?.()?.cityLayout?.footprints,type);
+  }
   function cityWorldPoint(building, index) {
     const x = Number(building?.position_x), z = Number(building?.position_z);
     if (building?.position_x != null && building?.position_z != null &&
-        Number.isFinite(x) && Number.isFinite(z)) return { x: x * .53, z: z * .53 };
+        Number.isFinite(x) && Number.isFinite(z)) return cityModelAnchor(x,z,serverCityFootprint(building.building_type));
     // Only legacy buildings without stored coordinates use this preview grid.
     // Keep the familiar 3x3 arrangement for compact cities, and arrange
     // larger settlements in four columns without changing persisted layout.
@@ -1024,9 +1028,17 @@ if (host && "WebGLRenderingContext" in window) {
       const group = b.building_type==="castle"||!template
         ? createBuilding(b.building_type, b.level, x, z, latestCastleSkinId) : template.clone(true);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
+      const plot=serverCityFootprint(b.building_type);
+      let artScale=1;
+      if(plot){
+        const bounds=new THREE.Box3().setFromObject(group);
+        artScale=cityModelFit(b.building_type,plot,Math.max(Math.abs(bounds.min.x-x),Math.abs(bounds.max.x-x)),Math.max(Math.abs(bounds.min.z-z),Math.abs(bounds.max.z-z)));
+      }
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
       // Adicionar acessórios depois das sombras: ornamentos mobile não projetam sombras.
       if (b.building_type === "castle") applyCastleVisualUpgrades(group, b.level, latestCastleVipLevel);
+      group.scale.multiplyScalar(artScale);
+      group.userData.coIArtScale=artScale;
       scene.add(group);
       activeModels.push(group);
     });
@@ -1403,8 +1415,12 @@ if (host && "WebGLRenderingContext" in window) {
         const clip = asset.animations.find(animation => animation.name.toLowerCase() === asset.animation.toLowerCase())
           || asset.animations.find(animation => animation.name.toLowerCase() === "static")
           || asset.animations[0];
-        if (clip) { mixer.clipAction(clip).play(); armyMixers.push(mixer); }
-        if (qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) mixer.update(0);
+        if (clip) {
+          const action=mixer.clipAction(clip).play();
+          action.time=troopAnimationPhase(activeTroops.length,clip.duration,qualityProfile?.tier==="low"||qualityProfile?.prefersReducedMotion);
+          mixer.update(0);
+          armyMixers.push(mixer);
+        }
       }
       activeTroops.push({ root, mixer, procedural });
     }
@@ -1579,6 +1595,7 @@ if (host && "WebGLRenderingContext" in window) {
         scannedMaterials:[...scannedSurfaceMaps.keys()].sort(),
         scannedMaterialsPending,
         cameraFocus:cameraFocusCenter?"center":"overview",
+        cityArtLayout:activeModels.filter(m=>!m.userData.coISpecial).map(m=>({type:m.userData.coIType,x:m.position.x,z:m.position.z,scale:m.userData.coIArtScale})),
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
         loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },

@@ -143,6 +143,17 @@
       "source": "Quaternius Ultimate Fantasy RTS",
       "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-siege-workshop",
+      "type": "siege_workshop",
+      "src": "/assets/3d/quaternius/siege_workshop.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.8,
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0"
     }
   ],
   "props": [
@@ -575,6 +586,16 @@
       "bytes": 223250,
       "licenseFile": "licenses/Poly-Haven-CC0.txt",
       "mirror": "https://github.com/OmniTender-Systems/game-visual-assets/blob/8d5e1881b519d2f1f7573cebf9a86798067d149a/vendor/polyhaven/weathered_brown_planks/weathered_brown_planks_nor_gl_1k.jpg"
+    },
+    "/assets/3d/quaternius/siege_workshop.glb": {
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Medieval Village Pack — Quaternius",
+      "sha256": "264fc6abe5be8c091a1c6f293dce9e8ae79b96b50ccec45f0a7fb12201db1d7c",
+      "bytes": 670832,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/medieval_village_pack/Blacksmith.glb"
     }
   },
   "scannedMaterials": {
