@@ -4,6 +4,8 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <link rel="stylesheet" href="/styles/coi-theme.css">
 <link rel="stylesheet" href="/styles/visual-polish.css">
+<link rel="stylesheet" href="/styles/skin-art.css">
+<script src="/scripts/skin-art.js"></script>
 <meta name="theme-color" content="#142b44"><link rel="manifest" href="/manifest.json"><link rel="icon" href="/icon-192.svg" type="image/svg+xml"><title>Clash of Izzy: Arena</title>
 <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
 <style>
@@ -524,12 +526,13 @@ function toggleShop(show){document.getElementById('shop').style.display=show?'fl
 document.getElementById('attack').onclick=attack;document.querySelectorAll('[data-skill]').forEach(b=>b.onclick=()=>skill(b.dataset.skill));document.getElementById('openShop').onclick=()=>toggleShop(true);document.getElementById('closeShop').onclick=()=>toggleShop(false);
 document.getElementById('buyDamage').onclick=()=>{if(gold<300)return;gold-=300;damageBonus+=25;updateHud()};document.getElementById('buyHealth').onclick=()=>{if(gold<250)return;gold-=250;healthBonus+=150;player.max+=150;player.hp=Math.min(player.max,player.hp+150);updateHud()};document.getElementById('buySpeed').onclick=()=>{if(gold<200)return;gold-=200;speedBonus+=2;updateHud()};
 document.getElementById('whatsapp').onclick=()=>window.open('https://wa.me/5547996531437?text='+encodeURIComponent('Olá! Quero consultar os pacotes e skins do Clash of Izzy.'),'_blank','noopener');
-function storeCard(title,description,buttonLabel,onClick,disabled=false){
+function storeCard(title,description,buttonLabel,onClick,disabled=false,artId=null){
  const card=document.createElement('article');card.className='storeCard';
  const heading=document.createElement('strong');heading.textContent=title;
  const detail=document.createElement('small');detail.textContent=description;
  const button=document.createElement('button');button.type='button';button.textContent=buttonLabel;button.disabled=disabled;
  if(onClick)button.addEventListener('click',onClick);
+ const art=window.COI_SKIN_ART?.create(artId,title);if(art)card.append(art);
  card.append(heading,detail,button);return card;
 }
 async function runStoreAction(payload,button){
@@ -559,11 +562,20 @@ function renderKingdomStore(){
  if(!castleSkins.length){const empty=document.createElement('p');empty.className='storeMuted';empty.textContent='As skins adquiridas aparecem aqui. Somente o proprietário pode equipá-las.';castleSkinGrid.append(empty);}
  for(const skin of castleSkins){
   const equipped=Number(skin.id)===equippedCastleSkinId;
-  castleSkinGrid.append(storeCard(skin.name,'Skin de castelo · Aparência visual no reino compartilhado',equipped?'✓ Equipada':'Equipar',()=>runStoreAction({type:'castle_skin_equip',skinId:Number(skin.id)}),equipped));
+  castleSkinGrid.append(storeCard(skin.name,'Skin de castelo · Aparência visual no reino compartilhado',equipped?'✓ Equipada':'Equipar',()=>runStoreAction({type:'castle_skin_equip',skinId:Number(skin.id)}),equipped,'castle-'+Number(skin.id)));
  }
  root.append(castleSkinGrid);
  if(equippedCastleSkinId)root.append(storeCard('Aparência original','Retira a skin e restaura o castelo padrão','Restaurar',()=>runStoreAction({type:'castle_skin_equip',skinId:null}),false));
  const owned=new Set((cosmetics.owned||[]).map(x=>x.item_id));
+ const cosmeticTitle=document.createElement('h3');cosmeticTitle.textContent='Coleção de aparências';root.append(cosmeticTitle);
+ const cosmeticGrid=document.createElement('div');cosmeticGrid.className='storeGrid';
+ for(const [id,skin] of Object.entries(cosmetics.skins||{})){
+  if(!/^(?:c[1-8]|r[1-5]|e[1-4]|l[1-3]|n[1-6])$/.test(id))continue;
+  const has=owned.has(id);
+  cosmeticGrid.append(storeCard(skin.name,(skin.visual||'Cosmético de coleção')+' · '+Number(skin.price||0).toLocaleString('pt-BR')+' diamantes',has?'Adquirida':'Adquirir',()=>runStoreAction({type:'cosmetic_buy',skin:id}),has||Number(player.gems||0)<Number(skin.price||0),id));
+ }
+ root.append(cosmeticGrid);
+ if(window.COI_SKIN_ART)root.append(window.COI_SKIN_ART.credit());
  const collections=cosmetics.collections||[];
  const collectionTitle=document.createElement('h3');collectionTitle.textContent='🎖️ Recompensas de coleção';root.append(collectionTitle);
  const collectionGrid=document.createElement('div');collectionGrid.className='storeGrid';
@@ -594,7 +606,7 @@ function renderKingdomStore(){
   const pieces=document.createElement('div');pieces.className='pantheon-piece-grid';
   for(const item of set.items||[]){
    const piece=document.createElement('article');piece.className='pantheon-piece'+(item.equipped?' is-equipped':'')+(!item.owned?' is-locked':'');
-   const icon=document.createElement('span');icon.className='pantheon-piece-icon';icon.textContent=item.icon||'✦';
+   const icon=window.COI_SKIN_ART?.create(item.id,item.name)||document.createElement('span');icon.classList.add('pantheon-piece-icon');if(icon.namespaceURI!=='http://www.w3.org/2000/svg')icon.textContent=item.icon||'✦';
    const copy=document.createElement('div');copy.className='pantheon-piece-copy';
    const slot=document.createElement('small');slot.textContent=item.slotLabel||item.slot;
    const name=document.createElement('strong');name.textContent=item.name;
@@ -642,7 +654,7 @@ function renderKingdomStore(){
  for(const skin of cosmetics.seasonal||[]){
   const has=owned.has(skin.id),active=Boolean(cosmetics.seasonActive);
   const desc=(skin.theme||'Skin especial')+' · Aparência visual temática'+(skin.legendary?' · Lendária':'')+' · '+Number(skin.price||0).toLocaleString('pt-BR')+' diamantes';
-  seasonGrid.append(storeCard(skin.icon+' '+skin.name,desc,has?'Já adquirida':active?'Adquirir skin':'Temporada encerrada',()=>runStoreAction({type:'seasonal_buy',skin:skin.id}),has||!active));
+  seasonGrid.append(storeCard(skin.icon+' '+skin.name,desc,has?'Já adquirida':active?'Adquirir skin':'Temporada encerrada',()=>runStoreAction({type:'seasonal_buy',skin:skin.id}),has||!active,skin.id));
  }
  if(!seasonGrid.children.length){const note=document.createElement('p');note.className='storeMuted';note.textContent='Nenhuma skin sazonal disponível.';seasonGrid.append(note)}
  root.append(seasonGrid);
@@ -651,7 +663,7 @@ function renderKingdomStore(){
  for(const recipe of cosmetics.fusions||[]){
   const output=recipe.output||{},ready=(recipe.inputs||[]).every(id=>owned.has(id)),already=owned.has(output.id);
   const description='Receita: '+(recipe.inputs||[]).join(' + ')+' · Custo: 50 fragmentos';
-  fusionGrid.append(storeCard((output.icon||'✨')+' '+(output.name||'Skin fundida'),description,already?'Já possui':ready?'Fundir skins':'Faltam skins ou fragmentos',()=>runStoreAction({type:'skin_fuse',inputs:recipe.inputs}),!ready||already||Number(cosmetics.shards||0)<50));
+  fusionGrid.append(storeCard((output.icon||'✨')+' '+(output.name||'Skin fundida'),description,already?'Já possui':ready?'Fundir skins':'Faltam skins ou fragmentos',()=>runStoreAction({type:'skin_fuse',inputs:recipe.inputs}),!ready||already||Number(cosmetics.shards||0)<50,output.id));
  }
  root.append(fusionGrid);
  const items=shop.items||{},offers=shop.offers||[];

@@ -150,8 +150,10 @@
       const hasSkin=owned.has(id);button.disabled=busy||hasSkin;
       button.textContent=hasSkin?"ADQUIRIDA":"Comprar · "+fmt(skin.price)+" diamantes";
       button.addEventListener("click",()=>perform({type:"cosmetic_buy",skin:id},"Skin "+skin.name+" adquirida."));
+      const art=window.COI_SKIN_ART?.create(id,skin.name);if(art)card.append(art);
       card.append(title,rarity,description,button);return card;
     }));
+    if(window.COI_SKIN_ART){const section=grid.closest(".norse-skins");if(section&&!section.querySelector(".coi-skin-credit"))section.append(window.COI_SKIN_ART.credit());}
     $("skin-gems").textContent="Diamantes: "+fmt(state?.player?.gems);
     $("skin-shards").textContent="Fragmentos: "+fmt(cosmetics.shards);
     const collection=cosmetics.collections?.find(item=>item.id==="col_norse");
