@@ -40,6 +40,13 @@ for(const [type,name,hash,targetFootprint,targetHeight] of choices){
  const previous=manifest.models.find(a=>a.id===id);
  const entry={id,type,src,enabled:true,targetFootprint,targetHeight,source,sourceUrl,license};
  if(previous)Object.assign(previous,entry);else manifest.models.push(entry);
+ // The v2 entity index is a second consumer of the canonical model IDs.
+ // Keep the original Canvas artwork and other metadata when replacing a role.
+ const indexed=manifest.entityArt?.buildings?.[type];
+ if(manifest.entityArt){
+  if(!indexed?.webgl||!Array.isArray(indexed.webgl.modelIds))throw Error("Missing v2 entityArt building index for "+type);
+  indexed.webgl.modelIds=[id];
+ }
 }
 await mkdir(dest,{recursive:true});
 for(const v of validated){await writeFile(path.join(dest,v.name),v.bytes);manifest.files[v.src]=v.file;}
