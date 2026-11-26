@@ -4,6 +4,8 @@ on:
     branches: [beta]
     paths:
       - scripts/convert-millennium-fortress.py
+      - scripts/millennium-art-budget.mjs
+      - scripts/compare-millennium-candidates.mjs
       - .github/workflows/beta-millennium-art.yml
 permissions:
   contents: read
@@ -53,5 +55,20 @@ jobs:
         with:
           name: millennium-fortress-candidate
           path: art-candidates/
+          retention-days: 7
+          if-no-files-found: error
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Generate lossless welded candidates without changing the game
+        run: |
+          mkdir -p art-optimized
+          cp art-candidates/*.dae art-candidates/*.png art-candidates/*LICENSE.txt art-candidates/PROVENANCE.txt art-optimized/
+          python3 scripts/convert-millennium-fortress.py --dedup art-optimized
+          node scripts/compare-millennium-candidates.mjs art-candidates art-optimized
+      - uses: actions/upload-artifact@v4
+        with:
+          name: millennium-lossless-budget-report
+          path: art-optimized/
           retention-days: 7
           if-no-files-found: error
