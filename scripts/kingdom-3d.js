@@ -90,7 +90,7 @@ if (host && "WebGLRenderingContext" in window) {
   let kingdomRenderHandler = null;
   let kingdomZoomHandler = null;
   let cameraZoomFactor = 1;
-  let cameraFocusCenter = false;
+  let cameraFocusCenter = true;
   let valhallaModeHandler = null;
   let developmentStatsBadge = null;
   let developmentStatsTimer = null;
@@ -520,8 +520,8 @@ if (host && "WebGLRenderingContext" in window) {
   function addEldoriaCastle(group,level,skin,wall,roof,stone,accent){
     const tier=level>=30?4:level>=20?3:level>=10?2:1;
     const high=qualityProfile?.tier==="high",low=qualityProfile?.tier==="low";
-    const keepHeight=1.42+(tier-1)*.19;
-    const towerHeight=1.28+(tier-1)*.16;
+    const keepHeight=1.66+(tier-1)*.23;
+    const towerHeight=1.37+(tier-1)*.17;
     group.userData.coIArchitecture="eldoria-imperial-v1";
     group.userData.coIArchitectureTier=tier;
     box(group,1.75,.15,1.52,mats.darkStone,0,.075,0);
@@ -531,6 +531,41 @@ if (host && "WebGLRenderingContext" in window) {
     box(group,1.04,.14,.95,stone,0,.25+keepHeight,-.12);
     const mainRoof=new THREE.Mesh(new THREE.ConeGeometry(.73,.68+(tier-1)*.07,4),roof);
     mainRoof.rotation.y=Math.PI/4;mainRoof.position.set(0,.32+keepHeight+(.68+(tier-1)*.07)/2,-.12);group.add(mainRoof);
+    // Layered royal citadel silhouette: raised stone courses, a tall central
+    // lantern and arched windows on both camera-facing sides. Remains in plot.
+    const archShape=(w,h)=>{
+      const sh=new THREE.Shape(),radius=w/2;
+      sh.moveTo(-radius,0);sh.lineTo(radius,0);sh.lineTo(radius,h-radius);
+      sh.absarc(0,h-radius,radius,0,Math.PI,false);sh.lineTo(-radius,0);
+      return sh;
+    };
+    const archWindow=(x,y,z,angle,w,h)=>{
+      const surround=new THREE.Mesh(new THREE.ShapeGeometry(archShape(w,h)),stone);
+      surround.position.set(x,y,z);surround.rotation.y=angle;group.add(surround);
+      const inset=new THREE.Mesh(new THREE.ShapeGeometry(archShape(w*.69,h*.77)),mats.darkStone);
+      inset.position.set(x+Math.sin(angle)*.009,y+h*.085,z+Math.cos(angle)*.009);
+      inset.rotation.y=angle;group.add(inset);
+      if(!low){
+        const glass=new THREE.Mesh(new THREE.ShapeGeometry(archShape(w*.43,h*.61)),mats.window);
+        glass.position.set(x+Math.sin(angle)*.016,y+h*.13,z+Math.cos(angle)*.016);
+        glass.rotation.y=angle;group.add(glass);
+      }
+    };
+    if(!low){
+      for(const y of [.51,.25+keepHeight*.5,.25+keepHeight-.12]){
+        box(group,.99,.055,.90,stone,0,y,-.12);
+      }
+      for(const x of [-.43,.43])for(const z of [-.48,.24])
+        box(group,.085,keepHeight*.83,.09,stone,x,.25+keepHeight*.42,z);
+      for(const y of [.44,.25+keepHeight*.55]){
+        for(const x of [-.26,0,.26])archWindow(x,y,.311,0,.145,.28);
+        for(const z of [-.36,-.10,.16])archWindow(.479,y,z,Math.PI/2,.145,.28);
+      }
+      const lanternY=.32+keepHeight+(.68+(tier-1)*.07)*.68;
+      addCylinder(group,.145,.19,.34,stone,0,lanternY,-.12,8);
+      addCylinder(group,0,.19,.36,roof,0,lanternY+.32,-.12,8);
+      addCylinder(group,.018,.025,.16,accent,0,lanternY+.55,-.12,6);
+    }
     // Optional CC0 fortification facade. Clone owned geometries/materials so
     // normal castle teardown never disposes a cached GLB template.
     const gateTemplate=glbTemplates.get("castle_gate");
@@ -566,7 +601,13 @@ if (host && "WebGLRenderingContext" in window) {
       addCylinder(group,.22,.26,towerHeight,stone,x,.25+towerHeight/2,z,low?6:10);
       addCylinder(group,.29,.25,.13,stone,x,.25+towerHeight,z,low?6:10);
       addCylinder(group,0,.30,.47+(tier-1)*.035,roof,x,.25+towerHeight+.30,z,low?6:10);
-      box(group,.09,.25,.04,mats.darkStone,x,.25+towerHeight*.65,z+.255);
+      if(low)box(group,.09,.25,.04,mats.darkStone,x,.25+towerHeight*.65,z+.255);
+      else{
+        archWindow(x,.25+towerHeight*.52,z+.255,0,.14,.29);
+        archWindow(x+.255,.25+towerHeight*.52,z,Math.PI/2,.14,.29);
+        addCylinder(group,.245,.255,.045,wall,x,.25+towerHeight*.35,z,10);
+        addCylinder(group,.26,.25,.045,stone,x,.25+towerHeight*.79,z,10);
+      }
       if(!low)box(group,.11,.04,.06,accent,x,.25+towerHeight*.65-.14,z+.26);
     }
     for(const x of [-.47,.47])box(group,.32,.56,.18,wall,x,.48,.55);
@@ -582,7 +623,7 @@ if (host && "WebGLRenderingContext" in window) {
       box(group,.14,.58,.54,wall,-.65,.45,z);
       box(group,.14,.58,.54,wall,.65,.45,z);
     }
-    for(const x of [-.24,.24]){
+    if(low)for(const x of [-.24,.24]){
       box(group,.12,.30,.045,mats.darkStone,x,.25+keepHeight*.65,.32);
       box(group,.075,.22,.055,mats.window,x,.25+keepHeight*.65,.35);
     }
@@ -1028,7 +1069,7 @@ if (host && "WebGLRenderingContext" in window) {
     const screenXs = projected.map(point => point.x);
     const screenYs = projected.map(point => point.y);
     const projectedWidth = Math.max(...screenXs) - Math.min(...screenXs) + 3.2;
-    const projectedHeight = Math.max(...screenYs) - Math.min(...screenYs) + 4.6;
+    const projectedHeight = Math.max(...screenYs) - Math.min(...screenYs) + 5.3;
     const viewportWidth = Math.max(1, camera.right - camera.left);
     const viewportHeight = Math.max(1, camera.top - camera.bottom);
     // Player zoom remains view-only. A reset always restores the safe fit.
