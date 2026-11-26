@@ -488,3 +488,14 @@ test("optional equipped dragon refreshes only after loading and retains shared m
  assert.match(renderer,/asset\.unit_type === "equipped_dragon" \? !!projectDragonVisual\(window\.__coiKingdomDragon\)/);
  assert.match(renderer,/if\(activeDragon\.figure\.imported\)disposeImportedDragonFigure\(activeDragon\.figure\);\s*else disposeDetachedObject3D/);
 });
+
+test("city contact shadows stay bounded and use one reusable instanced batch",async()=>{
+ const {cityContactShadowSize,CITY_DAYLIGHT}=await import("../scripts/kingdom-materials.js");
+ assert.deepEqual(cityContactShadowSize(100,NaN),{width:3.4,depth:1.25});
+ assert.deepEqual(cityContactShadowSize(0,0),{width:.7,depth:.7});
+ assert.ok(CITY_DAYLIGHT.sun>CITY_DAYLIGHT.hemisphere);
+ assert.match(renderer,/new THREE\.InstancedMesh\(new THREE\.PlaneGeometry\(1,1\),mat,24\)/);
+ assert.match(renderer,/updateCityContactShadows\(\);\s*renderer\.render\(scene, camera\);\s*publishBuildingHitTargets\(list\)/);
+ assert.match(renderer,/contactShadowBatch = null/);
+ assert.match(renderer,/mat\.color\.set\(skin\?\.stone/);
+});

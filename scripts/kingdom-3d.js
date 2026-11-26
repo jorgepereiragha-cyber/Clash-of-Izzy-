@@ -9,7 +9,7 @@ import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTim
 import { readGraphicsChoice, getGraphicsStorage } from "./kingdom-visual-preferences.js";
 import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
 import { projectDragonVisual, makeDragonFigure, makeImportedDragonFigure, disposeImportedDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
-import { derivePbrTextureData, forEachPeriodicSurfaceCell } from "./kingdom-materials.js";
+import { derivePbrTextureData, forEachPeriodicSurfaceCell, cityContactShadowSize, CITY_DAYLIGHT } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
@@ -96,14 +96,15 @@ if (host && "WebGLRenderingContext" in window) {
   let kingdomSunLight = null;
   let advancedShaders = null;
   let waterFeature = null;
+  let contactShadowBatch = null;
 
   function setKingdomValhallaMode(active) {
     valhallaModeActive = Boolean(active);
     if (!scene) return;
     scene.background = valhallaModeActive ? new THREE.Color(0x0a0510) : null;
     scene.fog = valhallaModeActive ? new THREE.FogExp2(0x1a0f25, 0.035) : null;
-    if (kingdomHemisphereLight) kingdomHemisphereLight.intensity = valhallaModeActive ? 0.95 : 2.05;
-    if (kingdomSunLight) kingdomSunLight.intensity = valhallaModeActive ? 1.15 : 2.4;
+    if (kingdomHemisphereLight) kingdomHemisphereLight.intensity = valhallaModeActive ? 0.95 : CITY_DAYLIGHT.hemisphere;
+    if (kingdomSunLight) kingdomSunLight.intensity = valhallaModeActive ? 1.15 : CITY_DAYLIGHT.sun;
     if (valhallaAuroraLight) {
       scene.remove(valhallaAuroraLight);
       valhallaAuroraLight = null;
@@ -222,6 +223,7 @@ if (host && "WebGLRenderingContext" in window) {
     advancedShaders?.dispose();
     advancedShaders = null;
     waterFeature = null;
+    contactShadowBatch = null;
   }
   // Small, deterministic, tileable procedural albedo maps add material identity
   // without shipping large image files or creating per-building texture copies.
@@ -491,8 +493,9 @@ if (host && "WebGLRenderingContext" in window) {
         const recolor=original=>{
           const mat=original.clone();
           const name=original.name.toLowerCase();
-          if(name==="stone_light")mat.color.copy(stone.color);
-          else if(name==="stone")mat.color.copy(wall.color);
+          // Textured procedural materials use white tint; use the actual skin palette.
+          if(name==="stone_light")mat.color.set(skin?.stone||"#9c9b8b");
+          else if(name==="stone")mat.color.set(skin?.wall||"#a69a80");
           else if(name==="main")mat.color.set(skin?.banner||"#24476B");
           return mat;
         };
@@ -518,6 +521,14 @@ if (host && "WebGLRenderingContext" in window) {
       if(!low)box(group,.11,.04,.06,accent,x,.25+towerHeight*.65-.14,z+.26);
     }
     for(const x of [-.47,.47])box(group,.32,.56,.18,wall,x,.48,.55);
+    // Repeated crenellations add a recognizable fortified silhouette in one draw call.
+    const battlementPositions=[];
+    for(const x of [-.48,-.24,0,.24,.48])battlementPositions.push([x,.84,-.64]);
+    if(!low)for(const z of [-.38,-.12,.14])for(const x of [-.72,.72])battlementPositions.push([x,.84,z]);
+    const battlements=new THREE.InstancedMesh(new THREE.BoxGeometry(.13,.17,.13),stone,battlementPositions.length);
+    const transform=new THREE.Object3D();
+    battlementPositions.forEach(([x,y,z],i)=>{transform.position.set(x,y,z);transform.updateMatrix();battlements.setMatrixAt(i,transform.matrix);});
+    battlements.instanceMatrix.needsUpdate=true;battlements.computeBoundingSphere();group.add(battlements);
     for(const z of [-.38,.23]){
       box(group,.14,.58,.54,wall,-.65,.45,z);
       box(group,.14,.58,.54,wall,.65,.45,z);
@@ -773,6 +784,40 @@ if (host && "WebGLRenderingContext" in window) {
     }
     return group;
   }
+  // A single instanced soft contact-shadow batch anchors every visible building,
+  // even when expensive shadow maps are disabled on mobile.
+  function createCityContactShadows() {
+    const size=64,canvas=document.createElement("canvas");canvas.width=canvas.height=size;
+    const ctx=canvas.getContext("2d");if(!ctx)return;
+    const gradient=ctx.createRadialGradient(32,32,4,32,32,31);
+    gradient.addColorStop(0,"rgba(0,0,0,0.66)");
+    gradient.addColorStop(.55,"rgba(0,0,0,0.32)");
+    gradient.addColorStop(1,"rgba(0,0,0,0)");
+    ctx.fillStyle=gradient;ctx.fillRect(0,0,size,size);
+    const texture=new THREE.CanvasTexture(canvas);
+    const mat=new THREE.MeshBasicMaterial({color:0x30271e,map:texture,transparent:true,depthWrite:false,opacity:qualityProfile?.shadows ? .42 : .82});
+    contactShadowBatch=new THREE.InstancedMesh(new THREE.PlaneGeometry(1,1),mat,24);
+    contactShadowBatch.count=0;
+    contactShadowBatch.renderOrder=1;
+    scene.add(contactShadowBatch);
+  }
+  function updateCityContactShadows() {
+    if(!contactShadowBatch)return;
+    const transform=new THREE.Object3D(),bounds=new THREE.Box3(),size=new THREE.Vector3();
+    transform.rotation.x=-Math.PI/2;
+    const count=Math.min(24,activeModels.length);
+    for(let i=0;i<count;i++){
+      const model=activeModels[i];
+      bounds.setFromObject(model);bounds.getSize(size);
+      const footprint=cityContactShadowSize(size.x,size.z);
+      transform.position.set(model.position.x,-.028,model.position.z);
+      transform.scale.set(footprint.width,footprint.depth,1);
+      transform.updateMatrix();contactShadowBatch.setMatrixAt(i,transform.matrix);
+    }
+    contactShadowBatch.count=count;
+    contactShadowBatch.instanceMatrix.needsUpdate=true;
+    if(count)contactShadowBatch.computeBoundingSphere();
+  }
   function buildGround() {
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(32, 32), mats.grass);
     ground.rotation.x = -Math.PI / 2; ground.position.y = -.08; ground.receiveShadow = true; scene.add(ground);
@@ -816,6 +861,7 @@ if (host && "WebGLRenderingContext" in window) {
     pathRibbon(.36, -.045, mats.road);
     // Forest is batched into three instanced draw calls instead of one per tree part.
     addForestInstances();
+    createCityContactShadows();
   }
   function cityWorldPoint(building, index) {
     const x = Number(building?.position_x), z = Number(building?.position_z);
@@ -944,6 +990,7 @@ if (host && "WebGLRenderingContext" in window) {
       // Small decorations have no extra animation or shadow draw calls.
       scene.add(group);activeModels.push(group);
     }
+    updateCityContactShadows();
     renderer.render(scene, camera);
     publishBuildingHitTargets(list);
   }
@@ -1417,7 +1464,7 @@ if (host && "WebGLRenderingContext" in window) {
     renderer.setSize(host.clientWidth, host.clientHeight, false);
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.12;
+    renderer.toneMappingExposure = CITY_DAYLIGHT.exposure;
     renderer.shadowMap.enabled = qualityProfile.shadows;
     renderer.shadowMap.type = qualityProfile.tier === "high" ? THREE.PCFSoftShadowMap : THREE.PCFShadowMap;
     renderer.domElement.id = "kingdom3d";
@@ -1427,12 +1474,15 @@ if (host && "WebGLRenderingContext" in window) {
     scene = new THREE.Scene();
     camera = new THREE.OrthographicCamera(-8.2, 8.2, 6.4, -6.4, .1, 60);
     camera.position.set(10, 13, 11); camera.lookAt(0, .2, 0);
-    kingdomHemisphereLight = new THREE.HemisphereLight("#e6f0d6", "#43513b", 2.05);
+    kingdomHemisphereLight = new THREE.HemisphereLight("#e6efff", "#554638", CITY_DAYLIGHT.hemisphere);
     scene.add(kingdomHemisphereLight);
-    kingdomSunLight = new THREE.DirectionalLight("#ffe0a4", 2.4);
-    kingdomSunLight.position.set(-5, 10, 6); kingdomSunLight.castShadow = renderer.shadowMap.enabled;
+    kingdomSunLight = new THREE.DirectionalLight("#ffe3bd", CITY_DAYLIGHT.sun);
+    kingdomSunLight.position.set(-7, 11, 6); kingdomSunLight.castShadow = renderer.shadowMap.enabled;
     kingdomSunLight.shadow.mapSize.set(qualityProfile.shadowMapSize, qualityProfile.shadowMapSize); kingdomSunLight.shadow.camera.left = -9; kingdomSunLight.shadow.camera.right = 9;
-    kingdomSunLight.shadow.camera.top = 9; kingdomSunLight.shadow.camera.bottom = -9; scene.add(kingdomSunLight);
+    kingdomSunLight.shadow.camera.top = 9; kingdomSunLight.shadow.camera.bottom = -9;
+    kingdomSunLight.shadow.normalBias = .035;
+    kingdomSunLight.shadow.bias = -.00015;
+    scene.add(kingdomSunLight);
     window.__coiKingdomValhallaMode = setKingdomValhallaMode;
     setKingdomValhallaMode(valhallaModeActive);
     applyProceduralSurfaceMaps();
@@ -1477,6 +1527,7 @@ if (host && "WebGLRenderingContext" in window) {
         maxTextureSize: renderer.capabilities.maxTextureSize,
         shadows: renderer.shadowMap.enabled,
         premiumWater: Boolean(waterFeature),
+        contactShadowInstances:contactShadowBatch?.count||0,
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
         pbrMaps: qualityProfile.pbrMaps,
         loadedGlbTemplates: { buildings: glbTemplates.size, props: glbPropTemplates.size, units: glbUnitTemplates.size },
