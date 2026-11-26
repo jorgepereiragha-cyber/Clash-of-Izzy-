@@ -1,0 +1,117 @@
+{
+  "version": 1,
+  "reviewedOn": "2026-11-25",
+  "status": "staging only; no runtime or commercial art approval",
+  "sources": [
+    {
+      "id": "farm",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-mmo-starter-realm-farmhouse-and-barn-bf08417d",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/28763/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 4000,
+      "status": "candidate-not-approved",
+      "notes": "Rigid door animation; preview at rest. Different kit; inspect scale/palette."
+    },
+    {
+      "id": "lumber_mill",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-sawmill-d8251d20",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24932/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    },
+    {
+      "id": "quarry",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-quarry-office-7cc89270",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24936/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    },
+    {
+      "id": "iron_mine",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-mine-entrance-5db603e7",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24937/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    },
+    {
+      "id": "warehouse",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-warehouse-d2f51991",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24946/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    },
+    {
+      "id": "barracks",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-militia-barracks-e88c71de",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24949/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    },
+    {
+      "id": "archery_range",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-archery-range-6ecd8399",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24951/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    },
+    {
+      "id": "stable",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-cavalry-stables-53f9485b",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24950/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    },
+    {
+      "id": "siege_workshop",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-siege-workshop-a2441a34",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24952/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    },
+    {
+      "id": "academy",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-war-academy-029c3732",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24957/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    },
+    {
+      "id": "hospital",
+      "sourceUrl": "https://3dassets.dev/assets/medieval-rts-faction-buildings-infirmary-d8def116",
+      "downloadUrl": "https://cdn.3dassets.dev/assets/24962/v1/model.glb",
+      "license": "CC0-1.0",
+      "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "maxTriangles": 8000,
+      "status": "candidate-not-approved",
+      "notes": "Static low-poly candidate; inspect visual quality before replacing procedural art."
+    }
+  ]
+}

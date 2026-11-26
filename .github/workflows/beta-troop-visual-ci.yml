@@ -14,4 +14,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - run: node --test tests/kingdom-army-visual.test.js tests/kingdom-3d.test.js
+      - run: node --test tests/kingdom-army-visual.test.js tests/kingdom-3d.test.js tests/kingdom-model-selection.test.js tests/asset-manifest-validation.test.js
+      - run: node scripts/validate-3d-assets.js
+      - run: python3 -m py_compile docs/art-pipeline/*.py
+      - run: python3 docs/art-pipeline/plan_generation.py all > /tmp/eldoria-queue.json
+      - run: python3 -c 'import json; a=json.load(open("/tmp/eldoria-queue.json")); assert len(a)==76; assert len({x["id"] for x in a})==76'

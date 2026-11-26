@@ -7,12 +7,13 @@ const renderer = await readFile(new URL("../scripts/kingdom-3d.js", import.meta.
 const kingdom = await readFile(new URL("../kingdom.html", import.meta.url), "utf8");
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 
-test("original imperial keep is rendered at every skin and quality without substituting standalone wall GLBs", () => {
+test("original imperial keep remains the fallback and preserves equipped skins without substituting standalone wall GLBs", () => {
   assert.match(renderer,/function addEldoriaCastle/);
   assert.match(renderer,/eldoria-imperial-v1/);
-  assert.match(renderer,/level>=30\?4:level>=20\?3:level>=10\?2:1/);
+  assert.match(renderer,/const tier=castleArchitectureTier\(level\)/);
   assert.match(renderer,/if\(type==="castle"\)\{\s*addEldoriaCastle/);
-  assert.match(renderer,/b\.building_type==="castle"\|\|!template/);
+  assert.match(renderer,/b\.building_type === "castle" && latestCastleSkinId\) \? null : glbTemplates\.get\(selected\?\.id\)/);
+  assert.match(renderer,/const group = !template/);
   assert.doesNotMatch(renderer,/createCastleGlbGroup|kenney-castle-kit-composite/);
   assert.match(renderer,/PCFSoftShadowMap/);
   for(const type of ["barracks","farm","quarry","lumber_mill","iron_mine","market","academy","wall","hospital","watchtower","stable","archery_range","siege_workshop","embassy","warehouse"]){
@@ -91,8 +92,8 @@ test("glTF and KTX2/Basis loaders are configured for production assets", () => {
 
 test("procedural buildings are replaceable by explicitly enabled GLB assets", () => {
   assert.match(renderer, /asset\?\.enabled === true/);
-  assert.match(renderer, /glbTemplates\.set\(asset\.type, template\)/);
-  assert.match(renderer, /glbTemplates\.get\(b\.building_type\)/);
+  assert.match(renderer, /glbTemplates\.set\(asset\.id, template\)/);
+  assert.match(renderer, /glbTemplates\.get\(selected\?\.id\)/);
   assert.match(renderer, /coIType/);
 });
 
@@ -152,10 +153,10 @@ test("WebGL loss disconnects resize observers and prevents rendering through a d
 
 
 test("GLB manifest accepts only bounded same-origin assets for known buildings", () => {
-  assert.match(renderer, /manifest\.models\.slice\(0, 32\)/);
-  assert.match(renderer, /const neededTypes = new Set/);
-  assert.match(renderer, /Object\.hasOwn\(palettes, type\)/);
-  assert.match(renderer, /neededTypes\.has\(asset\.type\)/);
+  assert.match(renderer, /manifest\.models\.slice\(0, MODEL_LIMITS\.models\)/);
+  assert.match(renderer, /const selectedBuildings =/);
+  assert.match(renderer, /Object\.hasOwn\(palettes, b\.building_type\)/);
+  assert.match(renderer, /selectBuildingAsset\(manifestAssets, b\.building_type, b\.level, qualityProfile\?\.tier\)/);
   assert.match(renderer, /url\.origin !== window\.location\.origin/);
   assert.match(renderer, /url\.pathname\.startsWith\("\/assets\/3d\/"\)/);
   assert.match(renderer, /pathname\.toLowerCase\(\)\.endsWith\("\.glb"\)/);
@@ -288,7 +289,7 @@ test("GLB assets are normalized to a mobile building footprint and grounded at y
 
 
 test("optional GLB assets load only for present building types with bounded concurrency", () => {
-  assert.ok(renderer.includes("const neededTypes = new Set"));
+  assert.ok(renderer.includes("const selectedBuildings ="));
   assert.ok(renderer.includes("glbLoadPromises.has(entry.key)"));
   assert.ok(renderer.includes("const glbLoadLanes = Array.from({ length: 3 }"));
   assert.ok(renderer.includes("loadOptionalGlbAssets(list, latestTroops)"));
@@ -481,4 +482,29 @@ test("rural buildings have separate models and bounded crop instances",()=>{
  assert.match(renderer,/const rows=low\?2:high\?5:3/);
  assert.match(renderer,/new THREE\.InstancedMesh\(new THREE\.CylinderGeometry\(\.014,\.022,\.15,5\),grain,rows\*3\)/);
  assert.match(renderer,/if \(node\.isInstancedMesh\) node\.dispose\(\)/);
+});
+
+test("Eldoria gable geometry has bounded coordinates, outward faces and two material regions", async () => {
+  const { gableRoofData } = await import("../scripts/kingdom-roof-geometry.js");
+  const { positions, uv, groups } = gableRoofData(1.5,1.1,.48);
+  assert.equal(positions.length,72);
+  assert.equal(uv.length,48);
+  assert.deepEqual(groups,[{start:0,count:18,materialIndex:0},{start:18,count:6,materialIndex:1}]);
+  assert.ok(positions.every(Number.isFinite) && uv.every(Number.isFinite));
+  const vertices = Array.from({length:24},(_,i)=>positions.slice(i*3,i*3+3));
+  assert.equal(Math.min(...vertices.map(p=>p[1])),0);
+  assert.equal(Math.max(...vertices.map(p=>p[1])),.48);
+  const normal=(a,b,c)=>{
+    const u=b.map((x,i)=>x-a[i]),v=c.map((x,i)=>x-a[i]);
+    return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+  };
+  const normals=Array.from({length:8},(_,i)=>normal(...vertices.slice(i*3,i*3+3)));
+  assert.ok(normals.slice(0,4).every(n=>n[1]>0));
+  assert.ok(normals.slice(4,6).every(n=>n[1]<0));
+  assert.ok(normals[6][2]<0 && normals[7][2]>0);
+  assert.throws(()=>gableRoofData(0,1,1),RangeError);
+  assert.throws(()=>gableRoofData(1,NaN,1),RangeError);
+  assert.match(renderer,/addGableRoof\(group,\.86,\.48,\.30/);
+  assert.match(renderer,/if\(longX\) pitched\.rotation\.y = Math\.PI \/ 2/);
+  assert.match(renderer,/qualityProfile\?\.tier !== "low" && type !== "wall"/);
 });

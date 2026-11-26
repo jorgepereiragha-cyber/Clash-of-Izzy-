@@ -1,0 +1,27 @@
+name: Eldoria free art candidates (staging only)
+on:
+  pull_request:
+    branches: [beta]
+    paths:
+      - 'docs/art-pipeline/online_candidates.json'
+      - 'docs/art-pipeline/fetch_online_candidates.py'
+      - 'docs/art-pipeline/validate_staging_glb.py'
+      - '.github/workflows/eldoria-free-art-staging.yml'
+permissions:
+  contents: read
+jobs:
+  stage-free-art:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m py_compile docs/art-pipeline/fetch_online_candidates.py
+      - run: python3 docs/art-pipeline/fetch_online_candidates.py "${RUNNER_TEMP}/eldoria-free-art"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eldoria-free-art-review
+          path: ${{ runner.temp }}/eldoria-free-art/
+          if-no-files-found: error
+          retention-days: 7

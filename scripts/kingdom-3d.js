@@ -13,6 +13,8 @@ import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
+import { MODEL_LIMITS, selectBuildingAsset, castleArchitectureTier } from "./kingdom-model-selection.js";
+import { gableRoofData } from "./kingdom-roof-geometry.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -241,22 +243,35 @@ if (host && "WebGLRenderingContext" in window) {
         ctx.stroke();
       }
     } else if (kind === "stone") {
-      for (let y = 0; y < 128; y += 22) {
-        const offset = (Math.floor(y / 22) % 2) * 16;
-        for (let x = -16; x < 144; x += 32) {
-          ctx.fillStyle = rand() > .5 ? "rgba(242,226,194,.11)" : "rgba(34,38,34,.10)";
-          ctx.fillRect(x + offset + 2, y + 2, 28, 18);
+      // Exact tile divisors keep masonry seams consistent across repeated UVs.
+      for (let y = 0; y < 128; y += 16) {
+        const offset = (Math.floor(y / 16) % 2) * 16;
+        for (let x = -32; x < 128; x += 32) {
+          // A partial brick at the left/right boundary must have the same shade.
+          const cell = ((x / 32) % 4 + 4) % 4;
+          const light = ((Math.imul((seed ^ (y / 16 * 131 + cell * 17)) >>> 0, 2654435761) >>> 0) & 256) !== 0;
+          ctx.fillStyle = light ? "rgba(242,226,194,.11)" : "rgba(34,38,34,.10)";
+          ctx.fillRect(x + offset + 2, y + 2, 28, 12);
           ctx.fillStyle = "rgba(255,244,215,.18)";
           ctx.fillRect(x + offset + 2, y + 2, 28, 1);
           ctx.strokeStyle = "rgba(35,39,37,.28)";
           ctx.lineWidth = 1.5;
-          ctx.strokeRect(x + offset + 1, y + 1, 30, 20);
+          ctx.strokeRect(x + offset + 1, y + 1, 30, 14);
+          ctx.fillStyle = "rgba(35,39,37,.12)";
+          ctx.fillRect(x + offset + 3, y + 12, 26, 2);
         }
       }
     } else if (kind === "roof") {
-      for (let y = 0; y < 128; y += 12) for (let x = 0; x < 128; x += 16) {
-        ctx.fillStyle = rand() > .5 ? "rgba(210,225,245,.20)" : "rgba(8,18,34,.22)";
-        ctx.fillRect(x + ((y / 12) % 2) * 8, y, 14, 9);
+      for (let y = 0; y < 128; y += 8) for (let x = -16; x < 128; x += 16) {
+        const start = x + ((y / 8) % 2) * 8;
+        const cell = ((x / 16) % 8 + 8) % 8;
+        const light = ((Math.imul((seed ^ (y / 8 * 131 + cell * 17)) >>> 0, 2654435761) >>> 0) & 256) !== 0;
+        ctx.fillStyle = light ? "rgba(210,225,245,.20)" : "rgba(8,18,34,.22)";
+        ctx.fillRect(start, y, 15, 7);
+        ctx.fillStyle = "rgba(230,235,240,.13)";
+        ctx.fillRect(start, y, 15, 1);
+        ctx.fillStyle = "rgba(8,18,34,.25)";
+        ctx.fillRect(start, y + 6, 15, 1);
       }
     } else if (kind === "grass") {
       // Seamless deterministic turf variation within the existing texture budget.
@@ -394,6 +409,20 @@ if (host && "WebGLRenderingContext" in window) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
+  // Pitched roofs are built once per procedural building, never in the frame loop.
+  function addGableRoof(parent, width, depth, height, roof, gable, x, y, z) {
+    const data = gableRoofData(width, depth, height);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(data.positions, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(data.uv, 2));
+    for (const part of data.groups) geometry.addGroup(part.start, part.count, part.materialIndex);
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, [roof, gable]);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  }
   function addForestInstances() {
     const count = 18;
     const trunkGeometry = new THREE.CylinderGeometry(.09, .13, .65, 5);
@@ -455,10 +484,10 @@ if (host && "WebGLRenderingContext" in window) {
     warehouse:[1.46,.9,1.1,.52]
   });
   function addEldoriaCastle(group,level,skin,wall,roof,stone,accent){
-    const tier=level>=30?4:level>=20?3:level>=10?2:1;
+    const tier=castleArchitectureTier(level);
     const high=qualityProfile?.tier==="high",low=qualityProfile?.tier==="low";
-    const keepHeight=1.42+(tier-1)*.19;
-    const towerHeight=1.28+(tier-1)*.16;
+    const keepHeight=1.42+(tier-1)*.15;
+    const towerHeight=1.28+(tier-1)*.12;
     group.userData.coIArchitecture="eldoria-imperial-v1";
     group.userData.coIArchitectureTier=tier;
     box(group,1.75,.15,1.52,mats.darkStone,0,.075,0);
@@ -474,7 +503,7 @@ if (host && "WebGLRenderingContext" in window) {
     box(group,.30,.45,.045,mats.wood,0,.48,.72);
     box(group,.44,.075,.08,accent,0,.74,.725);
     box(group,.66,.09,.24,stone,0,.09,.77);
-    const towers=low?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
+    const towers=low||tier===1?[[-.62,.46],[.62,.46]]:[[-.62,.46],[.62,.46],[-.62,-.44],[.62,-.44]];
     for(const [x,z] of towers){
       addCylinder(group,.22,.26,towerHeight,stone,x,.25+towerHeight/2,z,low?6:10);
       addCylinder(group,.29,.25,.13,stone,x,.25+towerHeight,z,low?6:10);
@@ -490,6 +519,17 @@ if (host && "WebGLRenderingContext" in window) {
     for(const x of [-.24,.24]){
       box(group,.12,.30,.045,mats.darkStone,x,.25+keepHeight*.65,.32);
       box(group,.075,.22,.055,mats.window,x,.25+keepHeight*.65,.35);
+    }
+    // Gate reinforcement and royal facade evolve without new assets or state.
+    if(tier>=2&&!low){
+      for(const x of [-.105,0,.105])box(group,.025,.45,.025,mats.darkStone,x,.49,.75);
+      box(group,.29,.025,.035,mats.darkStone,0,.58,.75);
+    }
+    if(tier>=4&&!low){
+      for(const x of [-.24,.24]){
+        box(group,.17,.045,.065,accent,x,.25+keepHeight*.65+.14,.35);
+        box(group,.17,.045,.065,accent,x,.25+keepHeight*.65-.14,.35);
+      }
     }
     // Tier-dependent buttresses and royal ornaments; no effect on gameplay.
     if(tier>=2&&!low)for(const x of [-.43,.43])box(group,.12,.76,.14,stone,x,.63,.42);
@@ -524,9 +564,7 @@ if (host && "WebGLRenderingContext" in window) {
       box(group,.98,.05,.98,earth,0,.10,0);
       // Barn and foreground crop field are separate readable volumes.
       box(group,.78,.46+.06*stage,.38,wall,0,.35+.03*stage,-.27);
-      const barnRoof=new THREE.Mesh(new THREE.ConeGeometry(1,.3,4),roof);
-      barnRoof.rotation.y=Math.PI/4;barnRoof.scale.set(.86/Math.SQRT2,1,.48/Math.SQRT2);
-      barnRoof.position.set(0,.76+.06*stage,-.27);group.add(barnRoof);
+      addGableRoof(group,.86,.48,.30,roof,wall,0,.61+.06*stage,-.27);
       box(group,.21,.32,.035,mats.wood,0,.28,-.06);
       for(const x of [-.32,0,.32])box(group,.20,.035,.49,earth,x,.145,.23);
       const rows=low?2:high?5:3;
@@ -606,13 +644,21 @@ if (host && "WebGLRenderingContext" in window) {
     box(group, bodyWidth+.08, .09, bodyDepth+.08, mats.wood, 0, height + .035, 0);
     if(type==="wall"||type==="quarry"||type==="iron_mine"){
       box(group,bodyWidth+.09,.12,bodyDepth+.09,mats.darkStone,0,height+.10,0);
-    }else{
+    }else if(type==="watchtower"){
       const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(1, roofHeight, 4), roof);
       roofMesh.rotation.y = Math.PI / 4;
       roofMesh.scale.set((bodyWidth+.14)/Math.SQRT2,1,(bodyDepth+.14)/Math.SQRT2);
       roofMesh.position.y = height + .08 + roofHeight/2;
       roofMesh.castShadow = true;
       group.add(roofMesh);
+    }else{
+      // Long ridge follows the longer building axis: less generic pyramid silhouettes.
+      const longX = bodyWidth > bodyDepth;
+      const pitched = addGableRoof(group,
+        (longX ? bodyDepth : bodyWidth)+.14,
+        (longX ? bodyWidth : bodyDepth)+.14,
+        roofHeight,roof,wall,0,height+.08,0);
+      if(longX) pitched.rotation.y = Math.PI / 2;
     }
 
     // Warm emissive windows stay legible in the isometric view without adding
@@ -623,6 +669,15 @@ if (host && "WebGLRenderingContext" in window) {
       box(group, .18, .22, .045, mats.window, wx, height * .63, facade);
       box(group, .035, .25, .055, mats.wood, wx, height * .63, facade+.025);
       box(group, .2, .035, .055, mats.wood, wx, height * .63, facade+.025);
+    }
+
+    // Side-facing light and structural trim read from the existing isometric camera.
+    // Skip these extra details on low quality and on defensive masonry.
+    if (qualityProfile?.tier !== "low" && type !== "wall" && type !== "watchtower") {
+      const sideX = bodyWidth/2 + .018;
+      box(group,.035,.20,.22,mats.window,sideX,height*.62,0);
+      box(group,.045,.24,.035,mats.wood,sideX+.012,height*.62,0);
+      box(group,.06,.07,.30,mats.stone,sideX,height*.62-.13,0);
     }
 
     if (type === "watchtower") {
@@ -865,8 +920,10 @@ if (host && "WebGLRenderingContext" in window) {
     frameCityBuildings(list);
     list.forEach((b, i) => {
       const { x, z } = cityWorldPoint(b, i);
-      const template = glbTemplates.get(b.building_type);
-      const group = b.building_type==="castle"||!template
+      const selected = selectBuildingAsset(manifestAssets, b.building_type, b.level, qualityProfile?.tier);
+      // Preserve existing skin appearance until skin-aware GLB materials are implemented.
+      const template = (b.building_type === "castle" && latestCastleSkinId) ? null : glbTemplates.get(selected?.id);
+      const group = !template
         ? createBuilding(b.building_type, b.level, x, z, latestCastleSkinId) : template.clone(true);
       group.position.set(x, 0, z); group.userData.coIType = b.building_type;
       group.traverse(node => { if (node.isMesh) { node.castShadow = true; node.receiveShadow = true; } });
@@ -1162,7 +1219,7 @@ if (host && "WebGLRenderingContext" in window) {
         return;
       }
       const template = normalizeGlbTemplate(gltf, asset);
-      if (kind === "building") glbTemplates.set(asset.type, template);
+      if (kind === "building") glbTemplates.set(asset.id, template);
       else if (kind === "prop") glbPropTemplates.set(asset.id, template);
       else if (kind === "unit") glbUnitTemplates.set(asset.unit_type, {
         template,
@@ -1254,9 +1311,9 @@ if (host && "WebGLRenderingContext" in window) {
           if (!response.ok) throw new Error("Manifesto 3D indisponível.");
           const manifest = await response.json();
           if (disposed || !renderer) return;
-          manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, 32) : [];
-          manifestProps = Array.isArray(manifest.props) ? manifest.props.slice(0, 16) : [];
-          manifestUnits = Array.isArray(manifest.units) ? manifest.units.slice(0, 8) : [];
+          manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, MODEL_LIMITS.models) : [];
+          manifestProps = Array.isArray(manifest.props) ? manifest.props.slice(0, MODEL_LIMITS.props) : [];
+          manifestUnits = Array.isArray(manifest.units) ? manifest.units.slice(0, MODEL_LIMITS.units) : [];
         })().catch(error => {
           manifestLoad = null;
           throw error;
@@ -1265,12 +1322,13 @@ if (host && "WebGLRenderingContext" in window) {
       await manifestLoad;
       if (disposed || !renderer) return;
 
-      const neededTypes = new Set(
-        (Array.isArray(buildings) ? buildings : [])
-          .map(item => item?.building_type)
-          .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
-      );
-      // Optional GLBs replace only their own building type, never the original keep.
+      const visibleBuildings = (Array.isArray(buildings) ? buildings : [])
+        .slice(0, Math.min(16, qualityProfile?.maxBuildings || 9));
+      const selectedBuildings = [...new Map(visibleBuildings
+        .filter(b => b && Object.hasOwn(palettes, b.building_type) && !(b.building_type === "castle" && latestCastleSkinId))
+        .map(b => selectBuildingAsset(manifestAssets, b.building_type, b.level, qualityProfile?.tier))
+        .filter(Boolean).map(asset => [asset.id, asset])).values()];
+      // Fetch only the currently visible tier/LOD, never all upgrade variants.
       const presentUnits = new Set(
         (Array.isArray(troops) ? troops : [])
           .filter(unit => Number(unit?.quantity) > 0)
@@ -1278,9 +1336,9 @@ if (host && "WebGLRenderingContext" in window) {
           .filter(type => typeof type === "string")
       );
       const queue = [
-        ...manifestAssets
-          .filter(asset => asset?.enabled === true && neededTypes.has(asset.type) && !glbTemplates.has(asset.type))
-          .map(asset => ({ asset, kind: "building", key: `building:${asset.type}` })),
+        ...selectedBuildings
+          .filter(asset => !glbTemplates.has(asset.id))
+          .map(asset => ({ asset, kind: "building", key: `building:${asset.id}` })),
         ...manifestProps
           .filter(asset => asset?.enabled === true && typeof asset.id === "string" && !glbPropTemplates.has(asset.id))
           .map(asset => ({ asset, kind: "prop", key: `prop:${asset.id}` })),
