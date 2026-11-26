@@ -1,4 +1,4 @@
-name: Prepare Clash of Izzy Preview D1 (isolated)
+name: Prepare Clash of Izzy 4X Preview D1 (through 0041, isolated)
 
 on:
   workflow_dispatch:
@@ -6,7 +6,7 @@ on:
       target_branch:
         description: "Branch cujo schema será aplicado no D1 descartável"
         required: true
-        default: release/one-shared-realm-early-access
+        default: main
         type: string
       confirm_preview_id:
         description: "Digite exatamente o UUID do D1 Preview"
@@ -87,6 +87,37 @@ jobs:
       - name: Validate Worker bundle without publishing
         run: npx wrangler --config wrangler.jsonc deploy --dry-run --outdir=dist
 
+      - name: Preparar somente migrations ate 0041 em diretório temporario
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,pathlib,re,shutil
+          root=pathlib.Path.cwd()
+          prod=json.loads((root/"wrangler.jsonc").read_text())["d1_databases"][0]["database_id"]
+          cfg=json.loads((root/"wrangler.preview-migrations.jsonc").read_text())
+          binding=cfg["d1_databases"][0]
+          preview="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          assert prod=="7e63af59-d9ff-4159-a9cf-b02e35b92605" and preview!=prod
+          assert binding["binding"]=="PREVIEW_DB" and binding["database_id"]==preview
+          sources=sorted(f for f in (root/"migrations").glob("*.sql")
+              if re.fullmatch(r"00[0-9]{2}_.+\.sql",f.name) and int(f.name[:4])<=41)
+          names=[f.name for f in sources]
+          required=("0037_daily_login_rewards.sql","0038_onboarding_bonus.sql",
+                    "0039_support_orders.sql","0040_support_packages.sql",
+                    "0041_4x_industries_defenses_progression.sql")
+          if not sources or not all(name in names for name in required):
+              raise SystemExit("Incomplete 4X migration source; no remote write.")
+          directory=root/".coi-preview-4x-through-0041"
+          directory.mkdir(exist_ok=False)
+          for file in sources:shutil.copy2(file,directory/file.name)
+          if sorted(f.name for f in directory.glob("*.sql"))!=names:
+              raise SystemExit("Unexpected staged files; no remote write.")
+          binding["migrations_dir"]=directory.name
+          (root/"wrangler.preview-4x.generated.jsonc").write_text(json.dumps(cfg,indent=2)+"\n")
+          print("STAGED_4X_MIGRATIONS="+str(len(names))+"; last="+names[-1])
+          print("No migration 0042-0044 is present in the apply directory.")
+          PY
       - name: Normalize Cloudflare API token
         shell: bash
         env:
@@ -120,7 +151,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler --config wrangler.preview-migrations.jsonc d1 info PREVIEW_DB --json > "$RUNNER_TEMP/preview-d1-info.json"
+          npx wrangler --config wrangler.preview-4x.generated.jsonc d1 info PREVIEW_DB --json > "$RUNNER_TEMP/preview-d1-info.json"
           python - <<'PY'
           import os
           from pathlib import Path
@@ -134,11 +165,55 @@ jobs:
           print("UUID do D1 Preview confirmado; produção não foi selecionada.")
           PY
 
+      - name: Bloquear Preview com dados reais ou historico comercial (somente leitura)
+        shell: bash
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          import json,os,pathlib,re,urllib.request
+          account=os.environ["CLOUDFLARE_ACCOUNT_ID"].strip()
+          token=os.environ["CLOUDFLARE_API_TOKEN"].strip()
+          if not re.fullmatch(r"[0-9a-fA-F]{32}",account) or not token:
+              raise SystemExit("Cloudflare credentials unavailable; no remote write.")
+          preview="6674c0ac-3636-4e57-bff8-23cf60ab9637"
+          url=f"https://api.cloudflare.com/client/v4/accounts/{account}/d1/database/{preview}/query"
+          def query(sql):
+              if not (sql.startswith("SELECT ") or sql=="PRAGMA foreign_key_check"):
+                  raise SystemExit("Only read-only preflight queries permitted.")
+              request=urllib.request.Request(url,method="POST",
+                  data=json.dumps({"sql":sql}).encode(),
+                  headers={"Authorization":"Bearer "+token,"Content-Type":"application/json"})
+              with urllib.request.urlopen(request,timeout=30) as response:reply=json.load(response)
+              if reply.get("success") is not True or not isinstance(reply.get("result"),list) or not reply["result"]:
+                  raise SystemExit("Preview read-only audit failed; no remote write.")
+              rows=reply["result"][0].get("results")
+              if not isinstance(rows,list):raise SystemExit("Malformed Preview reply; no remote write.")
+              return rows
+          tables={r["name"] for r in query("SELECT name FROM sqlite_master WHERE type='table'")}
+          staged=sorted(f.name for f in pathlib.Path(".coi-preview-4x-through-0041").glob("*.sql"))
+          history=[r["name"] for r in query("SELECT name FROM d1_migrations ORDER BY id")] if "d1_migrations" in tables else []
+          if history!=staged[:len(history)]:
+              raise SystemExit("Preview schema/history diverges from 4X through 0041; use separate disposable D1.")
+          if not history and tables-{"_cf_KV","d1_migrations"}:
+              raise SystemExit("Untracked Preview schema detected; no remote write.")
+          for name in ("players","kingdoms","player_accounts","purchase_requests",
+                       "mercadopago_orders","support_orders","level_pack_claims"):
+              if name in tables:
+                  count=query("SELECT COUNT(*) AS n FROM "+name)
+                  if len(count)!=1 or not isinstance(count[0].get("n"),int) or count[0]["n"]!=0:
+                      raise SystemExit("Preview contains rows in "+name+"; no remote write.")
+          if query("PRAGMA foreign_key_check"):
+              raise SystemExit("Preview foreign-key violations; no remote write.")
+          print("PREVIEW_4X_PREFLIGHT=passed; zero player/order rows; no 0042-0044 history.")
+          print("This step performs read-only queries; application requires explicit approval.")
+          PY
       - name: Capture Preview D1 Time Travel bookmark
         shell: bash
         run: |
           set -euo pipefail
-          npx wrangler --config wrangler.preview-migrations.jsonc d1 time-travel info PREVIEW_DB --json > "$RUNNER_TEMP/preview-d1-time-travel.json"
+          npx wrangler --config wrangler.preview-4x.generated.jsonc d1 time-travel info PREVIEW_DB --json > "$RUNNER_TEMP/preview-d1-time-travel.json"
           test -s "$RUNNER_TEMP/preview-d1-time-travel.json"
           echo "Bookmark/estado de Time Travel do Preview consultado antes da migration."
 
@@ -153,13 +228,13 @@ jobs:
           retention-days: 30
 
       - name: Show pending Preview migrations (read-only)
-        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations list PREVIEW_DB --remote
+        run: npx wrangler --config wrangler.preview-4x.generated.jsonc d1 migrations list PREVIEW_DB --remote
 
       - name: Apply migrations to isolated Preview D1 only
-        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations apply PREVIEW_DB --remote
+        run: npx wrangler --config wrangler.preview-4x.generated.jsonc d1 migrations apply PREVIEW_DB --remote
 
       - name: Verify Preview migration status after apply
-        run: npx wrangler --config wrangler.preview-migrations.jsonc d1 migrations list PREVIEW_DB --remote
+        run: npx wrangler --config wrangler.preview-4x.generated.jsonc d1 migrations list PREVIEW_DB --remote
 
       - name: Confirm no production deploy was performed
         run: |
