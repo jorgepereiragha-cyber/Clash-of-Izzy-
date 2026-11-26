@@ -592,8 +592,8 @@
       "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
       "license": "CC0-1.0",
       "attribution": "Quaternius Medieval Village Pack — Quaternius",
-      "sha256": "264fc6abe5be8c091a1c6f293dce9e8ae79b96b50ccec45f0a7fb12201db1d7c",
-      "bytes": 670832,
+      "sha256": "f469580f07c0a907694869dccfea9f2416081be895f5d3aa07783de82ecfe74d",
+      "bytes": 463796,
       "licenseFile": "licenses/Quaternius-CC0.txt",
       "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/medieval_village_pack/Blacksmith.glb"
     }
