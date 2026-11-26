@@ -5,6 +5,16 @@ export class KingdomEntityArtController {
   setQuality(profile){this.quality=normalizeQualityProfile(profile);}
   getAsset(category,id,tier=1){return resolveEntity2DAsset(this.manifest,category,id,{quality:this.quality,tier});}
   getBuildingAsset(id,tier=1){return this.getAsset("buildings",id,tier);}
+  // Match the nine visible Canvas plots and resolve the exact artwork
+  // selected by the renderer (level and graphics quality included).
+  getCityPreloadAssets(buildings){
+    const unique=new Map();
+    for(const building of (Array.isArray(buildings)?buildings:[]).slice(0,9)){
+      const asset=this.getBuildingAsset(building?.building_type,building?.level);
+      if(asset&&!unique.has(asset.src))unique.set(asset.src,asset);
+    }
+    return [...unique.values()];
+  }
   getDragonPortrait(id){return this.getAsset("dragons",id);}
   getTroopIcon(id){return this.getAsset("troops",id);}
   getHeroPortrait(id){return this.getAsset("heroes",id);}
@@ -37,7 +47,7 @@ export class KingdomEntityArtController {
   }
 }
 if(typeof window!=="undefined"&&typeof document!=="undefined"){
-  let controller,revision=0,loadedSignature=null,inFlightSignature=null;
+  let controller,revision=0,inFlightSignature=null;
   const currentBuildings=()=>window.__coiKingdomBuildings||[];
   const city=()=>document.getElementById("city");
   function updatePreviews(){
@@ -53,17 +63,21 @@ if(typeof window!=="undefined"&&typeof document!=="undefined"){
   }
   function warmCity(){
     const host=city();if(!controller||!host||host.classList.contains("has-3d"))return;
-    const buildings=currentBuildings().slice(0,9);
-    const ids=[...new Set(buildings.map(b=>b.building_type))];
-    if(!ids.length)return;
-    const signature=ids.join("|")+"|"+controller.quality;
-    if(signature===loadedSignature||signature===inFlightSignature)return;
+    const assets=controller.getCityPreloadAssets(currentBuildings());
+    const missing=assets.filter(asset=>!peekEntityCanvasImage(asset));
+    if(!missing.length){
+      if(inFlightSignature!==null){++revision;inFlightSignature=null;}
+      return;
+    }
+    // A previously loaded URL may have been evicted by the bounded cache.
+    // Retry missing artwork without duplicating concurrent decodes.
+    const signature=JSON.stringify(assets.map(asset=>asset.src));
+    if(signature===inFlightSignature)return;
     inFlightSignature=signature;const run=++revision;
-    Promise.all(ids.map(id=>controller.preload("buildings",id))).then(results=>{
+    Promise.all(missing.map(asset=>loadEntityCanvasImage(asset).catch(()=>null))).then(results=>{
       if(run!==revision)return;
       inFlightSignature=null;
-      if(results.every(Boolean))loadedSignature=signature;
-      if(!host.classList.contains("has-3d"))window.dispatchEvent(new Event("coi:entity-art-ready"));
+      if(results.some(Boolean)&&!host.classList.contains("has-3d"))window.dispatchEvent(new Event("coi:entity-art-ready"));
     });
   }
   function render(){paint();warmCity();}
