@@ -98,3 +98,16 @@ test("canvas draw uses a previously decoded asset and never draws invalid dimens
  assert.equal(controller.drawCanvas2DEntity(ctx,{category:"buildings",id:"castle",x:1,y:2,w:0,h:40}),false);
  assert.equal(calls.length,1);
 });
+
+test("special buildings use canonical D1 keys and real local art",async()=>{
+ const {SPECIAL_CITY_CATALOG}=await import("../city-special-buildings.js");
+ const svg=await readFile(new URL("../assets/art/buildings/icons.svg",import.meta.url),"utf8");
+ for(const key of Object.keys(SPECIAL_CITY_CATALOG)){
+   assert.equal(art.buildings[key].webgl.fallback,"procedural");
+   assert.equal(resolveEntity2DAsset(manifest,"buildings",key).src,"/assets/art/buildings/icons.svg#"+key);
+   assert.ok(svg.includes('id="'+key+'"'));
+ }
+ const source=await readFile(new URL("../scripts/city-layout-editor.js",import.meta.url),"utf8");
+ assert.match(source,/paintBuildingArt\(b\.building_type/);
+ assert.doesNotMatch(source,/from\s+["']three(?:\/|["'])/);
+});

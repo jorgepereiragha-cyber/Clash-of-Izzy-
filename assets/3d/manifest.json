@@ -824,6 +824,28 @@
           "fallback": "procedural"
         },
         "canvas2d": null
+      },
+      "dragon_nest": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "dragon_nest",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "summon_altar": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/icons.svg",
+          "symbol": "summon_altar",
+          "viewBox": "0 0 100 90"
+        }
       }
     },
     "dragons": {
