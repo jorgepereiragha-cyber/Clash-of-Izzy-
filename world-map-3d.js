@@ -3,7 +3,7 @@ import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
 import { marchVisualProgress, marchVisualPoint, planMarchFormation, planMarchRepresentatives } from "./scripts/march-visual-path.js";
-import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-state.js";
+import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/world-map-visual-state.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -322,7 +322,7 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     return group;
   }
 
-  function createRoyalThrone(parent,x,z,shielded){
+  function createRoyalThrone(parent,x,z,visualState){
     // Original low-poly model made from procedural geometry. No downloads/GLB.
     const group=new THREE.Group();
     group.position.set(x,terrainHeight(x,z)+.2,z);
@@ -339,9 +339,12 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     for(const dx of [-3.8,3.8]){
       makeTower(group,dx,2.6,3,shared.stone);
     }
-    if(shielded){
+    if (visualState !== "idle") {
+      const shielded = visualState === "shielded";
+      const ringMaterial = shielded ? shared.blueTroop
+        : visualState === "contest" ? shared.enemy : shared.gold;
       const halo=makeMesh(new THREE.TorusGeometry(4.6,.13,7,38),
-        shared.blueTroop,group,0,2.0,0);
+        ringMaterial,group,0,shielded ? 2.0 : .39,0);
       halo.rotation.x=Math.PI/2;
       halo.castShadow=false;
     }
@@ -371,7 +374,7 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     inset.rotation.y = Math.PI / 6;
 
     if (territory.territory_kind === "throne") {
-      createRoyalThrone(parent,x,z,worldState?.throneShielded===true);
+      createRoyalThrone(parent,x,z,throneVisualState(worldState));
       return;
     }
     if (territory.territory_kind === "castle") {

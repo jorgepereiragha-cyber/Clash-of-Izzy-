@@ -530,9 +530,9 @@ if (host && "WebGLRenderingContext" in window) {
   });
   function addEldoriaCastle(group,level,skin,wall,roof,stone,accent){
     const tier=level>=30?4:level>=20?3:level>=10?2:1;
-    const high=qualityProfile?.tier==="high",low=qualityProfile?.tier==="low";
-    const keepHeight=1.66+(tier-1)*.23;
-    const towerHeight=1.37+(tier-1)*.17;
+    const low=qualityProfile?.tier==="low";
+    const keepHeight=1.92+(tier-1)*.27;
+    const towerHeight=1.52+(tier-1)*.20;
     group.userData.coIArchitecture="eldoria-imperial-v1";
     group.userData.coIArchitectureTier=tier;
     box(group,1.75,.15,1.52,mats.darkStone,0,.075,0);
@@ -621,7 +621,12 @@ if (host && "WebGLRenderingContext" in window) {
       }
       if(!low)box(group,.11,.04,.06,accent,x,.25+towerHeight*.65-.14,z+.26);
     }
-    for(const x of [-.47,.47])box(group,.32,.56,.18,wall,x,.48,.55);
+    for (const x of [-.46, .46]) {
+      box(group, .37, .58, .20, wall, x, .49, .56);
+      box(group, .40, .08, .24, stone, x, .80, .56);
+    }
+    box(group, 1.40, .58, .16, wall, 0, .49, -.64);
+    box(group, 1.44, .08, .21, stone, 0, .80, -.64);
     // Repeated crenellations add a recognizable fortified silhouette in one draw call.
     const battlementPositions=[];
     for(const x of [-.48,-.24,0,.24,.48])battlementPositions.push([x,.84,-.64]);
@@ -645,7 +650,7 @@ if (host && "WebGLRenderingContext" in window) {
       const finial=new THREE.Mesh(new THREE.OctahedronGeometry(.10),accent);
       finial.position.set(0,1.13+keepHeight,-.12);group.add(finial);
     }
-    if(high)for(const x of [-.48,-.24,0,.24,.48])box(group,.14,.16,.14,stone,x,.90,.51);
+
     if(!low){
       const bannerMaterial=material(skin?.banner||"#E7BD68",.82);
       // The heraldic seal keeps the original royal palette and respects owned skins.
@@ -677,11 +682,11 @@ if (host && "WebGLRenderingContext" in window) {
       box(group,.21,.32,.035,mats.wood,0,.28,-.06);
       for(const x of [-.32,0,.32])box(group,.20,.035,.49,earth,x,.145,.23);
       const rows=low?2:high?5:3;
-      const stems=new THREE.InstancedMesh(new THREE.CylinderGeometry(.014,.022,.15,5),grain,rows*3);
+      const stems=new THREE.InstancedMesh(new THREE.CylinderGeometry(.041,.027,.23,5),grain,rows*3);
       const dummy=new THREE.Object3D();
       let i=0;
       for(const x of [-.32,0,.32])for(let j=0;j<rows;j++){
-        dummy.position.set(x,.23,.02+j*.42/(rows-1));
+        dummy.position.set(x,.26,.02+j*.42/(rows-1));
         dummy.scale.setScalar(1);dummy.updateMatrix();stems.setMatrixAt(i++,dummy.matrix);
       }
       stems.instanceMatrix.needsUpdate=true;stems.computeBoundingSphere();group.add(stems);
@@ -1561,6 +1566,8 @@ if (host && "WebGLRenderingContext" in window) {
           .map(item => item?.building_type)
           .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
       );
+      // Keep the barn and raised crops visible at city zoom.
+      neededTypes.delete("farm");
       // The gate is an optional facade, never a replacement for the original keep.
       if (neededTypes.has("castle") && qualityProfile?.tier !== "low") neededTypes.add("castle_gate");
       // Optional GLBs replace only their own building type, never the original keep.
