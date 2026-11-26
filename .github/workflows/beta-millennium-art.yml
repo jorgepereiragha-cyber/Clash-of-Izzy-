@@ -10,12 +10,15 @@ permissions:
   contents: read
 jobs:
   convert:
-    runs-on: ubuntu-22.04
+    runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Download pinned art only and verify Git blob hashes
         shell: bash
         run: |
@@ -65,9 +68,9 @@ jobs:
       - name: Install browser smoke dependencies
         if: github.head_ref == 'improve/beta-millennium-integrate'
         run: |
-          npm ci
-          npx playwright install chromium
+          npm install --no-save --no-audit --no-fund --package-lock=false
           npm run vendor:three
+          npx playwright install --with-deps chromium
       - name: Render staged models in local beta Worker and D1
         if: github.head_ref == 'improve/beta-millennium-integrate'
         env:
