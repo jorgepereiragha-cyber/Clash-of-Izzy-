@@ -629,6 +629,155 @@
           "atlas": "art/buildings/icons.svg",
           "symbol": "castle",
           "viewBox": "0 0 100 90"
+        },
+        "tiers": {
+          "10": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "11": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "12": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "13": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "14": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "15": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "16": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "17": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "18": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "19": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-2",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "20": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "21": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "22": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "23": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "24": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "25": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "26": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "27": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "28": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "29": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-3",
+              "viewBox": "0 0 100 90"
+            }
+          },
+          "30": {
+            "canvas2d": {
+              "atlas": "art/buildings/icons.svg",
+              "symbol": "castle-stage-4",
+              "viewBox": "0 0 100 90"
+            }
+          }
         }
       },
       "barracks": {
