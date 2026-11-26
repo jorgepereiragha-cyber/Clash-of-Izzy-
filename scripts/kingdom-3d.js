@@ -1559,8 +1559,8 @@ if (host && "WebGLRenderingContext" in window) {
           .map(item => item?.building_type)
           .filter(type => typeof type === "string" && Object.hasOwn(palettes, type))
       );
-      // Keep the barn and raised crops visible at city zoom.
-      neededTypes.delete("farm");
+      // Preserve the verified farm GLB on supported devices; the barn and
+      // raised crops remain the procedural fallback on low or unavailable assets.
       // The gate is an optional facade, never a replacement for the original keep.
       if (neededTypes.has("castle") && qualityProfile?.tier !== "low") neededTypes.add("castle_gate");
       // Optional GLBs replace only their own building type, never the original keep.
