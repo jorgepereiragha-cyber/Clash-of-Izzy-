@@ -1,3 +1,4 @@
+import { castleSkinPalettes } from "./castle-skin-visuals.js";
 /* Progressive Three.js kingdom renderer. Canvas art remains as offline/WebGL fallback. */
 import * as THREE from "three";
 import { loadEntityManifest } from "./kingdom-2d-art-atlas.js";
@@ -73,14 +74,6 @@ if (host && "WebGLRenderingContext" in window) {
     watchtower: ["#9c927b", "#24476B"], stable: ["#98734e", "#31577D"],
     archery_range: ["#a49a6c", "#456B4E"], siege_workshop: ["#827466", "#52677D"],
     embassy: ["#b0a18a", "#31577D"], warehouse: ["#9b886a", "#24476B"]
-  };
-  const castleSkinPalettes = {
-    1:{wall:"#c7a86f",roof:"#9b6627",stone:"#ead5a3",accent:"#f1d078",banner:"#8d401f",seal:"#f6dc92"},
-    2:{wall:"#d2d0c5",roof:"#264d77",stone:"#f1ead4",accent:"#e4bd68",banner:"#17385f",seal:"#dcecf5"},
-    3:{wall:"#887767",roof:"#5a3828",stone:"#b69b75",accent:"#c6a15d",banner:"#5a2724",seal:"#d8b776"},
-    4:{wall:"#aaa2c8",roof:"#5a4b8c",stone:"#d8cbed",accent:"#e2caef",banner:"#342d6f",seal:"#e8d7f4"},
-    5:{wall:"#9fb8ca",roof:"#3e6b91",stone:"#d9e8ee",accent:"#c2e1ec",banner:"#264869",seal:"#edf8ff"},
-    6:{wall:"#d29b65",roof:"#9e3d27",stone:"#f2c68a",accent:"#f5cf63",banner:"#7c241f",seal:"#ffe3a1"}
   };
   const sharedMaterials = new Set(Object.values(mats));
   const surfaceTextureCache = new Map();

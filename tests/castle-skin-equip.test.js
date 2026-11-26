@@ -54,3 +54,18 @@ test("owner castle appearance is carried into the center castle on the shared ma
   assert.ok(renderer.includes("worldState.castleSkinId"));
   assert.ok(renderer.includes("territory.castle_skin_id"));
 });
+
+test("all six equipped skins have matching city and map artwork",async()=>{
+  const {castleCityArtId,castleSkinPalettes}=await import("../scripts/castle-skin-visuals.js");
+  const {KingdomEntityArtController}=await import("../scripts/kingdom-entity-art-boot.js");
+  const controller=new KingdomEntityArtController();
+  const atlas=await read("assets/art/buildings/icons.svg");
+  for(const [id,palette] of Object.entries(castleSkinPalettes)){
+    const artId=castleCityArtId(id);
+    const symbol=atlas.split('<symbol id="'+artId+'"')[1]?.split("</symbol>")[0];
+    assert.ok(symbol?.includes("--castle-roof:"+palette.roof));
+    assert.ok(symbol?.includes("--castle-wall:"+palette.wall));
+    assert.equal(controller.getBuildingAsset(artId).src,"/assets/art/buildings/icons.svg#"+artId);
+  }
+  for(const value of [null,0,7,"__proto__"])assert.equal(castleCityArtId(value),"castle");
+});

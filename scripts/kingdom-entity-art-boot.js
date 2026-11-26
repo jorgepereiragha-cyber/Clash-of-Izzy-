@@ -1,9 +1,15 @@
+import { castleCityArtId } from "./castle-skin-visuals.js";
 import {loadEntityManifest,resolveEntity2DAsset,createEntityArtElement,resolveQualityFolder,loadEntityCanvasImage,peekEntityCanvasImage,loadCachedImage,imageCacheInfo} from "./kingdom-2d-art-atlas.js";
 export const normalizeQualityProfile=resolveQualityFolder;
 export class KingdomEntityArtController {
   constructor({manifest,quality="balanced"}={}){this.manifest=manifest||{version:2};this.setQuality(quality);}
   setQuality(profile){this.quality=normalizeQualityProfile(profile);}
-  getAsset(category,id,tier=1){return resolveEntity2DAsset(this.manifest,category,id,{quality:this.quality,tier});}
+  getAsset(category,id,tier=1){
+    if (category === "buildings" && /^castle-[1-6]$/.test(id)) {
+      return {kind:"symbol",src:"/assets/art/buildings/icons.svg#"+id,viewBox:"0 0 100 90"};
+    }
+    return resolveEntity2DAsset(this.manifest,category,id,{quality:this.quality,tier});
+  }
   getBuildingAsset(id,tier=1){return this.getAsset("buildings",id,tier);}
   getDragonPortrait(id){return this.getAsset("dragons",id);}
   getTroopIcon(id){return this.getAsset("troops",id);}
@@ -54,7 +60,8 @@ if(typeof window!=="undefined"&&typeof document!=="undefined"){
   function warmCity(){
     const host=city();if(!controller||!host||host.classList.contains("has-3d"))return;
     const buildings=currentBuildings().slice(0,9);
-    const ids=[...new Set(buildings.map(b=>b.building_type))];
+    const ids=[...new Set(buildings.map(b=>b.building_type==="castle"
+      ? castleCityArtId(window.__coiKingdomCastleSkin) : b.building_type))];
     if(!ids.length)return;
     const signature=ids.join("|")+"|"+controller.quality;
     if(signature===loadedSignature||signature===inFlightSignature)return;

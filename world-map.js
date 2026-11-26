@@ -1,3 +1,5 @@
+import { castleCityArtId } from "./scripts/castle-skin-visuals.js";
+import { createEntityArtElement } from "./scripts/kingdom-2d-art-atlas.js";
 import { throneVisualState } from "./scripts/world-map-visual-state.js";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
 import { readMarchComposition } from "./scripts/march-visual-path.js";
@@ -153,7 +155,16 @@ function renderMap() {
     button.title = isCastle
       ? territory.name + " · " + (territory.commander_name || "Comandante") + " · poder " + fmt(territory.power)
       : territory.name + " · " + resource.label + " · " + owner;
-    button.append(make("span", "", resource.icon));
+    if (isCastle) {
+      const artId = castleCityArtId(territory.castle_skin_id);
+      const portrait = createEntityArtElement({
+        kind:"symbol",src:"/assets/art/buildings/icons.svg#"+artId,viewBox:"0 0 100 90"
+      }, document);
+      portrait.classList.add("territory-castle-art");
+      button.append(portrait);
+    } else {
+      button.append(make("span", "", resource.icon));
+    }
     button.append(make("small", "", territory.name));
     button.addEventListener("click", () => {
       selectedTerritoryId = territory.id;
