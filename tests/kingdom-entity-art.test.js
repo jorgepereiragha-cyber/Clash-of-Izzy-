@@ -125,3 +125,6 @@ test("city preloads the exact level and quality art of visible plots without dup
  assert.deepEqual(controller.getCityPreloadAssets([{building_type:"castle",level:1}]).map(a=>a.src),["/assets/art/castle.webp"]);
  assert.deepEqual(controller.getCityPreloadAssets([{building_type:"unknown"},null]),[]);
 });
+
+
+test("castle progression uses four actual atlas symbols for levels 1 through 30",async()=>{const atlas=await readFile(new URL("../assets/art/buildings/icons.svg",import.meta.url),"utf8");for(let level=1;level<=30;level++){const stage=level===30?4:level>=20?3:level>=10?2:1;const symbol=stage===1?"castle":"castle-stage-"+stage;assert.equal(resolveEntity2DAsset(manifest,"buildings","castle",{tier:level}).src,"/assets/art/buildings/icons.svg#"+symbol);assert.ok(atlas.includes('id="'+symbol+'"'));}});
