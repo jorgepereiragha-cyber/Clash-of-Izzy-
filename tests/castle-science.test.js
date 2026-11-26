@@ -88,3 +88,16 @@ test("Worker debit and UI share the price and readiness contract",async()=>{
  assert.match(page,/row\.resourceShortfall/);
  assert.match(page,/row\.academyLevel/);
 });
+
+test("Academy cards use canonical rows, unique local icons and the existing research selector",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const [page,icons,styles]=await Promise.all(["../kingdom.html","../assets/art/science/icons.svg","../styles/kingdom-4x-systems.css"].map(p=>readFile(new URL(p,import.meta.url),"utf8")));
+ const ids=[...icons.matchAll(/<symbol id="([^"]+)"/g)].map(m=>m[1]);
+ assert.deepEqual(ids.sort(),Object.keys(SCIENCE_CATALOG).sort());
+ assert.match(icons,/Icons made by Lorc, CC BY 3.0/);
+ assert.match(page,/renderScienceCards\(rows,select\.value\)/);
+ assert.match(page,/select\.value=card\.dataset\.scienceKey/);
+ assert.match(page,/type="button"|card\.type="button"/);
+ assert.match(page,/creativecommons\.org\/licenses\/by\/3\.0/);
+ assert.match(styles,/\.coi-science-card\[aria-pressed="true"\]/);
+});
