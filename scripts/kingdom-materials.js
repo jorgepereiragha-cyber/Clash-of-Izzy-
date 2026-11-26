@@ -85,3 +85,10 @@ export function forEachPeriodicSurfaceCell(kind, visit) {
     }
   }
 }
+
+// Warm directional key + cool, subdued fill; keep the existing single shadow light.
+export const CITY_DAYLIGHT=Object.freeze({hemisphere:1.30,sun:2.65,exposure:1.02});
+export function cityContactShadowSize(width,depth){
+ const safe=n=>Number.isFinite(n)?Math.max(.7,Math.min(3.4,n*1.24)) : 1.25;
+ return {width:safe(width),depth:safe(depth)};
+}
