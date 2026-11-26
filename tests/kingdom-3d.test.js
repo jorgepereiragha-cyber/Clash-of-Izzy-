@@ -565,3 +565,15 @@ test("royal citadel includes a layered silhouette and focused initial view",()=>
  assert.match(renderer,/if\(!low\)\{/);
  assert.match(renderer,/cameraFocusCenter=action==="center"/);
 });
+
+
+test("forest uses broadleaf crowns and bounded instanced tonal variation",()=>{
+ const start=renderer.indexOf("function addForestInstances()");
+ const end=renderer.indexOf("function addCylinder(",start);
+ const forest=renderer.slice(start,end);
+ assert.match(forest,/new THREE\.IcosahedronGeometry/);
+ assert.doesNotMatch(forest,/new THREE\.ConeGeometry/);
+ assert.equal((forest.match(/new THREE\.InstancedMesh/g)||[]).length,3);
+ assert.match(forest,/setColorAt/);
+ assert.match(forest,/instanceColor\.needsUpdate=true/);
+});
