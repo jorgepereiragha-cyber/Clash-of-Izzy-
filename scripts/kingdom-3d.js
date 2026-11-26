@@ -14,6 +14,7 @@ import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
 import { MODEL_LIMITS, selectBuildingAsset, castleArchitectureTier } from "./kingdom-model-selection.js";
+import { gableRoofData } from "./kingdom-roof-geometry.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -245,8 +246,11 @@ if (host && "WebGLRenderingContext" in window) {
       // Exact tile divisors keep masonry seams consistent across repeated UVs.
       for (let y = 0; y < 128; y += 16) {
         const offset = (Math.floor(y / 16) % 2) * 16;
-        for (let x = -16; x < 144; x += 32) {
-          ctx.fillStyle = rand() > .5 ? "rgba(242,226,194,.11)" : "rgba(34,38,34,.10)";
+        for (let x = -32; x < 128; x += 32) {
+          // A partial brick at the left/right boundary must have the same shade.
+          const cell = ((x / 32) % 4 + 4) % 4;
+          const light = ((Math.imul((seed ^ (y / 16 * 131 + cell * 17)) >>> 0, 2654435761) >>> 0) & 256) !== 0;
+          ctx.fillStyle = light ? "rgba(242,226,194,.11)" : "rgba(34,38,34,.10)";
           ctx.fillRect(x + offset + 2, y + 2, 28, 12);
           ctx.fillStyle = "rgba(255,244,215,.18)";
           ctx.fillRect(x + offset + 2, y + 2, 28, 1);
@@ -260,7 +264,9 @@ if (host && "WebGLRenderingContext" in window) {
     } else if (kind === "roof") {
       for (let y = 0; y < 128; y += 8) for (let x = -16; x < 128; x += 16) {
         const start = x + ((y / 8) % 2) * 8;
-        ctx.fillStyle = rand() > .5 ? "rgba(210,225,245,.20)" : "rgba(8,18,34,.22)";
+        const cell = ((x / 16) % 8 + 8) % 8;
+        const light = ((Math.imul((seed ^ (y / 8 * 131 + cell * 17)) >>> 0, 2654435761) >>> 0) & 256) !== 0;
+        ctx.fillStyle = light ? "rgba(210,225,245,.20)" : "rgba(8,18,34,.22)";
         ctx.fillRect(start, y, 15, 7);
         ctx.fillStyle = "rgba(230,235,240,.13)";
         ctx.fillRect(start, y, 15, 1);
@@ -403,6 +409,20 @@ if (host && "WebGLRenderingContext" in window) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat);
     mesh.position.set(x, y, z); mesh.castShadow = true; mesh.receiveShadow = true; parent.add(mesh); return mesh;
   }
+  // Pitched roofs are built once per procedural building, never in the frame loop.
+  function addGableRoof(parent, width, depth, height, roof, gable, x, y, z) {
+    const data = gableRoofData(width, depth, height);
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute("position", new THREE.Float32BufferAttribute(data.positions, 3));
+    geometry.setAttribute("uv", new THREE.Float32BufferAttribute(data.uv, 2));
+    for (const part of data.groups) geometry.addGroup(part.start, part.count, part.materialIndex);
+    geometry.computeVertexNormals();
+    const mesh = new THREE.Mesh(geometry, [roof, gable]);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = mesh.receiveShadow = true;
+    parent.add(mesh);
+    return mesh;
+  }
   function addForestInstances() {
     const count = 18;
     const trunkGeometry = new THREE.CylinderGeometry(.09, .13, .65, 5);
@@ -544,9 +564,7 @@ if (host && "WebGLRenderingContext" in window) {
       box(group,.98,.05,.98,earth,0,.10,0);
       // Barn and foreground crop field are separate readable volumes.
       box(group,.78,.46+.06*stage,.38,wall,0,.35+.03*stage,-.27);
-      const barnRoof=new THREE.Mesh(new THREE.ConeGeometry(1,.3,4),roof);
-      barnRoof.rotation.y=Math.PI/4;barnRoof.scale.set(.86/Math.SQRT2,1,.48/Math.SQRT2);
-      barnRoof.position.set(0,.76+.06*stage,-.27);group.add(barnRoof);
+      addGableRoof(group,.86,.48,.30,roof,wall,0,.61+.06*stage,-.27);
       box(group,.21,.32,.035,mats.wood,0,.28,-.06);
       for(const x of [-.32,0,.32])box(group,.20,.035,.49,earth,x,.145,.23);
       const rows=low?2:high?5:3;
@@ -626,13 +644,21 @@ if (host && "WebGLRenderingContext" in window) {
     box(group, bodyWidth+.08, .09, bodyDepth+.08, mats.wood, 0, height + .035, 0);
     if(type==="wall"||type==="quarry"||type==="iron_mine"){
       box(group,bodyWidth+.09,.12,bodyDepth+.09,mats.darkStone,0,height+.10,0);
-    }else{
+    }else if(type==="watchtower"){
       const roofMesh = new THREE.Mesh(new THREE.ConeGeometry(1, roofHeight, 4), roof);
       roofMesh.rotation.y = Math.PI / 4;
       roofMesh.scale.set((bodyWidth+.14)/Math.SQRT2,1,(bodyDepth+.14)/Math.SQRT2);
       roofMesh.position.y = height + .08 + roofHeight/2;
       roofMesh.castShadow = true;
       group.add(roofMesh);
+    }else{
+      // Long ridge follows the longer building axis: less generic pyramid silhouettes.
+      const longX = bodyWidth > bodyDepth;
+      const pitched = addGableRoof(group,
+        (longX ? bodyDepth : bodyWidth)+.14,
+        (longX ? bodyWidth : bodyDepth)+.14,
+        roofHeight,roof,wall,0,height+.08,0);
+      if(longX) pitched.rotation.y = Math.PI / 2;
     }
 
     // Warm emissive windows stay legible in the isometric view without adding
@@ -643,6 +669,15 @@ if (host && "WebGLRenderingContext" in window) {
       box(group, .18, .22, .045, mats.window, wx, height * .63, facade);
       box(group, .035, .25, .055, mats.wood, wx, height * .63, facade+.025);
       box(group, .2, .035, .055, mats.wood, wx, height * .63, facade+.025);
+    }
+
+    // Side-facing light and structural trim read from the existing isometric camera.
+    // Skip these extra details on low quality and on defensive masonry.
+    if (qualityProfile?.tier !== "low" && type !== "wall" && type !== "watchtower") {
+      const sideX = bodyWidth/2 + .018;
+      box(group,.035,.20,.22,mats.window,sideX,height*.62,0);
+      box(group,.045,.24,.035,mats.wood,sideX+.012,height*.62,0);
+      box(group,.06,.07,.30,mats.stone,sideX,height*.62-.13,0);
     }
 
     if (type === "watchtower") {

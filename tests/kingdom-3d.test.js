@@ -483,3 +483,28 @@ test("rural buildings have separate models and bounded crop instances",()=>{
  assert.match(renderer,/new THREE\.InstancedMesh\(new THREE\.CylinderGeometry\(\.014,\.022,\.15,5\),grain,rows\*3\)/);
  assert.match(renderer,/if \(node\.isInstancedMesh\) node\.dispose\(\)/);
 });
+
+test("Eldoria gable geometry has bounded coordinates, outward faces and two material regions", async () => {
+  const { gableRoofData } = await import("../scripts/kingdom-roof-geometry.js");
+  const { positions, uv, groups } = gableRoofData(1.5,1.1,.48);
+  assert.equal(positions.length,72);
+  assert.equal(uv.length,48);
+  assert.deepEqual(groups,[{start:0,count:18,materialIndex:0},{start:18,count:6,materialIndex:1}]);
+  assert.ok(positions.every(Number.isFinite) && uv.every(Number.isFinite));
+  const vertices = Array.from({length:24},(_,i)=>positions.slice(i*3,i*3+3));
+  assert.equal(Math.min(...vertices.map(p=>p[1])),0);
+  assert.equal(Math.max(...vertices.map(p=>p[1])),.48);
+  const normal=(a,b,c)=>{
+    const u=b.map((x,i)=>x-a[i]),v=c.map((x,i)=>x-a[i]);
+    return [u[1]*v[2]-u[2]*v[1],u[2]*v[0]-u[0]*v[2],u[0]*v[1]-u[1]*v[0]];
+  };
+  const normals=Array.from({length:8},(_,i)=>normal(...vertices.slice(i*3,i*3+3)));
+  assert.ok(normals.slice(0,4).every(n=>n[1]>0));
+  assert.ok(normals.slice(4,6).every(n=>n[1]<0));
+  assert.ok(normals[6][2]<0 && normals[7][2]>0);
+  assert.throws(()=>gableRoofData(0,1,1),RangeError);
+  assert.throws(()=>gableRoofData(1,NaN,1),RangeError);
+  assert.match(renderer,/addGableRoof\(group,\.86,\.48,\.30/);
+  assert.match(renderer,/if\(longX\) pitched\.rotation\.y = Math\.PI \/ 2/);
+  assert.match(renderer,/qualityProfile\?\.tier !== "low" && type !== "wall"/);
+});

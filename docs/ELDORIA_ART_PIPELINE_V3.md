@@ -24,3 +24,10 @@ Utilize docs/art-pipeline/prepare_static_lods.py em Blender headless com arquivo
 - Receitas PBR: docs/art-pipeline/MATERIAL_RECIPES.md.
 - Projeto real: JavaScript ES modules, Three.js, Node test, Worker/D1; sem Vite/TypeScript/Vitest. Não importar CityState/UpgradeFlow paralelos ou criar placeholders binários fictícios. O fallback procedural existente é mantido.
 - Pipeline operacional requer modelos reais, Blender e aprovação de arte; não chamar staging de release. Não registrar arte sem licença. Referência Meshy: https://docs.meshy.ai/en/api/text-to-3d .
+
+## Acabamento procedural adicional
+- Telhados de duas águas originais, com faces UV e materiais de telha/alvenaria separados, no celeiro e edifícios cívicos. A orientação acompanha o eixo maior. Torres e muralhas mantêm o desenho específico.
+- Janela lateral e acabamento de pedra visíveis na câmera isométrica em Balanced/High, sem luz pontual adicional. Economia não recebe as três malhas extras.
+- Tijolos e telhas nos limites horizontais recebem cor determinística por célula periódica; não se introduz uma segunda biblioteca de texturas.
+- Referências de materiais: https://threejs.org/manual/pages/color-management.html ; https://polyhaven.com/license ; https://docs.ambientcg.com/license/ . Nenhum arquivo de textura de terceiros foi incorporado nesta revisão.
+- Ainda requer screenshot comparativo e teste físico Android; não é certificação artística ou de FPS.
