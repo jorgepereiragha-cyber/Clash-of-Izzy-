@@ -6,6 +6,7 @@ on:
       - scripts/convert-millennium-fortress.py
       - scripts/millennium-art-budget.mjs
       - scripts/compare-millennium-candidates.mjs
+      - scripts/pack-millennium-draco.mjs
       - .github/workflows/beta-millennium-art.yml
 permissions:
   contents: read
@@ -70,5 +71,25 @@ jobs:
         with:
           name: millennium-lossless-budget-report
           path: art-optimized/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Build optional Draco candidates with shared textures
+        shell: bash
+        run: |
+          mkdir -p art-draco
+          cp art-candidates/*LICENSE.txt art-candidates/PROVENANCE.txt art-draco/
+          echo 'Geometry compressed with Draco using quantization. Shared source textures are unchanged.' >> art-draco/PROVENANCE.txt
+          for model in caro_farmstead caro_market caro_storehouse; do
+            npx --yes @gltf-transform/cli@4.5.1 draco "art-optimized/$model.glb" "art-draco/$model.gltf"
+          done
+          node scripts/pack-millennium-draco.mjs art-candidates art-draco
+      - uses: actions/upload-artifact@v4
+        with:
+          name: millennium-draco-budget-report
+          path: |
+            art-draco/*.glb
+            art-draco/*.png
+            art-draco/*.txt
+            art-draco/draco-budget.json
           retention-days: 7
           if-no-files-found: error
