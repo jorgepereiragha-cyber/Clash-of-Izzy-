@@ -107,6 +107,7 @@ export async function validateAssetManifest(root = process.cwd()) {
   if (entries.length > MAX_ASSETS) fail("máximo de " + MAX_ASSETS + " assets no manifesto.");
   const ids = new Set();
   const sources = new Set();
+  const activeRoles = new Set();
   let totalBytes = 0;
   let enabled = 0;
 
@@ -116,6 +117,10 @@ export async function validateAssetManifest(root = process.cwd()) {
     if (ids.has(asset.id)) fail("id duplicado: " + asset.id + ".");
     ids.add(asset.id);
     if (!asset.enabled) continue;
+    const role = category === "models" ? asset.type : category === "units" ? asset.unit_type : asset.id;
+    const roleKey = category + ":" + role;
+    if (activeRoles.has(roleKey)) fail("modelo ativo duplicado para " + roleKey + ".");
+    activeRoles.add(roleKey);
 
     const decodedSrc = decodePath(asset.src, label + ".src");
     if (!decodedSrc.startsWith("/assets/3d/")) fail(label + ".src não está dentro de /assets/3d/.");
