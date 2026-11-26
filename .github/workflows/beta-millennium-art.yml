@@ -5,6 +5,12 @@ on:
     paths:
       - scripts/convert-millennium-fortress.py
       - scripts/stage-millennium-buildings.mjs
+      - assets/3d/manifest.json
+      - assets/3d/millennium/**
+      - scripts/kingdom-3d.js
+      - tests/beta-runtime-local.test.js
+      - tests/kingdom-assets.test.js
+      - tests/art-license-policy.test.js
       - .github/workflows/beta-millennium-art.yml
 permissions:
   contents: read
