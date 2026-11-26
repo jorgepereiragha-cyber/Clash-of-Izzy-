@@ -9,7 +9,7 @@ import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTim
 import { readGraphicsChoice, getGraphicsStorage } from "./kingdom-visual-preferences.js";
 import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
 import { projectDragonVisual, makeDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
-import { derivePbrTextureData } from "./kingdom-materials.js";
+import { derivePbrTextureData, forEachPeriodicSurfaceCell } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
@@ -241,23 +241,30 @@ if (host && "WebGLRenderingContext" in window) {
         ctx.stroke();
       }
     } else if (kind === "stone") {
-      for (let y = 0; y < 128; y += 22) {
-        const offset = (Math.floor(y / 22) % 2) * 16;
-        for (let x = -16; x < 144; x += 32) {
-          ctx.fillStyle = rand() > .5 ? "rgba(242,226,194,.11)" : "rgba(34,38,34,.10)";
-          ctx.fillRect(x + offset + 2, y + 2, 28, 18);
-          ctx.fillStyle = "rgba(255,244,215,.18)";
-          ctx.fillRect(x + offset + 2, y + 2, 28, 1);
-          ctx.strokeStyle = "rgba(35,39,37,.28)";
+      forEachPeriodicSurfaceCell(kind, ({ positions, y, width, height }) => {
+        const face = rand() > .5 ? "rgba(242,226,194,.13)" : "rgba(34,38,34,.12)";
+        for (const x of positions) {
+          ctx.fillStyle = face;
+          ctx.fillRect(x + 2, y + 2, width - 4, height - 4);
+          ctx.fillStyle = "rgba(255,244,215,.20)";
+          ctx.fillRect(x + 2, y + 2, width - 4, 1);
+          ctx.strokeStyle = "rgba(35,39,37,.30)";
           ctx.lineWidth = 1.5;
-          ctx.strokeRect(x + offset + 1, y + 1, 30, 20);
+          ctx.strokeRect(x + 1, y + 1, width - 2, height - 2);
         }
-      }
+      });
     } else if (kind === "roof") {
-      for (let y = 0; y < 128; y += 12) for (let x = 0; x < 128; x += 16) {
-        ctx.fillStyle = rand() > .5 ? "rgba(210,225,245,.20)" : "rgba(8,18,34,.22)";
-        ctx.fillRect(x + ((y / 12) % 2) * 8, y, 14, 9);
-      }
+      forEachPeriodicSurfaceCell(kind, ({ positions, y, width, height }) => {
+        const face = rand() > .5 ? "rgba(210,225,245,.20)" : "rgba(8,18,34,.22)";
+        for (const x of positions) {
+          ctx.fillStyle = "rgba(8,18,34,.24)";
+          ctx.fillRect(x, y + 1, width, height - 1);
+          ctx.fillStyle = face;
+          ctx.fillRect(x + 1, y + 1, width - 2, height - 3);
+          ctx.fillStyle = "rgba(210,225,245,.16)";
+          ctx.fillRect(x + 2, y + 1, width - 4, 1);
+        }
+      });
     } else if (kind === "grass") {
       // Seamless deterministic turf variation within the existing texture budget.
       for (let i = 0; i < 24; i++) {
@@ -278,17 +285,17 @@ if (host && "WebGLRenderingContext" in window) {
       }
     } else if (kind === "road") {
       // Individual paving stones with alternating joints and weathered faces.
-      for (let y = 0; y < 128; y += 16) {
-        const offset = (y / 16 % 2) * 16;
-        for (let x = -32; x < 144; x += 32) {
+      forEachPeriodicSurfaceCell(kind, ({ positions, y, width, height }) => {
+        const face = rand() > .5 ? "rgba(238,222,184,.28)" : "rgba(103,91,68,.16)";
+        for (const x of positions) {
           ctx.fillStyle = "rgba(48,40,29,.22)";
-          ctx.fillRect(x + offset, y, 32, 16);
-          ctx.fillStyle = rand() > .5 ? "rgba(238,222,184,.28)" : "rgba(103,91,68,.16)";
-          ctx.fillRect(x + offset + 1, y + 1, 30, 14);
+          ctx.fillRect(x, y, width, height);
+          ctx.fillStyle = face;
+          ctx.fillRect(x + 1, y + 1, width - 2, height - 2);
           ctx.fillStyle = "rgba(255,245,214,.16)";
-          ctx.fillRect(x + offset + 2, y + 2, 28, 1);
+          ctx.fillRect(x + 2, y + 2, width - 4, 1);
         }
-      }
+      });
       for (let i = 0; i < 90; i++) {
         const x = rand() * 128, y = rand() * 128;
         ctx.fillStyle = rand() > .5 ? "rgba(45,39,29,.15)" : "rgba(255,245,215,.18)";
