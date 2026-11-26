@@ -16,3 +16,10 @@ Nenhum scene.json de terceiros deve substituir estado D1, posição dos edifíci
 
 ## Resultado da triagem de 25/11/2026
 Run 45726016000: 11 arquivos, 384404 bytes de GLB, 11 hashes SHA-256 conferidos após download do ZIP. Todos declaram KHR_mesh_quantization; nenhum contém imagens de textura. Fazenda 3548 triângulos e 2 animações; outros dez 200–780 triângulos. Não confundir cores PBR escalares com texturas PBR detalhadas. Manter como candidatos, não substituir arte procedural sem render comparativo. O validador agora verifica contagens de atributos por primitiva e registra imagens e materiais. O castelo procedural passa a ter cinco estágios (1/10/20/25/30), com evolução de torres e fachada; texturas procedurais de pedra e telha recebem ajuste de juntas e contraste sem novos downloads.
+
+## Texturas fotográficas CC0 (candidatas)
+- Pedra: https://polyhaven.com/a/castle_wall_slates
+- Madeira: https://polyhaven.com/a/medieval_wood
+- Ardósia: https://polyhaven.com/a/roof_slates_02
+- Pavimento: https://polyhaven.com/a/cobblestone_floor_001
+A aquisição usa somente 1K JPG de albedo, normal OpenGL e roughness, em staging. O script limita bytes, confere dimensões JPEG e registra SHA-256 e proveniência. O JPEG de normal é apenas candidato: converter a formato adequado e verificar artefatos antes de ativar. A aprovação visual, retintura para skins, redução de resolução e conversão KTX2 continuam obrigatórias. Nenhum carregamento de CDN no cliente nem alteração do manifesto ativo.
