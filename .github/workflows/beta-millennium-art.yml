@@ -35,12 +35,22 @@ jobs:
           acquire art/meshes/structural/caro_storehouse.dae caro_storehouse.dae af7174d950859abd150c46d36dd09a39e0824deb
           acquire art/textures/skins/structural/caro_struct.png caro_struct.png 099fc80f1d3d628e82fd1dbdbaf279bbe8c1d4c7
           acquire art/textures/skins/structural/caro_struct_norm.png caro_struct_norm.png b28d12d3007b7c9f288c11b9213dee23a72f02ed
-          curl --fail --silent --show-error --max-time 30 "$base/License.txt" -o art-candidates/UPSTREAM-LICENSE.txt
+          curl --fail --silent --show-error --max-time 30 "$base/art/license.txt" -o art-candidates/UPSTREAM-ART-LICENSE.txt
           printf '%s\n' 'Source: https://github.com/0ADMods/millenniumad/tree/91636b405ee8d0088ec3a34fba6074dbd5c9d0f3' 'Credits: Millennium A.D. contributors; see upstream README.' 'Candidate only; asset-specific licensing and visual review required before redistribution in the game.' > art-candidates/PROVENANCE.txt
-      - name: Convert static art
+      - uses: actions/upload-artifact@v4
+        with:
+          name: millennium-verified-source-art
+          path: art-candidates/
+          retention-days: 7
+          if-no-files-found: error
+      - name: Install conversion dependencies with bounded network retries
+        timeout-minutes: 5
         run: |
-          sudo apt-get update -qq
-          sudo apt-get install -y blender python3-numpy
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 update -qq
+          sudo apt-get -o Acquire::Retries=1 -o Acquire::http::Timeout=20 -o Acquire::https::Timeout=20 install -y blender python3-numpy
+      - name: Convert static art
+        timeout-minutes: 5
+        run: |
           /usr/bin/blender --background --disable-autoexec --python-exit-code 1 --python-expr 'import numpy; print(numpy.__version__)'
           /usr/bin/blender --background --disable-autoexec --python-exit-code 1 --python scripts/convert-millennium-fortress.py -- art-candidates
           cd art-candidates
