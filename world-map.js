@@ -1,3 +1,6 @@
+import { castleCityArtId } from "./scripts/castle-skin-visuals.js";
+import { createEntityArtElement } from "./scripts/kingdom-2d-art-atlas.js";
+import { throneVisualState } from "./scripts/world-map-visual-state.js";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
 import { readMarchComposition } from "./scripts/march-visual-path.js";
 
@@ -120,6 +123,16 @@ function resetMapViewport() {
 function renderMap() {
   const root = $("mapContent");
   root.querySelectorAll(".territory-pin").forEach(pin => pin.remove());
+  const visualState = {
+    territories: state.territories || [],
+    marches: state.marches || [],
+    kingdomId: state.kingdom?.id || 0,
+    castleSkinId: Number(state.kingdom?.equipped_skin_id || 0),
+    castleLevel: Number(state.kingdom?.castle_level || 1),
+    throneShielded:state.throne?.shielded===true,
+    thronePhase:state.throne?.phase,
+    throneClaimed:Boolean(state.throne?.kingAllianceId || state.throne?.occupantAllianceId)
+  };
   const buttonRefs = new Map();
   for (const territory of state.territories || []) {
     const isCastle = territory.territory_kind === "castle";
@@ -135,13 +148,23 @@ function renderMap() {
       (Number(territory.id) === Number(selectedTerritoryId) ? " selected" : ""));
     button.type = "button";
     button.dataset.territoryId = String(territory.id);
+    if (isThrone) button.dataset.throneState = throneVisualState(visualState);
     button.style.left = clamp(50 + Number(territory.x || 0) * 0.9, 9, 91) + "%";
     button.style.top = clamp(50 - Number(territory.z || 0) * 0.9, 10, 90) + "%";
     button.setAttribute("aria-label", territory.name + ", " + (isCastle ? "castelo de " + (territory.commander_name || "outro comandante") : terrain.label) + ", " + owner);
     button.title = isCastle
       ? territory.name + " · " + (territory.commander_name || "Comandante") + " · poder " + fmt(territory.power)
       : territory.name + " · " + resource.label + " · " + owner;
-    button.append(make("span", "", resource.icon));
+    if (isCastle) {
+      const artId = castleCityArtId(territory.castle_skin_id);
+      const portrait = createEntityArtElement({
+        kind:"symbol",src:"/assets/art/buildings/icons.svg#"+artId,viewBox:"0 0 100 90"
+      }, document);
+      portrait.classList.add("territory-castle-art");
+      button.append(portrait);
+    } else {
+      button.append(make("span", "", resource.icon));
+    }
     button.append(make("small", "", territory.name));
     button.addEventListener("click", () => {
       selectedTerritoryId = territory.id;
@@ -151,14 +174,6 @@ function renderMap() {
     buttonRefs.set(Number(territory.id), button);
     root.append(button);
   }
-  const visualState = {
-    territories: state.territories || [],
-    marches: state.marches || [],
-    kingdomId: state.kingdom?.id || 0,
-    castleSkinId: Number(state.kingdom?.equipped_skin_id || 0),
-    castleLevel: Number(state.kingdom?.castle_level || 1),
-    throneShielded:state.throne?.shielded===true
-  };
   window.__coiWorldMapButtons = buttonRefs;
   window.__coiWorldMapState = visualState;
   if (window.__coiWorldMap3D) {

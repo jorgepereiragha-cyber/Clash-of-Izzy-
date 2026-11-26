@@ -1,9 +1,10 @@
+import { castleSkinPalettes } from "./scripts/castle-skin-visuals.js";
 import {worldTerrainHeight,worldTerrainBlend,worldRiverDistance,worldRiverRibbon} from "./scripts/world-map-terrain.js";
 import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
 import { marchVisualProgress, marchVisualPoint, planMarchFormation, planMarchRepresentatives } from "./scripts/march-visual-path.js";
-import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-state.js";
+import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/world-map-visual-state.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -118,14 +119,15 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     skin: new THREE.MeshStandardMaterial({ color: 0xd9ad82, roughness: .9 }),
     spear: new THREE.MeshStandardMaterial({ color: 0x9ca9a5, metalness: .38, roughness: .55 })
   };
-  const castleSkinMaterials = {
-    1:{wall:new THREE.MeshStandardMaterial({color:0xc7a86f,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xead5a3,roughness:.82}),roof:new THREE.MeshStandardMaterial({color:0x9b6627,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x8d401f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xf1d078,metalness:.25,roughness:.48})},
-    2:{wall:new THREE.MeshStandardMaterial({color:0xd2d0c5,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xf1ead4,roughness:.82}),roof:new THREE.MeshStandardMaterial({color:0x264d77,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x17385f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xe4bd68,metalness:.25,roughness:.48})},
-    3:{wall:new THREE.MeshStandardMaterial({color:0x887767,roughness:.9}),wallLight:new THREE.MeshStandardMaterial({color:0xb69b75,roughness:.82}),roof:new THREE.MeshStandardMaterial({color:0x5a3828,roughness:.72}),banner:new THREE.MeshStandardMaterial({color:0x5a2724,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xc6a15d,metalness:.25,roughness:.5})},
-    4:{wall:new THREE.MeshStandardMaterial({color:0xaaa2c8,roughness:.86}),wallLight:new THREE.MeshStandardMaterial({color:0xd8cbed,roughness:.8}),roof:new THREE.MeshStandardMaterial({color:0x5a4b8c,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x342d6f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xe2caef,metalness:.22,roughness:.5})},
-    5:{wall:new THREE.MeshStandardMaterial({color:0x9fb8ca,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xd9e8ee,roughness:.8}),roof:new THREE.MeshStandardMaterial({color:0x3e6b91,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x264869,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xc2e1ec,metalness:.22,roughness:.5})},
-    6:{wall:new THREE.MeshStandardMaterial({color:0xd29b65,roughness:.88}),wallLight:new THREE.MeshStandardMaterial({color:0xf2c68a,roughness:.8}),roof:new THREE.MeshStandardMaterial({color:0x9e3d27,roughness:.7}),banner:new THREE.MeshStandardMaterial({color:0x7c241f,roughness:.78}),accent:new THREE.MeshStandardMaterial({color:0xf5cf63,metalness:.28,roughness:.46})}
-  };
+  const castleSkinMaterials = Object.fromEntries(
+    Object.entries(castleSkinPalettes).map(([id, palette]) => [id, {
+      wall: new THREE.MeshStandardMaterial({ color: palette.wall, roughness: .88 }),
+      wallLight: new THREE.MeshStandardMaterial({ color: palette.stone, roughness: .82 }),
+      roof: new THREE.MeshStandardMaterial({ color: palette.roof, roughness: .7 }),
+      banner: new THREE.MeshStandardMaterial({ color: palette.banner, roughness: .78 }),
+      accent: new THREE.MeshStandardMaterial({ color: palette.accent, metalness: .25, roughness: .48 })
+    }])
+  );
 
 
   function seeded(seed) {
@@ -322,7 +324,7 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     return group;
   }
 
-  function createRoyalThrone(parent,x,z,shielded){
+  function createRoyalThrone(parent,x,z,visualState){
     // Original low-poly model made from procedural geometry. No downloads/GLB.
     const group=new THREE.Group();
     group.position.set(x,terrainHeight(x,z)+.2,z);
@@ -339,9 +341,12 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     for(const dx of [-3.8,3.8]){
       makeTower(group,dx,2.6,3,shared.stone);
     }
-    if(shielded){
+    if (visualState !== "idle") {
+      const shielded = visualState === "shielded";
+      const ringMaterial = shielded ? shared.blueTroop
+        : visualState === "contest" ? shared.enemy : shared.gold;
       const halo=makeMesh(new THREE.TorusGeometry(4.6,.13,7,38),
-        shared.blueTroop,group,0,2.0,0);
+        ringMaterial,group,0,shielded ? 2.0 : .39,0);
       halo.rotation.x=Math.PI/2;
       halo.castShadow=false;
     }
@@ -371,7 +376,7 @@ import { worldVisualKeys, worldCastleTier } from "./scripts/world-map-visual-sta
     inset.rotation.y = Math.PI / 6;
 
     if (territory.territory_kind === "throne") {
-      createRoyalThrone(parent,x,z,worldState?.throneShielded===true);
+      createRoyalThrone(parent,x,z,throneVisualState(worldState));
       return;
     }
     if (territory.territory_kind === "castle") {

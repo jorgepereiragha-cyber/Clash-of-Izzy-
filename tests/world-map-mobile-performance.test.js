@@ -96,6 +96,11 @@ test("world visual keys ignore resource balances but detect ownership, geometry,
  assert.notEqual(a.routes,changed({x:4}).routes);assert.notEqual(a.features,changed({castle_skin_id:5}).features);
  assert.notEqual(a.home,worldVisualKeys({...s,castleSkinId:4}).home);
  assert.notEqual(a.features,worldVisualKeys({...s,throneShielded:false}).features);
+ const contest=worldVisualKeys({...s,throneShielded:false,thronePhase:"contest"});
+ const claimed=worldVisualKeys({...s,throneShielded:false,thronePhase:"contest",throneClaimed:true});
+ assert.notEqual(contest.features,claimed.features);
+ assert.equal(contest.routes,claimed.routes);
+ assert.equal(contest.marches,claimed.marches);
  assert.notEqual(a.marches,worldVisualKeys({...s,marches:[{id:1,status:"marching",march_type:"attack",target_territory_id:7,started_at:"2026-01-01T00:00:00Z",arrives_at:"2026-01-01T01:00:00Z"}]}).marches);
 });
 test("renderer skips unchanged mesh layers and reuses territory lookup during frames",async()=>{
