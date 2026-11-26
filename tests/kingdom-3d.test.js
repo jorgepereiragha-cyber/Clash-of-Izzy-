@@ -499,3 +499,12 @@ test("city contact shadows stay bounded and use one reusable instanced batch",as
  assert.match(renderer,/contactShadowBatch = null/);
  assert.match(renderer,/mat\.color\.set\(skin\?\.stone/);
 });
+
+test("city scenery extends beyond camera framing and supports separate center and overview",()=>{
+ assert.match(renderer,/PlaneGeometry\(96, 96\), mats\.grass/);
+ assert.match(renderer,/kind === "grass" \? 27 : 3/);
+ assert.match(renderer,/cameraFocusCenter \? buildings : \[\.\.\.buildings,\.\.\.currentSpecialLandmarks\(\)\]/);
+ assert.match(renderer,/cameraFocusCenter=action==="center"/);
+ assert.match(kingdom,/data-city-zoom="center"/);
+ assert.match(kingdom,/data-city-zoom="reset"/);
+});
