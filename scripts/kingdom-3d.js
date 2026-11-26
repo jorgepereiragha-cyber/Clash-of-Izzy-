@@ -1062,26 +1062,59 @@ if (host && "WebGLRenderingContext" in window) {
   function createSpecialLandmark(type){
     const group=new THREE.Group();
     group.userData.coIType=type;group.userData.coIProcedural=true;group.userData.coISpecial=true;
-    // Two compact original silhouettes; use shared scene materials and disposable geometry.
+    const low=qualityProfile?.tier==="low";
+    const segments=low?6:10;
     box(group,1.5,.15,1.5,mats.darkStone,0,.075,0);
     if(type==="dragon_nest"){
-      addCylinder(group,.65,.7,.32,mats.stone,0,.27,0,10);
+      // A fortified hatchery: stone retaining walls, a recessed nest, eggs
+      // and an open entrance, all within the existing 3x3 landmark footprint.
+      addCylinder(group,.70,.73,.15,mats.stone,0,.20,0,segments);
+      addCylinder(group,.49,.56,.09,mats.wood,0,.29,0,segments);
       for(let i=0;i<8;i++){
         const a=i*Math.PI/4;
-        const twig=box(group,.42,.12,.11,mats.wood,.58*Math.cos(a),.46,.58*Math.sin(a));
-        if(twig)twig.rotation.y=-a+Math.PI/2;
+        if(i!==2){
+          const rock=box(group,.43,.34+(i%3)*.045,.19,mats.stone,.59*Math.cos(a),.40,.59*Math.sin(a));
+          rock.rotation.y=-a+Math.PI/2;
+          const rim=box(group,.43,.07,.23,mats.darkStone,.59*Math.cos(a),.61+(i%3)*.02,.59*Math.sin(a));
+          rim.rotation.y=rock.rotation.y;
+        }
+        const twig=box(group,.40,.065,.085,mats.wood,.40*Math.cos(a),.35,.40*Math.sin(a));
+        twig.rotation.y=-a+Math.PI/2;
       }
-      for(const [x,z] of [[-.23,-.14],[.23,-.12],[0,.23]]){
-        const egg=new THREE.Mesh(new THREE.SphereGeometry(.18,8,6),mats.gold);
-        egg.scale.y=1.45;egg.position.set(x,.58,z);group.add(egg);
+      for(const x of [-.29,.29]){
+        addCylinder(group,.12,.15,.68,mats.stone,x,.48,.50,segments);
+        addCylinder(group,0,.15,.26,mats.roof,x,.95,.50,segments);
+      }
+      box(group,.34,.065,.22,mats.stone,0,.18,.61);
+      for(const [x,z,scale] of [[-.23,-.14,1],[.23,-.12,.87],[0,.23,1.08]]){
+        const egg=new THREE.Mesh(new THREE.SphereGeometry(.18,segments,low?6:10),mats.gold);
+        egg.scale.set(scale,scale*1.45,scale);
+        egg.position.set(x,.34+.18*scale*1.45,z);egg.castShadow=true;egg.receiveShadow=true;group.add(egg);
       }
     }else{
-      box(group,1.14,.14,1.14,mats.stone,0,.22,0);
-      for(const x of [-.48,.48])for(const z of [-.48,.48])addCylinder(group,.09,.12,.78,mats.stone,x,.68,z,6);
-      box(group,1.2,.12,1.2,mats.gold,0,1.12,0);
-      const crest=new THREE.Mesh(new THREE.OctahedronGeometry(.28),mats.window);
-      crest.position.y=1.43;group.add(crest);
-      box(group,.43,.28,.43,mats.roof,0,.42,0);
+      // Open royal summoning sanctuary: raised steps, colonnade, canopy and
+      // a suspended crystal focal point. No extra textures or dynamic lights.
+      box(group,1.30,.13,1.30,mats.stone,0,.21,0);
+      box(group,1.15,.11,1.15,mats.stone,0,.32,0);
+      box(group,.68,.08,.18,mats.stone,0,.20,.64);
+      for(const x of [-.48,.48])for(const z of [-.48,.48]){
+        addCylinder(group,.13,.15,.10,mats.stone,x,.40,z,segments);
+        addCylinder(group,.075,.105,.83,mats.stone,x,.86,z,segments);
+        addCylinder(group,.14,.11,.09,mats.gold,x,1.31,z,segments);
+      }
+      box(group,1.23,.12,1.23,mats.stone,0,1.40,0);
+      box(group,1.29,.055,1.29,mats.gold,0,1.48,0);
+      const canopy=new THREE.Mesh(new THREE.ConeGeometry(.89,.44,4),mats.roof);
+      canopy.rotation.y=Math.PI/4;canopy.position.y=1.71;canopy.castShadow=true;group.add(canopy);
+      addCylinder(group,.025,.055,.19,mats.gold,0,2.02,0,segments);
+      addCylinder(group,.24,.33,.22,mats.stone,0,.49,0,segments);
+      addCylinder(group,.32,.24,.075,mats.gold,0,.63,0,segments);
+      const crest=new THREE.Mesh(new THREE.OctahedronGeometry(.24),mats.window);
+      crest.position.y=.94;group.add(crest);
+      if(!low)for(const x of [-.48,.48]){
+        box(group,.14,.29,.035,mats.roof,x,1.12,.56);
+        box(group,.14,.035,.04,mats.gold,x,.99,.56);
+      }
     }
     return group;
   }
