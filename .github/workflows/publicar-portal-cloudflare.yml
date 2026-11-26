@@ -49,7 +49,7 @@ jobs:
           python3 - <<'PY'
           from pathlib import Path
           root = Path("public-portal")
-          allowed = {"portal.html", "apoie.html", "favicon.svg", "styles/coi-theme.css", "assets/brand/hero-emblem.svg", "assets/brand/royal-king.webp"}
+          allowed = {"portal.html", "apoie.html", "creditos.html", "favicon.svg", "styles/coi-theme.css", "assets/brand/hero-emblem.svg", "assets/brand/royal-king.webp"}
           found = {p.relative_to(root).as_posix() for p in root.rglob("*") if p.is_file()}
           assert found == allowed, f"Asset fora da allowlist: {found ^ allowed}"
           PY

@@ -39,6 +39,7 @@ jobs:
           allowed = {
               "portal.html",
               "apoie.html",
+              "creditos.html",
               "favicon.svg",
               "styles/coi-theme.css",
               "assets/brand/hero-emblem.svg",
@@ -48,5 +49,5 @@ jobs:
           found = {p.relative_to(public).as_posix() for p in public.rglob("*") if p.is_file()}
           assert found == allowed, f"Asset inesperado ou ausente: {found ^ allowed}"
           assert (public / "portal.html").read_bytes() == Path("portal.html").read_bytes(), "Copia da propaganda desatualizada"
-          print("Portal contém exclusivamente seis assets promocionais permitidos.")
+          print("Portal contém exclusivamente sete assets promocionais permitidos.")
           PY

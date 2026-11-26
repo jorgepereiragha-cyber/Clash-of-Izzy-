@@ -13,6 +13,7 @@ import { derivePbrTextureData } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
 import { planSpecialCityLandmarks } from "./kingdom-special-landmarks.js";
+import { loadLicenseRegistry, assertLicensedAsset } from "../engine/license-registry.js";
 
 const host = document.getElementById("city");
 if (host && "WebGLRenderingContext" in window) {
@@ -1050,6 +1051,9 @@ if (host && "WebGLRenderingContext" in window) {
     const { asset, kind } = entry;
     try {
       const assetUrl = safeAssetUrl(asset);
+      const registry = await loadLicenseRegistry();
+      assertLicensedAsset(registry, assetUrl, window.location.origin, asset);
+      if (disposed || !renderer) return;
       const loadPromise = gltfLoader.loadAsync(assetUrl);
       const gltf = await loadPromise;
       if (disposed || !renderer) {

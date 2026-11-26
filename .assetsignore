@@ -120,3 +120,11 @@ admin-gem-grants.js
 
 # Server-only production clock.
 production-clock.js
+
+# Raw acquisition and conversion staging must never be served by the Worker.
+raw_textures/**
+raw_glb/**
+raw_fbx/**
+raw_ktx2/**
+scripts/fetch_polyhaven.sh
+scripts/textures_to_ktx2.sh

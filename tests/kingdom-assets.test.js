@@ -13,7 +13,7 @@ test("bundled Kenney assets keep CC0 provenance and a bounded local footprint", 
   for (const asset of [...manifest.models, ...manifest.props, ...manifest.units]) {
     assert.equal(asset.enabled, true);
     assert.equal(asset.license, "CC0-1.0");
-    assert.match(asset.sourceUrl, /^https:\/\/kenney\.nl\/assets\//);
+    assert.match(asset.sourceUrl, /^https:\/\/(?:kenney\.nl\/assets\/|quaternius\.com\/packs\/)/);
     assert.ok(asset.src.startsWith("/assets/3d/"));
     assert.ok(asset.src.endsWith(".glb"));
   }
@@ -33,14 +33,16 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
     const document = JSON.parse(data.subarray(20, 20 + jsonLength).toString("utf8").trim());
     assert.equal(document.asset?.version, "2.0", asset.id);
     for (const image of document.images || []) {
+      if (image.bufferView !== undefined) { assert.ok(Number.isInteger(image.bufferView)); continue; }
       assert.ok(image.uri, asset.id + " should use a readable local texture URI");
+      if (image.uri.startsWith("data:")) continue;
       assert.ok(!/^https?:/i.test(image.uri), asset.id + " must not request a third-party texture");
       const texturePath = relativePath.slice(0, relativePath.lastIndexOf("/") + 1) + image.uri;
       const texture = await readFile(toUrl(texturePath));
       assert.ok(texture.byteLength > 0, texturePath);
     }
   }
-  assert.ok(totalBytes < 1_000_000, "optional 3D downloads must remain under 1 MB");
+  assert.ok(totalBytes < 2_000_000, "first reviewed city GLB catalog must remain under 2 MB");
 });
 
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {

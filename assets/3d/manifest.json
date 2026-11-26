@@ -22,6 +22,39 @@
       "source": "Kenney Castle Kit",
       "sourceUrl": "https://kenney.nl/assets/castle-kit",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-village-lumber_mill",
+      "type": "lumber_mill",
+      "src": "/assets/3d/quaternius/medieval-village/Sawmill.glb",
+      "enabled": true,
+      "targetFootprint": 1.8,
+      "targetHeight": 1.8,
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-village-stable",
+      "type": "stable",
+      "src": "/assets/3d/quaternius/medieval-village/Stable.glb",
+      "enabled": true,
+      "targetFootprint": 1.8,
+      "targetHeight": 1.8,
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-village-market",
+      "type": "market",
+      "src": "/assets/3d/quaternius/medieval-village/MarketStand_1.glb",
+      "enabled": true,
+      "targetFootprint": 1.65,
+      "targetHeight": 1.65,
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0"
     }
   ],
   "props": [

@@ -1,0 +1,32 @@
+{
+  "author": "Quaternius",
+  "pack": "Medieval Village Pack",
+  "license": "CC0-1.0",
+  "licenseUrl": "https://creativecommons.org/publicdomain/zero/1.0/",
+  "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+  "mirror": "trebeljahr/quaternius-showcase",
+  "revision": "0128ca510d653bb04d6d1e4885bd8890b5050b4f",
+  "mirrorLicenseFile": "LICENSES.md",
+  "validatedRun": "https://github.com/jorgepereiragha-cyber/Clash-of-Izzy-/actions/runs/45732113638",
+  "files": [
+    {
+      "file": "Sawmill.glb",
+      "bytes": 309568,
+      "gitBlob": "61bb00a510792562bcad524ab874f8dcd6542b86",
+      "sha256": "45b86787f29746003eb6b3eb889555b5d4cd99983f77011cb7d0d461cd6e547e"
+    },
+    {
+      "file": "Stable.glb",
+      "bytes": 444596,
+      "gitBlob": "0a5d8cf36222f8a579bb44c9402a8f8df1b50da6",
+      "sha256": "c5ed9626d931c52b5a2b48d805bccd4232239da5ba677ca169730c036eb5b8c8"
+    },
+    {
+      "file": "MarketStand_1.glb",
+      "bytes": 84992,
+      "gitBlob": "3894530a8476c5411cb685278eafcaedd90e1249",
+      "sha256": "19b9b99c84d41c0b1124fe286ac3b99668d2f2d489d44affa559188881448d75"
+    }
+  ],
+  "visualReview": "pending"
+}

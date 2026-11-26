@@ -140,3 +140,18 @@ test("rejects an enabled GLB whose external texture or buffer path escapes the a
   try { await assert.rejects(validateAssetManifest(escaping), /traversal|escapa/); }
   finally { await rm(escaping, { recursive: true, force: true }); }
 });
+
+test("rejects unknown, restricted and noncommercial licenses even for disabled models",async()=>{
+  for(const license of ["","free","unknown","CC-BY-NC-4.0","CC-BY-SA-4.0","All rights reserved",null]){
+    const root=await fixture({models:[{...baseAsset("model-one","/assets/3d/models/a.glb",false),license}]});
+    try{await assert.rejects(validateAssetManifest(root),/license deve ser CC0-1.0/);}
+    finally{await rm(root,{recursive:true,force:true});}
+  }
+});
+test("rejects malformed source URLs and embedded credentials",async()=>{
+  for(const sourceUrl of ["https://","http://example.com/asset","https://user:pass@example.com/asset","https://example.com/#fragment"]){
+    const root=await fixture({models:[{...baseAsset("model-one","/assets/3d/models/a.glb",false),sourceUrl}]});
+    try{await assert.rejects(validateAssetManifest(root),/sourceUrl/);}
+    finally{await rm(root,{recursive:true,force:true});}
+  }
+});

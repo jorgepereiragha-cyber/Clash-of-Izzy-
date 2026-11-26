@@ -17,7 +17,9 @@
     "test:e2e:headed": "playwright test --headed",
     "vendor:three": "node scripts/vendor-three.mjs",
     "pretest": "npm run vendor:three",
-    "pretest:e2e": "npm run vendor:three"
+    "pretest:e2e": "npm run vendor:three",
+    "assets:licenses": "node scripts/generate-licenses.mjs --check",
+    "build": "npm run assets:licenses && npm run check"
   },
   "devDependencies": {
     "wrangler": "4.161.0",
