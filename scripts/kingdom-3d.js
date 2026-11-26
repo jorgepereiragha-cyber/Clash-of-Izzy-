@@ -689,6 +689,8 @@ if (host && "WebGLRenderingContext" in window) {
         wingRoof.position.set(x,.25+wingHeight+.18,z);
         group.add(wingRoof);
         archWindow(x,.25+wingHeight*.48,z+.247,0,.105,.22);
+        // The exposed outer facade remains readable from the isometric camera.
+        archWindow(x+side*.147,.25+wingHeight*.48,z,side*Math.PI/2,.105,.22);
       }
     }
     if(!low){
