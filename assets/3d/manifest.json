@@ -22,6 +22,39 @@
       "source": "Kenney Castle Kit",
       "sourceUrl": "https://kenney.nl/assets/castle-kit",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "kaykit-blue-barracks",
+      "type": "barracks",
+      "src": "/assets/3d/kaykit/medieval-blue/barracks.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.85,
+      "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/tree/84fa4e91af6a88989be7c99e0891cede11f2ca38",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "kaykit-blue-market",
+      "type": "market",
+      "src": "/assets/3d/kaykit/medieval-blue/market.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.65,
+      "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/tree/84fa4e91af6a88989be7c99e0891cede11f2ca38",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "kaykit-blue-iron-mine",
+      "type": "iron_mine",
+      "src": "/assets/3d/kaykit/medieval-blue/iron_mine.glb",
+      "enabled": false,
+      "targetFootprint": 1.45,
+      "targetHeight": 1.5,
+      "source": "KayKit Medieval Hexagon Pack (Kay Lousberg)",
+      "sourceUrl": "https://github.com/KayKit-Game-Assets/KayKit-Medieval-Hexagon-Pack-1.0/tree/84fa4e91af6a88989be7c99e0891cede11f2ca38",
+      "license": "CC0-1.0"
     }
   ],
   "props": [
