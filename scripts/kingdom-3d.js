@@ -1262,9 +1262,9 @@ if (host && "WebGLRenderingContext" in window) {
           if (!response.ok) throw new Error("Manifesto 3D indisponível.");
           const manifest = await response.json();
           if (disposed || !renderer) return;
-          manifestAssets = Array.isArray(manifest.models) ? manifest.models.filter(asset => approvedManifestEntry(asset, manifest.files)).slice(0, 32) : [];
-          manifestProps = Array.isArray(manifest.props) ? manifest.props.filter(asset => approvedManifestEntry(asset, manifest.files)).slice(0, 16) : [];
-          manifestUnits = Array.isArray(manifest.units) ? manifest.units.filter(asset => approvedManifestEntry(asset, manifest.files)).slice(0, 16) : [];
+          manifestAssets = Array.isArray(manifest.models) ? manifest.models.slice(0, 32).filter(asset => approvedManifestEntry(asset, manifest.files)) : [];
+          manifestProps = Array.isArray(manifest.props) ? manifest.props.slice(0, 16).filter(asset => approvedManifestEntry(asset, manifest.files)) : [];
+          manifestUnits = Array.isArray(manifest.units) ? manifest.units.slice(0, 16).filter(asset => approvedManifestEntry(asset, manifest.files)) : [];
         })().catch(error => {
           manifestLoad = null;
           throw error;
