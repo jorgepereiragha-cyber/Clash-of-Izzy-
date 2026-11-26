@@ -86,3 +86,15 @@ test("science symbols and pure 2D integration stay tied to real UI",async()=>{
  assert.match(html,/coiTroopArtPreview/);assert.match(html,/coiHeroArtPreview/);
  assert.match(html,/data-entity-art-existing/);
 });
+
+test("canvas draw uses a previously decoded asset and never draws invalid dimensions",async()=>{
+ const fakeManifest={entityArt:{buildings:{castle:{canvas2d:{src:"art/test-canvas.webp"}}}}};
+ const controller=new KingdomEntityArtController({manifest:fakeManifest});
+ class FakeImage{set src(_){queueMicrotask(()=>this.onload());}}
+ const image=await controller.acquireImage("/assets/art/test-canvas.webp",FakeImage);
+ const calls=[],ctx={drawImage(...args){calls.push(args);}};
+ assert.equal(controller.drawCanvas2DEntity(ctx,{category:"buildings",id:"castle",x:1,y:2,w:30,h:40}),true);
+ assert.deepEqual(calls,[[image,1,2,30,40]]);
+ assert.equal(controller.drawCanvas2DEntity(ctx,{category:"buildings",id:"castle",x:1,y:2,w:0,h:40}),false);
+ assert.equal(calls.length,1);
+});

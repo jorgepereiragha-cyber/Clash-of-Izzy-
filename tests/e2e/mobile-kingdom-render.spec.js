@@ -388,4 +388,6 @@ test("2D city paints local atlas art and troop preview follows selection",async(
  await page.locator("#unitType").selectOption("archer");
  await expect(page.locator("#coiTroopArtPreview use")).toHaveAttribute("href","/assets/art/eldoria/hud.svg#troop-archer");
  await expect(page.locator('#city [data-building="castle"]')).toBeVisible();
+ await mkdir("test-results/beta-visual",{recursive:true});
+ await page.locator("#city").screenshot({path:"test-results/beta-visual/eldoria-canvas-atlas.png",animations:"disabled"});
 });
