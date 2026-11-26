@@ -1011,6 +1011,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.ok(refreshCounts.before >= 1, "initial optional models refresh the scene");
         assert.equal(refreshCounts.after,refreshCounts.before,
           "unchanged kingdom state must not trigger an extra optional model rebuild");
+        await page.waitForFunction(()=>window.__coiKingdomDiagnostics?.()?.photoStoneLoaded===true,null,{timeout:45_000});
         const diagnostics = await page.evaluate(() => window.__coiKingdomDiagnostics());
         assert.ok(diagnostics.architecture.some(x=>x.type==="castle"&&x.design==="eldoria-imperial-v1"&&x.tier===1),"new realm uses original tier-one keep");
         const artLayout=diagnostics.cityArtLayout;

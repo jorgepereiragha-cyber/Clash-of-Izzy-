@@ -82,6 +82,7 @@ if (host && "WebGLRenderingContext" in window) {
   const sharedMaterials = new Set(Object.values(mats));
   const surfaceTextureCache = new Map();
   const surfaceMaterialCache = new Map();
+  let photoStoneMaps = null;
   let disposed = false;
   let kingdomRenderHandler = null;
   let kingdomZoomHandler = null;
@@ -204,6 +205,7 @@ if (host && "WebGLRenderingContext" in window) {
     disposeResourceSet(resources);
     scene?.clear();
     surfaceTextureCache.clear();
+    photoStoneMaps = null;
     surfaceMaterialCache.clear();
     glbTemplates.clear();
     glbPropTemplates.clear();
@@ -383,9 +385,48 @@ if (host && "WebGLRenderingContext" in window) {
       metalness: 0.01
     });
     // Evita recompilar materiais iguais após cada atualização de estado.
+    if(kind === "stone" && photoStoneMaps) applyPhotoStone(mat,base);
     surfaceMaterialCache.set(key,mat);
     sharedMaterials.add(mat);
     return mat;
+  }
+  // Licensed local photograph, shared color and derived relief maps.
+  function applyPhotoStone(mat,base){
+    Object.assign(mat,photoStoneMaps);
+    mat.color.set(base);mat.normalScale.set(.55,.55);mat.roughness=.92;
+    mat.needsUpdate=true;
+  }
+  async function loadPhotoStone(){
+    if(!qualityProfile?.loadOptionalAssets)return;
+    try{
+      const image=await new Promise((resolve,reject)=>{const img=new Image();img.onload=()=>resolve(img);img.onerror=reject;img.src="/assets/3d/polyhaven/stone_wall_diff_1k.jpg";});
+      if(disposed||!renderer||!scene)return;
+      const size=qualityProfile.surfaceTextureSize;
+      const canvas=document.createElement("canvas");canvas.width=canvas.height=size;
+      const ctx=canvas.getContext("2d",{alpha:false});ctx.drawImage(image,0,0,size,size);
+      const pixels=ctx.getImageData(0,0,size,size),d=pixels.data,luminance=new Uint8Array(size*size);
+      let mean=0;
+      for(let i=0;i<d.length;i+=4){const lum=Math.round(.2126*d[i]+.7152*d[i+1]+.0722*d[i+2]);luminance[i/4]=lum;mean+=lum;}
+      mean/=luminance.length;
+      for(let i=0;i<d.length;i+=4){const v=Math.max(65,Math.min(255,205+(luminance[i/4]-mean)*.9));d[i]=d[i+1]=d[i+2]=v;}
+      ctx.putImageData(pixels,0,0);
+      const makeMap=(source,colorSpace)=>{
+        const map=new THREE.CanvasTexture(source);map.colorSpace=colorSpace;map.wrapS=map.wrapT=THREE.RepeatWrapping;map.repeat.set(2,2);
+        map.anisotropy=Math.min(qualityProfile.anisotropy,renderer.capabilities.getMaxAnisotropy());return map;
+      };
+      const derived=derivePbrTextureData({luminance,width:size,height:size,kind:"stone"});
+      const makeLinear=data=>{const c=document.createElement("canvas");c.width=c.height=size;const x=c.getContext("2d"),p=x.createImageData(size,size);p.data.set(data);x.putImageData(p,0,0);return makeMap(c,THREE.NoColorSpace);};
+      photoStoneMaps={map:makeMap(canvas,THREE.SRGBColorSpace),normalMap:makeLinear(derived.normalData),roughnessMap:makeLinear(derived.roughnessData)};
+      surfaceTextureCache.set("photo-stone",photoStoneMaps);
+      for(const [mat,base] of [[mats.stone,"#9c9b8b"],[mats.darkStone,"#555d5c"],[mats.roadEdge,"#76664c"]]){
+        const old=[mat.map,mat.normalMap,mat.roughnessMap];applyPhotoStone(mat,base);
+        for(const t of old)t?.dispose();
+      }
+      for(const [key,mat] of surfaceMaterialCache){
+        const [base,kind]=key.split(":");if(kind==="stone")applyPhotoStone(mat,base);
+      }
+      renderer.render(scene,camera);
+    }catch(error){console.info("Clash of Izzy: textura fotográfica indisponível; mantendo material procedural.",error);}
   }
   function applyProceduralSurfaceMaps() {
     const maps = [
@@ -1501,6 +1542,7 @@ if (host && "WebGLRenderingContext" in window) {
     setKingdomValhallaMode(valhallaModeActive);
     applyProceduralSurfaceMaps();
     buildGround();
+    void loadPhotoStone();
     if (qualityProfile.tier === "high" && !qualityProfile.prefersReducedMotion) {
       try {
         advancedShaders = new AdvancedShaders(scene, renderer, camera, THREE);
@@ -1542,6 +1584,7 @@ if (host && "WebGLRenderingContext" in window) {
         shadows: renderer.shadowMap.enabled,
         premiumWater: Boolean(waterFeature),
         contactShadowInstances:contactShadowBatch?.count||0,
+        photoStoneLoaded:Boolean(photoStoneMaps),
         cameraFocus:cameraFocusCenter?"center":"overview",
         cityArtLayout:activeModels.filter(m=>!m.userData.coISpecial).map(m=>({type:m.userData.coIType,x:m.position.x,z:m.position.z,scale:m.userData.coIArtScale})),
         surfaceTextureSize: qualityProfile.surfaceTextureSize,
