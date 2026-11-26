@@ -630,17 +630,33 @@ if (host && "WebGLRenderingContext" in window) {
       if(!low)box(group,.11,.04,.06,accent,x,.25+cornerHeight*.65-.14,z+.26);
     }
     for(const x of [-.47,.47])box(group,.32,.56,.18,wall,x,.48,.55);
-    // Repeated crenellations add a recognizable fortified silhouette in one draw call.
+    // Continuous curtain walls support every merlon. Use one instanced
+    // batch for crenellations and preserve the gate opening and plot footprint.
+    const curtainHeight=.58+(tier-1)*.055;
+    const curtainTop=.16+curtainHeight;
+    box(group,1.30,curtainHeight,.14,wall,0,.16+curtainHeight/2,-.64);
+    box(group,1.38,.085,.22,stone,0,curtainTop+.035,-.64);
+    for(const x of [-.65,.65]){
+      box(group,.14,curtainHeight,1.04,wall,x,.16+curtainHeight/2,-.05);
+      box(group,.22,.085,1.08,stone,x,curtainTop+.035,-.05);
+    }
     const battlementPositions=[];
-    for(const x of [-.48,-.24,0,.24,.48])battlementPositions.push([x,.84,-.64]);
-    if(!low)for(const z of [-.38,-.12,.14])for(const x of [-.72,.72])battlementPositions.push([x,.84,z]);
+    for(const x of [-.48,-.24,0,.24,.48])battlementPositions.push([x,curtainTop+.16,-.64]);
+    if(!low)for(const z of [-.35,-.11,.13])for(const x of [-.65,.65])battlementPositions.push([x,curtainTop+.16,z]);
     const battlements=new THREE.InstancedMesh(new THREE.BoxGeometry(.13,.17,.13),stone,battlementPositions.length);
     const transform=new THREE.Object3D();
     battlementPositions.forEach(([x,y,z],i)=>{transform.position.set(x,y,z);transform.updateMatrix();battlements.setMatrixAt(i,transform.matrix);});
-    battlements.instanceMatrix.needsUpdate=true;battlements.computeBoundingSphere();group.add(battlements);
-    for(const z of [-.38,.23]){
-      box(group,.14,.58,.54,wall,-.65,.45,z);
-      box(group,.14,.58,.54,wall,.65,.45,z);
+    battlements.instanceMatrix.needsUpdate=true;battlements.computeBoundingSphere();
+    battlements.castShadow=true;battlements.receiveShadow=true;group.add(battlements);
+    if(!low){
+      // Stone stair approach and raised gate plinth, all within existing base.
+      for(let i=0;i<3;i++){
+        const w=.60-i*.065,h=.045*(i+1);
+        box(group,w,h,.12,stone,0,.025+h/2,.80-i*.07);
+      }
+      // Buttresses emphasize masonry on the visible outer walls.
+      for(const x of [-.65,.65])for(const z of [-.22,.12])
+        box(group,.23,curtainHeight*.73,.115,stone,x,.16+curtainHeight*.365,z);
     }
     if(low)for(const x of [-.24,.24]){
       box(group,.12,.30,.045,mats.darkStone,x,.25+keepHeight*.65,.32);
