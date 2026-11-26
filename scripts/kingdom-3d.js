@@ -1796,7 +1796,7 @@ if (host && "WebGLRenderingContext" in window) {
         importedBuildings:activeModels.filter(model=>model.userData.coIAssetId).map(model=>({type:model.userData.coIType,assetId:model.userData.coIAssetId})),
         specialLandmarks:activeModels.filter(model=>model.userData.coISpecial).map(model=>({type:model.userData.coIType,x:model.position.x,z:model.position.z})),
         troopFigures: activeTroops.map(entry => ({type:entry.root.userData.coIUnitType, procedural:entry.procedural})),
-        dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon(),imported:Boolean(activeDragon.figure.imported)} : null,
+        dragonVisual: activeDragon ? {key:activeDragon.key,level:activeDragon.level,animated:canAnimateDragon(),imported:Boolean(activeDragon.figure.imported),scale:activeDragon.figure.root.scale.toArray()} : null,
         animationLoop: { active: Boolean(animationFrame), ...animationFrameTiming.snapshot() }
       };
     };
