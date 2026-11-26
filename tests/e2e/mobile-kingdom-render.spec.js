@@ -376,3 +376,18 @@ test.describe("Mobile kingdom rendering", () => {
   });
 
 });
+
+test("2D city paints local atlas art and troop preview follows selection",async({page})=>{
+ await page.addInitScript(()=>localStorage.setItem("coi_graphics_preference","2d"));
+ await installApiFixtures(page);
+ await page.goto("/kingdom.html");
+ await expect(page.locator("#status")).toContainText("Reino sincronizado");
+ await expect(page.locator("#city .building.canvas-art-ready")).toHaveCount(9);
+ await expect(page.locator("#city canvas#kingdom3d")).toHaveCount(0);
+ await expect(page.locator("#resources .coi-entity-art")).toHaveCount(6);
+ await page.locator("#unitType").selectOption("archer");
+ await expect(page.locator("#coiTroopArtPreview use")).toHaveAttribute("href","/assets/art/eldoria/hud.svg#troop-archer");
+ await expect(page.locator('#city [data-building="castle"]')).toBeVisible();
+ await mkdir("test-results/beta-visual",{recursive:true});
+ await page.locator("#city").screenshot({path:"test-results/beta-visual/eldoria-canvas-atlas.png",animations:"disabled"});
+});
