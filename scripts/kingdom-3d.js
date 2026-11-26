@@ -8,7 +8,7 @@ import { clone as cloneSkinned } from "three/addons/utils/SkeletonUtils.js";
 import { selectKingdomQualityProfile, calculateKingdomPixelRatio, createFrameTimingSampler, createAdaptivePixelScaleController } from "./kingdom-quality.js";
 import { readGraphicsChoice, getGraphicsStorage } from "./kingdom-visual-preferences.js";
 import { planArmyFigures, createProceduralUnit } from "./kingdom-army-visual.js";
-import { projectDragonVisual, makeDragonFigure, poseDragon } from "./kingdom-dragon-visual.js";
+import { projectDragonVisual, makeDragonFigure, poseDragon, dragonHoverOffset } from "./kingdom-dragon-visual.js";
 import { derivePbrTextureData, forEachPeriodicSurfaceCell } from "./kingdom-materials.js";
 import { AdvancedShaders } from "./advanced-shaders.js";
 import { applyCastleVisualUpgrades, disposeCastleVisualUpgrades } from "./castle-visual-upgrades.js";
@@ -513,7 +513,10 @@ if (host && "WebGLRenderingContext" in window) {
       seal.position.set(0,.25+keepHeight*.84,.323);group.add(seal);
       const sealCore=new THREE.Mesh(new THREE.CircleGeometry(.064,10),material(skin?.seal||"#24476B",.58));
       sealCore.position.set(0,.25+keepHeight*.84,.328);group.add(sealCore);
-      for(const x of [-.40,.40])box(group,.13,.34,.035,bannerMaterial,x,.99,.65);
+      for(const x of [-.40,.40]){
+        const banner=box(group,.13,.34,.035,bannerMaterial,x,.99,.65);
+        if(skin)banner.userData.coISkinBanner=true;
+      }
     }
   }
   // Resource plots have their own silhouette instead of the common civic house.
@@ -1071,10 +1074,22 @@ if (host && "WebGLRenderingContext" in window) {
     }
     const castleIndex=latestBuildings.findIndex(b=>b.building_type==="castle");
     const anchor=castleIndex>=0?cityWorldPoint(latestBuildings[castleIndex],castleIndex):{x:0,z:0};
-    activeDragon.figure.root.position.set(anchor.x+1.65,2.35,anchor.z-1.05);
+    activeDragon.figure.root.position.set(anchor.x+1.65,2.35+dragonHoverOffset(dragonTime,canAnimateDragon()),anchor.z-1.05);
   }
   function canAnimateDragon(){
     return !!activeDragon && qualityProfile?.tier==="high" && !qualityProfile?.prefersReducedMotion;
+  }
+  function canAnimateCastleSkin(){
+    return Boolean(latestCastleSkinId && qualityProfile?.tier==="high" && !qualityProfile?.prefersReducedMotion && activeModels.some(model=>model.userData.coIType==="castle"));
+  }
+  let skinMotionTime=0;
+  function animateCastleSkin(time){
+    const castle=activeModels.find(model=>model.userData.coIType==="castle");
+    if(!castle)return;
+    let i=0;
+    for(const child of castle.children){
+      if(child.userData.coISkinBanner)child.rotation.x=Math.sin(time*2.4+i++*.8)*.10;
+    }
   }
   function canRunArmyAnimation() {
     return !disposed && !cinematicCaptureActive && !document.hidden && sceneInViewport;
@@ -1090,7 +1105,7 @@ if (host && "WebGLRenderingContext" in window) {
     adaptivePixelScale.reset();
   }
   function renderArmyFrame(timestamp) {
-    if (!canRunArmyAnimation() || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders && !canAnimateDragon())) {
+    if (!canRunArmyAnimation() || !renderer || !scene || !camera || (!armyMixers.length && !advancedShaders && !canAnimateDragon() && !canAnimateCastleSkin())) {
       animationFrame = 0;
       lastAnimationTime = 0;
       return;
@@ -1116,12 +1131,14 @@ if (host && "WebGLRenderingContext" in window) {
     if(canAnimateDragon()){
       dragonTime+=delta;
       poseDragon(activeDragon.figure,dragonTime,true);
+      activeDragon.figure.root.position.y=2.35+dragonHoverOffset(dragonTime,true);
     }
+    if(canAnimateCastleSkin()){skinMotionTime+=delta;animateCastleSkin(skinMotionTime);}
     renderer.render(scene, camera);
     animationFrame = requestAnimationFrame(renderArmyFrame);
   }
   function startArmyAnimationLoop() {
-    if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders && !canAnimateDragon()) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
+    if (!canRunArmyAnimation() || animationFrame || (!armyMixers.length && !advancedShaders && !canAnimateDragon() && !canAnimateCastleSkin()) || qualityProfile?.tier === "low" || qualityProfile?.prefersReducedMotion) return;
     lastAnimationTime = 0;
     animationFrameTiming.reset();
     adaptivePixelScale.reset();

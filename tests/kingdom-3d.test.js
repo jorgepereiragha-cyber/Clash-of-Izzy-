@@ -483,3 +483,11 @@ test("rural buildings have separate models and bounded crop instances",()=>{
  assert.match(renderer,/new THREE\.InstancedMesh\(new THREE\.CylinderGeometry\(\.014,\.022,\.15,5\),grain,rows\*3\)/);
  assert.match(renderer,/if \(node\.isInstancedMesh\) node\.dispose\(\)/);
 });
+
+
+test("equipped castle banners use the existing high-tier animation loop only",()=>{
+ assert.match(renderer,/if\(skin\)banner\.userData\.coISkinBanner=true/);
+ assert.match(renderer,/function canAnimateCastleSkin\(\)/);
+ assert.match(renderer,/latestCastleSkinId && qualityProfile\?\.tier==="high" && !qualityProfile\?\.prefersReducedMotion/);
+ assert.match(renderer,/if\(canAnimateCastleSkin\(\)\)\{skinMotionTime\+=delta;animateCastleSkin\(skinMotionTime\);\}/);
+});

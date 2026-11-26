@@ -386,17 +386,21 @@ import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
     for (const territory of rows) createTerritoryFeature(territoryRoot, territory);
   }
 
+  function marchPath(target,arrivalHeight=.35){
+    const home=homeCastleGroup?.position;
+    const sx=home?.x||0,sz=home?.z||0,x=Number(target.x)||0,z=Number(target.z)||0;
+    const mx=sx+(x-sx)*.44,mz=sz+(z-sz)*.44;
+    return new THREE.QuadraticBezierCurve3(
+      new THREE.Vector3(sx,terrainHeight(sx,sz)+.15,sz),
+      new THREE.Vector3(mx,Math.max(1.55,terrainHeight(mx,mz)+.85),mz),
+      new THREE.Vector3(x,terrainHeight(x,z)+arrivalHeight,z)
+    );
+  }
   function rebuildRoads() {
     clearGroup(routeRoot);
     const territories = Array.isArray(worldState?.territories) ? worldState.territories : [];
     for (const territory of territories) {
-      const x = Number(territory.x) || 0;
-      const z = Number(territory.z) || 0;
-      const curve = new THREE.QuadraticBezierCurve3(
-        new THREE.Vector3(0, terrainHeight(0, 0) + .1, 0),
-        new THREE.Vector3(x * .44, Math.max(1.15, terrainHeight(x * .44, z * .44) + .85), z * .44),
-        new THREE.Vector3(x, terrainHeight(x, z) + .12, z)
-      );
+      const curve = marchPath(territory,.12);
       makeMesh(new THREE.TubeGeometry(curve, 18, .14, 5, false), shared.roadEdge, routeRoot, 0, 0, 0);
       makeMesh(new THREE.TubeGeometry(curve, 18, .075, 5, false), shared.road, routeRoot, 0, .06, 0);
     }
@@ -419,12 +423,14 @@ import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
   function createMarchFormation(march) {
     const group = new THREE.Group();
     const material = march.march_type === "attack" ? shared.redTroop : shared.blueTroop;
-    createSoldier(group, material, -.42, -.28, 0);
-    createSoldier(group, material, .42, -.28, 1);
-    createSoldier(group, material, 0, .48, 2);
+    const soldiers=[
+      createSoldier(group, material, -.42, -.28, 0),
+      createSoldier(group, material, .42, -.28, 1),
+      createSoldier(group, material, 0, .48, 2)
+    ];
     const flagPole = box(group, .07, 1.45, .07, shared.gold, 0, 1.25, -.72);
     flagPole.castShadow = false;
-    box(group, .67, .35, .06, material, .3, 1.73, -.72);
+    const flag=box(group, .67, .35, .06, material, .3, 1.73, -.72);
     group.scale.setScalar(.9);
     armyRoot.add(group);
     return {
@@ -433,7 +439,8 @@ import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
       startAt: Date.parse(march.started_at || ""),
       endAt: Date.parse(march.arrives_at || ""),
       targetId: Number(march.target_territory_id),
-      marchType: march.march_type
+      marchType: march.march_type,
+      soldiers, flag, curve:null, point:new THREE.Vector3(), tangent:new THREE.Vector3()
     };
   }
 
@@ -455,18 +462,20 @@ import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
       const start = Number.isFinite(march.startAt) ? march.startAt : now;
       const end = Number.isFinite(march.endAt) ? march.endAt : now + 1000;
       const progress = THREE.MathUtils.clamp((now - start) / Math.max(1000, end - start), 0, 1);
-      const x = Number(target.x) || 0;
-      const z = Number(target.z) || 0;
-      const curve = new THREE.QuadraticBezierCurve3(
-        new THREE.Vector3(0, terrainHeight(0, 0) + .15, 0),
-        new THREE.Vector3(x * .44, 1.55, z * .44),
-        new THREE.Vector3(x, terrainHeight(x, z) + .35, z)
-      );
-      const point = curve.getPoint(progress);
-      march.group.position.copy(point);
-      march.group.rotation.y = Math.atan2(x, z);
-      const bob = reduceMotion ? 0 : Math.sin(now * .009 + march.id) * .045;
-      march.group.position.y += bob;
+      // Curves and scratch vectors live for the state snapshot, not per frame.
+      if(!march.curve)march.curve=marchPath(target);
+      march.curve.getPoint(progress,march.point);
+      march.curve.getTangent(progress,march.tangent);
+      march.group.position.copy(march.point);
+      if(Math.hypot(march.tangent.x,march.tangent.z)>.0001)march.group.rotation.y=Math.atan2(march.tangent.x,march.tangent.z);
+      const moving=!reduceMotion&&quality!=="low"&&progress>0&&progress<1;
+      const t=(now%60000)*.009+march.id;
+      for(let i=0;i<march.soldiers.length;i++){
+        const soldier=march.soldiers[i];
+        soldier.position.y=.1+(moving?Math.sin(t+i*2.1)*.045:0);
+        soldier.rotation.x=moving?Math.sin(t+i*2.1)*.055:0;
+      }
+      march.flag.rotation.y=moving?Math.sin(t*.46)*.16:0;
     }
   }
 

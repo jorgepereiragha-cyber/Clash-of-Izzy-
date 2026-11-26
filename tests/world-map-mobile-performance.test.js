@@ -85,3 +85,12 @@ test("march animation never rewrites static territory label positions each frame
  assert.doesNotMatch(tick,/projectTerritories\(\)/);
  assert.match(scene,/function draw\(\)[\s\S]*?projectTerritories\(\)/);
 });
+
+test("march path shares home castle origin and caches its curve and vectors",async()=>{
+ const scene=await read("world-map-3d.js");
+ assert.match(scene,/function marchPath\(target,arrivalHeight/);assert.match(scene,/homeCastleGroup\?\.position/);
+ assert.match(scene,/const curve = marchPath\(territory,\.12\)/);
+ assert.match(scene,/if\(!march\.curve\)march\.curve=marchPath\(target\)/);
+ assert.match(scene,/getPoint\(progress,march\.point\)/);assert.match(scene,/getTangent\(progress,march\.tangent\)/);
+ assert.match(scene,/moving=!reduceMotion&&quality!=="low"&&progress>0&&progress<1/);
+});
