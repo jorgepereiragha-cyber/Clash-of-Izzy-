@@ -41,7 +41,7 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
       assert.ok(texture.byteLength > 0, texturePath);
     }
   }
-  assert.ok(totalBytes < 3_750_000, "bundled GLBs must remain under 3.75 MB");
+  assert.ok(totalBytes < 4_000_000, "bundled GLBs must remain under 4 MB");
 });
 
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {
@@ -99,4 +99,8 @@ test("fortified castle gate uses embedded stone, wood and heraldry materials",as
  const a=manifest.models.find(x=>x.type==="castle_gate");assert.ok(a?.enabled);assert.equal(a.id,"quaternius-castle-gate");assert.ok(a.targetFootprint<=1.45);
  const b=await readFile(toUrl(a.src));const g=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());
  for(const name of ["Stone","Stone_Light","Wood","Main"])assert.ok(g.materials.some(x=>x.name===name));assert.ok(!g.images?.length);assert.equal(manifest.files[a.src].license,"CC0-1.0");
+});
+
+test("catapult and ram use existing licensed castle kit texture without duplicate files",async()=>{
+ for(const type of ["catapult","ram"]){const a=manifest.units.find(x=>x.unit_type===type);assert.ok(a?.enabled);assert.equal(a.maxInstances,2);const b=await readFile(toUrl(a.src));const g=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());assert.ok(g.meshes.length>=6);assert.deepEqual(g.images.map(x=>x.uri),["Textures/colormap.png"]);assert.equal(manifest.files[a.src].license,"CC0-1.0");}
 });
