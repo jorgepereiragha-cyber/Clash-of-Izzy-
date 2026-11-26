@@ -99,6 +99,17 @@
       "source": "Quaternius Ultimate Fantasy RTS",
       "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-farm",
+      "type": "farm",
+      "src": "/assets/3d/quaternius/farm.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 0.8,
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0"
     }
   ],
   "props": [
@@ -338,6 +349,16 @@
       "bytes": 393060,
       "licenseFile": "licenses/Quaternius-CC0.txt",
       "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/single_knight_pack/KnightCharacter.glb"
+    },
+    "/assets/3d/quaternius/farm.glb": {
+      "source": "Quaternius Ultimate Fantasy RTS",
+      "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Ultimate Fantasy RTS — Quaternius",
+      "sha256": "2bbcb19a1077ef7fab5bf70c521e83d0052cf543d03abf1efef6575df29d6511",
+      "bytes": 274124,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/real_time_strategy_pack/Farm_SecondAge_Level1_Wheat.glb"
     }
   }
 }
