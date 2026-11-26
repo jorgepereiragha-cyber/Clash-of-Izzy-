@@ -34,7 +34,7 @@ await mkdir(root,{recursive:true});
 for(const slug of ["medieval_wall_02","grassy_cobblestone"]){
  const listing=await files(slug);
  for(const [kind,name] of [["diff","color"],["nor_gl","normal"],["rough","roughness"]]){
-  const entry=listing[kind]?.["1k"]?.jpg;
+  const entry=(listing[kind]||(kind==="diff"?listing.diffuse:null))?.["1k"]?.jpg;
   await save(slug,name+".jpg",entry);
  }
 }
