@@ -554,3 +554,14 @@ test("connected decorative streets do not occupy building plots",async()=>{
  assert.match(renderer,/updateCityStreets\(\);/);
  assert.match(renderer,/mesh\.geometry\.dispose\(\)/);
 });
+
+
+test("royal citadel includes a layered silhouette and focused initial view",()=>{
+ assert.match(renderer,/let cameraFocusCenter = true/);
+ assert.match(renderer,/function addEldoriaCastle/);
+ assert.match(renderer,/new THREE\.ShapeGeometry\(archShape/);
+ assert.match(renderer,/const lanternY=/);
+ assert.match(renderer,/archWindow\(\.479,y,z,Math\.PI\/2/);
+ assert.match(renderer,/if\(!low\)\{/);
+ assert.match(renderer,/cameraFocusCenter=action==="center"/);
+});
