@@ -41,7 +41,7 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
       assert.ok(texture.byteLength > 0, texturePath);
     }
   }
-  assert.ok(totalBytes < 2_500_000, "bundled GLBs must remain under 2.5 MB");
+  assert.ok(totalBytes < 3_000_000, "bundled GLBs must remain under 3 MB");
 });
 
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {
@@ -76,7 +76,7 @@ test("KayKit civic models share the local atlas and preserve the original licens
 });
 
 test("Quaternius imports preserve local provenance and real GLB models",()=>{
- for(const type of ["archery_range","academy","warehouse","embassy","swordsman"]){
+ for(const type of ["archery_range","academy","warehouse","embassy","swordsman","farm","lumber_mill","stable"]){
  const a=[...manifest.models,...manifest.units].find(x=>x.id==="quaternius-"+type.replace("_","-"));assert.ok(a?.enabled);assert.equal(manifest.files[a.src].license,"CC0-1.0");assert.match(manifest.files[a.src].sha256,/^[a-f0-9]{64}$/);
  }
 });

@@ -110,6 +110,28 @@
       "source": "Quaternius Ultimate Fantasy RTS",
       "sourceUrl": "https://quaternius.com/packs/ultimatefantasyrts.html",
       "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-lumber-mill",
+      "type": "lumber_mill",
+      "src": "/assets/3d/quaternius/lumber_mill.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.35,
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0"
+    },
+    {
+      "id": "quaternius-stable",
+      "type": "stable",
+      "src": "/assets/3d/quaternius/stable.glb",
+      "enabled": true,
+      "targetFootprint": 1.55,
+      "targetHeight": 1.65,
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0"
     }
   ],
   "props": [
@@ -359,6 +381,26 @@
       "bytes": 274124,
       "licenseFile": "licenses/Quaternius-CC0.txt",
       "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/real_time_strategy_pack/Farm_SecondAge_Level1_Wheat.glb"
+    },
+    "/assets/3d/quaternius/lumber_mill.glb": {
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Medieval Village Pack — Quaternius",
+      "sha256": "45b86787f29746003eb6b3eb889555b5d4cd99983f77011cb7d0d461cd6e547e",
+      "bytes": 309568,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/medieval_village_pack/Sawmill.glb"
+    },
+    "/assets/3d/quaternius/stable.glb": {
+      "source": "Quaternius Medieval Village Pack",
+      "sourceUrl": "https://quaternius.com/packs/medievalvillage.html",
+      "license": "CC0-1.0",
+      "attribution": "Quaternius Medieval Village Pack — Quaternius",
+      "sha256": "c5ed9626d931c52b5a2b48d805bccd4232239da5ba677ca169730c036eb5b8c8",
+      "bytes": 444596,
+      "licenseFile": "licenses/Quaternius-CC0.txt",
+      "mirror": "https://github.com/trebeljahr/quaternius-showcase/blob/0128ca510d653bb04d6d1e4885bd8890b5050b4f/public/glb/medieval_village_pack/Stable.glb"
     }
   }
 }
