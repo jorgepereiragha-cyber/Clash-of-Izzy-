@@ -535,6 +535,56 @@
       "bytes": 103620,
       "licenseFile": "licenses/Kenney-Castle-Kit.txt",
       "mirror": "https://github.com/GeorgeQLe/assets-3d-medieval/blob/ce28cabc1229b4c0a9ac24a6d2e7704c70fc486a/assets/kenney/castle-kit/Models/GLB format/siege-ram.glb"
+    },
+    "/assets/3d/materials/stone-color.jpg": {
+      "source": "ambientCG Bricks 100",
+      "sourceUrl": "https://ambientcg.com/view?id=Bricks100",
+      "license": "CC0-1.0",
+      "attribution": "ambientCG Bricks 100",
+      "sha256": "e5596ce79d9a63d6b9a9e9ac15a0bb60d8a5c39b684999a872467641bc91d30d",
+      "bytes": 727003,
+      "licenseFile": "licenses/ambientCG-CC0.txt",
+      "mirror": "https://github.com/OmniTender-Systems/game-visual-assets/blob/8d5e1881b519d2f1f7573cebf9a86798067d149a/vendor/ambientcg/Bricks100/Bricks100_1K-JPG_Color.jpg"
+    },
+    "/assets/3d/materials/stone-normal.jpg": {
+      "source": "ambientCG Bricks 100",
+      "sourceUrl": "https://ambientcg.com/view?id=Bricks100",
+      "license": "CC0-1.0",
+      "attribution": "ambientCG Bricks 100",
+      "sha256": "3fd468809d149512cbbb7a0ee298bdb1d7c2213da05e5453e6612b8006bd3708",
+      "bytes": 830327,
+      "licenseFile": "licenses/ambientCG-CC0.txt",
+      "mirror": "https://github.com/OmniTender-Systems/game-visual-assets/blob/8d5e1881b519d2f1f7573cebf9a86798067d149a/vendor/ambientcg/Bricks100/Bricks100_1K-JPG_NormalGL.jpg"
+    },
+    "/assets/3d/materials/wood-color.jpg": {
+      "source": "Poly Haven — Weathered Brown Planks",
+      "sourceUrl": "https://polyhaven.com/a/weathered_brown_planks",
+      "license": "CC0-1.0",
+      "attribution": "Poly Haven — Weathered Brown Planks",
+      "sha256": "94833feda44e025a9139f7b5723ea84e4f0258d3b54939a79e1013c133085e29",
+      "bytes": 226049,
+      "licenseFile": "licenses/Poly-Haven-CC0.txt",
+      "mirror": "https://github.com/OmniTender-Systems/game-visual-assets/blob/8d5e1881b519d2f1f7573cebf9a86798067d149a/vendor/polyhaven/weathered_brown_planks/weathered_brown_planks_diffuse_1k.jpg"
+    },
+    "/assets/3d/materials/wood-normal.jpg": {
+      "source": "Poly Haven — Weathered Brown Planks",
+      "sourceUrl": "https://polyhaven.com/a/weathered_brown_planks",
+      "license": "CC0-1.0",
+      "attribution": "Poly Haven — Weathered Brown Planks",
+      "sha256": "8d38f02f121c0e58eaedc19cd668faea21381ae3ff4d5332cd90de75e6683393",
+      "bytes": 223250,
+      "licenseFile": "licenses/Poly-Haven-CC0.txt",
+      "mirror": "https://github.com/OmniTender-Systems/game-visual-assets/blob/8d5e1881b519d2f1f7573cebf9a86798067d149a/vendor/polyhaven/weathered_brown_planks/weathered_brown_planks_nor_gl_1k.jpg"
+    }
+  },
+  "scannedMaterials": {
+    "stone": {
+      "color": "/assets/3d/materials/stone-color.jpg",
+      "normal": "/assets/3d/materials/stone-normal.jpg"
+    },
+    "wood": {
+      "color": "/assets/3d/materials/wood-color.jpg",
+      "normal": "/assets/3d/materials/wood-normal.jpg"
     }
   }
 }
