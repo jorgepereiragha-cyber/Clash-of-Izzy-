@@ -1,0 +1,7 @@
+Poly Haven — Stone Wall
+Photography Charlotte Baglioni; processing Dario Barresi.
+CC0 1.0 Universal: https://creativecommons.org/publicdomain/zero/1.0/
+Provider license: https://polyhaven.com/license
+Asset: https://polyhaven.com/a/stone_wall
+Original file: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/stone_wall/stone_wall_diff_1k.jpg
+Recorded upstream MD5: 451e4c5e2309af341fcdc1f1d637b1d6 (source metadata; SHA-256 verified locally in manifest)

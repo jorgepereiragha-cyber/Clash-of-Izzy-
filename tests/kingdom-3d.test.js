@@ -508,3 +508,11 @@ test("city scenery extends beyond camera framing and supports separate center an
  assert.match(kingdom,/data-city-zoom="center"/);
  assert.match(kingdom,/data-city-zoom="reset"/);
 });
+
+test("photographic castle stone keeps one local color-neutral map, skins and procedural fallback",()=>{
+ assert.match(renderer,/ImageLoader\(\)\.load\("\/assets\/3d\/polyhaven\/stone_wall_diff_1k\.jpg"/);
+ assert.match(renderer,/if\(!qualityProfile\?\.loadOptionalAssets\)return/);
+ assert.match(renderer,/Math\.min\(512,qualityProfile\.surfaceTextureSize\)/);
+ assert.match(renderer,/rememberCastlePhotoMaterial\(wall,colors\[0\]\)/);
+ assert.match(renderer,/castleStonePhoto\?\.dispose\(\)/);
+});

@@ -104,3 +104,7 @@ test("fortified castle gate uses embedded stone, wood and heraldry materials",as
 test("catapult and ram use existing licensed castle kit texture without duplicate files",async()=>{
  for(const type of ["catapult","ram"]){const a=manifest.units.find(x=>x.unit_type===type);assert.ok(a?.enabled);assert.equal(a.maxInstances,2);const b=await readFile(toUrl(a.src));const g=JSON.parse(b.subarray(20,20+b.readUInt32LE(12)).toString("utf8").trim());assert.ok(g.meshes.length>=6);assert.deepEqual(g.images.map(x=>x.uri),["Textures/colormap.png"]);assert.equal(manifest.files[a.src].license,"CC0-1.0");}
 });
+
+test("photographic stone is a provenance-tracked local JPEG",async()=>{
+ const src="/assets/3d/polyhaven/stone_wall_diff_1k.jpg";const b=await readFile(toUrl(src));assert.equal(b.length,836975);assert.equal(b.readUInt16BE(0),0xffd8);assert.equal(manifest.files[src].license,"CC0-1.0");assert.equal(manifest.files[src].sourceUrl,"https://polyhaven.com/a/stone_wall");
+});
