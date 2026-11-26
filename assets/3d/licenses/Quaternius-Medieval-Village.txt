@@ -1,0 +1,5 @@
+Quaternius — Medieval Village Pack
+CC0 1.0 Universal
+Original author and source: https://quaternius.com/packs/medievalvillage.html
+Legal dedication: https://creativecommons.org/publicdomain/zero/1.0/legalcode
+Acquired from the pinned mirror and checked against source Git blob and CI SHA-256; see PROVENANCE.json. This record documents source evidence, not a new copyright claim.
