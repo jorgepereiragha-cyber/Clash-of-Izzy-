@@ -54,6 +54,9 @@ function askTroops(){
   return null;
  }
 }
+function nodeAvailability(node){
+ return node.is_mine?"Sua ocupação":node.occupied_by?"Ocupado por outro reino":node.reserved_by_rally?"Reservado para rally":"Livre para ocupação";
+}
 function nodeLabel(node){
  const type=NODE_TYPES[node.node_type]||{icon:"📍",name:"Nó",resource:"recurso"};
  return type.name+" nível "+node.level+" · "+type.resource;
@@ -66,10 +69,11 @@ function selectNode(node){
   details.replaceChildren(
    make("span","",node.id),
    make("span","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" recursos"),
-   make("span","",node.occupied_by?"Ocupado por um reino":"Livre para ocupação")
+   make("span","",nodeAvailability(node)),
+   make("span","",fmt(node.regen_rate)+" recursos/h de regeneração")
   );
  }
- document.querySelectorAll(".resource-node-pin").forEach(pin=>pin.classList.toggle("selected",pin.dataset.nodeId===node.id));
+ document.querySelectorAll(".resource-node-pin").forEach(pin=>pin.classList.toggle("selected",pin.dataset.nodeId===String(node.id)));
 }
 async function runNodeAction(action,node){
  if(busy)return;
@@ -93,7 +97,7 @@ function renderNodeList(){
   const head=make("div","resource-node-heading");
   head.append(make("strong","",type.icon+" "+node.id),make("span","", "Nível "+node.level));
   const info=make("p","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" "+type.resource.toLowerCase());
-  const ownership=make("p","resource-node-owner",node.occupied_by?"Ocupado":"Livre");
+  const ownership=make("p","resource-node-owner",nodeAvailability(node));
   card.append(head,info,ownership);
   const actions=make("div","resource-node-actions");
   if(node.is_mine){
@@ -157,8 +161,9 @@ function renderMapNodes(){
   button.style.left=Math.max(7,Math.min(93,50+Number(node.map_x)*0.9))+"%";
   button.style.top=Math.max(8,Math.min(92,50-Number(node.map_y)*0.9))+"%";
   button.textContent=type.icon;
-  button.title=node.id+" · "+nodeLabel(node);
-  button.setAttribute("aria-label",node.id+" · "+nodeLabel(node));
+  if(node.reserved_by_rally&&!node.occupied_by)button.style.borderStyle="dashed";
+  button.title=node.id+" · "+nodeLabel(node)+" · "+nodeAvailability(node);
+  button.setAttribute("aria-label",button.title);
   button.addEventListener("click",()=>{selectNode(node);$("rally-ui-panel")?.scrollIntoView({behavior:"smooth",block:"nearest"});});
   fragment.append(button);
  }
