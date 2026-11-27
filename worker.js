@@ -646,7 +646,11 @@ async function processMarches(env,kingdomId,batchSize=50){
     .bind(kingdomId,kingdomId,m.target_territory_id,m.target_territory_id,kingdomId,m.target_territory_id,JSON.stringify(losses),m.id,kingdomId,resolutionToken));
   }else{
    if(m.march_type==="scout"){
-    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,"svip_medal",m.id,kingdomId,resolutionToken));
+    // Snapshot only public world metadata at arrival; private castle/army data stays inaccessible.
+    const scoutEligible="EXISTS(SELECT 1 FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1) AND t.territory_kind NOT IN ('castle','throne') AND substr(t.territory_key,1,13)<>'royal_throne_' AND (t.owner_kingdom_id IS NULL OR t.owner_kingdom_id=k.id))";
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,'territory_scouted',json_object('marchId',?,'territoryId',t.id,'name',t.name,'terrain',t.terrain,'level',t.level,'resourceType',t.resource_type,'resourceRate',t.resource_rate,'observedAt',?) FROM world_territories t WHERE t.id=? AND "+guard+" AND "+scoutEligible)
+      .bind(kingdomId,m.id,resolvedAt,m.target_territory_id,m.id,kingdomId,resolutionToken,kingdomId,m.target_territory_id));
+    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" AND "+scoutEligible+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,"svip_medal",m.id,kingdomId,resolutionToken,kingdomId,m.target_territory_id));
    }
    for(const [unit,raw] of Object.entries(units)){
     const qty=Math.max(0,Math.floor(Number(raw)||0));if(!Object.hasOwn(UNITS,unit)||qty<1)continue;
