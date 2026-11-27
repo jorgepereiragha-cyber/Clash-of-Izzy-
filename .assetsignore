@@ -128,6 +128,11 @@ production-clock.js
 
 # Server-only castle shield policy.
 castle-shield.js
+territory-attack-settlement.js
+hospital-policy.js
+castle-science.js
+city-special-buildings.js
+equipment-enhancement.js
 
 # Server-only monster preview policy.
 world-monsters.js
@@ -135,3 +140,4 @@ world-monsters.js
 # Server-only hunt progression policy.
 monster-hunt-policy.js
 monster-hunt-state.js
+monster-hunt-marches.js

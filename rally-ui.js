@@ -1,3 +1,5 @@
+import {worldResourceArt} from "./scripts/kingdom-2d-art-atlas.js";
+import {focusMarchFormation, getMarchFormation} from "./world-map.js";
 const $=id=>document.getElementById(id);
 function readRallySession() {
  let readable=false;
@@ -42,20 +44,19 @@ function addAction(parent,label,action,disabled=false){
  parent.append(button);
  return button;
 }
-function askTroops(){
- const raw=window.prompt('Informe as tropas em JSON. Exemplo: {"militia": 50, "archer": 10}');
- if(!raw)return null;
- try{
-  const value=JSON.parse(raw);
-  if(!value||typeof value!=="object"||Array.isArray(value))throw new Error();
-  return value;
- }catch{
-  notify("Formato inválido. Use um objeto JSON com quantidades inteiras.",true);
-  return null;
- }
+function expeditionTroops(){
+ const troops=getMarchFormation();
+ if(Object.keys(troops).length)return troops;
+ notify("Escolha as tropas no painel da expedição.",true);
+ focusMarchFormation();
+ return null;
 }
 function nodeAvailability(node){
  return node.is_mine?"Sua ocupação":node.occupied_by?"Ocupado por outro reino":node.reserved_by_rally?"Reservado para rally":"Livre para ocupação";
+}
+function nodeResourceArt(node){
+ const key=Object.hasOwn(NODE_TYPES,node.node_type)?({mine:"iron",forest:"wood",farm:"food",quarry:"stone"})[node.node_type]:null;
+ return worldResourceArt(key,document)||make("span","","◆");
 }
 function nodeLabel(node){
  const type=NODE_TYPES[node.node_type]||{icon:"📍",name:"Nó",resource:"recurso"};
@@ -76,16 +77,21 @@ function selectNode(node){
  document.querySelectorAll(".resource-node-pin").forEach(pin=>pin.classList.toggle("selected",pin.dataset.nodeId===String(node.id)));
 }
 async function runNodeAction(action,node){
+ const troops=action==="occupy"?expeditionTroops():undefined;
+ if(action==="occupy"&&!troops)return;
+ await sendRallyAction(action,{node_id:node.id,...(troops?{troops}:{})},data=>action==="collect"?
+  "Coleta concluída: "+fmt(data.collected)+" "+NODE_TYPES[node.node_type].resource.toLocaleLowerCase("pt-BR")+".":
+  action==="recall"?"Tropas retornaram ao reino.":"Nó ocupado com sucesso.");
+}
+async function sendRallyAction(action,body,message){
  if(busy)return;
- const troops=action==="collect"||action==="recall"?undefined:askTroops();
- if(action!=="collect"&&action!=="recall"&&!troops)return;
  busy=true;
  try{
-  const data=await api(action,{method:"POST",body:JSON.stringify({node_id:node.id,...(troops?{troops}:{})})});
-  notify(action==="collect"?"Coleta concluída: "+fmt(data.collected)+" "+data.resource_type+".":action==="recall"?"Tropas retornaram ao reino.":"Nó ocupado com sucesso.");
-  await refresh();
+  const data=await api(action,{method:"POST",body:JSON.stringify(body)});
+  window.dispatchEvent(new Event("coi:refresh-world"));
+  await refresh(message(data));
  }catch(error){notify(error.message,true);}
- finally{busy=false;}
+ finally{busy=false;renderNodeList();renderRallies();}
 }
 function renderNodeList(){
  const root=$("resource-node-list");if(!root)return;
@@ -95,7 +101,8 @@ function renderNodeList(){
   const type=NODE_TYPES[node.node_type]||NODE_TYPES.mine;
   const card=make("article","resource-node-card"+(node.id===selectedNodeId?" selected":""));
   const head=make("div","resource-node-heading");
-  head.append(make("strong","",type.icon+" "+node.id),make("span","", "Nível "+node.level));
+  const name=make("strong","resource-node-name");name.append(nodeResourceArt(node),document.createTextNode(type.name+" · "+node.id));
+  head.append(name,make("span","", "Nível "+node.level));
   const info=make("p","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" "+type.resource.toLowerCase());
   const ownership=make("p","resource-node-owner",nodeAvailability(node));
   card.append(head,info,ownership);
@@ -109,8 +116,9 @@ function renderNodeList(){
    const locked=Boolean(node.reserved_by_rally);
    addAction(actions,inAlliance?"Criar rally":"Ocupar nó",()=>{
     if(inAlliance){
-     const troops=askTroops();if(!troops)return;
-     runRallyCreate(node,troops);
+     const troops=expeditionTroops();if(!troops)return;
+     sendRallyAction("create",{target_type:"resource_node",target_id:node.id,troops},data=>
+      "Rally criado. Reunião por 5 minutos. Poder: "+fmt(data.power)+".");
     }else runNodeAction("occupy",node);
    },locked||busy);
   }
@@ -119,15 +127,6 @@ function renderNodeList(){
   fragment.append(card);
  }
  root.append(fragment);
-}
-async function runRallyCreate(node,troops){
- if(busy)return;busy=true;
- try{
-  const data=await api("create",{method:"POST",body:JSON.stringify({target_type:"resource_node",target_id:node.id,troops})});
-  notify("Rally criado. Reunião por 5 minutos; poder: "+fmt(data.power)+".");
-  await refresh();
- }catch(error){notify(error.message,true);}
- finally{busy=false;}
 }
 function renderRallies(){
  const root=$("rally-active-list");if(!root)return;
@@ -141,10 +140,9 @@ function renderRallies(){
   const members=make("p","",fmt(rally.member_count)+" participantes");
   card.append(heading,meta,members);
   if(inAlliance&&rally.status==="gathering"&&!rally.joined){
-   addAction(card,"Enviar reforços",async()=>{
-    const troops=askTroops();if(!troops||busy)return;busy=true;
-    try{const data=await api("join",{method:"POST",body:JSON.stringify({rally_id:rally.id,troops})});notify("Reforços enviados: +"+fmt(data.power_added)+" poder.");await refresh();}
-    catch(error){notify(error.message,true);}finally{busy=false;}
+   addAction(card,"Enviar reforços",()=>{
+    const troops=expeditionTroops();if(!troops)return;
+    sendRallyAction("join",{rally_id:rally.id,troops},data=>"Reforços enviados. Poder adicionado: "+fmt(data.power_added)+".");
    },busy);
   }
   root.append(card);
@@ -180,7 +178,8 @@ function renderMapNodes(){
   button.type="button";button.dataset.nodeId=node.id;
   button.dataset.mapX=String(node.map_x);button.dataset.mapZ=String(node.map_y);
   if(node.occupied_by&&!node.is_mine)button.classList.add("foreign");
-  button.textContent=type.icon;
+  button.append(nodeResourceArt(node));
+  button.append(make("small","resource-node-level",String(node.level)));
   if(node.reserved_by_rally&&!node.occupied_by)button.style.borderStyle="dashed";
   button.title=node.id+" · "+nodeLabel(node)+" · "+nodeAvailability(node);
   button.setAttribute("aria-label",button.title);
@@ -189,7 +188,7 @@ function renderMapNodes(){
  }
  map.append(fragment);projectResourceNodes();
 }
-async function refresh(){
+async function refresh(successMessage){
  if(refreshing||!token)return;refreshing=true;
  try{
   const [nodeData,rallyData]=await Promise.all([api("nodes"),api("active")]);
@@ -199,7 +198,7 @@ async function refresh(){
   renderMapNodes();renderNodeList();renderRallies();
   const selected=nodes.find(node=>node.id===selectedNodeId);
   if(selected)selectNode(selected);
-  notify(nodes.length+" nós de recursos sincronizados.");
+  notify(successMessage||nodes.length+" nós de recursos sincronizados.");
  }catch(error){notify(error.message,true);}
  finally{refreshing=false;}
 }
@@ -207,6 +206,7 @@ function init(){
  if(!token){notify(rallySession.blocked
   ?"O navegador bloqueou o armazenamento da sessão. Ative o acesso deste site e abra o reino para recuperar a guerra."
   :"Entre no seu reino para acessar a guerra.",true);return;}
+ $("rallyFormation")?.addEventListener("click",focusMarchFormation);
  refresh();
  window.setInterval(()=>{if(!document.hidden)refresh();},12000);
  document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh();});

@@ -99,3 +99,11 @@ export function createEntityArtElement(asset,doc=globalThis.document) {
   const ns="http://www.w3.org/2000/svg",svg=doc.createElementNS(ns,"svg"),use=doc.createElementNS(ns,"use");
   svg.setAttribute("viewBox",asset.viewBox);svg.setAttribute("aria-hidden","true");svg.setAttribute("focusable","false");use.setAttribute("href",asset.src);svg.append(use);return svg;
 }
+
+// Canonical resource art shared by the map, HUD and resource-node cards.
+const WORLD_RESOURCE_KEYS=new Set(["food","wood","stone","iron","gold","gems"]);
+export function worldResourceArt(key,doc=globalThis.document){
+  if(!WORLD_RESOURCE_KEYS.has(key))return null;
+  const art=createEntityArtElement({kind:"symbol",src:"/assets/art/eldoria/hud.svg#resource-"+key,viewBox:"0 0 100 100"},doc);
+  art?.classList.add("world-resource-art");return art;
+}

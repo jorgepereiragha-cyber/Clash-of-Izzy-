@@ -1,5 +1,10 @@
 // Original hunt progression and energy policy. Server only; no client-supplied
 // power, energy or victories are trusted. Values are provisional beta tuning.
+import { COMBAT_UNIT_RULES } from "./game-adapter.js";
+
+// Trinta milicianos iniciais conseguem derrotar o lobo com uma formação completa.
+export const HUNT_UNIT_DAMAGE=Object.freeze(Object.fromEntries(Object.entries(COMBAT_UNIT_RULES)
+ .map(([type,rule])=>[type,rule.power*4])));
 export const HUNT_LEVELS=Object.freeze([1,3,5,8,12,18]);
 export const HUNT_ENERGY_MAX=120;
 export const HUNT_ENERGY_RECOVERY_SECONDS=300;

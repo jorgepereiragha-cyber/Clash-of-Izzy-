@@ -1,4 +1,6 @@
-// Beta map preview with lazy respawn. No attack or reward is exposed.
+// The beta bestiary and hunt dispatch share the same realm-scoped spawns.
+import { huntProgressView } from "./monster-hunt-state.js";
+
 export const worldMonstersEnabled=env=>env?.ENVIRONMENT==="beta"&&env?.GAME_4X_SYSTEMS_ENABLED==="true";
 // Lazy, server-authoritative respawn; no rewards or troop mutations.
 // Concurrent reads can only restore each generation once because hp=0 is
@@ -10,11 +12,14 @@ export async function respawnDueMonsters(env,region,now=Math.floor(Date.now()/10
 }
 export async function worldMonsterPreview(env,playerId){
  if(!worldMonstersEnabled(env))return {enabled:false,combatEnabled:false,monsters:[]};
- const kingdom=await env.DB.prepare("SELECT k.map_region FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
+ const kingdom=await env.DB.prepare("SELECT k.id,k.map_region FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
  if(!kingdom)return null;
  const region=Number(kingdom.map_region)||1;
  if(!Number.isSafeInteger(region)||region<1||region>3)return null;
  await respawnDueMonsters(env,region);
- const result=await env.DB.prepare("SELECT id,monster_key,name,level,x,z,max_hp,hp,respawn_at,generation FROM world_monsters WHERE map_region=? ORDER BY level,id LIMIT 50").bind(region).all();
- return {enabled:true,combatEnabled:false,region,monsters:result.results||[]};
+ const [result,progress]=await Promise.all([
+  env.DB.prepare("SELECT id,monster_key,name,level,x,z,max_hp,hp,respawn_at,generation FROM world_monsters WHERE map_region=? ORDER BY level,id LIMIT 50").bind(region).all(),
+  huntProgressView(env.DB,kingdom.id)
+ ]);
+ return {enabled:true,combatEnabled:true,region,monsters:result.results||[],progress};
 }

@@ -1,5 +1,5 @@
 import {createEntityArtElement} from "./kingdom-2d-art-atlas.js";
-// Read-only field guide for persisted beta monsters. Never dispatch a march.
+// A seleção do bestiário usa o mesmo painel de formação das demais marchas.
 const root=document.getElementById("worldMonsterPreview");
 const list=document.getElementById("worldMonsterList");
 const status=document.getElementById("worldMonsterStatus");
@@ -18,7 +18,8 @@ function token(){
 function element(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);return el;}
 const map=document.getElementById("mapContent");
 const mapHost=document.getElementById("worldMap");
-let pins=new Map(),cards=new Map(),selected=null,monsterRows=[];
+const pins=new Map(),cards=new Map();
+let selected=null,monsterRows=[],progress=null,combatEnabled=false,lastSnapshot="",snapshotBearer="";
 function syncMonsterModels(){window.__coiWorldMap3D?.setMonsters?.(monsterRows);}
 function projectPins(){
  for(const {button,monster} of pins.values()){
@@ -29,11 +30,14 @@ function projectPins(){
  }
 }
 function clearPins(){for(const {button} of pins.values())button.remove();pins.clear();cards.clear();}
-function selectMonster(id,showGuide=false){
+function selectMonster(id,openFormation=false,emit=true){
  selected=id;
  for(const [key,{button}] of pins){button.classList.toggle("selected",key===id);button.setAttribute("aria-pressed",String(key===id));}
  for(const [key,card] of cards)card.classList.toggle("monster-selected",key===id);
- if(showGuide)cards.get(id)?.scrollIntoView({block:"nearest",behavior:"auto"});
+ if(emit){
+  const monster=monsterRows.find(row=>String(row.id)===id);
+  window.dispatchEvent(new CustomEvent("coi:monster-selected",{detail:{monster,progress,combatEnabled,openFormation}}));
+ }
 }
 function addPin(monster,id,hp){
  if(!map||!Number.isFinite(Number(monster.x))||!Number.isFinite(Number(monster.z)))return;
@@ -47,18 +51,43 @@ function addPin(monster,id,hp){
 }
 for(const event of ["coi:world-map-3d-ready","coi:world-map-projection-changed","coi:world-map-2d-fallback"])window.addEventListener(event,projectPins);
 window.addEventListener("coi:world-map-3d-ready",syncMonsterModels);
-let busy=false;
+window.addEventListener("coi:territory-selected",()=>selectMonster(null,false,false));
+let busy=false,timer=null,suspended=false,enabled=null;
+function stopRefresh(){
+ if(timer!==null)clearTimeout(timer);
+ timer=null;
+}
+function clearSnapshot(){
+ lastSnapshot="";snapshotBearer="";monsterRows=[];progress=null;combatEnabled=false;
+ if(selected)selectMonster(null);
+ clearPins();list.replaceChildren();syncMonsterModels();
+ document.getElementById("worldMonsterProgress")?.replaceChildren();
+}
+function scheduleRefresh(){
+ stopRefresh();
+ if(!document.hidden&&!suspended&&enabled!==false&&token())timer=setTimeout(refresh,30000);
+}
 async function refresh(){
- const bearer=token();if(!bearer||busy||!root||!list||!status)return;
+ if(document.hidden||suspended||busy||!root||!list||!status)return;
+ stopRefresh();
+ const bearer=token();
+ if(snapshotBearer&&snapshotBearer!==bearer)clearSnapshot();
+ if(!bearer){root.hidden=true;return;}
  busy=true;
  try{
   const response=await fetch("/api/game/world-monsters",{headers:{Authorization:"Bearer "+bearer},cache:"no-store",redirect:"error"});
+  if(response.status===401||response.status===403){clearSnapshot();root.hidden=true;enabled=false;return;}
   if(!response.ok)throw Error("Consulta indisponível");
   const data=await response.json();
-  if(!data.enabled){root.hidden=true;clearPins();list.replaceChildren();monsterRows=[];syncMonsterModels();return;}
+  if(token()!==bearer||suspended)return;
+  enabled=data.enabled===true;
+  if(!enabled){clearSnapshot();root.hidden=true;return;}
+  snapshotBearer=bearer;
   root.hidden=false;
-  const progressResponse=await fetch("/api/game/monster-hunt/progress",{headers:{Authorization:"Bearer "+bearer},cache:"no-store",redirect:"error"}).catch(()=>null);
-  const progress=progressResponse?.ok?(await progressResponse.json().catch(()=>null))?.progress:null;
+  const snapshot=JSON.stringify(data);
+  if(snapshot===lastSnapshot)return;
+  progress=data.progress;
+  combatEnabled=data.combatEnabled===true;
   const progressBox=document.getElementById("worldMonsterProgress");
   if(progressBox){
    progressBox.replaceChildren();
@@ -68,6 +97,7 @@ async function refresh(){
    }else progressBox.append(element("span","Progresso de caça indisponível."));
   }
   const rows=Array.isArray(data.monsters)?data.monsters:[];
+  const focused=[...pins].find(([,entry])=>entry.button===document.activeElement)?.[0];
   clearPins();list.replaceChildren();
   for(const monster of rows){
    const id=String(monster.id);
@@ -77,21 +107,37 @@ async function refresh(){
    const heading=element("b");heading.className="monster-heading";heading.append(monsterArt(monster.monster_key),element("span",monster.name+" · Nv. "+monster.level));item.append(heading);
    const meter=element("progress");meter.max=max;meter.value=hp;meter.setAttribute("aria-label","Vida de "+monster.name);
    item.append(meter,element("span",hp+" / "+max+" PV · X "+monster.x+" / Z "+monster.z));
-   item.append(element("span",hp>0?"Disponível para visualização":"Aguardando reaparecimento"));
+   item.append(element("span",hp>0?"Criatura ativa":"Reaparece às "+new Date(monster.respawn_at*1000).toLocaleTimeString("pt-BR",{hour:"2-digit",minute:"2-digit"})));
    if(progress){
     const cost=progress.energyCosts?.[monster.level];
     const locked=Number(monster.level)>Number(progress.unlockedLevel);
     item.append(element("span",locked?"Nível bloqueado · derrote o anterior":"Custo previsto: "+cost+" energia"));
    }
-   const button=element("button","Localizar no mapa");button.type="button";button.className="secondary";
-   button.addEventListener("click",()=>{selectMonster(id);mapHost?.scrollIntoView({block:"nearest",behavior:"auto"});pins.get(id)?.button.focus({preventScroll:true});});
+   const button=element("button","Ver expedição");button.type="button";button.className="secondary";
+   button.addEventListener("click",()=>selectMonster(id,true));
    item.append(button);list.append(item);cards.set(id,item);addPin(monster,id,hp);
   }
   monsterRows=rows;syncMonsterModels();
-  selectMonster(pins.has(selected)?selected:null);projectPins();
-  status.textContent=rows.length+" criaturas no seu reino · prévia; caça ainda não liberada.";
- }catch{root.hidden=false;clearPins();list.replaceChildren();monsterRows=[];syncMonsterModels();status.textContent="Não foi possível carregar os monstros. Tente atualizar.";}
- finally{busy=false;}
+  if(selected)selectMonster(pins.has(selected)?selected:null);
+  projectPins();
+  if(focused)pins.get(focused)?.button.focus({preventScroll:true});
+  status.textContent=rows.length+" criaturas neste mundo.";
+  lastSnapshot=snapshot;
+ }catch{
+  if(token()!==bearer||suspended)return;
+  root.hidden=false;lastSnapshot="";combatEnabled=false;
+  if(selected)selectMonster(selected);
+  status.textContent="Não foi possível sincronizar as criaturas. Tente atualizar.";
+ }
+ finally{busy=false;scheduleRefresh();}
 }
 document.getElementById("worldMonsterRefresh")?.addEventListener("click",refresh);
+window.addEventListener("coi:refresh-monsters",refresh);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)stopRefresh();else if(enabled!==false)void refresh();});
+window.addEventListener("pagehide",()=>{suspended=true;stopRefresh();});
+window.addEventListener("pageshow",event=>{suspended=false;if(event.persisted)void refresh();});
+window.addEventListener("storage",event=>{
+ if(event.key!=="coi_game_token"&&event.key!==null)return;
+ clearSnapshot();root.hidden=true;enabled=null;void refresh();
+});
 void refresh();

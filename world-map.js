@@ -1,8 +1,8 @@
 import { castleCityArtId } from "./scripts/castle-skin-visuals.js";
-import { createEntityArtElement } from "./scripts/kingdom-2d-art-atlas.js";
+import { createEntityArtElement, worldResourceArt } from "./scripts/kingdom-2d-art-atlas.js";
 import { throneVisualState } from "./scripts/world-map-visual-state.js";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
-import { readMarchComposition } from "./scripts/march-visual-path.js";
+import { marchVisualPoint, marchVisualProgress, marchTimestamp, readMarchComposition } from "./scripts/march-visual-path.js";
 import { createWorldRefreshGate } from "./scripts/world-state-refresh.js";
 import { startRealtimePresence } from "./scripts/eldoria-realtime-client.js";
 
@@ -41,6 +41,8 @@ const UNIT_NAMES = {
 };
 let state = null;
 let selectedTerritoryId = null;
+let selectedHunt = null;
+let pendingHunt = null;
 let selectedUnits = {};
 let busy = false;
 const worldRefreshGate=createWorldRefreshGate();
@@ -94,12 +96,19 @@ function territoryOwner(territory) {
 function getSelectedTerritory() {
   return (state?.territories || []).find(item => Number(item.id) === Number(selectedTerritoryId)) || null;
 }
+export function getMarchFormation(){
+  return Object.fromEntries(Object.entries(selectedUnits).filter(([,quantity])=>quantity>0));
+}
+export function focusMarchFormation(){
+  $("worldTargetPanel").scrollIntoView({block:"nearest"});
+  ($("troops").querySelector("input")||$("worldTargetHeading")).focus({preventScroll:true});
+}
 function renderResources() {
   const root = $("resources");
   root.replaceChildren();
   for (const [key, meta] of Object.entries(RESOURCE)) {
     const item = make("div", "resource");
-    item.append(document.createTextNode(meta.icon + " " + meta.label));
+    item.append(worldResourceArt(key,document)||make("span","",meta.icon),document.createTextNode(meta.label));
     item.append(make("b", "", fmt(state.kingdom[key])));
     root.append(item);
   }
@@ -124,9 +133,23 @@ function resetMapViewport() {
   mapViewport = { zoom: 1, panX: 0, panY: 0 };
   applyMapViewport();
 }
+function tacticalHome(){
+  const hasThrone=state?.territories?.some(row=>row.territory_kind==="throne");
+  return {x:hasThrone?13:0,z:hasThrone?-11:0};
+}
+function tacticalMarches(now=Date.now()) {
+  if (!$('worldMap').classList.contains('map-3d-fallback')) return;
+  const home=tacticalHome();
+  for (const marker of $('mapContent').querySelectorAll('.tactical-march')) {
+    const { x, z, start, end } = marker.dataset;
+    const point=marchVisualPoint(home,{x:Number(x),z:Number(z)},marchVisualProgress(now,Number(start),Number(end)));
+    marker.style.left=clamp(50+point.x*.9,9,91)+'%';
+    marker.style.top=clamp(50-point.z*.9,10,90)+'%';
+  }
+}
 function renderMap() {
   const root = $("mapContent");
-  root.querySelectorAll(".territory-pin").forEach(pin => pin.remove());
+  root.querySelectorAll(".territory-pin,.tactical-march,.map-center").forEach(pin => pin.remove());
   const visualState = {
     territories: state.territories || [],
     marches: state.marches || [],
@@ -138,6 +161,13 @@ function renderMap() {
     throneClaimed:Boolean(state.throne?.kingAllianceId || state.throne?.occupantAllianceId)
   };
   const buttonRefs = new Map();
+  const home=make("div","map-center");
+  const homeLocation=tacticalHome();
+  home.style.left=(50+homeLocation.x*.9)+"%";
+  home.style.top=(50-homeLocation.z*.9)+"%";
+  const homeArt=createEntityArtElement({kind:"symbol",src:"/assets/art/buildings/icons.svg#"+castleCityArtId(visualState.castleSkinId),viewBox:"0 0 100 90"},document);
+  home.append(homeArt,make("small","",state.kingdom.kingdom_name||"Seu castelo"));
+  root.append(home);
   for (const territory of state.territories || []) {
     const isCastle = territory.territory_kind === "castle";
     const isThrone = territory.territory_kind === "throne";
@@ -167,11 +197,13 @@ function renderMap() {
       portrait.classList.add("territory-castle-art");
       button.append(portrait);
     } else {
-      button.append(make("span", "", resource.icon));
+      button.append((!isThrone&&worldResourceArt(territory.resource_type,document))||make("span", "", resource.icon));
     }
     button.append(make("small", "", territory.name));
     button.addEventListener("click", () => {
       selectedTerritoryId = territory.id;
+      selectedHunt = null;
+      window.dispatchEvent(new Event("coi:territory-selected"));
       renderMap();
       renderDetails();
     });
@@ -184,11 +216,34 @@ function renderMap() {
     window.__coiWorldMap3D.setProjectionButtons(buttonRefs);
     window.__coiWorldMap3D.update(visualState);
   }
+  for (const march of visualState.marches.filter(row=>row.status==="marching")) {
+    const target=march.march_type==="hunt"?{x:march.monster_x,z:march.monster_z}:
+      visualState.territories.find(row=>Number(row.id)===Number(march.target_territory_id));
+    if(!target||target.x==null||target.z==null)continue;
+    const marker=make("span","tactical-march",march.march_type==="gather"?"◆":"⚑");
+    marker.dataset.type=march.march_type;
+    marker.dataset.x=target.x;marker.dataset.z=target.z;
+    marker.dataset.start=marchTimestamp(march.started_at);marker.dataset.end=marchTimestamp(march.arrives_at);
+    marker.setAttribute("aria-hidden","true");
+    root.append(marker);
+  }
+  tacticalMarches();
   applyMapViewport();
 }
 // Rebuild tactical positions immediately when the 3D renderer is lost.
 window.addEventListener("coi:world-map-2d-fallback", () => {
   if (state?.kingdom) renderMap();
+});
+window.setInterval(()=>{if(!document.hidden)tacticalMarches();},1000);
+window.addEventListener("coi:monster-selected",({detail})=>{
+  selectedHunt=detail.monster?detail:null;
+  if(!state)return;
+  if(selectedHunt)selectedTerritoryId=null;
+  renderMap();renderDetails();
+  if(detail.openFormation){
+    $("worldTargetPanel").scrollIntoView({block:"nearest"});
+    $("worldTargetHeading").focus({preventScroll:true});
+  }
 });
 function addStat(root, label, value) {
   const stat = make("div", "stat");
@@ -282,6 +337,15 @@ function updateActionButtons() {
   const isCastle = territory?.territory_kind === "castle";
   const isThrone = territory?.territory_kind === "throne";
   const canVisit = Boolean(territory && !isCastle && !isThrone && territoryOwner(territory) !== "Outro reino");
+  const hunting=Boolean(selectedHunt);
+  for(const id of ["gather","scout","attack"])$(id).hidden=hunting;
+  $("hunt").hidden=!hunting;
+  $("hunt").disabled=busy||!hasTroops||!marchAvailable||!hunting||Boolean(huntRestriction());
+  if(hunting){
+    const damage=Object.entries(selectedUnits).reduce((sum,[type,count])=>sum+(selectedHunt.progress?.unitDamage?.[type]||0)*count,0);
+    $("marchHint").textContent=huntRestriction()||
+      (damage?"Dano previsto: "+fmt(Math.min(damage,selectedHunt.monster.hp))+" PV. ":"Escolha a formação. ")+"As tropas retornam após a expedição.";
+  }
   $("gather").disabled = busy || !canVisit || !["food","wood","stone","iron"].includes(territory?.resource_type) || !hasTroops || !marchAvailable;
   $("scout").disabled = busy || !canVisit || !hasTroops || !marchAvailable;
   $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops || !marchAvailable;
@@ -293,6 +357,16 @@ function updateActionButtons() {
     !state?.alliance?.id||Number(state?.kingdom?.castle_level||0)<10||
     siegeTotal<200||siegeTotal>10000;
 }
+function huntRestriction(){
+  const {monster,progress,combatEnabled}=selectedHunt||{};
+  if(!combatEnabled||!progress)return "Aguardando sincronização da energia de caça.";
+  if(monster.hp<=0)return "A criatura está reaparecendo.";
+  if(monster.level>progress.unlockedLevel)return "Derrote uma criatura do nível anterior para liberar este alvo.";
+  if(progress.energy<progress.energyCosts[monster.level])return "Energia de caça insuficiente.";
+  if(state.marches?.some(march=>march.status==="marching"&&march.march_type==="hunt"&&march.monster_id===monster.id))
+    return "Uma expedição sua já está a caminho desta criatura.";
+  return "";
+}
 // The server owns the duration; do not display a guessed rule.
 function throneHoldLabel(minutes) {
   return Number.isSafeInteger(minutes) && minutes>0 ? fmt(minutes)+" minutos" : "tempo definido pelo servidor";
@@ -301,15 +375,29 @@ function renderDetails() {
   const root = $("territoryDetails");
   root.replaceChildren();
   const territory = getSelectedTerritory();
+  if(selectedHunt){
+    const {monster,progress}=selectedHunt;
+    root.append(make("div","territory-title",monster.name));
+    const grid=make("div","detail-grid");
+    addStat(grid,"Nível e vida","Nv. "+monster.level+" · "+fmt(monster.hp)+" / "+fmt(monster.max_hp)+" PV");
+    if(progress)addStat(grid,"Energia da expedição",fmt(progress.energyCosts[monster.level])+" de "+fmt(progress.energy)+" disponível");
+    root.append(grid);
+    renderTroops();
+    return;
+  }
   if (!territory) {
     root.append(make("div", "muted", "Escolha um ponto no mapa."));
     $("troops").replaceChildren();
+    $("marchHint").textContent="";
     updateActionButtons();
     return;
   }
   const resource = territory.territory_kind==="throne"?{icon:"👑",label:"Trono Imperial"}:(RESOURCE[territory.resource_type] || { icon: "📍", label: "Recurso" });
   const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
-  root.append(make("div", "territory-title", resource.icon + " " + territory.name));
+  const title=make("div","territory-title");
+  const resourceArt=territory.territory_kind!=="throne"&&territory.territory_kind!=="castle"?worldResourceArt(territory.resource_type,document):null;
+  title.append(resourceArt||make("span","",resource.icon),document.createTextNode(territory.name));
+  root.append(title);
   root.append(make("p", "muted", territoryOwner(territory)));
   const grid = make("div", "detail-grid");
   const isCastle = territory.territory_kind === "castle";
@@ -332,23 +420,20 @@ function renderDetails() {
     addStat(grid, "Terreno", terrain.label);
     addStat(grid, "Recurso", resource.label);
     addStat(grid, "Produção", fmt(territory.resource_rate) + " / hora");
+    if(["food","wood","stone","iron"].includes(territory.resource_type)&&territoryOwner(territory)!=="Outro reino")
+      addStat(grid,"Coleta por marcha",fmt(Math.max(1,Number(territory.resource_rate)||90))+" "+resource.label.toLocaleLowerCase("pt-BR"));
     addStat(grid, "Nível", fmt(territory.level || 1));
     if (territory.alliance_id != null) addStat(grid, "Aliança controladora", territory.controlling_alliance_tag ? "[" + territory.controlling_alliance_tag + "]" : "Território reivindicado");
   }
   root.append(grid);
-  $("marchNotice").textContent = isThrone
+  $("marchHint").textContent = isThrone
     ? "Guerra do Trono: alianças rivais, cerco de tropas e "+throneHoldLabel(state?.throne?.holdRequiredMinutes)+" de ocupação para coroação."
     : isCastle
     ? "Castelo de outro comandante detectado. Você pode consultar comandante, poder e aliança; o envio de ataques PvP será ativado na Fase 10."
     : territory.owner_kingdom_id && territoryOwner(territory) === "Outro reino"
       ? "Este território pertence a outro jogador e não está disponível para coleta."
       : "Escolha as tropas e uma ação. O servidor confirma custos, disponibilidade e resultado.";
-  if (isCastle) {
-    $("troops").replaceChildren();
-    updateActionButtons();
-  } else {
-    renderTroops();
-  }
+  renderTroops();
 }
 function renderMarches() {
   const root = $("marches");
@@ -360,21 +445,33 @@ function renderMarches() {
   }
   const territories = new Map((state.territories || []).map(item => [Number(item.id), item.name]));
   const scoutReports=new Map();
+  const gatherReports=new Map();
   for(const event of state.recentEvents||[]){
-    if(event.event_type!=="territory_scouted")continue;
-    try{const report=JSON.parse(event.payload_json);if(Number.isSafeInteger(report.marchId)&&!scoutReports.has(report.marchId))scoutReports.set(report.marchId,report);}catch{}
+    const reports=event.event_type==="territory_scouted"?scoutReports:event.event_type==="territory_gathered"?gatherReports:null;
+    if(!reports)continue;
+    try{const report=JSON.parse(event.payload_json);if(Number.isSafeInteger(report.marchId)&&!reports.has(report.marchId))reports.set(report.marchId,report);}catch{}
   }
   for (const march of marches.slice(0, 10)) {
     const card = make("div", "march");
-    const title = make("strong", "", (march.march_type || "Marcha").toUpperCase() + " · " + (territories.get(Number(march.target_territory_id)) || "Território"));
-    const date = march.arrives_at ? new Date(march.arrives_at).toLocaleString("pt-BR") : "—";
-    card.append(title, make("div", "muted", "Estado: " + march.status), make("div", "muted", "Chegada prevista: " + date));
+    const types={hunt:"Caça",gather:"Coleta",scout:"Exploração",attack:"Conquista",reinforce:"Reforço",return:"Retorno"};
+    const statuses={marching:"Em marcha",completed:"Concluída",arrived:"Chegou",returning:"Retornando",cancelled:"Cancelada"};
+    const title = make("strong", "", (types[march.march_type] || "Marcha") + " · " + (march.monster_name || territories.get(Number(march.target_territory_id)) || "Território"));
+    const date = march.arrives_at ? new Date(marchTimestamp(march.arrives_at)).toLocaleString("pt-BR") : "—";
+    card.append(title, make("div", "muted", statuses[march.status]||"Situação indisponível"));
+    if(march.status==="marching")card.append(make("div","muted","Chegada prevista: "+date));
     const composition=readMarchComposition(march.units_json);
     if(composition.length)card.append(make("div","muted","Formação: "+composition.map(u=>UNIT_NAMES[u.type]+" × "+fmt(u.count)).join(" · ")));
     const report=scoutReports.get(Number(march.id));
     if(march.march_type==="scout"&&report){
       const label=RESOURCE[report.resourceType]?.label||"Sem recurso";
       card.append(make("div","muted","Reconhecimento: "+String(report.name||"Território")+" · Nv. "+fmt(report.level)+" · "+label+" · Taxa "+fmt(report.resourceRate)));
+    }
+    const haul=gatherReports.get(Number(march.id));
+    if(haul)card.append(make("div","muted",haul.amount>0?"Entregue ao reino: "+fmt(haul.amount)+" "+(RESOURCE[haul.resource]?.label||""):"Tropas retornaram sem carga. O ponto de coleta ficou indisponível."));
+    if(march.hunt_outcome){
+      const outcomes={victory:"Criatura derrotada. Recompensas entregues ao reino.",wounded:"Criatura ferida. As tropas retornaram.",unavailable:"Alvo indisponível. As tropas retornaram e a energia foi devolvida."};
+      card.append(make("div","muted",outcomes[march.hunt_outcome]));
+      if(march.hunt_damage>0)card.append(make("div","muted",fmt(march.hunt_damage)+" PV de dano"));
     }
     root.append(card);
   }
@@ -430,7 +527,9 @@ function render() {
   renderMarches();
 }
 async function refreshState({background=false}={}) {
-  return worldRefreshGate.run(()=>request("/game/state"),response=>{
+  return worldRefreshGate.run(()=>request("/game/state"),applyWorldState,{background});
+}
+function applyWorldState(response){
   const nextState=response.state || response;
   if (!nextState.kingdom) throw new Error("O servidor não retornou o reino.");
   const oldThrone=state?.throne||null;
@@ -448,9 +547,8 @@ async function refreshState({background=false}={}) {
     if (match) selectedTerritoryId = match.id;
     requestedTerritoryApplied = true;
   }
-  if (!getSelectedTerritory() && state.territories?.length) selectedTerritoryId = state.territories[0].id;
+  if (!selectedHunt&&!getSelectedTerritory()&&state.territories?.length) selectedTerritoryId = state.territories[0].id;
   render();
-  },{background});
 }
 async function sendThroneAssault(){
   if(busy||getSelectedTerritory()?.territory_kind!=="throne"||state?.throne?.phase!=="contest")return;
@@ -481,8 +579,10 @@ $("throneAssault").addEventListener("click",sendThroneAssault);
 async function sendMarch(marchType) {
   if (busy) return;
   const territory = getSelectedTerritory();
-  const units = Object.fromEntries(Object.entries(selectedUnits).filter(([, quantity]) => Number(quantity) > 0));
-  if (!territory || !Object.keys(units).length) return;
+  const hunting=marchType==="hunt";
+  const target=hunting?selectedHunt?.monster:territory;
+  const units = getMarchFormation();
+  if (!target || !Object.keys(units).length || (hunting&&huntRestriction())) return;
   if(marchType==="gather"&&!["food","wood","stone","iron"].includes(territory.resource_type))return;
   const total=Object.values(units).reduce((sum,value)=>sum+Number(value||0),0);
   const max=Number(state?.marchCapacity?.maximum||0);
@@ -499,17 +599,26 @@ async function sendMarch(marchType) {
   busy = true;
   updateActionButtons();
   $("marchNotice").textContent = "Enviando ordem de marcha ao servidor…";
+  const draft={type: "march", targetId: target.id, marchType, units};
+  if(hunting){
+    draft.generation=target.generation;
+    const key=JSON.stringify(draft);
+    if(pendingHunt?.key!==key)pendingHunt={key,id:crypto.randomUUID()};
+    draft.requestId=pendingHunt.id;
+  }
   try {
     const result = await request("/game/action", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ type: "march", targetId: territory.id, marchType, units }),
+      body: JSON.stringify(draft),
     });
     selectedUnits = {};
-    await refreshState();
-    $("marchNotice").textContent = result.message || "Marcha registrada pelo servidor.";
+    applyWorldState(result);
+    if(hunting){pendingHunt=null;window.dispatchEvent(new Event("coi:refresh-monsters"));}
+    $("marchNotice").textContent = hunting?"Expedição de caça enviada.":result.message || "Marcha registrada pelo servidor.";
     setStatus("● Reino sincronizado");
   } catch (error) {
+    if(hunting&&error.status>=400&&error.status<500){pendingHunt=null;window.dispatchEvent(new Event("coi:refresh-monsters"));}
     $("marchNotice").textContent = error.message;
     setStatus(error.message, true);
   } finally {
@@ -520,6 +629,7 @@ async function sendMarch(marchType) {
 $("gather").addEventListener("click", () => sendMarch("gather"));
 $("scout").addEventListener("click", () => sendMarch("scout"));
 $("attack").addEventListener("click", () => sendMarch("attack"));
+$("hunt").addEventListener("click", () => sendMarch("hunt"));
 $("zoomIn").addEventListener("click", () => changeMapZoom(0.25));
 $("zoomOut").addEventListener("click", () => changeMapZoom(-0.25));
 $("mapReset").addEventListener("click", resetMapViewport);
@@ -610,6 +720,9 @@ $("worldMap").addEventListener("wheel", event => {
   changeMapZoom(event.deltaY < 0 ? 0.1 : -0.1);
 }, { passive: false });
 window.addEventListener("resize", () => applyMapViewport());
+window.addEventListener("coi:refresh-world",()=>{
+  if(state&&!busy)void refreshState().catch(error=>setStatus(error.message,true));
+});
 
 function showWorldSessionRecovery() {
   setStatus("O navegador bloqueou o armazenamento da sessão. Nenhum novo reino será criado automaticamente.", true);
@@ -656,6 +769,7 @@ let lastRealtimeRefresh=0;
 if(typeof WebSocket==="function")startRealtimePresence({onWorldChanged:()=>{
   if(document.hidden||busy||!token||Date.now()-lastRealtimeRefresh<5000)return;
   lastRealtimeRefresh=Date.now();
+  window.dispatchEvent(new Event("coi:refresh-monsters"));
   refreshState({background:true}).catch(()=>{/* periodic polling remains available */});
   updateRealmCards({background:true});
 }});
