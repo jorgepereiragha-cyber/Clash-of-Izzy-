@@ -1553,3 +1553,16 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     await rm(persist, { recursive:true, force:true });
   }
 });
+
+test("construction preview reports only missing resources and special materials",async()=>{
+ const {runInNewContext}=await import("node:vm");
+ const source=await readFile(new URL("../kingdom.html",import.meta.url),"utf8");
+ const start=source.indexOf("function constructionShortages("),end=source.indexOf("let selectedCityBuildingType",start);
+ assert.ok(start>=0&&end>start);
+ const shortages=runInNewContext(source.slice(start,end)+"\nconstructionShortages");
+ const option={cost:{wood:300,stone:200,food:0},materials:{royal_blueprint:2}};
+ const report=shortages(option,{wood:250,stone:200},[{item_key:"royal_blueprint",quantity:1}]);
+ assert.deepEqual(JSON.parse(JSON.stringify(report)),[{key:"wood",missing:50,material:false},{key:"royal_blueprint",missing:1,material:true}]);
+ assert.equal(shortages(option,{wood:300,stone:200},[{item_key:"royal_blueprint",quantity:2}]).length,0);
+ assert.equal(shortages(null,{},[]).length,0);
+});

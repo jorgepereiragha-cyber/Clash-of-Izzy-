@@ -976,6 +976,14 @@ function buildingActionAvailable(definition){
  const target=document.getElementById(definition.target);
  return Boolean(target&&!target.closest("[hidden]"));
 }
+function constructionShortages(option,kingdom,inventory){
+ if(!option)return [];
+ const owned=new Map((inventory||[]).map(item=>[item.item_key,Math.max(0,Number(item.quantity)||0)]));
+ return [
+  ...Object.entries(option.cost||{}).map(([key,amount])=>({key,missing:Math.max(0,Number(amount)-(Number(kingdom?.[key])||0)),material:false})),
+  ...Object.entries(option.materials||{}).map(([key,amount])=>({key,missing:Math.max(0,Number(amount)-(owned.get(key)||0)),material:true}))
+ ].filter(item=>item.missing>0);
+}
 let selectedCityBuildingType = null;
 function selectCityBuilding(type){
  const panel=document.getElementById("coiCitySelection");
@@ -1052,8 +1060,10 @@ document.getElementById("coiCitySelectionDetails").addEventListener("click",()=>
  if(!selectedCityBuildingType)return;
  const target=[...document.querySelectorAll("#buildings [data-upgrade]")].find(button=>button.dataset.upgrade===selectedCityBuildingType);
  if(!target)return;
- target.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
- target.focus({preventScroll:true});
+ const focusTarget=target.disabled?(target.closest(".building-row")||target):target;
+ if(focusTarget!==target)focusTarget.tabIndex=-1;
+ focusTarget.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
+ focusTarget.focus({preventScroll:true});
 });
 function cityBuildingArt(type,emoji,skinId,level=1){
  const allowed=["castle","barracks","farm","quarry","lumber_mill","iron_mine","market","academy","wall","hospital","watchtower","stable","archery_range","siege_workshop","embassy","warehouse"];
@@ -1070,7 +1080,7 @@ city.insertAdjacentHTML("beforeend",buildings.slice(0,16).map((b,i)=>{const [nam
 document.getElementById("summary").innerHTML=[["⭐ Poder",fmt(k.power)],["💎 Diamantes",fmt(state.player?.gems)],["👑 VIP do Castelo",fmt(state.castleVip?.level??k.prestige)],["🐉 Dragão",state.dragon?.dragon_name||"Ainda não despertado"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="construction"&&q.status==="running").length;
 const constructionResourceLabels={wood:"Madeira",stone:"Pedra",food:"Comida",iron:"Ferro"};
-document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const option=state.buildingUpgradeOptions?.[b.building_type];const needsCastle=option?.requiredCastleLevel>Number(k.castle_level);const costText=option?Object.entries(option.cost).filter(([,amount])=>amount>0).map(([resource,amount])=>constructionResourceLabels[resource]+": "+fmt(amount)).join(" · "):"";const materialText=option?Object.entries(option.materials).map(([item,amount])=>(state.castleMaterials?.[item]?.name||item)+": "+fmt(amount)).join(" · "):"";const blocked=maxed||activeConstructionCount>=2||alreadyQueued||needsCastle||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":needsCastle?"CASTELO "+option.requiredCastleLevel:"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small>'+(option?'<small style="display:block;margin-top:4px">Nível '+fmt(option.nextLevel)+' · '+esc(costText)+'</small>':"")+(materialText?'<small style="display:block;margin-top:4px">Materiais: '+esc(materialText)+'</small>':"")+'</div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
+document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const option=state.buildingUpgradeOptions?.[b.building_type];const needsCastle=option?.requiredCastleLevel>Number(k.castle_level);const costText=option?Object.entries(option.cost).filter(([,amount])=>amount>0).map(([resource,amount])=>constructionResourceLabels[resource]+": "+fmt(amount)).join(" · "):"";const materialText=option?Object.entries(option.materials).map(([item,amount])=>(state.castleMaterials?.[item]?.name||item)+": "+fmt(amount)).join(" · "):"";const shortages=constructionShortages(option,k,state.inventoryItems);const missingText=shortages.map(item=>(item.material?(state.castleMaterials?.[item.key]?.name||item.key):constructionResourceLabels[item.key])+": "+fmt(item.missing)).join(" · ");const blocked=maxed||activeConstructionCount>=2||alreadyQueued||needsCastle||shortages.length>0||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":needsCastle?"CASTELO "+option.requiredCastleLevel:shortages.length?"FALTAM RECURSOS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small>'+(option?'<small style="display:block;margin-top:4px">Nível '+fmt(option.nextLevel)+' · '+esc(costText)+'</small>':"")+(materialText?'<small style="display:block;margin-top:4px">Materiais: '+esc(materialText)+'</small>':"")+(missingText?'<small style="display:block;margin-top:4px;color:#ffc1ac">Faltam: '+esc(missingText)+'</small>':"")+'</div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
 renderQueues();
 document.getElementById("researchLevels").innerHTML=(state.research||[]).map(r=>'<div class="event">'+esc(String(r.research_key).replaceAll("_"," "))+' · nível '+fmt(r.level)+'</div>').join("")||'<div class="muted">Nenhuma pesquisa concluída ainda.</div>';
 renderTrainingForm();
