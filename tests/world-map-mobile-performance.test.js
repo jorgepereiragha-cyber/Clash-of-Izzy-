@@ -395,3 +395,33 @@ test("late unauthorized map response cannot clear another session's UI",async()=
  assert.equal(context.collectReturnEnabled,true);
  assert.match(ui,/finally\{\s*busy=false;\s*if\(readRallySession\(\)\.token===token\)\{renderNodeList\(\);renderRallies\(\);\}/);
 });
+
+test("realtime invalidations during a resource refresh produce one trailing read",async()=>{
+ const ui=await read("rally-ui.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("let refreshQueued=false;"),end=ui.indexOf("async function loadRallyState(",start);
+ assert.ok(start>=0&&end>start);
+ const releases=[];
+ let session="original",reads=0;
+ const context={token:"original",refreshing:null,readRallySession:()=>({token:session}),
+  loadRallyState:()=>{reads++;return new Promise(resolve=>releases.push(resolve));}};
+ const refresh=runInNewContext(ui.slice(start,end)+"\nrefresh",context);
+ const first=refresh();
+ assert.equal(reads,1);
+ assert.equal(refresh(),first);
+ assert.equal(refresh(),first);
+ releases.shift()();
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.equal(reads,2);
+ releases.shift()();
+ await first;
+ assert.equal(reads,2);
+ assert.equal(context.refreshing,null);
+ const second=refresh();
+ refresh();
+ session="replacement";
+ releases.shift()();
+ await second;
+ assert.equal(reads,3);
+ assert.equal(refresh(),null);
+});
