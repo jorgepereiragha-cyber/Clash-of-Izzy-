@@ -43,3 +43,7 @@
 .coi-science-level,.coi-science-status{font-size:11px;color:#e1e9f2;line-height:1.35}
 .coi-science-credit{font-size:11px;color:#c4d1df;margin:9px 0 0}
 .coi-science-credit a{color:#e9c77e}
+
+/* Original industry and defense art; keep native action controls and text. */
+.coi-4x-panel .coi-4x-art{display:inline-block;width:36px;height:34px;vertical-align:middle;margin-right:7px;pointer-events:none;flex:none}
+.coi-4x-panel .coi-defense-chip .coi-4x-art{width:28px;height:26px}
