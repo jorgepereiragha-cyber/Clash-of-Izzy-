@@ -3,6 +3,7 @@ import { createEntityArtElement } from "./scripts/kingdom-2d-art-atlas.js";
 import { throneVisualState } from "./scripts/world-map-visual-state.js";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
 import { readMarchComposition } from "./scripts/march-visual-path.js";
+import { createWorldRefreshGate } from "./scripts/world-state-refresh.js";
 
 const API = "/api";
 const $ = id => document.getElementById(id);
@@ -41,6 +42,7 @@ let state = null;
 let selectedTerritoryId = null;
 let selectedUnits = {};
 let busy = false;
+const worldRefreshGate=createWorldRefreshGate();
 let mapViewport = { zoom: 1, panX: 0, panY: 0 };
 const activeMapPointers = new Map();
 let mapPanStart = null;
@@ -401,13 +403,14 @@ function render() {
   renderDetails();
   renderMarches();
 }
-async function refreshState() {
+async function refreshState({background=false}={}) {
+  return worldRefreshGate.run(()=>request("/game/state"),response=>{
+  const nextState=response.state || response;
+  if (!nextState.kingdom) throw new Error("O servidor não retornou o reino.");
   const oldThrone=state?.throne||null;
-  const response = await request("/game/state");
-  state = response.state || response;
+  state = nextState;
   if(oldThrone&&Number(oldThrone.realmId)===Number(state?.kingdom?.map_region||1))
     state.throne=oldThrone;
-  if (!state.kingdom) throw new Error("O servidor não retornou o reino.");
   if (!requestedTerritoryApplied && requestedTerritorySearch) {
     const query = normalizeTerritorySearch(requestedTerritorySearch);
     const territories = state.territories || [];
@@ -419,6 +422,7 @@ async function refreshState() {
   }
   if (!getSelectedTerritory() && state.territories?.length) selectedTerritoryId = state.territories[0].id;
   render();
+  },{background});
 }
 async function sendThroneAssault(){
   if(busy||getSelectedTerritory()?.territory_kind!=="throne"||state?.throne?.phase!=="contest")return;
@@ -426,6 +430,7 @@ async function sendThroneAssault(){
   const count=Object.values(units).reduce((n,q)=>n+Number(q),0);
   if(count<200||count>10000)return;
   if(!window.confirm("Confirmar cerco ao Trono Imperial? O resultado pode causar perdas permanentes de tropas."))return;
+  worldRefreshGate.invalidate();
   busy=true;updateActionButtons();
   $("marchNotice").textContent="Realizando cerco ao Trono Imperial…";
   try{
@@ -460,6 +465,7 @@ async function sendMarch(marchType) {
       ". Evolua heróis, castelo, academia e pesquisa militar.";
     return;
   }
+  worldRefreshGate.invalidate();
   busy = true;
   updateActionButtons();
   $("marchNotice").textContent = "Enviando ordem de marcha ao servidor…";
@@ -618,14 +624,14 @@ async function connect() {
 connect();
 window.setInterval(() => {
   if (document.hidden || busy || !token) return;
-  refreshState().catch(error => setStatus(error.message, true));
+  refreshState({background:true}).catch(error => setStatus(error.message, true));
 }, 15000);
 window.setInterval(() => { if(!document.hidden&&!busy&&token) updateRealmCards(); },60000);
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden && !busy && token) refreshState().catch(error => setStatus(error.message, true));
+  if (!document.hidden && !busy && token) refreshState({background:true}).catch(error => setStatus(error.message, true));
 });
 window.addEventListener("coi:app-resume", event => {
   if (event.detail?.reason === "online" && !busy && token) {
-    refreshState().catch(error => setStatus(error.message, true));
+    refreshState({background:true}).catch(error => setStatus(error.message, true));
   }
 });
