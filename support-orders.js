@@ -1,5 +1,5 @@
 // Apoio voluntário ao desenvolvimento. Sem gemas/itens: pacotes pagos permanecem na loja oficial.
-import { mercadoPagoNewCheckoutEnabled } from "./payment-activation.js";
+import { commercialSalesEnabled, mercadoPagoNewCheckoutEnabled } from "./payment-activation.js";
 export const SUPPORT_TIERS=Object.freeze({
   escudeiro:{label:"Escudeiro",amountCents:1000},
   cavaleiro:{label:"Cavaleiro",amountCents:5000},
@@ -19,6 +19,7 @@ const getSupportOrderSql=`SELECT s.*,p.player_id AS public_player_id FROM suppor
 
 export async function createSupportCheckout(request,env,ctx){
   if(request.method!=="POST")return ctx.json({error:"Método não permitido."},405);
+  if (!commercialSalesEnabled(env)) return ctx.json({error:"Vendas temporariamente desativadas.",code:"COMMERCIAL_SALES_DISABLED"},503);
   if(!mercadoPagoNewCheckoutEnabled(env))return ctx.json({error:"Mercado Pago ainda não está homologado para contribuições."},503);
   const playerId=await ctx.gameIdentity(request,env);
   if(!playerId)return ctx.json({error:"Abra o jogo e entre no seu reino antes de apoiar."},401);
