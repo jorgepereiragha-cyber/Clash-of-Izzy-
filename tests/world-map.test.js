@@ -184,7 +184,7 @@ test("expanded 3D footprint fits distant castles with a fixed geometry budget",a
   assert.ok(f.segmentsX<=96&&f.segmentsZ<=96);
   assert.ok(f.distanceScale>1);
  }
- const scene=await read("world-map-3d.js");
+ const scene=await readFile(new URL("../world-map-3d.js",import.meta.url),"utf8");
  assert.match(scene,/groundMesh\.geometry\.dispose\(\)/);
  assert.match(scene,/waterMesh\.geometry\.dispose\(\)/);
  assert.match(scene,/if\(footprintChanged\)\{loadedBounds=nextBounds;updateGround/);
