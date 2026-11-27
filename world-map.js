@@ -174,7 +174,7 @@ function resetMapViewport() {
   mapViewport = { zoom: 1, panX: 0, panY: 0 };
   applyMapViewport();
 }
-function tacticalHome(){
+export function tacticalHome(){
   const hasThrone=state?.territories?.some(row=>row.territory_kind==="throne");
   return {x:hasThrone?13:0,z:hasThrone?-11:0};
 }
