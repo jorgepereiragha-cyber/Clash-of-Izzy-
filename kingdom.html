@@ -1273,20 +1273,21 @@ function renderTrainingForm(){
  const enough=costs.every(([key,amount])=>Number(state.kingdom[key])>=amount);
  const resourceNames={food:"Comida",wood:"Madeira",iron:"Ferro"};
  const preview=[];
- if(spec)preview.push(names[spec.building][0]+(level?" · Nível "+fmt(level):" · Edifício necessário"));
+ if(spec)preview.push((names[spec.building]?.[0]||"Local de treinamento")+(level?" · Nível "+fmt(level):" · Edifício necessário"));
+ else preview.push("Tropa indisponível. Sincronize o reino.");
  if(costs.length&&quantity>0)preview.push(costs.map(([key,amount])=>resourceNames[key]+" "+fmt(amount)).join(" · "));
  if(!enough)preview.push("Recursos insuficientes");
  preview.push(fmt(slots)+" / 2 filas ocupadas",fmt(capacity)+" vagas no exército");
  const quote=document.getElementById("trainingQuote");
  const next=preview.join(" · ");
  if(quote.textContent!==next)quote.textContent=next;
- document.getElementById("trainButton").disabled=busy||slots>=2||!Number.isSafeInteger(quantity)||quantity<1||quantity>max||Boolean(spec&&!level)||!enough;
+ document.getElementById("trainButton").disabled=busy||slots>=2||!Number.isSafeInteger(quantity)||quantity<1||quantity>max||!spec||!level||!enough;
 }
 async function startTraining(event){
  event.preventDefault();
  if(document.getElementById("trainButton").disabled)return;
- const quantity=Math.max(1,Math.min(100,Math.floor(Number(document.getElementById("unitQuantity").value)||1)));
- document.getElementById("unitQuantity").value=String(quantity);
+ const quantity=document.getElementById("unitQuantity").valueAsNumber;
+ if(!Number.isSafeInteger(quantity)||quantity<1||quantity>100)return;
  await submitQueue("train",{unit:document.getElementById("unitType").value,quantity},"Treinamento iniciado. As tropas serão liberadas ao concluir.");
 }
 async function startResearch(event){
