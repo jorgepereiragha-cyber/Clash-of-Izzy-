@@ -68,6 +68,20 @@ function collectableNodeAmount(node){
  const available=Number(node.current_resources);
  return Number.isFinite(available)?Math.max(0,Math.floor(available*0.5)):0;
 }
+function nodeReadyLabel(node){
+ if(collectableNodeAmount(node)>0)return "Coleta disponível";
+ if(!Number.isFinite(node.collection_ready_at)||!Number.isFinite(node.server_time))return "Aguardando regeneração para coletar";
+ const minutes=Math.max(1,Math.ceil((node.collection_ready_at-node.server_time)/60));
+ const time=minutes>=60?Math.floor(minutes/60)+" h "+(minutes%60)+" min":minutes+" min";
+ return "Aguardando regeneração para coletar · ~"+time;
+}
+function nodeStockMeter(node){
+ const meter=make("progress","resource-node-stock");
+ meter.max=Math.max(1,Number(node.max_resources)||0);
+ meter.value=Math.max(0,Math.min(meter.max,Number(node.current_resources)||0));
+ meter.setAttribute("aria-label","Estoque disponível do ponto de coleta");
+ return meter;
+}
 function selectNode(node){
  const previous=selectedNodeId;
  selectedNodeId=node?.id??null;
@@ -78,7 +92,7 @@ function selectNode(node){
    make("span","",node.id),
    make("span","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" recursos"),
    make("span","",nodeAvailability(node)),
-   ...(node.is_mine?[make("span","",collectableNodeAmount(node)>0?"Coleta estimada: "+fmt(collectableNodeAmount(node)):"Aguardando regeneração para coletar")]:[]),
+   ...(node.is_mine?[make("span","",collectableNodeAmount(node)>0?"Coleta estimada: "+fmt(collectableNodeAmount(node)):nodeReadyLabel(node))]:[]),
    make("span","",fmt(node.regen_rate)+" recursos/h de regeneração")
   ]:[]));
  }
@@ -133,11 +147,11 @@ function renderNodeList(){
   head.append(name,make("span","", "Nível "+node.level));
   const info=make("p","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" "+type.resource.toLowerCase());
   const ownership=make("p","resource-node-owner",nodeAvailability(node));
-  card.append(head,info,ownership);
+  card.append(head,info,nodeStockMeter(node),ownership);
   const actions=make("div","resource-node-actions");
   if(node.is_mine){
    const amount=collectableNodeAmount(node);
-   card.append(make("p","resource-node-yield",amount>0?"Coleta estimada: "+fmt(amount)+" "+type.resource.toLowerCase():"Aguardando regeneração para coletar"));
+   card.append(make("p","resource-node-yield",amount>0?"Coleta estimada: "+fmt(amount)+" "+type.resource.toLowerCase():nodeReadyLabel(node)));
    addAction(actions,"Coletar",()=>runNodeAction("collect",node),busy||amount<1);
    addAction(actions,"Recolher tropas",()=>runNodeAction("recall",node),busy||Boolean(node.reserved_by_rally));
   }else if(node.occupied_by){
