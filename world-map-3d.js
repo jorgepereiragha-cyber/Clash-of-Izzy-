@@ -1,3 +1,4 @@
+import {createWorldMonsterLayer} from "./scripts/world-monster-models.js";
 import { castleSkinPalettes } from "./scripts/castle-skin-visuals.js";
 import {worldTerrainHeight,worldTerrainBlend,worldRiverDistance,worldRiverRibbon} from "./scripts/world-map-terrain.js";
 import * as THREE from "three";
@@ -93,6 +94,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   const routeRoot = new THREE.Group();
   const territoryRoot = new THREE.Group();
   const armyRoot = new THREE.Group();
+  const monsterLayer=createWorldMonsterLayer(THREE,worldRoot,terrainHeight);
   const shared = {
     terrainGround: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 }),
     riverBank: new THREE.MeshStandardMaterial({ color: 0x9a9370, roughness: 1 }),
@@ -693,6 +695,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     sceneVisibilityObserver?.disconnect();
     if (visibilityChangeHandler) document.removeEventListener("visibilitychange", visibilityChangeHandler);
     if (resizeHandler) window.removeEventListener("resize", resizeHandler);
+    monsterLayer.dispose();
     // Release geometry buffers of the scene on page navigation; all batches are
     // shared by the same renderer and must be disposed only once.
     const geometries = new Set();
@@ -784,6 +787,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
         },
         project: projectTerritories,
         projectPoint: projectMapPoint,
+        setMonsters(rows){if(!disposed&&!contextLost&&monsterLayer.update(rows))draw();},
         diagnostics: () => ({ rebuilds: {...visualRebuilds} })
       };
       window.dispatchEvent(new CustomEvent("coi:world-map-3d-ready"));
