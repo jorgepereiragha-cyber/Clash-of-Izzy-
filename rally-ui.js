@@ -210,8 +210,15 @@ resourceFilter?.addEventListener("change",()=>{
  if(!filteredNodes().some(node=>node.id===selectedNodeId))selectNode(null);
  renderMapNodes();renderNodeList();
 });
+function rankResourceNode(node){
+ if(!node.is_mine&&(node.occupied_by||node.reserved_by_rally))return 2;
+ return Number(node.current_resources)>0?0:1;
+}
+function compareResourceNodes(a,b){
+ return rankResourceNode(a)-rankResourceNode(b)||Math.hypot(a.map_x,a.map_y)-Math.hypot(b.map_x,b.map_y);
+}
 $("resourceMapLocate")?.addEventListener("click",()=>{
- const candidates=filteredNodes().sort((a,b)=>Math.hypot(a.map_x,a.map_y)-Math.hypot(b.map_x,b.map_y));
+ const candidates=filteredNodes().sort(compareResourceNodes);
  if(candidates.length)locateNode(candidates[0]);
 });
 window.addEventListener("coi:territory-selected",()=>{if(selectedNodeId)selectNode(null);});
