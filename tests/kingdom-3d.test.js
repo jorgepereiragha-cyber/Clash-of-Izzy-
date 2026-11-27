@@ -592,3 +592,26 @@ test("imported dragon animates on balanced graphics while low and reduced motion
  }
  assert.equal(Boolean(canAnimate(null,{tier:"high"})),false);
 });
+
+test("special city entrances follow persisted 3D landmarks and retain 2D navigation",async()=>{
+ const {runInNewContext}=await import("node:vm");
+ const start=kingdom.indexOf('window.addEventListener("coi:kingdom-projection",event=>{');
+ const end=kingdom.indexOf("function renderCastleSkins(",start);
+ assert.ok(start>=0&&end>start);
+ const events={},focus=[];
+ const nest={dataset:{specialSite:"dragon_nest"},style:{},hidden:true};
+ const altar={dataset:{specialSite:"summon_altar"},style:{},hidden:true};
+ const city={classList:{toggle(){},remove(){}},querySelectorAll(selector){return selector==="[data-special-site]"?[nest,altar]:[];}};
+ const document={activeElement:null,getElementById(id){return id==="city"?city:{focus(){focus.push(id);}};}};
+ runInNewContext(kingdom.slice(start,end),{window:{addEventListener(name,handler){events[name]=handler;}},document,cityCameraControls:null,state:null,drawKingdomScene(){}});
+ const project=detail=>events["coi:kingdom-projection"]({detail});
+ project({positions:[],specialPositions:[{type:"dragon_nest",visible:true,left:25,top:40},{type:"summon_altar",visible:false,left:50,top:60}]});
+ assert.equal(nest.hidden,false);assert.equal(nest.style.left,"25.000%");assert.equal(altar.hidden,true);
+ project({specialPositions:[{type:"summon_altar",visible:true,left:NaN,top:20}]});
+ assert.equal(nest.hidden,true);assert.equal(altar.hidden,true);
+ project({specialPositions:[{type:"dragon_nest",visible:true,left:20,top:30}]});
+ document.activeElement=nest;events["coi:kingdom-2d-fallback"]();
+ assert.equal(nest.hidden,true);assert.equal(altar.hidden,true);assert.deepEqual(focus,["coiDragonNest"]);
+ assert.match(renderer,/const specialPositions=currentSpecialLandmarks\(\)\.map/);
+ assert.match(renderer,/detail: \{ positions,specialPositions \}/);
+});
