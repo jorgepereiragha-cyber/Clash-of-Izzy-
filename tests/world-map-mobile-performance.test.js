@@ -292,3 +292,24 @@ test("accelerated beta harvest is ready at the initial seeded stock and regenera
  assert.equal(policy.nodeRegeneration(depleted,72999),7999);
  assert.equal(policy.nodeRegeneration(depleted,73000),8000);
 });
+
+test("world map resets all authenticated panels when the stored session changes",async()=>{
+ const ui=await read("world-map.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function worldSessionChanged(");
+ const end=ui.indexOf("const RESOURCE",start);
+ assert.ok(start>=0&&end>start);
+ let current="session-a",listener,reloads=0,invalidations=0;
+ const gate={invalidate(){invalidations++;}};
+ runInNewContext(ui.slice(start,end),{
+  token:"session-a",readWorldSession:()=>({token:current}),
+  worldRefreshGate:gate,realmRefreshGate:gate,
+  window:{addEventListener(name,callback){assert.equal(name,"storage");listener=callback;},location:{reload(){reloads++;}}}
+ });
+ listener({key:"theme"});listener({key:"coi_game_token"});
+ assert.equal(reloads,0);
+ current="session-b";listener({key:"coi_game_token"});
+ assert.equal(reloads,1);assert.equal(invalidations,2);
+ current="";listener({key:null});
+ assert.equal(reloads,2);assert.equal(invalidations,4);
+});
