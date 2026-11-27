@@ -36,3 +36,6 @@ jobs:
         run: node --test tests/castle-shield.test.js
       - name: Castle PvP eligibility and deterministic combat
         run: node --test tests/castle-pvp-policy.test.js tests/castle-pvp-simulator.test.js
+
+      - name: Monster hunt progression and energy contract
+        run: node --test tests/monster-hunt-policy.test.js
