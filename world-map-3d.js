@@ -650,7 +650,8 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
       const own=Number(territory.owner_kingdom_id||0)===Number(worldState.kingdomId||0);
       // Place the nameplate just above the flag, not over the model.
       const castleScale=Number(territory.owner_kingdom_id||0)>0&&!own ? .92 : 1.1;
-      const labelHeight=isCastle?(7.05+(tier-1)*.48+(tier>=3?.52:0))*castleScale:2.45;
+      // The throne roof reaches 6.27 world units; anchor its phase label above it.
+      const labelHeight=isCastle?(7.05+(tier-1)*.48+(tier>=3?.52:0))*castleScale:territory.territory_kind==="throne"?6.65:2.45;
       const point = new THREE.Vector3(x,terrainHeight(x,z)+labelHeight,z).project(camera);
       button.style.left = ((point.x * .5 + .5) * width) + "px";
       button.style.top = ((-point.y * .5 + .5) * height) + "px";
