@@ -18,7 +18,8 @@ function token(){
 function element(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);return el;}
 const map=document.getElementById("mapContent");
 const mapHost=document.getElementById("worldMap");
-let pins=new Map(),cards=new Map(),selected=null;
+let pins=new Map(),cards=new Map(),selected=null,monsterRows=[];
+function syncMonsterModels(){window.__coiWorldMap3D?.setMonsters?.(monsterRows);}
 function projectPins(){
  for(const {button,monster} of pins.values()){
   const x=Number(monster.x),z=Number(monster.z);
@@ -45,6 +46,7 @@ function addPin(monster,id,hp){
  map.append(button);pins.set(id,{button,monster});
 }
 for(const event of ["coi:world-map-3d-ready","coi:world-map-projection-changed","coi:world-map-2d-fallback"])window.addEventListener(event,projectPins);
+window.addEventListener("coi:world-map-3d-ready",syncMonsterModels);
 let busy=false;
 async function refresh(){
  const bearer=token();if(!bearer||busy||!root||!list||!status)return;
@@ -53,7 +55,7 @@ async function refresh(){
   const response=await fetch("/api/game/world-monsters",{headers:{Authorization:"Bearer "+bearer},cache:"no-store",redirect:"error"});
   if(!response.ok)throw Error("Consulta indisponível");
   const data=await response.json();
-  if(!data.enabled){root.hidden=true;clearPins();list.replaceChildren();return;}
+  if(!data.enabled){root.hidden=true;clearPins();list.replaceChildren();monsterRows=[];syncMonsterModels();return;}
   root.hidden=false;
   const rows=Array.isArray(data.monsters)?data.monsters:[];
   clearPins();list.replaceChildren();
@@ -70,9 +72,10 @@ async function refresh(){
    button.addEventListener("click",()=>{selectMonster(id);mapHost?.scrollIntoView({block:"nearest",behavior:"auto"});pins.get(id)?.button.focus({preventScroll:true});});
    item.append(button);list.append(item);cards.set(id,item);addPin(monster,id,hp);
   }
+  monsterRows=rows;syncMonsterModels();
   selectMonster(pins.has(selected)?selected:null);projectPins();
   status.textContent=rows.length+" criaturas no seu reino · prévia; caça ainda não liberada.";
- }catch{root.hidden=false;clearPins();list.replaceChildren();status.textContent="Não foi possível carregar os monstros. Tente atualizar.";}
+ }catch{root.hidden=false;clearPins();list.replaceChildren();monsterRows=[];syncMonsterModels();status.textContent="Não foi possível carregar os monstros. Tente atualizar.";}
  finally{busy=false;}
 }
 document.getElementById("worldMonsterRefresh")?.addEventListener("click",refresh);
