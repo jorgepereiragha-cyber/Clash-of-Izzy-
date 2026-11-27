@@ -1,5 +1,6 @@
 import { guardTerritoryAttackSettlement } from "./territory-attack-settlement.js";
 export { EldoriaRoom } from "./eldoria-room.js";
+import { notifyWorldChanged } from "./scripts/eldoria-world-notify.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses, combatRulesVersion } from "./game-adapter.js";
 import { hospitalEnabled,HOSPITAL_PER_LEVEL,HOSPITAL_HEAL_MAX,recoverableLosses,hospitalHealCost,hospitalAdmission } from "./hospital-policy.js";
@@ -650,7 +651,11 @@ async function processMarches(env,kingdomId,batchSize=50){
     .bind(kingdomId,kingdomId,m.target_territory_id,m.target_territory_id,kingdomId,m.target_territory_id,JSON.stringify(losses),m.id,kingdomId,resolutionToken));
   }else{
    if(m.march_type==="scout"){
-    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,"svip_medal",m.id,kingdomId,resolutionToken));
+    // Snapshot only public world metadata at arrival; private castle/army data stays inaccessible.
+    const scoutEligible="EXISTS(SELECT 1 FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1) AND t.territory_kind NOT IN ('castle','throne') AND substr(t.territory_key,1,13)<>'royal_throne_' AND (t.owner_kingdom_id IS NULL OR t.owner_kingdom_id=k.id))";
+    statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,'territory_scouted',json_object('marchId',?,'territoryId',t.id,'name',t.name,'terrain',t.terrain,'level',t.level,'resourceType',t.resource_type,'resourceRate',t.resource_rate,'observedAt',?) FROM world_territories t WHERE t.id=? AND "+guard+" AND "+scoutEligible)
+      .bind(kingdomId,m.id,resolvedAt,m.target_territory_id,m.id,kingdomId,resolutionToken,kingdomId,m.target_territory_id));
+    statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" AND "+scoutEligible+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,"svip_medal",m.id,kingdomId,resolutionToken,kingdomId,m.target_territory_id));
    }
    for(const [unit,raw] of Object.entries(units)){
     const qty=Math.max(0,Math.floor(Number(raw)||0));if(!Object.hasOwn(UNITS,unit)||qty<1)continue;
@@ -673,7 +678,8 @@ async function processMarches(env,kingdomId,batchSize=50){
   statements.push(env.DB.prepare(
     "INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'march_resolved',? WHERE EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)"
   ).bind(kingdomId,JSON.stringify({marchId:m.id,marchType:m.march_type,targetTerritoryId:m.target_territory_id}),m.id,kingdomId,resolutionToken));
-  await env.DB.batch(statements);
+  const resolution=await env.DB.batch(statements);
+  if(m.march_type==="attack"&&resolution[1]?.meta?.changes>0)await notifyWorldChanged(env);
  }
 }
 const CASTLE_MATERIALS={
@@ -1408,13 +1414,15 @@ async function gameAction(env,playerId,body){
     const member=await env.DB.prepare("SELECT alliance_id,rank FROM alliance_members WHERE kingdom_id=?").bind(k.id).first();
     const territoryId=Number(body.territoryId);
     if(!member||!["lider","co_lider","oficial"].includes(member.rank))return json({error:"Seu cargo não pode reivindicar território."},403);
-    const t=await env.DB.prepare("SELECT id,territory_key,alliance_id,owner_kingdom_id FROM world_territories WHERE id=? AND map_region=?").bind(territoryId,Number(k.map_region)||1).first();
+    const t=await env.DB.prepare("SELECT id,territory_key,territory_kind,alliance_id,owner_kingdom_id FROM world_territories WHERE id=? AND map_region=?").bind(territoryId,Number(k.map_region)||1).first();
     if(!t)return json({error:"Território não encontrado."},404);
-    if(t.territory_key?.startsWith("royal_throne_"))return json({error:"O Trono Imperial não pode ser reivindicado fora da Guerra do Trono."},409);
+    if(t.territory_kind==="throne"||t.territory_key?.startsWith("royal_throne_"))return json({error:"O Trono Imperial não pode ser reivindicado fora da Guerra do Trono."},409);
+    if(t.territory_kind==="castle")return json({error:"Castelos de jogadores não podem ser reivindicados pela aliança."},409);
+    if(t.owner_kingdom_id!=null&&!await env.DB.prepare("SELECT 1 FROM alliance_members WHERE kingdom_id=? AND alliance_id=?").bind(t.owner_kingdom_id,member.alliance_id).first())return json({error:"Território pertence a um reino externo à aliança."},409);
     if(t.alliance_id&&t.alliance_id!==member.alliance_id)return json({error:"Território controlado por outra aliança."},409);
     if(t.alliance_id!=null)return json({error:"Este território já pertence a uma aliança."},409);
     const claim=await env.DB.batch([
-      env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000 AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=? AND rank IN ('lider','co_lider','oficial')) AND EXISTS(SELECT 1 FROM world_territories WHERE id=? AND map_region=? AND alliance_id IS NULL AND territory_key NOT LIKE 'royal_throne_%')").bind(member.alliance_id,member.alliance_id,k.id,territoryId,Number(k.map_region)||1),
+      env.DB.prepare("UPDATE alliances SET shared_food=shared_food-1000,shared_wood=shared_wood-1000 WHERE id=? AND shared_food>=1000 AND shared_wood>=1000 AND EXISTS(SELECT 1 FROM alliance_members WHERE alliance_id=? AND kingdom_id=? AND rank IN ('lider','co_lider','oficial')) AND EXISTS(SELECT 1 FROM world_territories WHERE id=? AND map_region=? AND alliance_id IS NULL AND territory_kind NOT IN ('castle','throne') AND substr(territory_key,1,13)<>'royal_throne_' AND (owner_kingdom_id IS NULL OR EXISTS(SELECT 1 FROM alliance_members am WHERE am.kingdom_id=world_territories.owner_kingdom_id AND am.alliance_id=?)))").bind(member.alliance_id,member.alliance_id,k.id,territoryId,Number(k.map_region)||1,member.alliance_id),
       env.DB.prepare("UPDATE world_territories SET alliance_id=? WHERE id=? AND alliance_id IS NULL AND changes()=1").bind(member.alliance_id,territoryId),
       env.DB.prepare("UPDATE alliances SET territory_count=territory_count+1 WHERE id=? AND changes()=1").bind(member.alliance_id)
     ]);
@@ -1748,13 +1756,14 @@ async function gameAction(env,playerId,body){
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
     const target=await env.DB.prepare("SELECT id,territory_key,resource_type,owner_kingdom_id,territory_kind FROM world_territories WHERE id=? AND map_region=?").bind(targetId,Number(k.map_region)||1).first();
     if(!target)return json({error:"Território não encontrado."},404);
-    if(target.territory_key?.startsWith("royal_throne_"))
+    if(target.territory_kind==="throne"||target.territory_key?.startsWith("royal_throne_"))
       return json({error:"O Trono Imperial exige Guerra do Trono; não pode ser atacado por marcha normal."},409);
     const marchType=body.marchType;
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
     if(marchType==="attack"&&(target.owner_kingdom_id||target.territory_kind==="castle"))return json({error:"O castelo de outro comandante está visível no mapa. O combate PvP será habilitado na Fase 10; por enquanto, ataque apenas territórios neutros."},409);
     if(target.territory_kind==="castle"&&marchType!=="attack")return json({error:"Castelos de jogadores não podem ser coletados nem usados como ponto de exploração."},409);
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
+    if(marchType==="gather"&&!["food","wood","stone","iron"].includes(target.resource_type))return json({error:"Este território não possui recurso coletável."},409);
     const requested=body.units;
     if(!requested||typeof requested!=="object"||Array.isArray(requested))return json({error:"Informe a composição da marcha."},400);
     const selected={};
@@ -1894,6 +1903,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("UPDATE world_territories SET name=? WHERE territory_key=? AND territory_kind='castle'").bind("Castelo de "+name,"kingdom_castle_"+k.id)
     ]);
   }else{return json({error:"Ação de jogo desconhecida."},400)}
+  if(type==="alliance_claim_territory"||type==="throne_assault")await notifyWorldChanged(env);
   return json({success:true,state:await gameState(env,playerId),...(battleOutcome?{battle:battleOutcome}:{})});
 }
 

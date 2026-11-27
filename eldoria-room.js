@@ -59,6 +59,11 @@ export class EldoriaRoom {
   async fetch(request) {
     const url = new URL(request.url);
     if (url.pathname === "/ticket") return this.issueTicket(request);
+    if (url.hostname === "eldoria.internal" && url.pathname === "/world-changed" && request.method === "POST" && this.env.ENVIRONMENT === "beta") {
+      const message = JSON.stringify({ type: "world_changed" });
+      for (const socket of this.ctx.getWebSockets()) { try { socket.send(message); } catch {} }
+      return new Response(null, { status: 204 });
+    }
     if (request.method !== "GET") return new Response("Method Not Allowed", { status: 405 });
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket") {
       return new Response("WebSocket upgrade required", { status: 426 });

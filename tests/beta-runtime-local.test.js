@@ -439,6 +439,62 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.ok(guild.chat.some(row=>row.message===message),"leader receives member chat");
     console.log("Beta legacy alliance passed: two independent kingdoms, membership gate and shared chat.");
 
+    // Two authenticated Chromium WebSockets, one legacy and one sharded, must
+    // receive a data-free invalidation from a real committed alliance action.
+    const firstRealm=await getStateFor(cookie,start.data.token);
+    const claimTarget=firstRealm.territories.find(t=>t.territory_kind!=="castle"&&t.territory_kind!=="throne"&&!String(t.territory_key).startsWith("royal_throne_")&&t.owner_kingdom_id==null&&t.alliance_id==null);
+    const castleTarget=firstRealm.territories.find(t=>t.territory_kind==="castle");
+    assert.ok(claimTarget&&castleTarget,"valid resource and prohibited castle targets exist");
+    const leaderId=Number(start.data.state.kingdom.id);
+    assert.ok(Number.isSafeInteger(leaderId)&&leaderId>0);
+    await command([...common,"execute","clash-of-izzy-beta-db","--local","--persist-to",persist,"--command",
+      "UPDATE alliances SET shared_food=shared_food+2000,shared_wood=shared_wood+2000 WHERE id=(SELECT alliance_id FROM alliance_members WHERE kingdom_id="+leaderId+")"]);
+    assert.equal((await actionFor(cookie,start.data.token,{type:"alliance_claim_territory",territoryId:castleTarget.id})).status,409);
+    const {chromium:realtimeChromium}=await import("@playwright/test");
+    const realtimeBrowser=await realtimeChromium.launch({headless:true});
+    try{
+      async function attach(sessionCookie,gameToken,sharded){
+        const ctx=await realtimeBrowser.newContext();
+        const [name,value]=sessionCookie.split("=");
+        await ctx.addCookies([{name,value,url:base+"/",secure:true,httpOnly:true,sameSite:"Lax"}]);
+        const page=await ctx.newPage();
+        await page.goto(base+"/api/health");
+        const headers={Cookie:sessionCookie,Authorization:"Bearer "+gameToken};
+        if(sharded)headers["X-COI-Shard-Support"]="1";
+        const ticketResponse=await fetch(base+"/api/realtime/eldoria/ticket",{method:"POST",headers,signal:AbortSignal.timeout(10000)});
+        assert.equal(ticketResponse.status,201);
+        const ticket=await ticketResponse.json();
+        if(sharded)assert.ok(Number.isSafeInteger(ticket.room));
+        const wsUrl=base.replace(/^http/,"ws")+"/api/realtime/eldoria"+(sharded?"?room="+ticket.room:"");
+        await page.evaluate(({wsUrl,ticket})=>new Promise((resolve,reject)=>{
+          const ws=new WebSocket(wsUrl,["coi-eldoria","coi-ticket."+ticket]);
+          window.__coiTestSocket=ws;
+          window.__coiTestPackets=[];
+          const timer=setTimeout(()=>reject(new Error("WebSocket connect timeout")),10000);
+          ws.addEventListener("message",event=>{
+            const packet=JSON.parse(event.data);
+            window.__coiTestPackets.push(packet);
+            if(packet.type==="connected"){clearTimeout(timer);resolve();}
+          });
+          ws.addEventListener("error",()=>{clearTimeout(timer);reject(new Error("WebSocket handshake failed"));});
+          ws.addEventListener("close",()=>{clearTimeout(timer);reject(new Error("WebSocket closed"));});
+        }),{wsUrl,ticket:ticket.ticket});
+        return page;
+      }
+      const [legacySocket,shardedSocket]=await Promise.all([attach(cookie,start.data.token,false),attach(claimedCookie,second.data.token,true)]);
+      const claim=await actionFor(cookie,start.data.token,{type:"alliance_claim_territory",territoryId:claimTarget.id});
+      assert.equal(claim.status,200,"valid alliance claim commits");
+      for(const page of [legacySocket,shardedSocket]){
+        await page.waitForFunction(()=>window.__coiTestPackets.some(p=>p.type==="world_changed"),null,{timeout:15000});
+        const invalidation=await page.evaluate(()=>window.__coiTestPackets.find(p=>p.type==="world_changed"));
+        assert.deepEqual(invalidation,{type:"world_changed"},"invalidation contains no private state");
+      }
+      const refreshed=await getStateFor(cookie,start.data.token);
+      assert.ok(refreshed.territories.find(t=>t.id===claimTarget.id)?.alliance_id,"committed claim is visible after authenticated reload");
+      console.log("Beta realtime passed: real legacy and sharded sockets received committed alliance change.");
+    }finally{await realtimeBrowser.close();}
+
+
     // Exercise the previously untested attack branch with the second realm.
     const attackerBefore = await getStateFor(claimedCookie,second.data.token);
     const powerCrystalCount = state => {
