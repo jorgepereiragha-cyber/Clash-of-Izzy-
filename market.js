@@ -1,3 +1,5 @@
+import {createEntityArtElement, worldResourceArt} from "./scripts/kingdom-2d-art-atlas.js";
+
 (() => {
   "use strict";
   if (window.__COI_MARKET__) return;
@@ -5,7 +7,9 @@
   const $ = id => document.getElementById(id);
   const fmt = value => Number(value || 0).toLocaleString("pt-BR");
   const labels = {food:"Comida",wood:"Madeira",stone:"Pedra",iron:"Ferro",gold:"Ouro",gems:"Diamantes"};
-  const icons = {food:"🌾",wood:"🪵",stone:"🪨",iron:"⛓️",gold:"🪙",gems:"💎"};
+  const nodeTypes = {food:"farm",wood:"forest",stone:"quarry",iron:"mine"};
+  const rarityNames = {white:"Branco · Comum",blue:"Azul · Raro",purple:"Roxo · Épico",gold:"Dourado · Lendário"};
+  const shieldItems = ["shield_8h","shield_3d"];
   const acceleratorSeconds = {
     acc_5min:300,acc_1h:3600,acc_8h:28800,acc_1d:86400,
     train_1h:3600,train_8h:28800,res_1h:3600,res_8h:28800
@@ -16,7 +20,7 @@
     training:["train_1h","train_8h"],
     research:["res_1h","res_8h"]
   };
-  let state = null, busy = false;
+  let state = null, busy = false, outdated = false, clockOffset = null, retryAfter = 0;
   function token(){
     let readable=false;
     // A falha de um armazenamento não pode ocultar uma sessão válida no outro.
@@ -37,7 +41,8 @@
       method:options.method||"GET",
       headers:{"Authorization":"Bearer "+auth,...(options.body?{"Content-Type":"application/json"}:{})},
       body:options.body?JSON.stringify(options.body):undefined,
-      cache:"no-store"
+      cache:"no-store",
+      signal:AbortSignal.timeout(15000)
     });
     const data=await response.json().catch(()=>({}));
     if(!response.ok)throw new Error(data.error||"Não foi possível concluir a operação.");
@@ -46,6 +51,7 @@
   function node(tag,className,text){
     const element=document.createElement(tag);
     if(className)element.className=className;
+    if(className==="market-icon")element.setAttribute("aria-hidden","true");
     if(text!==undefined)element.textContent=String(text);
     return element;
   }
@@ -53,37 +59,66 @@
     const element=node("button","market-action",text);
     element.type="button";element.dataset.action=action;
     for(const [key,value] of Object.entries(data||{}))element.dataset[key]=String(value);
-    element.disabled=busy||disabled;
+    element.disabled=busy||outdated||disabled;
     return element;
   }
   function setStatus(message,kind="info"){
     const element=$("market-status");
     element.textContent=message;element.dataset.kind=kind==="error"?"error":"info";
   }
-  function costText(costs){
-    return Object.entries(costs||{}).filter(([,amount])=>Number(amount)>0)
-      .map(([key,amount])=>(icons[key]||"")+" "+fmt(amount)+" "+(labels[key]||key)).join(" + ");
+  const balance = key => Number((key==="gems"?state?.player?.gems:state?.kingdom?.[key])||0);
+  function costsLine(costs, className="market-costs"){
+    const line=node("p",className);
+    for(const [key,amount] of Object.entries(costs||{})){
+      const part=node("span","market-amount",fmt(amount)+" "+(labels[key]||key).toLocaleLowerCase("pt-BR"));
+      const art=worldResourceArt(key);
+      if(art)part.prepend(art);
+      line.append(part);
+    }
+    return line;
   }
-  function hasCosts(costs){
-    return Object.entries(costs||{}).every(([key,amount])=>Number(state?.kingdom?.[key]||0)>=Number(amount||0));
+  function shortfalls(costs){
+    return Object.entries(costs||{}).map(([key,amount])=>[key,Number(amount)-balance(key)]).filter(([,missing])=>missing>0);
+  }
+  function offerStatus(card,stock,costs){
+    const missing=shortfalls(costs);
+    if(stock<=0)card.append(node("p","market-note","Esgotado nesta rotação."));
+    else card.append(node("p","market-meta","Restam "+fmt(stock)+" nesta rotação."));
+    if(stock>0&&missing.length){
+      const deficit=node("p","market-note","Saldo insuficiente · faltam ");
+      for(const [index,[key,amount]] of missing.entries()){
+        if(index)deficit.append(" · ");
+        const label=fmt(amount)+" "+(labels[key]||key).toLocaleLowerCase("pt-BR");
+        if(Object.hasOwn(nodeTypes,key)){
+          const link=node("a","",label);
+          link.href="/world.html?coleta="+nodeTypes[key]+"#resource-nodes";
+          deficit.append(link);
+        }else deficit.append(label);
+      }
+      card.append(deficit);
+    }
+    return stock<=0||missing.length>0;
   }
   function refreshBalances(){
     for(const key of Object.keys(labels)){
       const element=$("balance-"+key);
-      if(element)element.textContent=fmt(key==="gems"?state?.player?.gems:state?.kingdom?.[key]);
+      if(element)element.textContent=fmt(balance(key));
     }
   }
   function renderExchange(){
     const root=$("merchant-exchanges");root.replaceChildren();
-    const offers=state?.shop?.exchangeOffers||[];
-    if(!offers.length){root.append(node("p","empty-state","Nenhuma troca disponível nesta rotação."));return;}
+    const available=state?.shop?.exchangeOffers||[];
+    const affordable=$("merchant-affordable").checked;
+    const offers=affordable?available.filter(offer=>offer.stock>0&&!shortfalls(offer.costs).length):available;
+    if(!offers.length){root.append(node("p","empty-state",affordable?"Nenhuma troca ao alcance dos saldos atuais.":"Nenhuma troca disponível nesta rotação."));return;}
     for(const offer of offers){
       const card=node("article","market-card");
-      card.append(node("div","market-icon","⚖️"),node("h3","",offer.name),node("p","",offer.description));
-      card.append(node("p","market-price","Entrega: "+(state.shop.items?.[offer.reward?.item]?.name||offer.rewardName||offer.reward?.item)+" × "+fmt(offer.reward?.quantity||1)));
-      card.append(node("p","market-meta","Custo: "+costText(offer.costs)));
-      card.append(node("p","market-meta","Estoque restante: "+fmt(offer.stock)));
-      card.append(button("TROCAR RECURSOS","exchange",{offerId:offer.id},offer.stock<=0||!hasCosts(offer.costs)));
+      const reward=state.shop.items?.[offer.reward?.item];
+      card.append(node("div","market-icon",reward?.icon||"⚡"),node("h3","",offer.name));
+      card.append(node("p","market-reward",(reward?.name||offer.rewardName||offer.reward?.item)+" × "+fmt(offer.reward?.quantity||1)));
+      card.append(costsLine(offer.costs));
+      const unavailable=offerStatus(card,offer.stock,offer.costs);
+      card.append(button("TROCAR RECURSOS","exchange",{offerId:offer.id},unavailable||rotationExpired()));
       root.append(card);
     }
   }
@@ -94,26 +129,50 @@
     for(const offer of offers){
       const card=node("article","market-card");
       card.append(node("div","market-icon",offer.icon||"🎁"),node("h3","",offer.name),node("p","",offer.desc||"Oferta temporária do mercador."));
-      card.append(node("p","market-price","💎 "+fmt(offer.price)+" diamantes · "+fmt(offer.discount)+"% de desconto"));
-      card.append(node("p","market-meta","Estoque: "+fmt(offer.stock)));
-      card.append(button("COMPRAR OFERTA","buy",{item:offer.id,source:"merchant"},offer.stock<=0||Number(state.player?.gems||0)<Number(offer.price||0)));
+      const costs={[offer.currency]:offer.price};
+      const price=costsLine(costs);
+      if(offer.originalPrice>offer.price){
+        price.append(node("s","market-original",fmt(offer.originalPrice)),node("span","market-discount","−"+fmt(offer.discount)+"%"));
+      }
+      card.append(price);
+      const locked=shieldItems.includes(offer.id)&&!state.shop.castleShield?.available;
+      if(locked)card.append(node("p","market-note","Proteção PvP do castelo indisponível."));
+      const unavailable=offerStatus(card,offer.stock,costs);
+      card.append(button("COMPRAR OFERTA","buy",{item:offer.id,source:"merchant"},locked||unavailable||rotationExpired()));
       root.append(card);
     }
   }
   function renderHeroRecruitment(){
     const root=$("hero-recruitment");root.replaceChildren();
-    const options=[
-      {quantity:1,cost:100,label:"Convocação individual",description:"Uma chance de recrutar um novo comandante ou receber fragmentos de um repetido."},
-      {quantity:10,cost:900,label:"Convocação em lote",description:"Dez convocações com desconto sobre o preço individual."}
-    ];
+    const options=state.heroSummonOptions||[];
+    const odds=$("summon-odds");
+    const oddsText=(state.heroSummonOdds||[]).filter(({rarity})=>Object.hasOwn(rarityNames,rarity))
+      .map(({rarity,chancePercent})=>fmt(chancePercent)+"% "+rarityNames[rarity].split(" · ")[1]).join(" · ");
+    odds.hidden=!oddsText;
+    if(oddsText)odds.textContent="Chances por convocação · "+oddsText;
     for(const option of options){
       const card=node("article","market-card");
-      card.append(node("div","market-icon","📜"),node("h3","",option.label),node("p","",option.description));
-      card.append(node("p","market-price","💎 "+fmt(option.cost)+" diamantes"));
-      card.append(node("p","market-meta","Probabilidades por convocação: 70% Comum · 25% Raro · 5% Lendário"));
-      card.append(button(option.quantity===1?"CONVOCAR 1 HERÓI":"CONVOCAR 10 HERÓIS","hero-summon",{quantity:option.quantity},Number(state.player?.gems||0)<option.cost));
+      card.append(node("div","market-icon","📜"),node("h3","",option.quantity===1?"Convocação individual":"Convocação em lote"),
+        node("p","","Heróis repetidos rendem fragmentos."),costsLine({gems:option.cost}));
+      card.append(button(option.quantity===1?"CONVOCAR 1 HERÓI":"CONVOCAR 10 HERÓIS","hero-summon",{quantity:option.quantity},balance("gems")<option.cost));
       root.append(card);
     }
+  }
+  function heroPortrait(symbol){
+    if(!/^[a-z0-9-]+$/.test(symbol||""))return node("div","market-icon","⚔️");
+    const portrait=createEntityArtElement({kind:"symbol",src:"/assets/art/heroes/portraits.svg#"+symbol,viewBox:"0 0 320 480"});
+    portrait.classList.add("market-portrait");
+    return portrait;
+  }
+  function renderSummons(summons){
+    const results=$("summon-results");
+    results.replaceChildren();
+    for(const hero of summons){
+      const entry=node("li","",hero.name);
+      entry.append(node("span","",hero.result_type==="duplicate"?"+"+fmt(hero.fragments)+" fragmentos":"Novo herói"));
+      results.append(entry);
+    }
+    results.hidden=!summons.length;
   }
   function renderHeroShop(){
     const root=$("hero-offers");root.replaceChildren();
@@ -121,14 +180,14 @@
     if(!offers.length){root.append(node("p","empty-state","Recrute um herói para habilitar a compra de fragmentos. Nenhum herói será criado pela loja de fragmentos sem recrutamento."));return;}
     for(const offer of offers){
       const card=node("article","market-card");
-      const rarity={white:"Branco · Comum",blue:"Azul · Raro",purple:"Roxo · Épico",gold:"Dourado · Lendário"}[offer.rarity]||"Raridade não informada";
+      const hero=state.heroInventory?.find(item=>item.hero_key===offer.heroKey);
+      const rarity=rarityNames[offer.rarity]||"Raridade não informada";
       card.dataset.heroRarity=["white","blue","purple","gold"].includes(offer.rarity)?offer.rarity:"unknown";
-      const icon={white:"⚔️",blue:"🛡️",purple:"✦",gold:"👑"}[offer.rarity]||"⚔️";
-      card.append(node("div","market-icon",icon),node("h3","",offer.name),node("p","",rarity+" · "+fmt(offer.stars)+" estrela(s)"));
-      card.append(node("p","market-price","Fragmentos: "+fmt(offer.fragments)+" → +"+fmt(offer.quantity)));
-      card.append(node("p","market-meta","Custo: "+costText(offer.costs)));
-      card.append(node("p","market-meta","Estoque da rotação: "+fmt(offer.stock)));
-      card.append(button("COMPRAR FRAGMENTOS","hero-buy",{heroKey:offer.heroKey},offer.stock<=0||!hasCosts(offer.costs)));
+      card.append(heroPortrait(hero?.portrait_symbol),node("h3","",offer.name),node("p","",rarity+" · "+fmt(offer.stars)+" estrela(s)"));
+      card.append(node("p","market-reward","+"+fmt(offer.quantity)+" fragmentos · "+fmt(offer.fragments)+" no herói"));
+      card.append(costsLine(offer.costs));
+      const unavailable=offerStatus(card,offer.stock,offer.costs);
+      card.append(button("COMPRAR FRAGMENTOS","hero-buy",{heroKey:offer.heroKey},unavailable||rotationExpired()));
       root.append(card);
     }
   }
@@ -159,8 +218,9 @@
     for(const queue of active){
       const card=node("article","accel-queue"),info=node("div","");
       const title=queueTypes[queue.queue_type]||queue.queue_type;
-      const remaining=Math.max(0,(Date.parse(queue.completes_at)-Date.now())/1000);
-      info.append(node("h4","",title+" · "+(queue.target_key||"Projeto")),node("p","","Tempo restante aproximado: "+durationText(remaining)));
+      const clock=node("p","");
+      clock.dataset.queueDeadline=String(Date.parse(queue.completes_at));
+      info.append(node("h4","",title+" · "+(queue.target_key||"Projeto")),clock);
       const controls=node("div","queue-actions");
       for(const itemId of compatible[queue.queue_type]||[]){
         const count=inventory.get(itemId)||0;
@@ -168,58 +228,163 @@
         const meta=state.shop.items?.[itemId];
         const action=node("button","",(meta?.name||itemId)+" × "+fmt(count));
         action.type="button";action.dataset.action="speedup";action.dataset.queueId=String(queue.id);action.dataset.item=itemId;
-        action.disabled=busy;controls.append(action);
+        action.disabled=busy||outdated;controls.append(action);
       }
       if(!controls.childElementCount)controls.append(node("span","market-meta","Sem aceleradores compatíveis no inventário."));
       card.append(info,controls);root.append(card);
     }
   }
+  function renderSupplies(){
+    const root=$("market-supplies");
+    const selectedHero=$("exp-hero")?.value;
+    root.replaceChildren();
+    const inventory=new Map((state.shop?.inventory||[]).map(item=>[item.item_id,Number(item.quantity)]));
+    const books=inventory.get("hero_exp")||0;
+    const eligible=(state.heroInventory||[]).filter(hero=>hero.level<hero.max_level);
+    const bookCard=node("article","market-card");
+    bookCard.append(node("h3","",state.shop?.items?.hero_exp?.name||"Livro de EXP"),node("p","","10.000 EXP por livro · "+fmt(books)+" no inventário"));
+    if(books>0&&eligible.length){
+      const label=node("label","market-category","Herói");
+      const select=node("select","");
+      select.id="exp-hero";
+      for(const hero of eligible){
+        const option=node("option","",hero.name+" · Nv. "+fmt(hero.level));
+        option.value=hero.hero_key;
+        select.append(option);
+      }
+      if(eligible.some(hero=>hero.hero_key===selectedHero))select.value=selectedHero;
+      label.append(select);
+      bookCard.append(label,button("USAR LIVRO","exp-book"));
+    }else if(books>0)bookCard.append(node("p","market-note","Nenhum herói abaixo do nível máximo."));
+    root.append(bookCard);
+    const shields=state.shop?.castleShield;
+    const shieldCard=node("article","market-card");
+    shieldCard.append(node("h3","","Proteção do castelo"));
+    if(!shields?.available)shieldCard.append(node("p","market-note","Proteção PvP do castelo indisponível."));
+    else if(shields.active)shieldCard.append(node("p","market-note","Seu castelo já está protegido."));
+    for(const id of shieldItems){
+      const count=inventory.get(id)||0;
+      const name=state.shop?.items?.[id]?.name||(id==="shield_8h"?"Escudo 8 horas":"Escudo 3 dias");
+      shieldCard.append(node("p","",name+" · "+fmt(count)+" no inventário"));
+      if(count>0&&shields?.available&&!shields.active)shieldCard.append(button("Ativar "+name.toLocaleLowerCase("pt-BR"),"shield",{item:id}));
+    }
+    root.append(shieldCard);
+  }
   function renderOfficialShop(){
     const root=$("official-products");root.replaceChildren();
     const items=Object.entries(state?.shop?.items||{});
-    const featured=items.filter(([,item])=>["accelerators","special","packages"].includes(item.category));
+    const category=$("market-category").value;
+    const featured=category==="all"?items:items.filter(([,item])=>item.category===category);
     for(const [id,item] of featured){
       const card=node("article","market-card");
       card.append(node("div","market-icon",item.icon||"🎁"),node("h3","",item.name),node("p","",item.desc||"Item do catálogo do reino."));
-      const currency=item.currency==="gems"?"diamantes":"ouro";
-      card.append(node("p","market-price",fmt(item.price)+" "+currency));
-      const enough=Number(item.currency==="gems"?state.player?.gems:state.kingdom?.gold)>=Number(item.price||0);
-      card.append(button("COMPRAR","buy",{item:id,source:"shop"},!enough));
+      card.append(costsLine({[item.currency]:item.price}));
+      const locked=shieldItems.includes(id)&&!state.shop.castleShield?.available;
+      if(locked)card.append(node("p","market-note","Proteção PvP do castelo indisponível."));
+      card.append(button("COMPRAR","buy",{item:id,source:"shop"},locked||balance(item.currency)<item.price));
       root.append(card);
     }
     if(!root.childElementCount)root.append(node("p","empty-state","Catálogo indisponível."));
   }
+  function serverNow(){
+    return clockOffset===null?Date.now():clockOffset+performance.now();
+  }
+  function rotationExpired(){
+    return Boolean(state?.shop?.refreshAt&&state.shop.refreshAt<=serverNow());
+  }
+  function tick(){
+    const next=Number(state?.shop?.refreshAt||0);
+    if(next){
+      const current=serverNow(),expired=next<=current;
+      $("merchant-refresh").textContent=expired?"Nova rotação · sincronizando…":"Renova em "+durationText((next-current)/1000);
+      if(expired&&!document.hidden&&!busy&&performance.now()>=retryAfter){
+        retryAfter=performance.now()+15000;
+        refresh("Nova rotação sincronizada.");
+      }
+    }
+    for(const clock of $("active-queues").querySelectorAll("[data-queue-deadline]")){
+      const remaining=(Number(clock.dataset.queueDeadline)-serverNow())/1000;
+      clock.textContent=remaining>0?"Tempo restante · "+durationText(remaining):"Aguardando sincronização da fila";
+      if(!(remaining>0))clock.closest("article").querySelectorAll("button").forEach(control=>{control.disabled=true;});
+    }
+  }
+  function acceptState(result){
+    if(!result.state)throw new Error("O reino retornou um estado incompleto.");
+    state=result.state;
+    outdated=false;
+    clockOffset=Number.isFinite(state.shop?.serverTime)?state.shop.serverTime-performance.now():null;
+  }
   function render(){
     if(!state)return;
     refreshBalances();
-    const next=Number(state.shop?.refreshAt||0);
-    $("merchant-refresh").textContent=next?"Próxima rotação: "+new Date(next).toLocaleString("pt-BR"):"Rotação periódica";
-    renderExchange();renderMerchantSpecials();renderHeroRecruitment();renderHeroShop();renderAcceleratorInventory();renderQueues();renderOfficialShop();
+    renderExchange();renderMerchantSpecials();renderHeroRecruitment();renderHeroShop();renderAcceleratorInventory();renderQueues();renderSupplies();renderOfficialShop();
+    tick();
   }
-  async function refresh(){
-    const result=await request("/api/game/state");state=result.state;render();
+  function lock(){
+    busy=true;
+    $("market-refresh").disabled=true;
+    document.querySelectorAll("button[data-action]").forEach(control=>{control.disabled=true;});
   }
-  async function perform(action,success){
+  function unlock(previous){
+    busy=false;
+    $("market-refresh").disabled=false;
+    render();
+    if(previous?.dataset.action){
+      const same=[...document.querySelectorAll("button[data-action]:not(:disabled)")].find(control=>
+        Object.entries(previous.dataset).every(([key,value])=>control.dataset[key]===value));
+      if(same&&document.activeElement===document.body)same.focus({preventScroll:true});
+    }
+  }
+  async function refresh(message=""){
     if(busy)return;
-    busy=true;render();
+    const previous=document.activeElement;
+    lock();
     try{
+      acceptState(await request("/api/game/state"));
+      if(message)setStatus(message);
+    }catch(error){
+      outdated=true;
+      retryAfter=performance.now()+15000;
+      setStatus(error.message,"error");
+    }finally{unlock(previous);}
+  }
+  async function perform(action,success,rotating=false){
+    if(busy)return;
+    if(rotating&&rotationExpired()){refresh("Nova rotação sincronizada. Confira a oferta atual.");return;}
+    const previous=document.activeElement;
+    lock();
+    try{
+      if(rotating&&Number.isSafeInteger(state.shop?.cycle))action.cycle=state.shop.cycle;
       const result=await request("/api/game/action",{method:"POST",body:action});
-      state=result.state;setStatus(success,"info");
+      acceptState(result);
+      if(action.type==="hero_summon")renderSummons(result.battle?.summons||[]);
+      setStatus(success);
     }catch(error){
       setStatus(error.message||"Operação não concluída.", "error");
-      try{await refresh();}catch{}
-    }finally{busy=false;render();}
+      try{acceptState(await request("/api/game/state"));}
+      catch{outdated=true;retryAfter=performance.now()+15000;}
+    }finally{unlock(previous);}
   }
   document.addEventListener("click",event=>{
     const target=event.target.closest("button[data-action]");
-    if(!target||busy)return;
+    if(!target||target.disabled||busy||outdated)return;
     const action=target.dataset.action;
-    if(action==="exchange")perform({type:"merchant_exchange",offerId:target.dataset.offerId},"Troca concluída. O acelerador foi enviado ao inventário.");
-    else if(action==="hero-buy")perform({type:"hero_shop_buy",heroKey:target.dataset.heroKey},"Fragmentos comprados e creditados ao herói.");
+    if(action==="exchange")perform({type:"merchant_exchange",offerId:target.dataset.offerId},"Troca concluída. O acelerador foi enviado ao inventário.",true);
+    else if(action==="hero-buy")perform({type:"hero_shop_buy",heroKey:target.dataset.heroKey},"Fragmentos comprados e creditados ao herói.",true);
     else if(action==="hero-summon")perform({type:"hero_summon",quantity:Number(target.dataset.quantity)},"Convocação concluída. Novos heróis e fragmentos foram sincronizados.");
-    else if(action==="buy")perform({type:"shop_buy",item:target.dataset.item,source:target.dataset.source},"Compra concluída e item enviado ao inventário.");
+    else if(action==="buy")perform({type:"shop_buy",item:target.dataset.item,source:target.dataset.source},"Compra concluída. Saldos e inventário atualizados.",target.dataset.source==="merchant");
     else if(action==="speedup")perform({type:"queue_speedup",queueId:Number(target.dataset.queueId),itemId:target.dataset.item,quantity:1},"Acelerador aplicado à fila. O tempo foi recalculado pelo servidor.");
+    else if(action==="exp-book")perform({type:"hero_use_exp_book",heroKey:$("exp-hero").value},"Experiência aplicada ao herói.");
+    else if(action==="shield")perform({type:"castle_shield_activate",itemId:target.dataset.item,requestId:crypto.randomUUID()},"Escudo ativado no castelo.");
   });
-  $("market-refresh").addEventListener("click",()=>refresh().then(()=>setStatus("Mercado e inventário atualizados.")).catch(error=>setStatus(error.message,"error")));
-  refresh().then(()=>setStatus("Mercado sincronizado com o reino.")).catch(error=>setStatus(error.message,"error"));
+  for(const key of Object.keys(labels)){
+    const art=worldResourceArt(key);
+    if(art)$("balance-"+key).previousElementSibling.prepend(art);
+  }
+  $("merchant-affordable").addEventListener("change",()=>{if(state)renderExchange();});
+  $("market-category").addEventListener("change",()=>{if(state)renderOfficialShop();});
+  $("market-refresh").addEventListener("click",()=>refresh("Mercado e inventário atualizados."));
+  document.addEventListener("visibilitychange",()=>{if(!document.hidden&&state)refresh();});
+  setInterval(tick,1000);
+  refresh("Mercado sincronizado com o reino.");
 })();
