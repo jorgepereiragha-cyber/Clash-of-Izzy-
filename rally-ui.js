@@ -1,3 +1,4 @@
+import {worldResourceArt} from "./scripts/kingdom-2d-art-atlas.js";
 const $=id=>document.getElementById(id);
 function readRallySession() {
  let readable=false;
@@ -57,6 +58,10 @@ function askTroops(){
 function nodeAvailability(node){
  return node.is_mine?"Sua ocupação":node.occupied_by?"Ocupado por outro reino":node.reserved_by_rally?"Reservado para rally":"Livre para ocupação";
 }
+function nodeResourceArt(node){
+ const key=Object.hasOwn(NODE_TYPES,node.node_type)?({mine:"iron",forest:"wood",farm:"food",quarry:"stone"})[node.node_type]:null;
+ return worldResourceArt(key,document)||make("span","","◆");
+}
 function nodeLabel(node){
  const type=NODE_TYPES[node.node_type]||{icon:"📍",name:"Nó",resource:"recurso"};
  return type.name+" nível "+node.level+" · "+type.resource;
@@ -95,7 +100,8 @@ function renderNodeList(){
   const type=NODE_TYPES[node.node_type]||NODE_TYPES.mine;
   const card=make("article","resource-node-card"+(node.id===selectedNodeId?" selected":""));
   const head=make("div","resource-node-heading");
-  head.append(make("strong","",type.icon+" "+node.id),make("span","", "Nível "+node.level));
+  const name=make("strong","resource-node-name");name.append(nodeResourceArt(node),document.createTextNode(type.name+" · "+node.id));
+  head.append(name,make("span","", "Nível "+node.level));
   const info=make("p","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" "+type.resource.toLowerCase());
   const ownership=make("p","resource-node-owner",nodeAvailability(node));
   card.append(head,info,ownership);
@@ -180,7 +186,8 @@ function renderMapNodes(){
   button.type="button";button.dataset.nodeId=node.id;
   button.dataset.mapX=String(node.map_x);button.dataset.mapZ=String(node.map_y);
   if(node.occupied_by&&!node.is_mine)button.classList.add("foreign");
-  button.textContent=type.icon;
+  button.append(nodeResourceArt(node));
+  button.append(make("small","resource-node-level",String(node.level)));
   if(node.reserved_by_rally&&!node.occupied_by)button.style.borderStyle="dashed";
   button.title=node.id+" · "+nodeLabel(node)+" · "+nodeAvailability(node);
   button.setAttribute("aria-label",button.title);
