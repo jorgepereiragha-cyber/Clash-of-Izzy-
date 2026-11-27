@@ -83,9 +83,10 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
       scene.add(valhallaAuroraLight);
     }
   }
-  window.addEventListener("coi:valhalla-mode", event => {
-    setValhallaMode(event.detail?.active === true);
-  });
+  const valhallaModeHandler = event => {
+    if (!disposed && !contextLost) setValhallaMode(event.detail?.active === true);
+  };
+  window.addEventListener("coi:valhalla-mode", valhallaModeHandler);
 
   const worldRoot = new THREE.Group();
   const terrainRoot = new THREE.Group();
@@ -539,7 +540,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   }
 
   function projectTerritories() {
-    if (!camera || !renderer || !worldState) return;
+    if (disposed || contextLost || !camera || !renderer || !worldState) return;
     const width = host.clientWidth || 1;
     const height = host.clientHeight || 1;
     const rows = Array.isArray(worldState.territories) ? worldState.territories : [];
@@ -557,7 +558,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   }
 
   function draw() {
-    if (disposed || !renderer || !scene || !camera) return;
+    if (disposed || contextLost || !renderer || !scene || !camera) return;
     renderer.render(scene, camera);
     projectTerritories();
   }
@@ -656,7 +657,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   }
 
   function resize() {
-    if (!renderer || !camera || !host.clientWidth || !host.clientHeight) return;
+    if (disposed || contextLost || !renderer || !camera || !host.clientWidth || !host.clientHeight) return;
     const width = host.clientWidth;
     const height = host.clientHeight;
     const aspect = width / height;
@@ -675,7 +676,9 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   }
 
   function dispose() {
+    if (disposed) return;
     disposed = true;
+    window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
     stopMarchAnimation();
     resizeObserver?.disconnect();
     sceneVisibilityObserver?.disconnect();
@@ -693,6 +696,18 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     }
     Object.values(shared).forEach(material => material.dispose());
     Object.values(castleSkinMaterials).forEach(theme => Object.values(theme).forEach(material => material.dispose()));
+  }
+
+  function activateMapFallback() {
+    contextLost = true;
+    host.classList.add("map-3d-fallback");
+    canvas.hidden = true;
+    delete window.__coiWorldMap3D;
+    window.__coiWorldGraphicsQuality = "2d";
+    // Disable the dead renderer before redrawing the tactical pins.
+    try { dispose(); } finally {
+      window.dispatchEvent(new CustomEvent("coi:world-map-2d-fallback"));
+    }
   }
 
   function init() {
@@ -747,10 +762,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
       }
       canvas.addEventListener("webglcontextlost", event => {
         event.preventDefault();
-        contextLost = true;
-        stopMarchAnimation();
-        canvas.hidden = true;
-        host.classList.add("map-3d-fallback");
+        activateMapFallback();
         console.warn("Clash of Izzy: WebGL do mapa indisponível; marcadores táticos continuam ativos.");
       }, { once: true });
       resize();
@@ -779,8 +791,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
         }
       });
     } catch (error) {
-      canvas.hidden = true;
-      host.classList.add("map-3d-fallback");
+      activateMapFallback();
       console.warn("Clash of Izzy: mapa 3D não pôde iniciar; mantendo mapa tático acessível.", error);
     }
   }
