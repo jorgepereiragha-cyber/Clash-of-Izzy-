@@ -62,6 +62,10 @@ function nodeLabel(node){
  const type=NODE_TYPES[node.node_type]||{icon:"📍",name:"Nó",resource:"recurso"};
  return type.name+" nível "+node.level+" · "+type.resource;
 }
+function collectableNodeAmount(node){
+ const available=Number(node.current_resources);
+ return Number.isFinite(available)?Math.max(0,Math.floor(available*0.5)):0;
+}
 function selectNode(node){
  const previous=selectedNodeId;
  selectedNodeId=node?.id??null;
@@ -72,6 +76,7 @@ function selectNode(node){
    make("span","",node.id),
    make("span","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" recursos"),
    make("span","",nodeAvailability(node)),
+   ...(node.is_mine?[make("span","",collectableNodeAmount(node)>0?"Coleta estimada: "+fmt(collectableNodeAmount(node)):"Aguardando regeneração para coletar")]:[]),
    make("span","",fmt(node.regen_rate)+" recursos/h de regeneração")
   ]:[]));
  }
@@ -129,7 +134,8 @@ function renderNodeList(){
   card.append(head,info,ownership);
   const actions=make("div","resource-node-actions");
   if(node.is_mine){
-   addAction(actions,"Coletar",()=>runNodeAction("collect",node),busy);
+   const amount=collectableNodeAmount(node);
+   addAction(actions,amount>0?"Coletar "+fmt(amount):"Aguardando regeneração",()=>runNodeAction("collect",node),busy||amount<1);
    addAction(actions,"Recolher tropas",()=>runNodeAction("recall",node),busy||Boolean(node.reserved_by_rally));
   }else if(node.occupied_by){
    addAction(actions,"Ocupado",()=>selectNode(node),true);
@@ -212,7 +218,7 @@ resourceFilter?.addEventListener("change",()=>{
 });
 function rankResourceNode(node){
  if(!node.is_mine&&(node.occupied_by||node.reserved_by_rally))return 2;
- return Number(node.current_resources)>0?0:1;
+ return Number(node.current_resources)>=2?0:1;
 }
 function compareResourceNodes(a,b){
  return rankResourceNode(a)-rankResourceNode(b)||Math.hypot(a.map_x,a.map_y)-Math.hypot(b.map_x,b.map_y);
@@ -228,7 +234,7 @@ function renderMapNodes(){
  const filtered=filteredNodes();
  $("resourceMapLocate").disabled=!filtered.length;
  $("resourceMapCount").textContent=filtered.length===1?"1 nó":fmt(filtered.length)+" nós";
- const snapshot=JSON.stringify(filtered.map(node=>[node.id,node.node_type,node.level,node.map_x,node.map_y,nodeAvailability(node)]));
+ const snapshot=JSON.stringify(filtered.map(node=>[node.id,node.node_type,node.level,node.map_x,node.map_y,nodeAvailability(node),collectableNodeAmount(node)>0]));
  if(snapshot===lastMapNodes)return;
  lastMapNodes=snapshot;
  const focusedId=document.activeElement?.dataset.nodeId;
@@ -243,7 +249,7 @@ function renderMapNodes(){
   button.append(nodeResourceArt(node));
   button.append(make("small","resource-node-level",String(node.level)));
   if(node.reserved_by_rally&&!node.occupied_by)button.style.borderStyle="dashed";
-  button.title=node.id+" · "+nodeLabel(node)+" · "+nodeAvailability(node);
+  button.title=node.id+" · "+nodeLabel(node)+" · "+nodeAvailability(node)+(collectableNodeAmount(node)<1?" · Aguardando regeneração":"");
   button.setAttribute("aria-label",button.title);
   button.setAttribute("aria-pressed",String(node.id===selectedNodeId));
   button.addEventListener("pointerdown",event=>event.stopPropagation());
