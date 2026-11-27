@@ -48,7 +48,7 @@ test("monster pins use isometric coordinates when available and revert to tactic
  const pins=new Map([["1",{button,monster:{x:22,z:-8}}]]);
  let fallback=false;
  const window={__coiWorldMap3D:{projectPoint:(x,z)=>({left:x*2,top:z+100})}};
- const project=runInNewContext(ui.slice(start,end)+"\nprojectPins",{pins,window,mapHost:{classList:{contains:()=>fallback}}});
+ const project=runInNewContext(ui.slice(start,end)+"\nprojectPins",{pins,window,mapHost:{classList:{contains:()=>fallback}},projectTacticalPoint:(x,z)=>({left:50+x*.9,top:50-z*.9})});
  project();
  assert.equal(button.style.left,"44px");assert.equal(button.style.top,"92px");
  fallback=true;project();
