@@ -208,3 +208,40 @@ export function calculateMarchDuration(baseSeconds, speedBonusPercent = 0) {
   const speed = clamp(Number(speedBonusPercent) || 0, 0, 50);
   return Math.max(5, Math.ceil(base / (1 + speed / 100)));
 }
+
+
+// Pure PvP simulation foundation. Caller must load both formations from D1;
+// no client-provided defender state and no persistence in this function.
+// Keep the existing PvE rules unchanged until PvP resolution is transactional.
+export function simulateCastlePvp({ attackerArmy, defenderArmy, attackerBonuses={}, defenderBonuses={} } = {}){
+ const a=canonicalArmy(attackerArmy),d=canonicalArmy(defenderArmy);
+ if(!a.length)throw new Error("Exército atacante vazio.");
+ const build=(rows,side,bonuses)=>rows.map((row,index)=>{
+  const stack=makeStack(row,side,index,2);
+  const percent=key=>clamp(Number(bonuses?.[key])||0,0,30)/100;
+  stack.power*=1+percent("attackPercent");
+  stack.hpPerUnit=Math.floor(stack.hpPerUnit*(1+percent("healthPercent")));
+  stack.hp=stack.quantity*stack.hpPerUnit;
+  stack.defenseBonusPercent=percent("defensePercent")*100;
+  return stack;
+ });
+ const attackers=build(a,"attacker",attackerBonuses),defenders=build(d,"defender",defenderBonuses);
+ const log=[],metrics={criticalHits:0};
+ let rounds=0;
+ // Alternate initiative so attackers do not receive first strike every round.
+ while(rounds<30&&attackers.some(alive)&&defenders.some(alive)){
+  rounds++;
+  const [first,second]=rounds%2?[attackers,defenders]:[defenders,attackers];
+  attackPhase(first,second,rounds,log,0,{},metrics,2);
+  attackPhase(second,first,rounds,log,0,{},metrics,2);
+ }
+ const summarize=stacks=>stacks.map(stack=>({
+  unit_type:stack.key,tier:stack.tier,initialQuantity:stack.initialQuantity,
+  survivors:stack.quantity,losses:stack.initialQuantity-stack.quantity
+ }));
+ const attackerAlive=attackers.some(alive),defenderAlive=defenders.some(alive);
+ return {
+  winner:attackerAlive&&!defenderAlive?"attacker":defenderAlive?"defender":"draw",
+  rounds,attacker:summarize(attackers),defender:summarize(defenders),log
+ };
+}
