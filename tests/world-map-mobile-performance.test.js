@@ -248,7 +248,7 @@ test("collection estimate matches server rounding and disables empty node collec
  }
  assert.equal(estimate({current_resources:4000000,collection_amount:0}),0);
  assert.equal(estimate({current_resources:5000000,collection_amount:5000000}),5000000);
- assert.match(server,/available>=Number\(node.max_resources\)\?5000000:0/);
+ assert.match(server,/available>=betaHarvestThreshold\(node\)\?5000000:0/);
  assert.match(ui,/addAction\(actions,"Coletar",\(\)=>runNodeAction\("collect",node\),busy\|\|amount<1\)/);
  assert.match(ui,/Aguardando regeneração para coletar/);
 });
@@ -267,4 +267,20 @@ test("monster search favors living unlocked targets with sufficient hunt energy"
  assert.equal(rank({hp:0,level:1},progress,true),3);
  assert.equal(rank({hp:100,level:1},progress,false),2);
  assert.match(ui,/Energia insuficiente/);
+});
+test("accelerated beta harvest is ready at the initial seeded stock and regenerates after depletion",async()=>{
+ const server=await read("rally.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=server.indexOf("function betaHarvestThreshold(");
+ const end=server.indexOf("async function kingdomForPlayer(",start);
+ assert.ok(start>=0&&end>start);
+ const policy=runInNewContext(server.slice(start,end)+"\n({betaHarvestThreshold,nodeReadyAt,nodeRegeneration})");
+ const node={max_resources:10000,current_resources:8000,regen_rate:400,last_regen:1000};
+ const required=policy.betaHarvestThreshold(node);
+ assert.equal(required,8000);
+ assert.equal(policy.nodeReadyAt(node,1000,required),1000);
+ const depleted={...node,current_resources:0};
+ assert.equal(policy.nodeReadyAt(depleted,1000,required),73000);
+ assert.equal(policy.nodeRegeneration(depleted,72999),7999);
+ assert.equal(policy.nodeRegeneration(depleted,73000),8000);
 });
