@@ -1363,6 +1363,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await page.locator('.tactical-march[data-type="hunt"]').waitFor({state:"visible"});
         await page.evaluate(()=>localStorage.setItem("coi_graphics_preference","balanced"));
         await page.reload();
+        await page.locator("#worldMap").scrollIntoViewIfNeeded();
         await page.waitForFunction(()=>window.__coiWorldMap3D?.diagnostics().rebuilds.marches>0);
         await page.waitForFunction(()=>document.querySelector(".world-monster-pin")?.style.left.endsWith("px"));
         assert.ok(await page.locator('.tactical-march[data-type="hunt"]').isHidden());
