@@ -856,7 +856,8 @@ async function gameState(env,playerId){
       "SELECT wt.id,wt.name,wt.terrain,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.x-? ELSE wt.x END AS x,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.z-? ELSE wt.z END AS z,"+
-      "wt.territory_key,wt.shield_until,wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,"+
+      "wt.territory_key,wt.shield_until,wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,wt.alliance_id,"+
+      "COALESCE((SELECT a.tag FROM alliances a WHERE a.id=wt.alliance_id),'') AS controlling_alliance_tag,"+
       "CASE WHEN wt.territory_key LIKE 'royal_throne_%' THEN 'throne' ELSE wt.territory_kind END AS territory_kind,"+
       "owner.id AS kingdom_id,owner.kingdom_name,owner.castle_level,owner.power,owner.equipped_skin_id AS castle_skin_id,"+
       "COALESCE(n.nickname,op.name) AS commander_name,"+
