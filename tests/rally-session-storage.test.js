@@ -10,7 +10,7 @@ function runRallySession(storages) {
   const window={...storages,setInterval() {},addEventListener(){}};
   const fetch=async(path,options)=>{
     captured.push({path,authorization:options.headers.Authorization});
-    return {ok:true,async json(){return path.endsWith("/nodes")?{nodes:[]}:{rallies:[],in_alliance:false}}};
+    return {ok:true,async json(){return {nodes:[],rallies:[],in_alliance:false}}};
   };
   vm.runInNewContext(src,{window,document,fetch,console}, {filename:"rally-ui.js"});
   return {status,captured};
@@ -25,7 +25,8 @@ test("rally uses sessionStorage when localStorage access raises SecurityError", 
     sessionStorage:{getItem(){return "valid-session-only"}}
   });
   for(let i=0;i<8;i++)await Promise.resolve();
-  assert.equal(client.captured.length,2);
+  assert.equal(client.captured.length,1);
+  assert.equal(client.captured[0].path,"/api/game/rally/world");
   assert.ok(client.captured.every(entry=>entry.authorization==="Bearer valid-session-only"));
   assert.match(client.status.textContent,/sincronizados/);
 });

@@ -450,6 +450,29 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.ok(guild.chat.some(row=>row.message===message),"leader receives member chat");
     console.log("Beta legacy alliance passed: two independent kingdoms, membership gate and shared chat.");
 
+    const rallyCall=(path,body)=>http(base,"/api/game/rally/"+path,{
+      cookie,bearer:start.data.token,method:body?"POST":"GET",body
+    });
+    const rallyWorld=await rallyCall("world");
+    assert.equal(rallyWorld.status,200);
+    const rallyNode=rallyWorld.data.nodes.find(node=>!node.occupied_by&&!node.reserved_by_rally);
+    const rallyArmyBefore=(await getStateFor(cookie,start.data.token)).troops.find(unit=>unit.unit_type==="militia"&&unit.tier===1).quantity;
+    const createdRally=await rallyCall("create",{target_type:"resource_node",target_id:rallyNode.id,troops:{militia:1}});
+    assert.equal(createdRally.status,201);
+    const rallyId=createdRally.data.rally_id;
+    assert.match(rallyId,/^[0-9a-f-]{36}$/i);
+    const gatheringRally=await rallyCall("world");
+    assert.ok(gatheringRally.data.rallies.some(rally=>rally.id===rallyId&&rally.status==="gathering"));
+    assert.equal(gatheringRally.data.nodes.find(node=>node.id===rallyNode.id).reserved_by_rally,rallyId);
+    await command([...common,"execute","clash-of-izzy-beta-db","--local","--persist-to",persist,"--command",
+      "UPDATE rallies SET departure_time=unixepoch()-60,arrival_time=unixepoch()-1 WHERE id='"+rallyId+"'"]);
+    const occupiedRally=await rallyCall("world");
+    assert.ok(occupiedRally.data.nodes.find(node=>node.id===rallyNode.id).is_mine,"beta map resolves the rally without cron");
+    assert.ok(!occupiedRally.data.rallies.some(rally=>rally.id===rallyId));
+    assert.equal((await rallyCall("recall",{node_id:rallyNode.id})).data.returned,1);
+    const rallyArmyAfter=(await getStateFor(cookie,start.data.token)).troops.find(unit=>unit.unit_type==="militia"&&unit.tier===1).quantity;
+    assert.equal(rallyArmyAfter,rallyArmyBefore);
+
     // Two authenticated Chromium WebSockets, one legacy and one sharded, must
     // receive a data-free invalidation from a real committed alliance action.
     const firstRealm=await getStateFor(cookie,start.data.token);
@@ -1348,6 +1371,40 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await page.locator(".map-center svg").waitFor({state:"visible"});
         await page.locator("#resources .world-resource-art").first().waitFor({state:"visible"});
         await page.locator(".resource-node-pin .world-resource-art").first().waitFor({state:"visible"});
+        await page.locator("#resourceMapFilter").selectOption("farm");
+        const farmPins=page.locator(".resource-node-pin");
+        assert.equal(await farmPins.count(),await page.locator(".resource-node-card").count());
+        assert.ok(await farmPins.count()>0);
+        await page.locator("#resourceMapLocate").click();
+        const selectedFarm=page.locator('.resource-node-pin[aria-pressed="true"]');
+        assert.equal(await selectedFarm.count(),1);
+        assert.match(await page.locator("#territoryDetails").innerText(),/Fazenda/);
+        const farmId=await selectedFarm.getAttribute("data-node-id");
+        const militia=page.getByRole("spinbutton",{name:"Quantidade de Milícia"});
+        await militia.fill("3");
+        const worldRefreshed=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/game/state");
+        await page.evaluate(()=>window.dispatchEvent(new Event("coi:refresh-world")));
+        await worldRefreshed;
+        assert.equal(await militia.inputValue(),"3");
+        assert.ok(await militia.evaluate(input=>input===document.activeElement),"world refresh preserves formation editor focus");
+        const farmCard=page.locator('.resource-node-card[data-node-id="'+farmId+'"]');
+        await farmCard.getByRole("button",{name:"Ocupar nó"}).click();
+        await farmCard.getByRole("button",{name:"Recolher tropas"}).waitFor();
+        await page.locator("#resourceMapFilter").selectOption("mine-owned");
+        assert.equal(await selectedFarm.getAttribute("data-node-id"),farmId);
+        await farmCard.getByRole("button",{name:"Coletar",exact:true}).click();
+        await page.waitForFunction(()=>document.querySelector("#rally-status").textContent.includes("Coleta concluída"));
+        await farmCard.getByRole("button",{name:"Recolher tropas"}).click();
+        await page.waitForFunction(()=>document.querySelector("#resourceMapCount").textContent==="0 nós");
+        await page.locator("#resourceMapFilter").selectOption("all");
+
+        await page.locator("#worldMonsterLevel").selectOption("3");
+        assert.equal(await page.locator(".world-monster-pin:visible").count(),1);
+        await page.locator("#worldMonsterLocate").click();
+        assert.match(await page.locator("#territoryDetails").innerText(),/Javali de Ferro/);
+        assert.ok(await page.locator("#hunt").isDisabled(),"locked creature stays available for inspection");
+        await page.locator("#worldMonsterLevel").selectOption("all");
+        await page.locator("#worldMap .territory-pin").first().evaluate(button=>button.click());
         assert.equal(await page.locator("#worldMonsterList article").count(),6);
         assert.equal(await page.locator(".world-monster-pin svg use").count(),6);
         assert.equal(await page.locator("#worldMonsterList progress").count(),6);
@@ -1367,6 +1424,10 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await page.waitForFunction(()=>window.__coiWorldMap3D?.diagnostics().rebuilds.marches>0);
         await page.waitForFunction(()=>document.querySelector(".world-monster-pin")?.style.left.endsWith("px"));
         assert.ok(await page.locator('.tactical-march[data-type="hunt"]').isHidden());
+        assert.ok(await page.locator(".resource-node-pin").evaluateAll(pins=>{
+          const width=document.querySelector("#worldMap").clientWidth;
+          return pins.length>0&&pins.every(pin=>pin.offsetLeft>0&&pin.offsetLeft<width);
+        }),"portrait 3D map keeps resource markers inside the horizontal play area");
         assert.deepEqual(pwaRegistrationAttempts, [], "closed beta must not attempt official service worker registration");
         assert.equal(await page.evaluate(async () =>
           (await navigator.serviceWorker.getRegistrations()).length), 0,

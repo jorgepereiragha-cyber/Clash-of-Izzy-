@@ -692,7 +692,10 @@ async function processMarches(env,kingdomId,batchSize=50){
     "INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'march_resolved',? WHERE EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)"
   ).bind(kingdomId,JSON.stringify({marchId:m.id,marchType:m.monster_id?"hunt":m.march_type,targetTerritoryId:m.target_territory_id,...(m.monster_id?{monsterId:m.monster_id}:{})}),m.id,kingdomId,resolutionToken));
   const resolution=await env.DB.batch(statements);
-  if(m.march_type==="attack"&&resolution[m.monster_id?2:1]?.meta?.changes>0)await notifyWorldChanged(env);
+  const worldChanged=m.monster_id
+   ? resolution[2]?.meta?.changes>0
+   : m.march_type==="attack"&&resolution[1]?.meta?.changes>0;
+  if(worldChanged)await notifyWorldChanged(env);
  }
 }
 const CASTLE_MATERIALS={
@@ -2929,7 +2932,7 @@ export default {
       }
       if(url.pathname.startsWith("/api/game/rally/")){
         const rallyPath=url.pathname.slice("/api/game/rally/".length);
-        if(!["active","nodes","create","join","occupy","collect","recall"].includes(rallyPath))return json({error:"Rota de guerra não encontrada."},404);
+        if(!["world","active","nodes","create","join","occupy","collect","recall"].includes(rallyPath))return json({error:"Rota de guerra não encontrada."},404);
         const isWrite=request.method==="POST";
         if(!isWrite&&request.method!=="GET")return json({error:"Método não permitido."},405);
         const playerLimit=await rateLimitDecision(env,isWrite?"rally-write-player":"rally-read-player",playerId,isWrite?20:120,60);

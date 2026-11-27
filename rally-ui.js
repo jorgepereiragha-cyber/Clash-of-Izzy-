@@ -1,5 +1,5 @@
 import {worldResourceArt} from "./scripts/kingdom-2d-art-atlas.js";
-import {focusMarchFormation, getMarchFormation} from "./world-map.js";
+import {focusMapMarker, focusMarchFormation, getMarchFormation, setResourceExpedition} from "./world-map.js";
 const $=id=>document.getElementById(id);
 function readRallySession() {
  let readable=false;
@@ -16,7 +16,7 @@ const NODE_TYPES={
  farm:{icon:"🌾",name:"Fazenda",resource:"Comida"},
  quarry:{icon:"🪨",name:"Pedreira",resource:"Pedra"}
 };
-let nodes=[],rallies=[],inAlliance=false,selectedNodeId=null,busy=false,refreshing=false;
+let nodes=[],rallies=[],inAlliance=false,selectedNodeId=null,busy=false,refreshing=null,lastMapNodes="";
 function make(tag,className,text){
  const el=document.createElement(tag);
  if(className)el.className=className;
@@ -63,18 +63,29 @@ function nodeLabel(node){
  return type.name+" nível "+node.level+" · "+type.resource;
 }
 function selectNode(node){
- selectedNodeId=node.id;
+ const previous=selectedNodeId;
+ selectedNodeId=node?.id??null;
  const title=$("selected-node-title"),details=$("selected-node-details");
- if(title)title.textContent=nodeLabel(node);
+ if(title)title.textContent=node?nodeLabel(node):"Selecione um nó no mapa";
  if(details){
-  details.replaceChildren(
+  details.replaceChildren(...(node?[
    make("span","",node.id),
    make("span","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" recursos"),
    make("span","",nodeAvailability(node)),
    make("span","",fmt(node.regen_rate)+" recursos/h de regeneração")
-  );
+  ]:[]));
  }
- document.querySelectorAll(".resource-node-pin").forEach(pin=>pin.classList.toggle("selected",pin.dataset.nodeId===String(node.id)));
+ document.querySelectorAll(".resource-node-pin").forEach(pin=>{
+  const selected=pin.dataset.nodeId===String(selectedNodeId);
+  pin.classList.toggle("selected",selected);
+  pin.setAttribute("aria-pressed",String(selected));
+ });
+ document.querySelectorAll(".resource-node-card").forEach(card=>
+  card.classList.toggle("selected",card.dataset.nodeId===String(selectedNodeId)));
+ const list=$("resource-node-list");
+ const activeCard=list?.querySelector(".resource-node-card.selected");
+ if(activeCard&&list.firstElementChild!==activeCard)list.prepend(activeCard);
+ if(node||previous)setResourceExpedition(node?{label:nodeLabel(node),availability:nodeAvailability(node)}:null);
 }
 async function runNodeAction(action,node){
  const troops=action==="occupy"?expeditionTroops():undefined;
@@ -86,20 +97,29 @@ async function runNodeAction(action,node){
 async function sendRallyAction(action,body,message){
  if(busy)return;
  busy=true;
+ renderNodeList();renderRallies();
  try{
   const data=await api(action,{method:"POST",body:JSON.stringify(body)});
   window.dispatchEvent(new Event("coi:refresh-world"));
+  if(refreshing)await refreshing;
   await refresh(message(data));
  }catch(error){notify(error.message,true);}
  finally{busy=false;renderNodeList();renderRallies();}
 }
 function renderNodeList(){
  const root=$("resource-node-list");if(!root)return;
+ const focused=document.activeElement?.closest(".resource-node-card");
+ const focusedId=focused?.dataset.nodeId;
+ const focusedAction=focused?document.activeElement.textContent:null;
  root.replaceChildren();
  const fragment=document.createDocumentFragment();
- for(const node of nodes){
+ const filtered=filteredNodes();
+ filtered.sort((a,b)=>Number(b.id===selectedNodeId)-Number(a.id===selectedNodeId));
+ if(!filtered.length)fragment.append(make("p","rally-empty","Nenhum nó neste filtro."));
+ for(const node of filtered){
   const type=NODE_TYPES[node.node_type]||NODE_TYPES.mine;
   const card=make("article","resource-node-card"+(node.id===selectedNodeId?" selected":""));
+  card.dataset.nodeId=node.id;
   const head=make("div","resource-node-heading");
   const name=make("strong","resource-node-name");name.append(nodeResourceArt(node),document.createTextNode(type.name+" · "+node.id));
   head.append(name,make("span","", "Nível "+node.level));
@@ -114,19 +134,24 @@ function renderNodeList(){
    addAction(actions,"Ocupado",()=>selectNode(node),true);
   }else{
    const locked=Boolean(node.reserved_by_rally);
-   addAction(actions,inAlliance?"Criar rally":"Ocupar nó",()=>{
-    if(inAlliance){
+   addAction(actions,"Ocupar nó",()=>runNodeAction("occupy",node),locked||busy);
+   if(inAlliance){
+    addAction(actions,"Criar rally",()=>{
      const troops=expeditionTroops();if(!troops)return;
      sendRallyAction("create",{target_type:"resource_node",target_id:node.id,troops},data=>
       "Rally criado. Reunião por 5 minutos. Poder: "+fmt(data.power)+".");
-    }else runNodeAction("occupy",node);
-   },locked||busy);
+    },locked||busy);
+   }
   }
-  addAction(actions,"Ver no mapa",()=>selectNode(node));
+  addAction(actions,"Ver no mapa",()=>locateNode(node));
   card.append(actions);
   fragment.append(card);
  }
  root.append(fragment);
+ if(focusedId){
+  const card=Array.from(root.children).find(item=>item.dataset.nodeId===focusedId);
+  Array.from(card?.querySelectorAll("button")||[]).find(button=>button.textContent===focusedAction)?.focus({preventScroll:true});
+ }
 }
 function renderRallies(){
  const root=$("rally-active-list");if(!root)return;
@@ -166,14 +191,39 @@ function nodeMatchesMapFilter(node,filter){
  return node.node_type===filter;
 }
 for(const event of ["coi:world-map-3d-ready","coi:world-map-projection-changed","coi:world-map-2d-fallback"])window.addEventListener(event,projectResourceNodes);
-$("resourceMapFilter")?.addEventListener("change",renderMapNodes);
+function filteredNodes(){
+ const filter=$("resourceMapFilter")?.value;
+ return nodes.filter(node=>nodeMatchesMapFilter(node,filter));
+}
+function locateNode(node){
+ selectNode(node);
+ const pin=Array.from($("mapContent").querySelectorAll(".resource-node-pin"))
+  .find(marker=>marker.dataset.nodeId===String(node.id));
+ focusMapMarker(pin);
+}
+$("resourceMapFilter")?.addEventListener("change",()=>{
+ if(!filteredNodes().some(node=>node.id===selectedNodeId))selectNode(null);
+ renderMapNodes();renderNodeList();
+});
+$("resourceMapLocate")?.addEventListener("click",()=>{
+ const candidates=filteredNodes().sort((a,b)=>Math.hypot(a.map_x,a.map_y)-Math.hypot(b.map_x,b.map_y));
+ if(candidates.length)locateNode(candidates[0]);
+});
+window.addEventListener("coi:territory-selected",()=>{if(selectedNodeId)selectNode(null);});
+window.addEventListener("coi:monster-selected",event=>{if(selectedNodeId&&event.detail.monster)selectNode(null);});
 function renderMapNodes(){
  const map=$("mapContent");if(!map)return;
+ const filtered=filteredNodes();
+ $("resourceMapLocate").disabled=!filtered.length;
+ $("resourceMapCount").textContent=filtered.length===1?"1 nó":fmt(filtered.length)+" nós";
+ const snapshot=JSON.stringify(filtered.map(node=>[node.id,node.node_type,node.level,node.map_x,node.map_y,nodeAvailability(node)]));
+ if(snapshot===lastMapNodes)return;
+ lastMapNodes=snapshot;
+ const focusedId=document.activeElement?.dataset.nodeId;
  map.querySelectorAll(".resource-node-pin").forEach(pin=>pin.remove());
  const fragment=document.createDocumentFragment();
- for(const node of nodes){
-  if(!nodeMatchesMapFilter(node,$("resourceMapFilter")?.value))continue;
-  const type=NODE_TYPES[node.node_type]||NODE_TYPES.mine;
+ let replacementFocus;
+ for(const node of filtered){
   const button=make("button","resource-node-pin"+(node.occupied_by?" occupied":"")+(node.id===selectedNodeId?" selected":""));
   button.type="button";button.dataset.nodeId=node.id;
   button.dataset.mapX=String(node.map_x);button.dataset.mapZ=String(node.map_y);
@@ -183,24 +233,36 @@ function renderMapNodes(){
   if(node.reserved_by_rally&&!node.occupied_by)button.style.borderStyle="dashed";
   button.title=node.id+" · "+nodeLabel(node)+" · "+nodeAvailability(node);
   button.setAttribute("aria-label",button.title);
-  button.addEventListener("click",()=>{selectNode(node);$("rally-ui-panel")?.scrollIntoView({behavior:"smooth",block:"nearest"});});
+  button.setAttribute("aria-pressed",String(node.id===selectedNodeId));
+  button.addEventListener("pointerdown",event=>event.stopPropagation());
+  button.addEventListener("click",()=>{
+   selectNode(nodes.find(row=>row.id===node.id));
+   const title=$("selected-node-title");
+   title?.scrollIntoView({block:"nearest"});
+   title?.focus({preventScroll:true});
+  });
+  if(button.dataset.nodeId===focusedId)replacementFocus=button;
   fragment.append(button);
  }
  map.append(fragment);projectResourceNodes();
+ replacementFocus?.focus({preventScroll:true});
 }
-async function refresh(successMessage){
- if(refreshing||!token)return;refreshing=true;
+function refresh(successMessage){
+ if(refreshing||!token)return refreshing;
+ refreshing=loadRallyState(successMessage).finally(()=>{refreshing=null;});
+ return refreshing;
+}
+async function loadRallyState(successMessage){
  try{
-  const [nodeData,rallyData]=await Promise.all([api("nodes"),api("active")]);
-  nodes=Array.isArray(nodeData.nodes)?nodeData.nodes:[];
-  rallies=Array.isArray(rallyData.rallies)?rallyData.rallies:[];
-  inAlliance=rallyData.in_alliance===true;
+  const data=await api("world");
+  nodes=Array.isArray(data.nodes)?data.nodes:[];
+  rallies=Array.isArray(data.rallies)?data.rallies:[];
+  inAlliance=data.in_alliance===true;
   renderMapNodes();renderNodeList();renderRallies();
   const selected=nodes.find(node=>node.id===selectedNodeId);
-  if(selected)selectNode(selected);
+  if(selected||selectedNodeId)selectNode(selected);
   notify(successMessage||nodes.length+" nós de recursos sincronizados.");
  }catch(error){notify(error.message,true);}
- finally{refreshing=false;}
 }
 function init(){
  if(!token){notify(rallySession.blocked
@@ -208,7 +270,7 @@ function init(){
   :"Entre no seu reino para acessar a guerra.",true);return;}
  $("rallyFormation")?.addEventListener("click",focusMarchFormation);
  refresh();
- window.setInterval(()=>{if(!document.hidden)refresh();},12000);
- document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh();});
+ window.setInterval(()=>{if(!document.hidden&&!busy)refresh();},12000);
+ document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!busy)refresh();});
 }
 init();

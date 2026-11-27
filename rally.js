@@ -286,6 +286,12 @@ export async function handleRally(request,env,publicPlayerId,path,body={}){
  try{
   const kingdomId=await kingdomForPlayer(env,publicPlayerId);
   if(!kingdomId)return reply({error:"Reino não encontrado."},404);
+  if(request.method==="GET"&&path==="world"){
+   // Beta has no cron. Settle a bounded batch before exposing nodes and rallies together.
+   if(env.ENVIRONMENT==="beta")await processDueRallies(env,5);
+   const [nodes,rallies]=await Promise.all([loadNodes(env,kingdomId),listRallies(env,kingdomId)]);
+   return reply({nodes,...rallies});
+  }
   if(request.method==="GET"&&path==="nodes")return reply({nodes:await loadNodes(env,kingdomId)});
   if(request.method==="GET"&&path==="active")return reply(await listRallies(env,kingdomId));
   if(request.method!=="POST")return reply({error:"Método não permitido."},405);

@@ -42,6 +42,7 @@ const UNIT_NAMES = {
 let state = null;
 let selectedTerritoryId = null;
 let selectedHunt = null;
+let selectedResourceNode = null;
 let pendingHunt = null;
 let selectedUnits = {};
 let busy = false;
@@ -103,6 +104,30 @@ export function focusMarchFormation(){
   $("worldTargetPanel").scrollIntoView({block:"nearest"});
   ($("troops").querySelector("input")||$("worldTargetHeading")).focus({preventScroll:true});
 }
+export function focusMapMarker(marker) {
+  if (!marker) return;
+  const map = $("worldMap");
+  const { clientWidth:width, clientHeight:height } = map;
+  const zoom = Math.max(mapViewport.zoom, 1.75);
+  const left = marker.offsetLeft - width / 2;
+  const top = marker.offsetTop - height / 2;
+  applyMapViewport({ zoom, panX: -left * zoom, panY: -top * zoom });
+  map.scrollIntoView({ block: "nearest" });
+  marker.focus({ preventScroll: true });
+}
+export function setResourceExpedition(node) {
+  selectedResourceNode = node;
+  if (node) {
+    selectedTerritoryId = null;
+    selectedHunt = null;
+    window.dispatchEvent(new Event("coi:resource-node-selected"));
+    for (const button of window.__coiWorldMapButtons?.values() || []) {
+      button.classList.remove("selected");
+      button.setAttribute("aria-pressed", "false");
+    }
+  }
+  if (state) renderDetails();
+}
 function renderResources() {
   const root = $("resources");
   root.replaceChildren();
@@ -149,6 +174,7 @@ function tacticalMarches(now=Date.now()) {
 }
 function renderMap() {
   const root = $("mapContent");
+  const focusedTerritory = document.activeElement?.dataset.territoryId;
   root.querySelectorAll(".territory-pin,.tactical-march,.map-center").forEach(pin => pin.remove());
   const visualState = {
     territories: state.territories || [],
@@ -182,6 +208,7 @@ function renderMap() {
       (Number(territory.id) === Number(selectedTerritoryId) ? " selected" : ""));
     button.type = "button";
     button.dataset.territoryId = String(territory.id);
+    button.setAttribute("aria-pressed", String(Number(territory.id) === Number(selectedTerritoryId)));
     if (isThrone) button.dataset.throneState = throneVisualState(visualState);
     button.style.left = clamp(50 + Number(territory.x || 0) * 0.9, 9, 91) + "%";
     button.style.top = clamp(50 - Number(territory.z || 0) * 0.9, 10, 90) + "%";
@@ -203,6 +230,7 @@ function renderMap() {
     button.addEventListener("click", () => {
       selectedTerritoryId = territory.id;
       selectedHunt = null;
+      selectedResourceNode = null;
       window.dispatchEvent(new Event("coi:territory-selected"));
       renderMap();
       renderDetails();
@@ -229,6 +257,7 @@ function renderMap() {
   }
   tacticalMarches();
   applyMapViewport();
+  if (focusedTerritory) buttonRefs.get(Number(focusedTerritory))?.focus({ preventScroll: true });
 }
 // Rebuild tactical positions immediately when the 3D renderer is lost.
 window.addEventListener("coi:world-map-2d-fallback", () => {
@@ -238,7 +267,10 @@ window.setInterval(()=>{if(!document.hidden)tacticalMarches();},1000);
 window.addEventListener("coi:monster-selected",({detail})=>{
   selectedHunt=detail.monster?detail:null;
   if(!state)return;
-  if(selectedHunt)selectedTerritoryId=null;
+  if(selectedHunt){
+    selectedTerritoryId=null;
+    selectedResourceNode=null;
+  }
   renderMap();renderDetails();
   if(detail.openFormation){
     $("worldTargetPanel").scrollIntoView({block:"nearest"});
@@ -293,38 +325,55 @@ for(const [id,mode] of [["presetGather","gather"],["presetBalanced","balanced"],
 }
 function renderTroops() {
   const root = $("troops");
-  root.replaceChildren();
   const available = (state.troops || []).filter(unit => Number(unit.tier) === 1 && Number(unit.quantity) > 0);
   const availableTypes = new Set(available.map(unit => unit.unit_type));
   for (const unitType of Object.keys(selectedUnits)) {
     if (!availableTypes.has(unitType)) delete selectedUnits[unitType];
   }
   if (!available.length) {
-    root.append(make("div", "muted", "Você ainda não possui tropas disponíveis para marchar."));
+    root.replaceChildren(make("div", "muted", "Você ainda não possui tropas disponíveis para marchar."));
     updateActionButtons();
+    updateMarchCapacityLabel();
     return;
   }
+  const rows = new Map(Array.from(root.children, row => [row.dataset.unitType, row]));
+  for (const [type, row] of rows) {
+    if (!availableTypes.has(type)) row.remove();
+  }
   for (const unit of available) {
-    const row = make("div", "troop-row");
-    const label = make("label", "", (UNIT_NAMES[unit.unit_type] || unit.unit_type) + " · " + fmt(unit.quantity));
-    const input = make("input");
-    input.type = "number";
-    input.min = "0";
-    input.max = String(unit.quantity);
-    input.step = "1";
-    input.inputMode = "numeric";
-    input.setAttribute("aria-label", "Quantidade de " + (UNIT_NAMES[unit.unit_type] || unit.unit_type));
-    const defaultValue = 0;
-    input.value = String(selectedUnits[unit.unit_type] ?? defaultValue);
-    selectedUnits[unit.unit_type] = clamp(Math.floor(Number(input.value) || 0), 0, Number(unit.quantity));
-    input.addEventListener("input", () => {
-      selectedUnits[unit.unit_type] = clamp(Math.floor(Number(input.value) || 0), 0, Number(unit.quantity));
-      input.value = String(selectedUnits[unit.unit_type]);
-      updateActionButtons();
-      updateMarchCapacityLabel();
-    });
-    row.append(label, input);
-    root.append(row);
+    const type = unit.unit_type;
+    const name = UNIT_NAMES[type] || type;
+    let row = rows.get(type);
+    if (!row) {
+      row = make("div", "troop-row");
+      row.dataset.unitType = type;
+      const label = make("label", "");
+      const input = make("input");
+      input.type = "number";
+      input.id = "march-unit-" + type;
+      input.min = "0";
+      input.step = "1";
+      input.inputMode = "numeric";
+      input.setAttribute("aria-label", "Quantidade de " + name);
+      label.htmlFor = input.id;
+      input.addEventListener("input", () => {
+        selectedUnits[type] = clamp(Math.floor(Number(input.value) || 0), 0, Number(input.max));
+        if (input.value && Number(input.value) !== selectedUnits[type]) input.value = String(selectedUnits[type]);
+        updateActionButtons();
+        updateMarchCapacityLabel();
+      });
+      input.addEventListener("blur", () => { input.value = String(selectedUnits[type] || 0); });
+      row.append(label, input);
+      root.append(row);
+    }
+    const [label, input] = row.children;
+    label.textContent = name + " · " + fmt(unit.quantity);
+    input.max = String(Math.min(10000, Number(unit.quantity)));
+    selectedUnits[type] = clamp(selectedUnits[type] || 0, 0, Number(input.max));
+    const quantity = String(selectedUnits[type]);
+    if (input.value !== quantity && (document.activeElement !== input || input.value !== "")) {
+      input.value = quantity;
+    }
   }
   updateActionButtons();
   updateMarchCapacityLabel();
@@ -338,7 +387,7 @@ function updateActionButtons() {
   const isThrone = territory?.territory_kind === "throne";
   const canVisit = Boolean(territory && !isCastle && !isThrone && territoryOwner(territory) !== "Outro reino");
   const hunting=Boolean(selectedHunt);
-  for(const id of ["gather","scout","attack"])$(id).hidden=hunting;
+  for(const id of ["gather","scout","attack"])$(id).hidden=hunting||Boolean(selectedResourceNode);
   $("hunt").hidden=!hunting;
   $("hunt").disabled=busy||!hasTroops||!marchAvailable||!hunting||Boolean(huntRestriction());
   if(hunting){
@@ -375,6 +424,16 @@ function renderDetails() {
   const root = $("territoryDetails");
   root.replaceChildren();
   const territory = getSelectedTerritory();
+  if (selectedResourceNode) {
+    const { label, availability } = selectedResourceNode;
+    root.append(make("div", "territory-title", label), make("p", "muted", availability));
+    const nodeActions = make("a", "", "Abrir ações do nó");
+    nodeActions.href = "#selected-node-title";
+    root.append(nodeActions);
+    $("marchHint").textContent = "Escolha a formação e abra as ações do nó para ocupar ou convocar um rally.";
+    renderTroops();
+    return;
+  }
   if(selectedHunt){
     const {monster,progress}=selectedHunt;
     root.append(make("div","territory-title",monster.name));
@@ -547,7 +606,7 @@ function applyWorldState(response){
     if (match) selectedTerritoryId = match.id;
     requestedTerritoryApplied = true;
   }
-  if (!selectedHunt&&!getSelectedTerritory()&&state.territories?.length) selectedTerritoryId = state.territories[0].id;
+  if (!selectedHunt&&!selectedResourceNode&&!getSelectedTerritory()&&state.territories?.length) selectedTerritoryId = state.territories[0].id;
   render();
 }
 async function sendThroneAssault(){

@@ -162,7 +162,8 @@ test("collection nodes distinguish own occupancy, foreign occupancy, rally reser
  assert.equal(availability({occupied_by:2}),"Ocupado por outro reino");
  assert.equal(availability({reserved_by_rally:"rally-1"}),"Reservado para rally");
  assert.equal(availability({}),"Livre para ocupação");
- assert.match(source,/pin\.dataset\.nodeId===String\(node\.id\)/);
+ assert.match(source,/pin\.dataset\.nodeId===String\(selectedNodeId\)/);
+ assert.match(source,/pin\.setAttribute\("aria-pressed",String\(selected\)\)/);
  assert.match(source,/button\.style\.borderStyle="dashed"/);
  assert.match(source,/button\.setAttribute\("aria-label",button\.title\)/);
 });
