@@ -113,12 +113,22 @@ function selectNode(node){
  if(activeCard&&list.firstElementChild!==activeCard)list.prepend(activeCard);
  if(node||previous)setResourceExpedition(node?{label:nodeLabel(node),availability:nodeAvailability(node),harvest:nodeHarvestPreview(node)}:null);
 }
+function nodeActionReceipt(action,node,data){
+ const resource=(Object.hasOwn(NODE_TYPES,node.node_type)?NODE_TYPES[node.node_type].resource:"Recursos").toLocaleLowerCase("pt-BR");
+ if(action==="collect"||action==="collect-return"){
+  const collected="Coleta concluída: "+fmt(data.collected)+" "+resource+".";
+  if(action==="collect")return collected;
+  const returned=Number(data.returned),allies=Number(data.returned_allies);
+  const own=Number.isSafeInteger(returned)&&returned>=0?fmt(returned)+" tropas próprias retornaram.":"Tropas retornaram ao reino.";
+  return collected+" "+own+(Number.isSafeInteger(allies)&&allies>0?" "+fmt(allies)+" tropas aliadas retornaram.":"");
+ }
+ if(action==="recall")return "Tropas retornaram ao reino.";
+ return "Nó ocupado com sucesso.";
+}
 async function runNodeAction(action,node){
  const troops=action==="occupy"?expeditionTroops():undefined;
  if(action==="occupy"&&!troops)return;
- await sendRallyAction(action,{node_id:node.id,...(troops?{troops}:{})},data=>action==="collect"?
-  "Coleta concluída: "+fmt(data.collected)+" "+NODE_TYPES[node.node_type].resource.toLocaleLowerCase("pt-BR")+".":
-  action==="collect-return"?"Coleta concluída: "+fmt(data.collected)+" recursos. Tropas retornaram ao reino.":action==="recall"?"Tropas retornaram ao reino.":"Nó ocupado com sucesso.");
+ await sendRallyAction(action,{node_id:node.id,...(troops?{troops}:{})},data=>nodeActionReceipt(action,node,data));
 }
 async function sendRallyAction(action,body,message){
  if(busy||readRallySession().token!==token)return;
@@ -126,12 +136,18 @@ async function sendRallyAction(action,body,message){
  renderNodeList();renderRallies();
  try{
   const data=await api(action,{method:"POST",body:JSON.stringify(body)});
+  if(readRallySession().token!==token)return;
+  const receipt=message(data);
   if(body.troops)clearMarchFormation();
   window.dispatchEvent(new Event("coi:refresh-world"));
   if(refreshing)await refreshing;
-  await refresh(message(data));
- }catch(error){notify(error.message,true);}
- finally{busy=false;renderNodeList();renderRallies();}
+  if(readRallySession().token!==token)return;
+  await refresh(receipt);
+ }catch(error){if(readRallySession().token===token)notify(error.message,true);}
+ finally{
+  busy=false;
+  if(readRallySession().token===token){renderNodeList();renderRallies();}
+ }
 }
 function renderNodeList(){
  const root=$("resource-node-list");if(!root)return;
@@ -291,9 +307,20 @@ function renderMapNodes(){
  map.append(fragment);projectResourceNodes();
  replacementFocus?.focus({preventScroll:true});
 }
+// Coalesce invalidations arriving during a read into a trailing read.
+let refreshQueued=false;
 function refresh(successMessage){
- if(refreshing||!token)return refreshing;
- refreshing=loadRallyState(successMessage).finally(()=>{refreshing=null;});
+ if(!token||readRallySession().token!==token)return refreshing;
+ if(refreshing){refreshQueued=true;return refreshing;}
+ refreshing=(async()=>{
+  try{
+   await loadRallyState(successMessage);
+   while(refreshQueued&&readRallySession().token===token){
+    refreshQueued=false;
+    await loadRallyState(successMessage);
+   }
+  }finally{refreshQueued=false;refreshing=null;}
+ })();
  return refreshing;
 }
 async function loadRallyState(successMessage){
@@ -310,12 +337,13 @@ async function loadRallyState(successMessage){
   if(selected||selectedNodeId)selectNode(selected);
   notify(successMessage||nodes.length+" nós de recursos sincronizados.");
  }catch(error){
+  if(readRallySession().token!==token)return;
   if(error.status===401||error.status===403){
    nodes=[];rallies=[];inAlliance=false;collectReturnEnabled=false;
    if(selectedNodeId)selectNode(null);
    renderMapNodes();renderNodeList();renderRallies();
   }
-  notify(error.message,true);
+  notify(successMessage?successMessage+" Não foi possível atualizar o mapa; aguarde a próxima sincronização.":error.message,true);
  }
 }
 function init(){

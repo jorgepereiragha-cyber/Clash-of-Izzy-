@@ -11,3 +11,9 @@ export async function notifyWorldChanged(env){
   await stub.fetch(new Request("https://eldoria.internal/world-changed",{method:"POST",signal:AbortSignal.timeout(2000)}));
  }));
 }
+
+// A committed mutation invalidates clients; rejected actions and polling do not.
+export async function notifyCommittedRallyMutation(env,method,response){
+ if(method==="POST"&&response.ok)await notifyWorldChanged(env);
+ return response;
+}
