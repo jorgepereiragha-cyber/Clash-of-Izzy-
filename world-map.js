@@ -329,6 +329,7 @@ function renderDetails() {
     addStat(grid, "Recurso", resource.label);
     addStat(grid, "Produção", fmt(territory.resource_rate) + " / hora");
     addStat(grid, "Nível", fmt(territory.level || 1));
+    if (territory.alliance_id != null) addStat(grid, "Aliança controladora", territory.controlling_alliance_tag ? "[" + territory.controlling_alliance_tag + "]" : "Território reivindicado");
   }
   root.append(grid);
   $("marchNotice").textContent = isThrone
