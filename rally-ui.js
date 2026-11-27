@@ -63,6 +63,8 @@ function nodeLabel(node){
  return type.name+" nível "+node.level+" · "+type.resource;
 }
 function collectableNodeAmount(node){
+ const authoritative=node.collection_amount;
+ if(Number.isSafeInteger(authoritative)&&authoritative>=0)return authoritative;
  const available=Number(node.current_resources);
  return Number.isFinite(available)?Math.max(0,Math.floor(available*0.5)):0;
 }
@@ -219,7 +221,7 @@ resourceFilter?.addEventListener("change",()=>{
 });
 function rankResourceNode(node){
  if(!node.is_mine&&(node.occupied_by||node.reserved_by_rally))return 2;
- return Number(node.current_resources)>=2?0:1;
+ return collectableNodeAmount(node)>0?0:1;
 }
 function compareResourceNodes(a,b){
  return rankResourceNode(a)-rankResourceNode(b)||Math.hypot(a.map_x,a.map_y)-Math.hypot(b.map_x,b.map_y);
