@@ -370,22 +370,34 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   }
 
   function createRoyalThrone(parent,x,z,visualState){
-    // Original low-poly model made from procedural geometry. No downloads/GLB.
+    // Original imperial sanctuary: a raised throne framed by a ceremonial colonnade.
     const group=new THREE.Group();
     group.position.set(x,terrainHeight(x,z)+.2,z);
+    group.userData.coIThroneState=visualState;
     makeMesh(new THREE.CylinderGeometry(4.2,4.6,.48,8),shared.stone,group,0,.1,0);
-    makeMesh(new THREE.CylinderGeometry(3.2,3.6,.38,8),shared.stoneLight,group,0,.5,0);
-    box(group,2.5,.55,2.1,shared.gold,0,1.1,0);
+    makeMesh(new THREE.CylinderGeometry(3.65,3.9,.30,8),shared.stoneLight,group,0,.48,0);
+    box(group,4.7,.32,3.9,shared.stone,0,.75,0);
+    // Axial stairs and the raised imperial dais.
+    const steps=[];
+    for(let i=0;i<3;i++)steps.push([0,.25+i*.16,2.95-i*.38,2.5,.22,.5]);
+    castleStonework(group,shared.stoneLight,steps);
+    box(group,2.45,.48,2.1,shared.gold,0,1.13,-.35);
     box(group,1.7,2.6,.45,shared.stone,0,2.45,-.84);
     box(group,1.95,.28,.62,shared.gold,0,3.9,-.84);
-    box(group,.5,1.5,.45,shared.gold,-1.35,2.0,-.66);
-    box(group,.5,1.5,.45,shared.gold,1.35,2.0,-.66);
-    for(const dx of [-1.1,0,1.1]){
-      cone(group,.44,.75,shared.gold,dx,4.45,-.84,4);
+    box(group,1.45,.18,1.14,shared.roof,0,1.48,-.12);
+    const columns=[],capitals=[],crowns=[];
+    for(const dx of [-2.1,2.1])for(const dz of [-1.45,1.45]){
+      columns.push([dx,2.1,dz,.48,2.7,.48]);
+      capitals.push([dx,3.52,dz,.70,.26,.70],[dx,.99,dz,.76,.22,.76]);
     }
-    for(const dx of [-3.8,3.8]){
-      makeTower(group,dx,2.6,3,shared.stone);
-    }
+    castleStonework(group,shared.stoneLight,columns);
+    castleStonework(group,shared.gold,capitals);
+    for(const dx of [-1.1,0,1.1])crowns.push([dx,4.15,-.84,.35,.35,.35]);
+    castleStonework(group,shared.gold,crowns);
+    box(group,5.15,.28,3.75,shared.stoneLight,0,3.82,0);
+    cone(group,3.05,1.35,shared.roof,0,4.65,0,4);
+    cone(group,.47,.9,shared.gold,0,5.62,0,6);
+    // State colors describe only the authoritative throne phase.
     if (visualState !== "idle") {
       const shielded = visualState === "shielded";
       const ringMaterial = shielded ? shared.blueTroop
