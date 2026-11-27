@@ -456,7 +456,11 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       async function attach(sessionCookie,gameToken,sharded){
         const ctx=await realtimeBrowser.newContext();
         const [name,value]=sessionCookie.split("=");
-        await ctx.addCookies([{name,value,url:base+"/",secure:true,httpOnly:true,sameSite:"Lax"}]);
+        // Playwright derives Secure from the cookie URL, even with secure:true.
+        // Register the host-only Secure cookie using an HTTPS URL; Chromium
+        // treats HTTP loopback as trustworthy. The real WS still uses the beta gate.
+        await ctx.addCookies([{name,value,url:base.replace(/^http:/,"https:")+"/",secure:true,httpOnly:true,sameSite:"Lax"}]);
+        assert.ok((await ctx.cookies()).some(c=>c.name===name&&c.value===value&&c.secure&&c.httpOnly&&c.path==="/"),"browser retains the secure beta session");
         const page=await ctx.newPage();
         await page.goto(base+"/api/health");
         const headers={Cookie:sessionCookie,Authorization:"Bearer "+gameToken};
