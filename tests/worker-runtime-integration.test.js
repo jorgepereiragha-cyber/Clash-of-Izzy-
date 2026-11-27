@@ -989,6 +989,15 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "march", targetId: -1, marchType: "gather", units: { militia: 1 } }, 400);
       const beforeInvalidMarches=stateA.marches.length;
       const beforeInvalidTroops=troopCount("militia",stateA);
+      assert.ok(Number.isSafeInteger(Number(neutral.id)));
+      assert.ok(["food","wood","stone","iron"].includes(neutral.resource_type));
+      const localTargetSql=async sql=>runCli(["--config","wrangler.jsonc","d1","execute","clash-of-izzy-db","--local","--persist-to",persistDir,"--command",sql]);
+      await localTargetSql("UPDATE world_territories SET resource_type=NULL WHERE id="+Number(neutral.id));
+      try{
+        await action(tokenA,{type:"march",targetId:neutral.id,marchType:"gather",units:{militia:1}},409,"coleta sem recurso");
+      }finally{
+        await localTargetSql("UPDATE world_territories SET resource_type='"+neutral.resource_type+"' WHERE id="+Number(neutral.id));
+      }
       for(const invalid of [
         {marchType:"gather"},
         {marchType:"gather",units:null},
@@ -1018,6 +1027,25 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       assert.ok(coreResourceKeys.some(key => resourcesAfterDebit[key] < resourcesBeforeQueues[key]),
         "iniciar melhorias e treinamentos debita recursos do reino");
 
+      // Resolve the existing march in the isolated local database, then verify a scout report.
+      const finishLocalMarches=()=>runCli(["--config","wrangler.jsonc","d1","execute","clash-of-izzy-db","--local","--persist-to",persistDir,"--command",
+        "UPDATE marches SET arrives_at='2000-01-01T00:00:00.000Z' WHERE kingdom_id="+kingdomA+" AND status='marching'"]);
+      await finishLocalMarches();
+      stateA=(await api("/api/game/state",{token:tokenA})).data.state;
+      const beforeScout=troopCount("militia",stateA);
+      const scout=await action(tokenA,{type:"march",targetId:neutral.id,marchType:"scout",units:{militia:1}},200,"reconhecimento territorial");
+      const scoutId=scout.state.marches.find(m=>m.march_type==="scout"&&m.status==="marching")?.id;
+      assert.ok(scoutId);
+      await finishLocalMarches();
+      stateA=(await api("/api/game/state",{token:tokenA})).data.state;
+      const scoutReports=stateA.recentEvents.filter(e=>e.event_type==="territory_scouted").map(e=>JSON.parse(e.payload_json));
+      const report=scoutReports.find(e=>e.marchId===scoutId);
+      assert.equal(report?.territoryId,neutral.id);
+      assert.equal(report?.resourceType,neutral.resource_type);
+      assert.equal(troopCount("militia",stateA),beforeScout,"scout returns troops");
+      const again=(await api("/api/game/state",{token:tokenA})).data.state;
+      assert.equal(again.recentEvents.filter(e=>e.event_type==="territory_scouted"&&JSON.parse(e.payload_json).marchId===scoutId).length,1);
+      
       // A conclusão é forçada somente no D1 local isolado do teste; o Worker
       // continua sendo responsável por processar a fila no próximo GET /state.
       await runCli([
