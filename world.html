@@ -110,6 +110,16 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 .world-map{scroll-margin-top:128px}
 #selected-node-title{scroll-margin-top:128px}
 .world-map .territory-pin.selected,.world-map .world-monster-pin.selected,.world-map .resource-node-pin.selected{z-index:7}
+
+/* WebGL renders the castle itself; keep its name and a full touch target,
+   without placing a second illustrated castle over its 3D architecture. */
+.world-map.map-3d-ready:not(.map-3d-fallback) .territory-pin.castle{min-width:44px;min-height:44px;width:max-content;max-width:136px;padding:0 4px;background:transparent;border:0;box-shadow:none;border-radius:8px;outline-offset:0}
+.world-map.map-3d-ready:not(.map-3d-fallback) .territory-pin.castle .territory-castle-art{display:none}
+.world-map.map-3d-ready:not(.map-3d-fallback) .territory-pin.castle small{position:static;transform:none;max-width:128px;overflow:hidden;text-overflow:ellipsis;font-size:11px;line-height:1.25;padding:4px 7px;border:1px solid #e7bd68;background:#101a2bf2;color:#fff4dc}
+.world-map.map-3d-ready:not(.map-3d-fallback) .territory-pin.castle.owned small{border-color:#79d49a}
+.world-map.map-3d-ready:not(.map-3d-fallback) .territory-pin.castle.enemy small{border-color:#ed8b80}
+.world-map.map-3d-ready:not(.map-3d-fallback) .territory-pin.castle:is(.selected,:focus-visible){outline:2px solid #fff2b5;box-shadow:0 0 0 3px #ffe09a44}
+
 </style>
   <link rel="stylesheet" href="/styles/navigation.css">
   <link rel="stylesheet" href="/styles/android-experience.css">
