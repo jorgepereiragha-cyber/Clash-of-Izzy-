@@ -29,3 +29,11 @@
 .resource-node-pin.foreign{border-color:#ed8b80;background:#4c282bee}
 .resource-node-pin:focus-visible{outline:2px solid #fff2b5;outline-offset:3px}
 #resourceMapFilter{max-width:100%;min-height:36px;border:1px solid #9d8256;background:#14243a;color:#fff1cb;border-radius:6px;padding:5px 8px;font-size:12px}
+
+/* Resource pins use the same original iconography as the city HUD. */
+.resource-node-name{display:inline-flex;align-items:center;gap:5px}
+.resource-node-name .world-resource-art{width:21px;height:21px}
+.resource-node-pin{width:36px;height:36px;min-width:36px;min-height:36px;touch-action:manipulation}
+.resource-node-pin .world-resource-art{width:23px;height:23px;pointer-events:none}
+.resource-node-level{position:absolute;right:-3px;bottom:-4px;min-width:14px;padding:2px;border-radius:5px;background:#101a2b;color:#ffe2a0;font-size:9px;font-weight:800;pointer-events:none}
+@media(max-width:500px){.resource-node-pin{width:34px;height:34px;min-width:34px;min-height:34px}}
