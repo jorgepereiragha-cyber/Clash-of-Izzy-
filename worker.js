@@ -373,6 +373,16 @@ async function gameIdentity(request,env){
   }else if(p.av!==undefined)return null;
   return String(p.sub);
 }
+const WORLD_RESOURCE_SITES=[
+  ["forest_east","Bosque Antigo","forest",18,12,"wood"],
+  ["forest_west","Bosque Nebuloso","forest",-22,8,"wood"],
+  ["golden_fields","Campos Dourados","plains",12,-24,"food"],
+  ["fertile_vale","Vale Fértil","plains",-18,-20,"food"],
+  ["north_quarry","Pedreira do Norte","mountain",30,18,"stone"],
+  ["grey_rock","Rochedo Cinzento","mountain",-32,-14,"stone"],
+  ["iron_vein","Veio de Ferro","mountain",34,-25,"iron"],
+  ["old_mine","Mina Abandonada","mountain",-35,28,"iron"]
+ ];
 export async function ensureKingdom(env,playerId){
   // The entire foundation is one transaction. A random guard identifies
   // only the kingdom inserted by this invocation, never a legacy kingdom.
@@ -391,13 +401,13 @@ export async function ensureKingdom(env,playerId){
       "WITH RECURSIVE candidates(slot) AS (SELECT COALESCE(MAX(map_slot)+1,0) FROM kingdoms WHERE map_region=1 "+
       "UNION ALL SELECT slot+1 FROM candidates WHERE slot<(SELECT COALESCE(MAX(map_slot)+128,127) FROM kingdoms WHERE map_region=1)), "+
       "positions AS (SELECT slot,((slot%20)-10)*5 AS x,(CAST(slot/20 AS INTEGER)-10)*5 AS z FROM candidates), "+
-      "reserved(x,z) AS (VALUES(0,0),(18,12),(-22,8),(12,-24),(-18,-20),(30,18),(-32,-14),(34,-25),(-35,28)), "+
+      "reserved(x,z,clearance) AS (VALUES(0,0,10),"+WORLD_RESOURCE_SITES.map(site=>`(${site[3]},${site[4]},5)`).join(",")+"), "+
       "next_slot AS (SELECT pos.slot,pos.x,pos.z FROM positions pos "+
       "WHERE NOT EXISTS(SELECT 1 FROM kingdoms k WHERE k.map_region=1 AND k.map_x>pos.x-8 AND k.map_x<pos.x+8 AND k.map_z>pos.z-8 AND k.map_z<pos.z+8) "+
       "AND NOT EXISTS(SELECT 1 FROM world_territories t WHERE t.map_region=1 AND t.x>pos.x-5 AND t.x<pos.x+5 AND t.z>pos.z-5 AND t.z<pos.z+5) "+
       "AND NOT EXISTS(SELECT 1 FROM resource_nodes n WHERE n.map_x>pos.x-5 AND n.map_x<pos.x+5 AND n.map_y>pos.z-5 AND n.map_y<pos.z+5) "+
       "AND NOT EXISTS(SELECT 1 FROM world_monsters m WHERE m.map_region=1 AND m.x>pos.x-5 AND m.x<pos.x+5 AND m.z>pos.z-5 AND m.z<pos.z+5) "+
-      "AND NOT EXISTS(SELECT 1 FROM reserved p WHERE ABS(p.x-pos.x)<5 AND ABS(p.z-pos.z)<5) ORDER BY pos.slot LIMIT 1) "+
+      "AND NOT EXISTS(SELECT 1 FROM reserved p WHERE ABS(p.x-pos.x)<p.clearance AND ABS(p.z-pos.z)<p.clearance) ORDER BY pos.slot LIMIT 1) "+
       "INSERT INTO kingdoms(player_id,kingdom_name,food,wood,stone,iron,gold,last_production_at,map_region,map_slot,map_x,map_z) "+
       "SELECT p.id,?,?,?,?,?,?,?,1,slot,x,z FROM next_slot CROSS JOIN players p WHERE p.player_id=? AND NOT EXISTS(SELECT 1 FROM kingdoms WHERE player_id=p.id)"
       :
@@ -586,17 +596,8 @@ async function applyProduction(env,kingdomId){
   await env.DB.batch(writes);
 }
 async function seedWorld(env,region=1){
- const nodes=[
-  ["forest_east","Bosque Antigo","forest",18,12,"wood"],
-  ["forest_west","Bosque Nebuloso","forest",-22,8,"wood"],
-  ["golden_fields","Campos Dourados","plains",12,-24,"food"],
-  ["fertile_vale","Vale Fértil","plains",-18,-20,"food"],
-  ["north_quarry","Pedreira do Norte","mountain",30,18,"stone"],
-  ["grey_rock","Rochedo Cinzento","mountain",-32,-14,"stone"],
-  ["iron_vein","Veio de Ferro","mountain",34,-25,"iron"],
-  ["old_mine","Mina Abandonada","mountain",-35,28,"iron"]
- ];
- await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate,map_region) VALUES(?,?,?,?,?,?,?,?)").bind(n[0]+(region===1?"":"_realm_"+region),...n.slice(1),90,region)));
+
+ await env.DB.batch(WORLD_RESOURCE_SITES.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate,map_region) VALUES(?,?,?,?,?,?,?,?)").bind(n[0]+(region===1?"":"_realm_"+region),...n.slice(1),90,region)));
 }
 async function processMarches(env,kingdomId,batchSize=50){
  const now=new Date().toISOString();
