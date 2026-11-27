@@ -307,9 +307,20 @@ function renderMapNodes(){
  map.append(fragment);projectResourceNodes();
  replacementFocus?.focus({preventScroll:true});
 }
+// Coalesce invalidations arriving during a read into a trailing read.
+let refreshQueued=false;
 function refresh(successMessage){
- if(refreshing||!token)return refreshing;
- refreshing=loadRallyState(successMessage).finally(()=>{refreshing=null;});
+ if(!token||readRallySession().token!==token)return refreshing;
+ if(refreshing){refreshQueued=true;return refreshing;}
+ refreshing=(async()=>{
+  try{
+   await loadRallyState(successMessage);
+   while(refreshQueued&&readRallySession().token===token){
+    refreshQueued=false;
+    await loadRallyState(successMessage);
+   }
+  }finally{refreshQueued=false;refreshing=null;}
+ })();
  return refreshing;
 }
 async function loadRallyState(successMessage){
