@@ -152,3 +152,20 @@ test("collection and return remains disabled outside beta even with flag enabled
   assert.equal(sql.prepare("SELECT occupied_by FROM resource_nodes").get().occupied_by,10);
  }finally{sql.close()}
 });
+test("harvest and return competes safely with manual collection and never rewinds regeneration",async()=>{
+ const {sql,env}=fixture();
+ try{
+  enableHarvestFixture(sql,env);
+  await processDueRallies(env);
+  sql.exec("UPDATE resource_nodes SET current_resources=100,last_regen=unixepoch()+3600");
+  const timestamp=sql.prepare("SELECT last_regen FROM resource_nodes").get().last_regen;
+  const manual=()=>handleRally(new Request("https://test.example/collect",{method:"POST"}),env,"leader","collect",{node_id:"node_001"});
+  const responses=await Promise.all([manual(),collectReturn(env)]);
+  assert.equal(responses.filter(r=>r.status===200).length,1);
+  assert.equal(sql.prepare("SELECT food FROM kingdoms WHERE id=10").get().food,5000000);
+  assert.equal(sql.prepare("SELECT COUNT(*) n FROM resource_ledger").get().n,1);
+  assert.equal(sql.prepare("SELECT last_regen FROM resource_nodes").get().last_regen,timestamp);
+  if(sql.prepare("SELECT occupied_by FROM resource_nodes").get().occupied_by!==null)assert.equal((await recall(env)).status,200);
+  assert.deepEqual(army(sql),[[10,"archer",2],[10,"militia",10],[20,"militia",15]]);
+ }finally{sql.close()}
+});
