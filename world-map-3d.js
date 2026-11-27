@@ -538,6 +538,14 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     }
   }
 
+  // Read-only projection for independently managed map overlays (creatures).
+  function projectMapPoint(x,z) {
+    if (disposed || contextLost || !camera || !renderer) return null;
+    const point = new THREE.Vector3(x,terrainHeight(x,z)+2.45,z).project(camera);
+    if (!Number.isFinite(point.x)||!Number.isFinite(point.y)) return null;
+    return {left:(point.x*.5+.5)*host.clientWidth,top:(-point.y*.5+.5)*host.clientHeight};
+  }
+
   function projectTerritories() {
     if (!camera || !renderer || !worldState) return;
     const width = host.clientWidth || 1;
@@ -672,6 +680,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, profileRatioCap, pixelBudgetRatio));
     renderer.setSize(width, height, false);
     draw();
+    window.dispatchEvent(new CustomEvent("coi:world-map-projection-changed"));
   }
 
   function dispose() {
@@ -762,6 +771,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
           projectTerritories();
         },
         project: projectTerritories,
+        projectPoint: projectMapPoint,
         diagnostics: () => ({ rebuilds: {...visualRebuilds} })
       };
       window.dispatchEvent(new CustomEvent("coi:world-map-3d-ready"));
