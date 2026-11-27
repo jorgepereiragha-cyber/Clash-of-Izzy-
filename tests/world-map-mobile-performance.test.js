@@ -252,3 +252,19 @@ test("collection estimate matches server rounding and disables empty node collec
  assert.match(ui,/addAction\(actions,"Coletar",\(\)=>runNodeAction\("collect",node\),busy\|\|amount<1\)/);
  assert.match(ui,/Aguardando regeneração para coletar/);
 });
+test("monster search favors living unlocked targets with sufficient hunt energy",async()=>{
+ const ui=await read("scripts/world-monster-preview.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function monsterSearchRank(");
+ const end=ui.indexOf('locate.addEventListener("click"',start);
+ assert.ok(start>=0&&end>start);
+ const rank=runInNewContext(ui.slice(start,end)+"\nmonsterSearchRank");
+ const progress={unlockedLevel:3,energy:5,energyCosts:{1:3,2:5,3:8,4:10}};
+ assert.equal(rank({hp:100,level:1},progress,true),0);
+ assert.equal(rank({hp:100,level:2},progress,true),0);
+ assert.equal(rank({hp:100,level:3},progress,true),1);
+ assert.equal(rank({hp:100,level:4},progress,true),2);
+ assert.equal(rank({hp:0,level:1},progress,true),3);
+ assert.equal(rank({hp:100,level:1},progress,false),2);
+ assert.match(ui,/Energia insuficiente/);
+});
