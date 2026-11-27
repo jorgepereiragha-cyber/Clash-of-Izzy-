@@ -1,3 +1,4 @@
+import {loadEntityManifest,resolveEntity2DAsset,createEntityArtElement,loadEntityCanvasImage,peekEntityCanvasImage} from "./kingdom-2d-art-atlas.js";
 /* Interface 4X progressiva: usa a sessão, estado e /game/action existentes. */
 const root=document.getElementById("coiFourXPanel");
 if(root){
@@ -14,7 +15,25 @@ if(root){
  const heroSummary=document.getElementById("coiHeroSummary"),heroFeedback=document.getElementById("coiHeroFeedback");
  const roleTypes={"industry:mill":["suporte"],"defense:tower":["arqueiro","infantaria"]};
  const state=()=>window.__coiCityLayoutState?.();
- let pending=false,positionDirty=false;
+ let pending=false,positionDirty=false,artManifest=null;
+ const defenseArt=key=>({tower:"defense_tower",trap:"defense_trap",gate:"defense_gate"})[key];
+ const artLoads=new Set();
+ const artRetryAfter=new Map();
+ function artAsset(id){return resolveEntity2DAsset(artManifest,"buildings",id);}
+ function addArt(host,id,text){
+  host.textContent=text;
+  const asset=artAsset(id),node=asset&&createEntityArtElement(asset,host.ownerDocument);
+  if(node){node.classList.add("coi-4x-art");host.prepend(node);}
+ }
+ function drawArt(id,px,py,w,h){
+  const asset=artAsset(id);
+  if(!asset)return;
+  const img=peekEntityCanvasImage(asset);
+  if(img){ctx.drawImage(img,px,py,w,h);return;}
+  if(artLoads.has(asset.src)||(artRetryAfter.get(asset.src)||0)>Date.now())return;
+  artLoads.add(asset.src);
+  loadEntityCanvasImage(asset).then(()=>{artLoads.delete(asset.src);artRetryAfter.delete(asset.src);draw();},()=>{artLoads.delete(asset.src);artRetryAfter.set(asset.src,Date.now()+5000);});
+ }
  const f=n=>Number(n||0).toLocaleString("pt-BR");
  function intersect(ax,az,aw,ah,bx,bz,bw,bh){
   return ax<bx+bw && ax+aw>bx && az<bz+bh && az+ah>bz;
@@ -52,9 +71,11 @@ if(root){
   for(const b of rows){
    const fp=layout?.footprints?.[b.building_type];if(!fp)continue;
    ctx.fillStyle="#5887ae";ctx.fillRect((Number(b.position_x)-min)*unit,(Number(b.position_z)-min)*unit,fp.width*unit,fp.height*unit);
+   if(b.position_x!=null&&b.position_z!=null)drawArt(b.building_type,(Number(b.position_x)-min)*unit,(Number(b.position_z)-min)*unit,fp.width*unit,fp.height*unit);
   }
   for(const d of defenses){
    ctx.fillStyle="#d4a75b";ctx.fillRect((Number(d.grid_x)-min)*unit,(Number(d.grid_z)-min)*unit,Number(d.width)*unit,Number(d.height)*unit);
+   drawArt(defenseArt(d.defense_type),(Number(d.grid_x)-min)*unit,(Number(d.grid_z)-min)*unit,Number(d.width)*unit,Number(d.height)*unit);
   }
   const p=preview();
   if(p.fp&&Number.isFinite(p.cx)&&Number.isFinite(p.cz)){
@@ -113,8 +134,8 @@ if(root){
   defenseList.replaceChildren();
   for(const d of s.cityDefenses||[]){
    const label=document.createElement("span");label.className="coi-defense-chip";
-   label.textContent=(catalog[d.defense_type]?.name||d.defense_type)+
-    " · X "+d.grid_x+" Z "+d.grid_z+" · Nv. "+d.level;
+   addArt(label,defenseArt(d.defense_type),(catalog[d.defense_type]?.name||d.defense_type)+
+    " · X "+d.grid_x+" Z "+d.grid_z+" · Nv. "+d.level);
    defenseList.append(label);
   }
   if(!(s.cityDefenses||[]).length)defenseList.textContent="Nenhuma defesa posicionada.";
@@ -122,8 +143,8 @@ if(root){
    const kind=button.dataset.coiIndustry;
    const lv=Number(kind==="mill"?industry.mill_level:industry.bakery_level)||1;
    button.disabled=pending||lv>=30||Number(s.kingdom?.castle_level||1)<=lv;
-   button.textContent=(kind==="mill"?"Evoluir moinho":"Evoluir padaria")+
-    " · Nv. "+(lv+1)+" · madeira "+f((lv+1)*120)+" · pedra "+f((lv+1)*80);
+   addArt(button,kind,(kind==="mill"?"Evoluir moinho":"Evoluir padaria")+
+    " · Nv. "+(lv+1)+" · madeira "+f((lv+1)*120)+" · pedra "+f((lv+1)*80));
   }
   renderHeroRoles(s);
   draw();
@@ -176,5 +197,6 @@ if(root){
   if(canvas.hasPointerCapture?.(event.pointerId))canvas.releasePointerCapture(event.pointerId);
  });
  window.addEventListener("coi:kingdom-render",render);
+ loadEntityManifest().then(m=>{artManifest=m;render();}).catch(()=>{/* Preserve text and footprint fallback. */});
  render();
 }
