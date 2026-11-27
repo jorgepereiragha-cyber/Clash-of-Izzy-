@@ -494,7 +494,13 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.deepEqual(invalidation,{type:"world_changed"},"invalidation contains no private state");
       }
       const refreshed=await getStateFor(cookie,start.data.token);
-      assert.ok(refreshed.territories.find(t=>t.id===claimTarget.id)?.alliance_id,"committed claim is visible after authenticated reload");
+      const refreshedMember=await getStateFor(claimedCookie,second.data.token);
+      assert.ok(refreshed.alliance?.id,"claiming alliance exists");
+      for(const snapshot of [refreshed,refreshedMember]){
+        const territory=snapshot.territories.find(t=>t.id===claimTarget.id);
+        assert.equal(territory?.alliance_id,refreshed.alliance.id,"both authenticated clients see the persisted controlling alliance");
+        assert.equal(territory?.controlling_alliance_tag,refreshed.alliance.tag,"public tag matches controlling alliance");
+      }
       console.log("Beta realtime passed: real legacy and sharded sockets received committed alliance change.");
     }finally{await realtimeBrowser.close();}
 
