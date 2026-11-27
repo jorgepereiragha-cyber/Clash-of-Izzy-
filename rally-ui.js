@@ -136,11 +136,14 @@ async function sendRallyAction(action,body,message){
  renderNodeList();renderRallies();
  try{
   const data=await api(action,{method:"POST",body:JSON.stringify(body)});
+  if(readRallySession().token!==token)return;
+  const receipt=message(data);
   if(body.troops)clearMarchFormation();
   window.dispatchEvent(new Event("coi:refresh-world"));
   if(refreshing)await refreshing;
-  await refresh(message(data));
- }catch(error){notify(error.message,true);}
+  if(readRallySession().token!==token)return;
+  await refresh(receipt);
+ }catch(error){if(readRallySession().token===token)notify(error.message,true);}
  finally{busy=false;renderNodeList();renderRallies();}
 }
 function renderNodeList(){
@@ -325,7 +328,8 @@ async function loadRallyState(successMessage){
    if(selectedNodeId)selectNode(null);
    renderMapNodes();renderNodeList();renderRallies();
   }
-  notify(error.message,true);
+  if(readRallySession().token!==token)return;
+  notify(successMessage?successMessage+" Não foi possível atualizar o mapa; aguarde a próxima sincronização.":error.message,true);
  }
 }
 function init(){
