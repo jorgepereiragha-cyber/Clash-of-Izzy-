@@ -5,7 +5,7 @@ import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
 import { marchTimestamp, marchVisualProgress, marchVisualPoint, planMarchFormation, planMarchRepresentatives } from "./scripts/march-visual-path.js";
-import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/world-map-visual-state.js";
+import { worldVisualKeys, worldCastleTier, throneVisualState, worldHomePosition } from "./scripts/world-map-visual-state.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -657,9 +657,8 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
         terrainRoot.remove(homeCastleGroup);
         homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
       }
-      // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
-      const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
-      homeCastleGroup=createCastle(terrainRoot,hasThrone?13:0,hasThrone?-11:0,1.4,"home",Number(worldState.castleSkinId)||0,worldState.castleLevel);
+      const home=worldHomePosition(worldState);
+      homeCastleGroup=createCastle(terrainRoot,home.x,home.z,1.4,"home",Number(worldState.castleSkinId)||0,worldState.castleLevel);
       visualRebuilds.home++;
     }
     if(keys.features!==previous?.features){rebuildTerritories();visualRebuilds.features++;}
