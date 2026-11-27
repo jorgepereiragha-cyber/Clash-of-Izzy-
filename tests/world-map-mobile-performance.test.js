@@ -359,3 +359,23 @@ test("rally and gathering action controls maintain mobile touch targets and visi
  assert.match(css,/\.rally-action:focus-visible\{[^}]*outline:/);
  assert.match(css,/\.resource-node-yield\{[^}]*font-variant-numeric:tabular-nums/);
 });
+
+test("committed gathering receipt survives a temporary map refresh failure",async()=>{
+ const ui=await read("rally-ui.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("async function loadRallyState("),end=ui.indexOf("function init(",start);
+ assert.ok(start>=0&&end>start);
+ const messages=[];
+ let current="original";
+ const load=runInNewContext(ui.slice(start,end)+"\nloadRallyState",{
+  token:"original",readRallySession:()=>({token:current}),
+  api:async()=>{throw new Error("offline");},
+  notify:(message,error)=>messages.push({message,error})
+ });
+ await load("Coleta concluída.");
+ assert.equal(messages[0].message,"Coleta concluída. Não foi possível atualizar o mapa; aguarde a próxima sincronização.");
+ assert.equal(messages[0].error,true);
+ current="other";
+ await load("Coleta concluída.");
+ assert.equal(messages.length,1);
+});
