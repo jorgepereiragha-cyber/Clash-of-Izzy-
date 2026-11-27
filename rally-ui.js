@@ -1,5 +1,5 @@
 import {worldResourceArt} from "./scripts/kingdom-2d-art-atlas.js";
-import {clearMarchFormation, focusMapMarker, focusMarchFormation, getMarchFormation, setResourceExpedition, tacticalHome} from "./world-map.js";
+import {clearMarchFormation, focusMapMarker, focusMarchFormation, getMarchFormation, setResourceExpedition, tacticalHome, projectTacticalPoint} from "./world-map.js";
 const $=id=>document.getElementById(id);
 function readRallySession() {
  let readable=false;
@@ -227,8 +227,8 @@ function projectResourceNodes(){
  for(const button of map.querySelectorAll(".resource-node-pin")){
   const x=Number(button.dataset.mapX),z=Number(button.dataset.mapZ);
   const point=!host?.classList.contains("map-3d-fallback")?window.__coiWorldMap3D?.projectPoint?.(x,z):null;
-  button.style.left=point?point.left+"px":Math.max(7,Math.min(93,50+x*.9))+"%";
-  button.style.top=point?point.top+"px":Math.max(8,Math.min(92,50-z*.9))+"%";
+  const tactical=point?null:projectTacticalPoint(x,z);
+  if(point||tactical){button.style.left=point?point.left+"px":tactical.left+"%";button.style.top=point?point.top+"px":tactical.top+"%";}
  }
 }
 function nodeMatchesMapFilter(node,filter){
@@ -357,3 +357,5 @@ function init(){
  window.addEventListener("coi:refresh-resource-nodes",()=>{if(!document.hidden&&!busy)refresh();});
 }
 init();
+
+window.addEventListener("coi:tactical-bounds-changed",projectResourceNodes);
