@@ -384,7 +384,23 @@ export async function ensureKingdom(env,playerId){
     env.DB.prepare("INSERT OR IGNORE INTO players(player_id,name,gems) VALUES(?,?,?)").bind(playerId,"Lorde de Eldoria",50),
     // A região e a posição são reservadas no mesmo INSERT para evitar
     // dois castelos na mesma coordenada. Nunca remapear reinos antigos.
-    env.DB.prepare(
+    env.DB.prepare(env.ENVIRONMENT==="beta"?
+      // Scan a bounded window of future slots inside the atomic foundation batch.
+      // Realm 1 is the canonical destination for new beta players. Legacy regions
+      // and existing castles remain untouched until a separately audited migration.
+      "WITH RECURSIVE candidates(slot) AS (SELECT COALESCE(MAX(map_slot)+1,0) FROM kingdoms WHERE map_region=1 "+
+      "UNION ALL SELECT slot+1 FROM candidates WHERE slot<(SELECT COALESCE(MAX(map_slot)+128,127) FROM kingdoms WHERE map_region=1)), "+
+      "positions AS (SELECT slot,((slot%20)-10)*5 AS x,(CAST(slot/20 AS INTEGER)-10)*5 AS z FROM candidates), "+
+      "reserved(x,z) AS (VALUES(0,0),(18,12),(-22,8),(12,-24),(-18,-20),(30,18),(-32,-14),(34,-25),(-35,28)), "+
+      "next_slot AS (SELECT pos.slot,pos.x,pos.z FROM positions pos "+
+      "WHERE NOT EXISTS(SELECT 1 FROM kingdoms k WHERE k.map_region=1 AND ABS(k.map_x-pos.x)<8 AND ABS(k.map_z-pos.z)<8) "+
+      "AND NOT EXISTS(SELECT 1 FROM world_territories t WHERE t.map_region=1 AND ABS(t.x-pos.x)<5 AND ABS(t.z-pos.z)<5) "+
+      "AND NOT EXISTS(SELECT 1 FROM resource_nodes n WHERE ABS(n.map_x-pos.x)<5 AND ABS(n.map_y-pos.z)<5) "+
+      "AND NOT EXISTS(SELECT 1 FROM world_monsters m WHERE m.map_region=1 AND ABS(m.x-pos.x)<5 AND ABS(m.z-pos.z)<5) "+
+      "AND NOT EXISTS(SELECT 1 FROM reserved p WHERE ABS(p.x-pos.x)<5 AND ABS(p.z-pos.z)<5) ORDER BY pos.slot LIMIT 1) "+
+      "INSERT INTO kingdoms(player_id,kingdom_name,food,wood,stone,iron,gold,last_production_at,map_region,map_slot,map_x,map_z) "+
+      "SELECT p.id,?,?,?,?,?,?,?,1,slot,x,z FROM next_slot CROSS JOIN players p WHERE p.player_id=? AND NOT EXISTS(SELECT 1 FROM kingdoms WHERE player_id=p.id)"
+      :
       "WITH destination AS (SELECT MAX(COALESCE((SELECT MAX(realm_id) FROM realm_openings),1),"+
       "CASE WHEN (SELECT COUNT(*) FROM kingdoms)>=1000 THEN 3 WHEN (SELECT COUNT(*) FROM kingdoms)>=700 THEN 2 ELSE 1 END) AS realm_id), "+
       "next_slot AS (SELECT realm_id,COALESCE((SELECT MAX(map_slot)+1 FROM kingdoms WHERE map_region=destination.realm_id),0) AS slot FROM destination) "+
