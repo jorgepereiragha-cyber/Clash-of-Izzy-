@@ -1,5 +1,5 @@
 import {worldResourceArt} from "./scripts/kingdom-2d-art-atlas.js";
-import {clearMarchFormation, focusMapMarker, focusMarchFormation, getMarchFormation, setResourceExpedition} from "./world-map.js";
+import {clearMarchFormation, focusMapMarker, focusMarchFormation, getMarchFormation, setResourceExpedition, tacticalHome} from "./world-map.js";
 const $=id=>document.getElementById(id);
 function readRallySession() {
  let readable=false;
@@ -239,7 +239,8 @@ function rankResourceNode(node){
  return collectableNodeAmount(node)>0?0:1;
 }
 function compareResourceNodes(a,b){
- return rankResourceNode(a)-rankResourceNode(b)||Math.hypot(a.map_x,a.map_y)-Math.hypot(b.map_x,b.map_y);
+ const home=tacticalHome();
+ return rankResourceNode(a)-rankResourceNode(b)||Math.hypot(a.map_x-home.x,a.map_y-home.z)-Math.hypot(b.map_x-home.x,b.map_y-home.z);
 }
 $("resourceMapLocate")?.addEventListener("click",()=>{
  const candidates=filteredNodes().sort(compareResourceNodes);
