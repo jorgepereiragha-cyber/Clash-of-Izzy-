@@ -724,6 +724,13 @@ const CASTLE_MATERIALS={
  imperial_crest:{name:"Brasão de Prestígio",description:"Material raro das evoluções avançadas."},
  svip_medal:{name:"Medalha SVIP",description:"Medalha especial obtida em eventos; não é obrigatória para evoluir o Castelo."}
 };
+function buildingUpgradeOption(key,level){
+ const base=BUILDINGS[key];
+ if(!base||level>=30)return null;
+ const materials=key==="castle"?(level>=25?{imperial_crest:2,power_crystal:2}:level>=20?{imperial_crest:1,power_crystal:2}:level>=15?{power_crystal:2,imperial_seal:1}:level>=10?{imperial_seal:2,royal_blueprint:1}:level>=5?{royal_blueprint:2}:{}):{};
+ const cost=Object.fromEntries(["wood","stone","food","iron"].map(resource=>[resource,Math.ceil(base[resource]*level)]));
+ return {nextLevel:level+1,cost,materials,requiredCastleLevel:key==="castle"?null:level+1};
+}
 function eventMaterialStatement(env,kingdomId,eventKey){
  const rewards={battle:"royal_blueprint",gather:"power_crystal",scout:"svip_medal",upgrade:"imperial_seal",research:"imperial_crest",train:"royal_blueprint"};
  const key=rewards[eventKey];if(!key)return null;
@@ -998,7 +1005,7 @@ async function gameState(env,playerId){
     getKingdomProgression(env,kingdom.id)
   ]):null;
   const specialCityBuildings=specialCityEnabled(env)?(await env.DB.prepare("SELECT building_type,grid_x,grid_z,width,height FROM city_special_buildings WHERE kingdom_id=? ORDER BY building_type").bind(kingdom.id).all()).results||[]:[];
-  return {activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,heroSummonOptions:HERO_SUMMON_OPTIONS,trainingOptions:TRAINING_OPTIONS,worldGatherFixedAmount:env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true"?5000000:null,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
+  return {activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,heroSummonOptions:HERO_SUMMON_OPTIONS,trainingOptions:TRAINING_OPTIONS,buildingUpgradeOptions:Object.fromEntries((buildings.results||[]).map(b=>[b.building_type,buildingUpgradeOption(b.building_type,b.level)])),worldGatherFixedAmount:env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true"?5000000:null,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
     defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,rallyTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
@@ -1687,11 +1694,10 @@ async function gameAction(env,playerId,body){
     const occupiedBuildSlots=new Set((runningBuilds.results||[]).map(row=>Number(row.queue_slot)||1));
     const queueSlot=!occupiedBuildSlots.has(1)?1:!occupiedBuildSlots.has(2)?2:0;
     if(!queueSlot)return json({error:"As duas filas de construção estão ocupadas."},409);
-    const factor=b.level;
-    const base=BUILDINGS[key];
-    const materialNeeds=key==="castle"?(b.level>=25?{imperial_crest:2,power_crystal:2}:b.level>=20?{imperial_crest:1,power_crystal:2}:b.level>=15?{power_crystal:2,imperial_seal:1}:b.level>=10?{imperial_seal:2,royal_blueprint:1}:b.level>=5?{royal_blueprint:2}:{}):{};
+    const upgradeOption=buildingUpgradeOption(key,b.level);
+    const materialNeeds=upgradeOption.materials;
     for(const [item,quantity] of Object.entries(materialNeeds)){const owned=await env.DB.prepare("SELECT quantity FROM inventory_items WHERE kingdom_id=? AND item_key=?").bind(k.id,item).first();if(!owned||owned.quantity<quantity)return json({error:"Materiais insuficientes: "+CASTLE_MATERIALS[item].name+" ("+quantity+" necessários)."},409);}
-    const cost={wood:Math.ceil(base.wood*factor),stone:Math.ceil(base.stone*factor),food:Math.ceil(base.food*factor),iron:Math.ceil(base.iron*factor)};
+    const cost=upgradeOption.cost;
     const castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
     if(!castle)return json({error:"Castelo não encontrado."},409);
     const constructionResearch=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='construction'").bind(k.id).first();
