@@ -379,3 +379,19 @@ test("committed gathering receipt survives a temporary map refresh failure",asyn
  await load("Coleta concluída.");
  assert.equal(messages.length,1);
 });
+
+test("late unauthorized map response cannot clear another session's UI",async()=>{
+ const ui=await read("rally-ui.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("async function loadRallyState("),end=ui.indexOf("function init(",start);
+ assert.ok(start>=0&&end>start);
+ let renders=0, notices=0;
+ const context={token:"old",readRallySession:()=>({token:"new"}),api:async()=>{throw Object.assign(new Error("expired"),{status:401});},nodes:[{id:"preserved"}],rallies:[],inAlliance:true,collectReturnEnabled:true,selectedNodeId:"preserved",selectNode:()=>{renders++;},renderMapNodes:()=>{renders++;},renderNodeList:()=>{renders++;},renderRallies:()=>{renders++;},notify:()=>{notices++;}};
+ const load=runInNewContext(ui.slice(start,end)+"\nloadRallyState",context);
+ await load();
+ assert.equal(renders,0);
+ assert.equal(notices,0);
+ assert.equal(context.nodes[0].id,"preserved");
+ assert.equal(context.collectReturnEnabled,true);
+ assert.match(ui,/finally\{\s*busy=false;\s*if\(readRallySession\(\)\.token===token\)\{renderNodeList\(\);renderRallies\(\);\}/);
+});
