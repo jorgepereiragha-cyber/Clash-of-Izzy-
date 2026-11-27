@@ -335,3 +335,35 @@ test("expedition preview shows authoritative resource yield before occupation",a
  assert.match(regenerating.readyLabel,/1 min/);
  assert.match(map,/addStat\(grid,"Coleta estimada",harvest.blocked\?"Indisponível"/);
 });
+
+test("map citadels gain four distinct silhouettes with bounded batched stonework",async()=>{
+ const THREE=await import("three");
+ const {runInNewContext}=await import("node:vm");
+ const {worldCastleTier}=await import("../scripts/world-map-visual-state.js");
+ const scene=await read("world-map-3d.js");
+ const start=scene.indexOf("function castleStonework("),end=scene.indexOf("function createRoyalThrone(",start);
+ assert.ok(start>=0&&end>start);
+ const materials=Object.fromEntries(["stone","stoneLight","enemy","roof","banner","gold","leather"].map(k=>[k,new THREE.MeshStandardMaterial()]));
+ const skin={wall:new THREE.MeshStandardMaterial(),wallLight:materials.stoneLight,roof:materials.roof,banner:materials.banner,accent:materials.gold};
+ const mesh=(geometry,material,parent,x,y,z)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);parent.add(m);return m;};
+ for(const quality of ["low","balanced","high"]){
+  const create=runInNewContext(scene.slice(start,end)+"\ncreateCastle",{THREE,quality,worldCastleTier,terrainHeight:()=>0,shared:materials,castleSkinMaterials:{2:skin},box:(p,w,h,d,m,x,y,z)=>mesh(new THREE.BoxGeometry(w,h,d),m,p,x,y,z),cone:(p,r,h,m,x,y,z,n)=>mesh(new THREE.ConeGeometry(r,h,n),m,p,x,y,z)});
+  let lastHeight=0;
+  for(const level of [1,10,20,30]){
+   const root=new THREE.Group();
+   const castle=create(root,7,-4,1,"enemy",2,level);
+   const bounds=new THREE.Box3().setFromObject(castle);
+   assert.ok(bounds.max.y>lastHeight);lastHeight=bounds.max.y;
+   assert.equal(castle.position.x,7);assert.equal(castle.position.z,-4);
+   assert.equal(castle.userData.coICastleTier,worldCastleTier(level));
+   const meshes=[],batches=[];castle.traverse(n=>{if(n.isMesh)meshes.push(n);if(n.isInstancedMesh)batches.push(n);});
+   assert.ok(meshes.length<=32);
+   assert.ok(batches.length>=2&&batches.length<=3);
+   assert.ok(batches.every(n=>n.count<=24&&n.castShadow===(quality!=="low")));
+   assert.ok(meshes.some(n=>n.material===skin.wall));
+   assert.ok(meshes.some(n=>n.material===materials.enemy));
+   for(const n of meshes){if(n.isInstancedMesh)n.dispose();n.geometry.dispose();}
+  }
+ }
+ for(const m of [...Object.values(materials),skin.wall])m.dispose();
+});
