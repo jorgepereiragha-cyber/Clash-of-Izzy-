@@ -845,6 +845,7 @@ if(typeof WebSocket==="function")startRealtimePresence({onWorldChanged:()=>{
   if(document.hidden||busy||!token||Date.now()-lastRealtimeRefresh<5000)return;
   lastRealtimeRefresh=Date.now();
   window.dispatchEvent(new Event("coi:refresh-monsters"));
+  window.dispatchEvent(new Event("coi:refresh-resource-nodes"));
   refreshState({background:true}).catch(()=>{/* periodic polling remains available */});
   updateRealmCards({background:true});
 }});
