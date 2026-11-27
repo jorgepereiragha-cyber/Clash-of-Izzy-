@@ -484,7 +484,7 @@ function renderDetails() {
     addStat(grid, "Recurso", resource.label);
     addStat(grid, "Produção", fmt(territory.resource_rate) + " / hora");
     if(["food","wood","stone","iron"].includes(territory.resource_type)&&territoryOwner(territory)!=="Outro reino")
-      addStat(grid,"Coleta por marcha",fmt(Math.max(1,Number(territory.resource_rate)||90))+" "+resource.label.toLocaleLowerCase("pt-BR"));
+      addStat(grid,"Coleta por marcha",fmt(state.worldGatherFixedAmount??Math.max(1,Number(territory.resource_rate)||90))+" "+resource.label.toLocaleLowerCase("pt-BR"));
     addStat(grid, "Nível", fmt(territory.level || 1));
     if (territory.alliance_id != null) addStat(grid, "Aliança controladora", territory.controlling_alliance_tag ? "[" + territory.controlling_alliance_tag + "]" : "Território reivindicado");
   }
