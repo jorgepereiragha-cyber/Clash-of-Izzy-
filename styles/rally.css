@@ -24,3 +24,8 @@
 #selected-node-details{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px;color:#c6d5e5;font-size:11px}
 #selected-node-details span{background:#152943;border:1px solid #40556b;border-radius:6px;padding:5px 7px}
 @media(max-width:500px){.resource-node-actions .rally-action{flex:1 1 42%}.resource-node-pin{width:20px;height:20px;min-height:20px;font-size:11px}}
+
+/* Distinguish foreign occupation from the player's own without changing game rules. */
+.resource-node-pin.foreign{border-color:#ed8b80;background:#4c282bee}
+.resource-node-pin:focus-visible{outline:2px solid #fff2b5;outline-offset:3px}
+#resourceMapFilter{max-width:100%;min-height:36px;border:1px solid #9d8256;background:#14243a;color:#fff1cb;border-radius:6px;padding:5px 8px;font-size:12px}
