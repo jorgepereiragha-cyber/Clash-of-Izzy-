@@ -37,6 +37,8 @@
     "ENVIRONMENT": "production",
     "GAME_4X_SYSTEMS_ENABLED": "false",
     "MP_PAYMENTS_ENABLED": "false",
+    "COMMERCIAL_SALES_ENABLED": "false",
+    "MANUAL_WHATSAPP_ENABLED": "false",
     "LEVEL_PACKS_ENABLED": "false",
     "LEVEL_PACKS_PUBLIC_ENABLED": "false",
     "LEVEL_PACKS_PROPOSED_PRICES_APPROVED": "false"
