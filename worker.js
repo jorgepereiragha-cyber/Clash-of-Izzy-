@@ -35,7 +35,7 @@ import { CASTLE_MAX_LEVEL, CASTLE_VIP_MAX_LEVEL, getCastleVipBonuses, getCastleV
 import { handleDailyReward } from "./daily-rewards.js";
 import { handleOnboarding } from "./onboarding-bonus.js";
 import { createSupportCheckout } from "./support-orders.js";
-import { mercadoPagoNewCheckoutEnabled } from "./payment-activation.js";
+import { commercialSalesEnabled, manualWhatsappOrdersEnabled, mercadoPagoNewCheckoutEnabled } from "./payment-activation.js";
 
 // Launch edition: keep the full catalog in D1, but expose only six paid skins.
 const INITIAL_PAID_SKIN_LIMIT = 6;
@@ -2234,8 +2234,9 @@ export default {
       return json({token,state:await gameState(env,playerId),referral_recorded:referralRecorded},201);
     }catch(e){console.error("game_start_failed",String(e?.message||e));return json({error:"Não foi possível fundar o reino. Verifique a configuração e as migrações do banco."},503)}
   }
-  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:mercadoPagoNewCheckoutEnabled(env),nubankPix:nubankPixReady(env)});
+  if(url.pathname==="/api/store/payment-methods"&&request.method==="GET")return json({mercadoPago:mercadoPagoNewCheckoutEnabled(env),nubankPix:commercialSalesEnabled(env)&&nubankPixReady(env)});
   if(url.pathname==="/api/store/pix-instructions"&&request.method==="POST"){
+    if(!commercialSalesEnabled(env))return json({error:"Vendas temporariamente desativadas.",code:"COMMERCIAL_SALES_DISABLED"},503);
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
@@ -2252,6 +2253,7 @@ export default {
     return json({requestId:pending.id,product:pending.product_name,amountBRL:Number(pending.price_brl),currency:"BRL",bank:"Nubank",pixKey:nubankPixKey(env),message:"Confira o nome do recebedor apresentado por seu banco antes de confirmar. O pedido só será entregue após conciliação manual."});
   }
   if(url.pathname==="/api/store/purchase-request"&&request.method==="POST"){
+    if(!commercialSalesEnabled(env))return json({error:"Vendas temporariamente desativadas.",code:"COMMERCIAL_SALES_DISABLED"},503);
     if(!env.SESSION_SECRET)return json({error:"Sessão indisponível."},503);
     const playerId=await gameIdentity(request,env);
     if(!playerId)return json({error:"Sessão do jogador inválida."},401);
@@ -2263,6 +2265,7 @@ export default {
     if(!Number.isSafeInteger(itemId)||itemId<1||!requestKey||!/^[a-zA-Z0-9_-]{12,64}$/.test(requestKey)||!["vip_package","skin"].includes(kind))return json({error:"Pacote ou solicitação inválida."},400);
     const requestedPaymentMethod=String(body.paymentMethod||"mercadopago_link");
     if(!["mercadopago_link","manual_whatsapp","pix"].includes(requestedPaymentMethod))return json({error:"Método de pagamento inválido."},400);
+    if(requestedPaymentMethod==="manual_whatsapp"&&!manualWhatsappOrdersEnabled(env))return json({error:"Pedidos manuais desativados.",code:"MANUAL_WHATSAPP_DISABLED"},503);
     if(requestedPaymentMethod==="pix" && !nubankPixReady(env))return json({error:"O Pix Nubank ainda não está habilitado para pedidos.",code:"NUBANK_PIX_NOT_CONFIGURED"},503);
     if(requestedPaymentMethod==="mercadopago_link"&&!mercadoPagoNewCheckoutEnabled(env))return json({error:"O checkout Mercado Pago ainda não está habilitado para pedidos.",code:"MP_NOT_CONFIGURED"},503);
     const paymentMethod=requestedPaymentMethod==="mercadopago_link"?"mercadopago_link":requestedPaymentMethod==="pix"?"pix":"manual";
