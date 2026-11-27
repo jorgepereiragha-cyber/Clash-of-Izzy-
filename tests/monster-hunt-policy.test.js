@@ -56,3 +56,42 @@ test("persisted hunt progress reads only its kingdom and does not mutate energy 
   assert.throws(()=>sql.exec("INSERT INTO monster_hunt_progress(kingdom_id,updated_at) VALUES(3,100)"));
  }finally{sql.close();}
 });
+
+
+test("monster snapshot polling is visibility-bound, session-safe and avoids unchanged DOM rebuilds",async()=>{
+ const {readFile}=await import("node:fs/promises");
+ const {runInNewContext}=await import("node:vm");
+ const source=(await readFile(new URL("../scripts/world-monster-preview.js",import.meta.url),"utf8"))
+  .replace(/^import[^\n]*\n/,"").replace(/void refresh\(\);\s*$/,"");
+ let bearer="session-a",calls=0,rebuilds=0,nextId=0,reply={enabled:true,region:1,monsters:[]},defer=null;
+ const timers=new Map(),listeners={},windowListeners={};
+ const node=()=>({hidden:true,textContent:"",replaceChildren(){rebuilds++;},append(){},addEventListener(){}});
+ const nodes=Object.fromEntries(["worldMonsterPreview","worldMonsterList","worldMonsterStatus","worldMonsterProgress","worldMonsterRefresh"].map(id=>[id,node()]));
+ const document={hidden:false,getElementById:id=>nodes[id]||null,createElement:node,addEventListener:(k,fn)=>listeners[k]=fn};
+ const window={localStorage:{getItem:()=>bearer},addEventListener:(k,fn)=>windowListeners[k]=fn};
+ const api=runInNewContext(source+"\n({refresh,stopRefresh})",{
+  document,window,fetch:async url=>{
+   calls++;
+   if(url.endsWith("progress"))return {ok:true,json:async()=>({progress:null})};
+   if(defer)await defer;
+   return {ok:true,json:async()=>reply};
+  },
+  setTimeout:(fn,ms)=>{assert.equal(ms,30000);const id=++nextId;timers.set(id,fn);return id;},
+  clearTimeout:id=>timers.delete(id)
+ });
+ await api.refresh();
+ assert.equal(calls,2);assert.equal(timers.size,1);assert.equal(nodes.worldMonsterPreview.hidden,false);
+ const first=rebuilds;await api.refresh();assert.equal(rebuilds,first);assert.equal(timers.size,1);
+ document.hidden=true;listeners.visibilitychange();assert.equal(timers.size,0);
+ await api.refresh();assert.equal(calls,4);
+ document.hidden=false;
+ let release;defer=new Promise(resolve=>release=resolve);
+ const pending=api.refresh();
+ await api.refresh();assert.equal(calls,5);
+ bearer="session-b";release();await pending;defer=null;
+ assert.equal(nodes.worldMonsterPreview.hidden,true);assert.equal(timers.size,1);
+ await api.refresh();assert.equal(nodes.worldMonsterPreview.hidden,false);
+ reply={enabled:false,monsters:[]};await api.refresh();
+ assert.equal(nodes.worldMonsterPreview.hidden,true);assert.equal(timers.size,0);
+ bearer="";await api.refresh();assert.equal(timers.size,0);
+});
