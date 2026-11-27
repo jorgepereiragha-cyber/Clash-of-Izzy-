@@ -2,15 +2,15 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {DatabaseSync} from "node:sqlite";
 import {readFile} from "node:fs/promises";
-import {worldMonsterPreview} from "../world-monsters.js";
-test("monster preview is persisted, isolated by region, idempotent and read-only",async()=>{
+import {worldMonsterPreview,respawnDueMonsters} from "../world-monsters.js";
+test("monster preview is persisted, isolated by region and idempotent",async()=>{
  const migration=await readFile(new URL("../migrations/0048_world_monsters.sql",import.meta.url),"utf8");
  const sql=new DatabaseSync(":memory:");
  try{
   sql.exec("CREATE TABLE players(id INTEGER PRIMARY KEY,player_id TEXT); CREATE TABLE kingdoms(id INTEGER PRIMARY KEY,player_id INTEGER,map_region INTEGER); INSERT INTO players VALUES(1,'a'),(2,'b'),(3,'c'); INSERT INTO kingdoms VALUES(1,1,1),(2,2,2),(3,3,3)");
   sql.exec(migration);sql.exec(migration);
   assert.equal(sql.prepare("SELECT count(*) AS n FROM world_monsters").get().n,18);
-  const env={ENVIRONMENT:"beta",GAME_4X_SYSTEMS_ENABLED:"true",DB:{prepare(q){return{bind(...args){return{first:async()=>sql.prepare(q).get(...args),all:async()=>({results:sql.prepare(q).all(...args)})}}}}}};
+  const env={ENVIRONMENT:"beta",GAME_4X_SYSTEMS_ENABLED:"true",DB:{prepare(q){return{bind(...args){return{first:async()=>sql.prepare(q).get(...args),all:async()=>({results:sql.prepare(q).all(...args)}),run:async()=>({meta:{changes:Number(sql.prepare(q).run(...args).changes)}})}}}}}};
   const regions=await Promise.all(["a","b","c"].map(p=>worldMonsterPreview(env,p)));
   assert.deepEqual(regions.map(x=>x.region),[1,2,3]);
   for(const result of regions){assert.equal(result.monsters.length,6);assert.equal(result.combatEnabled,false);assert.deepEqual(result.monsters.map(x=>x.level),[1,3,5,8,12,18]);assert.ok(result.monsters.every(m=>m.hp===m.max_hp));}
@@ -20,7 +20,7 @@ test("monster preview is persisted, isolated by region, idempotent and read-only
   assert.throws(()=>sql.exec("UPDATE world_monsters SET hp=max_hp+1"));
   assert.throws(()=>sql.exec("UPDATE world_monsters SET map_region=4"));
   const id=regions[0].monsters[0].id;
-  sql.prepare("UPDATE world_monsters SET hp=0,respawn_at=2000000000 WHERE id=?").run(id);
+  sql.prepare("UPDATE world_monsters SET hp=0,respawn_at=4102444800 WHERE id=?").run(id);
   sql.exec(migration);
   assert.equal((await worldMonsterPreview(env,"a")).monsters[0].hp,0);
  }finally{sql.close()}
@@ -110,4 +110,23 @@ test("monster GPU batches rebuild only on changed visual state and dispose resou
  layer.dispose();layer.dispose();
  assert.equal(counters.geometry,4);assert.equal(counters.material,1);assert.equal(root.children.length,0);
  assert.equal(layer.update([row]),false);
+});
+
+test("respawn is region-scoped, generation-safe, due-only and idempotent",async()=>{
+ const migration=await readFile(new URL("../migrations/0048_world_monsters.sql",import.meta.url),"utf8");
+ const sql=new DatabaseSync(":memory:");
+ try{
+  sql.exec(migration);
+  const env={ENVIRONMENT:"beta",GAME_4X_SYSTEMS_ENABLED:"true",DB:{prepare(q){return{bind(...args){return{run:async()=>({meta:{changes:Number(sql.prepare(q).run(...args).changes)}})}}}}}};
+  sql.exec("UPDATE world_monsters SET hp=0,respawn_at=100 WHERE id IN (1,7); UPDATE world_monsters SET hp=0,respawn_at=101 WHERE id=2; UPDATE world_monsters SET hp=0,respawn_at=0 WHERE id=3; UPDATE world_monsters SET hp=max_hp-1,respawn_at=100 WHERE id=4");
+  assert.equal(await respawnDueMonsters(env,1,99),0);
+  assert.deepEqual(await Promise.all([respawnDueMonsters(env,1,100),respawnDueMonsters(env,1,100)]),[1,0]);
+  const get=id=>sql.prepare("SELECT hp,max_hp,respawn_at,generation FROM world_monsters WHERE id=?").get(id);
+  assert.equal(get(1).hp,get(1).max_hp);assert.equal(get(1).generation,2);assert.equal(get(1).respawn_at,0);
+  assert.equal(get(7).hp,0);assert.equal(get(2).hp,0);assert.equal(get(3).hp,0);assert.equal(get(4).hp,get(4).max_hp-1);
+  assert.equal(await respawnDueMonsters(env,1,101),1);assert.equal(get(2).generation,2);
+  assert.equal(await respawnDueMonsters({...env,ENVIRONMENT:"production"},2,100),0);
+  assert.equal(await respawnDueMonsters(env,4,100),0);
+  assert.equal(await respawnDueMonsters(env,2,100),1);assert.equal(get(7).generation,2);
+ }finally{sql.close()}
 });
