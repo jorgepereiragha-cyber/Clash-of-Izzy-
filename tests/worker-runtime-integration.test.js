@@ -987,6 +987,23 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       const neutral = stateA.territories.find(item => item.territory_kind==="resource" && item.resource_type && !item.owner_kingdom_id && !item.alliance_id);
       assert.ok(neutral?.id, "mapa possui território neutro para marcha");
       await action(tokenA, { type: "march", targetId: -1, marchType: "gather", units: { militia: 1 } }, 400);
+      const beforeInvalidMarches=stateA.marches.length;
+      const beforeInvalidTroops=troopCount("militia",stateA);
+      for(const invalid of [
+        {marchType:"gather"},
+        {marchType:"gather",units:null},
+        {marchType:"gather",units:[]},
+        {marchType:"gather",units:{}},
+        {marchType:"gather",units:{militia:1.5}},
+        {marchType:"gather",units:{militia:"1"}},
+        {marchType:"gather",units:{militia:true}},
+        {marchType:"gather",units:{militia:10001}},
+        {marchType:"gather",units:{militia:1,unknown_unit:1}},
+        {units:{militia:1}}
+      ]) await action(tokenA,{type:"march",targetId:neutral.id,...invalid},400);
+      stateA=(await api("/api/game/state",{token:tokenA})).data.state;
+      assert.equal(stateA.marches.length,beforeInvalidMarches,"invalid orders create no marches");
+      assert.equal(troopCount("militia",stateA),beforeInvalidTroops,"invalid orders debit no troops");
       await action(tokenA, { type: "march", targetId: neutral.id, marchType: "gather", units: { militia: 1 } }, 200);
       stateA = (await api("/api/game/state", { token: tokenA })).data.state;
       assert.ok(stateA.marches.some(item => item.status === "marching"), "marcha fica persistida no servidor");
