@@ -358,6 +358,7 @@ async function castleTestThree(t){
  class BoxGeometry{constructor(w,h,d){this.height=h;}dispose(){}}
  class ConeGeometry{constructor(r,h,sides){this.height=h;}dispose(){}}
  class CylinderGeometry{constructor(rt,rb,h,sides){this.height=h;}dispose(){}}
+ class TorusGeometry{constructor(radius,tube){this.height=2*(radius+tube);}dispose(){}}
  class MeshStandardMaterial{dispose(){}}
  class Mesh extends Object3D{constructor(geometry,material){super();Object.assign(this,{geometry,material,isMesh:true});}}
  class InstancedMesh extends Mesh{
@@ -379,7 +380,7 @@ async function castleTestThree(t){
    visit(root);this.max={y:max};return this;
   }
  }
- return {Object3D,Group,BoxGeometry,ConeGeometry,CylinderGeometry,MeshStandardMaterial,Mesh,InstancedMesh,Box3};
+ return {Object3D,Group,BoxGeometry,ConeGeometry,CylinderGeometry,TorusGeometry,MeshStandardMaterial,Mesh,InstancedMesh,Box3};
 }
 test("map citadels gain four distinct silhouettes with bounded batched stonework",async(t)=>{
  const THREE=await castleTestThree(t);
@@ -463,4 +464,29 @@ test("3D castle nameplates clear the architecture without weakening 2D touch con
  assert.match(scene,/host\.classList\.remove\("map-3d-ready"\)/);
  assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.castle\{min-width:44px;min-height:44px/);
  assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.castle \.territory-castle-art\{display:none\}/);
+});
+
+test("imperial throne preserves server phase colors and uses a bounded sanctuary model",async(t)=>{
+ const THREE=await castleTestThree(t);
+ const {runInNewContext}=await import("node:vm");
+ const scene=await read("world-map-3d.js");
+ const batchStart=scene.indexOf("function castleStonework("),batchEnd=scene.indexOf("function createCastle(",batchStart);
+ const start=scene.indexOf("function createRoyalThrone("),end=scene.indexOf("// Resource landmarks",start);
+ assert.ok(batchStart>=0&&batchEnd>batchStart&&start>=0&&end>start);
+ const shared=Object.fromEntries(["stone","stoneLight","gold","roof","blueTroop","enemy"].map(k=>[k,new THREE.MeshStandardMaterial()]));
+ const makeMesh=(geometry,material,parent,x,y,z)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);parent.add(m);return m;};
+ const create=runInNewContext(scene.slice(batchStart,batchEnd)+scene.slice(start,end)+"\ncreateRoyalThrone",{THREE,quality:"low",shared,terrainHeight:()=>3,makeMesh,box:(p,w,h,d,m,x,y,z)=>makeMesh(new THREE.BoxGeometry(w,h,d),m,p,x,y,z),cone:(p,r,h,m,x,y,z,n)=>makeMesh(new THREE.ConeGeometry(r,h,n),m,p,x,y,z)});
+ for(const [phase,key] of Object.entries({idle:null,shielded:"blueTroop",contest:"enemy",claimed:"gold"})){
+  const parent=new THREE.Group(),group=create(parent,4,6,phase);
+  assert.equal(group.position.x,4);assert.equal(group.position.z,6);
+  assert.equal(group.userData.coIThroneState,phase);
+  const meshes=[];group.traverse(n=>{if(n.isMesh)meshes.push(n);});
+  assert.ok(meshes.length>=12&&meshes.length<=18);
+  const rings=meshes.filter(n=>n.geometry instanceof THREE.TorusGeometry);
+  assert.equal(rings.length,key?1:0);
+  if(key){assert.equal(rings[0].material,shared[key]);assert.equal(rings[0].castShadow,false);}
+  assert.equal(meshes.filter(n=>n.isInstancedMesh).length,4);
+  for(const n of meshes){if(n.isInstancedMesh)n.dispose();n.geometry.dispose();}
+ }
+ for(const m of Object.values(shared))m.dispose();
 });
