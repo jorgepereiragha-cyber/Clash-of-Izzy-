@@ -208,6 +208,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     while (group.children.length) {
       const child = group.children[group.children.length - 1];
       child.traverse(node => {
+        if (node.isInstancedMesh) node.dispose();
         if (node.geometry) node.geometry.dispose();
       });
       group.remove(child);
@@ -288,6 +289,22 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     box(parent, .8, .42, .06, shared.banner, x + .61, y + height + 1.82, z);
   }
 
+  // One draw call for repeated stonework per material, even at the highest tier.
+  function castleStonework(parent, material, pieces) {
+    if(!pieces.length)return;
+    const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),material,pieces.length);
+    const dummy=new THREE.Object3D();
+    for(let i=0;i<pieces.length;i++){
+      const [x,y,z,w,h,d]=pieces[i];
+      dummy.position.set(x,y,z);dummy.scale.set(w,h,d);dummy.updateMatrix();
+      mesh.setMatrixAt(i,dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate=true;
+    mesh.computeBoundingSphere();
+    mesh.castShadow=quality!=="low";mesh.receiveShadow=true;
+    parent.add(mesh);
+  }
+
   function createCastle(parent, x, z, scale = 1, color = "home", skinId = 0, level = 1) {
     const group = new THREE.Group();
     group.position.set(x, terrainHeight(x, z), z);
@@ -300,50 +317,87 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     const accent=theme?.accent||shared.gold;
     const tier=worldCastleTier(level);
     group.userData.coICastleTier=tier;
-    const rise=(tier-1)*.32;
-    box(group,5.6,1.35,4.5,wall,0,.76,0);
-    box(group,3.2,2.8+rise,3.1,wallLight,0,2.55+rise/2,0);
-    box(group,1.15,1.9,.18,shared.wood,0,1.1,1.64);
+    const rise=(tier-1)*.48, towerRise=(tier-1)*.25;
+    const stone=[],trim=[],slits=[];
+    // A stepped foundation, curtain walls, gatehouse and a visibly taller keep.
+    box(group,5.9,.32,4.8,wallLight,0,.16,0);
+    box(group,5.6,1.45,4.5,wall,0,1.02,0);
+    box(group,3.1,2.8+rise,2.7,wallLight,0,2.72+rise/2,-.23);
+    box(group,3.35,.22,2.96,wall,0,4.2+rise,-.23);
+    box(group,1.52,1.65,.64,wallLight,0,1.12,2.27);
+    box(group,1.03,1.26,.15,shared.leather,0,.85,2.64);
+    box(group,1.2,.19,.22,accent,0,1.55,2.65);
     for(const [tx,tz] of [[-2.5,-1.9],[2.5,-1.9],[-2.5,1.9],[2.5,1.9]]){
       const tower=new THREE.Group();tower.position.set(tx,0,tz);group.add(tower);
-      box(tower,1.25,2.6,1.25,wall,0,1.3,0);
-      box(tower,1.42,.2,1.42,wallLight,0,2.65,0);
-      cone(tower,1.05,1.45,roof,0,3.45,0,4);
+      box(tower,1.28,2.7+towerRise,1.28,wall,0,1.35+towerRise/2,0);
+      box(tower,1.48,.23,1.48,wallLight,0,2.72+towerRise,0);
+      cone(tower,1.08,1.45+towerRise*.2,roof,0,3.55+towerRise,4);
+      slits.push([tx,1.96+towerRise,tz+.65,.16,.45,.045]);
+      if(quality!=="low"){
+        trim.push([tx, .55,tz,1.40,.13,1.40],[tx,1.38,tz,1.33,.10,1.33]);
+      }
     }
-    cone(group,1.8,1.25,roof,0,4.55+rise,0,4);
+    // Curtain-wall merlons leave a clear opening over the gatehouse.
+    for(const bx of [-1.62,-.95,.95,1.62]){
+      stone.push([bx,1.9,2.1,.38,.38,.34],[bx,1.9,-2.1,.38,.38,.34]);
+    }
+    for(const bz of [-.9,0,.9])stone.push([-2.68,1.9,bz,.34,.38,.38],[2.68,1.9,bz,.34,.38,.38]);
+    for(const bx of [-.92,0,.92])slits.push([bx,2.8+rise*.5,1.14,.19,.64,.05]);
     if(tier>=2){
-      for(const tx of [-1.3,1.3])box(group,.44,.56,.50,accent,tx,3.5+rise,1.57);
+      for(const bx of [-1.24,1.24])stone.push([bx,3.45+rise,1.15,.36,.66,.35]);
+      trim.push([0,3.48+rise,1.16,2.7,.13,.16]);
     }
     if(tier>=3){
-      box(group,1.1,.23,.18,accent,0,3.75+rise,1.57);
-      for(const tx of [-1.15,1.15])cone(group,.39,.8,roof,tx,4.25+rise,1.12,4);
+      // The upper tiers gain a separate raised hall and flanking spires.
+      box(group,1.55,.66,1.58,wall,0,4.56+rise,-.23);
+      for(const bx of [-1.05,1.05])cone(group,.55,1.18,roof,bx,4.82+rise,.55,4);
     }
-    if(tier>=4)cone(group,.38,.72,accent,0,5.38+rise,0,6);
-    box(group,.08,1.85,.08,accent,.55,5.45+rise,0);
-    box(group,1.0,.48,.07,banner,1.02,5.83+rise,0);
+    const roofY=4.99+rise+(tier>=3?.52:0);
+    cone(group,1.78,1.42,roof,0,roofY,-.23,4);
+    if(tier>=4){
+      cone(group,.36,.9,accent,0,roofY+1.05,-.23,6);
+      trim.push([0,2.15,2.58,1.7,.13,.15]);
+    }
+    castleStonework(group,wallLight,stone);
+    castleStonework(group,wall,trim);
+    castleStonework(group,shared.leather,slits);
+    box(group,.08,1.45,.08,accent,.55,roofY+1.15,0);
+    box(group,1.0,.48,.07,banner,1.02,roofY+1.49,0);
     // Keep an independent faction pennant: cosmetic colors never disguise ownership.
-    box(group,.56,.24,.08,color==="enemy"?shared.enemy:shared.banner,.82,5.27+rise,0);
+    box(group,.56,.24,.08,color==="enemy"?shared.enemy:shared.banner,.82,roofY+.97,0);
     parent.add(group);
     return group;
   }
 
   function createRoyalThrone(parent,x,z,visualState){
-    // Original low-poly model made from procedural geometry. No downloads/GLB.
+    // Original imperial sanctuary: a raised throne framed by a ceremonial colonnade.
     const group=new THREE.Group();
     group.position.set(x,terrainHeight(x,z)+.2,z);
+    group.userData.coIThroneState=visualState;
     makeMesh(new THREE.CylinderGeometry(4.2,4.6,.48,8),shared.stone,group,0,.1,0);
-    makeMesh(new THREE.CylinderGeometry(3.2,3.6,.38,8),shared.stoneLight,group,0,.5,0);
-    box(group,2.5,.55,2.1,shared.gold,0,1.1,0);
+    makeMesh(new THREE.CylinderGeometry(3.65,3.9,.30,8),shared.stoneLight,group,0,.48,0);
+    box(group,4.7,.32,3.9,shared.stone,0,.75,0);
+    // Axial stairs and the raised imperial dais.
+    const steps=[];
+    for(let i=0;i<3;i++)steps.push([0,.25+i*.16,2.95-i*.38,2.5,.22,.5]);
+    castleStonework(group,shared.stoneLight,steps);
+    box(group,2.45,.48,2.1,shared.gold,0,1.13,-.35);
     box(group,1.7,2.6,.45,shared.stone,0,2.45,-.84);
     box(group,1.95,.28,.62,shared.gold,0,3.9,-.84);
-    box(group,.5,1.5,.45,shared.gold,-1.35,2.0,-.66);
-    box(group,.5,1.5,.45,shared.gold,1.35,2.0,-.66);
-    for(const dx of [-1.1,0,1.1]){
-      cone(group,.44,.75,shared.gold,dx,4.45,-.84,4);
+    box(group,1.45,.18,1.14,shared.roof,0,1.48,-.12);
+    const columns=[],capitals=[],crowns=[];
+    for(const dx of [-2.1,2.1])for(const dz of [-1.45,1.45]){
+      columns.push([dx,2.1,dz,.48,2.7,.48]);
+      capitals.push([dx,3.52,dz,.70,.26,.70],[dx,.99,dz,.76,.22,.76]);
     }
-    for(const dx of [-3.8,3.8]){
-      makeTower(group,dx,2.6,3,shared.stone);
-    }
+    castleStonework(group,shared.stoneLight,columns);
+    castleStonework(group,shared.gold,capitals);
+    for(const dx of [-1.1,0,1.1])crowns.push([dx,4.15,-.84,.35,.35,.35]);
+    castleStonework(group,shared.gold,crowns);
+    box(group,5.15,.28,3.75,shared.stoneLight,0,3.82,0);
+    cone(group,3.05,1.35,shared.roof,0,4.65,0,4);
+    cone(group,.47,.9,shared.gold,0,5.62,0,6);
+    // State colors describe only the authoritative throne phase.
     if (visualState !== "idle") {
       const shielded = visualState === "shielded";
       const ringMaterial = shielded ? shared.blueTroop
@@ -357,12 +411,41 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     return group;
   }
 
-  function createMine(parent, x, z, resource) {
-    const material = resource === "iron" ? shared.iron : resource === "stone" ? shared.stoneLight : resource === "food" ? shared.food : shared.wood;
-    const y = terrainHeight(x, z);
-    box(parent, 2.5, 1.55, 2.1, shared.wood, x, y + .78, z);
-    cone(parent, 1.9, .9, shared.roof, x, y + 1.95, z, 4);
-    box(parent, .65, 1.05, .12, material, x + .5, y + .62, z + 1.1);
+  // Resource landmarks use distinct silhouettes rather than recoloring one hut.
+  function createResourceSite(parent,x,z,resource){
+    const group=new THREE.Group();
+    group.position.set(x,terrainHeight(x,z)+.37,z);
+    group.userData.coIResourceSite=resource;
+    if(resource==="food"){
+      box(group,2.55,.13,2.15,shared.wood,0,.07,0);
+      const crops=[];
+      for(const row of [-.74,0,.74])for(const col of [-.65,0,.65])
+        crops.push([col,.24,row,.42,.34,.54]);
+      castleStonework(group,shared.food,crops);
+      box(group,.72,.65,.65,shared.wood,1.0,.39,-.7);
+      cone(group,.58,.44,shared.roof,1.0,.94,-.7,4);
+    }else if(resource==="wood"){
+      box(group,1.1,.82,.9,shared.wood,-.62,.48,-.42);
+      cone(group,.85,.58,shared.roof,-.62,1.18,-.42,4);
+      for(const [lx,ly] of [[.55,.21],[1.02,.21],[.78,.53]]){
+        const log=makeMesh(new THREE.CylinderGeometry(.22,.24,1.3,6),shared.trunk,group,lx,ly,.28);
+        log.rotation.x=Math.PI/2;
+      }
+      box(group,1.4,.12,1.4,shared.wood,.78,.07,.28);
+    }else if(resource==="stone"){
+      box(group,2.3,.16,1.9,shared.stone,0,.08,0);
+      for(const [rx,rz,scale] of [[-.65,-.48,.83],[.52,-.52,.64],[.1,.46,.52]])
+        cone(group,scale,.85+scale,shared.stoneLight,rx,.5,rz,5);
+      box(group,.65,.3,.62,shared.stoneLight,.85,.22,.55);
+    }else if(resource==="iron"){
+      box(group,2.4,1.45,1.8,shared.stone,0,.72,-.15);
+      cone(group,1.55,.82,shared.stoneLight,0,1.8,-.15,5);
+      box(group,.88,.94,.12,shared.leather,0,.51,.8);
+      for(const sx of [-.56,.56])box(group,.18,1.12,.24,shared.wood,sx,.56,.88);
+      box(group,1.28,.18,.24,shared.wood,0,1.08,.88);
+      box(group,.78,.32,.55,shared.iron,.83,.24,1.08);
+    }else{return;}
+    parent.add(group);
   }
 
   function createTerritoryFeature(parent, territory, forestPositions) {
@@ -387,7 +470,10 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
       return;
     }
 
-    if (territory.terrain === "mountain") {
+    const resource=territory.resource_type;
+    if(["food","wood","stone","iron"].includes(resource)){
+      createResourceSite(parent,x,z,resource);
+    } else if (territory.terrain === "mountain") {
       for (let i = 0; i < 3; i++) {
         const rockX = x - .9 + i * .9;
         const rockZ = z + (i % 2 ? .6 : -.45);
@@ -404,9 +490,6 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
       cone(parent, .9, .55, shared.roof, x, y + 1.32, z, 4);
     }
 
-    if (territory.resource_type === "iron" || territory.resource_type === "stone" || territory.resource_type === "wood") {
-      createMine(parent, x + 1.55, z + .8, territory.resource_type);
-    }
     if (ownership === "owned" || ownership === "enemy") {
       makeTower(parent, x - 1.35, z - 1.15, 2.4, ownership === "enemy" ? shared.enemy : shared.stone);
     }
@@ -561,11 +644,15 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     for (const territory of rows) {
       const button = projectionButtons.get(Number(territory.id));
       if (!button) continue;
-      const point = new THREE.Vector3(
-        Number(territory.x) || 0,
-        terrainHeight(Number(territory.x) || 0, Number(territory.z) || 0) + 2.45,
-        Number(territory.z) || 0
-      ).project(camera);
+      const x=Number(territory.x)||0,z=Number(territory.z)||0;
+      const isCastle=territory.territory_kind==="castle";
+      const tier=worldCastleTier(territory.castle_level??territory.level);
+      const own=Number(territory.owner_kingdom_id||0)===Number(worldState.kingdomId||0);
+      // Place the nameplate just above the flag, not over the model.
+      const castleScale=Number(territory.owner_kingdom_id||0)>0&&!own ? .92 : 1.1;
+      // The throne roof reaches 6.27 world units; anchor its phase label above it.
+      const labelHeight=isCastle?(7.05+(tier-1)*.48+(tier>=3?.52:0))*castleScale:territory.territory_kind==="throne"?6.65:2.45;
+      const point = new THREE.Vector3(x,terrainHeight(x,z)+labelHeight,z).project(camera);
       button.style.left = ((point.x * .5 + .5) * width) + "px";
       button.style.top = ((-point.y * .5 + .5) * height) + "px";
     }
@@ -655,7 +742,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     if (keys.home !== previous?.home) {
       if(homeCastleGroup){
         terrainRoot.remove(homeCastleGroup);
-        homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
+        homeCastleGroup.traverse(node=>{if(node.isInstancedMesh)node.dispose();if(node.geometry)node.geometry.dispose();});
       }
       // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
       const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
@@ -695,6 +782,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   function dispose() {
     if (disposed) return;
     disposed = true;
+    host.classList.remove("map-3d-ready");
     window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
     stopMarchAnimation();
     resizeObserver?.disconnect();
@@ -705,7 +793,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     // Release geometry buffers of the scene on page navigation; all batches are
     // shared by the same renderer and must be disposed only once.
     const geometries = new Set();
-    worldRoot.traverse(node => { if (node.geometry) geometries.add(node.geometry); });
+    worldRoot.traverse(node => { if (node.isInstancedMesh) node.dispose(); if (node.geometry) geometries.add(node.geometry); });
     for (const geometry of geometries) geometry.dispose();
     if (renderer) {
       renderer.setAnimationLoop(null);
@@ -796,6 +884,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
         setMonsters(rows){if(!disposed&&!contextLost&&monsterLayer.update(rows))draw();},
         diagnostics: () => ({ rebuilds: {...visualRebuilds} })
       };
+      host.classList.add("map-3d-ready");
       window.dispatchEvent(new CustomEvent("coi:world-map-3d-ready"));
       if (window.__coiWorldMapState) setWorldState(window.__coiWorldMapState);
       if (window.__coiWorldMapButtons) projectionButtons = window.__coiWorldMapButtons;

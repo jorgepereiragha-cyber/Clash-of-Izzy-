@@ -336,6 +336,165 @@ test("expedition preview shows authoritative resource yield before occupation",a
  assert.match(map,/addStat\(grid,"Coleta estimada",harvest.blocked\?"Indisponível"/);
 });
 
+// The offline visual workflow intentionally has no npm install. Exercise the
+// same construction function with a recording scene graph there; the full
+// installed suite uses the real Three.js classes and real bounding boxes.
+async function castleTestThree(t){
+ try{return await import("three");}
+ catch(error){if(error.code!=="ERR_MODULE_NOT_FOUND"||!error.message.includes("Cannot find package 'three'"))throw error;}
+ t.diagnostic("Offline scene-graph contract; real Three.js bounds require installed suite.");
+ class Vector{
+  constructor(){this.set(0,0,0);}
+  set(x,y,z){Object.assign(this,{x,y,z});}
+  setScalar(v){this.set(v,v,v);}
+ }
+ class Object3D{
+  constructor(){this.position=new Vector();this.scale=new Vector();this.scale.setScalar(1);this.rotation=new Vector();this.children=[];this.userData={};}
+  add(child){this.children.push(child);}
+  traverse(fn){fn(this);for(const child of this.children)child.traverse(fn);}
+  updateMatrix(){this.matrix={position:{...this.position},scale:{...this.scale}};}
+ }
+ class Group extends Object3D{}
+ class BoxGeometry{constructor(w,h,d){this.height=h;}dispose(){}}
+ class ConeGeometry{constructor(r,h,sides){this.height=h;}dispose(){}}
+ class CylinderGeometry{constructor(rt,rb,h,sides){this.height=h;}dispose(){}}
+ class TorusGeometry{constructor(radius,tube){this.height=2*(radius+tube);}dispose(){}}
+ class MeshStandardMaterial{dispose(){}}
+ class Mesh extends Object3D{constructor(geometry,material){super();Object.assign(this,{geometry,material,isMesh:true});}}
+ class InstancedMesh extends Mesh{
+  constructor(geometry,material,count){super(geometry,material);Object.assign(this,{count,isInstancedMesh:true,instanceMatrix:{},matrices:[]});}
+  setMatrixAt(i,matrix){this.matrices[i]=matrix;}
+  computeBoundingSphere(){assert.equal(this.matrices.length,this.count);}
+  dispose(){}
+ }
+ class Box3{
+  setFromObject(root){
+   let max=-Infinity;
+   function visit(n,y=0,scale=1){
+    const py=y+n.position.y*scale, sy=scale*n.scale.y;
+    if(n.isInstancedMesh){
+     for(const m of n.matrices)max=Math.max(max,py+(m.position.y+n.geometry.height*m.scale.y/2)*sy);
+    }else if(n.isMesh)max=Math.max(max,py+n.geometry.height*sy/2);
+    for(const child of n.children)visit(child,py,sy);
+   }
+   visit(root);this.max={y:max};return this;
+  }
+ }
+ return {Object3D,Group,BoxGeometry,ConeGeometry,CylinderGeometry,TorusGeometry,MeshStandardMaterial,Mesh,InstancedMesh,Box3};
+}
+test("map citadels gain four distinct silhouettes with bounded batched stonework",async(t)=>{
+ const THREE=await castleTestThree(t);
+ const {runInNewContext}=await import("node:vm");
+ const {worldCastleTier}=await import("../scripts/world-map-visual-state.js");
+ const scene=await read("world-map-3d.js");
+ const start=scene.indexOf("function castleStonework("),end=scene.indexOf("function createRoyalThrone(",start);
+ assert.ok(start>=0&&end>start);
+ const materials=Object.fromEntries(["stone","stoneLight","enemy","roof","banner","gold","leather"].map(k=>[k,new THREE.MeshStandardMaterial()]));
+ const skin={wall:new THREE.MeshStandardMaterial(),wallLight:materials.stoneLight,roof:materials.roof,banner:materials.banner,accent:materials.gold};
+ const mesh=(geometry,material,parent,x,y,z)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);parent.add(m);return m;};
+ for(const quality of ["low","balanced","high"]){
+  const create=runInNewContext(scene.slice(start,end)+"\ncreateCastle",{THREE,quality,worldCastleTier,terrainHeight:()=>0,shared:materials,castleSkinMaterials:{2:skin},box:(p,w,h,d,m,x,y,z)=>mesh(new THREE.BoxGeometry(w,h,d),m,p,x,y,z),cone:(p,r,h,m,x,y,z,n)=>mesh(new THREE.ConeGeometry(r,h,n),m,p,x,y,z)});
+  let lastHeight=0;
+  for(const level of [1,10,20,30]){
+   const root=new THREE.Group();
+   const castle=create(root,7,-4,1,"enemy",2,level);
+   const bounds=new THREE.Box3().setFromObject(castle);
+   assert.ok(bounds.max.y>lastHeight);lastHeight=bounds.max.y;
+   assert.equal(castle.position.x,7);assert.equal(castle.position.z,-4);
+   assert.equal(castle.userData.coICastleTier,worldCastleTier(level));
+   const meshes=[],batches=[];castle.traverse(n=>{if(n.isMesh)meshes.push(n);if(n.isInstancedMesh)batches.push(n);});
+   assert.ok(meshes.length<=32);
+   assert.ok(batches.length>=2&&batches.length<=3);
+   assert.ok(batches.every(n=>n.count<=24&&n.castShadow===(quality!=="low")));
+   assert.ok(meshes.some(n=>n.material===skin.wall));
+   assert.ok(meshes.some(n=>n.material===materials.enemy));
+   for(const n of meshes){if(n.isInstancedMesh)n.dispose();n.geometry.dispose();}
+  }
+ }
+ for(const m of [...Object.values(materials),skin.wall])m.dispose();
+});
+
+test("world resource landmarks have distinct forms and bounded mesh counts",async(t)=>{
+ const THREE=await castleTestThree(t);
+ const {runInNewContext}=await import("node:vm");
+ const scene=await read("world-map-3d.js");
+ const batchStart=scene.indexOf("function castleStonework("),batchEnd=scene.indexOf("function createCastle(",batchStart);
+ const start=scene.indexOf("function createResourceSite("),end=scene.indexOf("function createTerritoryFeature(",start);
+ assert.ok(batchStart>=0&&batchEnd>batchStart&&start>=0&&end>start);
+ const shared=Object.fromEntries(["wood","food","roof","trunk","stone","stoneLight","leather","iron"].map(k=>[k,new THREE.MeshStandardMaterial()]));
+ const makeMesh=(geometry,material,parent,x,y,z)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);parent.add(m);return m;};
+ const create=runInNewContext(scene.slice(batchStart,batchEnd)+scene.slice(start,end)+"\ncreateResourceSite",{THREE,quality:"low",shared,terrainHeight:()=>2,makeMesh,box:(p,w,h,d,m,x,y,z)=>makeMesh(new THREE.BoxGeometry(w,h,d),m,p,x,y,z),cone:(p,r,h,m,x,y,z,n)=>makeMesh(new THREE.ConeGeometry(r,h,n),m,p,x,y,z)});
+ const expected={food:"food",wood:"trunk",stone:"stoneLight",iron:"iron"};
+ const signatures=new Set();
+ for(const [resource,key] of Object.entries(expected)){
+  const parent=new THREE.Group();
+  create(parent,8,9,resource);
+  assert.equal(parent.children.length,1);
+  const group=parent.children[0];
+  assert.equal(group.position.x,8);assert.equal(group.position.z,9);
+  assert.equal(group.userData.coIResourceSite,resource);
+  const meshes=[];group.traverse(n=>{if(n.isMesh)meshes.push(n);});
+  assert.ok(meshes.length>=4&&meshes.length<=8);
+  assert.ok(meshes.some(n=>n.material===shared[key]));
+  signatures.add(meshes.map(n=>Object.keys(shared).find(k=>shared[k]===n.material)).join(","));
+  for(const n of meshes){if(n.isInstancedMesh)n.dispose();n.geometry.dispose();}
+ }
+ assert.equal(signatures.size,4);
+ const unknown=new THREE.Group();create(unknown,0,0,"unknown");assert.equal(unknown.children.length,0);
+ assert.match(scene,/createResourceSite\(parent,x,z,resource\)/);
+ for(const material of Object.values(shared))material.dispose();
+});
+
+test("3D castle nameplates clear the architecture without weakening 2D touch controls",async()=>{
+ const [scene,html]=await Promise.all([read("world-map-3d.js"),read("world.html")]);
+ const {runInNewContext}=await import("node:vm");
+ const {worldCastleTier}=await import("../scripts/world-map-visual-state.js");
+ const start=scene.indexOf("function projectTerritories("),end=scene.indexOf("function draw(",start);
+ assert.ok(start>=0&&end>start);
+ const territories=[{id:1,territory_kind:"castle",castle_level:1,owner_kingdom_id:7},{id:2,territory_kind:"castle",castle_level:30,owner_kingdom_id:7},{id:3,territory_kind:"castle",castle_level:30,owner_kingdom_id:9},{id:4,territory_kind:"resource"},{id:5,territory_kind:"throne"}];
+ const heights=[];
+ class Vector3{constructor(x,y,z){heights.push(y);this.x=0;this.y=0;}project(){return this;}}
+ const projectionButtons=new Map(territories.map(row=>[row.id,{style:{}}]));
+ const project=runInNewContext(scene.slice(start,end)+"\nprojectTerritories",{disposed:false,contextLost:false,camera:{},renderer:{},worldState:{kingdomId:7,territories},host:{clientWidth:100,clientHeight:100},projectionButtons,THREE:{Vector3},terrainHeight:()=>0,worldCastleTier});
+ project();
+ assert.equal(heights.length,5);
+ assert.ok(heights[1]>heights[0]&&heights[1]>heights[2]&&heights[2]>heights[3]);
+ assert.equal(heights[3],2.45);
+ assert.equal(heights[4],6.65); // Above the imperial sanctuary, not over its model.
+ assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.throne span\{display:none\}/);
+ assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.throne\{min-width:44px;min-height:44px/);
+ assert.match(html,/\.territory-pin\.throne\[data-throne-state="shielded"\] small\{border-color:#83cafa\}/);
+ assert.match(html,/\.territory-pin\.throne\[data-throne-state="contest"\] small\{border-color:#ed8b80\}/);
+ assert.match(scene,/host\.classList\.add\("map-3d-ready"\)/);
+ assert.match(scene,/host\.classList\.remove\("map-3d-ready"\)/);
+ assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.castle\{min-width:44px;min-height:44px/);
+ assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.castle \.territory-castle-art\{display:none\}/);
+});
+
+test("imperial throne preserves server phase colors and uses a bounded sanctuary model",async(t)=>{
+ const THREE=await castleTestThree(t);
+ const {runInNewContext}=await import("node:vm");
+ const scene=await read("world-map-3d.js");
+ const batchStart=scene.indexOf("function castleStonework("),batchEnd=scene.indexOf("function createCastle(",batchStart);
+ const start=scene.indexOf("function createRoyalThrone("),end=scene.indexOf("// Resource landmarks",start);
+ assert.ok(batchStart>=0&&batchEnd>batchStart&&start>=0&&end>start);
+ const shared=Object.fromEntries(["stone","stoneLight","gold","roof","blueTroop","enemy"].map(k=>[k,new THREE.MeshStandardMaterial()]));
+ const makeMesh=(geometry,material,parent,x,y,z)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);parent.add(m);return m;};
+ const create=runInNewContext(scene.slice(batchStart,batchEnd)+scene.slice(start,end)+"\ncreateRoyalThrone",{THREE,quality:"low",shared,terrainHeight:()=>3,makeMesh,box:(p,w,h,d,m,x,y,z)=>makeMesh(new THREE.BoxGeometry(w,h,d),m,p,x,y,z),cone:(p,r,h,m,x,y,z,n)=>makeMesh(new THREE.ConeGeometry(r,h,n),m,p,x,y,z)});
+ for(const [phase,key] of Object.entries({idle:null,shielded:"blueTroop",contest:"enemy",claimed:"gold"})){
+  const parent=new THREE.Group(),group=create(parent,4,6,phase);
+  assert.equal(group.position.x,4);assert.equal(group.position.z,6);
+  assert.equal(group.userData.coIThroneState,phase);
+  const meshes=[];group.traverse(n=>{if(n.isMesh)meshes.push(n);});
+  assert.ok(meshes.length>=12&&meshes.length<=18);
+  const rings=meshes.filter(n=>n.geometry instanceof THREE.TorusGeometry);
+  assert.equal(rings.length,key?1:0);
+  if(key){assert.equal(rings[0].material,shared[key]);assert.equal(rings[0].castShadow,false);}
+  assert.equal(meshes.filter(n=>n.isInstancedMesh).length,4);
+  for(const n of meshes){if(n.isInstancedMesh)n.dispose();n.geometry.dispose();}
+ }
+ for(const m of Object.values(shared))m.dispose();
+});
 test("collection receipt reports authoritative resource and own/allied troop returns",async()=>{
  const ui=await read("rally-ui.js");
  const {runInNewContext}=await import("node:vm");

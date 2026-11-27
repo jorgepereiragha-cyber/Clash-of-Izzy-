@@ -71,6 +71,10 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .city.has-3d .building{position:absolute;left:50%;top:50%;width:clamp(76px,22%,112px);height:56px;min-height:44px;transform:translate(-50%,-18%);background:linear-gradient(180deg,#0c172500 65%,#0c17259c 100%);backdrop-filter:none;border-color:transparent;box-shadow:none;justify-content:end;padding:5px 4px 8px;z-index:2}
 .city.has-3d .building:hover{transform:translate(-50%,-18%) translateY(-2px) scale(1.02)}
 .city .building[hidden]{display:none!important}
+.coi-special-city-pin{display:none}
+.city.has-3d .coi-special-city-pin:not([hidden]){position:absolute;display:flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;padding:5px 8px;transform:translate(-50%,-12%);z-index:3;color:#fff2d7;text-decoration:none;font-size:11px;font-weight:700;text-shadow:0 1px 3px #000;background:linear-gradient(180deg,transparent,#101d30e8);border-radius:7px;touch-action:manipulation}
+.city .coi-special-city-pin:focus-visible{outline:2px solid #ffe39a;outline-offset:2px}
+
 .coi-city-camera-controls[hidden]{display:none!important}
 .coi-city-camera-controls{display:flex;align-items:center;justify-content:center;gap:8px;margin:8px 0 12px}
 .coi-city-camera-controls button{min-width:48px;min-height:48px;font-size:18px;touch-action:manipulation}
@@ -220,7 +224,10 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <section class="panel coi-city-panel"><h2>🏰 Sua cidade fortificada</h2>
  <div class="coi-city-stage">
   <div class="coi-city-stage-label" aria-hidden="true"><span>ELDORIA</span><small>CENTRO DO REINO</small></div>
-  <div class="city" id="city"></div>
+  <div class="city" id="city">
+   <a class="coi-special-city-pin" data-special-site="summon_altar" href="/equipment-ui.html#hero-summon-title" aria-label="Entrar no Altar de Convocação" hidden>Altar</a>
+   <a class="coi-special-city-pin" data-special-site="dragon_nest" href="#coiDragonPanel" aria-label="Entrar no Ninho de Dragões" hidden>Ninho</a>
+  </div>
   <div class="coi-city-stage-corner" aria-hidden="true">Toque em um edifício para ver melhorias</div>
  <div class="coi-city-camera-controls" id="coiCityCameraControls" role="group" aria-label="Aproximação da cidade 3D" hidden>
   <button type="button" class="secondary" data-city-zoom="out" aria-label="Afastar câmera da cidade">−</button>
@@ -661,6 +668,12 @@ window.addEventListener("coi:kingdom-projection",event=>{
   button.style.left=point.left.toFixed(3)+"%";
   button.style.top=point.top.toFixed(3)+"%";
  });
+ const special=Array.isArray(event.detail?.specialPositions)?event.detail.specialPositions:[];
+ city.querySelectorAll("[data-special-site]").forEach(link=>{
+  const point=special.find(row=>row.type===link.dataset.specialSite);
+  link.hidden=!point||point.visible!==true||!Number.isFinite(point.left)||!Number.isFinite(point.top);
+  if(!link.hidden){link.style.left=point.left.toFixed(3)+"%";link.style.top=point.top.toFixed(3)+"%";}
+ });
 });
 window.addEventListener("coi:kingdom-2d-fallback",()=>{
  // Context loss can hide the focused camera button. Preserve keyboard focus.
@@ -668,6 +681,10 @@ window.addEventListener("coi:kingdom-2d-fallback",()=>{
  if(cityCameraControls)cityCameraControls.hidden=true;
  const city=document.getElementById("city");if(!city)return;
  city.classList.remove("dense-3d");
+ city.querySelectorAll("[data-special-site]").forEach(link=>{
+  if(document.activeElement===link)document.getElementById(link.dataset.specialSite==="dragon_nest"?"coiDragonNest":"coiSummonAltar")?.focus({preventScroll:true});
+  link.hidden=true;
+ });
  city.querySelectorAll("[data-building]").forEach((button,index)=>{
   // Canvas fallback has nine slots; never expose an unpositioned extra button.
   button.hidden=index>=9;
