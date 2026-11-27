@@ -147,7 +147,9 @@ test("modelo 3D e mapa exibem Trono sem liberar marcha comum ou captura de terri
  assert.match(worker,/realm_thrones","throne_assaults/);
  assert.match(worker,/Trono Imperial exige Guerra do Trono/);
  assert.match(worker,/não pode ser reivindicado fora da Guerra do Trono/);
- assert.match(worker,/territory_key NOT LIKE 'royal_throne_%'/);
+ // Exact literal prefix avoids LIKE's underscore wildcard and still excludes the throne.
+ assert.match(worker,/territory_kind NOT IN \('castle','throne'\) AND substr\(territory_key,1,13\)<>'royal_throne_'/);
+ assert.match(worker,/UPDATE alliances SET shared_food=shared_food-1000[^\n]+territory_kind NOT IN \('castle','throne'\) AND substr\(territory_key,1,13\)<>'royal_throne_'/);
  assert.match(worker,/CASE WHEN wt\.territory_key LIKE 'royal_throne_%' THEN 'throne'/);
  assert.match(ui,/id/); // Presence of module is checked below with meaningful patterns.
  assert.match(ui,/request\("\/throne\/status\?realm="/);

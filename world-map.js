@@ -4,6 +4,7 @@ import { throneVisualState } from "./scripts/world-map-visual-state.js";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
 import { readMarchComposition } from "./scripts/march-visual-path.js";
 import { createWorldRefreshGate } from "./scripts/world-state-refresh.js";
+import { startRealtimePresence } from "./scripts/eldoria-realtime-client.js";
 
 const API = "/api";
 const $ = id => document.getElementById(id);
@@ -277,7 +278,7 @@ function updateActionButtons() {
   const isCastle = territory?.territory_kind === "castle";
   const isThrone = territory?.territory_kind === "throne";
   const canVisit = Boolean(territory && !isCastle && !isThrone && territoryOwner(territory) !== "Outro reino");
-  $("gather").disabled = busy || !canVisit || !hasTroops || !marchAvailable;
+  $("gather").disabled = busy || !canVisit || !["food","wood","stone","iron"].includes(territory?.resource_type) || !hasTroops || !marchAvailable;
   $("scout").disabled = busy || !canVisit || !hasTroops || !marchAvailable;
   $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops || !marchAvailable;
   const siegeTotal=Object.values(selectedUnits).reduce((n,q)=>n+Number(q||0),0);
@@ -328,6 +329,7 @@ function renderDetails() {
     addStat(grid, "Recurso", resource.label);
     addStat(grid, "Produção", fmt(territory.resource_rate) + " / hora");
     addStat(grid, "Nível", fmt(territory.level || 1));
+    if (territory.alliance_id != null) addStat(grid, "Aliança controladora", territory.controlling_alliance_tag ? "[" + territory.controlling_alliance_tag + "]" : "Território reivindicado");
   }
   root.append(grid);
   $("marchNotice").textContent = isThrone
@@ -353,6 +355,11 @@ function renderMarches() {
     return;
   }
   const territories = new Map((state.territories || []).map(item => [Number(item.id), item.name]));
+  const scoutReports=new Map();
+  for(const event of state.recentEvents||[]){
+    if(event.event_type!=="territory_scouted")continue;
+    try{const report=JSON.parse(event.payload_json);if(Number.isSafeInteger(report.marchId)&&!scoutReports.has(report.marchId))scoutReports.set(report.marchId,report);}catch{}
+  }
   for (const march of marches.slice(0, 10)) {
     const card = make("div", "march");
     const title = make("strong", "", (march.march_type || "Marcha").toUpperCase() + " · " + (territories.get(Number(march.target_territory_id)) || "Território"));
@@ -360,6 +367,11 @@ function renderMarches() {
     card.append(title, make("div", "muted", "Estado: " + march.status), make("div", "muted", "Chegada prevista: " + date));
     const composition=readMarchComposition(march.units_json);
     if(composition.length)card.append(make("div","muted","Formação: "+composition.map(u=>UNIT_NAMES[u.type]+" × "+fmt(u.count)).join(" · ")));
+    const report=scoutReports.get(Number(march.id));
+    if(march.march_type==="scout"&&report){
+      const label=RESOURCE[report.resourceType]?.label||"Sem recurso";
+      card.append(make("div","muted","Reconhecimento: "+String(report.name||"Território")+" · Nv. "+fmt(report.level)+" · "+label+" · Taxa "+fmt(report.resourceRate)));
+    }
     root.append(card);
   }
 }
@@ -467,6 +479,7 @@ async function sendMarch(marchType) {
   const territory = getSelectedTerritory();
   const units = Object.fromEntries(Object.entries(selectedUnits).filter(([, quantity]) => Number(quantity) > 0));
   if (!territory || !Object.keys(units).length) return;
+  if(marchType==="gather"&&!["food","wood","stone","iron"].includes(territory.resource_type))return;
   const total=Object.values(units).reduce((sum,value)=>sum+Number(value||0),0);
   const max=Number(state?.marchCapacity?.maximum||0);
   if(Number(state?.marchSlots?.available??1)<1){
@@ -635,6 +648,13 @@ async function connect() {
   }
 }
 connect();
+let lastRealtimeRefresh=0;
+if(typeof WebSocket==="function")startRealtimePresence({onWorldChanged:()=>{
+  if(document.hidden||busy||!token||Date.now()-lastRealtimeRefresh<5000)return;
+  lastRealtimeRefresh=Date.now();
+  refreshState({background:true}).catch(()=>{/* periodic polling remains available */});
+  updateRealmCards({background:true});
+}});
 window.setInterval(() => {
   if (document.hidden || busy || !token) return;
   refreshState({background:true}).catch(error => setStatus(error.message, true));

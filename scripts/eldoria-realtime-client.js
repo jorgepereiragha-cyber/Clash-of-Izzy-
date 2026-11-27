@@ -31,6 +31,7 @@ export function readRealtimePacket(raw) {
     }
     if (packet?.type === "connected") return { type: "connected" };
     if (packet?.type === "pong") return { type: "pong" };
+    if (packet?.type === "world_changed") return { type: "world_changed" };
   } catch {}
   return null;
 }
@@ -64,6 +65,7 @@ export function startRealtimePresence({
   windowRef = window,
   fetchImpl = fetch,
   WebSocketImpl = WebSocket,
+  onWorldChanged = () => {},
 } = {}) {
   const status = documentRef.getElementById("eldoriaPresence");
   if (!status) return () => {};
@@ -112,7 +114,15 @@ export function startRealtimePresence({
       update("Tempo real requer HTTPS.");
       return;
     }
-    const token = readGameToken(windowRef.localStorage, windowRef.sessionStorage);
+    // Storage properties themselves can throw SecurityError in restricted WebViews.
+    // Read lazily so an unavailable localStorage never blocks sessionStorage.
+    let token = "";
+    for (const key of ["localStorage", "sessionStorage"]) {
+      try {
+        token = readGameToken(windowRef[key], null);
+        if (token) break;
+      } catch {}
+    }
     if (!token) {
       update("Entre na conta para usar o tempo real.");
       return;
@@ -140,6 +150,7 @@ export function startRealtimePresence({
       client.addEventListener("message", event => {
         if (socket !== client) return;
         const packet = readRealtimePacket(event.data);
+        if (packet?.type === "world_changed") { onWorldChanged(); return; }
         if (packet?.type === "presence") {
           update("Presença na sala: " + packet.online + " conexões");
         }

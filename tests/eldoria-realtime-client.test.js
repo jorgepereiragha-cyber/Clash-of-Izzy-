@@ -59,7 +59,7 @@ test("kingdom displays realtime status without exposing principal token in a URL
   assert.doesNotMatch(client, /new WebSocketImpl\([^;\n]*\+ token/);
 });
 
-function mockPresenceEnvironment(fetchImpl) {
+function mockPresenceEnvironment(fetchImpl, configureWindow = () => {}) {
   const events = (target => ({
     target,
     handlers: new Map(),
@@ -76,6 +76,7 @@ function mockPresenceEnvironment(fetchImpl) {
   windowRef.location = { protocol: "https:", host: "play.example" };
   windowRef.localStorage = { getItem: () => "valid-game-token" };
   windowRef.sessionStorage = { getItem: () => null };
+  configureWindow(windowRef);
   const sockets = [];
   class FakeWebSocket {
     static OPEN = 1;
@@ -101,6 +102,41 @@ const validTicketResponse = (ticket = "a".repeat(72)) => new Response(
 const flushMicrotasks = async () => {
   for (let n = 0; n < 8; n++) await Promise.resolve();
 };
+
+test("restricted WebView storage getters recover using the alternate session", async () => {
+  let calls = 0;
+  const env = mockPresenceEnvironment(async (_url, options) => {
+    calls++;
+    assert.equal(options.headers.Authorization, "Bearer fallback-session");
+    return validTicketResponse();
+  }, windowRef => {
+    Object.defineProperty(windowRef, "localStorage", { get() { throw new Error("SecurityError"); } });
+    windowRef.sessionStorage = { getItem: () => "fallback-session" };
+  });
+  try {
+    await flushMicrotasks();
+    assert.equal(calls, 1);
+    assert.equal(env.sockets.length, 1);
+  } finally { env.stop(); }
+});
+
+test("both blocked storage getters fail closed without requesting a ticket", async () => {
+  let calls = 0;
+  const env = mockPresenceEnvironment(async () => {
+    calls++;
+    return validTicketResponse();
+  }, windowRef => {
+    for (const key of ["localStorage", "sessionStorage"]) {
+      Object.defineProperty(windowRef, key, { get() { throw new Error("SecurityError"); } });
+    }
+  });
+  try {
+    await flushMicrotasks();
+    assert.equal(calls, 0);
+    assert.equal(env.sockets.length, 0);
+    assert.match(env.status.textContent, /Entre na conta/);
+  } finally { env.stop(); }
+});
 
 test("realtime client permits only one ticket request when multiple resume events race", async () => {
   let resolveTicket;
