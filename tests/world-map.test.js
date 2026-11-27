@@ -153,3 +153,18 @@ test("map forest instancing minimizes WebGL draw calls without changing territor
   assert.doesNotMatch(scene, /addTree\(terrainRoot/);
   assert.match(scene, /for \(const geometry of geometries\) geometry\.dispose\(\)/);
 });
+
+test("tactical world fits distant castles without collapsing markers at the map edge",async()=>{
+ const {tacticalWorldBounds,tacticalWorldPoint}=await import("../world-map-viewport.js");
+ const home={x:-50,z:350};
+ const locations=[{x:45,z:355},{x:45,z:360},{x:-12,z:24},{x:0,z:0}];
+ const bounds=tacticalWorldBounds(home,locations);
+ for(const p of [home,...locations]){
+  const projected=tacticalWorldPoint(p.x,p.z,bounds);
+  assert.ok(projected.left>0&&projected.left<100&&projected.top>0&&projected.top<100);
+ }
+ assert.notDeepEqual(tacticalWorldPoint(45,355,bounds),tacticalWorldPoint(45,360,bounds));
+ assert.ok(tacticalWorldPoint(45,360,bounds).top<tacticalWorldPoint(45,355,bounds).top);
+ assert.equal(tacticalWorldPoint(NaN,0,bounds),null);
+ assert.deepEqual(tacticalWorldBounds(null),{minX:-56,maxX:56,minZ:-56,maxZ:56});
+});
