@@ -131,3 +131,6 @@ castle-shield.js
 
 # Server-only monster preview policy.
 world-monsters.js
+
+# Server-only hunt progression policy.
+monster-hunt-policy.js
