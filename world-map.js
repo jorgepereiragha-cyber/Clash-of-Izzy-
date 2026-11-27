@@ -43,6 +43,7 @@ let selectedTerritoryId = null;
 let selectedUnits = {};
 let busy = false;
 const worldRefreshGate=createWorldRefreshGate();
+const realmRefreshGate=createWorldRefreshGate();
 let mapViewport = { zoom: 1, panX: 0, panY: 0 };
 const activeMapPointers = new Map();
 let mapPanStart = null;
@@ -362,12 +363,19 @@ function renderMarches() {
     root.append(card);
   }
 }
-async function updateRealmCards(){
+async function updateRealmCards({background=false}={}){
   const grid=$("realmGrid"),label=$("realmStatus");
-  if(!grid||!label)return;
+  if(!grid||!label||!state?.kingdom)return;
+  const realmId=Number(state.kingdom.map_region||1);
   try{
-    const data=await request("/realms/status");
-    if(!Array.isArray(data.realms)||data.realms.length!==3)throw new Error("resposta inválida");
+    await realmRefreshGate.run(async()=>{
+      const data=await request("/realms/status");
+      if(!Array.isArray(data.realms)||data.realms.length!==3)throw new Error("resposta inválida");
+      let throne=null;
+      try{throne=await request("/throne/status?realm="+encodeURIComponent(realmId));}catch{/* Disable throne actions until the next successful refresh. */}
+      return {data,throne};
+    },({data,throne})=>{
+    if(!state?.kingdom||Number(state.kingdom.map_region||1)!==realmId)return;
     grid.replaceChildren();
     label.textContent="Reinos cadastrados: "+fmt(data.registeredPlayers)+" · Mapa atual: "+fmt(state?.kingdom?.map_region||1);
     for(const realm of data.realms){
@@ -388,12 +396,14 @@ async function updateRealmCards(){
       }
       grid.append(card);
     }
-    try{
-      state.throne=await request("/throne/status?realm="+encodeURIComponent(state?.kingdom?.map_region||1));
-      renderMap();
-      renderDetails();
-    }catch{state.throne=null;updateActionButtons();}
+    state.throne=throne&&Number(throne.realmId)===realmId?throne:null;
+    renderMap();
+    renderDetails();
+    },{background});
   }catch{
+    if(!state?.kingdom||Number(state.kingdom.map_region||1)!==realmId)return;
+    state.throne=null;
+    updateActionButtons();
     label.textContent="Não foi possível consultar o desbloqueio dos mapas.";
   }
 }
@@ -408,7 +418,9 @@ async function refreshState({background=false}={}) {
   const nextState=response.state || response;
   if (!nextState.kingdom) throw new Error("O servidor não retornou o reino.");
   const oldThrone=state?.throne||null;
+  const previousRealm=Number(state?.kingdom?.map_region||1);
   state = nextState;
+  if(previousRealm!==Number(state.kingdom.map_region||1))realmRefreshGate.invalidate();
   if(oldThrone&&Number(oldThrone.realmId)===Number(state?.kingdom?.map_region||1))
     state.throne=oldThrone;
   if (!requestedTerritoryApplied && requestedTerritorySearch) {
@@ -431,6 +443,7 @@ async function sendThroneAssault(){
   if(count<200||count>10000)return;
   if(!window.confirm("Confirmar cerco ao Trono Imperial? O resultado pode causar perdas permanentes de tropas."))return;
   worldRefreshGate.invalidate();
+  realmRefreshGate.invalidate();
   busy=true;updateActionButtons();
   $("marchNotice").textContent="Realizando cerco ao Trono Imperial…";
   try{
@@ -626,7 +639,7 @@ window.setInterval(() => {
   if (document.hidden || busy || !token) return;
   refreshState({background:true}).catch(error => setStatus(error.message, true));
 }, 15000);
-window.setInterval(() => { if(!document.hidden&&!busy&&token) updateRealmCards(); },60000);
+window.setInterval(() => { if(!document.hidden&&!busy&&token) updateRealmCards({background:true}); },60000);
 document.addEventListener("visibilitychange", () => {
   if (!document.hidden && !busy && token) refreshState({background:true}).catch(error => setStatus(error.message, true));
 });
