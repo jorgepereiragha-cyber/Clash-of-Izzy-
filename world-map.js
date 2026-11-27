@@ -62,6 +62,7 @@ let busy = false;
 const worldRefreshGate=createWorldRefreshGate();
 const realmRefreshGate=createWorldRefreshGate();
 let mapViewport = { zoom: 1, panX: 0, panY: 0 };
+let tacticalBounds=tacticalWorldBounds(null);
 const activeMapPointers = new Map();
 let mapPanStart = null;
 let mapPinchStart = null;
@@ -180,7 +181,7 @@ export function tacticalHome(){
 }
 export function projectTacticalPoint(x,z){
   if(state?.worldCoordinateSpace!=="absolute-v1")return {left:Math.max(9,Math.min(91,50+x*.9)),top:Math.max(10,Math.min(90,50-z*.9))};
-  return tacticalWorldPoint(x,z,tacticalWorldBounds(tacticalHome(),state.territories));
+  return tacticalWorldPoint(x,z,tacticalBounds);
 }
 function tacticalMarches(now=Date.now()) {
   if (!$('worldMap').classList.contains('map-3d-fallback')) return;
@@ -193,6 +194,7 @@ function tacticalMarches(now=Date.now()) {
   }
 }
 function renderMap() {
+  tacticalBounds=tacticalWorldBounds(tacticalHome(),state.territories);
   const root = $("mapContent");
   const focusedTerritory = document.activeElement?.dataset.territoryId;
   root.querySelectorAll(".territory-pin,.tactical-march,.map-center").forEach(pin => pin.remove());
