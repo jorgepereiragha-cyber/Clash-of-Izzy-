@@ -111,3 +111,36 @@ test("special buildings use canonical D1 keys and real local art",async()=>{
  assert.match(source,/paintBuildingArt\(b\.building_type/);
  assert.doesNotMatch(source,/from\s+["']three(?:\/|["'])/);
 });
+
+test("city preloads the exact level and quality art of visible plots without duplicates",()=>{
+ const controller=new KingdomEntityArtController({manifest:{entityArt:{buildings:{
+   castle:{canvas2d:{src:"art/castle.webp"},tiers:{"20":{canvas2d:{src:"art/castle-20.webp",quality:{low:{src:"art/castle-20-low.webp"}}}}}},
+   farm:{canvas2d:{src:"art/farm.webp"}},warehouse:{canvas2d:{src:"art/warehouse.webp"}}
+ }}}});
+ const buildings=[{building_type:"castle",level:20},...Array.from({length:8},()=>({building_type:"farm",level:1})),{building_type:"warehouse",level:1}];
+ assert.deepEqual(controller.getCityPreloadAssets(buildings).map(a=>a.src),["/assets/art/castle-20.webp","/assets/art/farm.webp"]);
+ controller.setQuality("low");
+ assert.deepEqual(controller.getCityPreloadAssets(buildings).map(a=>a.src),["/assets/art/castle-20-low.webp","/assets/art/farm.webp"]);
+ assert.deepEqual(controller.getCityPreloadAssets([{building_type:"castle",level:1}]).map(a=>a.src),["/assets/art/castle.webp"]);
+ assert.deepEqual(controller.getCityPreloadAssets([{building_type:"unknown"},null]),[]);
+});
+
+
+test("castle progression uses four actual atlas symbols for levels 1 through 30",async()=>{const atlas=await readFile(new URL("../assets/art/buildings/icons.svg",import.meta.url),"utf8");for(let level=1;level<=30;level++){const stage=level===30?4:level>=20?3:level>=10?2:1;const symbol=stage===1?"castle":"castle-stage-"+stage;assert.equal(resolveEntity2DAsset(manifest,"buildings","castle",{tier:level}).src,"/assets/art/buildings/icons.svg#"+symbol);assert.ok(atlas.includes('id="'+symbol+'"'));}});
+
+
+test("city DOM fallback uses the same manifest tier as the Canvas artwork",async()=>{
+ const html=await readFile(new URL("../kingdom.html",import.meta.url),"utf8");
+ assert.ok(html.includes('data-entity-art-existing data-entity-art-category="buildings"'));
+ assert.ok(html.includes('data-entity-art-tier="\x27+esc(String(tier))'));
+ const controller=new KingdomEntityArtController({manifest});
+ let href;
+ const target={dataset:{entityArtCategory:"buildings",entityArtId:"castle",entityArtTier:"30"},hasAttribute:key=>key==="data-entity-art-existing",querySelector:selector=>selector==="use"?{setAttribute:(key,value)=>{if(key==="href")href=value;}}:null};
+ controller.bindDomArtTargets({querySelectorAll:()=>[target]});
+ assert.equal(href,"/assets/art/buildings/icons.svg#castle-stage-4");
+});
+
+test("equipped castle skins keep their art while warming the cache",()=>{
+ const controller=new KingdomEntityArtController({manifest});
+ for(let id=1;id<=6;id++)assert.equal(controller.getCityPreloadAssets([{building_type:"castle",level:30}],id)[0].src,"/assets/art/buildings/icons.svg#castle-"+id);
+});
