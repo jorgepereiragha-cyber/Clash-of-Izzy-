@@ -1744,13 +1744,14 @@ async function gameAction(env,playerId,body){
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
     const target=await env.DB.prepare("SELECT id,territory_key,resource_type,owner_kingdom_id,territory_kind FROM world_territories WHERE id=? AND map_region=?").bind(targetId,Number(k.map_region)||1).first();
     if(!target)return json({error:"Território não encontrado."},404);
-    if(target.territory_key?.startsWith("royal_throne_"))
+    if(target.territory_kind==="throne"||target.territory_key?.startsWith("royal_throne_"))
       return json({error:"O Trono Imperial exige Guerra do Trono; não pode ser atacado por marcha normal."},409);
     const marchType=body.marchType;
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
     if(marchType==="attack"&&(target.owner_kingdom_id||target.territory_kind==="castle"))return json({error:"O castelo de outro comandante está visível no mapa. O combate PvP será habilitado na Fase 10; por enquanto, ataque apenas territórios neutros."},409);
     if(target.territory_kind==="castle"&&marchType!=="attack")return json({error:"Castelos de jogadores não podem ser coletados nem usados como ponto de exploração."},409);
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
+    if(marchType==="gather"&&!["food","wood","stone","iron"].includes(target.resource_type))return json({error:"Este território não possui recurso coletável."},409);
     const requested=body.units;
     if(!requested||typeof requested!=="object"||Array.isArray(requested))return json({error:"Informe a composição da marcha."},400);
     const selected={};
