@@ -399,12 +399,41 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     return group;
   }
 
-  function createMine(parent, x, z, resource) {
-    const material = resource === "iron" ? shared.iron : resource === "stone" ? shared.stoneLight : resource === "food" ? shared.food : shared.wood;
-    const y = terrainHeight(x, z);
-    box(parent, 2.5, 1.55, 2.1, shared.wood, x, y + .78, z);
-    cone(parent, 1.9, .9, shared.roof, x, y + 1.95, z, 4);
-    box(parent, .65, 1.05, .12, material, x + .5, y + .62, z + 1.1);
+  // Resource landmarks use distinct silhouettes rather than recoloring one hut.
+  function createResourceSite(parent,x,z,resource){
+    const group=new THREE.Group();
+    group.position.set(x,terrainHeight(x,z)+.37,z);
+    group.userData.coIResourceSite=resource;
+    if(resource==="food"){
+      box(group,2.55,.13,2.15,shared.wood,0,.07,0);
+      const crops=[];
+      for(const row of [-.74,0,.74])for(const col of [-.65,0,.65])
+        crops.push([col,.24,row,.42,.34,.54]);
+      castleStonework(group,shared.food,crops);
+      box(group,.72,.65,.65,shared.wood,1.0,.39,-.7);
+      cone(group,.58,.44,shared.roof,1.0,.94,-.7,4);
+    }else if(resource==="wood"){
+      box(group,1.1,.82,.9,shared.wood,-.62,.48,-.42);
+      cone(group,.85,.58,shared.roof,-.62,1.18,-.42,4);
+      for(const [lx,ly] of [[.55,.21],[1.02,.21],[.78,.53]]){
+        const log=makeMesh(new THREE.CylinderGeometry(.22,.24,1.3,6),shared.trunk,group,lx,ly,.28);
+        log.rotation.x=Math.PI/2;
+      }
+      box(group,1.4,.12,1.4,shared.wood,.78,.07,.28);
+    }else if(resource==="stone"){
+      box(group,2.3,.16,1.9,shared.stone,0,.08,0);
+      for(const [rx,rz,scale] of [[-.65,-.48,.83],[.52,-.52,.64],[.1,.46,.52]])
+        cone(group,scale,.85+scale,shared.stoneLight,rx,.5,rz,5);
+      box(group,.65,.3,.62,shared.stoneLight,.85,.22,.55);
+    }else if(resource==="iron"){
+      box(group,2.4,1.45,1.8,shared.stone,0,.72,-.15);
+      cone(group,1.55,.82,shared.stoneLight,0,1.8,-.15,5);
+      box(group,.88,.94,.12,shared.leather,0,.51,.8);
+      for(const sx of [-.56,.56])box(group,.18,1.12,.24,shared.wood,sx,.56,.88);
+      box(group,1.28,.18,.24,shared.wood,0,1.08,.88);
+      box(group,.78,.32,.55,shared.iron,.83,.24,1.08);
+    }else{return;}
+    parent.add(group);
   }
 
   function createTerritoryFeature(parent, territory, forestPositions) {
@@ -429,7 +458,10 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
       return;
     }
 
-    if (territory.terrain === "mountain") {
+    const resource=territory.resource_type;
+    if(["food","wood","stone","iron"].includes(resource)){
+      createResourceSite(parent,x,z,resource);
+    } else if (territory.terrain === "mountain") {
       for (let i = 0; i < 3; i++) {
         const rockX = x - .9 + i * .9;
         const rockZ = z + (i % 2 ? .6 : -.45);
@@ -446,9 +478,6 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
       cone(parent, .9, .55, shared.roof, x, y + 1.32, z, 4);
     }
 
-    if (territory.resource_type === "iron" || territory.resource_type === "stone" || territory.resource_type === "wood") {
-      createMine(parent, x + 1.55, z + .8, territory.resource_type);
-    }
     if (ownership === "owned" || ownership === "enemy") {
       makeTower(parent, x - 1.35, z - 1.15, 2.4, ownership === "enemy" ? shared.enemy : shared.stone);
     }
