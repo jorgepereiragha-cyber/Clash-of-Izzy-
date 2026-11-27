@@ -1265,7 +1265,13 @@ if (host && "WebGLRenderingContext" in window) {
         visible
       };
     });
-    window.dispatchEvent(new CustomEvent("coi:kingdom-projection", { detail: { positions } }));
+    const specialPositions=currentSpecialLandmarks().map(landmark=>{
+      const {x,z}=cityWorldPoint(landmark,0);
+      const point=new THREE.Vector3(x,.18,z).project(camera);
+      return {type:landmark.building_type,left:(point.x*.5+.5)*100,top:(1-(point.y*.5+.5))*100,
+        visible:point.z>=-1&&point.z<=1&&Math.abs(point.x)<=1&&Math.abs(point.y)<=1};
+    });
+    window.dispatchEvent(new CustomEvent("coi:kingdom-projection", { detail: { positions,specialPositions } }));
   }
   function renderBuildings(buildings, castleSkinId = latestCastleSkinId) {
     latestBuildings = Array.isArray(buildings) ? buildings : [];
