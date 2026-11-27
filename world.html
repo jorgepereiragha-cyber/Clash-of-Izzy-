@@ -47,6 +47,11 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 #world3d{position:absolute;inset:0;width:100%;height:100%;z-index:0;display:block;pointer-events:none}
 .map-content .territory-pin{z-index:3}
 .world-map.map-3d-fallback #world3d{display:none}
+.world-monster-pin{position:absolute;z-index:5;transform:translate(-50%,-50%);min-width:42px;min-height:42px;border:2px solid #dcad72;border-radius:12px;background:#39252bee;color:#fff3da;display:grid;place-items:center;padding:3px 6px;box-shadow:0 3px 8px #0009;touch-action:manipulation;line-height:1}
+.world-monster-pin span{font-size:19px}.world-monster-pin .monster-portrait{width:29px;height:29px;display:block;pointer-events:none}.monster-heading{display:flex;align-items:center;gap:8px}.monster-heading .monster-portrait{width:40px;height:40px;flex:0 0 40px;display:block}.world-monster-pin small{font-size:10px;font-weight:800;color:#ffe6ad}
+.world-monster-pin.defeated{opacity:.6;border-style:dashed}.world-monster-pin.selected,.world-monster-pin:focus-visible{outline:3px solid #ffe2a0;outline-offset:2px}
+#worldMonsterList .monster-selected{outline:2px solid #ffe2a0}#worldMonsterList progress{width:100%;accent-color:#b75341}
+
 .world-map.is-dragging .map-content{transition:none}
 .map-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
 .map-controls button{min-width:42px;padding:8px 11px}
@@ -118,6 +123,12 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
     <button id="mapReset" type="button" class="secondary">Centralizar</button>
     <span id="worldGraphicsStatus" class="map-hint" role="status" aria-live="polite">Carregando qualidade gráfica…</span>
     <a class="secondary" href="/kingdom.html#coiGraphicsPreset">Ajustes de imagem</a>
+    <label for="resourceMapFilter" class="map-hint">Coletas</label>
+    <select id="resourceMapFilter" aria-label="Filtrar pontos de coleta no mapa">
+      <option value="all">Todos</option><option value="free">Livres</option>
+      <option value="mine-owned">Minhas ocupações</option><option value="farm">Comida</option>
+      <option value="forest">Madeira</option><option value="quarry">Pedra</option><option value="mine">Ferro</option>
+    </select>
    </div>
    <div id="worldMap" class="world-map" role="group" aria-label="Mapa estratégico 3D isométrico. Arraste para navegar, use os controles de zoom e toque em um território para selecioná-lo.">
     <span class="map-label north">Norte</span><span class="map-label south">Sul</span>
@@ -127,6 +138,12 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
    </div>
    <p class="map-hint">Arraste para explorar · use + e − para aproximar · tropas em marcha seguem a rota até o território selecionado.</p>
    <div class="legend"><span><i class="dot"></i> Neutro</span><span><i class="dot owned"></i> Seu território</span><span><i class="dot enemy"></i> Outro reino</span></div>
+ <section id="worldMonsterPreview" hidden aria-labelledby="worldMonsterHeading">
+   <h2 id="worldMonsterHeading">Criaturas de Eldoria</h2>
+   <p id="worldMonsterStatus" class="muted" role="status">Consultando criaturas…</p>
+   <div id="worldMonsterList" class="detail-grid"></div>
+   <button id="worldMonsterRefresh" type="button" class="secondary">Atualizar criaturas</button>
+ </section>
  <section aria-labelledby="realmHeading">
   <h2 id="realmHeading">Mundos de Eldoria</h2>
   <div id="realmStatus" role="status" aria-live="polite" class="realm-notice">Consultando desbloqueio dos mapas…</div>
@@ -198,6 +215,7 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 </script>
 <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
 <script type="module" src="/world-map.js"></script>
+<script type="module" src="/scripts/world-monster-preview.js"></script>
 <script type="module" src="/scripts/world-map-visual-boot.js"></script>
 <script type="module" src="/rally-ui.js"></script>
 <script src="/valhalla-shop-ui.js" defer></script>

@@ -240,6 +240,16 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(state.status, 200, "state responds after game start");
     assert.equal(state.data.state?.kingdom?.id, start.data.state.kingdom.id);
     assert.equal(state.data.state?.advanced4xEnabled, true);
+    const monsters = await http(base, "/api/game/world-monsters", {cookie,bearer:start.data.token});
+    assert.equal(monsters.status,200,"D1-backed monster preview responds");
+    assert.equal(monsters.data.enabled,true);
+    assert.equal(monsters.data.combatEnabled,false);
+    assert.equal(monsters.data.region,Number(state.data.state.kingdom.map_region)||1);
+    assert.equal(monsters.data.monsters.length,6);
+    assert.ok(monsters.data.monsters.every(m=>m.hp===m.max_hp && m.hp>0));
+    const noSessionMonsters=await http(base,"/api/game/world-monsters",{cookie});
+    assert.equal(noSessionMonsters.status,401,"monster preview requires player session");
+
 
     const badIndustry = await http(base, "/api/game/action", {
       method:"POST", body:{type:"industry_upgrade",industry:"not-a-real-industry"},
@@ -1270,6 +1280,13 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await page.goto(base + "/world.html");
         assert.equal(new URL(page.url()).pathname, "/world.html");
         await page.waitForLoadState("load");
+        await page.waitForFunction(()=>document.querySelectorAll(".world-monster-pin").length===6);
+        assert.equal(await page.locator("#worldMonsterList article").count(),6);
+        assert.equal(await page.locator(".world-monster-pin svg use").count(),6);
+        assert.equal(await page.locator("#worldMonsterList progress").count(),6);
+        assert.equal(await page.locator(".world-monster-pin").first().getAttribute("aria-pressed"),"false");
+        await page.locator("#worldMonsterList button").first().click();
+        assert.equal(await page.locator(".world-monster-pin").first().getAttribute("aria-pressed"),"true");
         assert.deepEqual(pwaRegistrationAttempts, [], "closed beta must not attempt official service worker registration");
         assert.equal(await page.evaluate(async () =>
           (await navigator.serviceWorker.getRegistrations()).length), 0,

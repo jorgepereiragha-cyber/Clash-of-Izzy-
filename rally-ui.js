@@ -150,16 +150,36 @@ function renderRallies(){
   root.append(card);
  }
 }
+// Collection markers share the actual isometric projection used by castles and monsters.
+function projectResourceNodes(){
+ const map=$("mapContent"),host=$("worldMap");
+ if(!map)return;
+ for(const button of map.querySelectorAll(".resource-node-pin")){
+  const x=Number(button.dataset.mapX),z=Number(button.dataset.mapZ);
+  const point=!host?.classList.contains("map-3d-fallback")?window.__coiWorldMap3D?.projectPoint?.(x,z):null;
+  button.style.left=point?point.left+"px":Math.max(7,Math.min(93,50+x*.9))+"%";
+  button.style.top=point?point.top+"px":Math.max(8,Math.min(92,50-z*.9))+"%";
+ }
+}
+function nodeMatchesMapFilter(node,filter){
+ if(filter==="free")return !node.occupied_by&&!node.reserved_by_rally;
+ if(filter==="mine-owned")return node.is_mine===true;
+ if(filter==="all"||!filter)return true;
+ return node.node_type===filter;
+}
+for(const event of ["coi:world-map-3d-ready","coi:world-map-projection-changed","coi:world-map-2d-fallback"])window.addEventListener(event,projectResourceNodes);
+$("resourceMapFilter")?.addEventListener("change",renderMapNodes);
 function renderMapNodes(){
  const map=$("mapContent");if(!map)return;
  map.querySelectorAll(".resource-node-pin").forEach(pin=>pin.remove());
  const fragment=document.createDocumentFragment();
  for(const node of nodes){
+  if(!nodeMatchesMapFilter(node,$("resourceMapFilter")?.value))continue;
   const type=NODE_TYPES[node.node_type]||NODE_TYPES.mine;
   const button=make("button","resource-node-pin"+(node.occupied_by?" occupied":"")+(node.id===selectedNodeId?" selected":""));
   button.type="button";button.dataset.nodeId=node.id;
-  button.style.left=Math.max(7,Math.min(93,50+Number(node.map_x)*0.9))+"%";
-  button.style.top=Math.max(8,Math.min(92,50-Number(node.map_y)*0.9))+"%";
+  button.dataset.mapX=String(node.map_x);button.dataset.mapZ=String(node.map_y);
+  if(node.occupied_by&&!node.is_mine)button.classList.add("foreign");
   button.textContent=type.icon;
   if(node.reserved_by_rally&&!node.occupied_by)button.style.borderStyle="dashed";
   button.title=node.id+" · "+nodeLabel(node)+" · "+nodeAvailability(node);
@@ -167,7 +187,7 @@ function renderMapNodes(){
   button.addEventListener("click",()=>{selectNode(node);$("rally-ui-panel")?.scrollIntoView({behavior:"smooth",block:"nearest"});});
   fragment.append(button);
  }
- map.append(fragment);
+ map.append(fragment);projectResourceNodes();
 }
 async function refresh(){
  if(refreshing||!token)return;refreshing=true;
