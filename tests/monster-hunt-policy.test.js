@@ -29,3 +29,30 @@ test("hunt preflight rejects dead, stale, cross-realm and unaffordable monsters"
  assert.equal(evaluateMonsterHunt({...request,energyRow:{energy:9,updated_at:1000}}).code,"INSUFFICIENT_ENERGY");
  assert.equal(evaluateMonsterHunt({...request,energyRow:{energy:9,updated_at:700}}).energyAfter,0);
 });
+
+test("persisted hunt progress reads only its kingdom and does not mutate energy on refresh",async()=>{
+ const {DatabaseSync}=await import("node:sqlite");
+ const {readFile}=await import("node:fs/promises");
+ const {huntProgressView}=await import("../monster-hunt-state.js");
+ const sql=new DatabaseSync(":memory:");
+ try{
+  sql.exec("PRAGMA foreign_keys=ON; CREATE TABLE kingdoms(id INTEGER PRIMARY KEY); INSERT INTO kingdoms VALUES(1),(2)");
+  const migration=await readFile(new URL("../migrations/0049_monster_hunt_progress.sql",import.meta.url),"utf8");
+  sql.exec(migration);sql.exec(migration);
+  const db={prepare(q){return{bind(...args){return{first:async()=>sql.prepare(q).get(...args)}}}}};
+  const fresh=await huntProgressView(db,1,1000);
+  assert.equal(fresh.energy,120);assert.equal(fresh.unlockedLevel,1);assert.equal(fresh.nextEnergyAt,null);
+  sql.exec("INSERT INTO monster_hunt_progress(kingdom_id,energy,updated_at,cleared_level) VALUES(1,20,100,3)");
+  const state=await huntProgressView(db,1,850);
+  assert.equal(state.energy,22);assert.equal(state.nextEnergyAt,1000);assert.equal(state.unlockedLevel,5);
+  assert.equal(state.energyCosts[5],15);
+  assert.deepEqual(await huntProgressView(db,1,850),state);
+  assert.equal(sql.prepare("SELECT energy FROM monster_hunt_progress WHERE kingdom_id=1").get().energy,20);
+  assert.equal((await huntProgressView(db,2,850)).energy,120);
+  assert.equal(await huntProgressView(db,0,850),null);
+  assert.equal(await huntProgressView(db,1,99),null);
+  assert.throws(()=>sql.exec("UPDATE monster_hunt_progress SET energy=121"));
+  assert.throws(()=>sql.exec("UPDATE monster_hunt_progress SET cleared_level=2"));
+  assert.throws(()=>sql.exec("INSERT INTO monster_hunt_progress(kingdom_id,updated_at) VALUES(3,100)"));
+ }finally{sql.close();}
+});

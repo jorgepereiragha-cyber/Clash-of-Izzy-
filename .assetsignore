@@ -134,3 +134,4 @@ world-monsters.js
 
 # Server-only hunt progression policy.
 monster-hunt-policy.js
+monster-hunt-state.js
