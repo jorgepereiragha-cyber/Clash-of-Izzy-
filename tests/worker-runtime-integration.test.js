@@ -989,6 +989,15 @@ test("Worker + D1: rotas, autenticação e 34 ações do jogo em fluxos reais", 
       await action(tokenA, { type: "march", targetId: -1, marchType: "gather", units: { militia: 1 } }, 400);
       const beforeInvalidMarches=stateA.marches.length;
       const beforeInvalidTroops=troopCount("militia",stateA);
+      assert.ok(Number.isSafeInteger(Number(neutral.id)));
+      assert.ok(["food","wood","stone","iron"].includes(neutral.resource_type));
+      const localTargetSql=async sql=>runCli(["--config","wrangler.jsonc","d1","execute","clash-of-izzy-db","--local","--persist-to",persistDir,"--command",sql]);
+      await localTargetSql("UPDATE world_territories SET resource_type=NULL WHERE id="+Number(neutral.id));
+      try{
+        await action(tokenA,{type:"march",targetId:neutral.id,marchType:"gather",units:{militia:1}},409,"coleta sem recurso");
+      }finally{
+        await localTargetSql("UPDATE world_territories SET resource_type='"+neutral.resource_type+"' WHERE id="+Number(neutral.id));
+      }
       for(const invalid of [
         {marchType:"gather"},
         {marchType:"gather",units:null},
