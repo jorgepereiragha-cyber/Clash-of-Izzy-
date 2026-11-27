@@ -20,17 +20,17 @@ function fixture(occupied = null) {
  INSERT INTO resource_nodes VALUES('node_001',NULL,NULL,'{}','r1',unixepoch()-3600,10,100,1);
  `);
  if(occupied!==null)sql.prepare("UPDATE resource_nodes SET occupied_by=?").run(occupied);
- let fail=false;
+ let failPrefix=null;
  const db={
   prepare(query){return {bind(...args){return {
    async first(){return sql.prepare(query).get(...args)||null},
    async all(){return {results:sql.prepare(query).all(...args)}},
    async run(){return {meta:{changes:Number(sql.prepare(query).run(...args).changes)}}},
-   execute(){if(fail&&query.startsWith("UPDATE rallies SET status='completed'"))throw Error("Injected failure");return {meta:{changes:Number(sql.prepare(query).run(...args).changes)}}}
+   execute(){if(failPrefix&&query.startsWith(failPrefix))throw Error("Injected failure");return {meta:{changes:Number(sql.prepare(query).run(...args).changes)}}}
   }}}},
   async batch(statements){sql.exec("BEGIN");try{const r=statements.map(s=>s.execute());sql.exec("COMMIT");return r}catch(e){sql.exec("ROLLBACK");throw e}}
  };
- return {sql,env:{DB:db},fail:()=>{fail=true},recover:()=>{fail=false}};
+ return {sql,env:{DB:db},fail:(prefix="UPDATE rallies SET status='completed'")=>{failPrefix=prefix},recover:()=>{failPrefix=null}};
 }
 const recall = env => handleRally(new Request("https://test.example/recall",{method:"POST"}),env,"leader","recall",{node_id:"node_001"});
 function army(sql){return sql.prepare("SELECT kingdom_id,unit_type,quantity FROM army_units ORDER BY kingdom_id,unit_type").all().map(r=>[r.kingdom_id,r.unit_type,r.quantity])}
@@ -107,5 +107,48 @@ test("legacy mixed garrison is not incorrectly transferred to the leader",async(
   const after=sql.prepare("SELECT current_resources,last_regen FROM resource_nodes").get();
   assert.equal(after.current_resources,40);
   assert.equal(after.last_regen,before);
+ }finally{sql.close()}
+});
+
+function enableHarvestFixture(sql,env){
+ sql.exec("ALTER TABLE kingdoms ADD COLUMN food INTEGER NOT NULL DEFAULT 0; ALTER TABLE kingdoms ADD COLUMN updated_at TEXT; ALTER TABLE resource_nodes ADD COLUMN node_type TEXT DEFAULT 'farm'; CREATE TABLE resource_ledger(kingdom_id INTEGER,resource TEXT,amount INTEGER,reason TEXT);");
+ env.ENVIRONMENT="beta";env.BETA_GATHERING_5M_ENABLED="true";
+}
+const collectReturn=env=>handleRally(new Request("https://test.example/collect-return",{method:"POST"}),env,"leader","collect-return",{node_id:"node_001"});
+test("atomic harvest and return restores every ally once and rolls back on ledger failure",async()=>{
+ const {sql,env,fail,recover}=fixture();
+ try{
+  enableHarvestFixture(sql,env);
+  await processDueRallies(env);
+  sql.exec("UPDATE resource_nodes SET current_resources=80,last_regen=unixepoch()");
+  const snapshot=sql.prepare("SELECT * FROM resource_nodes").get();
+  fail("INSERT INTO resource_ledger");
+  assert.equal((await collectReturn(env)).status,500);
+  assert.deepEqual(sql.prepare("SELECT * FROM resource_nodes").get(),snapshot);
+  assert.equal(sql.prepare("SELECT food FROM kingdoms WHERE id=10").get().food,0);
+  assert.deepEqual(army(sql),[[10,"militia",3],[20,"militia",4]]);
+  recover();
+  const attempts=await Promise.all([collectReturn(env),collectReturn(env)]);
+  assert.equal(attempts.filter(r=>r.status===200).length,1);
+  const receipt=await attempts.find(r=>r.status===200).json();
+  assert.equal(receipt.collected,5000000);
+  assert.equal(receipt.returned,9);
+  assert.equal(receipt.returned_allies,11);
+  assert.equal(sql.prepare("SELECT food FROM kingdoms WHERE id=10").get().food,5000000);
+  assert.equal(sql.prepare("SELECT COUNT(*) n FROM resource_ledger").get().n,1);
+  assert.equal(sql.prepare("SELECT occupied_by FROM resource_nodes").get().occupied_by,null);
+  assert.deepEqual(army(sql),[[10,"archer",2],[10,"militia",10],[20,"militia",15]]);
+ }finally{sql.close()}
+});
+test("collection and return remains disabled outside beta even with flag enabled",async()=>{
+ const {sql,env}=fixture();
+ try{
+  enableHarvestFixture(sql,env);
+  env.ENVIRONMENT="production";
+  await processDueRallies(env);
+  sql.exec("UPDATE resource_nodes SET current_resources=100,last_regen=unixepoch()");
+  assert.equal((await collectReturn(env)).status,404);
+  assert.equal(sql.prepare("SELECT food FROM kingdoms WHERE id=10").get().food,0);
+  assert.equal(sql.prepare("SELECT occupied_by FROM resource_nodes").get().occupied_by,10);
  }finally{sql.close()}
 });
