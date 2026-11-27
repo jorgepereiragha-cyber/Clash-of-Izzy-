@@ -1738,6 +1738,10 @@ async function gameAction(env,playerId,body){
     ]);
     if(result.some(row=>row?.meta?.changes!==1))return json({error:"Feridos, hospital ou recursos alterados. Sincronize o reino."},409);
   }else if(type==="train"){
+    // Beta rejects malformed orders rather than silently training a different unit or quantity.
+    if(env.ENVIRONMENT==="beta"&&(typeof body.unit!=="string"||!Object.hasOwn(UNITS,body.unit)||
+      !Number.isSafeInteger(body.quantity)||body.quantity<1||body.quantity>100))
+      return json({error:"Informe uma tropa válida e uma quantidade inteira de 1 a 100."},400);
     const unit=String(body.unit||"militia"),quantity=Math.max(1,Math.min(100,Math.floor(Number(body.quantity)||10)));
     const spec=Object.hasOwn(UNITS,unit)?UNITS[unit]:null;if(!spec)return json({error:"Tipo de tropa inválido."},400);
     const requiredBuilding=TRAINING_FACILITIES[unit];
