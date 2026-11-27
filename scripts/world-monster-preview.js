@@ -1,5 +1,5 @@
 import {createEntityArtElement} from "./kingdom-2d-art-atlas.js";
-import {focusMapMarker} from "../world-map.js";
+import {focusMapMarker,tacticalHome} from "../world-map.js";
 // A seleção do bestiário usa o mesmo painel de formação das demais marchas.
 const root=document.getElementById("worldMonsterPreview");
 const list=document.getElementById("worldMonsterList");
@@ -80,7 +80,8 @@ function monsterSearchRank(monster,progress,combatEnabled){
 }
 locate.addEventListener("click",()=>{
  const available=visibleMonsters();
- const [monster]=available.sort((a,b)=>monsterSearchRank(a,progress,combatEnabled)-monsterSearchRank(b,progress,combatEnabled)||Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z));
+ const home=tacticalHome();
+ const [monster]=available.sort((a,b)=>monsterSearchRank(a,progress,combatEnabled)-monsterSearchRank(b,progress,combatEnabled)||Math.hypot(a.x-home.x,a.z-home.z)-Math.hypot(b.x-home.x,b.z-home.z));
  if(!monster)return;
  const id=String(monster.id);
  selectMonster(id);
