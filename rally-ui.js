@@ -97,7 +97,9 @@ function renderNodeList(){
  const root=$("resource-node-list");if(!root)return;
  root.replaceChildren();
  const fragment=document.createDocumentFragment();
+ const filter=$("resourceMapFilter")?.value;
  for(const node of nodes){
+  if(!nodeMatchesMapFilter(node,filter))continue;
   const type=NODE_TYPES[node.node_type]||NODE_TYPES.mine;
   const card=make("article","resource-node-card"+(node.id===selectedNodeId?" selected":""));
   const head=make("div","resource-node-heading");
@@ -126,6 +128,7 @@ function renderNodeList(){
   card.append(actions);
   fragment.append(card);
  }
+ if(!fragment.childElementCount)fragment.append(make("p","rally-empty","Nenhum ponto de coleta para este filtro."));
  root.append(fragment);
 }
 function renderRallies(){
@@ -166,7 +169,12 @@ function nodeMatchesMapFilter(node,filter){
  return node.node_type===filter;
 }
 for(const event of ["coi:world-map-3d-ready","coi:world-map-projection-changed","coi:world-map-2d-fallback"])window.addEventListener(event,projectResourceNodes);
-$("resourceMapFilter")?.addEventListener("change",renderMapNodes);
+const resourceFilter=$("resourceMapFilter");
+if(resourceFilter){
+ const target=new URLSearchParams(window.location.search).get("coleta");
+ if(Object.hasOwn(NODE_TYPES,target))resourceFilter.value=target;
+ resourceFilter.addEventListener("change",()=>{renderMapNodes();renderNodeList();});
+}
 function renderMapNodes(){
  const map=$("mapContent");if(!map)return;
  map.querySelectorAll(".resource-node-pin").forEach(pin=>pin.remove());
