@@ -135,7 +135,8 @@ function renderNodeList(){
   const actions=make("div","resource-node-actions");
   if(node.is_mine){
    const amount=collectableNodeAmount(node);
-   addAction(actions,amount>0?"Coletar "+fmt(amount):"Aguardando regeneração",()=>runNodeAction("collect",node),busy||amount<1);
+   card.append(make("p","resource-node-yield",amount>0?"Coleta estimada: "+fmt(amount)+" "+type.resource.toLowerCase():"Aguardando regeneração para coletar"));
+   addAction(actions,"Coletar",()=>runNodeAction("collect",node),busy||amount<1);
    addAction(actions,"Recolher tropas",()=>runNodeAction("recall",node),busy||Boolean(node.reserved_by_rally));
   }else if(node.occupied_by){
    addAction(actions,"Ocupado",()=>selectNode(node),true);
