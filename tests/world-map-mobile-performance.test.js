@@ -425,3 +425,16 @@ test("realtime invalidations during a resource refresh produce one trailing read
  assert.equal(reads,3);
  assert.equal(refresh(),null);
 });
+
+test("absolute world anchors are persistent and invalidate home, routes and marches together",async()=>{
+ const {worldHomePosition,worldVisualKeys}=await import("../scripts/world-map-visual-state.js");
+ const state={worldCoordinateSpace:"absolute-v1",homeX:-50,homeZ:45,territories:[{id:1,territory_kind:"throne",x:0,z:0}],marches:[]};
+ assert.deepEqual(worldHomePosition(state),{x:-50,z:45});
+ assert.deepEqual(worldHomePosition({...state,homeX:0,homeZ:0}),{x:0,z:0});
+ const before=worldVisualKeys(state),after=worldVisualKeys({...state,homeX:45});
+ for(const key of ["home","routes","marches"])assert.notEqual(before[key],after[key]);
+ assert.deepEqual(worldHomePosition({territories:state.territories}),{x:13,z:-11});
+ const [map,scene]=await Promise.all([read("world-map.js"),read("world-map-3d.js")]);
+ assert.match(map,/return worldHomePosition\(\{worldCoordinateSpace:state\?\.worldCoordinateSpace/);
+ assert.match(scene,/const home=worldHomePosition\(worldState\);\s*homeCastleGroup=createCastle\(terrainRoot,home\.x,home\.z/);
+});
