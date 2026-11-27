@@ -771,6 +771,25 @@ async function loadCatalog(){
  try{
   const token=chatToken();const res=await fetch('/api/store/catalog',{cache:'no-store',headers:token?{Authorization:'Bearer '+token}:{}});if(!res.ok)throw new Error('Catálogo indisponível');
   const data=await res.json();box.replaceChildren();
+  if(data.skin_edition==="beta"){
+   const preview=await fetch('/api/beta/progression-preview',{cache:'no-store',credentials:'same-origin'});
+   if(!preview.ok)throw new Error('Prévia indisponível');
+   const info=await preview.json();
+   if(info.previewOnly!==true||info.purchaseEnabled!==false)throw new Error('Prévia inválida');
+   const note=document.createElement('p');note.className='muted';note.textContent='Prévia de homologação: compras e recompensas reais desativadas.';
+   box.append(note);
+   for(const pack of info.packages||[]){
+    const card=document.createElement('article');card.className='storeCard';
+    const title=document.createElement('strong');title.textContent=pack.name;
+    const detail=document.createElement('p');detail.className='muted';
+    const resources=pack.levelPack?.resources||pack.bonus?.resources||{};
+    const names={food:'comida',wood:'madeira',stone:'pedra',iron:'ferro',gold:'ouro'};
+    const rewards=Object.entries(resources).filter(([,qty])=>Number(qty)>0).map(([key,qty])=>Number(qty).toLocaleString('pt-BR')+' '+(names[key]||key)).join(' · ');
+    detail.textContent=(pack.levelPack?'Nível '+pack.levelPack.requiredLevel+'+ · ':'Master · ')+Number(pack.gems).toLocaleString('pt-BR')+' diamantes · '+rewards+(pack.bonus?.dragons?.length?' · '+pack.bonus.dragons.length+' dragões dourados':'')+' · R$ '+Number(pack.price_brl).toFixed(2).replace('.',',')+(pack.levelPack?.priceProvisional?' (preço proposto)':'');
+    card.append(title,detail);box.append(card);
+   }
+   return;
+  }
   if(data.skin_edition==="initial"&&Number(data.skin_limit)>0){
    const note=document.createElement('p');note.className='muted';
    note.textContent='Edição inicial: '+Number(data.skin_limit)+' skins de castelo disponíveis. Novas coleções serão liberadas em futuras atualizações.';

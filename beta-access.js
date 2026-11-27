@@ -1,3 +1,4 @@
+import { betaProgressionPreview } from "./scripts/beta-progression-preview.js";
 // Fail-closed invite gate. Only active on the separately deployed beta Worker.
 // Static assets must use run_worker_first=true in wrangler.beta.jsonc.
 const COOKIE_NAME = "__Host-izzy_beta";
@@ -227,6 +228,9 @@ export async function betaAccessGuard(request, env) {
         },
         realMoneyPayments: false, administration: false, backgroundCron: false
       });
+    }
+    if (path === "/api/beta/progression-preview" && request.method === "GET") {
+      return responseJson(betaProgressionPreview(env));
     }
     if (path === "/api/store/catalog" && request.method === "GET") {
       // Empty paid-only catalog; /api/game/state still serves earnable cosmetics,
