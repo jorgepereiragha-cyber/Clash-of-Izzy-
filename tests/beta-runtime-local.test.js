@@ -1331,12 +1331,22 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         }
         console.log("Decoded beta GLB templates: " + JSON.stringify(diagnostics.loadedGlbTemplates));
         assert.deepEqual(localAssetErrors, [], "browser must not encounter missing graphics/script/style assets");
+        await page.waitForFunction(() => typeof window.__coiDrawCityEntityArt === "function");
         // Trigger a real GPU context loss (not a synthetic DOM event).
         const simulatedLoss = await page.evaluate(() => {
           const canvas = document.querySelector("#kingdom3d");
           const gl = canvas?.getContext("webgl2");
           const extension = gl?.getExtension("WEBGL_lose_context");
           if (!extension) return false;
+          const draw = window.__coiDrawCityEntityArt;
+          window.__coiTestBuildingPaints = new Map();
+          window.__coiDrawCityEntityArt = (context, art) => {
+            const painted = draw(context, art);
+            if (painted && art.category === "buildings") {
+              window.__coiTestBuildingPaints.set(art.id.startsWith("castle")?"castle":art.id, art);
+            }
+            return painted;
+          };
           extension.loseContext();
           return true;
         });
@@ -1347,6 +1357,16 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.ok(await page.locator("#city .building").first().isVisible(),"2D building controls remain usable");
         assert.equal(await page.locator("#coiCityCameraControls").isVisible(),false,"camera controls hidden after GPU loss");
         assert.ok(await page.locator("#city .building:not([hidden])").count() <= 9,"2D fallback retains at most nine controls");
+        await page.waitForFunction(()=>window.__coiTestBuildingPaints?.size===9);
+        assert.ok(await page.evaluate(()=>{
+          const canvas=document.querySelector("#kingdomScene").getBoundingClientRect();
+          return Array.from(document.querySelectorAll("#city .building:not([hidden])")).every(button=>{
+            const art=window.__coiTestBuildingPaints.get(button.dataset.building);
+            const plot=button.getBoundingClientRect();
+            return art&&art.x>=plot.left-canvas.left-1&&art.y>=plot.top-canvas.top-1&&
+              art.x+art.w<=plot.right-canvas.left+1&&art.y+art.h<=plot.bottom-canvas.top+1;
+          });
+        }),"2D building art stays inside each plot when switching renderers");
         assert.ok(await page.locator("#coiRoyalJourney").isVisible(),"journey remains available in fallback");
         assert.equal(await page.locator("#coiGraphicsPreset").inputValue(),"balanced");
         assert.equal(await page.locator("#coiGraphicsApply").isEnabled(),true,"same graphics profile can be retried");

@@ -109,7 +109,10 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .coi-training-quote{margin:0;color:#e4d2ac;font-size:13px}
 @media(max-width:450px){.coi-military-sites{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){#coiCitySelection{bottom:calc(86px + env(safe-area-inset-bottom));gap:7px;padding:9px}#coiCitySelectionDetails{min-width:106px;font-size:12px}}
-@media(prefers-reduced-motion:no-preference){.city .building{transition:transform .18s ease,border-color .18s ease}.city .building:hover{transform:translateY(-3px) scale(1.025)}}
+@media(prefers-reduced-motion:no-preference){
+ .city .building{transition:border-color .18s ease}
+ .city.has-3d .building{transition:transform .18s ease,border-color .18s ease}
+}
   .coi-castle-vip{margin-top:14px;background:linear-gradient(145deg,#13263b,#2c2940);border:1px solid #d1a958;border-radius:10px;padding:12px}
 .coi-castle-vip h3{margin:0 0 8px;color:#f1d38b;font-size:15px}
 .coi-vip-badge{display:inline-block;border:1px solid #e5c470;color:#f7dc9c;border-radius:999px;padding:4px 9px;font-weight:800}
@@ -125,6 +128,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 
 /* Scene art, not opaque UI cards, is the focus of the settlement. */
 .city:not(.has-3d) .building{background:linear-gradient(180deg,#142f2822,#0e211cc2);border-color:#e0c28275;box-shadow:0 2px 6px #07150e44;backdrop-filter:none;gap:2px}
+.city:not(.has-3d) .building:hover{transform:none}
 .city:not(.has-3d) .building.castle{background:linear-gradient(180deg,#735b2d55,#292719c9);border-color:#f4d78e}
 .city .building-art{display:block;width:clamp(38px,12vw,76px);height:clamp(36px,11vw,68px);filter:drop-shadow(0 3px 2px #0007);flex:none}
 .city.has-3d .building-art{display:none}
