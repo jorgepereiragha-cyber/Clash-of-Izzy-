@@ -490,3 +490,62 @@ test("imperial throne preserves server phase colors and uses a bounded sanctuary
  }
  for(const m of Object.values(shared))m.dispose();
 });
+test("collection receipt reports authoritative resource and own/allied troop returns",async()=>{
+ const ui=await read("rally-ui.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function nodeActionReceipt("),end=ui.indexOf("async function runNodeAction(",start);
+ assert.ok(start>=0&&end>start);
+ const receipt=runInNewContext(ui.slice(start,end)+"\nnodeActionReceipt",{NODE_TYPES:{farm:{resource:"Comida"}},fmt:value=>String(Number(value||0))});
+ assert.equal(receipt("collect",{node_type:"farm"},{collected:5000000}),"Coleta concluída: 5000000 comida.");
+ assert.equal(receipt("collect-return",{node_type:"farm"},{collected:5000000,returned:12,returned_allies:3}),"Coleta concluída: 5000000 comida. 12 tropas próprias retornaram. 3 tropas aliadas retornaram.");
+ assert.equal(receipt("collect-return",{node_type:"unknown"},{collected:5,returned:2,returned_allies:0}),"Coleta concluída: 5 recursos. 2 tropas próprias retornaram.");
+ assert.match(ui,/data=>nodeActionReceipt\(action,node,data\)/);
+});
+
+test("rally and gathering action controls maintain mobile touch targets and visible focus",async()=>{
+ const css=await read("styles/rally.css");
+ const rule=css.match(/\.rally-action\{([^}]+)\}/)?.[1];
+ assert.ok(rule);
+ assert.match(rule,/min-height:44px/);
+ assert.match(rule,/min-width:44px/);
+ assert.match(rule,/font-size:12px/);
+ assert.match(rule,/touch-action:manipulation/);
+ assert.match(css,/\.rally-action:focus-visible\{[^}]*outline:/);
+ assert.match(css,/\.resource-node-yield\{[^}]*font-variant-numeric:tabular-nums/);
+});
+
+test("committed gathering receipt survives a temporary map refresh failure",async()=>{
+ const ui=await read("rally-ui.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("async function loadRallyState("),end=ui.indexOf("function init(",start);
+ assert.ok(start>=0&&end>start);
+ const messages=[];
+ let current="original";
+ const load=runInNewContext(ui.slice(start,end)+"\nloadRallyState",{
+  token:"original",readRallySession:()=>({token:current}),
+  api:async()=>{throw new Error("offline");},
+  notify:(message,error)=>messages.push({message,error})
+ });
+ await load("Coleta concluída.");
+ assert.equal(messages[0].message,"Coleta concluída. Não foi possível atualizar o mapa; aguarde a próxima sincronização.");
+ assert.equal(messages[0].error,true);
+ current="other";
+ await load("Coleta concluída.");
+ assert.equal(messages.length,1);
+});
+
+test("late unauthorized map response cannot clear another session's UI",async()=>{
+ const ui=await read("rally-ui.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("async function loadRallyState("),end=ui.indexOf("function init(",start);
+ assert.ok(start>=0&&end>start);
+ let renders=0, notices=0;
+ const context={token:"old",readRallySession:()=>({token:"new"}),api:async()=>{throw Object.assign(new Error("expired"),{status:401});},nodes:[{id:"preserved"}],rallies:[],inAlliance:true,collectReturnEnabled:true,selectedNodeId:"preserved",selectNode:()=>{renders++;},renderMapNodes:()=>{renders++;},renderNodeList:()=>{renders++;},renderRallies:()=>{renders++;},notify:()=>{notices++;}};
+ const load=runInNewContext(ui.slice(start,end)+"\nloadRallyState",context);
+ await load();
+ assert.equal(renders,0);
+ assert.equal(notices,0);
+ assert.equal(context.nodes[0].id,"preserved");
+ assert.equal(context.collectReturnEnabled,true);
+ assert.match(ui,/finally\{\s*busy=false;\s*if\(readRallySession\(\)\.token===token\)\{renderNodeList\(\);renderRallies\(\);\}/);
+});

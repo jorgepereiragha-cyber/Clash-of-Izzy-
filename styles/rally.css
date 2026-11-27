@@ -14,7 +14,10 @@
 .rally-empty{margin:0;color:#aebdce;font-size:12px}
 .resource-node-owner{color:#9cd7a9!important}
 .resource-node-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
-.rally-action{padding:6px 9px;background:linear-gradient(#78502e,#51351f);border:1px solid #c69d56;color:#fff1cb;border-radius:6px;font-size:10px;font-weight:800}
+.rally-action{min-height:44px;min-width:44px;padding:9px 12px;background:linear-gradient(#78502e,#51351f);border:1px solid #c69d56;color:#fff1cb;border-radius:8px;font-size:12px;line-height:1.25;font-weight:800;white-space:normal;overflow-wrap:anywhere;touch-action:manipulation}
+.rally-action:focus-visible{outline:2px solid #fff2b5;outline-offset:2px}
+.resource-node-actions{gap:8px}
+.resource-node-yield{font-variant-numeric:tabular-nums;color:#ffe2a0!important}
 .rally-action:disabled{opacity:.45}
 .resource-node-pin{position:absolute;z-index:4;transform:translate(-50%,-50%);width:22px;height:22px;min-height:22px;padding:0;border-radius:50%;display:grid;place-items:center;background:#14243aee;border:1px solid #ffe2a0;box-shadow:0 2px 6px #0009;font-size:12px;line-height:1}
 .resource-node-pin.occupied{border-color:#8ee0a6;background:#17452de8}
