@@ -1,3 +1,4 @@
+import { guardTerritoryAttackSettlement } from "./territory-attack-settlement.js";
 export { EldoriaRoom } from "./eldoria-room.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses, combatRulesVersion } from "./game-adapter.js";
@@ -569,10 +570,13 @@ async function processMarches(env,kingdomId,batchSize=50){
    env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
   ];
   if(m.march_type==="attack"){
-   const target=await env.DB.prepare("SELECT id,territory_key,name,level,owner_kingdom_id FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
+   const target=await env.DB.prepare("SELECT t.id,t.territory_key,t.name,t.level,t.owner_kingdom_id,t.territory_kind,t.map_region FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1)").bind(kingdomId,m.target_territory_id).first();
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,criticalHits=0,losses={},battleLog=[],survivors={},replayData={};
-   if(target&&!target.territory_key?.startsWith("royal_throne_")&&!target.owner_kingdom_id&&army.length){
+   if(target&&target.territory_kind!=="castle"&&target.territory_kind!=="throne"&&!target.territory_key?.startsWith("royal_throne_")&&target.owner_kingdom_id==null&&army.length){
+    // If ownership, level, type or realm changes during simulation, defer the entire settlement.
+    // The next state request resolves the still-pending march against the fresh snapshot.
+    statements[0]=guardTerritoryAttackSettlement(env.DB,{resolvedAt,resolutionToken,marchId:m.id,kingdomId,now,target});
     const [kingdom,hero,dragon,military,defense]=await Promise.all([
      env.DB.prepare("SELECT castle_level,prestige,equipped_skin_id FROM kingdoms WHERE id=?").bind(kingdomId).first(),
      env.DB.prepare("SELECT h.id,h.level,hi.hero_key,hi.rarity,hi.stars FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,hi.hero_key,h.id LIMIT 1").bind(kingdomId).first(),
@@ -625,7 +629,7 @@ async function processMarches(env,kingdomId,batchSize=50){
    }
    const fragmentReward=pveFragmentReward(target?.level);
    // A captura é condicional e imediatamente seguida pelo relatório, que lê changes() da captura.
-   statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND territory_key NOT LIKE 'royal_throne_%' AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
+   statements.push(env.DB.prepare("UPDATE world_territories SET owner_kingdom_id=? WHERE id=? AND owner_kingdom_id IS NULL AND territory_kind NOT IN ('castle','throne') AND substr(territory_key,1,13)<>'royal_throne_' AND ?=1 AND "+guard).bind(kingdomId,m.target_territory_id,simulatedWin?1:0,m.id,kingdomId,resolutionToken));
    statements.push(env.DB.prepare("INSERT INTO battle_reports(attacker_kingdom_id,winner_kingdom_id,territory_id,battle_type,attacker_power,defender_power,losses_json,rewards_json,battle_log,replay_json) SELECT ?,CASE WHEN changes()>0 THEN ? ELSE NULL END,?,?,?,?,?,CASE WHEN changes()>0 THEN ? ELSE ? END,?,? WHERE "+guard)
     .bind(kingdomId,kingdomId,m.target_territory_id,"territory_pve",attackerPower,defenderPower,JSON.stringify(losses),JSON.stringify({territoryCaptured:true,criticalHits,...(fragmentReward?{equipmentFragments:fragmentReward}:{})}),JSON.stringify({territoryCaptured:false,criticalHits}),JSON.stringify(battleLog),JSON.stringify(replayData),m.id,kingdomId,resolutionToken));
    // Uma pequena recompensa de material acompanha cada conquista válida.
