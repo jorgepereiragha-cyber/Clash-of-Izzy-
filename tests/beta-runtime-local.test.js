@@ -944,6 +944,16 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
       "synthetic kingdom has room for two small training batches");
     const trainingStarts = await countEvents("troop_training_started");
     const trainingFinishes = await countEvents("troops_trained");
+    // Invalid client orders must not enqueue a default unit, clamp quantity, or debit resources.
+    for(const order of [{unit:"militia"},{unit:"militia",quantity:0},{unit:"militia",quantity:-1},
+      {unit:"militia",quantity:1.5},{unit:"militia",quantity:101},{unit:"militia",quantity:"3"},
+      {quantity:3},{unit:"unknown",quantity:3}]){
+      const rejected=await actionFor(cookie,start.data.token,{type:"train",...order});
+      assert.equal(rejected.status,400,JSON.stringify(order));
+    }
+    assert.equal(await countEvents("troop_training_started"),trainingStarts);
+    const afterInvalid=await getStateFor(cookie,start.data.token);
+    assert.equal(afterInvalid.queues.filter(q=>q.queue_type==="training"&&q.status==="running").length,0);
     const trainingRace = await Promise.all(Array.from({length:3},()=>actionFor(cookie,start.data.token,
       {type:"train",unit:"militia",quantity:3})));
     const accepted = trainingRace.filter(x=>x.status===200).length;
