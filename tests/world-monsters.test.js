@@ -59,3 +59,15 @@ test("monster pins use isometric coordinates when available and revert to tactic
  assert.match(ui,/button\.setAttribute\("aria-pressed",String\(key===id\)\)/);
  assert.match(html,/\.world-monster-pin\.selected/);
 });
+
+test("all six persisted monster types have distinct original tactical portraits",async()=>{
+ const [atlas,ui,migration]=await Promise.all(["assets/art/eldoria/monsters.svg","scripts/world-monster-preview.js","migrations/0048_world_monsters.sql"].map(path=>readFile(new URL("../"+path,import.meta.url),"utf8")));
+ const ids=[...atlas.matchAll(/<symbol id="([^"]+)" viewBox="0 0 64 64">/g)].map(m=>m[1]);
+ assert.deepEqual(ids,["ash_wolf","iron_boar","frost_bear","marsh_wyrm","stone_golem","ember_drake"]);
+ assert.ok(Buffer.byteLength(atlas)<12000);
+ assert.doesNotMatch(atlas,/<script|<image|<foreignObject|onload=/i);
+ for(const id of ids){assert.ok(migration.includes("'"+id+"'"));assert.ok(ui.includes('"'+id+'"'));}
+ assert.match(ui,/MONSTER_KEYS\.includes\(key\)/);
+ assert.match(ui,/\/assets\/art\/eldoria\/monsters\.svg#"\+key/);
+ assert.equal((ui.match(/monsterArt\(monster\.monster_key\)/g)||[]).length,2);
+});
