@@ -101,6 +101,7 @@
 <div id="shop"><div class="inside"><h2>🛒 Loja de Eldoria</h2><p>Melhore seu herói durante a partida ou consulte os pacotes e skins oficiais.</p><button id="buyDamage">Espada solar (+25 dano) · 300 ouro</button><button id="buyHealth">Armadura (+150 vida) · 250 ouro</button><button id="buySpeed">Botas (+velocidade) · 200 ouro</button><hr><p><b>Pacotes VIP e skins oficiais</b><br>Escolha seu pacote e conclua a compra pelo checkout seguro do Mercado Pago. A liberação ocorre após a confirmação do pagamento.</p><div id="catalog">Carregando catálogo oficial…</div><div class="purchase-meta" style="display:grid;gap:8px;margin:12px 0"><label>Forma de pagamento<select id="purchaseMethod" aria-label="Forma de pagamento"><option value="mercadopago_link" selected>Mercado Pago · checkout oficial</option><option value="pix" disabled>Nubank Pix · aguardando configuração</option></select></label><p>Os pagamentos são liberados apenas quando o recebedor e a integração estiverem configurados. Mercado Pago: confirmação pelo provedor. Nubank Pix: conciliação manual no extrato antes da entrega. Não envie senhas ou códigos de acesso.</p></div><p id="purchaseNotice" role="status" aria-live="polite">Pedidos vinculados ao seu reino.</p><button id="pixSupportButton" type="button" hidden>Solicitar cobrança Nubank Pix</button><div id="pixPaymentDetails" hidden><label>Chave Pix Nubank do pedido:<input type="text" id="pixKeyValue" readonly autocomplete="off" aria-label="Chave Pix para pagar o pedido" style="width:100%;padding:10px;margin:8px 0;background:#17283c;color:#fff5de;border:1px solid #d8ad5f;border-radius:8px"></label><button id="pixCopyKey" type="button">Copiar chave Pix</button><p id="pixPaymentSummary">Confira o nome do recebedor no seu banco antes de transferir. A entrega é manual após crédito confirmado.</p></div><hr><section id="kingdomStore" aria-live="polite"><h3>🏰 Loja e Coleções do Reino</h3><p>Conecte seu reino para carregar suas moedas, itens, skins e recompensas.</p></section><button id="whatsapp">Falar sobre outros pacotes no WhatsApp</button><button id="closeShop">Fechar</button></div></div>
 <script type="module">
 import * as THREE from 'three';
+import { arenaMarchAvailability } from './scripts/arena-march-policy.js';
 import { initAssetLoader, addModel, updateAssetAnimations, disposeAssetLoader } from './engine/asset-loader.js';
 import { initTextureManager, loadTexture, preloadTextures, getTexture, disposeTextures } from './engine/texture-manager.js';
 const API_BASE='/api';
@@ -211,6 +212,7 @@ document.getElementById('openMaterials').addEventListener('click',()=>{renderMat
 
 const territoryPanel=document.getElementById('territoryPanel'),territoryList=document.getElementById('territoryList'),territoryTroops=document.getElementById('territoryTroops'),territoryNotice=document.getElementById('territoryNotice');
 const unitLabels={militia:'Milícia',swordsman:'Espadachim',spearman:'Lanceiro',archer:'Arqueiro',cavalry:'Cavalaria',knight:'Cavaleiro',crossbowman:'Besteiro',catapult:'Catapulta',ram:'Aríete',trebuchet:'Trabuquete'};
+let territoryBusy=false;
 function selectedTerritoryUnits(){const result={};territoryTroops.querySelectorAll('input[data-unit]').forEach(input=>{const qty=Math.max(0,Math.floor(Number(input.value)||0));if(qty>0)result[input.dataset.unit]=qty});return result}
 function renderTerritories(){
  if(!kingdomSession){territoryList.textContent='Conecte seu reino para consultar o mapa.';return}
@@ -228,26 +230,29 @@ function renderTerritories(){
   head.append(title,state);
   const meta=document.createElement('div');meta.className='territoryMeta';meta.textContent='Terreno: '+(territory.terrain||'desconhecido')+' · Nível '+Number(territory.level||1)+' · Recurso: '+(territory.resource_type||'nenhum')+' · Taxa: '+Number(territory.resource_rate||0);
   const buttons=document.createElement('div');buttons.className='territoryButtons';
-  const own=Number(territory.owner_kingdom_id)===Number(kingdomSession.kingdom?.id);
-  const neutral=!territory.owner_kingdom_id;
-  const addAction=(label,type,disabled)=>{const button=document.createElement('button');button.className='territoryAction';button.type='button';button.textContent=label;button.disabled=disabled;button.addEventListener('click',()=>sendTerritoryMarch(territory.id,type,button));buttons.append(button)};
-  addAction('⚔ Atacar', 'attack',!neutral||!available.length);
-  addAction('🌾 Coletar','gather',(!neutral&&!own)||!available.length);
-  addAction('👁 Explorar','scout',(!neutral&&!own)||!available.length);
+  const eligibility=arenaMarchAvailability(territory,kingdomSession.kingdom?.id);
+  const addAction=(label,type,disabled)=>{const button=document.createElement('button');button.className='territoryAction';button.type='button';button.textContent=label;button.disabled=disabled||territoryBusy;button.addEventListener('click',()=>sendTerritoryMarch(territory.id,type,button));buttons.append(button)};
+  addAction('⚔ Atacar', 'attack',!eligibility.attack||!available.length);
+  addAction('🌾 Coletar','gather',!eligibility.gather||!available.length);
+  addAction('👁 Explorar','scout',!eligibility.scout||!available.length);
   card.append(head,meta,buttons);territoryList.append(card);
  }
  if(!territories.length){territoryList.textContent='Nenhum território disponível.'}
 }
 async function sendTerritoryMarch(targetId,marchType,button){
+ if(territoryBusy)return;
+ const target=kingdomSession?.territories?.find(t=>Number(t.id)===Number(targetId));
+ if(!arenaMarchAvailability(target,kingdomSession?.kingdom?.id)[marchType])return;
  const units=selectedTerritoryUnits();if(!Object.keys(units).length){territoryNotice.textContent='Selecione a quantidade de pelo menos uma tropa.';return}
- button.disabled=true;territoryNotice.textContent='Enviando marcha ao servidor…';
+ territoryBusy=true;button.disabled=true;territoryNotice.textContent='Enviando marcha ao servidor…';
  try{
-  await chatApi('/game/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'march',targetId,marchType,units})});
-  const data=await chatApi('/game/state');kingdomSession=data.state;renderTerritories();
-  territoryNotice.textContent=marchType==='attack'?'Ataque enviado! A marcha chega em aproximadamente 2 minutos.':'Marcha enviada! Consulte o painel para acompanhar.';
- }catch(error){territoryNotice.textContent=error.message;button.disabled=false}
+  const data=await chatApi('/game/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({type:'march',targetId,marchType,units})});
+  if(data.state?.kingdom)kingdomSession=data.state;
+  territoryNotice.textContent='Marcha registrada. Consulte o mapa para acompanhar o horário de chegada.';
+ }catch(error){territoryNotice.textContent=error.message}
+ finally{territoryBusy=false;renderTerritories()}
 }
-async function refreshTerritoryState(){try{const data=await chatApi('/game/state');kingdomSession=data.state;renderTerritories();territoryNotice.textContent='Mapa atualizado.'}catch(error){territoryNotice.textContent=error.message}}
+async function refreshTerritoryState(){if(territoryBusy)return;territoryBusy=true;try{const data=await chatApi('/game/state');kingdomSession=data.state;territoryNotice.textContent='Mapa atualizado.'}catch(error){territoryNotice.textContent=error.message}finally{territoryBusy=false;renderTerritories()}}
 document.getElementById('openTerritories').addEventListener('click',()=>{renderTerritories();territoryPanel.classList.add('open');refreshTerritoryState()});
 document.getElementById('closeTerritories').addEventListener('click',()=>territoryPanel.classList.remove('open'));
 document.getElementById('refreshTerritories').addEventListener('click',refreshTerritoryState);
