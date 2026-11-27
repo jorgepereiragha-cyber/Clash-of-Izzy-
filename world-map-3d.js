@@ -288,6 +288,22 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     box(parent, .8, .42, .06, shared.banner, x + .61, y + height + 1.82, z);
   }
 
+  // One draw call for repeated stonework per material, even at the highest tier.
+  function castleStonework(parent, material, pieces) {
+    if(!pieces.length)return;
+    const mesh=new THREE.InstancedMesh(new THREE.BoxGeometry(1,1,1),material,pieces.length);
+    const dummy=new THREE.Object3D();
+    for(let i=0;i<pieces.length;i++){
+      const [x,y,z,w,h,d]=pieces[i];
+      dummy.position.set(x,y,z);dummy.scale.set(w,h,d);dummy.updateMatrix();
+      mesh.setMatrixAt(i,dummy.matrix);
+    }
+    mesh.instanceMatrix.needsUpdate=true;
+    mesh.computeBoundingSphere();
+    mesh.castShadow=quality!=="low";mesh.receiveShadow=true;
+    parent.add(mesh);
+  }
+
   function createCastle(parent, x, z, scale = 1, color = "home", skinId = 0, level = 1) {
     const group = new THREE.Group();
     group.position.set(x, terrainHeight(x, z), z);
@@ -300,29 +316,54 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     const accent=theme?.accent||shared.gold;
     const tier=worldCastleTier(level);
     group.userData.coICastleTier=tier;
-    const rise=(tier-1)*.32;
-    box(group,5.6,1.35,4.5,wall,0,.76,0);
-    box(group,3.2,2.8+rise,3.1,wallLight,0,2.55+rise/2,0);
-    box(group,1.15,1.9,.18,shared.wood,0,1.1,1.64);
+    const rise=(tier-1)*.48, towerRise=(tier-1)*.25;
+    const stone=[],trim=[],slits=[];
+    // A stepped foundation, curtain walls, gatehouse and a visibly taller keep.
+    box(group,5.9,.32,4.8,wallLight,0,.16,0);
+    box(group,5.6,1.45,4.5,wall,0,1.02,0);
+    box(group,3.1,2.8+rise,2.7,wallLight,0,2.72+rise/2,-.23);
+    box(group,3.35,.22,2.96,wall,0,4.2+rise,-.23);
+    box(group,1.52,1.65,.64,wallLight,0,1.12,2.27);
+    box(group,1.03,1.26,.15,shared.leather,0,.85,2.64);
+    box(group,1.2,.19,.22,accent,0,1.55,2.65);
     for(const [tx,tz] of [[-2.5,-1.9],[2.5,-1.9],[-2.5,1.9],[2.5,1.9]]){
       const tower=new THREE.Group();tower.position.set(tx,0,tz);group.add(tower);
-      box(tower,1.25,2.6,1.25,wall,0,1.3,0);
-      box(tower,1.42,.2,1.42,wallLight,0,2.65,0);
-      cone(tower,1.05,1.45,roof,0,3.45,0,4);
+      box(tower,1.28,2.7+towerRise,1.28,wall,0,1.35+towerRise/2,0);
+      box(tower,1.48,.23,1.48,wallLight,0,2.72+towerRise,0);
+      cone(tower,1.08,1.45+towerRise*.2,roof,0,3.55+towerRise,4);
+      slits.push([tx,1.96+towerRise,tz+.65,.16,.45,.045]);
+      if(quality!=="low"){
+        trim.push([tx, .55,tz,1.40,.13,1.40],[tx,1.38,tz,1.33,.10,1.33]);
+      }
     }
-    cone(group,1.8,1.25,roof,0,4.55+rise,0,4);
+    // Curtain-wall merlons leave a clear opening over the gatehouse.
+    for(const bx of [-1.62,-.95,.95,1.62]){
+      stone.push([bx,1.9,2.1,.38,.38,.34],[bx,1.9,-2.1,.38,.38,.34]);
+    }
+    for(const bz of [-.9,0,.9])stone.push([-2.68,1.9,bz,.34,.38,.38],[2.68,1.9,bz,.34,.38,.38]);
+    for(const bx of [-.92,0,.92])slits.push([bx,2.8+rise*.5,1.14,.19,.64,.05]);
     if(tier>=2){
-      for(const tx of [-1.3,1.3])box(group,.44,.56,.50,accent,tx,3.5+rise,1.57);
+      for(const bx of [-1.24,1.24])stone.push([bx,3.45+rise,1.15,.36,.66,.35]);
+      trim.push([0,3.48+rise,1.16,2.7,.13,.16]);
     }
     if(tier>=3){
-      box(group,1.1,.23,.18,accent,0,3.75+rise,1.57);
-      for(const tx of [-1.15,1.15])cone(group,.39,.8,roof,tx,4.25+rise,1.12,4);
+      // The upper tiers gain a separate raised hall and flanking spires.
+      box(group,1.55,.66,1.58,wall,0,4.56+rise,-.23);
+      for(const bx of [-1.05,1.05])cone(group,.55,1.18,roof,bx,4.82+rise,.55,4);
     }
-    if(tier>=4)cone(group,.38,.72,accent,0,5.38+rise,0,6);
-    box(group,.08,1.85,.08,accent,.55,5.45+rise,0);
-    box(group,1.0,.48,.07,banner,1.02,5.83+rise,0);
+    const roofY=4.99+rise+(tier>=3?.52:0);
+    cone(group,1.78,1.42,roof,0,roofY,-.23,4);
+    if(tier>=4){
+      cone(group,.36,.9,accent,0,roofY+1.05,-.23,6);
+      trim.push([0,2.15,2.58,1.7,.13,.15]);
+    }
+    castleStonework(group,wallLight,stone);
+    castleStonework(group,wall,trim);
+    castleStonework(group,shared.leather,slits);
+    box(group,.08,1.45,.08,accent,.55,roofY+1.15,0);
+    box(group,1.0,.48,.07,banner,1.02,roofY+1.49,0);
     // Keep an independent faction pennant: cosmetic colors never disguise ownership.
-    box(group,.56,.24,.08,color==="enemy"?shared.enemy:shared.banner,.82,5.27+rise,0);
+    box(group,.56,.24,.08,color==="enemy"?shared.enemy:shared.banner,.82,roofY+.97,0);
     parent.add(group);
     return group;
   }
