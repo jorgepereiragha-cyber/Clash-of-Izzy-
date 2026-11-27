@@ -131,3 +131,18 @@ test("respawn is region-scoped, generation-safe, due-only and idempotent",async(
   assert.equal(await respawnDueMonsters(env,2,100),1);assert.equal(get(7).generation,2);
  }finally{sql.close()}
 });
+
+test("creature anatomy distinguishes wolf, boar, bear and drake without color cues",async()=>{
+ const {monsterParts}=await import("../scripts/world-monster-models.js");
+ const wolf=monsterParts("ash_wolf"),boar=monsterParts("iron_boar"),bear=monsterParts("frost_bear"),drake=monsterParts("ember_drake");
+ assert.ok(wolf[0].sx<boar[0].sx&&boar[0].sx<bear[0].sx);
+ assert.ok(wolf[2].sy>boar[2].sy&&bear[2].sx>wolf[2].sx);
+ assert.ok(drake[6].sy>wolf[6].sy);
+ const wings=drake.filter(p=>p.shape==="cone"&&Math.abs(p.x)>.8);
+ assert.equal(wings.length,2);
+ assert.equal(wings[0].x,-wings[1].x);
+ assert.equal(wings[0].rz,-wings[1].rz);
+ const withoutColor=parts=>JSON.stringify(parts.map(({color,...part})=>part));
+ assert.equal(new Set([wolf,boar,bear,drake].map(withoutColor)).size,4);
+ for(const parts of [wolf,boar,bear,drake])assert.ok(parts.length<=12);
+});
