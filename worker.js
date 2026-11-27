@@ -1,3 +1,4 @@
+import {huntProgressView} from "./monster-hunt-state.js";
 import {worldMonsterPreview} from "./world-monsters.js";
 import { guardTerritoryAttackSettlement } from "./territory-attack-settlement.js";
 export { EldoriaRoom } from "./eldoria-room.js";
@@ -2877,6 +2878,15 @@ export default {
         const first=(rows.results||[])[0];
         const alliance=first?{id:first.alliance_id,name:first.alliance_name,tag:first.alliance_tag}:null;
         return json({alliance,chat:messages});
+      }
+      if(url.pathname==="/api/game/monster-hunt/progress"&&request.method==="GET"){
+        if(env.ENVIRONMENT!=="beta"||env.GAME_4X_SYSTEMS_ENABLED!=="true")return json({error:"Caça indisponível."},404);
+        const limited=await rateLimitDecision(env,"monster-hunt-progress-player",playerId,30,60);
+        if(limited)return limited;
+        const kingdom=await env.DB.prepare("SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
+        if(!kingdom)return json({error:"Reino não encontrado."},404);
+        const progress=await huntProgressView(env.DB,Number(kingdom.id));
+        return progress?json({progress,combatEnabled:false}):json({error:"Progresso indisponível."},409);
       }
       if(url.pathname==="/api/game/world-monsters"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"world-monsters-read-player",playerId,30,60);
