@@ -223,7 +223,8 @@ test("resource locator prioritizes available productive nodes before nearer bloc
  const start=ui.indexOf("function rankResourceNode(");
  const end=ui.indexOf('$("resourceMapLocate")?.addEventListener',start);
  assert.ok(start>=0&&end>start);
- const compare=runInNewContext(ui.slice(start,end)+"\ncompareResourceNodes");
+ const amountStart=ui.indexOf("function collectableNodeAmount("),amountEnd=ui.indexOf("function selectNode(",amountStart);
+ const compare=runInNewContext(ui.slice(amountStart,amountEnd)+ui.slice(start,end)+"\ncompareResourceNodes");
  const nodes=[
   {id:"foreign",map_x:0,map_y:0,occupied_by:2,current_resources:100},
   {id:"reserved",map_x:1,map_y:0,reserved_by_rally:"r",current_resources:100},
@@ -245,7 +246,9 @@ test("collection estimate matches server rounding and disables empty node collec
  for(const [available,expected] of [[0,0],[1,0],[2,1],[3,1],[101,50],[-1,0],[undefined,0],[Infinity,0]]){
   assert.equal(estimate({current_resources:available}),expected);
  }
- assert.match(server,/amount=Math\.floor\(available\*0\.5\)/);
+ assert.equal(estimate({current_resources:4000000,collection_amount:0}),0);
+ assert.equal(estimate({current_resources:5000000,collection_amount:5000000}),5000000);
+ assert.match(server,/available>=Number\(node.max_resources\)\?5000000:0/);
  assert.match(ui,/addAction\(actions,"Coletar",\(\)=>runNodeAction\("collect",node\),busy\|\|amount<1\)/);
  assert.match(ui,/Aguardando regeneração para coletar/);
 });
