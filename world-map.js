@@ -353,6 +353,11 @@ function renderMarches() {
     return;
   }
   const territories = new Map((state.territories || []).map(item => [Number(item.id), item.name]));
+  const scoutReports=new Map();
+  for(const event of state.recentEvents||[]){
+    if(event.event_type!=="territory_scouted")continue;
+    try{const report=JSON.parse(event.payload_json);if(Number.isSafeInteger(report.marchId)&&!scoutReports.has(report.marchId))scoutReports.set(report.marchId,report);}catch{}
+  }
   for (const march of marches.slice(0, 10)) {
     const card = make("div", "march");
     const title = make("strong", "", (march.march_type || "Marcha").toUpperCase() + " · " + (territories.get(Number(march.target_territory_id)) || "Território"));
@@ -360,6 +365,11 @@ function renderMarches() {
     card.append(title, make("div", "muted", "Estado: " + march.status), make("div", "muted", "Chegada prevista: " + date));
     const composition=readMarchComposition(march.units_json);
     if(composition.length)card.append(make("div","muted","Formação: "+composition.map(u=>UNIT_NAMES[u.type]+" × "+fmt(u.count)).join(" · ")));
+    const report=scoutReports.get(Number(march.id));
+    if(march.march_type==="scout"&&report){
+      const label=RESOURCE[report.resourceType]?.label||"Sem recurso";
+      card.append(make("div","muted","Reconhecimento: "+String(report.name||"Território")+" · Nv. "+fmt(report.level)+" · "+label+" · Taxa "+fmt(report.resourceRate)));
+    }
     root.append(card);
   }
 }
