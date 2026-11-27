@@ -1,8 +1,14 @@
+import {createEntityArtElement} from "./kingdom-2d-art-atlas.js";
 // Read-only field guide for persisted beta monsters. Never dispatch a march.
 const root=document.getElementById("worldMonsterPreview");
 const list=document.getElementById("worldMonsterList");
 const status=document.getElementById("worldMonsterStatus");
-const ICONS=Object.freeze({ash_wolf:"🐺",iron_boar:"🐗",frost_bear:"🐻",marsh_wyrm:"🐍",stone_golem:"🗿",ember_drake:"🐲"});
+const MONSTER_KEYS=Object.freeze(["ash_wolf","iron_boar","frost_bear","marsh_wyrm","stone_golem","ember_drake"]);
+function monsterArt(key){
+ if(!MONSTER_KEYS.includes(key))return element("span","◆");
+ const svg=createEntityArtElement({kind:"symbol",src:"/assets/art/eldoria/monsters.svg#"+key,viewBox:"0 0 64 64"},document);
+ svg.classList.add("monster-portrait");return svg;
+}
 function token(){
  for(const key of ["localStorage","sessionStorage"]){
   try{const value=window[key]?.getItem("coi_game_token");if(value)return value;}catch{}
@@ -31,7 +37,7 @@ function selectMonster(id,showGuide=false){
 function addPin(monster,id,hp){
  if(!map||!Number.isFinite(Number(monster.x))||!Number.isFinite(Number(monster.z)))return;
  const button=element("button");button.type="button";button.className="world-monster-pin"+(hp===0?" defeated":"");
- button.append(element("span",ICONS[monster.monster_key]||"◆"),element("small","Nv. "+monster.level));
+ button.append(monsterArt(monster.monster_key),element("small","Nv. "+monster.level));
  button.title=monster.name+" · Nv. "+monster.level+" · "+hp+" PV";
  button.setAttribute("aria-label",button.title);button.setAttribute("aria-pressed","false");
  button.addEventListener("pointerdown",event=>event.stopPropagation());
@@ -56,7 +62,7 @@ async function refresh(){
    const item=element("article");item.className="stat";
    const max=Math.max(1,Number(monster.max_hp)||1);
    const hp=Math.max(0,Math.min(max,Number(monster.hp)||0));
-   item.append(element("b",(ICONS[monster.monster_key]||"◆")+" "+monster.name+" · Nv. "+monster.level));
+   const heading=element("b");heading.className="monster-heading";heading.append(monsterArt(monster.monster_key),element("span",monster.name+" · Nv. "+monster.level));item.append(heading);
    const meter=element("progress");meter.max=max;meter.value=hp;meter.setAttribute("aria-label","Vida de "+monster.name);
    item.append(meter,element("span",hp+" / "+max+" PV · X "+monster.x+" / Z "+monster.z));
    item.append(element("span",hp>0?"Disponível para visualização":"Aguardando reaparecimento"));
