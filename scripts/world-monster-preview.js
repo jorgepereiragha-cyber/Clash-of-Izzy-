@@ -57,6 +57,16 @@ async function refresh(){
   const data=await response.json();
   if(!data.enabled){root.hidden=true;clearPins();list.replaceChildren();monsterRows=[];syncMonsterModels();return;}
   root.hidden=false;
+  const progressResponse=await fetch("/api/game/monster-hunt/progress",{headers:{Authorization:"Bearer "+bearer},cache:"no-store",redirect:"error"}).catch(()=>null);
+  const progress=progressResponse?.ok?(await progressResponse.json().catch(()=>null))?.progress:null;
+  const progressBox=document.getElementById("worldMonsterProgress");
+  if(progressBox){
+   progressBox.replaceChildren();
+   if(progress){
+    const meter=element("progress");meter.max=progress.maxEnergy;meter.value=progress.energy;meter.setAttribute("aria-label","Energia de caça");
+    progressBox.append(element("b","Energia de caça: "+progress.energy+" / "+progress.maxEnergy),meter,element("span","Maior nível liberado: "+progress.unlockedLevel+" · +1 energia a cada "+Math.floor(progress.recoverySeconds/60)+" min"));
+   }else progressBox.append(element("span","Progresso de caça indisponível."));
+  }
   const rows=Array.isArray(data.monsters)?data.monsters:[];
   clearPins();list.replaceChildren();
   for(const monster of rows){
@@ -68,6 +78,11 @@ async function refresh(){
    const meter=element("progress");meter.max=max;meter.value=hp;meter.setAttribute("aria-label","Vida de "+monster.name);
    item.append(meter,element("span",hp+" / "+max+" PV · X "+monster.x+" / Z "+monster.z));
    item.append(element("span",hp>0?"Disponível para visualização":"Aguardando reaparecimento"));
+   if(progress){
+    const cost=progress.energyCosts?.[monster.level];
+    const locked=Number(monster.level)>Number(progress.unlockedLevel);
+    item.append(element("span",locked?"Nível bloqueado · derrote o anterior":"Custo previsto: "+cost+" energia"));
+   }
    const button=element("button","Localizar no mapa");button.type="button";button.className="secondary";
    button.addEventListener("click",()=>{selectMonster(id);mapHost?.scrollIntoView({block:"nearest",behavior:"auto"});pins.get(id)?.button.focus({preventScroll:true});});
    item.append(button);list.append(item);cards.set(id,item);addPin(monster,id,hp);
