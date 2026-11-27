@@ -75,6 +75,11 @@ function nodeReadyLabel(node){
  const time=minutes>=60?Math.floor(minutes/60)+" h "+(minutes%60)+" min":minutes+" min";
  return "Aguardando regeneração para coletar · ~"+time;
 }
+function nodeHarvestPreview(node){
+ const amount=collectableNodeAmount(node);
+ const type=NODE_TYPES[node.node_type];
+ return {amount,resource:type?.resource||"Recursos",stock:Math.max(0,Number(node.current_resources)||0),capacity:Math.max(0,Number(node.max_resources)||0),readyLabel:nodeReadyLabel(node),blocked:!node.is_mine&&Boolean(node.occupied_by||node.reserved_by_rally)};
+}
 function nodeStockMeter(node){
  const meter=make("progress","resource-node-stock");
  meter.max=Math.max(1,Number(node.max_resources)||0);
@@ -92,7 +97,7 @@ function selectNode(node){
    make("span","",node.id),
    make("span","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" recursos"),
    make("span","",nodeAvailability(node)),
-   ...(node.is_mine?[make("span","",collectableNodeAmount(node)>0?"Coleta estimada: "+fmt(collectableNodeAmount(node)):nodeReadyLabel(node))]:[]),
+   make("span","",nodeHarvestPreview(node).blocked?"Ponto indisponível para nova expedição":collectableNodeAmount(node)>0?"Coleta estimada: "+fmt(collectableNodeAmount(node)):nodeReadyLabel(node)),
    make("span","",fmt(node.regen_rate)+" recursos/h de regeneração")
   ]:[]));
  }
@@ -106,7 +111,7 @@ function selectNode(node){
  const list=$("resource-node-list");
  const activeCard=list?.querySelector(".resource-node-card.selected");
  if(activeCard&&list.firstElementChild!==activeCard)list.prepend(activeCard);
- if(node||previous)setResourceExpedition(node?{label:nodeLabel(node),availability:nodeAvailability(node)}:null);
+ if(node||previous)setResourceExpedition(node?{label:nodeLabel(node),availability:nodeAvailability(node),harvest:nodeHarvestPreview(node)}:null);
 }
 async function runNodeAction(action,node){
  const troops=action==="occupy"?expeditionTroops():undefined;
@@ -158,6 +163,7 @@ function renderNodeList(){
    addAction(actions,"Ocupado",()=>selectNode(node),true);
   }else{
    const locked=Boolean(node.reserved_by_rally);
+   if(!locked)card.append(make("p","resource-node-yield",collectableNodeAmount(node)>0?"Coleta estimada: "+fmt(collectableNodeAmount(node))+" "+type.resource.toLowerCase():nodeReadyLabel(node)));
    addAction(actions,"Ocupar nó",()=>runNodeAction("occupy",node),locked||busy);
    if(inAlliance){
     addAction(actions,"Criar rally",()=>{

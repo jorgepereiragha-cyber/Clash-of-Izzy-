@@ -441,8 +441,15 @@ function renderDetails() {
   root.replaceChildren();
   const territory = getSelectedTerritory();
   if (selectedResourceNode) {
-    const { label, availability } = selectedResourceNode;
+    const { label, availability, harvest } = selectedResourceNode;
     root.append(make("div", "territory-title", label), make("p", "muted", availability));
+    if(harvest){
+      const grid=make("div","detail-grid");
+      addStat(grid,"Estoque do nó",fmt(harvest.stock)+" / "+fmt(harvest.capacity));
+      addStat(grid,"Coleta estimada",harvest.blocked?"Indisponível":fmt(harvest.amount)+" "+harvest.resource.toLowerCase());
+      root.append(grid);
+      if(!harvest.blocked)root.append(make("p","muted",harvest.readyLabel));
+    }
     const nodeActions = make("a", "", "Abrir ações do nó");
     nodeActions.href = "#selected-node-title";
     root.append(nodeActions);
