@@ -393,10 +393,10 @@ export async function ensureKingdom(env,playerId){
       "positions AS (SELECT slot,((slot%20)-10)*5 AS x,(CAST(slot/20 AS INTEGER)-10)*5 AS z FROM candidates), "+
       "reserved(x,z) AS (VALUES(0,0),(18,12),(-22,8),(12,-24),(-18,-20),(30,18),(-32,-14),(34,-25),(-35,28)), "+
       "next_slot AS (SELECT pos.slot,pos.x,pos.z FROM positions pos "+
-      "WHERE NOT EXISTS(SELECT 1 FROM kingdoms k WHERE k.map_region=1 AND ABS(k.map_x-pos.x)<8 AND ABS(k.map_z-pos.z)<8) "+
-      "AND NOT EXISTS(SELECT 1 FROM world_territories t WHERE t.map_region=1 AND ABS(t.x-pos.x)<5 AND ABS(t.z-pos.z)<5) "+
-      "AND NOT EXISTS(SELECT 1 FROM resource_nodes n WHERE ABS(n.map_x-pos.x)<5 AND ABS(n.map_y-pos.z)<5) "+
-      "AND NOT EXISTS(SELECT 1 FROM world_monsters m WHERE m.map_region=1 AND ABS(m.x-pos.x)<5 AND ABS(m.z-pos.z)<5) "+
+      "WHERE NOT EXISTS(SELECT 1 FROM kingdoms k WHERE k.map_region=1 AND k.map_x>pos.x-8 AND k.map_x<pos.x+8 AND k.map_z>pos.z-8 AND k.map_z<pos.z+8) "+
+      "AND NOT EXISTS(SELECT 1 FROM world_territories t WHERE t.map_region=1 AND t.x>pos.x-5 AND t.x<pos.x+5 AND t.z>pos.z-5 AND t.z<pos.z+5) "+
+      "AND NOT EXISTS(SELECT 1 FROM resource_nodes n WHERE n.map_x>pos.x-5 AND n.map_x<pos.x+5 AND n.map_y>pos.z-5 AND n.map_y<pos.z+5) "+
+      "AND NOT EXISTS(SELECT 1 FROM world_monsters m WHERE m.map_region=1 AND m.x>pos.x-5 AND m.x<pos.x+5 AND m.z>pos.z-5 AND m.z<pos.z+5) "+
       "AND NOT EXISTS(SELECT 1 FROM reserved p WHERE ABS(p.x-pos.x)<5 AND ABS(p.z-pos.z)<5) ORDER BY pos.slot LIMIT 1) "+
       "INSERT INTO kingdoms(player_id,kingdom_name,food,wood,stone,iron,gold,last_production_at,map_region,map_slot,map_x,map_z) "+
       "SELECT p.id,?,?,?,?,?,?,?,1,slot,x,z FROM next_slot CROSS JOIN players p WHERE p.player_id=? AND NOT EXISTS(SELECT 1 FROM kingdoms WHERE player_id=p.id)"
