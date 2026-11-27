@@ -47,18 +47,39 @@ function addPin(monster,id,hp){
 }
 for(const event of ["coi:world-map-3d-ready","coi:world-map-projection-changed","coi:world-map-2d-fallback"])window.addEventListener(event,projectPins);
 window.addEventListener("coi:world-map-3d-ready",syncMonsterModels);
-let busy=false;
+let busy=false, timer=null, enabled=null, signature=null, renderedBearer="", suspended=false;
+const REFRESH_MS=30000;
+function stopRefresh(){if(timer!==null){clearTimeout(timer);timer=null;}}
+function clearSnapshot(){
+ signature=null;renderedBearer="";selected=null;
+ clearPins();list?.replaceChildren();monsterRows=[];syncMonsterModels();
+ document.getElementById("worldMonsterProgress")?.replaceChildren();
+}
+function scheduleRefresh(){
+ stopRefresh();
+ if(!suspended&&!document.hidden&&enabled!==false&&token())timer=setTimeout(()=>{timer=null;void refresh();},REFRESH_MS);
+}
 async function refresh(){
- const bearer=token();if(!bearer||busy||!root||!list||!status)return;
+ stopRefresh();
+ if(suspended||document.hidden||busy||!root||!list||!status)return;
+ const bearer=token();
+ if(!bearer){clearSnapshot();root.hidden=true;enabled=null;return;}
+ if(renderedBearer&&renderedBearer!==bearer){clearSnapshot();root.hidden=true;enabled=null;}
  busy=true;
  try{
   const response=await fetch("/api/game/world-monsters",{headers:{Authorization:"Bearer "+bearer},cache:"no-store",redirect:"error"});
   if(!response.ok)throw Error("Consulta indisponível");
   const data=await response.json();
-  if(!data.enabled){root.hidden=true;clearPins();list.replaceChildren();monsterRows=[];syncMonsterModels();return;}
-  root.hidden=false;
+  if(token()!==bearer||suspended){clearSnapshot();root.hidden=true;enabled=null;return;}
+  enabled=data.enabled===true;
+  if(!enabled){root.hidden=true;clearSnapshot();return;}
   const progressResponse=await fetch("/api/game/monster-hunt/progress",{headers:{Authorization:"Bearer "+bearer},cache:"no-store",redirect:"error"}).catch(()=>null);
   const progress=progressResponse?.ok?(await progressResponse.json().catch(()=>null))?.progress:null;
+  if(token()!==bearer||suspended){clearSnapshot();root.hidden=true;enabled=null;return;}
+  root.hidden=false;
+  const rows=Array.isArray(data.monsters)?data.monsters:[];
+  const nextSignature=JSON.stringify([data.region,rows,progress]);
+  if(renderedBearer===bearer&&signature===nextSignature)return;
   const progressBox=document.getElementById("worldMonsterProgress");
   if(progressBox){
    progressBox.replaceChildren();
@@ -67,7 +88,8 @@ async function refresh(){
     progressBox.append(element("b","Energia de caça: "+progress.energy+" / "+progress.maxEnergy),meter,element("span","Maior nível liberado: "+progress.unlockedLevel+" · +1 energia a cada "+Math.floor(progress.recoverySeconds/60)+" min"));
    }else progressBox.append(element("span","Progresso de caça indisponível."));
   }
-  const rows=Array.isArray(data.monsters)?data.monsters:[];
+  const focused=document.activeElement;
+  const focusedPin=[...pins].find(([,entry])=>entry.button===focused)?.[0];
   clearPins();list.replaceChildren();
   for(const monster of rows){
    const id=String(monster.id);
@@ -89,9 +111,18 @@ async function refresh(){
   }
   monsterRows=rows;syncMonsterModels();
   selectMonster(pins.has(selected)?selected:null);projectPins();
+  if(focusedPin)pins.get(focusedPin)?.button.focus({preventScroll:true});
+  signature=nextSignature;renderedBearer=bearer;
   status.textContent=rows.length+" criaturas no seu reino · prévia; caça ainda não liberada.";
- }catch{root.hidden=false;clearPins();list.replaceChildren();monsterRows=[];syncMonsterModels();status.textContent="Não foi possível carregar os monstros. Tente atualizar.";}
- finally{busy=false;}
+ }catch{
+  clearSnapshot();root.hidden=token()!==bearer||suspended;enabled=null;
+  status.textContent="Não foi possível carregar os monstros. Tente atualizar.";
+ }
+ finally{busy=false;scheduleRefresh();}
 }
 document.getElementById("worldMonsterRefresh")?.addEventListener("click",refresh);
+document.addEventListener("visibilitychange",()=>{if(document.hidden)stopRefresh();else if(enabled!==false)void refresh();});
+window.addEventListener("pagehide",()=>{suspended=true;stopRefresh();});
+window.addEventListener("pageshow",event=>{suspended=false;if(event.persisted&&enabled!==false)void refresh();});
+window.addEventListener("storage",event=>{if(event.key==="coi_game_token"||event.key===null){clearSnapshot();root.hidden=true;enabled=null;void refresh();}});
 void refresh();
