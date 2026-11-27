@@ -846,6 +846,61 @@
           "symbol": "summon_altar",
           "viewBox": "0 0 100 90"
         }
+      },
+      "mill": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/industry-defense.svg",
+          "symbol": "mill",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "bakery": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/industry-defense.svg",
+          "symbol": "bakery",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "defense_tower": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/industry-defense.svg",
+          "symbol": "defense_tower",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "defense_trap": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/industry-defense.svg",
+          "symbol": "defense_trap",
+          "viewBox": "0 0 100 90"
+        }
+      },
+      "defense_gate": {
+        "webgl": {
+          "modelIds": [],
+          "fallback": "procedural"
+        },
+        "canvas2d": {
+          "atlas": "art/buildings/industry-defense.svg",
+          "symbol": "defense_gate",
+          "viewBox": "0 0 100 90"
+        }
       }
     },
     "dragons": {
