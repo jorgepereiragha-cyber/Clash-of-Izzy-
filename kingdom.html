@@ -101,8 +101,13 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 #coiCitySelection{flex-wrap:wrap}
 #coiCitySelection .coi-selection-copy{flex-basis:100%}
 #coiCitySelectionAction{flex:1;min-height:48px}
-#coiCitySelectionAction[hidden]{display:none!important}
+#coiCitySelectionAction[hidden],#coiCitySelectionTrain[hidden]{display:none!important}
 #coiCitySelectionClose{min-width:48px;font-size:21px}
+.coi-military-sites{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px;margin:8px 0}
+.coi-military-sites button{display:grid;justify-items:center;gap:3px;min-height:62px;padding:5px;font-size:11px;line-height:1.15}
+.coi-military-sites svg{width:32px;height:29px;display:block}
+.coi-training-quote{margin:0;color:#e4d2ac;font-size:13px}
+@media(max-width:450px){.coi-military-sites{grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){#coiCitySelection{bottom:calc(86px + env(safe-area-inset-bottom));gap:7px;padding:9px}#coiCitySelectionDetails{min-width:106px;font-size:12px}}
 @media(prefers-reduced-motion:no-preference){.city .building{transition:transform .18s ease,border-color .18s ease}.city .building:hover{transform:translateY(-3px) scale(1.025)}}
   .coi-castle-vip{margin-top:14px;background:linear-gradient(145deg,#13263b,#2c2940);border:1px solid #d1a958;border-radius:10px;padding:12px}
@@ -220,6 +225,13 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
   <button type="button" class="secondary" data-city-zoom="in" aria-label="Aproximar câmera da cidade">+</button>
  </div>
  </div>
+ <nav class="coi-military-sites" aria-label="Locais de treinamento de tropas">
+  <button type="button" class="secondary" data-training-site="barracks"><svg viewBox="0 0 100 90" aria-hidden="true"><use href="/assets/art/buildings/icons.svg#barracks"></use></svg>Quartel</button>
+  <button type="button" class="secondary" data-training-site="archery_range"><svg viewBox="0 0 100 90" aria-hidden="true"><use href="/assets/art/buildings/icons.svg#archery_range"></use></svg>Campo de arqueiros</button>
+  <button type="button" class="secondary" data-training-site="stable"><svg viewBox="0 0 100 90" aria-hidden="true"><use href="/assets/art/buildings/icons.svg#stable"></use></svg>Estábulo</button>
+  <button type="button" class="secondary" data-training-site="siege_workshop"><svg viewBox="0 0 100 90" aria-hidden="true"><use href="/assets/art/buildings/icons.svg#siege_workshop"></use></svg>Oficina de cerco</button>
+  <button type="button" class="secondary" data-training-site="academy"><svg viewBox="0 0 100 90" aria-hidden="true"><use href="/assets/art/buildings/icons.svg#academy"></use></svg>Academia</button>
+ </nav>
  <nav id="coiRecruitmentSites" class="coi-recruitment-sites" aria-label="Locais de recrutamento da cidade">
   <a id="coiSummonAltar" class="coi-recruitment-site coi-site-altar" href="/equipment-ui.html#hero-summon-title" aria-label="Entrar no Altar de Convocação e convocar heróis">
    <span class="coi-site-crest" aria-hidden="true">🏛️</span>
@@ -305,6 +317,12 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <section class="panel"><h2>⏳ Centro de operações</h2><div id="queues" class="events"><div class="muted">Carregando filas do reino…</div></div></section>
 <section class="panel"><h2>⚔️ Recrutamento de tropas</h2>
 <form id="trainingForm" class="queue-form">
+<label for="trainingSite">Local de treinamento</label>
+<select id="trainingSite">
+<option value="">Todos os locais</option><option value="barracks">Quartel</option>
+<option value="archery_range">Campo de arqueiros</option><option value="stable">Estábulo</option>
+<option value="siege_workshop">Oficina de cerco</option><option value="academy">Academia</option>
+</select>
 <label for="unitType">Unidade militar</label>
 <span id="coiTroopArtPreview" class="coi-art-preview" data-entity-art-category="troops" data-entity-art-id="militia" aria-hidden="true"></span>
 <select id="unitType" required>
@@ -315,8 +333,8 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 </select>
 <label for="unitQuantity">Quantidade (1–100)</label>
 <input id="unitQuantity" type="number" min="1" max="100" value="10" step="1" inputmode="numeric" required>
+<p class="coi-training-quote" id="trainingQuote" aria-live="polite"></p>
 <button id="trainButton" type="submit">Iniciar treinamento</button>
-<p class="muted">Os recursos são cobrados ao iniciar. As tropas entram no exército ao concluir. A capacidade é de 500 tropas por nível do quartel e considera o exército no castelo, em marcha e em treinamento.</p>
 </form>
 </section>
 <section class="panel"><h2>🔬 Academia e pesquisas</h2>
@@ -387,6 +405,7 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 <div id="coiCitySelection" aria-label="Edifício selecionado" hidden>
  <div class="coi-selection-copy" aria-live="polite"><strong id="coiCitySelectionName"></strong><small id="coiCitySelectionLevel"></small><small id="coiCitySelectionRole"></small></div>
  <button type="button" id="coiCitySelectionAction" class="secondary" hidden></button>
+ <button type="button" id="coiCitySelectionTrain" class="secondary" hidden>Treinar magos</button>
  <button type="button" id="coiCitySelectionDetails" class="secondary">Ver melhorias</button>
  <button type="button" id="coiCitySelectionClose" class="secondary" aria-label="Fechar seleção do edifício">×</button>
 </div>
@@ -926,7 +945,7 @@ const buildingFunctions=Object.freeze({
  lumber_mill:{role:"Produção de madeira",resource:"wood"},
  iron_mine:{role:"Produção de ferro",resource:"iron"},
  market:{role:"Produção de ouro",resource:"gold",href:"/market.html#merchant",action:"Visitar mercador"},
- academy:{role:"Ciência militar e treinamento de magos",target:"researchForm",action:"Pesquisar"},
+ academy:{role:"Ciência militar e treinamento de magos",target:"researchForm",action:"Pesquisar",units:["mage"]},
  wall:{role:"Resistência da muralha e defesa",target:"coiDefenseGrid",action:"Defesas"},
  hospital:{role:"Tratamento de tropas feridas",target:"coiHospitalPanel",action:"Hospital"},
  watchtower:{role:"Contribui para a defesa do reino",target:"coiDefenseGrid",action:"Defesas"},
@@ -971,7 +990,8 @@ function selectCityBuilding(type){
  document.getElementById("coiCitySelectionRole").textContent=definition?buildingRoleText(type,definition):"";
  const action=document.getElementById("coiCitySelectionAction");
  action.hidden=!buildingActionAvailable(definition);
- action.textContent=definition?.units?"Treinar":definition?.action||"";
+ action.textContent=definition?.action||(definition?.units?"Treinar":"");
+ document.getElementById("coiCitySelectionTrain").hidden=!(definition?.units&&definition.target);
  document.getElementById("coiCitySelectionLevel").textContent="Nível "+fmt(entry.level)+(upgradeButton?.disabled?" · Melhoria indisponível no momento":" · Ver progresso e melhorias");
  panel.hidden=false;
  document.querySelectorAll("#city [data-building]").forEach(button=>button.setAttribute("aria-pressed",String(button.dataset.building===type)));
@@ -989,22 +1009,40 @@ document.getElementById("coiCitySelection").addEventListener("keydown",event=>{
  event.preventDefault();
  document.getElementById("coiCitySelectionClose").click();
 });
-document.getElementById("coiCitySelectionAction").addEventListener("click",()=>{
- const definition=buildingFunctions[selectedCityBuildingType];
- if(!buildingActionAvailable(definition))return;
- if(definition.href){window.location.assign(definition.href);return;}
- const target=document.getElementById(definition.units?"trainingForm":definition.target);
- if(!target)return;
- let focusTarget=target.querySelector("select:not(:disabled),button:not(:disabled),input:not(:disabled)")||target;
- if(definition.units){
-  const unit=document.getElementById("unitType");
-  if(!definition.units.includes(unit.value))unit.value=definition.units[0];
-  focusTarget=unit;
- }
+function focusCityAction(target,focusTarget){
  selectCityBuilding(null);
  target.scrollIntoView({behavior:window.matchMedia("(prefers-reduced-motion: reduce)").matches?"auto":"smooth",block:"center"});
  if(!focusTarget.matches("select,button,input,a,[tabindex]"))focusTarget.tabIndex=-1;
  focusTarget.focus({preventScroll:true});
+}
+function applyTrainingSite(){
+ const site=document.getElementById("trainingSite").value;
+ const units=buildingFunctions[site]?.units;
+ const select=document.getElementById("unitType");
+ for(const option of select.options)option.hidden=option.disabled=Boolean(units&&!units.includes(option.value));
+ if(units&&!units.includes(select.value)){
+  select.value=units[0];
+  select.dispatchEvent(new Event("change",{bubbles:true}));
+ }else renderTrainingForm();
+}
+function openTrainingSite(site){
+ document.getElementById("trainingSite").value=site;
+ applyTrainingSite();
+ focusCityAction(document.getElementById("trainingForm"),document.getElementById("unitType"));
+}
+document.querySelectorAll("[data-training-site]").forEach(button=>
+ button.addEventListener("click",()=>openTrainingSite(button.dataset.trainingSite)));
+document.getElementById("coiCitySelectionTrain").addEventListener("click",()=>openTrainingSite(selectedCityBuildingType));
+document.getElementById("trainingSite").addEventListener("change",applyTrainingSite);
+document.getElementById("unitType").addEventListener("change",()=>renderTrainingForm());
+document.getElementById("unitQuantity").addEventListener("input",()=>renderTrainingForm());
+document.getElementById("coiCitySelectionAction").addEventListener("click",()=>{
+ const definition=buildingFunctions[selectedCityBuildingType];
+ if(!buildingActionAvailable(definition))return;
+ if(definition.href){window.location.assign(definition.href);return;}
+ if(definition.units&&!definition.target){openTrainingSite(selectedCityBuildingType);return;}
+ const target=document.getElementById(definition.target);
+ if(target)focusCityAction(target,target.querySelector("select:not(:disabled),button:not(:disabled),input:not(:disabled)")||target);
 });
 document.getElementById("coiCitySelectionDetails").addEventListener("click",()=>{
  if(!selectedCityBuildingType)return;
@@ -1030,8 +1068,7 @@ const activeConstructionCount=(state.queues||[]).filter(q=>q.queue_type==="const
 document.getElementById("buildings").innerHTML=buildings.map(b=>{const [name,emoji]=names[b.building_type]||[b.building_type,"🏘️"];const maxed=b.level>=30;const alreadyQueued=(state.queues||[]).some(q=>q.queue_type==="construction"&&q.status==="running"&&q.target_key===b.building_type);const blocked=maxed||activeConstructionCount>=2||alreadyQueued||busy;const label=maxed?"MÁXIMO":alreadyQueued?"EM CONSTRUÇÃO":activeConstructionCount>=2?"2 FILAS OCUPADAS":"Evoluir";return '<div class="building-row"><div class="info"><strong>'+esc(emoji)+' '+esc(name)+'</strong><small>Nível '+fmt(b.level)+(b.building_type==="castle"?" · Centro do reino":"")+'</small></div><button data-upgrade="'+esc(b.building_type)+'" '+(blocked?"disabled":"")+'>'+label+'</button></div>'}).join("");
 renderQueues();
 document.getElementById("researchLevels").innerHTML=(state.research||[]).map(r=>'<div class="event">'+esc(String(r.research_key).replaceAll("_"," "))+' · nível '+fmt(r.level)+'</div>').join("")||'<div class="muted">Nenhuma pesquisa concluída ainda.</div>';
-const activeTrainingCount=(state.queues||[]).filter(q=>q.queue_type==="training"&&q.status==="running").length;
-document.getElementById("trainButton").disabled=busy||activeTrainingCount>=2||Number(state.armyCount||0)>=Number(state.troopCapacity||500);
+renderTrainingForm();
 renderAcademyScience();
 const troops=state.troops||[];const total=troops.reduce((n,u)=>n+Number(u.quantity||0),0);document.getElementById("army").innerHTML=[["⚔️ Exército / capacidade",fmt(state.armyCount??total)+" / "+fmt(state.troopCapacity||500)],["🚶 Marchas",fmt((state.marches||[]).filter(m=>m.status==="marching"||m.status==="traveling").length)],["🌍 Territórios",fmt((state.territories||[]).filter(t=>t.owner_kingdom_id===k.id).length)],["🤝 Aliança",state.alliance?.tag||"Sem aliança"]].map(([a,b])=>'<div class="stat"><span>'+esc(a)+'</span><b>'+esc(b)+'</b></div>').join("");
 document.getElementById("events").innerHTML=(state.recentEvents||[]).slice(0,6).map(e=>'<div class="event">'+esc(String(e.event_type||"Atividade").replaceAll("_"," "))+'</div>').join("")||'<div class="muted">Seu reino está começando sua história.</div>';
@@ -1205,8 +1242,34 @@ async function submitQueue(type,payload,message){
  }catch(error){setStatus(error.message,true);}
  finally{busy=false;render();}
 }
+function renderTrainingForm(){
+ if(!state)return;
+ const unit=document.getElementById("unitType").value;
+ const field=document.getElementById("unitQuantity");
+ const quantity=field.valueAsNumber;
+ const slots=(state.queues||[]).filter(q=>q.queue_type==="training"&&q.status==="running").length;
+ const capacity=Math.max(0,Number(state.troopCapacity||500)-Number(state.armyCount||0));
+ const max=Math.min(100,capacity);
+ field.max=String(Math.max(1,max));
+ const spec=state.trainingOptions?.[unit];
+ const level=Number(state.buildings?.find(row=>row.building_type===spec?.building)?.level||0);
+ const costs=Object.entries(spec?.cost||{}).filter(([,amount])=>amount>0)
+  .map(([key,amount])=>[key,amount*(Number.isSafeInteger(quantity)&&quantity>0?quantity:0)]);
+ const enough=costs.every(([key,amount])=>Number(state.kingdom[key])>=amount);
+ const resourceNames={food:"Comida",wood:"Madeira",iron:"Ferro"};
+ const preview=[];
+ if(spec)preview.push(names[spec.building][0]+(level?" · Nível "+fmt(level):" · Edifício necessário"));
+ if(costs.length&&quantity>0)preview.push(costs.map(([key,amount])=>resourceNames[key]+" "+fmt(amount)).join(" · "));
+ if(!enough)preview.push("Recursos insuficientes");
+ preview.push(fmt(slots)+" / 2 filas ocupadas",fmt(capacity)+" vagas no exército");
+ const quote=document.getElementById("trainingQuote");
+ const next=preview.join(" · ");
+ if(quote.textContent!==next)quote.textContent=next;
+ document.getElementById("trainButton").disabled=busy||slots>=2||!Number.isSafeInteger(quantity)||quantity<1||quantity>max||Boolean(spec&&!level)||!enough;
+}
 async function startTraining(event){
  event.preventDefault();
+ if(document.getElementById("trainButton").disabled)return;
  const quantity=Math.max(1,Math.min(100,Math.floor(Number(document.getElementById("unitQuantity").value)||1)));
  document.getElementById("unitQuantity").value=String(quantity);
  await submitQueue("train",{unit:document.getElementById("unitType").value,quantity},"Treinamento iniciado. As tropas serão liberadas ao concluir.");

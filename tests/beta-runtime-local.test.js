@@ -1157,7 +1157,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await page.goto(base+"/kingdom.html");
         await page.locator("#game").waitFor({state:"visible",timeout:45_000});
 
-        // Authenticate with the actual browser session, then exercise the real training API.
+        // Use the browser session to verify the city training action against real D1.
         const auth = {Authorization:"Bearer " + firstToken, Origin:base};
         const readBrowserState = async () => {
           const response = await context.request.get(base + "/api/game/state", {headers:auth});
@@ -1175,9 +1175,16 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           unit => unit.unit_type === "archer" && Number(unit.tier) === 1
         )?.quantity || 0);
         const beforeArchers = archerCount(beforeTraining);
-        const training = await context.request.post(base + "/api/game/action", {
-          headers:auth, data:{type:"train",unit:"archer",quantity:3}
-        });
+        await page.locator('[data-training-site="archery_range"]').click();
+        assert.equal(await page.locator("#trainingSite").inputValue(),"archery_range");
+        assert.equal(await page.locator("#unitType").inputValue(),"archer");
+        assert.deepEqual(await page.locator("#unitType option:not([disabled])").evaluateAll(options=>options.map(option=>option.value)),["archer","crossbowman"]);
+        await page.waitForFunction(()=>document.querySelector("#coiTroopArtPreview use")?.getAttribute("href")?.endsWith("#troop-archer"));
+        await page.locator("#unitQuantity").fill("3");
+        assert.match(await page.locator("#trainingQuote").innerText(),/Campo de arqueiros.*Comida 60 · Madeira 21 · Ferro 3/);
+        const pendingTraining=page.waitForResponse(response=>new URL(response.url()).pathname==="/api/game/action"&&response.request().postDataJSON().type==="train");
+        await page.locator("#trainButton").click();
+        const training=await pendingTraining;
         assert.equal(training.status(), 200, "archer training succeeds in a new kingdom");
         const queued = (await training.json()).state;
         assert.ok(queued.queues.some(row => row.queue_type === "training" &&
