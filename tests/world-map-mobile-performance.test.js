@@ -166,3 +166,30 @@ test("collection nodes distinguish own occupancy, foreign occupancy, rally reser
  assert.match(source,/button\.style\.borderStyle="dashed"/);
  assert.match(source,/button\.setAttribute\("aria-label",button\.title\)/);
 });
+
+test("resource filters preserve distinct collection states and use shared isometric projection",async()=>{
+ const [ui,html,css]=await Promise.all([read("rally-ui.js"),read("world.html"),read("styles/rally.css")]);
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function nodeMatchesMapFilter("),end=ui.indexOf("for(const event",start);
+ assert.ok(start>=0&&end>start);
+ const filter=runInNewContext(ui.slice(start,end)+"\nnodeMatchesMapFilter");
+ assert.equal(filter({node_type:"farm"},"free"),true);
+ assert.equal(filter({node_type:"farm",reserved_by_rally:"r"},"free"),false);
+ assert.equal(filter({node_type:"farm",occupied_by:2},"free"),false);
+ assert.equal(filter({is_mine:true},"mine-owned"),true);
+ assert.equal(filter({is_mine:false},"mine-owned"),false);
+ assert.equal(filter({node_type:"farm"},"forest"),false);
+ assert.equal(filter({node_type:"forest"},"forest"),true);
+ assert.equal(filter({node_type:"forest"},"all"),true);
+ const a=ui.indexOf("function projectResourceNodes()"),b=ui.indexOf("function nodeMatchesMapFilter(",a);
+ const button={dataset:{mapX:"10",mapZ:"-20"},style:{}};
+ let fallback=false;
+ const map={querySelectorAll:()=>[button]},host={classList:{contains:()=>fallback}};
+ const window={__coiWorldMap3D:{projectPoint:(x,z)=>({left:x*2,top:z+100})}};
+ const project=runInNewContext(ui.slice(a,b)+"\nprojectResourceNodes",{$:id=>id==="mapContent"?map:host,window});
+ project();assert.equal(button.style.left,"20px");assert.equal(button.style.top,"80px");
+ fallback=true;project();assert.equal(button.style.left,"59%");assert.equal(button.style.top,"68%");
+ assert.match(ui,/coi:world-map-projection-changed/);
+ assert.match(html,/id="resourceMapFilter"/);
+ assert.match(css,/\.resource-node-pin\.foreign/);
+});
