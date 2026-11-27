@@ -1788,8 +1788,8 @@ async function gameAction(env,playerId,body){
     const arrival=new Date(Date.now()+seconds*1000).toISOString();
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
-    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=? AND (SELECT COUNT(*) FROM marches WHERE kingdom_id=? AND status='marching')<?")
-      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length,k.id,slots.max);
+    const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=? AND (SELECT COUNT(*) FROM marches WHERE kingdom_id=? AND status='marching')<? AND EXISTS(SELECT 1 FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1) AND t.territory_kind NOT IN ('castle','throne') AND substr(t.territory_key,1,13)<>'royal_throne_' AND ((?='attack' AND t.owner_kingdom_id IS NULL) OR (? IN ('gather','scout') AND (t.owner_kingdom_id IS NULL OR t.owner_kingdom_id=k.id))) AND (?<>'gather' OR t.resource_type IN ('food','wood','stone','iron')))")
+      .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length,k.id,slots.max,k.id,target.id,marchType,marchType,marchType);
     const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at) SELECT ?,?,?,?,?,? WHERE changes()=?")
       .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,unitTypes.length);
     const result=await env.DB.batch([
@@ -1798,7 +1798,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,?,?,? WHERE changes()>0")
         .bind(k.id,p.id,"march_started",JSON.stringify({targetId,marchType,units:selected}))
     ]);
-    if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes ou filas de marcha ocupadas. Atualize o reino e tente novamente."},409);
+    if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes, filas ocupadas ou território alterado. Atualize o reino e tente novamente."},409);
   }else if(type==="battle"){
     const units=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY unit_type,tier").bind(k.id).all();
     const armyRows=units.results||[];
