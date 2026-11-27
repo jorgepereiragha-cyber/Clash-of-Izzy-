@@ -186,6 +186,10 @@ function renderMap() {
   }
   applyMapViewport();
 }
+// Rebuild tactical positions immediately when the 3D renderer is lost.
+window.addEventListener("coi:world-map-2d-fallback", () => {
+  if (state?.kingdom) renderMap();
+});
 function addStat(root, label, value) {
   const stat = make("div", "stat");
   stat.append(make("span", "", label), make("b", "", value));
