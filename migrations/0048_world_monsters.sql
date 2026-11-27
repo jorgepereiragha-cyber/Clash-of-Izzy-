@@ -15,14 +15,22 @@ CREATE TABLE IF NOT EXISTS world_monsters (
  generation INTEGER NOT NULL DEFAULT 1 CHECK(generation>=1),
  UNIQUE(map_region,spawn_key)
 );
-INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp)
-SELECT r.region,s.spawn_key,s.monster_key,s.name,s.level,s.x,s.z,s.hp,s.hp
-FROM (SELECT 1 region UNION ALL SELECT 2 UNION ALL SELECT 3) r
-CROSS JOIN (
- SELECT 'wolf_north' spawn_key,'ash_wolf' monster_key,'Lobo das Cinzas' name,1 level,-12 x,24 z,240 hp
- UNION ALL SELECT 'boar_east','iron_boar','Javali de Ferro',3,22,-8,720
- UNION ALL SELECT 'bear_west','frost_bear','Urso da Geada',5,-28,2,1500
- UNION ALL SELECT 'wyrm_south','marsh_wyrm','Serpe do Pântano',8,8,-34,3200
- UNION ALL SELECT 'golem_north','stone_golem','Guardião de Pedra',12,3,35,7200
- UNION ALL SELECT 'drake_east','ember_drake','Draco das Brasas',18,42,6,18000
-) s;
+-- D1 limits compound SELECT terms; one insert per spawn avoids that limit.
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(1,'wolf_north','ash_wolf','Lobo das Cinzas',1,-12,24,240,240);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(1,'boar_east','iron_boar','Javali de Ferro',3,22,-8,720,720);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(1,'bear_west','frost_bear','Urso da Geada',5,-28,2,1500,1500);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(1,'wyrm_south','marsh_wyrm','Serpe do Pântano',8,8,-34,3200,3200);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(1,'golem_north','stone_golem','Guardião de Pedra',12,3,35,7200,7200);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(1,'drake_east','ember_drake','Draco das Brasas',18,42,6,18000,18000);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(2,'wolf_north','ash_wolf','Lobo das Cinzas',1,-12,24,240,240);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(2,'boar_east','iron_boar','Javali de Ferro',3,22,-8,720,720);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(2,'bear_west','frost_bear','Urso da Geada',5,-28,2,1500,1500);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(2,'wyrm_south','marsh_wyrm','Serpe do Pântano',8,8,-34,3200,3200);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(2,'golem_north','stone_golem','Guardião de Pedra',12,3,35,7200,7200);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(2,'drake_east','ember_drake','Draco das Brasas',18,42,6,18000,18000);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(3,'wolf_north','ash_wolf','Lobo das Cinzas',1,-12,24,240,240);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(3,'boar_east','iron_boar','Javali de Ferro',3,22,-8,720,720);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(3,'bear_west','frost_bear','Urso da Geada',5,-28,2,1500,1500);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(3,'wyrm_south','marsh_wyrm','Serpe do Pântano',8,8,-34,3200,3200);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(3,'golem_north','stone_golem','Guardião de Pedra',12,3,35,7200,7200);
+INSERT OR IGNORE INTO world_monsters(map_region,spawn_key,monster_key,name,level,x,z,max_hp,hp) VALUES(3,'drake_east','ember_drake','Draco das Brasas',18,42,6,18000,18000);
