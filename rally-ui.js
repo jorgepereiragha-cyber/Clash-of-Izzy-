@@ -144,7 +144,10 @@ async function sendRallyAction(action,body,message){
   if(readRallySession().token!==token)return;
   await refresh(receipt);
  }catch(error){if(readRallySession().token===token)notify(error.message,true);}
- finally{busy=false;renderNodeList();renderRallies();}
+ finally{
+  busy=false;
+  if(readRallySession().token===token){renderNodeList();renderRallies();}
+ }
 }
 function renderNodeList(){
  const root=$("resource-node-list");if(!root)return;
@@ -323,12 +326,12 @@ async function loadRallyState(successMessage){
   if(selected||selectedNodeId)selectNode(selected);
   notify(successMessage||nodes.length+" nós de recursos sincronizados.");
  }catch(error){
+  if(readRallySession().token!==token)return;
   if(error.status===401||error.status===403){
    nodes=[];rallies=[];inAlliance=false;collectReturnEnabled=false;
    if(selectedNodeId)selectNode(null);
    renderMapNodes();renderNodeList();renderRallies();
   }
-  if(readRallySession().token!==token)return;
   notify(successMessage?successMessage+" Não foi possível atualizar o mapa; aguarde a próxima sincronização.":error.message,true);
  }
 }
