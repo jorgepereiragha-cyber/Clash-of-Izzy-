@@ -277,7 +277,7 @@ function updateActionButtons() {
   const isCastle = territory?.territory_kind === "castle";
   const isThrone = territory?.territory_kind === "throne";
   const canVisit = Boolean(territory && !isCastle && !isThrone && territoryOwner(territory) !== "Outro reino");
-  $("gather").disabled = busy || !canVisit || !hasTroops || !marchAvailable;
+  $("gather").disabled = busy || !canVisit || !["food","wood","stone","iron"].includes(territory?.resource_type) || !hasTroops || !marchAvailable;
   $("scout").disabled = busy || !canVisit || !hasTroops || !marchAvailable;
   $("attack").disabled = busy || !territory || isCastle || isThrone || Boolean(territory.owner_kingdom_id) || !hasTroops || !marchAvailable;
   const siegeTotal=Object.values(selectedUnits).reduce((n,q)=>n+Number(q||0),0);
@@ -467,6 +467,7 @@ async function sendMarch(marchType) {
   const territory = getSelectedTerritory();
   const units = Object.fromEntries(Object.entries(selectedUnits).filter(([, quantity]) => Number(quantity) > 0));
   if (!territory || !Object.keys(units).length) return;
+  if(marchType==="gather"&&!["food","wood","stone","iron"].includes(territory.resource_type))return;
   const total=Object.values(units).reduce((sum,value)=>sum+Number(value||0),0);
   const max=Number(state?.marchCapacity?.maximum||0);
   if(Number(state?.marchSlots?.available??1)<1){
