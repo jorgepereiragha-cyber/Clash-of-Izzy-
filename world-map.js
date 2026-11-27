@@ -1,5 +1,5 @@
 import { castleCityArtId } from "./scripts/castle-skin-visuals.js";
-import { createEntityArtElement } from "./scripts/kingdom-2d-art-atlas.js";
+import { createEntityArtElement, worldResourceArt } from "./scripts/kingdom-2d-art-atlas.js";
 import { throneVisualState } from "./scripts/world-map-visual-state.js";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
 import { readMarchComposition } from "./scripts/march-visual-path.js";
@@ -99,7 +99,7 @@ function renderResources() {
   root.replaceChildren();
   for (const [key, meta] of Object.entries(RESOURCE)) {
     const item = make("div", "resource");
-    item.append(document.createTextNode(meta.icon + " " + meta.label));
+    item.append(worldResourceArt(key,document)||make("span","",meta.icon),document.createTextNode(meta.label));
     item.append(make("b", "", fmt(state.kingdom[key])));
     root.append(item);
   }
@@ -167,7 +167,7 @@ function renderMap() {
       portrait.classList.add("territory-castle-art");
       button.append(portrait);
     } else {
-      button.append(make("span", "", resource.icon));
+      button.append((!isThrone&&worldResourceArt(territory.resource_type,document))||make("span", "", resource.icon));
     }
     button.append(make("small", "", territory.name));
     button.addEventListener("click", () => {
@@ -309,7 +309,10 @@ function renderDetails() {
   }
   const resource = territory.territory_kind==="throne"?{icon:"👑",label:"Trono Imperial"}:(RESOURCE[territory.resource_type] || { icon: "📍", label: "Recurso" });
   const terrain = TERRAIN[territory.terrain] || { icon: "🗺️", label: "Terreno" };
-  root.append(make("div", "territory-title", resource.icon + " " + territory.name));
+  const title=make("div","territory-title");
+  const resourceArt=territory.territory_kind!=="throne"&&territory.territory_kind!=="castle"?worldResourceArt(territory.resource_type,document):null;
+  title.append(resourceArt||make("span","",resource.icon),document.createTextNode(territory.name));
+  root.append(title);
   root.append(make("p", "muted", territoryOwner(territory)));
   const grid = make("div", "detail-grid");
   const isCastle = territory.territory_kind === "castle";
