@@ -672,6 +672,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.ok(Number.isSafeInteger(gatherKingdom)&&gatherKingdom>0);
     const gatherRate = 5000000;
     assert.equal(gatherBefore.worldGatherFixedAmount,gatherRate);
+    assert.equal(gatherBefore.buildingUpgradeOptions.castle.nextLevel,Number(gatherBefore.kingdom.castle_level)+1);
+    assert.ok(gatherBefore.buildingUpgradeOptions.castle.cost.wood>0);
     const readGatherLedger = async () => {
       const raw = await command([...common,"execute","clash-of-izzy-beta-db","--local",
         "--persist-to",persist,"--json","--command",
@@ -1472,7 +1474,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await page.locator("#resourceMapFilter").selectOption("mine-owned");
         assert.equal(await selectedFarm.getAttribute("data-node-id"),farmId);
         await farmCard.getByRole("button",{name:"Coletar",exact:true}).click();
-        await page.waitForFunction(()=>document.querySelector("#rally-status").textContent.includes("Coleta concluída"));
+        await page.waitForFunction(()=>document.querySelector("#rally-status").textContent.includes("Coleta concluída: 5.000.000"));
         await farmCard.getByRole("button",{name:"Recolher tropas"}).click();
         await page.waitForFunction(()=>document.querySelector("#resourceMapCount").textContent==="0 nós");
         await page.locator("#resourceMapFilter").selectOption("all");
