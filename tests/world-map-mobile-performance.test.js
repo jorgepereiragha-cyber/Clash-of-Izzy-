@@ -216,3 +216,21 @@ test("map collection markers and resource HUD reuse the canonical local art",asy
  assert.match(rally,/resource-node-level/);
  assert.match(css,/min-height:36px;touch-action:manipulation/);
 });
+
+test("resource locator prioritizes available productive nodes before nearer blocked or empty nodes",async()=>{
+ const ui=await read("rally-ui.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function rankResourceNode(");
+ const end=ui.indexOf('$("resourceMapLocate")?.addEventListener',start);
+ assert.ok(start>=0&&end>start);
+ const compare=runInNewContext(ui.slice(start,end)+"\ncompareResourceNodes");
+ const nodes=[
+  {id:"foreign",map_x:0,map_y:0,occupied_by:2,current_resources:100},
+  {id:"reserved",map_x:1,map_y:0,reserved_by_rally:"r",current_resources:100},
+  {id:"empty",map_x:2,map_y:0,current_resources:0},
+  {id:"far-free",map_x:10,map_y:0,current_resources:100},
+  {id:"own",map_x:5,map_y:0,is_mine:true,occupied_by:1,current_resources:100}
+ ];
+ assert.deepEqual(nodes.sort(compare).map(node=>node.id),["own","far-free","empty","foreign","reserved"]);
+ assert.match(ui,/filteredNodes\(\)\.sort\(compareResourceNodes\)/);
+});
