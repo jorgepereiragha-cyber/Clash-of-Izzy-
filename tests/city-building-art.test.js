@@ -6,8 +6,8 @@ const svg=await readFile(new URL("../assets/art/buildings/icons.svg",import.meta
 const html=await readFile(new URL("../kingdom.html",import.meta.url),"utf8");
 const types=["castle","barracks","farm","quarry","lumber_mill","iron_mine","market","academy","wall","hospital","watchtower","stable","archery_range","siege_workshop","embassy","warehouse"];
 for(const type of types)assert.ok(svg.includes('id="'+type+'"'),type);
-assert.match(html,/cityBuildingArt\(b\.building_type,emoji,k\.equipped_skin_id\)/);
-assert.match(html,/function cityBuildingArt\(type,emoji,skinId\)/);
+assert.match(html,/cityBuildingArt\(b\.building_type,emoji,k\.equipped_skin_id,b\.level\)/);
+assert.match(html,/function cityBuildingArt\(type,emoji,skinId,level=1\)/);
 assert.ok(html.includes("/assets/art/buildings/icons.svg#"));
 assert.ok(!svg.includes("http://")||svg.includes("http://www.w3.org/2000/svg"));
 });
