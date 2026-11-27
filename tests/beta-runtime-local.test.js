@@ -1390,6 +1390,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         const farmCard=page.locator('.resource-node-card[data-node-id="'+farmId+'"]');
         await farmCard.getByRole("button",{name:"Ocupar nó"}).click();
         await farmCard.getByRole("button",{name:"Recolher tropas"}).waitFor();
+        assert.equal(await militia.inputValue(),"0","confirmed deployment clears the shared formation");
         await page.locator("#resourceMapFilter").selectOption("mine-owned");
         assert.equal(await selectedFarm.getAttribute("data-node-id"),farmId);
         await farmCard.getByRole("button",{name:"Coletar",exact:true}).click();

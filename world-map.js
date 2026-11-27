@@ -100,6 +100,10 @@ function getSelectedTerritory() {
 export function getMarchFormation(){
   return Object.fromEntries(Object.entries(selectedUnits).filter(([,quantity])=>quantity>0));
 }
+export function clearMarchFormation(){
+  selectedUnits={};
+  if(state)renderTroops();
+}
 export function focusMarchFormation(){
   $("worldTargetPanel").scrollIntoView({block:"nearest"});
   ($("troops").querySelector("input")||$("worldTargetHeading")).focus({preventScroll:true});
@@ -295,7 +299,7 @@ function updateMarchCapacityLabel(){
 }
 function applyMarchPreset(mode){
   if(busy||!state)return;
-  if(mode==="clear"){selectedUnits={};renderTroops();return;}
+  if(mode==="clear"){clearMarchFormation();return;}
   const troops=(state.troops||[]).filter(x=>Number(x.tier)===1&&Number(x.quantity)>0)
     .map(x=>({...x,usable:Math.min(10000,Math.floor(Number(x.quantity)))}));
   const cap=Math.max(0,Math.floor(Number(state?.marchCapacity?.maximum)||0));

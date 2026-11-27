@@ -1,5 +1,5 @@
 import {worldResourceArt} from "./scripts/kingdom-2d-art-atlas.js";
-import {focusMapMarker, focusMarchFormation, getMarchFormation, setResourceExpedition} from "./world-map.js";
+import {clearMarchFormation, focusMapMarker, focusMarchFormation, getMarchFormation, setResourceExpedition} from "./world-map.js";
 const $=id=>document.getElementById(id);
 function readRallySession() {
  let readable=false;
@@ -100,6 +100,7 @@ async function sendRallyAction(action,body,message){
  renderNodeList();renderRallies();
  try{
   const data=await api(action,{method:"POST",body:JSON.stringify(body)});
+  if(body.troops)clearMarchFormation();
   window.dispatchEvent(new Event("coi:refresh-world"));
   if(refreshing)await refreshing;
   await refresh(message(data));
