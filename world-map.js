@@ -2,6 +2,7 @@ import { castleCityArtId } from "./scripts/castle-skin-visuals.js";
 import { createEntityArtElement, worldResourceArt } from "./scripts/kingdom-2d-art-atlas.js";
 import { throneVisualState, worldHomePosition } from "./scripts/world-map-visual-state.js";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
+import { tacticalWorldBounds,tacticalWorldPoint } from "./world-map-viewport.js";
 import { marchVisualPoint, marchVisualProgress, marchTimestamp, readMarchComposition } from "./scripts/march-visual-path.js";
 import { createWorldRefreshGate } from "./scripts/world-state-refresh.js";
 import { startRealtimePresence } from "./scripts/eldoria-realtime-client.js";
@@ -177,14 +178,18 @@ function resetMapViewport() {
 export function tacticalHome(){
   return worldHomePosition({worldCoordinateSpace:state?.worldCoordinateSpace,homeX:state?.kingdom?.map_x,homeZ:state?.kingdom?.map_z,territories:state?.territories});
 }
+export function projectTacticalPoint(x,z){
+  if(state?.worldCoordinateSpace!=="absolute-v1")return {left:Math.max(9,Math.min(91,50+x*.9)),top:Math.max(10,Math.min(90,50-z*.9))};
+  return tacticalWorldPoint(x,z,tacticalWorldBounds(tacticalHome(),state.territories));
+}
 function tacticalMarches(now=Date.now()) {
   if (!$('worldMap').classList.contains('map-3d-fallback')) return;
   const home=tacticalHome();
   for (const marker of $('mapContent').querySelectorAll('.tactical-march')) {
     const { x, z, start, end } = marker.dataset;
     const point=marchVisualPoint(home,{x:Number(x),z:Number(z)},marchVisualProgress(now,Number(start),Number(end)));
-    marker.style.left=clamp(50+point.x*.9,9,91)+'%';
-    marker.style.top=clamp(50-point.z*.9,10,90)+'%';
+    const projected=projectTacticalPoint(point.x,point.z);
+    if(projected){marker.style.left=projected.left+'%';marker.style.top=projected.top+'%';}
   }
 }
 function renderMap() {
@@ -206,8 +211,9 @@ function renderMap() {
   const buttonRefs = new Map();
   const home=make("div","map-center");
   const homeLocation=tacticalHome();
-  home.style.left=(50+homeLocation.x*.9)+"%";
-  home.style.top=(50-homeLocation.z*.9)+"%";
+  const projectedHome=projectTacticalPoint(homeLocation.x,homeLocation.z);
+  home.style.left=projectedHome.left+"%";
+  home.style.top=projectedHome.top+"%";
   const homeArt=createEntityArtElement({kind:"symbol",src:"/assets/art/buildings/icons.svg#"+castleCityArtId(visualState.castleSkinId),viewBox:"0 0 100 90"},document);
   home.append(homeArt,make("small","",state.kingdom.kingdom_name||"Seu castelo"));
   root.append(home);
@@ -227,8 +233,10 @@ function renderMap() {
     button.dataset.territoryId = String(territory.id);
     button.setAttribute("aria-pressed", String(Number(territory.id) === Number(selectedTerritoryId)));
     if (isThrone) button.dataset.throneState = throneVisualState(visualState);
-    button.style.left = clamp(50 + Number(territory.x || 0) * 0.9, 9, 91) + "%";
-    button.style.top = clamp(50 - Number(territory.z || 0) * 0.9, 10, 90) + "%";
+    const projected=projectTacticalPoint(Number(territory.x||0),Number(territory.z||0));
+    if(!projected)continue;
+    button.style.left=projected.left+"%";
+    button.style.top=projected.top+"%";
     button.setAttribute("aria-label", territory.name + ", " + (isCastle ? "castelo de " + (territory.commander_name || "outro comandante") : terrain.label) + ", " + owner);
     button.title = isCastle
       ? territory.name + " · " + (territory.commander_name || "Comandante") + " · poder " + fmt(territory.power)
@@ -257,6 +265,7 @@ function renderMap() {
   }
   window.__coiWorldMapButtons = buttonRefs;
   window.__coiWorldMapState = visualState;
+  window.dispatchEvent(new Event("coi:tactical-bounds-changed"));
   if (window.__coiWorldMap3D) {
     window.__coiWorldMap3D.setProjectionButtons(buttonRefs);
     window.__coiWorldMap3D.update(visualState);
