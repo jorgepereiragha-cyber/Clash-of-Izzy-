@@ -42,6 +42,13 @@ function troopPower(troops){
 }
 function resourceForNode(type){return NODE_RESOURCE[type]||null;}
 function betaFiveMillion(env){return env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true";}
+function nodeReadyAt(node,now,required){
+ const capacity=Number(node.max_resources),rate=Number(node.regen_rate),stock=Number(node.current_resources);
+ if(!Number.isFinite(required)||required>capacity||!Number.isFinite(stock))return null;
+ if(nodeRegeneration(node,now)>=required)return now;
+ if(!Number.isFinite(rate)||rate<=0)return null;
+ return Math.max(now,Number(node.last_regen||now)+Math.ceil(Math.max(0,required-stock)*3600/rate));
+}
 function nodeRegeneration(node,now){
  const elapsed=Math.max(0,now-Number(node.last_regen||now));
  return Math.min(Number(node.max_resources),Number(node.current_resources)+Math.floor(elapsed*Number(node.regen_rate)/3600));
@@ -80,6 +87,7 @@ async function loadNodes(env,kingdomId){
   return {...row,current_resources:accelerated&&available>=capacity?5000000:Math.floor(available*scale),max_resources:accelerated?5000000:capacity,
    regen_rate:Math.floor(Number(row.regen_rate)*scale),
    collection_amount:accelerated?(available>=capacity?5000000:0):Math.floor(available*0.5),
+   collection_ready_at:nodeReadyAt(row,now,accelerated?capacity:2),server_time:now,
    resource_type:resourceForNode(row.node_type),is_mine:Number(row.occupied_by||0)===kingdomId};
  });
 }
