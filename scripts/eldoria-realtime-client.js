@@ -114,7 +114,15 @@ export function startRealtimePresence({
       update("Tempo real requer HTTPS.");
       return;
     }
-    const token = readGameToken(windowRef.localStorage, windowRef.sessionStorage);
+    // Storage properties themselves can throw SecurityError in restricted WebViews.
+    // Read lazily so an unavailable localStorage never blocks sessionStorage.
+    let token = "";
+    for (const key of ["localStorage", "sessionStorage"]) {
+      try {
+        token = readGameToken(windowRef[key], null);
+        if (token) break;
+      } catch {}
+    }
     if (!token) {
       update("Entre na conta para usar o tempo real.");
       return;
