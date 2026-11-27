@@ -1,5 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import {DatabaseSync} from "node:sqlite";
 import {readFile} from "node:fs/promises";
 import {marchSlots} from "../march-slots.js";
 const read=path=>readFile(new URL("../"+path,import.meta.url),"utf8");
@@ -49,4 +50,46 @@ test("map offers four editable quick formations and disables occupied queues",as
  assert.match(ui,/marchSlots\?\.available/);
  assert.match(ui,/Todas as filas de marcha estão ocupadas/);
  assert.ok(ignore.split(/\r?\n/).includes("march-slots.js"));
+});
+
+
+test("atomic dispatch refuses stale ownership, realm, throne, castle and gather resource without troop debit",async()=>{
+ const worker=await read("worker.js");
+ const action=worker.slice(worker.indexOf('}else if(type==="march"){'),worker.indexOf('}else if(type==="battle"){'));
+ const debit=action.match(/const debit=env\.DB\.prepare\("([^"\n]+)"\)/)?.[1];
+ assert.ok(debit,"extract exact worker troop debit SQL");
+ const db=new DatabaseSync(":memory:");
+ try{
+  db.exec("CREATE TABLE kingdoms(id INTEGER PRIMARY KEY,map_region INTEGER); CREATE TABLE world_territories(id INTEGER PRIMARY KEY,map_region INTEGER,territory_kind TEXT,territory_key TEXT,owner_kingdom_id INTEGER,resource_type TEXT); CREATE TABLE army_units(kingdom_id INTEGER,tier INTEGER,unit_type TEXT,quantity INTEGER); CREATE TABLE marches(kingdom_id INTEGER,status TEXT); INSERT INTO kingdoms VALUES(1,1); INSERT INTO army_units VALUES(1,1,'militia',100),(1,1,'archer',100); INSERT INTO world_territories VALUES(10,1,'resource','forest_10',NULL,'wood');");
+  const units=JSON.stringify({militia:10,archer:20});
+  const reset=()=>db.exec("UPDATE kingdoms SET map_region=1; DELETE FROM world_territories; INSERT INTO world_territories VALUES(10,1,'resource','forest_10',NULL,'wood'); UPDATE army_units SET quantity=100; DELETE FROM marches");
+  const cases=[
+   ["attack", "",true],["scout","",true],["gather","",true],
+   ["attack","UPDATE world_territories SET owner_kingdom_id=1",false],
+   ["attack","UPDATE world_territories SET owner_kingdom_id=2",false],
+   ["scout","UPDATE world_territories SET owner_kingdom_id=2",false],
+   ["gather","UPDATE world_territories SET owner_kingdom_id=2",false],
+   ["gather","UPDATE world_territories SET owner_kingdom_id=1",true],
+   ["scout","UPDATE world_territories SET owner_kingdom_id=1",true],
+   ["attack","UPDATE world_territories SET territory_kind='castle'",false],
+   ["gather","UPDATE world_territories SET territory_kind='throne'",false],
+   ["attack","UPDATE world_territories SET territory_key='royal_throne_1'",false],
+   ["gather","UPDATE world_territories SET resource_type=NULL",false],
+   ["gather","UPDATE world_territories SET resource_type='gold'",false],
+   ["scout","UPDATE world_territories SET resource_type=NULL",true],
+   ["scout","UPDATE kingdoms SET map_region=2",false],
+   ["gather","UPDATE world_territories SET map_region=2",false],
+   ["attack","DELETE FROM world_territories",false],
+   ["attack","INSERT INTO marches VALUES(1,'marching')",false],
+   ["attack","UPDATE army_units SET quantity=5 WHERE unit_type='archer'",false]
+  ];
+  for(const [kind,mutation,allowed] of cases){
+   reset();if(mutation)db.exec(mutation);
+   const before=db.prepare("SELECT quantity FROM army_units ORDER BY unit_type").all().map(r=>r.quantity);
+   const out=db.prepare(debit).run(units,1,units,units,1,2,1,1,1,10,kind,kind,kind);
+   assert.equal(Number(out.changes),allowed?2:0,kind+" "+mutation);
+   const after=db.prepare("SELECT quantity FROM army_units ORDER BY unit_type").all().map(r=>r.quantity);
+   assert.deepEqual(after,allowed?[80,90]:before,kind+" "+mutation);
+  }
+ }finally{db.close()}
 });
