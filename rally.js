@@ -207,7 +207,8 @@ async function occupyNode(env,kingdomId,body){
  if(Number(result[1]?.meta?.changes||0)!==1)return reply({error:"Tropas insuficientes ou nó reservado por outro reino."},409);
  return reply({success:true,node_id:nodeId});
 }
-async function collectResources(env,kingdomId,body){
+async function collectResources(env,kingdomId,body,returnTroops=false){
+ if(returnTroops&&!betaFiveMillion(env))return reply({error:"Retorno com coleta indisponível."},404);
  const nodeId=String(body.node_id||"").trim();
  const node=await env.DB.prepare("SELECT * FROM resource_nodes WHERE id=?").bind(nodeId).first();
  if(!node||Number(node.occupied_by)!==kingdomId)return reply({error:"Seu reino não ocupa este nó."},403);
@@ -218,6 +219,20 @@ async function collectResources(env,kingdomId,body){
  const amount=accelerated?(available>=betaHarvestThreshold(node)?5000000:0):Math.floor(available*0.5);
  if(amount<1)return reply({error:"O nó ainda não acumulou recursos suficientes."},409);
  const next=accelerated?0:available-amount;
+ if(returnTroops){
+  const owners=parseOwnedGarrison(node.garrison_json);
+  if(!owners||node.reserved_by_rally)return reply({error:"Guarnição indisponível para retorno seguro."},409);
+  // Release, grant, ledger and troop restoration commit together. The node snapshot
+  // prevents concurrent collect, recall or collect-return from duplicating credit.
+  const result=await env.DB.batch([
+   env.DB.prepare("UPDATE resource_nodes SET occupied_by=NULL,occupation_start=NULL,garrison_json='{}',current_resources=?,last_regen=? WHERE id=? AND occupied_by=? AND reserved_by_rally IS NULL AND garrison_json=? AND last_regen=? AND current_resources=?").bind(next,now,nodeId,kingdomId,node.garrison_json,node.last_regen,node.current_resources),
+   env.DB.prepare(`UPDATE kingdoms SET ${resource}=${resource}+?,updated_at=CURRENT_TIMESTAMP WHERE id=? AND changes()=1`).bind(amount,kingdomId),
+   env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE changes()=1").bind(kingdomId,resource,amount,"coleta e retorno: "+nodeId),
+   env.DB.prepare("INSERT INTO army_units(kingdom_id,unit_type,tier,quantity) SELECT CAST(o.key AS INTEGER),j.key,1,CAST(j.value AS INTEGER) FROM json_each(?,'$.owners') o,json_each(o.value) j WHERE changes()=1 ON CONFLICT(kingdom_id,unit_type,tier) DO UPDATE SET quantity=quantity+excluded.quantity").bind(node.garrison_json)
+  ]);
+  if(Number(result[0]?.meta?.changes||0)!==1)return reply({error:"O estado do nó mudou; atualize e tente novamente."},409);
+  return reply({success:true,collected:amount,resource_type:resource,returned:countTroops(owners.find(([id])=>Number(id)===kingdomId)?.[1]||{}),returned_allies:owners.filter(([id])=>Number(id)!==kingdomId).reduce((sum,[,troops])=>sum+countTroops(troops),0)});
+ }
  const result=await env.DB.batch([
   env.DB.prepare("UPDATE resource_nodes SET current_resources=?,last_regen=? WHERE id=? AND occupied_by=? AND last_regen=? AND current_resources=?")
    .bind(next,now,nodeId,kingdomId,node.last_regen,node.current_resources),
@@ -310,7 +325,7 @@ export async function handleRally(request,env,publicPlayerId,path,body={}){
    // Beta has no cron. Settle a bounded batch before exposing nodes and rallies together.
    if(env.ENVIRONMENT==="beta")await processDueRallies(env,5);
    const [nodes,rallies]=await Promise.all([loadNodes(env,kingdomId),listRallies(env,kingdomId)]);
-   return reply({nodes,...rallies});
+   return reply({nodes,...rallies,collect_return_enabled:betaFiveMillion(env)});
   }
   if(request.method==="GET"&&path==="nodes")return reply({nodes:await loadNodes(env,kingdomId)});
   if(request.method==="GET"&&path==="active")return reply(await listRallies(env,kingdomId));
@@ -319,6 +334,7 @@ export async function handleRally(request,env,publicPlayerId,path,body={}){
   if(path==="join")return await joinRally(env,kingdomId,body);
   if(path==="occupy")return await occupyNode(env,kingdomId,body);
   if(path==="collect")return await collectResources(env,kingdomId,body);
+  if(path==="collect-return")return await collectResources(env,kingdomId,body,true);
   if(path==="recall")return await recallNode(env,kingdomId,body);
   return reply({error:"Rota de guerra inválida."},404);
  }catch(error){
