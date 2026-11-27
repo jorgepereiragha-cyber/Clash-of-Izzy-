@@ -336,8 +336,52 @@ test("expedition preview shows authoritative resource yield before occupation",a
  assert.match(map,/addStat\(grid,"Coleta estimada",harvest.blocked\?"Indisponível"/);
 });
 
-test("map citadels gain four distinct silhouettes with bounded batched stonework",async()=>{
- const THREE=await import("three");
+// The offline visual workflow intentionally has no npm install. Exercise the
+// same construction function with a recording scene graph there; the full
+// installed suite uses the real Three.js classes and real bounding boxes.
+async function castleTestThree(t){
+ try{return await import("three");}
+ catch(error){if(error.code!=="ERR_MODULE_NOT_FOUND"||!error.message.includes("Cannot find package 'three'"))throw error;}
+ t.diagnostic("Offline scene-graph contract; real Three.js bounds require installed suite.");
+ class Vector{
+  constructor(){this.set(0,0,0);}
+  set(x,y,z){Object.assign(this,{x,y,z});}
+  setScalar(v){this.set(v,v,v);}
+ }
+ class Object3D{
+  constructor(){this.position=new Vector();this.scale=new Vector();this.scale.setScalar(1);this.children=[];this.userData={};}
+  add(child){this.children.push(child);}
+  traverse(fn){fn(this);for(const child of this.children)child.traverse(fn);}
+  updateMatrix(){this.matrix={position:{...this.position},scale:{...this.scale}};}
+ }
+ class Group extends Object3D{}
+ class BoxGeometry{constructor(w,h,d){this.height=h;}dispose(){}}
+ class ConeGeometry{constructor(r,h,sides){this.height=h;}dispose(){}}
+ class MeshStandardMaterial{dispose(){}}
+ class Mesh extends Object3D{constructor(geometry,material){super();Object.assign(this,{geometry,material,isMesh:true});}}
+ class InstancedMesh extends Mesh{
+  constructor(geometry,material,count){super(geometry,material);Object.assign(this,{count,isInstancedMesh:true,instanceMatrix:{},matrices:[]});}
+  setMatrixAt(i,matrix){this.matrices[i]=matrix;}
+  computeBoundingSphere(){assert.equal(this.matrices.length,this.count);}
+  dispose(){}
+ }
+ class Box3{
+  setFromObject(root){
+   let max=-Infinity;
+   function visit(n,y=0,scale=1){
+    const py=y+n.position.y*scale, sy=scale*n.scale.y;
+    if(n.isInstancedMesh){
+     for(const m of n.matrices)max=Math.max(max,py+(m.position.y+n.geometry.height*m.scale.y/2)*sy);
+    }else if(n.isMesh)max=Math.max(max,py+n.geometry.height*sy/2);
+    for(const child of n.children)visit(child,py,sy);
+   }
+   visit(root);this.max={y:max};return this;
+  }
+ }
+ return {Object3D,Group,BoxGeometry,ConeGeometry,MeshStandardMaterial,Mesh,InstancedMesh,Box3};
+}
+test("map citadels gain four distinct silhouettes with bounded batched stonework",async(t)=>{
+ const THREE=await castleTestThree(t);
  const {runInNewContext}=await import("node:vm");
  const {worldCastleTier}=await import("../scripts/world-map-visual-state.js");
  const scene=await read("world-map-3d.js");
