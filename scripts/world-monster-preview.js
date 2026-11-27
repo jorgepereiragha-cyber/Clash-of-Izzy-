@@ -10,6 +10,35 @@ function token(){
  return "";
 }
 function element(tag,text){const el=document.createElement(tag);if(text!==undefined)el.textContent=String(text);return el;}
+const map=document.getElementById("mapContent");
+const mapHost=document.getElementById("worldMap");
+let pins=new Map(),cards=new Map(),selected=null;
+function projectPins(){
+ for(const {button,monster} of pins.values()){
+  const x=Number(monster.x),z=Number(monster.z);
+  const point=!mapHost?.classList.contains("map-3d-fallback")?window.__coiWorldMap3D?.projectPoint?.(x,z):null;
+  button.style.left=point?point.left+"px":Math.max(9,Math.min(91,50+x*.9))+"%";
+  button.style.top=point?point.top+"px":Math.max(10,Math.min(90,50-z*.9))+"%";
+ }
+}
+function clearPins(){for(const {button} of pins.values())button.remove();pins.clear();cards.clear();}
+function selectMonster(id,showGuide=false){
+ selected=id;
+ for(const [key,{button}] of pins){button.classList.toggle("selected",key===id);button.setAttribute("aria-pressed",String(key===id));}
+ for(const [key,card] of cards)card.classList.toggle("monster-selected",key===id);
+ if(showGuide)cards.get(id)?.scrollIntoView({block:"nearest",behavior:"auto"});
+}
+function addPin(monster,id,hp){
+ if(!map||!Number.isFinite(Number(monster.x))||!Number.isFinite(Number(monster.z)))return;
+ const button=element("button");button.type="button";button.className="world-monster-pin"+(hp===0?" defeated":"");
+ button.append(element("span",ICONS[monster.monster_key]||"◆"),element("small","Nv. "+monster.level));
+ button.title=monster.name+" · Nv. "+monster.level+" · "+hp+" PV";
+ button.setAttribute("aria-label",button.title);button.setAttribute("aria-pressed","false");
+ button.addEventListener("pointerdown",event=>event.stopPropagation());
+ button.addEventListener("click",()=>selectMonster(id,true));
+ map.append(button);pins.set(id,{button,monster});
+}
+for(const event of ["coi:world-map-3d-ready","coi:world-map-projection-changed","coi:world-map-2d-fallback"])window.addEventListener(event,projectPins);
 let busy=false;
 async function refresh(){
  const bearer=token();if(!bearer||busy||!root||!list||!status)return;
@@ -18,11 +47,12 @@ async function refresh(){
   const response=await fetch("/api/game/world-monsters",{headers:{Authorization:"Bearer "+bearer},cache:"no-store",redirect:"error"});
   if(!response.ok)throw Error("Consulta indisponível");
   const data=await response.json();
-  if(!data.enabled){root.hidden=true;return;}
+  if(!data.enabled){root.hidden=true;clearPins();list.replaceChildren();return;}
   root.hidden=false;
   const rows=Array.isArray(data.monsters)?data.monsters:[];
-  list.replaceChildren();
+  clearPins();list.replaceChildren();
   for(const monster of rows){
+   const id=String(monster.id);
    const item=element("article");item.className="stat";
    const max=Math.max(1,Number(monster.max_hp)||1);
    const hp=Math.max(0,Math.min(max,Number(monster.hp)||0));
@@ -30,10 +60,13 @@ async function refresh(){
    const meter=element("progress");meter.max=max;meter.value=hp;meter.setAttribute("aria-label","Vida de "+monster.name);
    item.append(meter,element("span",hp+" / "+max+" PV · X "+monster.x+" / Z "+monster.z));
    item.append(element("span",hp>0?"Disponível para visualização":"Aguardando reaparecimento"));
-   list.append(item);
+   const button=element("button","Localizar no mapa");button.type="button";button.className="secondary";
+   button.addEventListener("click",()=>{selectMonster(id);mapHost?.scrollIntoView({block:"nearest",behavior:"auto"});pins.get(id)?.button.focus({preventScroll:true});});
+   item.append(button);list.append(item);cards.set(id,item);addPin(monster,id,hp);
   }
+  selectMonster(pins.has(selected)?selected:null);projectPins();
   status.textContent=rows.length+" criaturas no seu reino · prévia; caça ainda não liberada.";
- }catch{root.hidden=false;list.replaceChildren();status.textContent="Não foi possível carregar os monstros. Tente atualizar.";}
+ }catch{root.hidden=false;clearPins();list.replaceChildren();status.textContent="Não foi possível carregar os monstros. Tente atualizar.";}
  finally{busy=false;}
 }
 document.getElementById("worldMonsterRefresh")?.addEventListener("click",refresh);
