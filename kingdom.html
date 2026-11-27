@@ -44,6 +44,17 @@ button,.linkbtn{border:1px solid #e1b85f;background:linear-gradient(#8c5c2b,#684
 .pet-rarity-legendary{color:#ffecba;background:#5b431b;border-color:#e7be67}
 .pet-rarity-mythic{color:#ffe0f3;background:#67294e;border-color:#ee83c0}
 .pet-rarity-unknown{color:#e1e8f0;background:#283748;border-color:#72859c}
+.pet-card{position:relative;overflow:hidden;border:1px solid #6d6249;background:linear-gradient(155deg,#202e40,#101924 72%);border-radius:12px;padding:12px}
+.pet-card.is-active{border-color:#e3c27b;box-shadow:inset 0 0 0 1px #e3c27b66}
+.pet-card-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap;margin-bottom:6px}
+.pet-card-art{display:grid;place-items:center;position:relative;height:136px;margin-bottom:10px;border:1px solid #78694e;border-radius:8px;overflow:hidden;background:radial-gradient(ellipse at 50% 40%,#34435d,#121c2b 74%)}
+.pet-card-art svg{display:block;width:100%;height:100%;max-width:210px}
+.pet-card-art.pet-rarity-epic{background:radial-gradient(ellipse at 50% 45%,#493961,#131c2d 72%);border-color:#a888d7}
+.pet-card-art.pet-rarity-legendary{background:radial-gradient(ellipse at 50% 45%,#655036,#171e29 72%);border-color:#e7be67}
+.pet-card-art.pet-rarity-mythic{background:radial-gradient(ellipse at 50% 45%,#743b64,#191d2b 72%);border-color:#ee83c0}
+.pet-card-art.pet-rarity-rare{border-color:#4aa7f7}
+.pet-card-art .pet-art-fallback{font-size:42px}
+
 .stack{display:grid;gap:14px}.notice{padding:10px;border-radius:8px;background:#3a2d1c;border:1px solid #927344;color:#f4dca8;line-height:1.5}.events{display:grid;gap:7px}.event{background:#0e1a2a;padding:8px;border-radius:7px;color:#dbe3ec;font-size:12px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 #status{font-size:12px;color:#d8e2ee}#status.error{color:#ffb4a9}#loading{padding:25px;text-align:center;color:var(--muted)}
 @media(max-width:760px){.layout{grid-template-columns:1fr}.city{min-height:320px;grid-template-rows:repeat(3,minmax(78px,1fr));padding:10px;gap:7px}.resources{grid-template-columns:repeat(3,minmax(0,1fr))}.resource{font-size:10px;padding:6px 2px}.resource b{font-size:12px}.hero{align-items:start;flex-direction:column}}
@@ -1046,6 +1057,19 @@ const PET_RARITIES=Object.freeze({
  mythic:{label:"Mítico",css:"pet-rarity-mythic"},
  unknown:{label:"Não informada",css:"pet-rarity-unknown"}
 });
+
+/* Original inline vector portraits: fixed geometry, no remote URLs or user-supplied markup. */
+const PET_PORTRAITS=Object.freeze({
+ pet_raven:'<g stroke-linejoin="round"><path d="M32 93 57 78 49 55 20 36 28 61 17 65 36 84 24 92Z" fill="#182635" stroke="#7b92ae" stroke-width="1.4"/><path d="M48 78 56 47 65 31 86 23 98 31 112 36 96 43 88 42 79 66 88 89 72 104 53 101Z" fill="#26374a" stroke="#b2c3d8" stroke-width="1.4"/><path d="M65 70 34 40 41 62 31 60 46 78 39 80 56 92 69 85" fill="#3c526e" stroke="#7087a5" stroke-width="1.4"/><path d="M78 30 89 28 99 34 91 40 84 40Z" fill="#415c79"/><path d="M99 34 114 36 101 42 95 40Z" fill="#d2b78c"/><circle cx="89" cy="34" r="2.8" fill="#d8b9ff"/><path d="m53 100-6 6 12 0m14-6-1 6 12 0" stroke="#c9ad79" stroke-width="2" fill="none"/><path d="m39 52 16 19m-15-7 17 16m12-25 8-10m-13 20 11-11" stroke="#91a8c1" opacity=".7" fill="none"/></g>',
+ pet_wolf:'<g stroke-linejoin="round"><path d="M28 45 25 12 48 27 59 22 80 22 92 28 115 12 112 46 119 66 106 89 91 101 70 108 49 101 34 89 21 66Z" fill="#516777" stroke="#d2d9d9" stroke-width="1.6"/><path d="M30 20 45 34 34 46ZM110 20 95 34 106 46Z" fill="#25343f"/><path d="M32 44 58 31 70 41 82 31 108 44 102 62 86 57 70 70 54 57 38 62Z" fill="#8396a0"/><path d="M29 66 46 70 52 83 70 78 88 83 94 70 111 66 102 87 87 100 70 105 53 100 38 87Z" fill="#d0d7d5"/><path d="M50 57 61 59 58 64 50 63ZM90 57 79 59 82 64 90 63Z" fill="#e7bd66" stroke="#1d2937" stroke-width="1.5"/><path d="M62 79 70 76 78 79 75 84 65 84Z" fill="#162331"/><path d="M70 84v8m0-1-9 4m9-4 9 4M45 47l8-5m42 5-8-5" stroke="#3d4c55" stroke-width="2" fill="none"/></g>',
+ pet_dragon:'<g stroke-linejoin="round"><path d="M65 88Q28 93 14 56L21 30 36 47 50 27 57 58 69 68M75 88Q112 93 126 56L119 30 104 47 90 27 83 58 71 68" fill="#234c58" stroke="#7bc4bd" stroke-width="1.5"/><path d="M46 96 53 73 54 52 44 30 60 39 70 15 80 39 96 30 86 52 87 73 94 96 70 108Z" fill="#356a70" stroke="#c1e0cc" stroke-width="1.5"/><path d="M55 49 70 41 85 49 81 62 70 70 59 62Z" fill="#75aaa3"/><path d="M59 69 70 73 81 69 85 91 70 104 55 91Z" fill="#b8b789"/><path d="M55 53 66 56 61 60 56 58ZM85 53 74 56 79 60 84 58Z" fill="#f0db8a" stroke="#183a41" stroke-width="1.2"/><path d="m64 63 6 4 6-4m-6 4v4m-8 10h16m-18 7h20m-17 7h14" stroke="#315557" stroke-width="1.6" fill="none"/><path d="M22 38 41 65 54 69M118 38 99 65 86 69" stroke="#a7cec1" fill="none" opacity=".7"/></g>'
+});
+function petPortrait(p,rarity){
+ const artwork=Object.hasOwn(PET_PORTRAITS,p.id)?PET_PORTRAITS[p.id]:null;
+ const body=artwork?'<svg viewBox="0 0 140 120" aria-hidden="true" focusable="false"><circle cx="70" cy="60" r="51" fill="#121d2a" fill-opacity=".35" stroke="#d5b878" stroke-opacity=".55"/><circle cx="70" cy="60" r="46" fill="none" stroke="#d5b878" stroke-opacity=".2"/><path d="M70 5l4 5-4 5-4-5ZM70 105l4 5-4 5-4-5ZM15 60l5-4 5 4-5 4ZM115 60l5-4 5 4-5 4Z" fill="#c7a66a"/>'+artwork+'</svg>':'<span class="pet-art-fallback" aria-hidden="true">'+esc(p.icon||"🐾")+'</span>';
+ return '<div class="pet-card-art '+rarity.css+'" aria-hidden="true">'+body+'</div>';
+}
+
 function renderPets(){
  const root=document.getElementById("petsList");
  const pets=state?.pets||[];
@@ -1061,7 +1085,7 @@ function renderPets(){
   const action=owned
    ? '<div class="toolbar" style="margin-top:8px"><button class="secondary" data-pet-activate="'+esc(p.id)+'" '+(active||busy?"disabled":"")+'>'+(active?"✓ Ativo":"Ativar")+'</button><button class="secondary" data-pet-feed="'+esc(p.id)+'" '+(busy||Number(state.petGold||0)<100?"disabled":"")+' title="Consome 100 de ouro e concede 50 EXP">🍖 Alimentar · 100 ouro</button></div>'
    : '<div class="toolbar" style="margin-top:8px"><button data-pet-unlock="'+esc(p.id)+'" '+(busy||Number(state.petGold||0)<Number(p.unlock_cost_gold||0)?"disabled":"")+'>'+(Number(p.unlock_cost_gold||0)===0?"Resgatar gratuitamente":"Desbloquear · "+fmt(p.unlock_cost_gold)+" ouro")+'</button></div>';
-  return '<div class="event"><div style="display:flex;justify-content:space-between;gap:10px;align-items:center"><strong>'+esc(p.icon||"🐾")+' '+esc(p.name)+'</strong><span class="pet-rarity '+rarity.css+'">'+esc(rarity.label)+'</span></div><div>'+esc(p.description||"")+'</div><small class="muted">'+esc(skillText)+esc(level)+(active?" · Habilidade ativa":"")+'</small>'+action+'</div>';
+  return '<div class="event pet-card'+(active?" is-active":"")+'">'+petPortrait(p,rarity)+'<div class="pet-card-heading"><strong>'+esc(p.name)+'</strong><span class="pet-rarity '+rarity.css+'">'+esc(rarity.label)+'</span></div><div>'+esc(p.description||"")+'</div><small class="muted">'+esc(skillText)+esc(level)+(active?" · Habilidade ativa":"")+'</small>'+action+'</div>';
  }).join("");
  root.querySelectorAll("[data-pet-unlock]").forEach(button=>button.addEventListener("click",()=>sendPetAction("unlock",{pet_id:button.dataset.petUnlock})));
  root.querySelectorAll("[data-pet-activate]").forEach(button=>button.addEventListener("click",()=>sendPetAction("activate",{pet_id:button.dataset.petActivate})));
