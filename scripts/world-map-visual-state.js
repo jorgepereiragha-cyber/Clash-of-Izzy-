@@ -11,14 +11,21 @@ export function throneVisualState(state) {
  if (state?.throneClaimed === true) return "claimed";
  return state?.thronePhase === "contest" ? "contest" : "idle";
 }
+// Beta coordinates are server-authoritative. Legacy clients retain their old display anchor.
+export function worldHomePosition(state) {
+ if(state?.worldCoordinateSpace==="absolute-v1"&&Number.isFinite(state.homeX)&&Number.isFinite(state.homeZ))return {x:state.homeX,z:state.homeZ};
+ const throne=rows(state?.territories).some(r=>r.territory_kind==="throne");
+ return {x:throne?13:0,z:throne?-11:0};
+}
 export function worldVisualKeys(state) {
  const territories=rows(state?.territories), throne=territories.some(r=>r.territory_kind==="throne");
- const home=JSON.stringify([throne,number(state?.castleSkinId),worldCastleTier(state?.castleLevel)]);
+ const anchor=worldHomePosition(state);
+ const home=JSON.stringify([anchor.x,anchor.z,number(state?.castleSkinId),worldCastleTier(state?.castleLevel)]);
  const coordinates=territories.map(r=>[number(r.id),number(r.x),number(r.z)]);
  const landmarks=territories.map(r=>[number(r.id),number(r.x),number(r.z),number(r.owner_kingdom_id),r.territory_kind,r.terrain,r.resource_type,number(r.castle_skin_id),r.territory_kind==="castle"?worldCastleTier(r.castle_level??r.level):0]);
- const routes=JSON.stringify([throne,coordinates]);
+ const routes=JSON.stringify([throne,anchor.x,anchor.z,coordinates]);
  const features=JSON.stringify([number(state?.kingdomId),throneVisualState(state),landmarks]);
- const marches=JSON.stringify(rows(state?.marches).filter(r=>r.status==="marching"&&Number.isFinite(marchTimestamp(r.arrives_at))).slice(0,8)
-   .map(r=>[number(r.id),r.march_type,r.started_at,r.arrives_at,number(r.target_territory_id),r.monster_id,r.monster_x,r.monster_z,readMarchComposition(r.units_json)]));
+ const marches=JSON.stringify([anchor.x,anchor.z,rows(state?.marches).filter(r=>r.status==="marching"&&Number.isFinite(marchTimestamp(r.arrives_at))).slice(0,8)
+   .map(r=>[number(r.id),r.march_type,r.started_at,r.arrives_at,number(r.target_territory_id),r.monster_id,r.monster_x,r.monster_z,readMarchComposition(r.units_json)])]);
  return {home,routes,features,marches};
 }
