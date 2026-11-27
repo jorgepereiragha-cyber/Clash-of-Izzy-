@@ -5,6 +5,7 @@ Does not import actors, skeletal animations, attachments or mod scripts.
 import sys, pathlib, xml.etree.ElementTree as ET, struct, json, math
 from hashlib import sha256
 ROOT=pathlib.Path(sys.argv[-1]).resolve()
+DEDUP="--dedup" in sys.argv[1:-1]
 NAMES=("caro_fortress_struct","caro_farmstead","caro_market","caro_blacksmith","caro_wall_long","caro_wall_gate","caro_defense_tower","caro_storehouse")
 def check(condition,message):
     if not condition: raise ValueError(message)
@@ -57,11 +58,15 @@ def convert(name):
     check(len(ix)%stride==0 and len(ix)//stride==int(p.get("count"))*3,"Only triangulated meshes supported")
     if p.tag.endswith("polylist"):check(set(map(int,find(p,"c:vcount").text.split()))=={3},"Nontriangular polylist")
     for k in range(0,len(ix),stride):
-        key=tuple(ix[k+offset] for offset,_ in selectors)
+        source_key=tuple(ix[k+offset] for offset,_ in selectors)
+        check(all(0<=index<len(table) for index,(_,table) in zip(source_key,selectors)),"Index out of bounds")
+        v,n,uv=(table[index] for index,(_,table) in zip(source_key,selectors))
+        p3,n3,t2=pos(v),normal(n),(uv[0],1-uv[1])
+        # In candidate mode weld only byte-identical emitted float32 attributes.
+        # Keep UV seams, hard normals, vertex order of first occurrence and all triangles.
+        key=struct.pack("<8f",*p3,*n3,*t2) if DEDUP else source_key
         if key not in unique:
-            check(all(0<=index<len(table) for index,(_,table) in zip(key,selectors)),"Index out of bounds")
-            v,n,uv=(table[index] for index,(_,table) in zip(key,selectors))
-            positions.extend(pos(v));normals.extend(normal(n));uvs.extend((uv[0],1-uv[1]));unique[key]=len(unique)
+            positions.extend(p3);normals.extend(n3);uvs.extend(t2);unique[key]=len(unique)
         indices.append(unique[key])
     check(all(math.isfinite(x) for x in positions+normals+uvs),"Nonfinite vertex data")
     check(0<len(unique)<65536,"Vertex limit")

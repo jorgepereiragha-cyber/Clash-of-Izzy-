@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import {GLB_BUDGET_BYTES} from "../scripts/millennium-art-budget.mjs";
 
 const manifest = JSON.parse(await readFile(new URL("../assets/3d/manifest.json", import.meta.url), "utf8"));
 const toUrl = path => new URL("../" + path.replace(/^\/+/, ""), import.meta.url);
@@ -41,7 +42,7 @@ test("every bundled GLB is valid glTF 2.0 and its referenced textures are local"
       assert.ok(texture.byteLength > 0, texturePath);
     }
   }
-  assert.ok(totalBytes < 4_600_000, "bundled GLBs must remain under 4.6 MB (including siege workshop)");
+  assert.ok(totalBytes < GLB_BUDGET_BYTES, "bundled GLBs must remain under 4.6 MB (including siege workshop)");
 });
 
 test("archer asset includes the idle clip and both original CC0 license files are preserved", async () => {
