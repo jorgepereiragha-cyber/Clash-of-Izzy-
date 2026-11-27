@@ -17,40 +17,45 @@
   <main class="market-shell">
     <header class="market-heading">
       <div>
-        <p class="eyebrow">ECONOMIA DE ELDORIA</p>
-        <h1>Mercador & Loja de Heróis</h1>
-        <p class="market-intro">Troque recursos excedentes por acelerações, aproveite ofertas rotativas e fortaleça os heróis que já recrutou.</p>
+        <a class="market-back" href="/kingdom.html">‹ Reino</a>
+        <h1>Mercador de Eldoria</h1>
       </div>
-      <button id="market-refresh" class="button-secondary" type="button">↻ Atualizar</button>
+      <svg class="market-banner-art" viewBox="0 0 100 90" aria-hidden="true" focusable="false"><use href="/assets/art/buildings/icons.svg#market"></use></svg>
+      <button id="market-refresh" class="button-secondary" type="button">Atualizar saldos</button>
     </header>
 
     <div class="market-status" id="market-status" role="status" aria-live="polite">Conectando ao reino…</div>
 
     <section class="wallet-grid" aria-label="Saldos do reino">
-      <div class="wallet-card"><span>🌾 Comida</span><strong id="balance-food">—</strong></div>
-      <div class="wallet-card"><span>🪵 Madeira</span><strong id="balance-wood">—</strong></div>
-      <div class="wallet-card"><span>🪨 Pedra</span><strong id="balance-stone">—</strong></div>
-      <div class="wallet-card"><span>⛓️ Ferro</span><strong id="balance-iron">—</strong></div>
-      <div class="wallet-card"><span>🪙 Ouro</span><strong id="balance-gold">—</strong></div>
-      <div class="wallet-card"><span>💎 Diamantes</span><strong id="balance-gems">—</strong></div>
+      <div class="wallet-card"><span>Comida</span><strong id="balance-food">—</strong></div>
+      <div class="wallet-card"><span>Madeira</span><strong id="balance-wood">—</strong></div>
+      <div class="wallet-card"><span>Pedra</span><strong id="balance-stone">—</strong></div>
+      <div class="wallet-card"><span>Ferro</span><strong id="balance-iron">—</strong></div>
+      <div class="wallet-card"><span>Ouro</span><strong id="balance-gold">—</strong></div>
+      <div class="wallet-card"><span>Diamantes</span><strong id="balance-gems">—</strong></div>
     </section>
 
     <nav class="market-tabs" aria-label="Seções do mercado">
       <a href="#merchant">Mercador</a>
       <a href="#hero-shop">Loja de Heróis</a>
       <a href="#accelerators">Aceleradores</a>
+      <a href="#supplies">Suprimentos</a>
       <a href="#official-shop">Loja do Reino</a>
     </nav>
 
     <section class="market-section" id="merchant">
       <div class="section-heading">
-        <div><p class="eyebrow">ROTAÇÃO DE 8 HORAS</p><h2>Mercador de Eldoria</h2><p>Trocas limitadas de recursos por aceleradores. Cada reino tem estoque próprio.</p></div>
+        <div><h2>Caravana</h2><p>Troque recursos por itens. O estoque do seu reino renova a cada 8 horas.</p></div>
         <span class="refresh-clock" id="merchant-refresh">Próxima rotação: —</span>
+      </div>
+      <div class="market-toolbar">
+        <label><input id="merchant-affordable" type="checkbox"> Só ofertas que posso trocar</label>
+        <a href="/world.html#resource-nodes">Buscar recursos no mapa ›</a>
       </div>
       <div id="merchant-exchanges" class="market-grid">
         <p class="empty-state">Carregando ofertas de troca…</p>
       </div>
-      <div class="subsection-heading"><h3>Ofertas especiais</h3><span>Compras com diamantes · estoque limitado</span></div>
+      <div class="subsection-heading"><h3>Ofertas especiais</h3></div>
       <div id="merchant-specials" class="market-grid compact-grid">
         <p class="empty-state">Carregando ofertas…</p>
       </div>
@@ -58,21 +63,22 @@
 
     <section class="market-section" id="hero-shop">
       <div class="section-heading">
-        <div><p class="eyebrow">EVOLUÇÃO DE COMANDANTES</p><h2>Loja de Heróis</h2><p>Compre fragmentos dos heróis que você já possui. Os fragmentos são creditados diretamente na ficha do herói.</p></div>
-        <span class="refresh-clock">Sem duplicar inventários</span>
+        <div><h2>Loja de Heróis</h2><p>Compre fragmentos dos comandantes que você já recrutou.</p></div>
       </div>
       <div id="hero-offers" class="market-grid">
         <p class="empty-state">Carregando heróis…</p>
       </div>
-      <div class="subsection-heading"><h3>Recrutamento de Heróis</h3><span>Convocações com diamantes · sem duplicar coleções</span></div>
+      <div class="subsection-heading"><h3>Recrutamento de Heróis</h3></div>
+      <p class="summon-odds" id="summon-odds" hidden></p>
       <div id="hero-recruitment" class="recruitment-grid">
         <p class="empty-state">Carregando opções de recrutamento…</p>
       </div>
+      <ul id="summon-results" class="summon-results" aria-label="Resultado da convocação" hidden></ul>
     </section>
 
     <section class="market-section" id="accelerators">
       <div class="section-heading">
-        <div><p class="eyebrow">INVENTÁRIO E TEMPO</p><h2>Aceleradores</h2><p>Use os itens no tipo correto de fila. A redução é validada e aplicada pelo servidor.</p></div>
+        <div><h2>Aceleradores</h2><p>Use os itens em filas de construção, treino ou pesquisa.</p></div>
       </div>
       <div id="accelerator-inventory" class="accelerator-inventory"></div>
       <div class="subsection-heading"><h3>Filas em andamento</h3><span>Construção · Treino · Pesquisa</span></div>
@@ -81,9 +87,23 @@
       </div>
     </section>
 
+    <section class="market-section" id="supplies">
+      <div class="section-heading"><h2>Suprimentos</h2></div>
+      <div id="market-supplies" class="market-grid"></div>
+    </section>
+
     <section class="market-section" id="official-shop">
       <div class="section-heading">
-        <div><p class="eyebrow">CATÁLOGO DO REINO</p><h2>Loja do Reino</h2><p>Itens já cadastrados no catálogo do jogo. O preço e a moeda são definidos pelo servidor.</p></div>
+        <h2>Loja do Reino</h2>
+        <label class="market-category">Categoria
+          <select id="market-category">
+            <option value="all">Todas</option>
+            <option value="resources">Recursos</option>
+            <option value="accelerators">Aceleradores</option>
+            <option value="special">Suprimentos</option>
+            <option value="packages">Pacotes</option>
+          </select>
+        </label>
       </div>
       <div id="official-products" class="market-grid compact-grid">
         <p class="empty-state">Carregando catálogo…</p>
@@ -96,7 +116,7 @@
     </footer>
   </main>
   <script src="/scripts/pwa-runtime.js" defer></script>
-  <script src="/market.js" defer></script>
+  <script src="/market.js" type="module"></script>
   <script src="/navigation.js" defer></script>
 </body>
 </html>

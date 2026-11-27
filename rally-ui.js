@@ -192,9 +192,13 @@ function nodeMatchesMapFilter(node,filter){
  return node.node_type===filter;
 }
 for(const event of ["coi:world-map-3d-ready","coi:world-map-projection-changed","coi:world-map-2d-fallback"])window.addEventListener(event,projectResourceNodes);
+const resourceFilter=$("resourceMapFilter");
+if(resourceFilter){
+ const target=new URLSearchParams(window.location.search).get("coleta");
+ if(Object.hasOwn(NODE_TYPES,target))resourceFilter.value=target;
+}
 function filteredNodes(){
- const filter=$("resourceMapFilter")?.value;
- return nodes.filter(node=>nodeMatchesMapFilter(node,filter));
+ return nodes.filter(node=>nodeMatchesMapFilter(node,resourceFilter?.value));
 }
 function locateNode(node){
  selectNode(node);
@@ -202,7 +206,7 @@ function locateNode(node){
   .find(marker=>marker.dataset.nodeId===String(node.id));
  focusMapMarker(pin);
 }
-$("resourceMapFilter")?.addEventListener("change",()=>{
+resourceFilter?.addEventListener("change",()=>{
  if(!filteredNodes().some(node=>node.id===selectedNodeId))selectNode(null);
  renderMapNodes();renderNodeList();
 });

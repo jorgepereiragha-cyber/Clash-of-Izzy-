@@ -1009,6 +1009,38 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal((await actionFor(cookie,start.data.token,{type:"hero_evolve",hero:"kael_sunwarden",expectedStars:maxStars})).status,409);
     assert.equal(heroStars(await getStateFor(cookie,start.data.token)).fragments,1000);
     console.log("Beta hero stars passed: exact cost, concurrent CAS, replay, stat increase and rarity cap.");
+    await localSql("UPDATE kingdoms SET food=100000,wood=100000,stone=100000,iron=100000,gold=100000 WHERE id="+queueRealm);
+    await localSql("UPDATE players SET gems=300 WHERE id=(SELECT player_id FROM kingdoms WHERE id="+queueRealm+")");
+    const beforeMerchant=await getStateFor(cookie,start.data.token);
+    const merchantAction=body=>actionFor(cookie,start.data.token,body);
+    const {cycle,serverTime,refreshAt,exchangeOffers}=beforeMerchant.shop;
+    assert.ok(serverTime<refreshAt);
+    const exchange=exchangeOffers[0],rotating={type:"merchant_exchange",offerId:exchange.id};
+    for(const order of [rotating,{type:"shop_buy",source:"merchant",item:beforeMerchant.shop.offers[0].id},{type:"hero_shop_buy",heroKey:"kael_sunwarden"}]){
+      const expired=await merchantAction({...order,cycle:cycle-1});
+      assert.equal(expired.status,409);
+      assert.equal(expired.data.code,"MERCHANT_ROTATION_CHANGED");
+    }
+    const refreshed=await getStateFor(cookie,start.data.token);
+    assert.equal(refreshed.shop.exchangeOffers.find(offer=>offer.id===exchange.id).stock,exchange.stock);
+    assert.equal(refreshed.player.gems,beforeMerchant.player.gems);
+    const traded=await merchantAction({...rotating,cycle});
+    assert.equal(traded.status,200);
+    assert.equal(traded.data.state.shop.exchangeOffers.find(offer=>offer.id===exchange.id).stock,exchange.stock-1);
+    const protectedCastle=await merchantAction({type:"shop_buy",item:"shield_8h"});
+    assert.equal(protectedCastle.status,409);
+    const book=await merchantAction({type:"shop_buy",item:"hero_exp"});
+    assert.equal(book.status,200);
+    assert.equal(book.data.state.player.gems,100);
+    const useBook=()=>merchantAction({type:"hero_use_exp_book",heroKey:"kael_sunwarden"});
+    const bookRace=await Promise.all([useBook(),useBook()]);
+    assert.deepEqual(bookRace.map(result=>result.status).sort((a,b)=>a-b),[200,409]);
+    const afterBook=await getStateFor(cookie,start.data.token);
+    assert.equal(afterBook.shop.inventory.find(item=>item.item_id==="hero_exp"),undefined);
+    assert.ok(heroStars(afterBook).level>heroStars(beforeMerchant).level);
+    assert.equal(afterBook.heroes.find(hero=>hero.hero_key==="kael_sunwarden").experience,heroStars(afterBook).experience);
+    assert.equal((await useBook()).status,409);
+    console.log("Beta merchant passed: stale rotations, persisted stock, unavailable shield and single-use experience book.");
     // Disposable D1 fixture: move five active militia to wounded, not new troops.
     await localSql("UPDATE kingdoms SET food=10000 WHERE id="+queueRealm);
     await localSql("UPDATE army_units SET quantity=quantity-5,wounded=wounded+5 WHERE kingdom_id="+queueRealm+" AND unit_type='militia' AND tier=1 AND quantity>=5");
@@ -1109,6 +1141,21 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await page.waitForFunction(() => document.querySelector("#status")?.textContent.includes("Reino sincronizado"));
         const sameToken = await page.evaluate(() => localStorage.getItem("coi_game_token"));
         assert.ok(sameToken === firstToken, "reloading must resume the same realm without creating a new one");
+
+        await page.evaluate(()=>document.querySelector('#city [data-building="market"]').click());
+        await page.locator("#coiCitySelectionAction").click();
+        await page.waitForURL(base+"/market.html#merchant");
+        await page.waitForFunction(()=>document.querySelector("#market-status")?.textContent.includes("Mercado sincronizado"));
+        await page.waitForFunction(()=>document.querySelector("#merchant-refresh")?.textContent.includes("Renova em"));
+        await page.goto(base+"/world.html?coleta=forest#resource-nodes");
+        await page.locator("#resource-node-list .resource-node-card").first().waitFor();
+        assert.equal(await page.locator("#resourceMapFilter").inputValue(),"forest");
+        const nodeNames=await page.locator("#resource-node-list .resource-node-name").allTextContents();
+        assert.ok(nodeNames.length>0&&nodeNames.every(name=>name.startsWith("Floresta")));
+        await page.getByRole("link",{name:"Trocar recursos no mercador"}).click();
+        await page.waitForURL(base+"/market.html#merchant");
+        await page.goto(base+"/kingdom.html");
+        await page.locator("#game").waitFor({state:"visible",timeout:45_000});
 
         // Authenticate with the actual browser session, then exercise the real training API.
         const auth = {Authorization:"Bearer " + firstToken, Origin:base};
@@ -1364,14 +1411,15 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         }
         console.log("Beta connection recovery passed: preserved realm, successful resync, no duplicate anonymous creation.");
         await page.evaluate(()=>localStorage.setItem("coi_graphics_preference","2d"));
-        await page.goto(base + "/world.html");
+        await page.goto(base + "/world.html?coleta=farm#resource-nodes");
         assert.equal(new URL(page.url()).pathname, "/world.html");
         await page.waitForLoadState("load");
         await page.waitForFunction(()=>document.querySelectorAll(".world-monster-pin").length===6);
         await page.locator(".map-center svg").waitFor({state:"visible"});
         await page.locator("#resources .world-resource-art").first().waitFor({state:"visible"});
         await page.locator(".resource-node-pin .world-resource-art").first().waitFor({state:"visible"});
-        await page.locator("#resourceMapFilter").selectOption("farm");
+        assert.equal(await page.locator("#resourceMapFilter").inputValue(),"farm","merchant link applies its resource type");
+        assert.equal(await page.locator("#resource-nodes a").getAttribute("href"),"/market.html#merchant");
         const farmPins=page.locator(".resource-node-pin");
         assert.equal(await farmPins.count(),await page.locator(".resource-node-card").count());
         assert.ok(await farmPins.count()>0);
@@ -1421,6 +1469,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         await page.locator('.tactical-march[data-type="hunt"]').waitFor({state:"visible"});
         await page.evaluate(()=>localStorage.setItem("coi_graphics_preference","balanced"));
         await page.reload();
+        await page.locator("#resourceMapFilter").selectOption("all");
         await page.locator("#worldMap").scrollIntoViewIfNeeded();
         await page.waitForFunction(()=>window.__coiWorldMap3D?.diagnostics().rebuilds.marches>0);
         await page.waitForFunction(()=>document.querySelector(".world-monster-pin")?.style.left.endsWith("px"));
