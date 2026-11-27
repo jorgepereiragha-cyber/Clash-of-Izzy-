@@ -150,3 +150,19 @@ test("GPU failure disables projection and restores tactical markers and accessib
  assert.match(map,/addEventListener\("coi:world-map-2d-fallback", \(\) => \{\s*if \(state\?\.kingdom\) renderMap\(\)/);
  assert.match(boot,/addEventListener\("coi:world-map-2d-fallback", \(\) => \{\s*useFallback\("Mapa em 2D/);
 });
+
+test("collection nodes distinguish own occupancy, foreign occupancy, rally reservation and free status",async()=>{
+ const source=await read("rally-ui.js");
+ const start=source.indexOf("function nodeAvailability(node){");
+ const end=source.indexOf("function nodeLabel(node){",start);
+ assert.ok(start>=0&&end>start);
+ const {runInNewContext}=await import("node:vm");
+ const availability=runInNewContext(source.slice(start,end)+"\nnodeAvailability");
+ assert.equal(availability({is_mine:true,occupied_by:1}),"Sua ocupação");
+ assert.equal(availability({occupied_by:2}),"Ocupado por outro reino");
+ assert.equal(availability({reserved_by_rally:"rally-1"}),"Reservado para rally");
+ assert.equal(availability({}),"Livre para ocupação");
+ assert.match(source,/pin\.dataset\.nodeId===String\(node\.id\)/);
+ assert.match(source,/button\.style\.borderStyle="dashed"/);
+ assert.match(source,/button\.setAttribute\("aria-label",button\.title\)/);
+});
