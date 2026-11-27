@@ -72,10 +72,15 @@ window.addEventListener("coi:world-map-3d-ready",syncMonsterModels);
 window.addEventListener("coi:territory-selected",()=>selectMonster(null,false,false));
 window.addEventListener("coi:resource-node-selected",()=>selectMonster(null,false,false));
 levelFilter.addEventListener("change",applyLevelFilter);
+function monsterSearchRank(monster,progress,combatEnabled){
+ if(Number(monster.hp)<=0)return 3;
+ if(!combatEnabled||!progress||Number(monster.level)>Number(progress.unlockedLevel))return 2;
+ const cost=progress.energyCosts?.[monster.level];
+ return Number.isFinite(cost)&&Number(progress.energy)>=cost?0:1;
+}
 locate.addEventListener("click",()=>{
  const available=visibleMonsters();
- const canHunt=monster=>monster.hp>0&&monster.level<=progress?.unlockedLevel;
- const [monster]=available.sort((a,b)=>Number(canHunt(b))-Number(canHunt(a))||Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z));
+ const [monster]=available.sort((a,b)=>monsterSearchRank(a,progress,combatEnabled)-monsterSearchRank(b,progress,combatEnabled)||Math.hypot(a.x,a.z)-Math.hypot(b.x,b.z));
  if(!monster)return;
  const id=String(monster.id);
  selectMonster(id);
@@ -147,7 +152,8 @@ async function refresh(){
    if(progress){
     const cost=progress.energyCosts?.[monster.level];
     const locked=Number(monster.level)>Number(progress.unlockedLevel);
-    item.append(element("span",locked?"Nível bloqueado · derrote o anterior":"Custo previsto: "+cost+" energia"));
+    const costLabel=Number.isFinite(cost)?"Custo previsto: "+cost+" energia":"Custo indisponível";
+    item.append(element("span",locked?"Nível bloqueado · derrote o anterior":costLabel+(hp>0&&Number.isFinite(cost)&&progress.energy<cost?" · Energia insuficiente":"")));
    }
    const button=element("button","Ver expedição");button.type="button";button.className="secondary";
    button.dataset.monsterId=id;
