@@ -1746,17 +1746,18 @@ async function gameAction(env,playerId,body){
     if(!target)return json({error:"Território não encontrado."},404);
     if(target.territory_key?.startsWith("royal_throne_"))
       return json({error:"O Trono Imperial exige Guerra do Trono; não pode ser atacado por marcha normal."},409);
-    const marchType=String(body.marchType||"gather");
+    const marchType=body.marchType;
     if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
     if(marchType==="attack"&&(target.owner_kingdom_id||target.territory_kind==="castle"))return json({error:"O castelo de outro comandante está visível no mapa. O combate PvP será habilitado na Fase 10; por enquanto, ataque apenas territórios neutros."},409);
     if(target.territory_kind==="castle"&&marchType!=="attack")return json({error:"Castelos de jogadores não podem ser coletados nem usados como ponto de exploração."},409);
     if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
-    const requested=body.units&&typeof body.units==="object"&&!Array.isArray(body.units)?body.units:{militia:5};
+    const requested=body.units;
+    if(!requested||typeof requested!=="object"||Array.isArray(requested))return json({error:"Informe a composição da marcha."},400);
     const selected={};
-    for(const [unit,raw] of Object.entries(requested)){
-      if(!Object.hasOwn(UNITS,unit))continue;
-      const qty=Math.max(0,Math.min(10000,Math.floor(Number(raw)||0)));
-      if(qty>0)selected[unit]=qty;
+    for(const [unit,qty] of Object.entries(requested)){
+      if(!Object.hasOwn(UNITS,unit)||!Number.isSafeInteger(qty)||qty<1||qty>10000)
+        return json({error:"Composição de marcha inválida."},400);
+      selected[unit]=qty;
     }
     const unitTypes=Object.keys(selected);
     if(!unitTypes.length)return json({error:"Selecione pelo menos uma tropa válida."},400);
