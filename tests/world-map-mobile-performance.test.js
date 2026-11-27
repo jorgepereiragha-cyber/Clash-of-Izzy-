@@ -136,3 +136,17 @@ test("world terrain blends and river ribbons are deterministic, bounded, above g
  const source=await read("world-map-3d.js");assert.match(source,/worldRiverRibbon\(/);assert.match(source,/worldRiverDistance\(x,z\)<3/);assert.match(source,/shared\.terrainGround/);
  assert.doesNotMatch(source,/TubeGeometry\(river,/);
 });
+
+test("GPU failure disables projection and restores tactical markers and accessible status",async()=>{
+ const [scene,map,boot]=await Promise.all([read("world-map-3d.js"),read("world-map.js"),read("scripts/world-map-visual-boot.js")]);
+ const fallback=scene.slice(scene.indexOf("function activateMapFallback()"),scene.indexOf("function init()"));
+ assert.match(fallback,/delete window\.__coiWorldMap3D/);
+ assert.match(fallback,/__coiWorldGraphicsQuality = "2d"/);
+ assert.match(fallback,/try \{ dispose\(\); \} finally/);
+ assert.ok(fallback.indexOf("delete window.__coiWorldMap3D")<fallback.indexOf('new CustomEvent("coi:world-map-2d-fallback")'));
+ assert.match(scene,/function projectTerritories\(\) \{\s*if \(disposed \|\| contextLost/);
+ assert.match(scene,/function draw\(\) \{\s*if \(disposed \|\| contextLost/);
+ assert.match(scene,/function resize\(\) \{\s*if \(disposed \|\| contextLost/);
+ assert.match(map,/addEventListener\("coi:world-map-2d-fallback", \(\) => \{\s*if \(state\?\.kingdom\) renderMap\(\)/);
+ assert.match(boot,/addEventListener\("coi:world-map-2d-fallback", \(\) => \{\s*useFallback\("Mapa em 2D/);
+});
