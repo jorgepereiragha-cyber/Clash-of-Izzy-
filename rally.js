@@ -77,7 +77,7 @@ async function loadNodes(env,kingdomId){
   const available=nodeRegeneration(row,now), capacity=Number(row.max_resources);
   const accelerated=betaFiveMillion(env)&&capacity>0;
   const scale=accelerated?5000000/capacity:1;
-  return {...row,current_resources:Math.floor(available*scale),max_resources:accelerated?5000000:capacity,
+  return {...row,current_resources:accelerated&&available>=capacity?5000000:Math.floor(available*scale),max_resources:accelerated?5000000:capacity,
    regen_rate:Math.floor(Number(row.regen_rate)*scale),
    collection_amount:accelerated?(available>=capacity?5000000:0):Math.floor(available*0.5),
    resource_type:resourceForNode(row.node_type),is_mine:Number(row.occupied_by||0)===kingdomId};
