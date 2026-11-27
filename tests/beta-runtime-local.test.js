@@ -92,6 +92,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const production = JSON.parse(await readFile(path.join(root, "wrangler.jsonc"), "utf8"));
     assert.equal(original.name, "clash-of-izzy-beta");
     assert.equal(original.vars.ENVIRONMENT, "beta");
+    assert.equal(original.vars.BETA_GATHERING_5M_ENABLED,"true");
+    assert.notEqual(production.vars.BETA_GATHERING_5M_ENABLED,"true");
     assert.equal(original.vars.INVITE_ONLY, "true");
     assert.equal(original.vars.BETA_LIVE_PAYMENTS_APPROVED, "false");
     assert.equal(original.triggers, undefined);
@@ -668,7 +670,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.ok(gatherTarget,"neutral gathering node exists");
     const gatherKingdom = Number(gatherBefore.kingdom.id);
     assert.ok(Number.isSafeInteger(gatherKingdom)&&gatherKingdom>0);
-    const gatherRate = Math.max(1,Number(gatherTarget.resource_rate)||90);
+    const gatherRate = 5000000;
+    assert.equal(gatherBefore.worldGatherFixedAmount,gatherRate);
     const readGatherLedger = async () => {
       const raw = await command([...common,"execute","clash-of-izzy-beta-db","--local",
         "--persist-to",persist,"--json","--command",
