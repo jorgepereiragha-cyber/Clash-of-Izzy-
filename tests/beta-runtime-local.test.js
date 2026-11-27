@@ -1052,6 +1052,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
         assert.equal(diagnostics.dragonVisual.imported,true,"equipped dragon must decode rigged GLB");
         assert.deepEqual(diagnostics.specialLandmarks.map(x=>x.type).sort(),["dragon_nest","summon_altar"]);
         for(const model of diagnostics.specialLandmarks)assert.ok(Number.isFinite(model.x)&&Number.isFinite(model.z));
+        assert.ok(diagnostics.cityStructureFrameExtent > 0 && diagnostics.cityStructureFrameExtent <= .940001, "overview fits actual city structures including both special landmarks");
+        assert.ok(diagnostics.cityPavedPlots>=1&&diagnostics.cityPavedPlots<=diagnostics.cityArtLayout.length,"civic plaza paving shares the actual plot layout");
         const evidence = path.join(root, "test-results", "beta-visual");
         await mkdir(evidence, {recursive:true});
         await page.locator("#city").screenshot({path:path.join(evidence,"kingdom-3d.png")});
@@ -1088,6 +1090,29 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           assert.ok(variant.scale.every(axis => Number.isFinite(axis) && axis > 0));
         }
         await writeFile(path.join(evidence,"dragon-variants.json"), JSON.stringify(dragonVariants,null,2));
+        const originalCastle = await page.evaluate(() => ({
+          buildingLevel: state.buildings.find(building => building.building_type === "castle").level,
+          kingdomLevel: state.kingdom.castle_level
+        }));
+        const renderCastlePreview = levels => page.evaluate(({buildingLevel, kingdomLevel}) => {
+          state.buildings.find(building => building.building_type === "castle").level = buildingLevel;
+          state.kingdom.castle_level = kingdomLevel;
+          render();
+          return window.__coiKingdomDiagnostics().architecture.find(entry => entry.type === "castle");
+        }, levels);
+        try {
+          for (const [level, tier] of [[1,1], [9,1], [10,2], [19,2], [20,3], [25,3], [29,3], [30,4]]) {
+            const castle = await renderCastlePreview({buildingLevel:level, kingdomLevel:level});
+            assert.equal(castle.tier, tier, "city renders the correct castle tier at level " + level);
+            const extent = await page.evaluate(() => window.__coiKingdomDiagnostics().cityStructureFrameExtent);
+            assert.ok(extent > 0 && extent <= .940001, "castle tier " + tier + " and other structures fit the reset overview");
+            const levelLabel = page.locator('#city [data-building="castle"] small');
+            assert.equal(await levelLabel.textContent(), "Nível " + level);
+            await page.locator("#city").screenshot({path:path.join(evidence,"castle-level-"+level+".png")});
+          }
+        } finally {
+          await renderCastlePreview(originalCastle);
+        }
         console.log("Decoded beta GLB templates: " + JSON.stringify(diagnostics.loadedGlbTemplates));
         assert.deepEqual(localAssetErrors, [], "browser must not encounter missing graphics/script/style assets");
         // Trigger a real GPU context loss (not a synthetic DOM event).
