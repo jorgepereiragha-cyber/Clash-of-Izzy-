@@ -471,6 +471,16 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const occupiedRally=await rallyCall("world");
     assert.ok(occupiedRally.data.nodes.find(node=>node.id===rallyNode.id).is_mine,"beta map resolves the rally without cron");
     assert.ok(!occupiedRally.data.rallies.some(rally=>rally.id===rallyId));
+    const readyNode=occupiedRally.data.nodes.find(node=>node.id===rallyNode.id);
+    assert.equal(readyNode.collection_amount,5000000);
+    assert.equal(readyNode.max_resources,5000000);
+    assert.equal(readyNode.collection_ready_at,readyNode.server_time);
+    const competingCollections=await Promise.all([rallyCall("collect",{node_id:rallyNode.id}),rallyCall("collect",{node_id:rallyNode.id})]);
+    assert.deepEqual(competingCollections.map(response=>response.status).sort(),[200,409]);
+    assert.equal(competingCollections.find(response=>response.status===200).data.collected,5000000);
+    const exhausted=(await rallyCall("world")).data.nodes.find(node=>node.id===rallyNode.id);
+    assert.equal(exhausted.collection_amount,0);
+    assert.ok(exhausted.collection_ready_at>exhausted.server_time);
     assert.equal((await rallyCall("recall",{node_id:rallyNode.id})).data.returned,1);
     const rallyArmyAfter=(await getStateFor(cookie,start.data.token)).troops.find(unit=>unit.unit_type==="militia"&&unit.tier===1).quantity;
     assert.equal(rallyArmyAfter,rallyArmyBefore);
