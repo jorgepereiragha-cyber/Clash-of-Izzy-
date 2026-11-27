@@ -26,3 +26,21 @@ test("stale errors ignored but current network failures propagate",async()=>{
  await assert.rejects(gate.run(async()=>{throw new Error("network")},()=>{}),/network/);
  assert.equal(await gate.run(async()=>1,()=>{}),true);
 });
+
+test("a delayed throne poll cannot overwrite the post-assault status",async()=>{
+ const gate=createWorldRefreshGate(),old=deferred(),seen=[];
+ const poll=gate.run(()=>old.promise,x=>seen.push(x),{background:true});
+ gate.invalidate();
+ await gate.run(async()=>({realmId:1,phase:"contest",owner:"new"}),x=>seen.push(x));
+ old.resolve({realmId:1,phase:"contest",owner:"old"});
+ assert.equal(await poll,false);
+ assert.deepEqual(seen,[{realmId:1,phase:"contest",owner:"new"}]);
+});
+test("changing realms invalidates an in-flight throne response",async()=>{
+ const gate=createWorldRefreshGate(),old=deferred(),seen=[];
+ const poll=gate.run(()=>old.promise,x=>seen.push(x),{background:true});
+ gate.invalidate();
+ old.resolve({realmId:1});
+ assert.equal(await poll,false);
+ assert.deepEqual(seen,[]);
+});
