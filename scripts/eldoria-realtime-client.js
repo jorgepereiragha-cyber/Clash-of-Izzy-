@@ -31,6 +31,7 @@ export function readRealtimePacket(raw) {
     }
     if (packet?.type === "connected") return { type: "connected" };
     if (packet?.type === "pong") return { type: "pong" };
+    if (packet?.type === "world_changed") return { type: "world_changed" };
   } catch {}
   return null;
 }
@@ -64,6 +65,7 @@ export function startRealtimePresence({
   windowRef = window,
   fetchImpl = fetch,
   WebSocketImpl = WebSocket,
+  onWorldChanged = () => {},
 } = {}) {
   const status = documentRef.getElementById("eldoriaPresence");
   if (!status) return () => {};
@@ -140,6 +142,7 @@ export function startRealtimePresence({
       client.addEventListener("message", event => {
         if (socket !== client) return;
         const packet = readRealtimePacket(event.data);
+        if (packet?.type === "world_changed") { onWorldChanged(); return; }
         if (packet?.type === "presence") {
           update("Presença na sala: " + packet.online + " conexões");
         }
