@@ -443,3 +443,24 @@ test("world resource landmarks have distinct forms and bounded mesh counts",asyn
  assert.match(scene,/createResourceSite\(parent,x,z,resource\)/);
  for(const material of Object.values(shared))material.dispose();
 });
+
+test("3D castle nameplates clear the architecture without weakening 2D touch controls",async()=>{
+ const [scene,html]=await Promise.all([read("world-map-3d.js"),read("world.html")]);
+ const {runInNewContext}=await import("node:vm");
+ const {worldCastleTier}=await import("../scripts/world-map-visual-state.js");
+ const start=scene.indexOf("function projectTerritories("),end=scene.indexOf("function draw(",start);
+ assert.ok(start>=0&&end>start);
+ const territories=[{id:1,territory_kind:"castle",castle_level:1,owner_kingdom_id:7},{id:2,territory_kind:"castle",castle_level:30,owner_kingdom_id:7},{id:3,territory_kind:"castle",castle_level:30,owner_kingdom_id:9},{id:4,territory_kind:"resource"}];
+ const heights=[];
+ class Vector3{constructor(x,y,z){heights.push(y);this.x=0;this.y=0;}project(){return this;}}
+ const projectionButtons=new Map(territories.map(row=>[row.id,{style:{}}]));
+ const project=runInNewContext(scene.slice(start,end)+"\nprojectTerritories",{disposed:false,contextLost:false,camera:{},renderer:{},worldState:{kingdomId:7,territories},host:{clientWidth:100,clientHeight:100},projectionButtons,THREE:{Vector3},terrainHeight:()=>0,worldCastleTier});
+ project();
+ assert.equal(heights.length,4);
+ assert.ok(heights[1]>heights[0]&&heights[1]>heights[2]&&heights[2]>heights[3]);
+ assert.equal(heights[3],2.45);
+ assert.match(scene,/host\.classList\.add\("map-3d-ready"\)/);
+ assert.match(scene,/host\.classList\.remove\("map-3d-ready"\)/);
+ assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.castle\{min-width:44px;min-height:44px/);
+ assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.castle \.territory-castle-art\{display:none\}/);
+});
