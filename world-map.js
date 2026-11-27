@@ -21,6 +21,18 @@ function readWorldSession() {
   return { token: "", blocked: !readable };
 }
 let token = readWorldSession().token;
+// The world map, rallies and monster panels share authenticated state. A
+// session replacement must discard all three, including pending formations.
+function worldSessionChanged(event){
+  return (event.key==="coi_game_token"||event.key===null)&&readWorldSession().token!==token;
+}
+window.addEventListener("storage",event=>{
+  if(worldSessionChanged(event)){
+    worldRefreshGate.invalidate();
+    realmRefreshGate.invalidate();
+    window.location.reload();
+  }
+});
 const RESOURCE = {
   food: { icon: "🌾", label: "Comida" },
   wood: { icon: "🪵", label: "Madeira" },
@@ -162,7 +174,7 @@ function resetMapViewport() {
   mapViewport = { zoom: 1, panX: 0, panY: 0 };
   applyMapViewport();
 }
-function tacticalHome(){
+export function tacticalHome(){
   const hasThrone=state?.territories?.some(row=>row.territory_kind==="throne");
   return {x:hasThrone?13:0,z:hasThrone?-11:0};
 }
@@ -833,6 +845,7 @@ if(typeof WebSocket==="function")startRealtimePresence({onWorldChanged:()=>{
   if(document.hidden||busy||!token||Date.now()-lastRealtimeRefresh<5000)return;
   lastRealtimeRefresh=Date.now();
   window.dispatchEvent(new Event("coi:refresh-monsters"));
+  window.dispatchEvent(new Event("coi:refresh-resource-nodes"));
   refreshState({background:true}).catch(()=>{/* periodic polling remains available */});
   updateRealmCards({background:true});
 }});

@@ -232,7 +232,8 @@ test("resource locator prioritizes available productive nodes before nearer bloc
  const end=ui.indexOf('$("resourceMapLocate")?.addEventListener',start);
  assert.ok(start>=0&&end>start);
  const amountStart=ui.indexOf("function collectableNodeAmount("),amountEnd=ui.indexOf("function selectNode(",amountStart);
- const compare=runInNewContext(ui.slice(amountStart,amountEnd)+ui.slice(start,end)+"\ncompareResourceNodes");
+ let home={x:0,z:0};
+ const compare=runInNewContext(ui.slice(amountStart,amountEnd)+ui.slice(start,end)+"\ncompareResourceNodes",{tacticalHome:()=>home});
  const nodes=[
   {id:"foreign",map_x:0,map_y:0,occupied_by:2,current_resources:100},
   {id:"reserved",map_x:1,map_y:0,reserved_by_rally:"r",current_resources:100},
@@ -241,6 +242,9 @@ test("resource locator prioritizes available productive nodes before nearer bloc
   {id:"own",map_x:5,map_y:0,is_mine:true,occupied_by:1,current_resources:100}
  ];
  assert.deepEqual(nodes.sort(compare).map(node=>node.id),["own","far-free","empty","foreign","reserved"]);
+ home={x:13,z:-11};
+ const nearby=[{id:"origin",map_x:0,map_y:0,collection_amount:5000000},{id:"castle",map_x:13,map_y:-10,collection_amount:5000000}];
+ assert.equal(nearby.sort(compare)[0].id,"castle");
  assert.match(ui,/filteredNodes\(\)\.sort\(compareResourceNodes\)/);
 });
 
@@ -275,6 +279,7 @@ test("monster search favors living unlocked targets with sufficient hunt energy"
  assert.equal(rank({hp:0,level:1},progress,true),3);
  assert.equal(rank({hp:100,level:1},progress,false),2);
  assert.match(ui,/Energia insuficiente/);
+ assert.match(ui,/Math\.hypot\(a\.x-home\.x,a\.z-home\.z\)/);
 });
 test("accelerated beta harvest is ready at the initial seeded stock and regenerates after depletion",async()=>{
  const server=await read("rally.js");
@@ -291,4 +296,25 @@ test("accelerated beta harvest is ready at the initial seeded stock and regenera
  assert.equal(policy.nodeReadyAt(depleted,1000,required),73000);
  assert.equal(policy.nodeRegeneration(depleted,72999),7999);
  assert.equal(policy.nodeRegeneration(depleted,73000),8000);
+});
+
+test("world map resets all authenticated panels when the stored session changes",async()=>{
+ const ui=await read("world-map.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function worldSessionChanged(");
+ const end=ui.indexOf("const RESOURCE",start);
+ assert.ok(start>=0&&end>start);
+ let current="session-a",listener,reloads=0,invalidations=0;
+ const gate={invalidate(){invalidations++;}};
+ runInNewContext(ui.slice(start,end),{
+  token:"session-a",readWorldSession:()=>({token:current}),
+  worldRefreshGate:gate,realmRefreshGate:gate,
+  window:{addEventListener(name,callback){assert.equal(name,"storage");listener=callback;},location:{reload(){reloads++;}}}
+ });
+ listener({key:"theme"});listener({key:"coi_game_token"});
+ assert.equal(reloads,0);
+ current="session-b";listener({key:"coi_game_token"});
+ assert.equal(reloads,1);assert.equal(invalidations,2);
+ current="";listener({key:null});
+ assert.equal(reloads,2);assert.equal(invalidations,4);
 });
