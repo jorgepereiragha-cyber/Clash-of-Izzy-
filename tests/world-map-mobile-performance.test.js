@@ -451,15 +451,20 @@ test("3D castle nameplates clear the architecture without weakening 2D touch con
  const {worldCastleTier}=await import("../scripts/world-map-visual-state.js");
  const start=scene.indexOf("function projectTerritories("),end=scene.indexOf("function draw(",start);
  assert.ok(start>=0&&end>start);
- const territories=[{id:1,territory_kind:"castle",castle_level:1,owner_kingdom_id:7},{id:2,territory_kind:"castle",castle_level:30,owner_kingdom_id:7},{id:3,territory_kind:"castle",castle_level:30,owner_kingdom_id:9},{id:4,territory_kind:"resource"}];
+ const territories=[{id:1,territory_kind:"castle",castle_level:1,owner_kingdom_id:7},{id:2,territory_kind:"castle",castle_level:30,owner_kingdom_id:7},{id:3,territory_kind:"castle",castle_level:30,owner_kingdom_id:9},{id:4,territory_kind:"resource"},{id:5,territory_kind:"throne"}];
  const heights=[];
  class Vector3{constructor(x,y,z){heights.push(y);this.x=0;this.y=0;}project(){return this;}}
  const projectionButtons=new Map(territories.map(row=>[row.id,{style:{}}]));
  const project=runInNewContext(scene.slice(start,end)+"\nprojectTerritories",{disposed:false,contextLost:false,camera:{},renderer:{},worldState:{kingdomId:7,territories},host:{clientWidth:100,clientHeight:100},projectionButtons,THREE:{Vector3},terrainHeight:()=>0,worldCastleTier});
  project();
- assert.equal(heights.length,4);
+ assert.equal(heights.length,5);
  assert.ok(heights[1]>heights[0]&&heights[1]>heights[2]&&heights[2]>heights[3]);
  assert.equal(heights[3],2.45);
+ assert.equal(heights[4],6.65); // Above the imperial sanctuary, not over its model.
+ assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.throne span\{display:none\}/);
+ assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.throne\{min-width:44px;min-height:44px/);
+ assert.match(html,/\.territory-pin\.throne\[data-throne-state="shielded"\] small\{border-color:#83cafa\}/);
+ assert.match(html,/\.territory-pin\.throne\[data-throne-state="contest"\] small\{border-color:#ed8b80\}/);
  assert.match(scene,/host\.classList\.add\("map-3d-ready"\)/);
  assert.match(scene,/host\.classList\.remove\("map-3d-ready"\)/);
  assert.match(html,/\.world-map\.map-3d-ready:not\(\.map-3d-fallback\) \.territory-pin\.castle\{min-width:44px;min-height:44px/);
