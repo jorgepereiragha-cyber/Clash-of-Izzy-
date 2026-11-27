@@ -1,4 +1,9 @@
 // Original presentation-only interpolation. Does not alter authoritative arrival or combat.
+export function marchTimestamp(value){
+ if(typeof value!=="string")return NaN;
+ const utc=/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value)?value.replace(" ","T")+"Z":value;
+ return Date.parse(utc);
+}
 export function marchVisualProgress(now,start,end){
  if(![now,start,end].every(Number.isFinite)||end<=start)return 0;
  return Math.max(0,Math.min(1,(now-start)/(end-start)));
@@ -14,6 +19,7 @@ export function marchVisualPoint(origin,target,progress){
 export function planMarchFormation(type,quality="balanced"){
  const low=quality==="low";
  if(type==="attack")return {color:"red",positions:low?[[0,.48],[0,-.45]]:[[0,.55],[-.48,-.28],[.48,-.28]]};
+ if(type==="hunt")return {color:"gold",positions:low?[[0,.48],[0,-.45]]:[[0,.55],[-.48,-.28],[.48,-.28]]};
  if(type==="gather")return {color:"green",positions:low?[[0,.42],[0,-.42]]:[[0,.78],[0,0],[0,-.78]]};
  if(type==="scout")return {color:"gold",positions:low?[[0,.15]]:[[-.42,.20],[.42,-.20]]};
  return {color:"blue",positions:low?[[-.4,0],[.4,0]]:[[-.42,-.28],[.42,-.28],[0,.48]]};

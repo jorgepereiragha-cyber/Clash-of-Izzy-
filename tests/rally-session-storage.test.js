@@ -1,13 +1,13 @@
 import vm from "node:vm";
 import { readFile } from "node:fs/promises";
 
-const src = await readFile(new URL("../rally-ui.js", import.meta.url), "utf8");
+const src = (await readFile(new URL("../rally-ui.js", import.meta.url), "utf8")).replace(/^import .*;\n/gm, "");
 
 function runRallySession(storages) {
   const status={ textContent:"",classList:{toggle() {}} };
   const captured=[];
   const document={hidden:false,getElementById:id=>id==="rally-status"?status:null,addEventListener(){}};
-  const window={...storages,setInterval() {}};
+  const window={...storages,setInterval() {},addEventListener(){}};
   const fetch=async(path,options)=>{
     captured.push({path,authorization:options.headers.Authorization});
     return {ok:true,async json(){return path.endsWith("/nodes")?{nodes:[]}:{rallies:[],in_alliance:false}}};

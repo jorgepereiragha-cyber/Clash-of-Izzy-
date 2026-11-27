@@ -1,5 +1,7 @@
 import {huntProgressView} from "./monster-hunt-state.js";
-import {worldMonsterPreview} from "./world-monsters.js";
+import {worldMonsterPreview, worldMonstersEnabled} from "./world-monsters.js";
+import {dispatchMonsterHunt, monsterHuntSettlement} from "./monster-hunt-marches.js";
+import {HUNT_UNIT_DAMAGE} from "./monster-hunt-policy.js";
 import { guardTerritoryAttackSettlement } from "./territory-attack-settlement.js";
 export { EldoriaRoom } from "./eldoria-room.js";
 import { notifyWorldChanged } from "./scripts/eldoria-world-notify.js";
@@ -563,7 +565,11 @@ async function seedWorld(env,region=1){
 }
 async function processMarches(env,kingdomId,batchSize=50){
  const now=new Date().toISOString();
- const due=await env.DB.prepare("SELECT id,units_json,march_type,target_territory_id FROM marches WHERE kingdom_id=? AND status='marching' AND arrives_at<=? ORDER BY arrives_at,id LIMIT ?").bind(kingdomId,now,Math.max(1,Math.min(50,Math.floor(Number(batchSize)||50)))).all();
+ const beta=env.ENVIRONMENT==="beta";
+ const due=await env.DB.prepare("SELECT m.id,m.units_json,m.march_type,m.target_territory_id"+
+   (beta?",h.monster_id,h.level AS hunt_level FROM marches m LEFT JOIN monster_hunt_marches h ON h.march_id=m.id":" FROM marches m")+
+   " WHERE m.kingdom_id=? AND m.status='marching' AND m.arrives_at<=? ORDER BY m.arrives_at,m.id LIMIT ?")
+   .bind(kingdomId,now,Math.max(1,Math.min(50,Math.floor(Number(batchSize)||50)))).all();
  for(const m of due.results||[]){
   let units={};try{units=JSON.parse(m.units_json||"{}")}catch{}
   const resolvedAt=new Date().toISOString(),resolutionToken=crypto.randomUUID();
@@ -572,7 +578,10 @@ async function processMarches(env,kingdomId,batchSize=50){
    // A resolução inteira é uma transação D1. Se qualquer escrita falhar, o status e todas as recompensas voltam juntos.
    env.DB.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=?").bind(resolvedAt,resolutionToken,m.id,kingdomId,now)
   ];
-  if(m.march_type==="attack"){
+  if(m.monster_id){
+   statements.push(...monsterHuntSettlement(env.DB,m,{kingdomId,token:resolutionToken,resolvedAt,guard}));
+  }
+  if(m.march_type==="attack"&&!m.monster_id){
    const target=await env.DB.prepare("SELECT t.id,t.territory_key,t.name,t.level,t.owner_kingdom_id,t.territory_kind,t.map_region FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1)").bind(kingdomId,m.target_territory_id).first();
    const army=Object.entries(units).map(([unit,quantity])=>({unit_type:unit,tier:1,quantity:Math.max(0,Math.floor(Number(quantity)||0))})).filter(u=>Object.hasOwn(UNITS,u.unit_type)&&u.quantity>0);
    let simulatedWin=false,attackerPower=0,defenderPower=0,criticalHits=0,losses={},battleLog=[],survivors={},replayData={};
@@ -674,14 +683,16 @@ async function processMarches(env,kingdomId,batchSize=50){
      statements.push(env.DB.prepare("UPDATE kingdoms SET "+target.resource_type+"="+target.resource_type+"+? WHERE id=? AND "+guard+" AND "+eligible).bind(amount,kingdomId,...checks));
      statements.push(env.DB.prepare("INSERT INTO resource_ledger(kingdom_id,resource,amount,reason) SELECT ?,?,?,? WHERE "+guard+" AND "+eligible).bind(kingdomId,target.resource_type,amount,"coleta por marcha",...checks));
      statements.push(env.DB.prepare("INSERT INTO inventory_items(kingdom_id,item_key,quantity) SELECT ?,?,1 WHERE "+guard+" AND "+eligible+" ON CONFLICT(kingdom_id,item_key) DO UPDATE SET quantity=quantity+1").bind(kingdomId,"power_crystal",...checks));
+     statements.push(env.DB.prepare("INSERT INTO kingdom_events(kingdom_id,event_type,payload_json) SELECT ?,'territory_gathered',json_object('marchId',?,'resource',?,'amount',CASE WHEN "+eligible+" THEN ? ELSE 0 END) WHERE "+guard)
+      .bind(kingdomId,m.id,target.resource_type,kingdomId,m.target_territory_id,target.resource_type,target.resource_rate,amount,m.id,kingdomId,resolutionToken));
     }
    }
   }
   statements.push(env.DB.prepare(
     "INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'march_resolved',? WHERE EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)"
-  ).bind(kingdomId,JSON.stringify({marchId:m.id,marchType:m.march_type,targetTerritoryId:m.target_territory_id}),m.id,kingdomId,resolutionToken));
+  ).bind(kingdomId,JSON.stringify({marchId:m.id,marchType:m.monster_id?"hunt":m.march_type,targetTerritoryId:m.target_territory_id,...(m.monster_id?{monsterId:m.monster_id}:{})}),m.id,kingdomId,resolutionToken));
   const resolution=await env.DB.batch(statements);
-  if(m.march_type==="attack"&&resolution[1]?.meta?.changes>0)await notifyWorldChanged(env);
+  if(m.march_type==="attack"&&resolution[m.monster_id?2:1]?.meta?.changes>0)await notifyWorldChanged(env);
  }
 }
 const CASTLE_MATERIALS={
@@ -871,7 +882,12 @@ async function gameState(env,playerId){
     ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,Number(kingdom.map_region)||1,kingdom.id,
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45),
-    env.DB.prepare("SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id),
+    env.DB.prepare(env.ENVIRONMENT==="beta"?
+      "SELECT m.id,CASE WHEN h.march_id IS NULL THEN m.march_type ELSE 'hunt' END AS march_type,m.status,m.started_at,m.arrives_at,"+
+      "m.target_territory_id,m.units_json,h.monster_id,w.name AS monster_name,w.x AS monster_x,w.z AS monster_z,"+
+      "h.outcome AS hunt_outcome,h.damage_dealt AS hunt_damage FROM marches m LEFT JOIN monster_hunt_marches h ON h.march_id=m.id "+
+      "LEFT JOIN world_monsters w ON w.id=h.monster_id WHERE m.kingdom_id=? ORDER BY m.id DESC LIMIT 20":
+      "SELECT id,march_type,status,started_at,arrives_at,target_territory_id,units_json FROM marches WHERE kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id),
     env.DB.prepare("SELECT id,battle_type,attacker_power,defender_power,winner_kingdom_id,losses_json,rewards_json,created_at,CASE WHEN replay_expires_at>unixepoch() AND replay_json<>'{}' THEN 1 ELSE 0 END AS has_replay FROM battle_reports WHERE attacker_kingdom_id=? OR defender_kingdom_id=? ORDER BY id DESC LIMIT 20").bind(kingdom.id,kingdom.id),
     env.DB.prepare(
       "SELECT hi.*,vhc.hero_name AS seasonal_hero_name,vhc.rarity AS seasonal_rarity,"+
@@ -1755,18 +1771,27 @@ async function gameAction(env,playerId,body){
     if(!result.ok)return json({error:result.error,...(result.shieldUntil?{shieldUntil:result.shieldUntil}:{})},result.status);
     battleOutcome=result.combat;
   }else if(type==="march"){
+    const marchType=body.marchType;
+    const hunting=marchType==="hunt";
+    if(!["gather","scout","attack","hunt"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
+    if(hunting&&!worldMonstersEnabled(env))return json({error:"Caça indisponível."},404);
     const targetId=Number(body.targetId);
     if(!Number.isSafeInteger(targetId)||targetId<1)return json({error:"Território inválido."},400);
-    const target=await env.DB.prepare("SELECT id,territory_key,resource_type,owner_kingdom_id,territory_kind FROM world_territories WHERE id=? AND map_region=?").bind(targetId,Number(k.map_region)||1).first();
-    if(!target)return json({error:"Território não encontrado."},404);
-    if(target.territory_kind==="throne"||target.territory_key?.startsWith("royal_throne_"))
-      return json({error:"O Trono Imperial exige Guerra do Trono; não pode ser atacado por marcha normal."},409);
-    const marchType=body.marchType;
-    if(!["gather","scout","attack"].includes(marchType))return json({error:"Tipo de marcha inválido."},400);
-    if(marchType==="attack"&&(target.owner_kingdom_id||target.territory_kind==="castle"))return json({error:"O castelo de outro comandante está visível no mapa. O combate PvP será habilitado na Fase 10; por enquanto, ataque apenas territórios neutros."},409);
-    if(target.territory_kind==="castle"&&marchType!=="attack")return json({error:"Castelos de jogadores não podem ser coletados nem usados como ponto de exploração."},409);
-    if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
-    if(marchType==="gather"&&!["food","wood","stone","iron"].includes(target.resource_type))return json({error:"Este território não possui recurso coletável."},409);
+    const region=Number(k.map_region)||1;
+    if(hunting&&(!Number.isSafeInteger(body.generation)||body.generation<1||typeof body.requestId!=="string"||
+      !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(body.requestId)))
+      return json({error:"Identificação da expedição de caça inválida."},400);
+    let target;
+    if(!hunting){
+      target=await env.DB.prepare("SELECT id,territory_key,resource_type,owner_kingdom_id,territory_kind FROM world_territories WHERE id=? AND map_region=?").bind(targetId,region).first();
+      if(!target)return json({error:"Território não encontrado."},404);
+      if(target.territory_kind==="throne"||target.territory_key?.startsWith("royal_throne_"))
+        return json({error:"O Trono Imperial exige Guerra do Trono; não pode ser atacado por marcha normal."},409);
+      if(marchType==="attack"&&(target.owner_kingdom_id||target.territory_kind==="castle"))return json({error:"O castelo de outro comandante está visível no mapa. O combate PvP será habilitado na Fase 10; por enquanto, ataque apenas territórios neutros."},409);
+      if(target.territory_kind==="castle"&&marchType!=="attack")return json({error:"Castelos de jogadores não podem ser coletados nem usados como ponto de exploração."},409);
+      if(marchType!=="attack"&&target.owner_kingdom_id&&Number(target.owner_kingdom_id)!==Number(k.id))return json({error:"Este território pertence a outro reino."},409);
+      if(marchType==="gather"&&!["food","wood","stone","iron"].includes(target.resource_type))return json({error:"Este território não possui recurso coletável."},409);
+    }
     const requested=body.units;
     if(!requested||typeof requested!=="object"||Array.isArray(requested))return json({error:"Informe a composição da marcha."},400);
     const selected={};
@@ -1784,7 +1809,7 @@ async function gameAction(env,playerId,body){
         marchCapacity:capacity},409);
     const research=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='military'").bind(k.id).first();
     const slots=marchSlots({castleLevel:k.castle_level,militaryLevel:research?.level||0});
-    const unitsJson=JSON.stringify(selected);
+    const unitsJson=JSON.stringify(hunting?Object.fromEntries(unitTypes.sort().map(type=>[type,selected[type]])):selected);
     const baseSeconds=marchType==="scout"?15:marchType==="attack"?120:60;
     await ensureEquipmentTables(env,k.id);
     const activeHero=await env.DB.prepare("SELECT h.id FROM heroes h JOIN hero_inventory hi ON hi.kingdom_id=h.kingdom_id AND hi.hero_key=h.hero_key WHERE h.kingdom_id=? ORDER BY hi.level DESC,hi.stars DESC,hi.hero_key,h.id LIMIT 1").bind(k.id).first();
@@ -1797,13 +1822,20 @@ async function gameAction(env,playerId,body){
     const logistics=scienceEnabled(env)?await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='field_logistics'").bind(k.id).first():null;
     const marchBonus=equipmentMarchBonus+petBonuses.marchSpeedPercent+sciencePercent("field_logistics",logistics?.level);
     const seconds=calculateMarchDuration(baseSeconds,marchBonus);
-    const arrival=new Date(Date.now()+seconds*1000).toISOString();
+    const started=Date.now(),arrival=new Date(started+seconds*1000).toISOString();
+    if(hunting){
+      // Monster damage derives from the existing unit strengths; the client sends only composition.
+      const damage=Object.entries(selected).reduce((sum,[unit,count])=>sum+HUNT_UNIT_DAMAGE[unit]*count,0);
+      const hunt=await dispatchMonsterHunt(env,{kingdomId:k.id,region,playerId:p.id,monsterId:targetId,generation:body.generation,
+        requestId:body.requestId,unitsJson,unitCount:unitTypes.length,maxSlots:slots.max,damage,startedAt:new Date(started).toISOString(),arrivesAt:arrival});
+      if(!hunt.ok)return json({error:hunt.error},hunt.status);
+    }else{
     // Debita todas as tropas em uma única atualização condicional. A marcha só é criada
     // se todas as quantidades estiverem disponíveis; D1 confirma ou reverte o lote inteiro.
     const debit=env.DB.prepare("UPDATE army_units SET quantity=quantity-CAST((SELECT value FROM json_each(?) WHERE key=army_units.unit_type) AS INTEGER) WHERE kingdom_id=? AND tier=1 AND unit_type IN (SELECT key FROM json_each(?)) AND (SELECT COUNT(*) FROM json_each(?) AS requested JOIN army_units AS available ON available.kingdom_id=? AND available.tier=1 AND available.unit_type=requested.key WHERE available.quantity>=CAST(requested.value AS INTEGER))=? AND (SELECT COUNT(*) FROM marches WHERE kingdom_id=? AND status='marching')<? AND EXISTS(SELECT 1 FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1) AND t.territory_kind NOT IN ('castle','throne') AND substr(t.territory_key,1,13)<>'royal_throne_' AND ((?='attack' AND t.owner_kingdom_id IS NULL) OR (? IN ('gather','scout') AND (t.owner_kingdom_id IS NULL OR t.owner_kingdom_id=k.id))) AND (?<>'gather' OR t.resource_type IN ('food','wood','stone','iron')))")
       .bind(unitsJson,k.id,unitsJson,unitsJson,k.id,unitTypes.length,k.id,slots.max,k.id,target.id,marchType,marchType,marchType);
-    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,arrives_at) SELECT ?,?,?,?,?,? WHERE changes()=?")
-      .bind(k.id,target.id,marchType,unitsJson,"marching",arrival,unitTypes.length);
+    const createMarch=env.DB.prepare("INSERT INTO marches(kingdom_id,target_territory_id,march_type,units_json,status,started_at,arrives_at) SELECT ?,?,?,?,?,?,? WHERE changes()=?")
+      .bind(k.id,target.id,marchType,unitsJson,"marching",new Date(started).toISOString(),arrival,unitTypes.length);
     const result=await env.DB.batch([
       debit,
       createMarch,
@@ -1811,6 +1843,7 @@ async function gameAction(env,playerId,body){
         .bind(k.id,p.id,"march_started",JSON.stringify({targetId,marchType,units:selected}))
     ]);
     if(!result[1]?.meta?.changes)return json({error:"Tropas insuficientes, filas ocupadas ou território alterado. Atualize o reino e tente novamente."},409);
+    }
   }else if(type==="battle"){
     const units=await env.DB.prepare("SELECT unit_type,tier,quantity FROM army_units WHERE kingdom_id=? AND quantity>0 ORDER BY unit_type,tier").bind(k.id).all();
     const armyRows=units.results||[];
@@ -2231,7 +2264,7 @@ export default {
     const requiredTables=["players","player_accounts","google_account_links","google_auth_challenges","mercadopago_orders","kingdoms","kingdom_buildings","army_units","heroes","dragons","kingdom_dragons","kingdom_mailbox","master_bonus_claims","resource_ledger","world_territories","marches","research","battle_reports","inventory_items","kingdom_events","alliances","alliance_members","alliance_invites","alliance_chat","alliance_wars","kingdom_equipment","api_rate_limits","purchase_requests","game_search_documents","game_search_fts","game_search_substring_fts","player_nicknames","game_player_search_fts","game_player_substring_fts","world_events","world_event_participants","world_event_attacks","world_event_rewards","realm_openings","realm_thrones","throne_assaults","kingdom_queues","email_templates","player_email_contacts","email_queue","email_history","analytics_events","feedback","beta_signups","daily_reward_claims","onboarding_bonus_claims","support_orders","referral_tracking","game_config","valhalla_troop_catalog","valhalla_hero_catalog","valhalla_catalog","valhalla_troops","valhalla_rune_ledger","valhalla_purchases","valhalla_buffs","valhalla_daily_rewards","valhalla_wild_hunt","valhalla_wild_hunt_attacks","valhalla_leaderboard","valhalla_rewards_claimed","resource_nodes","rallies","rally_reinforcements","kingdom_tech","tech_catalog","pet_catalog","kingdom_pets","kingdom_pet_feed_requests"];
     requiredTables.push("equipment_fragments");
     if(specialCityEnabled(env))requiredTables.push("city_special_buildings");
-    if(env.ENVIRONMENT==="beta")requiredTables.push("beta_invites","beta_access_sessions","beta_redeem_attempts");
+    if(env.ENVIRONMENT==="beta")requiredTables.push("beta_invites","beta_access_sessions","beta_redeem_attempts","world_monsters","monster_hunt_progress","monster_hunt_marches");
     // An enabled 4X beta must fail readiness until all additive 0041 tables exist.
     if(env.ENVIRONMENT==="beta"&&advanced4xEnabled(env))requiredTables.push("intermediate_resources","city_defenses","kingdom_progression","progression_xp_ledger");
     let missingTables=[...requiredTables];
@@ -2886,7 +2919,7 @@ export default {
         const kingdom=await env.DB.prepare("SELECT k.id FROM kingdoms k JOIN players p ON p.id=k.player_id WHERE p.player_id=?").bind(playerId).first();
         if(!kingdom)return json({error:"Reino não encontrado."},404);
         const progress=await huntProgressView(env.DB,Number(kingdom.id));
-        return progress?json({progress,combatEnabled:false}):json({error:"Progresso indisponível."},409);
+        return progress?json({progress,combatEnabled:true}):json({error:"Progresso indisponível."},409);
       }
       if(url.pathname==="/api/game/world-monsters"&&request.method==="GET"){
         const limited=await rateLimitDecision(env,"world-monsters-read-player",playerId,30,60);

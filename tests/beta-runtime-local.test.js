@@ -2,7 +2,7 @@
 // Runs the actual Worker and beta-only D1 migrations using Wrangler's local emulator.
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { mkdtemp, readFile, writeFile, rm, mkdir } from "node:fs/promises";
 import os from "node:os";
@@ -243,7 +243,8 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const monsters = await http(base, "/api/game/world-monsters", {cookie,bearer:start.data.token});
     assert.equal(monsters.status,200,"D1-backed monster preview responds");
     assert.equal(monsters.data.enabled,true);
-    assert.equal(monsters.data.combatEnabled,false);
+    assert.equal(monsters.data.combatEnabled,true);
+    assert.equal(monsters.data.progress.energy,120);
     assert.equal(monsters.data.region,Number(state.data.state.kingdom.map_region)||1);
     assert.equal(monsters.data.monsters.length,6);
     assert.ok(monsters.data.monsters.every(m=>m.hp===m.max_hp && m.hp>0));
@@ -677,6 +678,9 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     const ledgerAfter=await readGatherLedger();
     assert.equal(Number(ledgerAfter.entries),Number(ledgerBefore.entries)+1);
     assert.equal(Number(ledgerAfter.total),Number(ledgerBefore.total)+gatherRate);
+    const gatherReceipt=(latest,id)=>latest.recentEvents.filter(e=>e.event_type==="territory_gathered")
+      .map(e=>JSON.parse(e.payload_json)).find(e=>e.marchId===id);
+    assert.deepEqual(gatherReceipt(gathered,gatherId),{marchId:gatherId,resource:gatherTarget.resource_type,amount:gatherRate});
     const gatheredAgain=await getStateFor(cookie,start.data.token);
     assert.equal(powerCrystalCount(gatheredAgain),powerCrystalCount(gathered));
     assert.equal(militiaCount(gatheredAgain),militiaCount(gathered));
@@ -704,6 +708,7 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(militiaCount(occupiedAfter),militiaCount(occupiedBefore),"troops return from occupied gathering node");
     assert.equal(powerCrystalCount(occupiedAfter),powerCrystalCount(occupiedBefore),"occupied node grants no crystal");
     assert.deepEqual(await readGatherLedger(),ledgerAfter,"occupied node grants no resource credit");
+    assert.equal(gatherReceipt(occupiedAfter,occupiedMarchId)?.amount,0);
     assert.ok(!occupiedAfter.marches.some(m=>Number(m.id)===occupiedMarchId&&m.status==="marching"));
     console.log("Beta occupied gathering regression passed: no foreign territory credit, troops returned.");
 
@@ -717,6 +722,64 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.ok(Number.isSafeInteger(queueRealm) && queueRealm > 0);
     const localSql = async sql => command([...common,"execute","clash-of-izzy-beta-db","--local",
       "--persist-to",persist,"--command",sql]);
+    {
+    const readHunt = async()=>{
+      const result=await http(base,"/api/game/world-monsters",{cookie,bearer:start.data.token});
+      assert.equal(result.status,200);
+      return result.data;
+    };
+    const huntBefore=await readHunt();
+    const [wolf,boar]=huntBefore.monsters;
+    const huntOrder=(monster)=>({type:"march",marchType:"hunt",targetId:monster.id,generation:monster.generation,requestId:randomUUID(),units:{militia:3}});
+    const sendHunt=body=>actionFor(cookie,start.data.token,body);
+    assert.equal((await sendHunt(huntOrder(boar))).status,409,"higher levels require a previous victory");
+    assert.equal((await sendHunt(huntOrder({...wolf,id:wolf.id+6}))).status,404,"creatures in other worlds cannot be targeted");
+    const huntArmy=militiaCount(await getStateFor(cookie,start.data.token));
+    const completeHunt=async id=>{
+      assert.ok(Number.isSafeInteger(id)&&id>0);
+      await localSql("UPDATE marches SET arrives_at=datetime('now','-1 minute') WHERE id="+id+" AND kingdom_id="+queueRealm);
+      await Promise.all([getStateFor(cookie,start.data.token),getStateFor(cookie,start.data.token)]);
+      const after=await getStateFor(cookie,start.data.token);
+      assert.equal(militiaCount(after),huntArmy);
+      return after.marches.find(m=>m.id===id);
+    };
+    const wound=await sendHunt(huntOrder(wolf));
+    assert.equal(wound.status,200,JSON.stringify(wound.data).slice(0,300));
+    const woundMarch=wound.data.state.marches.find(m=>m.march_type==="hunt"&&m.status==="marching");
+    assert.deepEqual([(await completeHunt(woundMarch.id)).hunt_outcome,(await readHunt()).monsters[0].hp],
+      ["wounded",wolf.hp-huntBefore.progress.unitDamage.militia*3]);
+
+    await localSql("UPDATE world_monsters SET hp=6 WHERE id="+wolf.id);
+    const order=huntOrder(wolf);
+    const sent=await Promise.all([sendHunt(order),sendHunt(order)]);
+    for (const result of sent) assert.equal(result.status,200,JSON.stringify(result.data).slice(0,300));
+    const huntMarch=sent[0].data.state.marches.find(m=>m.march_type==="hunt"&&m.status==="marching");
+    assert.equal(sent[1].data.state.marches.find(m=>m.march_type==="hunt"&&m.status==="marching").id,huntMarch.id);
+    assert.equal((await sendHunt({...order,units:{militia:4}})).status,409);
+    assert.equal(militiaCount(sent[1].data.state),huntArmy-3);
+    assert.equal((await readHunt()).progress.energy,100,"two hunts spend energy once each despite duplicate dispatch");
+    const victory=await completeHunt(huntMarch.id);
+    assert.deepEqual([victory.hunt_outcome,victory.hunt_damage],["victory",6]);
+    const afterHunt=await readHunt();
+    assert.equal(afterHunt.progress.unlockedLevel,boar.level);
+    assert.equal(afterHunt.monsters[0].hp,0);
+    const huntRewards=await command([...common,"execute","clash-of-izzy-beta-db","--local","--persist-to",persist,"--json","--command",
+      "SELECT resource,amount FROM resource_ledger WHERE kingdom_id="+queueRealm+" AND reason='caça de Eldoria' ORDER BY resource"]);
+    assert.deepEqual(JSON.parse(huntRewards)[0].results,[{resource:"food",amount:180},{resource:"wood",amount:120}]);
+
+    const raced=await sendHunt(huntOrder(boar));
+    assert.equal(raced.status,200,JSON.stringify(raced.data).slice(0,300));
+    const racedMarch=raced.data.state.marches.find(m=>m.march_type==="hunt"&&m.status==="marching");
+    await localSql("UPDATE world_monsters SET generation=generation+1 WHERE id="+boar.id);
+    assert.equal((await completeHunt(racedMarch.id)).hunt_outcome,"unavailable");
+    assert.equal((await readHunt()).progress.energy,100,"an obsolete target refunds the reserved energy");
+    await localSql("UPDATE world_monsters SET respawn_at=unixepoch()-1 WHERE id="+wolf.id);
+    const restored=(await readHunt()).monsters[0];
+    assert.deepEqual([restored.generation,restored.hp],[wolf.generation+1,wolf.max_hp]);
+    assert.equal((await sendHunt(huntOrder(wolf))).status,409,"an obsolete target cannot launch a new march");
+    console.log("Beta monster hunt passed: realm isolation, wounds, idempotent dispatch, reward, progression, respawn and refund.");
+    }
+
     // Real D1/API skin ownership, replay and concurrent selection. No purchase.
     await localSql("INSERT OR IGNORE INTO player_skins(player_id,skin_id) SELECT k.player_id,s.id FROM kingdoms k CROSS JOIN skins s WHERE k.id="+queueRealm+" ORDER BY s.id LIMIT 1");
     const skinBefore=await getStateFor(cookie,start.data.token);
@@ -1277,16 +1340,33 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
           await guestContext.close();
         }
         console.log("Beta connection recovery passed: preserved realm, successful resync, no duplicate anonymous creation.");
+        await page.evaluate(()=>localStorage.setItem("coi_graphics_preference","2d"));
         await page.goto(base + "/world.html");
         assert.equal(new URL(page.url()).pathname, "/world.html");
         await page.waitForLoadState("load");
         await page.waitForFunction(()=>document.querySelectorAll(".world-monster-pin").length===6);
+        await page.locator(".map-center svg").waitFor({state:"visible"});
+        await page.locator("#resources .world-resource-art").first().waitFor({state:"visible"});
+        await page.locator(".resource-node-pin .world-resource-art").first().waitFor({state:"visible"});
         assert.equal(await page.locator("#worldMonsterList article").count(),6);
         assert.equal(await page.locator(".world-monster-pin svg use").count(),6);
         assert.equal(await page.locator("#worldMonsterList progress").count(),6);
         assert.equal(await page.locator(".world-monster-pin").first().getAttribute("aria-pressed"),"false");
         await page.locator("#worldMonsterList button").first().click();
         assert.equal(await page.locator(".world-monster-pin").first().getAttribute("aria-pressed"),"true");
+        assert.ok(await page.locator("#hunt").isVisible());
+        assert.ok(await page.locator("#hunt").isDisabled());
+        await page.locator("#presetBalanced").click();
+        await page.locator("#hunt").click();
+        await page.waitForFunction(()=>document.querySelector("#marchNotice").textContent.includes("Expedição de caça enviada"));
+        assert.match(await page.locator("#marches .march").first().innerText(),/Caça · Lobo das Cinzas/);
+        await page.locator('.tactical-march[data-type="hunt"]').waitFor({state:"visible"});
+        await page.evaluate(()=>localStorage.setItem("coi_graphics_preference","balanced"));
+        await page.reload();
+        await page.locator("#worldMap").scrollIntoViewIfNeeded();
+        await page.waitForFunction(()=>window.__coiWorldMap3D?.diagnostics().rebuilds.marches>0);
+        await page.waitForFunction(()=>document.querySelector(".world-monster-pin")?.style.left.endsWith("px"));
+        assert.ok(await page.locator('.tactical-march[data-type="hunt"]').isHidden());
         assert.deepEqual(pwaRegistrationAttempts, [], "closed beta must not attempt official service worker registration");
         assert.equal(await page.evaluate(async () =>
           (await navigator.serviceWorker.getRegistrations()).length), 0,

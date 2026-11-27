@@ -52,7 +52,7 @@ test("strategic 3D world map and territory controls parse before deployment", ()
 });
 
 test("territory actions submit intent and troop quantities to the server API", () => {
-  for (const marker of ['request("/game/state")', 'request("/game/action"', 'type: "march"', 'targetId: territory.id', 'marchType, units', 'const defaultValue = 0', 'availableTypes.has(unitType)']) assert.ok(script.includes(marker), "missing march contract: " + marker);
+  for (const marker of ['request("/game/state")', 'request("/game/action"', 'type: "march"', 'targetId: target.id', 'marchType, units', 'const defaultValue = 0', 'availableTypes.has(unitType)']) assert.ok(script.includes(marker), "missing march contract: " + marker);
   assert.ok(script.includes('Number(unit.tier) === 1'));
 });
 

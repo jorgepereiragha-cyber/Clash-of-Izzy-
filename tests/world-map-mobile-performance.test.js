@@ -193,3 +193,25 @@ test("resource filters preserve distinct collection states and use shared isomet
  assert.match(html,/id="resourceMapFilter"/);
  assert.match(css,/\.resource-node-pin\.foreign/);
 });
+
+
+test("map collection markers and resource HUD reuse the canonical local art",async()=>{
+ const {worldResourceArt}=await import("../scripts/kingdom-2d-art-atlas.js");
+ const atlas=await read("assets/art/eldoria/hud.svg");
+ const node=()=>({attrs:{},children:[],classList:{add(){}},setAttribute(k,v){this.attrs[k]=v;},append(v){this.children.push(v);}});
+ const doc={createElementNS:()=>node()};
+ for(const key of ["food","wood","stone","iron","gold","gems"]){
+  const icon=worldResourceArt(key,doc);
+  assert.ok(atlas.includes('id="resource-'+key+'"'));
+  assert.equal(icon.children[0].attrs.href,"/assets/art/eldoria/hud.svg#resource-"+key);
+  assert.equal(icon.attrs["aria-hidden"],"true");
+ }
+ for(const key of ["__proto__","unknown","../wood",null])assert.equal(worldResourceArt(key,doc),null);
+ const [map,rally,css]=await Promise.all([read("world-map.js"),read("rally-ui.js"),read("styles/rally.css")]);
+ assert.match(map,/worldResourceArt\(key,document\)/);
+ assert.match(map,/worldResourceArt\(territory\.resource_type,document\)/);
+ assert.match(rally,/mine:"iron",forest:"wood",farm:"food",quarry:"stone"/);
+ assert.match(rally,/button\.append\(nodeResourceArt\(node\)\)/);
+ assert.match(rally,/resource-node-level/);
+ assert.match(css,/min-height:36px;touch-action:manipulation/);
+});

@@ -4,7 +4,7 @@ import {worldTerrainHeight,worldTerrainBlend,worldRiverDistance,worldRiverRibbon
 import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
-import { marchVisualProgress, marchVisualPoint, planMarchFormation, planMarchRepresentatives } from "./scripts/march-visual-path.js";
+import { marchTimestamp, marchVisualProgress, marchVisualPoint, planMarchFormation, planMarchRepresentatives } from "./scripts/march-visual-path.js";
 import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/world-map-visual-state.js";
 
 /*
@@ -365,7 +365,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     box(parent, .65, 1.05, .12, material, x + .5, y + .62, z + 1.1);
   }
 
-  function createTerritoryFeature(parent, territory) {
+  function createTerritoryFeature(parent, territory, forestPositions) {
     const x = Number(territory.x) || 0;
     const z = Number(territory.z) || 0;
     const y = terrainHeight(x, z);
@@ -394,9 +394,11 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
         cone(parent, .72 + i * .09, 1.55 + i * .25, shared.stone, rockX, y + 1.1 + i * .1, rockZ, 5);
       }
     } else if (territory.terrain === "forest") {
-      addTree(parent, x - .9, z - .1, .74, 2);
-      addTree(parent, x + .95, z + .45, .68, 3);
-      addTree(parent, x, z - 1.05, .62, 4);
+      forestPositions.push(
+        {x:x-.9,z:z-.1,scale:.74,variant:2},
+        {x:x+.95,z:z+.45,scale:.68,variant:3},
+        {x,z:z-1.05,scale:.62,variant:4}
+      );
     } else {
       box(parent, 1.25, .58, 1.15, shared.food, x, y + .78, z);
       cone(parent, .9, .55, shared.roof, x, y + 1.32, z, 4);
@@ -413,7 +415,9 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   function rebuildTerritories() {
     clearGroup(territoryRoot);
     const rows = Array.isArray(worldState?.territories) ? worldState.territories : [];
-    for (const territory of rows) createTerritoryFeature(territoryRoot, territory);
+    const forestPositions = [];
+    for (const territory of rows) createTerritoryFeature(territoryRoot, territory, forestPositions);
+    addInstancedForest(territoryRoot, forestPositions);
   }
 
   function visualHome(){return {x:homeCastleGroup?.position.x??0,z:homeCastleGroup?.position.z??0};}
@@ -506,10 +510,10 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
       id: Number(march.id),
       group,
       soldiers,
-      startAt: Date.parse(march.started_at || ""),
-      endAt: Date.parse(march.arrives_at || ""),
+      startAt: marchTimestamp(march.started_at),
+      endAt: marchTimestamp(march.arrives_at),
       targetId: Number(march.target_territory_id),
-      marchType: march.march_type
+      monsterTarget: march.march_type==="hunt"?{x:march.monster_x,z:march.monster_z}:null
     };
   }
 
@@ -517,7 +521,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     clearGroup(armyRoot);
     activeMarches = [];
     const rows = (Array.isArray(worldState?.marches) ? worldState.marches : [])
-      .filter(march => march.status === "marching" && Number.isFinite(Date.parse(march.arrives_at || "")));
+      .filter(march => march.status === "marching" && Number.isFinite(marchTimestamp(march.arrives_at)));
     for (const march of rows.slice(0, 8)) activeMarches.push(createMarchFormation(march));
     updateMarchPositions(Date.now());
     animateMarches();
@@ -525,7 +529,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
 
   function updateMarchPositions(now) {
     for (const march of activeMarches) {
-      const target = territoryLookup.get(march.targetId);
+      const target = march.monsterTarget || territoryLookup.get(march.targetId);
       if (!target) continue;
       const progress=marchVisualProgress(now,march.startAt,march.endAt);
       const origin=visualHome();
