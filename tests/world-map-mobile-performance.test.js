@@ -173,7 +173,8 @@ test("resource filters preserve distinct collection states and use shared isomet
  const {runInNewContext}=await import("node:vm");
  const start=ui.indexOf("function nodeMatchesMapFilter("),end=ui.indexOf("for(const event",start);
  assert.ok(start>=0&&end>start);
- const filter=runInNewContext(ui.slice(start,end)+"\nnodeMatchesMapFilter");
+ const amountStart=ui.indexOf("function collectableNodeAmount("),amountEnd=ui.indexOf("function nodeReadyLabel(",amountStart);
+ const filter=runInNewContext(ui.slice(amountStart,amountEnd)+ui.slice(start,end)+"\nnodeMatchesMapFilter");
  assert.equal(filter({node_type:"farm"},"free"),true);
  assert.equal(filter({node_type:"farm",reserved_by_rally:"r"},"free"),false);
  assert.equal(filter({node_type:"farm",occupied_by:2},"free"),false);
@@ -182,6 +183,13 @@ test("resource filters preserve distinct collection states and use shared isomet
  assert.equal(filter({node_type:"farm"},"forest"),false);
  assert.equal(filter({node_type:"forest"},"forest"),true);
  assert.equal(filter({node_type:"forest"},"all"),true);
+ assert.equal(filter({collection_amount:5000000},"ready"),true);
+ assert.equal(filter({is_mine:true,occupied_by:1,collection_amount:5000000},"ready"),true);
+ assert.equal(filter({occupied_by:2,collection_amount:5000000},"ready"),false);
+ assert.equal(filter({reserved_by_rally:"r",collection_amount:5000000},"ready"),false);
+ assert.equal(filter({collection_amount:0},"ready"),false);
+ assert.match(html,/value="ready">Prontos para coleta/);
+ assert.match(ui,/if\(selectedNodeId&&!filteredNodes\(\)\.some\(node=>node\.id===selectedNodeId\)\)selectNode\(null\)/);
  const a=ui.indexOf("function projectResourceNodes()"),b=ui.indexOf("function nodeMatchesMapFilter(",a);
  const button={dataset:{mapX:"10",mapZ:"-20"},style:{}};
  let fallback=false;
