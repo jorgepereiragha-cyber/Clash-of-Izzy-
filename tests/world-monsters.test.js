@@ -71,3 +71,43 @@ test("all six persisted monster types have distinct original tactical portraits"
  assert.match(ui,/\/assets\/art\/eldoria\/monsters\.svg#"\+key/);
  assert.equal((ui.match(/monsterArt\(monster\.monster_key\)/g)||[]).length,2);
 });
+
+test("3D monster models have bounded distinct silhouettes and ignore invalid or dead spawns",async()=>{
+ const {monsterModelKeys,monsterParts,visibleMonsterRows}=await import("../scripts/world-monster-models.js");
+ assert.equal(monsterModelKeys.length,6);
+ const signatures=new Set();
+ for(const key of monsterModelKeys){
+  const parts=monsterParts(key);
+  assert.ok(parts.length>=7&&parts.length<=12);
+  assert.ok(parts.every(p=>["orb","box","cone","rock"].includes(p.shape)&&[p.x,p.y,p.z,p.sx,p.sy,p.sz,p.rx,p.ry,p.rz].every(Number.isFinite)&&p.sx>0&&p.sy>0&&p.sz>0));
+  signatures.add(JSON.stringify(parts));
+ }
+ assert.equal(signatures.size,6);
+ assert.deepEqual(monsterParts("__proto__"),[]);
+ const good={id:2,x:10,z:5,hp:100,monster_key:"ash_wolf"};
+ const rows=visibleMonsterRows([good,good,{...good,id:3,hp:0},{...good,id:4,x:999},{...good,id:5,monster_key:"unknown"}]);
+ assert.deepEqual(rows,[{id:2,x:10,z:5,key:"ash_wolf"}]);
+ assert.deepEqual(visibleMonsterRows([{...good,hp:50}]),rows);
+});
+test("monster GPU batches rebuild only on changed visual state and dispose resources",async()=>{
+ const {createWorldMonsterLayer}=await import("../scripts/world-monster-models.js");
+ const counters={batch:0,geometry:0,material:0};
+ class Group{constructor(){this.children=[];}add(x){this.children.push(x);}remove(x){this.children=this.children.filter(v=>v!==x);}}
+ class Geo{dispose(){counters.geometry++;}}
+ class Material{dispose(){counters.material++;}}
+ class Object3D{constructor(){this.position=this.scale=this.rotation={set(){}};}updateMatrix(){}}
+ class Color{setHex(){return this;}}
+ class InstancedMesh{constructor(){this.instanceMatrix={};this.instanceColor={};}setMatrixAt(){}setColorAt(){}computeBoundingSphere(){}dispose(){counters.batch++;}}
+ const THREE={Group,SphereGeometry:Geo,BoxGeometry:Geo,ConeGeometry:Geo,DodecahedronGeometry:Geo,MeshStandardMaterial:Material,Object3D,Color,InstancedMesh};
+ const root=new Group(),layer=createWorldMonsterLayer(THREE,root,()=>0);
+ const row={id:1,x:1,z:2,hp:100,monster_key:"ash_wolf"};
+ assert.equal(layer.update([row]),true);
+ assert.ok(root.children[0].children.length<=4);
+ assert.equal(layer.update([{...row,hp:20}]),false);
+ assert.equal(counters.batch,0);
+ assert.equal(layer.update([{...row,hp:0}]),true);
+ assert.ok(counters.batch>0);
+ layer.dispose();layer.dispose();
+ assert.equal(counters.geometry,4);assert.equal(counters.material,1);assert.equal(root.children.length,0);
+ assert.equal(layer.update([row]),false);
+});
