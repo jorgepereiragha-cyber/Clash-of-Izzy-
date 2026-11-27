@@ -373,6 +373,16 @@ async function gameIdentity(request,env){
   }else if(p.av!==undefined)return null;
   return String(p.sub);
 }
+const WORLD_RESOURCE_SITES=[
+  ["forest_east","Bosque Antigo","forest",18,12,"wood"],
+  ["forest_west","Bosque Nebuloso","forest",-22,8,"wood"],
+  ["golden_fields","Campos Dourados","plains",12,-24,"food"],
+  ["fertile_vale","Vale Fértil","plains",-18,-20,"food"],
+  ["north_quarry","Pedreira do Norte","mountain",30,18,"stone"],
+  ["grey_rock","Rochedo Cinzento","mountain",-32,-14,"stone"],
+  ["iron_vein","Veio de Ferro","mountain",34,-25,"iron"],
+  ["old_mine","Mina Abandonada","mountain",-35,28,"iron"]
+ ];
 export async function ensureKingdom(env,playerId){
   // The entire foundation is one transaction. A random guard identifies
   // only the kingdom inserted by this invocation, never a legacy kingdom.
@@ -384,7 +394,23 @@ export async function ensureKingdom(env,playerId){
     env.DB.prepare("INSERT OR IGNORE INTO players(player_id,name,gems) VALUES(?,?,?)").bind(playerId,"Lorde de Eldoria",50),
     // A região e a posição são reservadas no mesmo INSERT para evitar
     // dois castelos na mesma coordenada. Nunca remapear reinos antigos.
-    env.DB.prepare(
+    env.DB.prepare(env.ENVIRONMENT==="beta"?
+      // Scan a bounded window of future slots inside the atomic foundation batch.
+      // Realm 1 is the canonical destination for new beta players. Legacy regions
+      // and existing castles remain untouched until a separately audited migration.
+      "WITH RECURSIVE candidates(slot) AS (SELECT COALESCE(MAX(map_slot)+1,0) FROM kingdoms WHERE map_region=1 "+
+      "UNION ALL SELECT slot+1 FROM candidates WHERE slot<(SELECT COALESCE(MAX(map_slot)+128,127) FROM kingdoms WHERE map_region=1)), "+
+      "positions AS (SELECT slot,((slot%20)-10)*5 AS x,(CAST(slot/20 AS INTEGER)-10)*5 AS z FROM candidates), "+
+      "reserved(x,z,clearance) AS (VALUES(0,0,10),"+WORLD_RESOURCE_SITES.map(site=>`(${site[3]},${site[4]},5)`).join(",")+"), "+
+      "next_slot AS (SELECT pos.slot,pos.x,pos.z FROM positions pos "+
+      "WHERE NOT EXISTS(SELECT 1 FROM kingdoms k WHERE k.map_region=1 AND k.map_x>pos.x-8 AND k.map_x<pos.x+8 AND k.map_z>pos.z-8 AND k.map_z<pos.z+8) "+
+      "AND NOT EXISTS(SELECT 1 FROM world_territories t WHERE t.map_region=1 AND t.x>pos.x-5 AND t.x<pos.x+5 AND t.z>pos.z-5 AND t.z<pos.z+5) "+
+      "AND NOT EXISTS(SELECT 1 FROM resource_nodes n WHERE n.map_x>pos.x-5 AND n.map_x<pos.x+5 AND n.map_y>pos.z-5 AND n.map_y<pos.z+5) "+
+      "AND NOT EXISTS(SELECT 1 FROM world_monsters m WHERE m.map_region=1 AND m.x>pos.x-5 AND m.x<pos.x+5 AND m.z>pos.z-5 AND m.z<pos.z+5) "+
+      "AND NOT EXISTS(SELECT 1 FROM reserved p WHERE ABS(p.x-pos.x)<p.clearance AND ABS(p.z-pos.z)<p.clearance) ORDER BY pos.slot LIMIT 1) "+
+      "INSERT INTO kingdoms(player_id,kingdom_name,food,wood,stone,iron,gold,last_production_at,map_region,map_slot,map_x,map_z) "+
+      "SELECT p.id,?,?,?,?,?,?,?,1,slot,x,z FROM next_slot CROSS JOIN players p WHERE p.player_id=? AND NOT EXISTS(SELECT 1 FROM kingdoms WHERE player_id=p.id)"
+      :
       "WITH destination AS (SELECT MAX(COALESCE((SELECT MAX(realm_id) FROM realm_openings),1),"+
       "CASE WHEN (SELECT COUNT(*) FROM kingdoms)>=1000 THEN 3 WHEN (SELECT COUNT(*) FROM kingdoms)>=700 THEN 2 ELSE 1 END) AS realm_id), "+
       "next_slot AS (SELECT realm_id,COALESCE((SELECT MAX(map_slot)+1 FROM kingdoms WHERE map_region=destination.realm_id),0) AS slot FROM destination) "+
@@ -570,17 +596,8 @@ async function applyProduction(env,kingdomId){
   await env.DB.batch(writes);
 }
 async function seedWorld(env,region=1){
- const nodes=[
-  ["forest_east","Bosque Antigo","forest",18,12,"wood"],
-  ["forest_west","Bosque Nebuloso","forest",-22,8,"wood"],
-  ["golden_fields","Campos Dourados","plains",12,-24,"food"],
-  ["fertile_vale","Vale Fértil","plains",-18,-20,"food"],
-  ["north_quarry","Pedreira do Norte","mountain",30,18,"stone"],
-  ["grey_rock","Rochedo Cinzento","mountain",-32,-14,"stone"],
-  ["iron_vein","Veio de Ferro","mountain",34,-25,"iron"],
-  ["old_mine","Mina Abandonada","mountain",-35,28,"iron"]
- ];
- await env.DB.batch(nodes.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate,map_region) VALUES(?,?,?,?,?,?,?,?)").bind(n[0]+(region===1?"":"_realm_"+region),...n.slice(1),90,region)));
+
+ await env.DB.batch(WORLD_RESOURCE_SITES.map(n=>env.DB.prepare("INSERT OR IGNORE INTO world_territories(territory_key,name,terrain,x,z,resource_type,resource_rate,map_region) VALUES(?,?,?,?,?,?,?,?)").bind(n[0]+(region===1?"":"_realm_"+region),...n.slice(1),90,region)));
 }
 async function processMarches(env,kingdomId,batchSize=50){
  const now=new Date().toISOString();
@@ -898,6 +915,7 @@ async function gameState(env,playerId){
       "SELECT wt.id,wt.name,wt.terrain,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.x-? ELSE wt.x END AS x,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.z-? ELSE wt.z END AS z,"+
+      "wt.x AS world_x,wt.z AS world_z,wt.map_region AS world_region,"+
       "wt.territory_key,wt.shield_until,wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,wt.alliance_id,"+
       "COALESCE((SELECT a.tag FROM alliances a WHERE a.id=wt.alliance_id),'') AS controlling_alliance_tag,"+
       "CASE WHEN wt.territory_key LIKE 'royal_throne_%' THEN 'throne' ELSE wt.territory_kind END AS territory_kind,"+
@@ -908,7 +926,7 @@ async function gameState(env,playerId){
       "LEFT JOIN players op ON op.id=owner.player_id LEFT JOIN player_nicknames n ON n.player_id=op.id "+
       "WHERE wt.map_region=? AND (wt.territory_kind='resource' OR (wt.territory_kind='castle' AND wt.owner_kingdom_id<>? "+
       "AND wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?)) ORDER BY wt.territory_kind,wt.id LIMIT 250"
-    ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,Number(kingdom.map_region)||1,kingdom.id,
+    ).bind(env.ENVIRONMENT==="beta"?0:(Number(kingdom.map_x)||0),env.ENVIRONMENT==="beta"?0:(Number(kingdom.map_z)||0),Number(kingdom.map_region)||1,kingdom.id,
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45),
     env.DB.prepare(env.ENVIRONMENT==="beta"?
@@ -1005,7 +1023,7 @@ async function gameState(env,playerId){
     getKingdomProgression(env,kingdom.id)
   ]):null;
   const specialCityBuildings=specialCityEnabled(env)?(await env.DB.prepare("SELECT building_type,grid_x,grid_z,width,height FROM city_special_buildings WHERE kingdom_id=? ORDER BY building_type").bind(kingdom.id).all()).results||[]:[];
-  return {activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,heroSummonOptions:HERO_SUMMON_OPTIONS,trainingOptions:TRAINING_OPTIONS,buildingUpgradeOptions:Object.fromEntries((buildings.results||[]).map(b=>[b.building_type,buildingUpgradeOption(b.building_type,b.level)])),worldGatherFixedAmount:env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true"?5000000:null,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
+  return {worldCoordinateSpace:env.ENVIRONMENT==="beta"?"absolute-v1":"legacy",activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,heroSummonOptions:HERO_SUMMON_OPTIONS,trainingOptions:TRAINING_OPTIONS,buildingUpgradeOptions:Object.fromEntries((buildings.results||[]).map(b=>[b.building_type,buildingUpgradeOption(b.building_type,b.level)])),worldGatherFixedAmount:env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true"?5000000:null,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
     defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,rallyTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }

@@ -424,6 +424,22 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal(second.status,201,"independent second realm starts");
     assert.ok(second.data.token);
     assert.notEqual(second.data.state.kingdom.id,start.data.state.kingdom.id);
+    // Both sessions must agree on canonical world coordinates, including each other's castles.
+    const [firstView,secondView]=await Promise.all([getStateFor(cookie,start.data.token),getStateFor(claimedCookie,second.data.token)]);
+    assert.equal(firstView.worldCoordinateSpace,"absolute-v1");
+    assert.equal(secondView.worldCoordinateSpace,"absolute-v1");
+    assert.equal(firstView.kingdom.map_region,secondView.kingdom.map_region);
+    for(const [viewer,other] of [[firstView,secondView],[secondView,firstView]]){
+      const target=viewer.territories.find(t=>t.territory_kind==="castle"&&Number(t.owner_kingdom_id)===Number(other.kingdom.id));
+      assert.ok(target,"other player's castle must appear once at its persistent coordinates");
+      assert.equal(viewer.territories.filter(t=>t.territory_kind==="castle"&&Number(t.owner_kingdom_id)===Number(other.kingdom.id)).length,1);
+      assert.deepEqual([target.x,target.z,target.world_x,target.world_z,target.world_region],
+        [other.kingdom.map_x,other.kingdom.map_z,other.kingdom.map_x,other.kingdom.map_z,other.kingdom.map_region]);
+      assert.ok(!viewer.territories.some(t=>t.territory_kind==="castle"&&Number(t.owner_kingdom_id)===Number(viewer.kingdom.id)));
+    }
+    const publicSites=view=>view.territories.filter(t=>t.territory_kind!=="castle").map(t=>[t.id,t.x,t.z,t.world_region]);
+    assert.deepEqual(publicSites(firstView),publicSites(secondView));
+
     const candidates = [{name:"Beta Test Guild A",tag:"BTA"},{name:"Beta Test Guild B",tag:"BTB"}];
     const creations = await Promise.all(candidates.map(candidate =>
       actionFor(cookie,start.data.token,{type:"alliance_create",...candidate})));

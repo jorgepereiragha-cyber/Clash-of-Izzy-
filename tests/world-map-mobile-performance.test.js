@@ -195,7 +195,7 @@ test("resource filters preserve distinct collection states and use shared isomet
  let fallback=false;
  const map={querySelectorAll:()=>[button]},host={classList:{contains:()=>fallback}};
  const window={__coiWorldMap3D:{projectPoint:(x,z)=>({left:x*2,top:z+100})}};
- const project=runInNewContext(ui.slice(a,b)+"\nprojectResourceNodes",{$:id=>id==="mapContent"?map:host,window});
+ const project=runInNewContext(ui.slice(a,b)+"\nprojectResourceNodes",{$:id=>id==="mapContent"?map:host,window,projectTacticalPoint:(x,z)=>({left:50+x*.9,top:50-z*.9})});
  project();assert.equal(button.style.left,"20px");assert.equal(button.style.top,"80px");
  fallback=true;project();assert.equal(button.style.left,"59%");assert.equal(button.style.top,"68%");
  assert.match(ui,/coi:world-map-projection-changed/);
@@ -424,4 +424,17 @@ test("realtime invalidations during a resource refresh produce one trailing read
  await second;
  assert.equal(reads,3);
  assert.equal(refresh(),null);
+});
+
+test("absolute world anchors are persistent and invalidate home, routes and marches together",async()=>{
+ const {worldHomePosition,worldVisualKeys}=await import("../scripts/world-map-visual-state.js");
+ const state={worldCoordinateSpace:"absolute-v1",homeX:-50,homeZ:45,territories:[{id:1,territory_kind:"throne",x:0,z:0}],marches:[]};
+ assert.deepEqual(worldHomePosition(state),{x:-50,z:45});
+ assert.deepEqual(worldHomePosition({...state,homeX:0,homeZ:0}),{x:0,z:0});
+ const before=worldVisualKeys(state),after=worldVisualKeys({...state,homeX:45});
+ for(const key of ["home","routes","marches"])assert.notEqual(before[key],after[key]);
+ assert.deepEqual(worldHomePosition({territories:state.territories}),{x:13,z:-11});
+ const [map,scene]=await Promise.all([read("world-map.js"),read("world-map-3d.js")]);
+ assert.match(map,/return worldHomePosition\(\{worldCoordinateSpace:state\?\.worldCoordinateSpace/);
+ assert.match(scene,/const home=worldHomePosition\(worldState\);\s*homeCastleGroup=createCastle\(terrainRoot,home\.x,home\.z/);
 });

@@ -1,5 +1,5 @@
 import {createEntityArtElement} from "./kingdom-2d-art-atlas.js";
-import {focusMapMarker,tacticalHome} from "../world-map.js";
+import {focusMapMarker,tacticalHome,projectTacticalPoint} from "../world-map.js";
 // A seleção do bestiário usa o mesmo painel de formação das demais marchas.
 const root=document.getElementById("worldMonsterPreview");
 const list=document.getElementById("worldMonsterList");
@@ -42,8 +42,8 @@ function projectPins(){
  for(const {button,monster} of pins.values()){
   const x=Number(monster.x),z=Number(monster.z);
   const point=!mapHost?.classList.contains("map-3d-fallback")?window.__coiWorldMap3D?.projectPoint?.(x,z):null;
-  button.style.left=point?point.left+"px":Math.max(9,Math.min(91,50+x*.9))+"%";
-  button.style.top=point?point.top+"px":Math.max(10,Math.min(90,50-z*.9))+"%";
+  const tactical=point?null:projectTacticalPoint(x,z);
+  if(point||tactical){button.style.left=point?point.left+"px":tactical.left+"%";button.style.top=point?point.top+"px":tactical.top+"%";}
  }
 }
 function clearPins(){for(const {button} of pins.values())button.remove();pins.clear();cards.clear();}
@@ -199,3 +199,5 @@ window.addEventListener("storage",event=>{
  activeRefresh?.abort();clearSnapshot();root.hidden=true;enabled=null;void refresh();
 });
 void refresh();
+
+window.addEventListener("coi:tactical-bounds-changed",projectPins);

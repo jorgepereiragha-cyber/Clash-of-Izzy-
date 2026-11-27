@@ -23,6 +23,8 @@ function fixture() {
  CREATE TABLE world_territories(id INTEGER PRIMARY KEY,territory_key TEXT UNIQUE,name TEXT,terrain TEXT,x REAL,z REAL,owner_kingdom_id INTEGER,level INTEGER,resource_type TEXT,resource_rate INTEGER,territory_kind TEXT,map_region INTEGER,shield_until TEXT);
  CREATE TABLE realm_thrones(realm_id INTEGER PRIMARY KEY,territory_id INTEGER,shield_until TEXT);
  CREATE TABLE research(kingdom_id INTEGER,research_key TEXT,level INTEGER);
+ CREATE TABLE resource_nodes(map_x INTEGER,map_y INTEGER);
+ CREATE TABLE world_monsters(map_region INTEGER,x INTEGER,z INTEGER);
  `);
  let fail=false;
  const DB={
@@ -74,5 +76,48 @@ test("repeated and concurrent foundation never restores spent balances or starte
   assert.notEqual(other,a);
   assert.equal(count(sql,"kingdoms"),2);
   assert.equal(sql.prepare("SELECT COUNT(DISTINCT map_slot) AS n FROM kingdoms").get().n,2);
+ }finally{sql.close()}
+});
+
+test("beta reserves new castles in Eldoria, avoids existing landmarks and keeps old kingdoms intact",async()=>{
+ const {sql,env}=fixture();
+ try{
+  sql.exec("INSERT INTO realm_openings(realm_id) VALUES(2),(3); INSERT INTO resource_nodes VALUES(-50,-50); INSERT INTO world_monsters VALUES(1,-45,-50);");
+  const legacy=await ensureKingdom(env,"legacy");
+  const old=sql.prepare("SELECT map_region,map_slot,map_x,map_z FROM kingdoms WHERE id=?").get(legacy);
+  assert.equal(old.map_region,3);
+  env.ENVIRONMENT="beta";
+  const [a,b]=await Promise.all([ensureKingdom(env,"beta_a"),ensureKingdom(env,"beta_b")]);
+  assert.notEqual(a,b);
+  const positions=[a,b].map(id=>sql.prepare("SELECT map_region,map_slot,map_x,map_z FROM kingdoms WHERE id=?").get(id));
+  for(const p of positions){
+   assert.equal(p.map_region,1);
+   assert.ok(Math.abs(p.map_x+50)>=5||Math.abs(p.map_z+50)>=5);
+   assert.ok(Math.abs(p.map_x+45)>=5||Math.abs(p.map_z+50)>=5);
+  }
+  assert.ok(Math.abs(positions[0].map_x-positions[1].map_x)>=8||Math.abs(positions[0].map_z-positions[1].map_z)>=8);
+  assert.deepEqual(sql.prepare("SELECT map_region,map_slot,map_x,map_z FROM kingdoms WHERE id=?").get(legacy),old);
+  assert.equal(await ensureKingdom(env,"beta_a"),a);
+  for(const id of [a,b]){
+   const k=sql.prepare("SELECT map_x,map_z FROM kingdoms WHERE id=?").get(id);
+   const t=sql.prepare("SELECT x,z,map_region FROM world_territories WHERE territory_key=?").get("kingdom_castle_"+id);
+   assert.deepEqual([t.x,t.z,t.map_region],[k.map_x,k.map_z,1]);
+  }
+ }finally{sql.close()}
+});
+
+test("beta placement skips the imperial throne and its immediate surroundings",async()=>{
+ const {sql,env}=fixture();
+ try{
+  env.ENVIRONMENT="beta";
+  const legacy=await ensureKingdom(env,"legacy_throne_test");
+  // Advance allocation to the center row without filling hundreds of players.
+  sql.prepare("UPDATE kingdoms SET map_slot=209,map_x=-5,map_z=0 WHERE id=?").run(legacy);
+  sql.prepare("UPDATE world_territories SET x=-5,z=0 WHERE owner_kingdom_id=?").run(legacy);
+  const newId=await ensureKingdom(env,"new_throne_test");
+  const p=sql.prepare("SELECT map_slot,map_x,map_z FROM kingdoms WHERE id=?").get(newId);
+  assert.ok(p.map_slot>=212);
+  assert.ok(Math.abs(p.map_x)>=10||Math.abs(p.map_z)>=10);
+  assert.deepEqual([sql.prepare("SELECT map_x FROM kingdoms WHERE id=?").get(legacy).map_x,sql.prepare("SELECT map_z FROM kingdoms WHERE id=?").get(legacy).map_z],[-5,0]);
  }finally{sql.close()}
 });

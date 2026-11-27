@@ -5,7 +5,8 @@ import * as THREE from "three";
 import { readGraphicsChoice } from "./scripts/kingdom-visual-preferences.js";
 import { selectKingdomQualityProfile } from "./scripts/kingdom-quality.js";
 import { marchTimestamp, marchVisualProgress, marchVisualPoint, planMarchFormation, planMarchRepresentatives } from "./scripts/march-visual-path.js";
-import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/world-map-visual-state.js";
+import {worldSceneBounds,worldSceneFrame} from "./world-map-viewport.js";
+import { worldVisualKeys, worldCastleTier, throneVisualState, worldHomePosition } from "./scripts/world-map-visual-state.js";
 
 /*
  * Strategic world map for Clash of Izzy.
@@ -55,6 +56,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   const visualRebuilds = { home:0, features:0, routes:0, marches:0 };
   let activeMarches = [];
   let homeCastleGroup = null;
+  let groundMesh=null,waterMesh=null,loadedBounds=null;
   let projectionButtons = new Map();
   let lastFrameTime = 0;
   let lastFpsCheck = 0;
@@ -214,8 +216,8 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     }
   }
 
-  function createGround() {
-    const geometry = new THREE.PlaneGeometry(112, 92, 56, 46);
+  function updateGround(frame=null) {
+    const geometry = frame?new THREE.PlaneGeometry(frame.width,frame.depth,frame.segmentsX,frame.segmentsZ):new THREE.PlaneGeometry(112,92,56,46);
     const positions = geometry.attributes.position;
     const colors = [];
     const greenA = new THREE.Color(0x658950);
@@ -223,8 +225,8 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     const marsh = new THREE.Color(0x526f50);
     const bank = new THREE.Color(0x9a9370),color=new THREE.Color();
     for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i);
-      const z = -positions.getY(i);
+      const x = positions.getX(i)+(frame?.x||0);
+      const z = -positions.getY(i)+(frame?.z||0);
       const h = terrainHeight(x, z);
       positions.setZ(i, h);
       const blend=worldTerrainBlend(x,z);
@@ -235,12 +237,18 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     geometry.setAttribute("color", new THREE.Float32BufferAttribute(colors, 3));
     geometry.rotateX(-Math.PI / 2);
     geometry.computeVertexNormals();
-    const ground = makeMesh(geometry, shared.terrainGround, terrainRoot, 0, -.25, 0);
-    ground.receiveShadow = true;
+    if(groundMesh){groundMesh.geometry.dispose();groundMesh.geometry=geometry;groundMesh.position.set(frame?.x||0,-.25,frame?.z||0);}
+    else groundMesh=makeMesh(geometry,shared.terrainGround,terrainRoot,frame?.x||0,-.25,frame?.z||0);
+    groundMesh.receiveShadow=true;
+    const waterGeometry=new THREE.PlaneGeometry(frame?frame.width+20:132,frame?frame.depth+20:112);
+    if(waterMesh){waterMesh.geometry.dispose();waterMesh.geometry=waterGeometry;waterMesh.position.set(frame?.x||0,-1.2,frame?.z||0);}
+    else waterMesh=makeMesh(waterGeometry,shared.water,terrainRoot,frame?.x||0,-1.2,frame?.z||0);
+    waterMesh.rotation.x=-Math.PI/2;
+    waterMesh.receiveShadow=false;
+  }
 
-    const water = makeMesh(new THREE.PlaneGeometry(132, 112), shared.water, terrainRoot, 0, -1.2, 0);
-    water.rotation.x = -Math.PI / 2;
-    water.receiveShadow = false;
+  function createGround() {
+    updateGround();
 
     // Two terrain-conforming ribbons instead of a buried fixed-height tube.
     // Road surfaces stay above the water; all march coordinates are unchanged.
@@ -651,15 +659,17 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     const keys = worldVisualKeys(nextState);
     const previous = visualKeys;
     worldState = nextState;
+    const nextBounds=nextState.worldCoordinateSpace==="absolute-v1"?worldSceneBounds(worldHomePosition(nextState),nextState.territories):null;
+    const footprintChanged=JSON.stringify(nextBounds)!==JSON.stringify(loadedBounds);
+    if(footprintChanged){loadedBounds=nextBounds;updateGround(loadedBounds?worldSceneFrame(loadedBounds):null);}
     territoryLookup = new Map(nextState.territories.map(item=>[Number(item.id),item]));
     if (keys.home !== previous?.home) {
       if(homeCastleGroup){
         terrainRoot.remove(homeCastleGroup);
         homeCastleGroup.traverse(node=>{if(node.geometry)node.geometry.dispose();});
       }
-      // Visual-only offset keeps the central Throne clear; D1 castle coordinates stay unchanged.
-      const hasThrone=worldState.territories.some(row=>row.territory_kind==="throne");
-      homeCastleGroup=createCastle(terrainRoot,hasThrone?13:0,hasThrone?-11:0,1.4,"home",Number(worldState.castleSkinId)||0,worldState.castleLevel);
+      const home=worldHomePosition(worldState);
+      homeCastleGroup=createCastle(terrainRoot,home.x,home.z,1.4,"home",Number(worldState.castleSkinId)||0,worldState.castleLevel);
       visualRebuilds.home++;
     }
     if(keys.features!==previous?.features){rebuildTerritories();visualRebuilds.features++;}
@@ -667,7 +677,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     if(keys.marches!==previous?.marches){rebuildMarches();visualRebuilds.marches++;}
     else {updateMarchPositions(Date.now());syncMarchAnimation();}
     visualKeys=keys;
-    draw();
+    if(footprintChanged)resize();else draw();
   }
 
   function resize() {
@@ -676,8 +686,15 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     const height = host.clientHeight;
     const aspect = width / height;
     // The diagonal of the playable area must fit even on portrait screens.
-    const viewWidth = Math.max(140, 94 * aspect);
-    const viewHeight = viewWidth / aspect;
+    const frame=loadedBounds?worldSceneFrame(loadedBounds,aspect):null;
+    const viewWidth=frame?.viewWidth??Math.max(140,94*aspect);
+    const viewHeight=viewWidth/aspect;
+    const centerX=frame?.x??0,centerZ=frame?.z??0,scale=frame?.distanceScale??1;
+    camera.position.set(centerX+58*scale,78*scale,centerZ+62*scale);
+    camera.lookAt(centerX,0,centerZ);
+    camera.far=220*scale+viewWidth;
+    if(!valhallaModeActive&&scene?.fog){scene.fog.near=78*scale;scene.fog.far=155*scale+viewWidth;}
+    else if(scene?.fog&&valhallaModeActive)scene.fog.density=.0025/scale;
     camera.left = -viewWidth / 2;
     camera.right = viewWidth / 2;
     camera.top = viewHeight / 2;
