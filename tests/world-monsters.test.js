@@ -35,3 +35,27 @@ test("monster guide uses authenticated read-only endpoint and safe text renderin
  assert.match(html,/id="worldMonsterPreview" hidden/);
  assert.ok(ignore.split(/\r?\n/).includes("world-monsters.js"));
 });
+
+test("monster pins use isometric coordinates when available and revert to tactical coordinates on failure",async()=>{
+ const ui=await readFile(new URL("../scripts/world-monster-preview.js",import.meta.url),"utf8");
+ const scene=await readFile(new URL("../world-map-3d.js",import.meta.url),"utf8");
+ const html=await readFile(new URL("../world.html",import.meta.url),"utf8");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function projectPins(){"),end=ui.indexOf("function clearPins()",start);
+ assert.ok(start>=0&&end>start);
+ const button={style:{}};
+ const pins=new Map([["1",{button,monster:{x:22,z:-8}}]]);
+ let fallback=false;
+ const window={__coiWorldMap3D:{projectPoint:(x,z)=>({left:x*2,top:z+100})}};
+ const project=runInNewContext(ui.slice(start,end)+"\nprojectPins",{pins,window,mapHost:{classList:{contains:()=>fallback}}});
+ project();
+ assert.equal(button.style.left,"44px");assert.equal(button.style.top,"92px");
+ fallback=true;project();
+ assert.equal(button.style.left,"69.8%");assert.equal(button.style.top,"57.2%");
+ fallback=false;delete window.__coiWorldMap3D;project();
+ assert.equal(button.style.left,"69.8%");
+ assert.match(scene,/function projectMapPoint\(x,z\) \{\s*if \(disposed \|\| contextLost/);
+ assert.match(ui,/coi:world-map-2d-fallback/);
+ assert.match(ui,/button\.setAttribute\("aria-pressed",String\(key===id\)\)/);
+ assert.match(html,/\.world-monster-pin\.selected/);
+});
