@@ -1,6 +1,14 @@
-// Additional explicit release gate. Secrets alone must never enable new real-money checkout.
-// Keep webhook settlement independent, so a temporary sales pause does not strand paid orders.
+// Explicit fail-closed gates for new sales; webhook settlement remains independent.
+export function commercialSalesEnabled(env) {
+  return env?.COMMERCIAL_SALES_ENABLED === "true";
+}
+
+export function manualWhatsappOrdersEnabled(env) {
+  return commercialSalesEnabled(env) && env?.MANUAL_WHATSAPP_ENABLED === "true";
+}
+
 export function mercadoPagoNewCheckoutEnabled(env) {
-  return env?.MP_PAYMENTS_ENABLED === "true" &&
+  return commercialSalesEnabled(env) &&
+    env?.MP_PAYMENTS_ENABLED === "true" &&
     Boolean(env?.MP_ACCESS_TOKEN && env?.MP_WEBHOOK_SECRET);
 }
