@@ -210,6 +210,7 @@ function projectResourceNodes(){
 }
 function nodeMatchesMapFilter(node,filter){
  if(filter==="free")return !node.occupied_by&&!node.reserved_by_rally;
+ if(filter==="ready")return (node.is_mine===true||(!node.occupied_by&&!node.reserved_by_rally))&&collectableNodeAmount(node)>0;
  if(filter==="mine-owned")return node.is_mine===true;
  if(filter==="all"||!filter)return true;
  return node.node_type===filter;
@@ -293,6 +294,7 @@ async function loadRallyState(successMessage){
   nodes=Array.isArray(data.nodes)?data.nodes:[];
   rallies=Array.isArray(data.rallies)?data.rallies:[];
   inAlliance=data.in_alliance===true;
+  if(selectedNodeId&&!filteredNodes().some(node=>node.id===selectedNodeId))selectNode(null);
   renderMapNodes();renderNodeList();renderRallies();
   const selected=nodes.find(node=>node.id===selectedNodeId);
   if(selected||selectedNodeId)selectNode(selected);
