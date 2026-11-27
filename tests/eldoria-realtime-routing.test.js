@@ -47,3 +47,19 @@ test("Worker binds only vetted rooms, protects tickets, and supports old clients
   assert.match(client, /"\?room=" \+ room/);
   assert.ok(ignore.split("\n").some(line => line.trim() === "scripts/eldoria-realtime-routing.js"));
 });
+
+test("committed rally mutations invalidate all beta rooms without leaking state",async()=>{
+ const {notifyCommittedRallyMutation}=await import("../scripts/eldoria-world-notify.js");
+ const calls=[];
+ const env={ENVIRONMENT:"beta",ELDORIA_ROOM:{idFromName:name=>name,get:name=>({fetch:async req=>{calls.push({name,method:req.method,path:new URL(req.url).pathname,body:await req.text()});return new Response(null,{status:204});}})}};
+ const success=new Response("receipt",{status:201});
+ assert.equal(await notifyCommittedRallyMutation(env,"POST",success),success);
+ assert.equal(calls.length,9);
+ assert.ok(calls.every(call=>call.method==="POST"&&call.path==="/world-changed"&&call.body===""));
+ await notifyCommittedRallyMutation(env,"POST",new Response(null,{status:409}));
+ await notifyCommittedRallyMutation(env,"GET",new Response(null,{status:200}));
+ await notifyCommittedRallyMutation({...env,ENVIRONMENT:"production"},"POST",success);
+ assert.equal(calls.length,9);
+ const worker=await readFile(new URL("../worker.js",import.meta.url),"utf8");
+ assert.match(worker,/return await notifyCommittedRallyMutation\(env,request.method,rallyResponse\)/);
+});
