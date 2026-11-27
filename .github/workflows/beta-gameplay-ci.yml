@@ -34,3 +34,5 @@ jobs:
 
       - name: Castle shield activation, concurrency and rollback
         run: node --test tests/castle-shield.test.js
+      - name: Castle PvP eligibility and deterministic combat
+        run: node --test tests/castle-pvp-policy.test.js tests/castle-pvp-simulator.test.js
