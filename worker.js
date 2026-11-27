@@ -2980,7 +2980,7 @@ export default {
       }
       if(url.pathname.startsWith("/api/game/rally/")){
         const rallyPath=url.pathname.slice("/api/game/rally/".length);
-        if(!["world","active","nodes","create","join","occupy","collect","recall"].includes(rallyPath))return json({error:"Rota de guerra não encontrada."},404);
+        if(!["world","active","nodes","create","join","occupy","collect","recall","collect-return"].includes(rallyPath))return json({error:"Rota de guerra não encontrada."},404);
         const isWrite=request.method==="POST";
         if(!isWrite&&request.method!=="GET")return json({error:"Método não permitido."},405);
         const playerLimit=await rateLimitDecision(env,isWrite?"rally-write-player":"rally-read-player",playerId,isWrite?20:120,60);
