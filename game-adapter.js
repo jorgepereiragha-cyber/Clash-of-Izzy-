@@ -214,6 +214,7 @@ export function calculateMarchDuration(baseSeconds, speedBonusPercent = 0) {
 // no client-provided defender state and no persistence in this function.
 // Keep the existing PvE rules unchanged until PvP resolution is transactional.
 export function simulateCastlePvp({ attackerArmy, defenderArmy, attackerBonuses={}, defenderBonuses={} } = {}){
+ if(!Array.isArray(attackerArmy)||!Array.isArray(defenderArmy))throw new Error("Guarnições obrigatórias.");
  const a=canonicalArmy(attackerArmy),d=canonicalArmy(defenderArmy);
  if(!a.length)throw new Error("Exército atacante vazio.");
  const build=(rows,side,bonuses)=>rows.map((row,index)=>{
