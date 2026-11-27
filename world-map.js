@@ -1,6 +1,6 @@
 import { castleCityArtId } from "./scripts/castle-skin-visuals.js";
 import { createEntityArtElement, worldResourceArt } from "./scripts/kingdom-2d-art-atlas.js";
-import { throneVisualState } from "./scripts/world-map-visual-state.js";
+import { throneVisualState, worldHomePosition } from "./scripts/world-map-visual-state.js";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
 import { marchVisualPoint, marchVisualProgress, marchTimestamp, readMarchComposition } from "./scripts/march-visual-path.js";
 import { createWorldRefreshGate } from "./scripts/world-state-refresh.js";
@@ -175,8 +175,7 @@ function resetMapViewport() {
   applyMapViewport();
 }
 export function tacticalHome(){
-  const hasThrone=state?.territories?.some(row=>row.territory_kind==="throne");
-  return {x:hasThrone?13:0,z:hasThrone?-11:0};
+  return worldHomePosition({worldCoordinateSpace:state?.worldCoordinateSpace,homeX:state?.kingdom?.map_x,homeZ:state?.kingdom?.map_z,territories:state?.territories});
 }
 function tacticalMarches(now=Date.now()) {
   if (!$('worldMap').classList.contains('map-3d-fallback')) return;
@@ -196,6 +195,8 @@ function renderMap() {
     territories: state.territories || [],
     marches: state.marches || [],
     kingdomId: state.kingdom?.id || 0,
+    worldCoordinateSpace:state.worldCoordinateSpace,
+    homeX:state.kingdom?.map_x,homeZ:state.kingdom?.map_z,
     castleSkinId: Number(state.kingdom?.equipped_skin_id || 0),
     castleLevel: Number(state.kingdom?.castle_level || 1),
     throneShielded:state.throne?.shielded===true,
