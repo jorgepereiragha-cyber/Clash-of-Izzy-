@@ -1,0 +1,4 @@
+// D1 batch: a stale target must never settle a march or debit casualties.
+export function guardTerritoryAttackSettlement(db,{resolvedAt,resolutionToken,marchId,kingdomId,now,target}){
+  return db.prepare("UPDATE marches SET status='completed',resolved_at=?,resolution_token=? WHERE id=? AND kingdom_id=? AND status='marching' AND arrives_at<=? AND EXISTS(SELECT 1 FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.owner_kingdom_id IS NULL AND t.territory_key=? AND t.level IS ? AND t.territory_kind IS ? AND t.territory_kind NOT IN ('castle','throne') AND substr(t.territory_key,1,13)<>'royal_throne_' AND t.map_region IS ? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1))").bind(resolvedAt,resolutionToken,marchId,kingdomId,now,kingdomId,target.id,target.territory_key,target.level,target.territory_kind,target.map_region);
+}
