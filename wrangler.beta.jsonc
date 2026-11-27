@@ -32,6 +32,7 @@
   }],
   "vars": {
     "ENVIRONMENT": "beta",
+    "BETA_GATHERING_5M_ENABLED": "true",
     "INVITE_ONLY": "true",
     "BETA_LIVE_PAYMENTS_APPROVED": "false",
     "BETA_EMAIL_DELIVERY_APPROVED": "false",
