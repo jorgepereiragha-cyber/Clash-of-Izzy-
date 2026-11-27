@@ -41,6 +41,7 @@ function troopPower(troops){
  return Object.entries(troops).reduce((sum,[type,count])=>sum+UNIT_POWER[type]*count,0);
 }
 function resourceForNode(type){return NODE_RESOURCE[type]||null;}
+function betaFiveMillion(env){return env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true";}
 function nodeRegeneration(node,now){
  const elapsed=Math.max(0,now-Number(node.last_regen||now));
  return Math.min(Number(node.max_resources),Number(node.current_resources)+Math.floor(elapsed*Number(node.regen_rate)/3600));
@@ -72,10 +73,15 @@ async function loadNodes(env,kingdomId){
   "SELECT id,node_type,map_x,map_y,level,current_resources,max_resources,regen_rate,occupied_by,occupation_start,reserved_by_rally,last_regen FROM resource_nodes ORDER BY level DESC,id"
  ).all();
  const now=Math.floor(Date.now()/1000);
- return (rows.results||[]).map(row=>({
-  ...row,current_resources:nodeRegeneration(row,now),
-  resource_type:resourceForNode(row.node_type),is_mine:Number(row.occupied_by||0)===kingdomId
- }));
+ return (rows.results||[]).map(row=>{
+  const available=nodeRegeneration(row,now), capacity=Number(row.max_resources);
+  const accelerated=betaFiveMillion(env)&&capacity>0;
+  const scale=accelerated?5000000/capacity:1;
+  return {...row,current_resources:Math.floor(available*scale),max_resources:accelerated?5000000:capacity,
+   regen_rate:Math.floor(Number(row.regen_rate)*scale),
+   collection_amount:accelerated?(available>=capacity?5000000:0):Math.floor(available*0.5),
+   resource_type:resourceForNode(row.node_type),is_mine:Number(row.occupied_by||0)===kingdomId};
+ });
 }
 async function listRallies(env,kingdomId){
  const membership=await env.DB.prepare("SELECT alliance_id FROM alliance_members WHERE kingdom_id=?").bind(kingdomId).first();
@@ -195,9 +201,11 @@ async function collectResources(env,kingdomId,body){
  if(!node||Number(node.occupied_by)!==kingdomId)return reply({error:"Seu reino não ocupa este nó."},403);
  const resource=resourceForNode(node.node_type);
  if(!resource)return reply({error:"Tipo de recurso inválido."},409);
- const now=Math.floor(Date.now()/1000),available=nodeRegeneration(node,now),amount=Math.floor(available*0.5);
+ const now=Math.floor(Date.now()/1000),available=nodeRegeneration(node,now);
+ const accelerated=betaFiveMillion(env)&&Number(node.max_resources)>0;
+ const amount=accelerated?(available>=Number(node.max_resources)?5000000:0):Math.floor(available*0.5);
  if(amount<1)return reply({error:"O nó ainda não acumulou recursos suficientes."},409);
- const next=available-amount;
+ const next=accelerated?0:available-amount;
  const result=await env.DB.batch([
   env.DB.prepare("UPDATE resource_nodes SET current_resources=?,last_regen=? WHERE id=? AND occupied_by=? AND last_regen=? AND current_resources=?")
    .bind(next,now,nodeId,kingdomId,node.last_regen,node.current_resources),
