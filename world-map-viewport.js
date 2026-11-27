@@ -50,3 +50,20 @@ export function tacticalWorldPoint(x,z,bounds){
  if(!(width>0&&height>0))return null;
  return {left:100*(x-bounds.minX)/width,top:100*(bounds.maxZ-z)/height};
 }
+
+/** Quantized loaded-map footprint: avoids recreating ground for tiny changes. */
+export function worldSceneBounds(home,territories){
+ const b=tacticalWorldBounds(home,territories);
+ return {minX:Math.floor(b.minX/16)*16,maxX:Math.ceil(b.maxX/16)*16,
+  minZ:Math.floor(b.minZ/16)*16,maxZ:Math.ceil(b.maxZ/16)*16};
+}
+export function worldSceneFrame(bounds,aspect=1){
+ const a=Number.isFinite(aspect)&&aspect>0?aspect:1;
+ const width=bounds.maxX-bounds.minX,depth=bounds.maxZ-bounds.minZ;
+ const diagonal=Math.hypot(width,depth);
+ const viewWidth=Math.max(140,diagonal*1.10,94*a,diagonal*.9*a);
+ const distanceScale=Math.max(1,diagonal/140);
+ return {x:(bounds.minX+bounds.maxX)/2,z:(bounds.minZ+bounds.maxZ)/2,
+  width,depth,viewWidth,viewHeight:viewWidth/a,distanceScale,
+  segmentsX:Math.max(1,Math.min(96,Math.ceil(width/2))),segmentsZ:Math.max(1,Math.min(96,Math.ceil(depth/2)))};
+}
