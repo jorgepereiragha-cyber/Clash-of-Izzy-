@@ -39,3 +39,6 @@ jobs:
 
       - name: Monster hunt progression and energy contract
         run: node --test tests/monster-hunt-policy.test.js
+
+      - name: Monster hunt atomic dispatch
+        run: node --test tests/monster-hunt-dispatch.test.js
