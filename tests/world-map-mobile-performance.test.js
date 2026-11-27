@@ -234,3 +234,18 @@ test("resource locator prioritizes available productive nodes before nearer bloc
  assert.deepEqual(nodes.sort(compare).map(node=>node.id),["own","far-free","empty","foreign","reserved"]);
  assert.match(ui,/filteredNodes\(\)\.sort\(compareResourceNodes\)/);
 });
+
+test("collection estimate matches server rounding and disables empty node collection",async()=>{
+ const [ui,server]=await Promise.all([read("rally-ui.js"),read("rally.js")]);
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function collectableNodeAmount(");
+ const end=ui.indexOf("function selectNode(",start);
+ assert.ok(start>=0&&end>start);
+ const estimate=runInNewContext(ui.slice(start,end)+"\ncollectableNodeAmount");
+ for(const [available,expected] of [[0,0],[1,0],[2,1],[3,1],[101,50],[-1,0],[undefined,0],[Infinity,0]]){
+  assert.equal(estimate({current_resources:available}),expected);
+ }
+ assert.match(server,/amount=Math\.floor\(available\*0\.5\)/);
+ assert.match(ui,/addAction\(actions,"Coletar",\(\)=>runNodeAction\("collect",node\),busy\|\|amount<1\)/);
+ assert.match(ui,/Aguardando regeneração para coletar/);
+});
