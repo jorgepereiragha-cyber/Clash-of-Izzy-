@@ -195,7 +195,7 @@ test("resource filters preserve distinct collection states and use shared isomet
  let fallback=false;
  const map={querySelectorAll:()=>[button]},host={classList:{contains:()=>fallback}};
  const window={__coiWorldMap3D:{projectPoint:(x,z)=>({left:x*2,top:z+100})}};
- const project=runInNewContext(ui.slice(a,b)+"\nprojectResourceNodes",{$:id=>id==="mapContent"?map:host,window});
+ const project=runInNewContext(ui.slice(a,b)+"\nprojectResourceNodes",{$:id=>id==="mapContent"?map:host,window,projectTacticalPoint:(x,z)=>({left:50+x*.9,top:50-z*.9})});
  project();assert.equal(button.style.left,"20px");assert.equal(button.style.top,"80px");
  fallback=true;project();assert.equal(button.style.left,"59%");assert.equal(button.style.top,"68%");
  assert.match(ui,/coi:world-map-projection-changed/);
