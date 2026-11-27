@@ -898,6 +898,7 @@ async function gameState(env,playerId){
       "SELECT wt.id,wt.name,wt.terrain,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.x-? ELSE wt.x END AS x,"+
       "CASE WHEN wt.territory_kind='castle' THEN wt.z-? ELSE wt.z END AS z,"+
+      "wt.x AS world_x,wt.z AS world_z,wt.map_region AS world_region,"+
       "wt.territory_key,wt.shield_until,wt.resource_type,wt.resource_rate,wt.owner_kingdom_id,wt.level,wt.alliance_id,"+
       "COALESCE((SELECT a.tag FROM alliances a WHERE a.id=wt.alliance_id),'') AS controlling_alliance_tag,"+
       "CASE WHEN wt.territory_key LIKE 'royal_throne_%' THEN 'throne' ELSE wt.territory_kind END AS territory_kind,"+
@@ -908,7 +909,7 @@ async function gameState(env,playerId){
       "LEFT JOIN players op ON op.id=owner.player_id LEFT JOIN player_nicknames n ON n.player_id=op.id "+
       "WHERE wt.map_region=? AND (wt.territory_kind='resource' OR (wt.territory_kind='castle' AND wt.owner_kingdom_id<>? "+
       "AND wt.x BETWEEN ? AND ? AND wt.z BETWEEN ? AND ?)) ORDER BY wt.territory_kind,wt.id LIMIT 250"
-    ).bind(Number(kingdom.map_x)||0,Number(kingdom.map_z)||0,Number(kingdom.map_region)||1,kingdom.id,
+    ).bind(env.ENVIRONMENT==="beta"?0:(Number(kingdom.map_x)||0),env.ENVIRONMENT==="beta"?0:(Number(kingdom.map_z)||0),Number(kingdom.map_region)||1,kingdom.id,
       (Number(kingdom.map_x)||0)-55,(Number(kingdom.map_x)||0)+55,
       (Number(kingdom.map_z)||0)-45,(Number(kingdom.map_z)||0)+45),
     env.DB.prepare(env.ENVIRONMENT==="beta"?
@@ -1005,7 +1006,7 @@ async function gameState(env,playerId){
     getKingdomProgression(env,kingdom.id)
   ]):null;
   const specialCityBuildings=specialCityEnabled(env)?(await env.DB.prepare("SELECT building_type,grid_x,grid_z,width,height FROM city_special_buildings WHERE kingdom_id=? ORDER BY building_type").bind(kingdom.id).all()).results||[]:[];
-  return {activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,heroSummonOptions:HERO_SUMMON_OPTIONS,trainingOptions:TRAINING_OPTIONS,buildingUpgradeOptions:Object.fromEntries((buildings.results||[]).map(b=>[b.building_type,buildingUpgradeOption(b.building_type,b.level)])),worldGatherFixedAmount:env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true"?5000000:null,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
+  return {worldCoordinateSpace:env.ENVIRONMENT==="beta"?"absolute-v1":"legacy",activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,heroSummonOptions:HERO_SUMMON_OPTIONS,trainingOptions:TRAINING_OPTIONS,buildingUpgradeOptions:Object.fromEntries((buildings.results||[]).map(b=>[b.building_type,buildingUpgradeOption(b.building_type,b.level)])),worldGatherFixedAmount:env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true"?5000000:null,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
     defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,rallyTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
