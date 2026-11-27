@@ -318,3 +318,20 @@ test("world map resets all authenticated panels when the stored session changes"
  current="";listener({key:null});
  assert.equal(reloads,2);assert.equal(invalidations,4);
 });
+test("expedition preview shows authoritative resource yield before occupation",async()=>{
+ const [ui,map]=await Promise.all([read("rally-ui.js"),read("world-map.js")]);
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function collectableNodeAmount("),end=ui.indexOf("function nodeStockMeter(",start);
+ assert.ok(start>=0&&end>start);
+ const preview=runInNewContext(ui.slice(start,end)+"\nnodeHarvestPreview",{NODE_TYPES:{farm:{resource:"Comida"}}});
+ const full={node_type:"farm",collection_amount:5000000,current_resources:5000000,max_resources:5000000};
+ assert.equal(preview(full).amount,5000000);
+ assert.equal(preview(full).resource,"Comida");
+ assert.equal(preview({...full,occupied_by:2}).blocked,true);
+ assert.equal(preview({...full,is_mine:true,occupied_by:1}).blocked,false);
+ assert.equal(preview({...full,reserved_by_rally:"r"}).blocked,true);
+ const regenerating=preview({...full,collection_amount:0,current_resources:1000,collection_ready_at:160,server_time:100});
+ assert.equal(regenerating.amount,0);
+ assert.match(regenerating.readyLabel,/1 min/);
+ assert.match(map,/addStat\(grid,"Coleta estimada",harvest.blocked\?"Indisponível"/);
+});
