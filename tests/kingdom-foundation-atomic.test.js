@@ -105,3 +105,19 @@ test("beta reserves new castles in Eldoria, avoids existing landmarks and keeps 
   }
  }finally{sql.close()}
 });
+
+test("beta placement skips the imperial throne and its immediate surroundings",async()=>{
+ const {sql,env}=fixture();
+ try{
+  env.ENVIRONMENT="beta";
+  const legacy=await ensureKingdom(env,"legacy_throne_test");
+  // Advance allocation to the center row without filling hundreds of players.
+  sql.prepare("UPDATE kingdoms SET map_slot=209,map_x=-5,map_z=0 WHERE id=?").run(legacy);
+  sql.prepare("UPDATE world_territories SET x=-5,z=0 WHERE owner_kingdom_id=?").run(legacy);
+  const newId=await ensureKingdom(env,"new_throne_test");
+  const p=sql.prepare("SELECT map_slot,map_x,map_z FROM kingdoms WHERE id=?").get(newId);
+  assert.ok(p.map_slot>=212);
+  assert.ok(Math.abs(p.map_x)>=10||Math.abs(p.map_z)>=10);
+  assert.deepEqual([sql.prepare("SELECT map_x FROM kingdoms WHERE id=?").get(legacy).map_x,sql.prepare("SELECT map_z FROM kingdoms WHERE id=?").get(legacy).map_z],[-5,0]);
+ }finally{sql.close()}
+});
