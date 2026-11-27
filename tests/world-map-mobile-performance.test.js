@@ -349,7 +349,7 @@ async function castleTestThree(t){
   setScalar(v){this.set(v,v,v);}
  }
  class Object3D{
-  constructor(){this.position=new Vector();this.scale=new Vector();this.scale.setScalar(1);this.children=[];this.userData={};}
+  constructor(){this.position=new Vector();this.scale=new Vector();this.scale.setScalar(1);this.rotation=new Vector();this.children=[];this.userData={};}
   add(child){this.children.push(child);}
   traverse(fn){fn(this);for(const child of this.children)child.traverse(fn);}
   updateMatrix(){this.matrix={position:{...this.position},scale:{...this.scale}};}
@@ -357,6 +357,7 @@ async function castleTestThree(t){
  class Group extends Object3D{}
  class BoxGeometry{constructor(w,h,d){this.height=h;}dispose(){}}
  class ConeGeometry{constructor(r,h,sides){this.height=h;}dispose(){}}
+ class CylinderGeometry{constructor(rt,rb,h,sides){this.height=h;}dispose(){}}
  class MeshStandardMaterial{dispose(){}}
  class Mesh extends Object3D{constructor(geometry,material){super();Object.assign(this,{geometry,material,isMesh:true});}}
  class InstancedMesh extends Mesh{
@@ -378,7 +379,7 @@ async function castleTestThree(t){
    visit(root);this.max={y:max};return this;
   }
  }
- return {Object3D,Group,BoxGeometry,ConeGeometry,MeshStandardMaterial,Mesh,InstancedMesh,Box3};
+ return {Object3D,Group,BoxGeometry,ConeGeometry,CylinderGeometry,MeshStandardMaterial,Mesh,InstancedMesh,Box3};
 }
 test("map citadels gain four distinct silhouettes with bounded batched stonework",async(t)=>{
  const THREE=await castleTestThree(t);
@@ -410,4 +411,35 @@ test("map citadels gain four distinct silhouettes with bounded batched stonework
   }
  }
  for(const m of [...Object.values(materials),skin.wall])m.dispose();
+});
+
+test("world resource landmarks have distinct forms and bounded mesh counts",async(t)=>{
+ const THREE=await castleTestThree(t);
+ const {runInNewContext}=await import("node:vm");
+ const scene=await read("world-map-3d.js");
+ const batchStart=scene.indexOf("function castleStonework("),batchEnd=scene.indexOf("function createCastle(",batchStart);
+ const start=scene.indexOf("function createResourceSite("),end=scene.indexOf("function createTerritoryFeature(",start);
+ assert.ok(batchStart>=0&&batchEnd>batchStart&&start>=0&&end>start);
+ const shared=Object.fromEntries(["wood","food","roof","trunk","stone","stoneLight","leather","iron"].map(k=>[k,new THREE.MeshStandardMaterial()]));
+ const makeMesh=(geometry,material,parent,x,y,z)=>{const m=new THREE.Mesh(geometry,material);m.position.set(x,y,z);parent.add(m);return m;};
+ const create=runInNewContext(scene.slice(batchStart,batchEnd)+scene.slice(start,end)+"\ncreateResourceSite",{THREE,quality:"low",shared,terrainHeight:()=>2,makeMesh,box:(p,w,h,d,m,x,y,z)=>makeMesh(new THREE.BoxGeometry(w,h,d),m,p,x,y,z),cone:(p,r,h,m,x,y,z,n)=>makeMesh(new THREE.ConeGeometry(r,h,n),m,p,x,y,z)});
+ const expected={food:"food",wood:"trunk",stone:"stoneLight",iron:"iron"};
+ const signatures=new Set();
+ for(const [resource,key] of Object.entries(expected)){
+  const parent=new THREE.Group();
+  create(parent,8,9,resource);
+  assert.equal(parent.children.length,1);
+  const group=parent.children[0];
+  assert.equal(group.position.x,8);assert.equal(group.position.z,9);
+  assert.equal(group.userData.coIResourceSite,resource);
+  const meshes=[];group.traverse(n=>{if(n.isMesh)meshes.push(n);});
+  assert.ok(meshes.length>=4&&meshes.length<=8);
+  assert.ok(meshes.some(n=>n.material===shared[key]));
+  signatures.add(meshes.map(n=>Object.keys(shared).find(k=>shared[k]===n.material)).join(","));
+  for(const n of meshes){if(n.isInstancedMesh)n.dispose();n.geometry.dispose();}
+ }
+ assert.equal(signatures.size,4);
+ const unknown=new THREE.Group();create(unknown,0,0,"unknown");assert.equal(unknown.children.length,0);
+ assert.match(scene,/createResourceSite\(parent,x,z,resource\)/);
+ for(const material of Object.values(shared))material.dispose();
 });
