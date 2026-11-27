@@ -4,7 +4,7 @@ import {dispatchMonsterHunt, monsterHuntSettlement} from "./monster-hunt-marches
 import {HUNT_UNIT_DAMAGE} from "./monster-hunt-policy.js";
 import { guardTerritoryAttackSettlement } from "./territory-attack-settlement.js";
 export { EldoriaRoom } from "./eldoria-room.js";
-import { notifyWorldChanged } from "./scripts/eldoria-world-notify.js";
+import { notifyWorldChanged, notifyCommittedRallyMutation } from "./scripts/eldoria-world-notify.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses, combatRulesVersion } from "./game-adapter.js";
 import { hospitalEnabled,HOSPITAL_PER_LEVEL,HOSPITAL_HEAL_MAX,recoverableLosses,hospitalHealCost,hospitalAdmission } from "./hospital-policy.js";
@@ -2991,7 +2991,8 @@ export default {
         }
         const rallyBody=isWrite?await readBody(request,8192):{};
         if(rallyBody.__bodyError)return json({error:"Solicitação de guerra inválida."},rallyBody.__bodyError==="payload_too_large"?413:400);
-        return await handleRally(request,env,playerId,rallyPath,rallyBody);
+        const rallyResponse=await handleRally(request,env,playerId,rallyPath,rallyBody);
+        return await notifyCommittedRallyMutation(env,request.method,rallyResponse);
       }
       if(url.pathname==="/api/game/state"&&request.method==="GET"){
         const state=await gameState(env,playerId);return state?json({state}):json({error:"Reino não encontrado."},404);
