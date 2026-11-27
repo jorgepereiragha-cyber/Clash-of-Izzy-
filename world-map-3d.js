@@ -632,11 +632,14 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     for (const territory of rows) {
       const button = projectionButtons.get(Number(territory.id));
       if (!button) continue;
-      const point = new THREE.Vector3(
-        Number(territory.x) || 0,
-        terrainHeight(Number(territory.x) || 0, Number(territory.z) || 0) + 2.45,
-        Number(territory.z) || 0
-      ).project(camera);
+      const x=Number(territory.x)||0,z=Number(territory.z)||0;
+      const isCastle=territory.territory_kind==="castle";
+      const tier=worldCastleTier(territory.castle_level??territory.level);
+      const own=Number(territory.owner_kingdom_id||0)===Number(worldState.kingdomId||0);
+      // Place the nameplate just above the flag, not over the model.
+      const castleScale=Number(territory.owner_kingdom_id||0)>0&&!own ? .92 : 1.1;
+      const labelHeight=isCastle?(7.05+(tier-1)*.48+(tier>=3?.52:0))*castleScale:2.45;
+      const point = new THREE.Vector3(x,terrainHeight(x,z)+labelHeight,z).project(camera);
       button.style.left = ((point.x * .5 + .5) * width) + "px";
       button.style.top = ((-point.y * .5 + .5) * height) + "px";
     }
@@ -766,6 +769,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
   function dispose() {
     if (disposed) return;
     disposed = true;
+    host.classList.remove("map-3d-ready");
     window.removeEventListener("coi:valhalla-mode", valhallaModeHandler);
     stopMarchAnimation();
     resizeObserver?.disconnect();
@@ -867,6 +871,7 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
         setMonsters(rows){if(!disposed&&!contextLost&&monsterLayer.update(rows))draw();},
         diagnostics: () => ({ rebuilds: {...visualRebuilds} })
       };
+      host.classList.add("map-3d-ready");
       window.dispatchEvent(new CustomEvent("coi:world-map-3d-ready"));
       if (window.__coiWorldMapState) setWorldState(window.__coiWorldMapState);
       if (window.__coiWorldMapButtons) projectionButtons = window.__coiWorldMapButtons;
