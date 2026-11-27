@@ -347,3 +347,15 @@ test("collection receipt reports authoritative resource and own/allied troop ret
  assert.equal(receipt("collect-return",{node_type:"unknown"},{collected:5,returned:2,returned_allies:0}),"Coleta concluída: 5 recursos. 2 tropas próprias retornaram.");
  assert.match(ui,/data=>nodeActionReceipt\(action,node,data\)/);
 });
+
+test("rally and gathering action controls maintain mobile touch targets and visible focus",async()=>{
+ const css=await read("styles/rally.css");
+ const rule=css.match(/\.rally-action\{([^}]+)\}/)?.[1];
+ assert.ok(rule);
+ assert.match(rule,/min-height:44px/);
+ assert.match(rule,/min-width:44px/);
+ assert.match(rule,/font-size:12px/);
+ assert.match(rule,/touch-action:manipulation/);
+ assert.match(css,/\.rally-action:focus-visible\{[^}]*outline:/);
+ assert.match(css,/\.resource-node-yield\{[^}]*font-variant-numeric:tabular-nums/);
+});
