@@ -168,3 +168,24 @@ test("tactical world fits distant castles without collapsing markers at the map 
  assert.equal(tacticalWorldPoint(NaN,0,bounds),null);
  assert.deepEqual(tacticalWorldBounds(null),{minX:-56,maxX:56,minZ:-56,maxZ:56});
 });
+
+test("expanded 3D footprint fits distant castles with a fixed geometry budget",async()=>{
+ const {worldSceneBounds,worldSceneFrame}=await import("../world-map-viewport.js");
+ const home={x:-50,z:350},targets=[{x:45,z:360},{x:0,z:0}];
+ const b=worldSceneBounds(home,targets);
+ for(const p of [home,...targets]){
+  assert.ok(b.minX<p.x&&p.x<b.maxX&&b.minZ<p.z&&p.z<b.maxZ);
+ }
+ assert.deepEqual(worldSceneBounds({...home,z:351},targets),b);
+ for(const aspect of [.6,1,2]){
+  const f=worldSceneFrame(b,aspect);
+  assert.ok(f.viewWidth>=Math.hypot(f.width,f.depth));
+  assert.ok(f.viewHeight>=Math.hypot(f.width,f.depth)*.9);
+  assert.ok(f.segmentsX<=96&&f.segmentsZ<=96);
+  assert.ok(f.distanceScale>1);
+ }
+ const scene=await read("world-map-3d.js");
+ assert.match(scene,/groundMesh\.geometry\.dispose\(\)/);
+ assert.match(scene,/waterMesh\.geometry\.dispose\(\)/);
+ assert.match(scene,/if\(footprintChanged\)\{loadedBounds=nextBounds;updateGround/);
+});
