@@ -128,3 +128,6 @@ production-clock.js
 
 # Server-only castle shield policy.
 castle-shield.js
+
+# Server-only monster preview policy.
+world-monsters.js
