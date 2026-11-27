@@ -21,6 +21,18 @@ function readWorldSession() {
   return { token: "", blocked: !readable };
 }
 let token = readWorldSession().token;
+// The world map, rallies and monster panels share authenticated state. A
+// session replacement must discard all three, including pending formations.
+function worldSessionChanged(event){
+  return (event.key==="coi_game_token"||event.key===null)&&readWorldSession().token!==token;
+}
+window.addEventListener("storage",event=>{
+  if(worldSessionChanged(event)){
+    worldRefreshGate.invalidate();
+    realmRefreshGate.invalidate();
+    window.location.reload();
+  }
+});
 const RESOURCE = {
   food: { icon: "🌾", label: "Comida" },
   wood: { icon: "🪵", label: "Madeira" },
