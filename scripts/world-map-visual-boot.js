@@ -17,6 +17,10 @@ function useFallback(message) {
   show(message);
 }
 
+window.addEventListener("coi:world-map-2d-fallback", () => {
+  useFallback("Mapa em 2D · falha da GPU; os controles continuam ativos. Recarregue para tentar o 3D novamente.");
+});
+
 if (force2D || choice === "2d" || !("WebGLRenderingContext" in window)) {
   useFallback(force2D ? "Mapa em 2D · dispositivo de baixa memória"
     : choice === "2d" ? "Mapa em 2D leve" : "Mapa em 2D · WebGL indisponível");
