@@ -16,7 +16,7 @@ const NODE_TYPES={
  farm:{icon:"🌾",name:"Fazenda",resource:"Comida"},
  quarry:{icon:"🪨",name:"Pedreira",resource:"Pedra"}
 };
-let nodes=[],rallies=[],inAlliance=false,selectedNodeId=null,busy=false,refreshing=null,lastMapNodes="";
+let nodes=[],rallies=[],inAlliance=false,collectReturnEnabled=false,selectedNodeId=null,busy=false,refreshing=null,lastMapNodes="";
 function make(tag,className,text){
  const el=document.createElement(tag);
  if(className)el.className=className;
@@ -118,7 +118,7 @@ async function runNodeAction(action,node){
  if(action==="occupy"&&!troops)return;
  await sendRallyAction(action,{node_id:node.id,...(troops?{troops}:{})},data=>action==="collect"?
   "Coleta concluída: "+fmt(data.collected)+" "+NODE_TYPES[node.node_type].resource.toLocaleLowerCase("pt-BR")+".":
-  action==="recall"?"Tropas retornaram ao reino.":"Nó ocupado com sucesso.");
+  action==="collect-return"?"Coleta concluída: "+fmt(data.collected)+" recursos. Tropas retornaram ao reino.":action==="recall"?"Tropas retornaram ao reino.":"Nó ocupado com sucesso.");
 }
 async function sendRallyAction(action,body,message){
  if(busy||readRallySession().token!==token)return;
@@ -158,6 +158,7 @@ function renderNodeList(){
    const amount=collectableNodeAmount(node);
    card.append(make("p","resource-node-yield",amount>0?"Coleta estimada: "+fmt(amount)+" "+type.resource.toLowerCase():nodeReadyLabel(node)));
    addAction(actions,"Coletar",()=>runNodeAction("collect",node),busy||amount<1);
+   if(collectReturnEnabled)addAction(actions,"Coletar e retornar",()=>runNodeAction("collect-return",node),busy||amount<1||Boolean(node.reserved_by_rally));
    addAction(actions,"Recolher tropas",()=>runNodeAction("recall",node),busy||Boolean(node.reserved_by_rally));
   }else if(node.occupied_by){
    addAction(actions,"Ocupado",()=>selectNode(node),true);
@@ -302,6 +303,7 @@ async function loadRallyState(successMessage){
   nodes=Array.isArray(data.nodes)?data.nodes:[];
   rallies=Array.isArray(data.rallies)?data.rallies:[];
   inAlliance=data.in_alliance===true;
+  collectReturnEnabled=data.collect_return_enabled===true;
   if(selectedNodeId&&!filteredNodes().some(node=>node.id===selectedNodeId))selectNode(null);
   renderMapNodes();renderNodeList();renderRallies();
   const selected=nodes.find(node=>node.id===selectedNodeId);
@@ -309,7 +311,7 @@ async function loadRallyState(successMessage){
   notify(successMessage||nodes.length+" nós de recursos sincronizados.");
  }catch(error){
   if(error.status===401||error.status===403){
-   nodes=[];rallies=[];inAlliance=false;
+   nodes=[];rallies=[];inAlliance=false;collectReturnEnabled=false;
    if(selectedNodeId)selectNode(null);
    renderMapNodes();renderNodeList();renderRallies();
   }
