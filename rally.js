@@ -42,6 +42,9 @@ function troopPower(troops){
 }
 function resourceForNode(type){return NODE_RESOURCE[type]||null;}
 function betaFiveMillion(env){return env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true";}
+// The original seed starts at 80% of physical capacity. In accelerated beta,
+// that seed stock is one full 5M harvest; the remaining raw headroom is not a second harvest.
+function betaHarvestThreshold(node){return Math.max(1,Math.floor(Number(node.max_resources)*0.8));}
 function nodeReadyAt(node,now,required){
  const capacity=Number(node.max_resources),rate=Number(node.regen_rate),stock=Number(node.current_resources);
  if(!Number.isFinite(required)||required>capacity||!Number.isFinite(stock))return null;
@@ -83,11 +86,12 @@ async function loadNodes(env,kingdomId){
  return (rows.results||[]).map(row=>{
   const available=nodeRegeneration(row,now), capacity=Number(row.max_resources);
   const accelerated=betaFiveMillion(env)&&capacity>0;
-  const scale=accelerated?5000000/capacity:1;
-  return {...row,current_resources:accelerated&&available>=capacity?5000000:Math.floor(available*scale),max_resources:accelerated?5000000:capacity,
+  const threshold=accelerated?betaHarvestThreshold(row):capacity;
+  const scale=accelerated?5000000/threshold:1;
+  return {...row,current_resources:accelerated&&available>=threshold?5000000:Math.floor(available*scale),max_resources:accelerated?5000000:capacity,
    regen_rate:Math.floor(Number(row.regen_rate)*scale),
-   collection_amount:accelerated?(available>=capacity?5000000:0):Math.floor(available*0.5),
-   collection_ready_at:nodeReadyAt(row,now,accelerated?capacity:2),server_time:now,
+   collection_amount:accelerated?(available>=threshold?5000000:0):Math.floor(available*0.5),
+   collection_ready_at:nodeReadyAt(row,now,accelerated?threshold:2),server_time:now,
    resource_type:resourceForNode(row.node_type),is_mine:Number(row.occupied_by||0)===kingdomId};
  });
 }
@@ -211,7 +215,7 @@ async function collectResources(env,kingdomId,body){
  if(!resource)return reply({error:"Tipo de recurso inválido."},409);
  const now=Math.floor(Date.now()/1000),available=nodeRegeneration(node,now);
  const accelerated=betaFiveMillion(env)&&Number(node.max_resources)>0;
- const amount=accelerated?(available>=Number(node.max_resources)?5000000:0):Math.floor(available*0.5);
+ const amount=accelerated?(available>=betaHarvestThreshold(node)?5000000:0):Math.floor(available*0.5);
  if(amount<1)return reply({error:"O nó ainda não acumulou recursos suficientes."},409);
  const next=accelerated?0:available-amount;
  const result=await env.DB.batch([
