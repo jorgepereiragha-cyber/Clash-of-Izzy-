@@ -113,12 +113,22 @@ function selectNode(node){
  if(activeCard&&list.firstElementChild!==activeCard)list.prepend(activeCard);
  if(node||previous)setResourceExpedition(node?{label:nodeLabel(node),availability:nodeAvailability(node),harvest:nodeHarvestPreview(node)}:null);
 }
+function nodeActionReceipt(action,node,data){
+ const resource=(Object.hasOwn(NODE_TYPES,node.node_type)?NODE_TYPES[node.node_type].resource:"Recursos").toLocaleLowerCase("pt-BR");
+ if(action==="collect"||action==="collect-return"){
+  const collected="Coleta concluída: "+fmt(data.collected)+" "+resource+".";
+  if(action==="collect")return collected;
+  const returned=Number(data.returned),allies=Number(data.returned_allies);
+  const own=Number.isSafeInteger(returned)&&returned>=0?fmt(returned)+" tropas próprias retornaram.":"Tropas retornaram ao reino.";
+  return collected+" "+own+(Number.isSafeInteger(allies)&&allies>0?" "+fmt(allies)+" tropas aliadas retornaram.":"");
+ }
+ if(action==="recall")return "Tropas retornaram ao reino.";
+ return "Nó ocupado com sucesso.";
+}
 async function runNodeAction(action,node){
  const troops=action==="occupy"?expeditionTroops():undefined;
  if(action==="occupy"&&!troops)return;
- await sendRallyAction(action,{node_id:node.id,...(troops?{troops}:{})},data=>action==="collect"?
-  "Coleta concluída: "+fmt(data.collected)+" "+NODE_TYPES[node.node_type].resource.toLocaleLowerCase("pt-BR")+".":
-  action==="collect-return"?"Coleta concluída: "+fmt(data.collected)+" recursos. Tropas retornaram ao reino.":action==="recall"?"Tropas retornaram ao reino.":"Nó ocupado com sucesso.");
+ await sendRallyAction(action,{node_id:node.id,...(troops?{troops}:{})},data=>nodeActionReceipt(action,node,data));
 }
 async function sendRallyAction(action,body,message){
  if(busy||readRallySession().token!==token)return;
