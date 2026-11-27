@@ -675,9 +675,11 @@ import { worldVisualKeys, worldCastleTier, throneVisualState } from "./scripts/w
     const width = host.clientWidth;
     const height = host.clientHeight;
     const aspect = width / height;
-    const viewHeight = 94;
-    camera.left = -viewHeight * aspect / 2;
-    camera.right = viewHeight * aspect / 2;
+    // The diagonal of the playable area must fit even on portrait screens.
+    const viewWidth = Math.max(140, 94 * aspect);
+    const viewHeight = viewWidth / aspect;
+    camera.left = -viewWidth / 2;
+    camera.right = viewWidth / 2;
     camera.top = viewHeight / 2;
     camera.bottom = -viewHeight / 2;
     camera.updateProjectionMatrix();

@@ -162,7 +162,8 @@ test("collection nodes distinguish own occupancy, foreign occupancy, rally reser
  assert.equal(availability({occupied_by:2}),"Ocupado por outro reino");
  assert.equal(availability({reserved_by_rally:"rally-1"}),"Reservado para rally");
  assert.equal(availability({}),"Livre para ocupação");
- assert.match(source,/pin\.dataset\.nodeId===String\(node\.id\)/);
+ assert.match(source,/pin\.dataset\.nodeId===String\(selectedNodeId\)/);
+ assert.match(source,/pin\.setAttribute\("aria-pressed",String\(selected\)\)/);
  assert.match(source,/button\.style\.borderStyle="dashed"/);
  assert.match(source,/button\.setAttribute\("aria-label",button\.title\)/);
 });
@@ -172,7 +173,8 @@ test("resource filters preserve distinct collection states and use shared isomet
  const {runInNewContext}=await import("node:vm");
  const start=ui.indexOf("function nodeMatchesMapFilter("),end=ui.indexOf("for(const event",start);
  assert.ok(start>=0&&end>start);
- const filter=runInNewContext(ui.slice(start,end)+"\nnodeMatchesMapFilter");
+ const amountStart=ui.indexOf("function collectableNodeAmount("),amountEnd=ui.indexOf("function nodeReadyLabel(",amountStart);
+ const filter=runInNewContext(ui.slice(amountStart,amountEnd)+ui.slice(start,end)+"\nnodeMatchesMapFilter");
  assert.equal(filter({node_type:"farm"},"free"),true);
  assert.equal(filter({node_type:"farm",reserved_by_rally:"r"},"free"),false);
  assert.equal(filter({node_type:"farm",occupied_by:2},"free"),false);
@@ -181,6 +183,13 @@ test("resource filters preserve distinct collection states and use shared isomet
  assert.equal(filter({node_type:"farm"},"forest"),false);
  assert.equal(filter({node_type:"forest"},"forest"),true);
  assert.equal(filter({node_type:"forest"},"all"),true);
+ assert.equal(filter({collection_amount:5000000},"ready"),true);
+ assert.equal(filter({is_mine:true,occupied_by:1,collection_amount:5000000},"ready"),true);
+ assert.equal(filter({occupied_by:2,collection_amount:5000000},"ready"),false);
+ assert.equal(filter({reserved_by_rally:"r",collection_amount:5000000},"ready"),false);
+ assert.equal(filter({collection_amount:0},"ready"),false);
+ assert.match(html,/value="ready">Prontos para coleta/);
+ assert.match(ui,/if\(selectedNodeId&&!filteredNodes\(\)\.some\(node=>node\.id===selectedNodeId\)\)selectNode\(null\)/);
  const a=ui.indexOf("function projectResourceNodes()"),b=ui.indexOf("function nodeMatchesMapFilter(",a);
  const button={dataset:{mapX:"10",mapZ:"-20"},style:{}};
  let fallback=false;
@@ -214,4 +223,72 @@ test("map collection markers and resource HUD reuse the canonical local art",asy
  assert.match(rally,/button\.append\(nodeResourceArt\(node\)\)/);
  assert.match(rally,/resource-node-level/);
  assert.match(css,/min-height:36px;touch-action:manipulation/);
+});
+
+test("resource locator prioritizes available productive nodes before nearer blocked or empty nodes",async()=>{
+ const ui=await read("rally-ui.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function rankResourceNode(");
+ const end=ui.indexOf('$("resourceMapLocate")?.addEventListener',start);
+ assert.ok(start>=0&&end>start);
+ const amountStart=ui.indexOf("function collectableNodeAmount("),amountEnd=ui.indexOf("function selectNode(",amountStart);
+ const compare=runInNewContext(ui.slice(amountStart,amountEnd)+ui.slice(start,end)+"\ncompareResourceNodes");
+ const nodes=[
+  {id:"foreign",map_x:0,map_y:0,occupied_by:2,current_resources:100},
+  {id:"reserved",map_x:1,map_y:0,reserved_by_rally:"r",current_resources:100},
+  {id:"empty",map_x:2,map_y:0,current_resources:0},
+  {id:"far-free",map_x:10,map_y:0,current_resources:100},
+  {id:"own",map_x:5,map_y:0,is_mine:true,occupied_by:1,current_resources:100}
+ ];
+ assert.deepEqual(nodes.sort(compare).map(node=>node.id),["own","far-free","empty","foreign","reserved"]);
+ assert.match(ui,/filteredNodes\(\)\.sort\(compareResourceNodes\)/);
+});
+
+test("collection estimate matches server rounding and disables empty node collection",async()=>{
+ const [ui,server]=await Promise.all([read("rally-ui.js"),read("rally.js")]);
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function collectableNodeAmount(");
+ const end=ui.indexOf("function selectNode(",start);
+ assert.ok(start>=0&&end>start);
+ const estimate=runInNewContext(ui.slice(start,end)+"\ncollectableNodeAmount");
+ for(const [available,expected] of [[0,0],[1,0],[2,1],[3,1],[101,50],[-1,0],[undefined,0],[Infinity,0]]){
+  assert.equal(estimate({current_resources:available}),expected);
+ }
+ assert.equal(estimate({current_resources:4000000,collection_amount:0}),0);
+ assert.equal(estimate({current_resources:5000000,collection_amount:5000000}),5000000);
+ assert.match(server,/available>=betaHarvestThreshold\(node\)\?5000000:0/);
+ assert.match(ui,/addAction\(actions,"Coletar",\(\)=>runNodeAction\("collect",node\),busy\|\|amount<1\)/);
+ assert.match(ui,/Aguardando regeneração para coletar/);
+});
+test("monster search favors living unlocked targets with sufficient hunt energy",async()=>{
+ const ui=await read("scripts/world-monster-preview.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function monsterSearchRank(");
+ const end=ui.indexOf('locate.addEventListener("click"',start);
+ assert.ok(start>=0&&end>start);
+ const rank=runInNewContext(ui.slice(start,end)+"\nmonsterSearchRank");
+ const progress={unlockedLevel:3,energy:5,energyCosts:{1:3,2:5,3:8,4:10}};
+ assert.equal(rank({hp:100,level:1},progress,true),0);
+ assert.equal(rank({hp:100,level:2},progress,true),0);
+ assert.equal(rank({hp:100,level:3},progress,true),1);
+ assert.equal(rank({hp:100,level:4},progress,true),2);
+ assert.equal(rank({hp:0,level:1},progress,true),3);
+ assert.equal(rank({hp:100,level:1},progress,false),2);
+ assert.match(ui,/Energia insuficiente/);
+});
+test("accelerated beta harvest is ready at the initial seeded stock and regenerates after depletion",async()=>{
+ const server=await read("rally.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=server.indexOf("function betaHarvestThreshold(");
+ const end=server.indexOf("async function kingdomForPlayer(",start);
+ assert.ok(start>=0&&end>start);
+ const policy=runInNewContext(server.slice(start,end)+"\n({betaHarvestThreshold,nodeReadyAt,nodeRegeneration})");
+ const node={max_resources:10000,current_resources:8000,regen_rate:400,last_regen:1000};
+ const required=policy.betaHarvestThreshold(node);
+ assert.equal(required,8000);
+ assert.equal(policy.nodeReadyAt(node,1000,required),1000);
+ const depleted={...node,current_resources:0};
+ assert.equal(policy.nodeReadyAt(depleted,1000,required),73000);
+ assert.equal(policy.nodeRegeneration(depleted,72999),7999);
+ assert.equal(policy.nodeRegeneration(depleted,73000),8000);
 });

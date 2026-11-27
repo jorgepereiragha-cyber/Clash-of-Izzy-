@@ -1,5 +1,5 @@
 import {worldResourceArt} from "./scripts/kingdom-2d-art-atlas.js";
-import {focusMarchFormation, getMarchFormation} from "./world-map.js";
+import {clearMarchFormation, focusMapMarker, focusMarchFormation, getMarchFormation, setResourceExpedition} from "./world-map.js";
 const $=id=>document.getElementById(id);
 function readRallySession() {
  let readable=false;
@@ -16,7 +16,7 @@ const NODE_TYPES={
  farm:{icon:"🌾",name:"Fazenda",resource:"Comida"},
  quarry:{icon:"🪨",name:"Pedreira",resource:"Pedra"}
 };
-let nodes=[],rallies=[],inAlliance=false,selectedNodeId=null,busy=false,refreshing=false;
+let nodes=[],rallies=[],inAlliance=false,selectedNodeId=null,busy=false,refreshing=null,lastMapNodes="";
 function make(tag,className,text){
  const el=document.createElement(tag);
  if(className)el.className=className;
@@ -62,19 +62,51 @@ function nodeLabel(node){
  const type=NODE_TYPES[node.node_type]||{icon:"📍",name:"Nó",resource:"recurso"};
  return type.name+" nível "+node.level+" · "+type.resource;
 }
+function collectableNodeAmount(node){
+ const authoritative=node.collection_amount;
+ if(Number.isSafeInteger(authoritative)&&authoritative>=0)return authoritative;
+ const available=Number(node.current_resources);
+ return Number.isFinite(available)?Math.max(0,Math.floor(available*0.5)):0;
+}
+function nodeReadyLabel(node){
+ if(collectableNodeAmount(node)>0)return "Coleta disponível";
+ if(!Number.isFinite(node.collection_ready_at)||!Number.isFinite(node.server_time))return "Aguardando regeneração para coletar";
+ const minutes=Math.max(1,Math.ceil((node.collection_ready_at-node.server_time)/60));
+ const time=minutes>=60?Math.floor(minutes/60)+" h "+(minutes%60)+" min":minutes+" min";
+ return "Aguardando regeneração para coletar · ~"+time;
+}
+function nodeStockMeter(node){
+ const meter=make("progress","resource-node-stock");
+ meter.max=Math.max(1,Number(node.max_resources)||0);
+ meter.value=Math.max(0,Math.min(meter.max,Number(node.current_resources)||0));
+ meter.setAttribute("aria-label","Estoque disponível do ponto de coleta");
+ return meter;
+}
 function selectNode(node){
- selectedNodeId=node.id;
+ const previous=selectedNodeId;
+ selectedNodeId=node?.id??null;
  const title=$("selected-node-title"),details=$("selected-node-details");
- if(title)title.textContent=nodeLabel(node);
+ if(title)title.textContent=node?nodeLabel(node):"Selecione um nó no mapa";
  if(details){
-  details.replaceChildren(
+  details.replaceChildren(...(node?[
    make("span","",node.id),
    make("span","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" recursos"),
    make("span","",nodeAvailability(node)),
+   ...(node.is_mine?[make("span","",collectableNodeAmount(node)>0?"Coleta estimada: "+fmt(collectableNodeAmount(node)):nodeReadyLabel(node))]:[]),
    make("span","",fmt(node.regen_rate)+" recursos/h de regeneração")
-  );
+  ]:[]));
  }
- document.querySelectorAll(".resource-node-pin").forEach(pin=>pin.classList.toggle("selected",pin.dataset.nodeId===String(node.id)));
+ document.querySelectorAll(".resource-node-pin").forEach(pin=>{
+  const selected=pin.dataset.nodeId===String(selectedNodeId);
+  pin.classList.toggle("selected",selected);
+  pin.setAttribute("aria-pressed",String(selected));
+ });
+ document.querySelectorAll(".resource-node-card").forEach(card=>
+  card.classList.toggle("selected",card.dataset.nodeId===String(selectedNodeId)));
+ const list=$("resource-node-list");
+ const activeCard=list?.querySelector(".resource-node-card.selected");
+ if(activeCard&&list.firstElementChild!==activeCard)list.prepend(activeCard);
+ if(node||previous)setResourceExpedition(node?{label:nodeLabel(node),availability:nodeAvailability(node)}:null);
 }
 async function runNodeAction(action,node){
  const troops=action==="occupy"?expeditionTroops():undefined;
@@ -86,50 +118,64 @@ async function runNodeAction(action,node){
 async function sendRallyAction(action,body,message){
  if(busy)return;
  busy=true;
+ renderNodeList();renderRallies();
  try{
   const data=await api(action,{method:"POST",body:JSON.stringify(body)});
+  if(body.troops)clearMarchFormation();
   window.dispatchEvent(new Event("coi:refresh-world"));
+  if(refreshing)await refreshing;
   await refresh(message(data));
  }catch(error){notify(error.message,true);}
  finally{busy=false;renderNodeList();renderRallies();}
 }
 function renderNodeList(){
  const root=$("resource-node-list");if(!root)return;
+ const focused=document.activeElement?.closest(".resource-node-card");
+ const focusedId=focused?.dataset.nodeId;
+ const focusedAction=focused?document.activeElement.textContent:null;
  root.replaceChildren();
  const fragment=document.createDocumentFragment();
- const filter=$("resourceMapFilter")?.value;
- for(const node of nodes){
-  if(!nodeMatchesMapFilter(node,filter))continue;
+ const filtered=filteredNodes();
+ filtered.sort((a,b)=>Number(b.id===selectedNodeId)-Number(a.id===selectedNodeId));
+ if(!filtered.length)fragment.append(make("p","rally-empty","Nenhum nó neste filtro."));
+ for(const node of filtered){
   const type=NODE_TYPES[node.node_type]||NODE_TYPES.mine;
   const card=make("article","resource-node-card"+(node.id===selectedNodeId?" selected":""));
+  card.dataset.nodeId=node.id;
   const head=make("div","resource-node-heading");
   const name=make("strong","resource-node-name");name.append(nodeResourceArt(node),document.createTextNode(type.name+" · "+node.id));
   head.append(name,make("span","", "Nível "+node.level));
   const info=make("p","",fmt(node.current_resources)+" / "+fmt(node.max_resources)+" "+type.resource.toLowerCase());
   const ownership=make("p","resource-node-owner",nodeAvailability(node));
-  card.append(head,info,ownership);
+  card.append(head,info,nodeStockMeter(node),ownership);
   const actions=make("div","resource-node-actions");
   if(node.is_mine){
-   addAction(actions,"Coletar",()=>runNodeAction("collect",node),busy);
+   const amount=collectableNodeAmount(node);
+   card.append(make("p","resource-node-yield",amount>0?"Coleta estimada: "+fmt(amount)+" "+type.resource.toLowerCase():nodeReadyLabel(node)));
+   addAction(actions,"Coletar",()=>runNodeAction("collect",node),busy||amount<1);
    addAction(actions,"Recolher tropas",()=>runNodeAction("recall",node),busy||Boolean(node.reserved_by_rally));
   }else if(node.occupied_by){
    addAction(actions,"Ocupado",()=>selectNode(node),true);
   }else{
    const locked=Boolean(node.reserved_by_rally);
-   addAction(actions,inAlliance?"Criar rally":"Ocupar nó",()=>{
-    if(inAlliance){
+   addAction(actions,"Ocupar nó",()=>runNodeAction("occupy",node),locked||busy);
+   if(inAlliance){
+    addAction(actions,"Criar rally",()=>{
      const troops=expeditionTroops();if(!troops)return;
      sendRallyAction("create",{target_type:"resource_node",target_id:node.id,troops},data=>
       "Rally criado. Reunião por 5 minutos. Poder: "+fmt(data.power)+".");
-    }else runNodeAction("occupy",node);
-   },locked||busy);
+    },locked||busy);
+   }
   }
-  addAction(actions,"Ver no mapa",()=>selectNode(node));
+  addAction(actions,"Ver no mapa",()=>locateNode(node));
   card.append(actions);
   fragment.append(card);
  }
- if(!fragment.childElementCount)fragment.append(make("p","rally-empty","Nenhum ponto de coleta para este filtro."));
  root.append(fragment);
+ if(focusedId){
+  const card=Array.from(root.children).find(item=>item.dataset.nodeId===focusedId);
+  Array.from(card?.querySelectorAll("button")||[]).find(button=>button.textContent===focusedAction)?.focus({preventScroll:true});
+ }
 }
 function renderRallies(){
  const root=$("rally-active-list");if(!root)return;
@@ -164,6 +210,7 @@ function projectResourceNodes(){
 }
 function nodeMatchesMapFilter(node,filter){
  if(filter==="free")return !node.occupied_by&&!node.reserved_by_rally;
+ if(filter==="ready")return (node.is_mine===true||(!node.occupied_by&&!node.reserved_by_rally))&&collectableNodeAmount(node)>0;
  if(filter==="mine-owned")return node.is_mine===true;
  if(filter==="all"||!filter)return true;
  return node.node_type===filter;
@@ -173,15 +220,46 @@ const resourceFilter=$("resourceMapFilter");
 if(resourceFilter){
  const target=new URLSearchParams(window.location.search).get("coleta");
  if(Object.hasOwn(NODE_TYPES,target))resourceFilter.value=target;
- resourceFilter.addEventListener("change",()=>{renderMapNodes();renderNodeList();});
 }
+function filteredNodes(){
+ return nodes.filter(node=>nodeMatchesMapFilter(node,resourceFilter?.value));
+}
+function locateNode(node){
+ selectNode(node);
+ const pin=Array.from($("mapContent").querySelectorAll(".resource-node-pin"))
+  .find(marker=>marker.dataset.nodeId===String(node.id));
+ focusMapMarker(pin);
+}
+resourceFilter?.addEventListener("change",()=>{
+ if(!filteredNodes().some(node=>node.id===selectedNodeId))selectNode(null);
+ renderMapNodes();renderNodeList();
+});
+function rankResourceNode(node){
+ if(!node.is_mine&&(node.occupied_by||node.reserved_by_rally))return 2;
+ return collectableNodeAmount(node)>0?0:1;
+}
+function compareResourceNodes(a,b){
+ return rankResourceNode(a)-rankResourceNode(b)||Math.hypot(a.map_x,a.map_y)-Math.hypot(b.map_x,b.map_y);
+}
+$("resourceMapLocate")?.addEventListener("click",()=>{
+ const candidates=filteredNodes().sort(compareResourceNodes);
+ if(candidates.length)locateNode(candidates[0]);
+});
+window.addEventListener("coi:territory-selected",()=>{if(selectedNodeId)selectNode(null);});
+window.addEventListener("coi:monster-selected",event=>{if(selectedNodeId&&event.detail.monster)selectNode(null);});
 function renderMapNodes(){
  const map=$("mapContent");if(!map)return;
+ const filtered=filteredNodes();
+ $("resourceMapLocate").disabled=!filtered.length;
+ $("resourceMapCount").textContent=filtered.length===1?"1 nó":fmt(filtered.length)+" nós";
+ const snapshot=JSON.stringify(filtered.map(node=>[node.id,node.node_type,node.level,node.map_x,node.map_y,nodeAvailability(node),collectableNodeAmount(node)>0]));
+ if(snapshot===lastMapNodes)return;
+ lastMapNodes=snapshot;
+ const focusedId=document.activeElement?.dataset.nodeId;
  map.querySelectorAll(".resource-node-pin").forEach(pin=>pin.remove());
  const fragment=document.createDocumentFragment();
- for(const node of nodes){
-  if(!nodeMatchesMapFilter(node,$("resourceMapFilter")?.value))continue;
-  const type=NODE_TYPES[node.node_type]||NODE_TYPES.mine;
+ let replacementFocus;
+ for(const node of filtered){
   const button=make("button","resource-node-pin"+(node.occupied_by?" occupied":"")+(node.id===selectedNodeId?" selected":""));
   button.type="button";button.dataset.nodeId=node.id;
   button.dataset.mapX=String(node.map_x);button.dataset.mapZ=String(node.map_y);
@@ -189,26 +267,39 @@ function renderMapNodes(){
   button.append(nodeResourceArt(node));
   button.append(make("small","resource-node-level",String(node.level)));
   if(node.reserved_by_rally&&!node.occupied_by)button.style.borderStyle="dashed";
-  button.title=node.id+" · "+nodeLabel(node)+" · "+nodeAvailability(node);
+  button.title=node.id+" · "+nodeLabel(node)+" · "+nodeAvailability(node)+(collectableNodeAmount(node)<1?" · Aguardando regeneração":"");
   button.setAttribute("aria-label",button.title);
-  button.addEventListener("click",()=>{selectNode(node);$("rally-ui-panel")?.scrollIntoView({behavior:"smooth",block:"nearest"});});
+  button.setAttribute("aria-pressed",String(node.id===selectedNodeId));
+  button.addEventListener("pointerdown",event=>event.stopPropagation());
+  button.addEventListener("click",()=>{
+   selectNode(nodes.find(row=>row.id===node.id));
+   const title=$("selected-node-title");
+   title?.scrollIntoView({block:"nearest"});
+   title?.focus({preventScroll:true});
+  });
+  if(button.dataset.nodeId===focusedId)replacementFocus=button;
   fragment.append(button);
  }
  map.append(fragment);projectResourceNodes();
+ replacementFocus?.focus({preventScroll:true});
 }
-async function refresh(successMessage){
- if(refreshing||!token)return;refreshing=true;
+function refresh(successMessage){
+ if(refreshing||!token)return refreshing;
+ refreshing=loadRallyState(successMessage).finally(()=>{refreshing=null;});
+ return refreshing;
+}
+async function loadRallyState(successMessage){
  try{
-  const [nodeData,rallyData]=await Promise.all([api("nodes"),api("active")]);
-  nodes=Array.isArray(nodeData.nodes)?nodeData.nodes:[];
-  rallies=Array.isArray(rallyData.rallies)?rallyData.rallies:[];
-  inAlliance=rallyData.in_alliance===true;
+  const data=await api("world");
+  nodes=Array.isArray(data.nodes)?data.nodes:[];
+  rallies=Array.isArray(data.rallies)?data.rallies:[];
+  inAlliance=data.in_alliance===true;
+  if(selectedNodeId&&!filteredNodes().some(node=>node.id===selectedNodeId))selectNode(null);
   renderMapNodes();renderNodeList();renderRallies();
   const selected=nodes.find(node=>node.id===selectedNodeId);
-  if(selected)selectNode(selected);
+  if(selected||selectedNodeId)selectNode(selected);
   notify(successMessage||nodes.length+" nós de recursos sincronizados.");
  }catch(error){notify(error.message,true);}
- finally{refreshing=false;}
 }
 function init(){
  if(!token){notify(rallySession.blocked
@@ -216,7 +307,7 @@ function init(){
   :"Entre no seu reino para acessar a guerra.",true);return;}
  $("rallyFormation")?.addEventListener("click",focusMarchFormation);
  refresh();
- window.setInterval(()=>{if(!document.hidden)refresh();},12000);
- document.addEventListener("visibilitychange",()=>{if(!document.hidden)refresh();});
+ window.setInterval(()=>{if(!document.hidden&&!busy)refresh();},12000);
+ document.addEventListener("visibilitychange",()=>{if(!document.hidden&&!busy)refresh();});
 }
 init();

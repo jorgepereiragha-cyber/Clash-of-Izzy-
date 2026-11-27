@@ -271,6 +271,14 @@ const UNITS = {
   ram:{label:"Aríete",food:60,wood:55,iron:18,power:20},
   trebuchet:{label:"Trabuco",food:90,wood:75,iron:30,power:30}
 };
+const TRAINING_FACILITIES=Object.freeze({
+ militia:"barracks",swordsman:"barracks",spearman:"barracks",
+ archer:"archery_range",crossbowman:"archery_range",cavalry:"stable",knight:"stable",
+ mage:"academy",catapult:"siege_workshop",ram:"siege_workshop",trebuchet:"siege_workshop"
+});
+const TRAINING_OPTIONS=Object.fromEntries(Object.entries(UNITS).map(([unit,{food,wood,iron}])=>[
+ unit,{building:TRAINING_FACILITIES[unit],cost:{food,wood,iron}}
+]));
 // Recebedor Pix é configurado só por secret no Cloudflare (não embutir CPF no repo).
 function nubankPixKey(env){
   const key=String(env.NUBANK_PIX_KEY||"").trim().replace(/[.\-\s]/g,"");
@@ -686,7 +694,7 @@ async function processMarches(env,kingdomId,batchSize=50){
    if(m.march_type==="gather"){
     const target=await env.DB.prepare("SELECT resource_type,resource_rate FROM world_territories WHERE id=?").bind(m.target_territory_id).first();
     if(target&&["food","wood","stone","iron"].includes(target.resource_type)){
-     const amount=Math.max(1,Number(target.resource_rate)||90);
+     const amount=env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true"?5000000:Math.max(1,Number(target.resource_rate)||90);
      // Recheck ownership, region and resource inside the same transaction as all credits.
      // A territory captured while troops are travelling must not pay a foreign kingdom.
      const eligible="EXISTS(SELECT 1 FROM world_territories t JOIN kingdoms k ON k.id=? WHERE t.id=? AND t.map_region=COALESCE(NULLIF(k.map_region,0),1) AND (t.owner_kingdom_id IS NULL OR t.owner_kingdom_id=k.id) AND t.territory_kind<>'castle' AND substr(t.territory_key,1,13)<>'royal_throne_' AND t.resource_type=? AND t.resource_rate IS ?)";
@@ -703,7 +711,10 @@ async function processMarches(env,kingdomId,batchSize=50){
     "INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'march_resolved',? WHERE EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)"
   ).bind(kingdomId,JSON.stringify({marchId:m.id,marchType:m.monster_id?"hunt":m.march_type,targetTerritoryId:m.target_territory_id,...(m.monster_id?{monsterId:m.monster_id}:{})}),m.id,kingdomId,resolutionToken));
   const resolution=await env.DB.batch(statements);
-  if(m.march_type==="attack"&&resolution[m.monster_id?2:1]?.meta?.changes>0)await notifyWorldChanged(env);
+  const worldChanged=m.monster_id
+   ? resolution[2]?.meta?.changes>0
+   : m.march_type==="attack"&&resolution[1]?.meta?.changes>0;
+  if(worldChanged)await notifyWorldChanged(env);
  }
 }
 const CASTLE_MATERIALS={
@@ -713,6 +724,13 @@ const CASTLE_MATERIALS={
  imperial_crest:{name:"Brasão de Prestígio",description:"Material raro das evoluções avançadas."},
  svip_medal:{name:"Medalha SVIP",description:"Medalha especial obtida em eventos; não é obrigatória para evoluir o Castelo."}
 };
+function buildingUpgradeOption(key,level){
+ const base=BUILDINGS[key];
+ if(!base||level>=30)return null;
+ const materials=key==="castle"?(level>=25?{imperial_crest:2,power_crystal:2}:level>=20?{imperial_crest:1,power_crystal:2}:level>=15?{power_crystal:2,imperial_seal:1}:level>=10?{imperial_seal:2,royal_blueprint:1}:level>=5?{royal_blueprint:2}:{}):{};
+ const cost=Object.fromEntries(["wood","stone","food","iron"].map(resource=>[resource,Math.ceil(base[resource]*level)]));
+ return {nextLevel:level+1,cost,materials,requiredCastleLevel:key==="castle"?null:level+1};
+}
 function eventMaterialStatement(env,kingdomId,eventKey){
  const rewards={battle:"royal_blueprint",gather:"power_crystal",scout:"svip_medal",upgrade:"imperial_seal",research:"imperial_crest",train:"royal_blueprint"};
  const key=rewards[eventKey];if(!key)return null;
@@ -987,7 +1005,7 @@ async function gameState(env,playerId){
     getKingdomProgression(env,kingdom.id)
   ]):null;
   const specialCityBuildings=specialCityEnabled(env)?(await env.DB.prepare("SELECT building_type,grid_x,grid_z,width,height FROM city_special_buildings WHERE kingdom_id=? ORDER BY building_type").bind(kingdom.id).all()).results||[]:[];
-  return {activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,heroSummonOptions:HERO_SUMMON_OPTIONS,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
+  return {activeCommanderHeroId:activeHeroId||null,activeCommanderHeroKey:activeHeroKey||null,heroSummonOptions:HERO_SUMMON_OPTIONS,trainingOptions:TRAINING_OPTIONS,buildingUpgradeOptions:Object.fromEntries((buildings.results||[]).map(b=>[b.building_type,buildingUpgradeOption(b.building_type,b.level)])),worldGatherFixedAmount:env.ENVIRONMENT==="beta"&&env.BETA_GATHERING_5M_ENABLED==="true"?5000000:null,academyScience:scienceEnabled(env)?scienceView(research.results||[],academyLevel,fresh||{}):null,hospital,specialCityBuildings,specialCityCatalog:specialCityEnabled(env)?SPECIAL_CITY_CATALOG:null,advanced4xEnabled:Boolean(advancedState),intermediateResources:advancedState?.[0]||null,
     cityDefenses:advancedState?.[1]?.results||[],playerProgression:advancedState?.[2]||null,
     defenseCatalog:advancedState?DEFENSE_CATALOG:null,castleVip:getCastleVipState(fresh),equipmentFragments,dragonCollection,mailbox:mailRows.results||[],equipment,heroEquipment,equipmentCatalog,equipmentResearch,equipmentProgression,equipmentBonuses:activeGear,activeCastleSkin,cosmetics,castleSkins:castleSkins.results||[],heroShop,player:{player_id:p.player_id,name:p.name,nickname:p.nickname||null,gems:p.gems},pets:petState.pets,petBonuses:petState.bonuses,petGold:petState.gold,kingdom:fresh,shop,castleMaterials:CASTLE_MATERIALS,recentEvents:recentEvents.results||[],inventoryItems:inventoryItems.results||[],cityLayout:cityLayoutConfig(),buildings:buildings.results||[],troops:troops.results||[],heroes:heroes.results||[],heroInventory:(heroInventory.results||[]).map(heroView),heroSummonOdds:getHeroSummonOdds(),heroSummonHistory:heroHistory.results||[],dragon,research:research.results||[],researchBonuses:{troopDefensePercent:Math.min(30,Math.max(0,Number((research.results||[]).find(x=>x.research_key==="defense")?.level||0)))},combatBonuses:{castlePowerPercent:Math.min(30,Math.max(0,Number(fresh?.castle_level||1))),castleSkinAttackPercent:activeCastleSkin.attackPercent,castleSkinDefensePercent:activeCastleSkin.defensePercent,legendarySetActive:activeGear.legendarySetActive===true},territories:territories.results||[],marches:marches.results||[],battleReports:reports.results||[],alliance:allianceDetails,pendingInvites:pendingInvites.results||[],queues:queues.results||[],totalTroops,fieldTroops,rallyTroops,queuedTraining,armyCount,troopCapacity,marchCapacity:marchLimit,marchSlots:marchQueues};
 }
@@ -1676,11 +1694,10 @@ async function gameAction(env,playerId,body){
     const occupiedBuildSlots=new Set((runningBuilds.results||[]).map(row=>Number(row.queue_slot)||1));
     const queueSlot=!occupiedBuildSlots.has(1)?1:!occupiedBuildSlots.has(2)?2:0;
     if(!queueSlot)return json({error:"As duas filas de construção estão ocupadas."},409);
-    const factor=b.level;
-    const base=BUILDINGS[key];
-    const materialNeeds=key==="castle"?(b.level>=25?{imperial_crest:2,power_crystal:2}:b.level>=20?{imperial_crest:1,power_crystal:2}:b.level>=15?{power_crystal:2,imperial_seal:1}:b.level>=10?{imperial_seal:2,royal_blueprint:1}:b.level>=5?{royal_blueprint:2}:{}):{};
+    const upgradeOption=buildingUpgradeOption(key,b.level);
+    const materialNeeds=upgradeOption.materials;
     for(const [item,quantity] of Object.entries(materialNeeds)){const owned=await env.DB.prepare("SELECT quantity FROM inventory_items WHERE kingdom_id=? AND item_key=?").bind(k.id,item).first();if(!owned||owned.quantity<quantity)return json({error:"Materiais insuficientes: "+CASTLE_MATERIALS[item].name+" ("+quantity+" necessários)."},409);}
-    const cost={wood:Math.ceil(base.wood*factor),stone:Math.ceil(base.stone*factor),food:Math.ceil(base.food*factor),iron:Math.ceil(base.iron*factor)};
+    const cost=upgradeOption.cost;
     const castle=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='castle'").bind(k.id).first();
     if(!castle)return json({error:"Castelo não encontrado."},409);
     const constructionResearch=await env.DB.prepare("SELECT level FROM research WHERE kingdom_id=? AND research_key='construction'").bind(k.id).first();
@@ -1723,7 +1740,7 @@ async function gameAction(env,playerId,body){
   }else if(type==="train"){
     const unit=String(body.unit||"militia"),quantity=Math.max(1,Math.min(100,Math.floor(Number(body.quantity)||10)));
     const spec=Object.hasOwn(UNITS,unit)?UNITS[unit]:null;if(!spec)return json({error:"Tipo de tropa inválido."},400);
-    const requiredBuilding={militia:"barracks",swordsman:"barracks",spearman:"barracks",archer:"archery_range",crossbowman:"archery_range",cavalry:"stable",knight:"stable",mage:"academy",catapult:"siege_workshop",ram:"siege_workshop",trebuchet:"siege_workshop"}[unit];
+    const requiredBuilding=TRAINING_FACILITIES[unit];
     const trainingHall=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type=?").bind(k.id,requiredBuilding).first();
     if(!trainingHall||trainingHall.level<1)return json({error:"Construa o edifício de treinamento exigido."},409);
     const barracks=await env.DB.prepare("SELECT level FROM kingdom_buildings WHERE kingdom_id=? AND building_type='barracks'").bind(k.id).first();
@@ -2963,7 +2980,7 @@ export default {
       }
       if(url.pathname.startsWith("/api/game/rally/")){
         const rallyPath=url.pathname.slice("/api/game/rally/".length);
-        if(!["active","nodes","create","join","occupy","collect","recall"].includes(rallyPath))return json({error:"Rota de guerra não encontrada."},404);
+        if(!["world","active","nodes","create","join","occupy","collect","recall"].includes(rallyPath))return json({error:"Rota de guerra não encontrada."},404);
         const isWrite=request.method==="POST";
         if(!isWrite&&request.method!=="GET")return json({error:"Método não permitido."},405);
         const playerLimit=await rateLimitDecision(env,isWrite?"rally-write-player":"rally-read-player",playerId,isWrite?20:120,60);
