@@ -484,6 +484,20 @@ test("actual beta Worker, D1 schema, invitation, kingdom and payment lock run lo
     assert.equal((await rallyCall("recall",{node_id:rallyNode.id})).data.returned,1);
     const rallyArmyAfter=(await getStateFor(cookie,start.data.token)).troops.find(unit=>unit.unit_type==="militia"&&unit.tier===1).quantity;
     assert.equal(rallyArmyAfter,rallyArmyBefore);
+    // An occupied, ready node may be harvested and released in one transaction.
+    const nextNode=(await rallyCall("world")).data.nodes.find(node=>!node.occupied_by&&!node.reserved_by_rally&&node.collection_amount===5000000&&node.id!==rallyNode.id);
+    assert.ok(nextNode);
+    assert.equal((await rallyCall("occupy",{node_id:nextNode.id,troops:{militia:1}})).status,200);
+    const combined=await Promise.all([rallyCall("collect-return",{node_id:nextNode.id}),rallyCall("collect-return",{node_id:nextNode.id})]);
+    assert.equal(combined.filter(result=>result.status===200).length,1);
+    assert.ok(combined.some(result=>[403,409].includes(result.status)));
+    const receipt=combined.find(result=>result.status===200).data;
+    assert.equal(receipt.collected,5000000);
+    assert.equal(receipt.returned,1);
+    const released=(await rallyCall("world")).data.nodes.find(node=>node.id===nextNode.id);
+    assert.equal(released.collection_amount,0);
+    assert.ok(!released.occupied_by&&!released.reserved_by_rally);
+    assert.equal((await getStateFor(cookie,start.data.token)).troops.find(unit=>unit.unit_type==="militia"&&unit.tier===1).quantity,rallyArmyBefore);
 
     // Two authenticated Chromium WebSockets, one legacy and one sharded, must
     // receive a data-free invalidation from a real committed alliance action.
