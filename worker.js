@@ -1,4 +1,5 @@
 export { EldoriaRoom } from "./eldoria-room.js";
+import { notifyWorldChanged } from "./scripts/eldoria-world-notify.js";
 import { shardForPlayerId, roomNameForShard, parseRealtimeShard } from "./scripts/eldoria-realtime-routing.js";
 import { simulateBattle, calculateMarchDuration, applyUnitLosses, combatRulesVersion } from "./game-adapter.js";
 import { hospitalEnabled,HOSPITAL_PER_LEVEL,HOSPITAL_HEAL_MAX,recoverableLosses,hospitalHealCost,hospitalAdmission } from "./hospital-policy.js";
@@ -669,7 +670,8 @@ async function processMarches(env,kingdomId,batchSize=50){
   statements.push(env.DB.prepare(
     "INSERT INTO action_logs(kingdom_id,player_id,action_type,details_json) SELECT ?,NULL,'march_resolved',? WHERE EXISTS(SELECT 1 FROM marches WHERE id=? AND kingdom_id=? AND status='completed' AND resolution_token=?)"
   ).bind(kingdomId,JSON.stringify({marchId:m.id,marchType:m.march_type,targetTerritoryId:m.target_territory_id}),m.id,kingdomId,resolutionToken));
-  await env.DB.batch(statements);
+  const resolution=await env.DB.batch(statements);
+  if(m.march_type==="attack"&&resolution[1]?.meta?.changes>0)await notifyWorldChanged(env);
  }
 }
 const CASTLE_MATERIALS={
@@ -1890,6 +1892,7 @@ async function gameAction(env,playerId,body){
       env.DB.prepare("UPDATE world_territories SET name=? WHERE territory_key=? AND territory_kind='castle'").bind("Castelo de "+name,"kingdom_castle_"+k.id)
     ]);
   }else{return json({error:"Ação de jogo desconhecida."},400)}
+  if(type==="alliance_claim_territory"||type==="throne_assault")await notifyWorldChanged(env);
   return json({success:true,state:await gameState(env,playerId),...(battleOutcome?{battle:battleOutcome}:{})});
 }
 
