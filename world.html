@@ -47,6 +47,11 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 #world3d{position:absolute;inset:0;width:100%;height:100%;z-index:0;display:block;pointer-events:none}
 .map-content .territory-pin{z-index:3}
 .world-map.map-3d-fallback #world3d{display:none}
+.world-monster-pin{position:absolute;z-index:5;transform:translate(-50%,-50%);min-width:42px;min-height:42px;border:2px solid #dcad72;border-radius:12px;background:#39252bee;color:#fff3da;display:grid;place-items:center;padding:3px 6px;box-shadow:0 3px 8px #0009;touch-action:manipulation;line-height:1}
+.world-monster-pin span{font-size:19px}.world-monster-pin small{font-size:10px;font-weight:800;color:#ffe6ad}
+.world-monster-pin.defeated{opacity:.6;border-style:dashed}.world-monster-pin.selected,.world-monster-pin:focus-visible{outline:3px solid #ffe2a0;outline-offset:2px}
+#worldMonsterList .monster-selected{outline:2px solid #ffe2a0}#worldMonsterList progress{width:100%;accent-color:#b75341}
+
 .world-map.is-dragging .map-content{transition:none}
 .map-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:0 0 10px}
 .map-controls button{min-width:42px;padding:8px 11px}
