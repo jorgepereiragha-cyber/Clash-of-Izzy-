@@ -4,6 +4,7 @@ import { throneVisualState } from "./scripts/world-map-visual-state.js";
 import { clampMapViewport, mapViewportTransform, nextMapZoom } from "./world-map-viewport.js";
 import { readMarchComposition } from "./scripts/march-visual-path.js";
 import { createWorldRefreshGate } from "./scripts/world-state-refresh.js";
+import { startRealtimePresence } from "./scripts/eldoria-realtime-client.js";
 
 const API = "/api";
 const $ = id => document.getElementById(id);
@@ -635,6 +636,13 @@ async function connect() {
   }
 }
 connect();
+let lastRealtimeRefresh=0;
+if(typeof WebSocket==="function")startRealtimePresence({onWorldChanged:()=>{
+  if(document.hidden||busy||!token||Date.now()-lastRealtimeRefresh<5000)return;
+  lastRealtimeRefresh=Date.now();
+  refreshState({background:true}).catch(()=>{/* periodic polling remains available */});
+  updateRealmCards({background:true});
+}});
 window.setInterval(() => {
   if (document.hidden || busy || !token) return;
   refreshState({background:true}).catch(error => setStatus(error.message, true));
