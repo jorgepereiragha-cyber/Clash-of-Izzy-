@@ -127,6 +127,12 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
    </div>
    <p class="map-hint">Arraste para explorar · use + e − para aproximar · tropas em marcha seguem a rota até o território selecionado.</p>
    <div class="legend"><span><i class="dot"></i> Neutro</span><span><i class="dot owned"></i> Seu território</span><span><i class="dot enemy"></i> Outro reino</span></div>
+ <section id="worldMonsterPreview" hidden aria-labelledby="worldMonsterHeading">
+   <h2 id="worldMonsterHeading">Criaturas de Eldoria</h2>
+   <p id="worldMonsterStatus" class="muted" role="status">Consultando criaturas…</p>
+   <div id="worldMonsterList" class="detail-grid"></div>
+   <button id="worldMonsterRefresh" type="button" class="secondary">Atualizar criaturas</button>
+ </section>
  <section aria-labelledby="realmHeading">
   <h2 id="realmHeading">Mundos de Eldoria</h2>
   <div id="realmStatus" role="status" aria-live="polite" class="realm-notice">Consultando desbloqueio dos mapas…</div>
@@ -198,6 +204,7 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
 </script>
 <script type="importmap">{"imports":{"three":"/vendor/three/build/three.module.js","three/addons/":"/vendor/three/examples/jsm/"}}</script>
 <script type="module" src="/world-map.js"></script>
+<script type="module" src="/scripts/world-monster-preview.js"></script>
 <script type="module" src="/scripts/world-map-visual-boot.js"></script>
 <script type="module" src="/rally-ui.js"></script>
 <script src="/valhalla-shop-ui.js" defer></script>
