@@ -144,3 +144,21 @@ test("equipped castle skins keep their art while warming the cache",()=>{
  const controller=new KingdomEntityArtController({manifest});
  for(let id=1;id<=6;id++)assert.equal(controller.getCityPreloadAssets([{building_type:"castle",level:30}],id)[0].src,"/assets/art/buildings/icons.svg#castle-"+id);
 });
+
+
+test("dragon and troop portraits share a complete atlas without duplicate symbols",async()=>{
+ const svg=await readFile(new URL("../assets/art/eldoria/hud.svg",import.meta.url),"utf8");
+ const matches=[...svg.matchAll(/<symbol id="([^"]+)"[^>]*>([\s\S]*?)<\/symbol>/g)];
+ const ids=matches.map(m=>m[1]);
+ assert.equal(ids.length,new Set(ids).size,"duplicate symbol IDs");
+ for(const category of ["dragons","troops","resources"]){
+   const expected=Object.keys(art[category]).map(id=>resolveEntity2DAsset(manifest,category,id).src.split("#")[1]);
+   assert.ok(expected.every(id=>ids.includes(id)),category+" atlas coverage");
+ }
+ for(const [prefix,count] of [["dragon-",9],["troop-",11]]){
+   const group=matches.filter(m=>m[1].startsWith(prefix));
+   assert.equal(group.length,count);
+   assert.equal(new Set(group.map(m=>m[2])).size,count,"identical portrait markup");
+   assert.ok(group.every(m=>m[2].includes("<path")),"missing portrait geometry");
+ }
+});
