@@ -335,3 +335,15 @@ test("expedition preview shows authoritative resource yield before occupation",a
  assert.match(regenerating.readyLabel,/1 min/);
  assert.match(map,/addStat\(grid,"Coleta estimada",harvest.blocked\?"Indisponível"/);
 });
+
+test("collection receipt reports authoritative resource and own/allied troop returns",async()=>{
+ const ui=await read("rally-ui.js");
+ const {runInNewContext}=await import("node:vm");
+ const start=ui.indexOf("function nodeActionReceipt("),end=ui.indexOf("async function runNodeAction(",start);
+ assert.ok(start>=0&&end>start);
+ const receipt=runInNewContext(ui.slice(start,end)+"\nnodeActionReceipt",{NODE_TYPES:{farm:{resource:"Comida"}},fmt:value=>String(Number(value||0))});
+ assert.equal(receipt("collect",{node_type:"farm"},{collected:5000000}),"Coleta concluída: 5000000 comida.");
+ assert.equal(receipt("collect-return",{node_type:"farm"},{collected:5000000,returned:12,returned_allies:3}),"Coleta concluída: 5000000 comida. 12 tropas próprias retornaram. 3 tropas aliadas retornaram.");
+ assert.equal(receipt("collect-return",{node_type:"unknown"},{collected:5,returned:2,returned_allies:0}),"Coleta concluída: 5 recursos. 2 tropas próprias retornaram.");
+ assert.match(ui,/data=>nodeActionReceipt\(action,node,data\)/);
+});
