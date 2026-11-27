@@ -123,6 +123,12 @@ h1{margin:0;font-size:clamp(22px,4vw,32px)}h2{margin:0 0 12px;font-size:18px}
     <button id="mapReset" type="button" class="secondary">Centralizar</button>
     <span id="worldGraphicsStatus" class="map-hint" role="status" aria-live="polite">Carregando qualidade gráfica…</span>
     <a class="secondary" href="/kingdom.html#coiGraphicsPreset">Ajustes de imagem</a>
+    <label for="resourceMapFilter" class="map-hint">Coletas</label>
+    <select id="resourceMapFilter" aria-label="Filtrar pontos de coleta no mapa">
+      <option value="all">Todos</option><option value="free">Livres</option>
+      <option value="mine-owned">Minhas ocupações</option><option value="farm">Comida</option>
+      <option value="forest">Madeira</option><option value="quarry">Pedra</option><option value="mine">Ferro</option>
+    </select>
    </div>
    <div id="worldMap" class="world-map" role="group" aria-label="Mapa estratégico 3D isométrico. Arraste para navegar, use os controles de zoom e toque em um território para selecioná-lo.">
     <span class="map-label north">Norte</span><span class="map-label south">Sul</span>
